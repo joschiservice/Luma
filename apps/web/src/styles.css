@@ -1,0 +1,54 @@
+:root {
+  font-family: Georgia, serif;
+  color: #193e34;
+  background: #f2f0e7;
+  font-synthesis: none;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+main {
+  min-height: 100svh;
+  padding: clamp(24px, 5vw, 72px);
+  display: flex;
+  flex-direction: column;
+}
+.wordmark {
+  margin: 0;
+  font-size: 36px;
+  font-weight: bold;
+  letter-spacing: -2px;
+}
+.wordmark span {
+  color: #c2532f;
+}
+.intro {
+  margin: auto 0;
+  padding: 80px 0;
+}
+.eyebrow,
+footer {
+  font-family: 'Helvetica Neue', sans-serif;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+h1 {
+  font-size: clamp(48px, 8vw, 112px);
+  font-weight: normal;
+  letter-spacing: -0.055em;
+  line-height: 1.02;
+  margin: 24px 0;
+}
+.description {
+  font-family: 'Helvetica Neue', sans-serif;
+  font-size: 18px;
+  line-height: 1.6;
+}
+footer {
+  padding-top: 24px;
+  border-top: 1px solid #bac8be;
+}

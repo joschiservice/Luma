@@ -1,0 +1,21 @@
+{
+  "name": "@luma/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "dev": "tsx watch --env-file-if-exists=.env src/index.ts",
+    "start": "node --env-file-if-exists=.env dist/index.js"
+  },
+  "devDependencies": {
+    "@luma/typescript-config": "workspace:*",
+    "tsx": "^4.20.0"
+  },
+  "dependencies": {
+    "@luma/config": "workspace:*",
+    "fastify": "5.12.5"
+  }
+}
