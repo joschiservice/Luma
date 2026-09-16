@@ -1,7 +1,11 @@
 {
   "extends": "@luma/typescript-config/react.json",
   "compilerOptions": {
-    "types": ["vite/client", "node"]
+    "types": ["vite/client", "node"],
+    "paths": {
+      "@luma/ui/*": ["./src/*"]
+    },
+    "allowImportingTsExtensions": true
   },
-  "include": ["src", ".storybook", "vitest.config.ts"]
+  "include": ["src", ".storybook", "vitest.config.ts", "vite.config.ts"]
 }

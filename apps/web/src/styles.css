@@ -1,7 +1,9 @@
+@import '@luma/ui/styles.css';
+
 :root {
-  font-family: Georgia, serif;
-  color: #193e34;
-  background: #f2f0e7;
+  font-family: var(--font-heading);
+  color: var(--foreground);
+  background: var(--background);
   font-synthesis: none;
 }
 * {
@@ -23,7 +25,7 @@ main {
   letter-spacing: -2px;
 }
 .wordmark span {
-  color: #c2532f;
+  color: var(--brand);
 }
 .intro {
   margin: auto 0;
@@ -31,7 +33,7 @@ main {
 }
 .eyebrow,
 footer {
-  font-family: 'Helvetica Neue', sans-serif;
+  font-family: var(--font-sans);
   font-size: 12px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -44,11 +46,11 @@ h1 {
   margin: 24px 0;
 }
 .description {
-  font-family: 'Helvetica Neue', sans-serif;
+  font-family: var(--font-sans);
   font-size: 18px;
   line-height: 1.6;
 }
 footer {
   padding-top: 24px;
-  border-top: 1px solid #bac8be;
+  border-top: 1px solid var(--border);
 }

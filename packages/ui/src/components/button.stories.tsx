@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, within } from 'storybook/test';
 import { Button } from './button';
+import { Spinner } from './spinner';
 
 const meta = {
   title: 'UI/Button',
@@ -49,7 +50,16 @@ export const Disabled: Story = {
 };
 
 export const Pending: Story = {
-  args: { pending: true },
+  args: {
+    disabled: true,
+    'aria-busy': true,
+    children: (
+      <>
+        <Spinner aria-hidden="true" data-icon="inline-start" />
+        Save changes
+      </>
+    ),
+  },
   play: async ({ canvasElement, args }) => {
     const button = within(canvasElement).getByRole('button', {
       name: 'Save changes',
@@ -60,3 +70,9 @@ export const Pending: Story = {
     await expect(args.onClick).not.toHaveBeenCalled();
   },
 };
+
+export const Outline: Story = { args: { variant: 'outline' } };
+export const Destructive: Story = {
+  args: { variant: 'destructive', children: 'Remove item' },
+};
+export const Dark: Story = { globals: { theme: 'dark' } };
