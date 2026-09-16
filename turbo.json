@@ -19,6 +19,10 @@
       "cache": false,
       "persistent": true,
       "env": ["HOST", "PORT", "LOG_LEVEL", "NODE_ENV"]
+    },
+    "build:storybook": {
+      "dependsOn": ["^build"],
+      "outputs": ["storybook-static/**"]
     }
   }
 }

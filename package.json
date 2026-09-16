@@ -8,13 +8,16 @@
   },
   "scripts": {
     "dev": "turbo run dev",
-    "build": "turbo run build",
+    "build": "turbo run build build:storybook",
     "typecheck": "turbo run typecheck",
     "lint": "eslint . --max-warnings 0",
     "test": "turbo run test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "storybook": "pnpm --filter @luma/ui storybook",
+    "test:ui": "pnpm --filter @luma/ui test",
+    "build:storybook": "turbo run build:storybook"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -27,6 +30,6 @@
     "turbo": "2.10.13",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.0",
-    "vitest": "^4.0.18"
+    "vitest": "4.1.11"
   }
 }

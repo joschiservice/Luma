@@ -10,6 +10,7 @@ nvm use
 corepack enable
 corepack install
 pnpm install --frozen-lockfile
+pnpm --filter @luma/ui exec playwright install chromium
 pnpm dev
 ```
 
@@ -38,6 +39,7 @@ pnpm build
 | ---------------------------- | ------------------------------------------------------------ |
 | `apps/web`                   | TanStack Start + React; minimal server-rendered landing page |
 | `apps/api`                   | Fastify process and service-free `/health` endpoint          |
+| `packages/ui`                | Reusable React components and Storybook component tests      |
 | `packages/config`            | Validated server environment configuration                   |
 | `packages/typescript-config` | Strict shared TypeScript settings for Node and React         |
 
@@ -60,3 +62,19 @@ Branch from `main`: `feature/luma-<id>-<summary>`, `fix/luma-<id>-<summary>`, or
 Link the Linear issue, describe behavior and validation, and keep PRs scoped. Run `pnpm check` before review. Commit `pnpm-lock.yaml` and the generated `apps/web/src/routeTree.gen.ts`; never edit the latter manually. Squash merge after review and passing CI. Once a GitHub remote exists, configure `Quality gates` as a required check on `main` and require review.
 
 Architecture follows the [Linear decision register](https://linear.app/auren-labs/document/architecture-decision-register-305db9bed1de). The web bootstrap follows [TanStack Start's setup guide](https://tanstack.com/start/latest/docs/framework/react/build-from-scratch). Contract-first API work belongs to LUMA-7; authentication and observability have separate follow-ups.
+
+## UI workshop
+
+```sh
+pnpm storybook        # http://localhost:6006
+pnpm test:ui          # stories + interactions + accessibility in headless Chromium
+pnpm build:storybook  # static workshop in packages/ui/storybook-static
+```
+
+`pnpm test` includes component tests; `pnpm build` includes the workshop. Install Chromium once using the setup command above (CI installs it with system dependencies). Storybook uses the React/Vite renderer without the TanStack Start server plugin, so no API, secrets or running application are needed. Only the Vitest and accessibility addons are installed; accessibility violations fail tests.
+
+Reusable components and their `*.stories.tsx` files live together in `packages/ui/src`. Import components in the web app through explicit package exports, for example `import { Button } from '@luma/ui/button'`. This internal package exports React source for Vite to bundle; its build emits type declarations. Components carry their own styles, shared unchanged by the app and workshop.
+
+Use `button.stories.tsx` as the example: default, keyboard, disabled and pending states share the real component. Add named stories for meaningful UI states and `play` assertions for important interactions. Keep fixtures deterministic and pass state through props. Keep data fetching, auth, mutations and business decisions in the application; stories must not reimplement them. Add a local decorator only when a component needs a provider (for example an in-memory TanStack router). Do not wrap every story in the application root.
+
+Automated accessibility checks complement keyboard and manual review; they do not establish full accessibility compliance. The integration follows the [Storybook Vitest guide](https://storybook.js.org/docs/writing-tests/integrations/vitest-addon) and [accessibility test guidance](https://storybook.js.org/docs/writing-tests/accessibility-testing).

@@ -6,3 +6,4 @@ dist/
 .tanstack/
 coverage/
 **/routeTree.gen.ts
+storybook-static/
