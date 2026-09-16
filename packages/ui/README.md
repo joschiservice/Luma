@@ -7,6 +7,7 @@ Owned React source, initialized with shadcn's Base UI registry. `components.json
 - **Button:** primary, outline, ghost and destructive actions; native keyboard behavior.
 - **Input:** text entry with native/Base UI props; consumers supply accessible labels and validation state.
 - **Dialog:** composable trigger, popup, title, description and close controls; Base UI owns focus and dismissal.
+- **Field:** composable labels, descriptions and associated validation errors.
 - **Spinner:** composable loading feedback with reduced-motion support.
 
 Components and stories live together in `src/components`. `src/styles/globals.css` owns Tailwind v4, semantic colors, typography and radii. Warm paper, forest green and terracotta replace the neutral preset. The `.dark` token set uses the same component classes. Apply `.dark` to the document element so portals inherit the theme; each host owns the theme preference.
@@ -43,3 +44,9 @@ pnpm dlx shadcn@latest add <component> --cwd packages/ui
 The web app's `components.json` also routes shared primitives into this package. Review new registry dependencies and source, adapt styling to Luma's tokens, and add stories before use. For upstream updates, inspect `--diff` and merge intentionally; do not overwrite owned styling. Add exports for new utility/hook directories when needed. `cn` is exposed through `lib/utils.ts` for consistent class merging.
 
 `pnpm storybook`, `pnpm test:ui` and `pnpm build:storybook` run the workshop. Stories cover light/dark, disabled/invalid/pending states, keyboard interaction and dialog focus/dismissal. Accessibility failures fail tests, including the portaled open dialog. Theme selection is built into the toolbar without an additional addon. The web package also checks server rendering through public UI imports.
+
+## Validated form example
+
+`Examples/Validated contact form` composes TanStack Form, direct Zod Standard Schema validation, Query mutations and exhaustive `ts-pattern` result handling. The host supplies the save function; story fixtures provide deterministic results. The example lives in `src/examples`, is excluded from the library build, and is not a public component or production contract.
+
+Reuse the small Field primitives, not an application-wide form abstraction. Connect labels with `htmlFor`, errors with `aria-describedby` and invalid inputs with `aria-invalid`. The example focuses the first invalid field, preserves drafts after failures, disables pending submissions and announces results. Browser tests cover normalization, rejected submissions, retry, unknown response validation and accessibility. Add feature forms in their owning app; extract reusable UI only when needed.

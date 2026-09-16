@@ -1,8 +1,18 @@
 import { createRouter } from '@tanstack/react-router';
+import { setupRouterSsrQueryIntegration } from '@tanstack/react-router-ssr-query';
+import { createQueryClient } from './lib/query-client';
 import { routeTree } from './routeTree.gen';
 
 export function getRouter() {
-  return createRouter({ routeTree, scrollRestoration: true });
+  const queryClient = createQueryClient();
+  const router = createRouter({
+    routeTree,
+    context: { queryClient },
+    scrollRestoration: true,
+  });
+  // Installs the provider and handles server dehydration/client hydration.
+  setupRouterSsrQueryIntegration({ router, queryClient });
+  return router;
 }
 
 declare module '@tanstack/react-router' {

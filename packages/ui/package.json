@@ -29,6 +29,8 @@
     "@storybook/addon-vitest": "10.6.0",
     "@storybook/react-vite": "10.6.0",
     "@tailwindcss/vite": "4.3.3",
+    "@tanstack/react-form": "1.33.5",
+    "@tanstack/react-query": "5.103.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitest/browser-playwright": "4.1.11",
@@ -37,8 +39,10 @@
     "react-dom": "^19.2.0",
     "storybook": "10.6.0",
     "tailwindcss": "4.3.3",
+    "ts-pattern": "5.9.0",
     "vite": "8.3.0",
-    "vitest": "4.1.11"
+    "vitest": "4.1.11",
+    "zod": "4.6.5"
   },
   "dependencies": {
     "@base-ui/react": "1.8.0",

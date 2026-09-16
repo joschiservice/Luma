@@ -1,22 +1,25 @@
 import {
-  createRootRoute,
+  createRootRouteWithContext,
   HeadContent,
   Outlet,
   Scripts,
 } from '@tanstack/react-router';
+import type { QueryClient } from '@tanstack/react-query';
 import stylesheet from '../styles.css?url';
 
-export const Route = createRootRoute({
-  head: () => ({
-    meta: [
-      { charSet: 'utf-8' },
-      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'Luma' },
-    ],
-    links: [{ rel: 'stylesheet', href: stylesheet }],
-  }),
-  component: Root,
-});
+export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
+  {
+    head: () => ({
+      meta: [
+        { charSet: 'utf-8' },
+        { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+        { title: 'Luma' },
+      ],
+      links: [{ rel: 'stylesheet', href: stylesheet }],
+    }),
+    component: Root,
+  },
+);
 
 function Root() {
   return (

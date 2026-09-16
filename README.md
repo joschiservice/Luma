@@ -80,3 +80,22 @@ Use `button.stories.tsx` as the example: default, keyboard, disabled and compose
 Automated accessibility checks complement keyboard and manual review; they do not establish full accessibility compliance. The integration follows the [Storybook Vitest guide](https://storybook.js.org/docs/writing-tests/integrations/vitest-addon) and [accessibility test guidance](https://storybook.js.org/docs/writing-tests/accessibility-testing).
 
 See [UI package conventions](packages/ui/README.md) for tokens, Base UI composition, adding components and future Tauri/React consumers.
+
+## Forms and state
+
+| State                                         | Owner                           |
+| --------------------------------------------- | ------------------------------- |
+| Draft values, touched fields and validation   | TanStack Form                   |
+| Server data, requests and mutation results    | TanStack Query                  |
+| Shareable filters, sorting and view selection | TanStack Router search params   |
+| Ephemeral UI state                            | React `useState` / `useReducer` |
+
+Use Zod schemas directly with Standard Schema consumers: Form's `validators` and Router's `validateSearch`. Form validates without applying schema transforms, so parse again on submission to obtain normalized output. Validate unknown responses at the I/O boundary; the server must independently validate requests. Keep schemas beside their feature until sharing has a real consumer.
+
+The web router creates one QueryClient per router/request and uses TanStack's SSR Query integration for hydration and its provider. Never make a server QueryClient a module singleton. Keep query keys, mutation functions and cache invalidation beside their features.
+
+For URL state, define `validateSearch` on the route, read `Route.useSearch()`, and update with `navigate({ search: ... })`. Do not mirror search values into a separate store. `apps/web/src/lib/search-params.test.ts` demonstrates direct Zod validation, defaults and parsed URL values with a memory router.
+
+Use `ts-pattern` with `.exhaustive()` for domain discriminated unions. There is no global state library API or custom form framework. TanStack Form internally depends on TanStack Store; Luma does not depend on it directly or create stores.
+
+`packages/ui/src/examples/contact-form.stories.tsx` demonstrates validated submission with the shared Base UI primitives, a local Query provider and injected fake I/O. It covers invalid, pending, conflict, failure and malformed-response states without adding a product API. Form, Query, Zod and ts-pattern are development dependencies of the workshop and runtime dependencies of the web host; shared primitives stay independent of them.
