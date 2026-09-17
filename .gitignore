@@ -10,3 +10,6 @@ coverage/
 !.env.example
 .DS_Store
 storybook-static/
+
+# Temporary backend E2E fixtures
+apps/api/.e2e-*/

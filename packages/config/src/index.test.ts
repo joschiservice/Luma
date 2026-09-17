@@ -14,7 +14,10 @@ describe('readApiConfig', () => {
       readApiConfig({ HOST: '0.0.0.0', PORT: '8080', LOG_LEVEL: 'warn' }),
     ).toEqual({ host: '0.0.0.0', port: 8080, logLevel: 'warn' });
   });
-  it.each(['', '0', '-1', '65536', '3001x', '1.5', '1e3', ' 3001'])(
+  it('accepts port zero for an operating-system assigned listener', () => {
+    expect(readApiConfig({ PORT: '0' }).port).toBe(0);
+  });
+  it.each(['', '-1', '65536', '3001x', '1.5', '1e3', ' 3001'])(
     'rejects invalid port %j',
     (PORT) => {
       expect(() => readApiConfig({ PORT })).toThrow('PORT');

@@ -34,6 +34,28 @@ pnpm build
 
 `pnpm check` runs all five. `pnpm format` applies formatting. CI runs the same gates after a frozen-lockfile install on Node 24. Typechecking generates the web route tree automatically; shared libraries build before dependent tasks. Tests use Vitest and fail if no tests are found.
 
+## Backend end-to-end tests
+
+`pnpm test:e2e` builds the API and its dependencies, then runs a dedicated Vitest suite with three process-level scenarios:
+
+- Start the compiled API against a freshly migrated database; sign up, create an organization, check tenant access, restart, and sign out over HTTP.
+- Run the migration command on an empty database and rerun it without changes. Reject a modified applied migration and roll back pending changes without losing existing data.
+- Kill an execution worker with `SIGKILL` after its fixture provider commits an effect. Start a fresh worker and verify reconciliation, audit delivery, and no duplicate effect.
+
+Use Node 24 and a disposable PostgreSQL 17 instance. `TEST_DATABASE_URL` must connect as an administrator that can create databases and roles. Each test creates a separate database and restricted runtime login, then removes them during cleanup. The migration role groups remain in the test cluster. External effects use a local, durable fixture ledger; no provider credentials are needed.
+
+```sh
+docker run --rm --detach --name luma-e2e-postgres \
+  -p 127.0.0.1:55432:5432 \
+  -e POSTGRES_PASSWORD=luma_test_only -e POSTGRES_DB=luma_test postgres:17-alpine
+# Wait until this reports that PostgreSQL accepts connections.
+docker exec luma-e2e-postgres pg_isready -U postgres -d luma_test
+TEST_DATABASE_URL=postgresql://postgres:luma_test_only@127.0.0.1:55432/luma_test pnpm test:e2e
+docker stop luma-e2e-postgres
+```
+
+The command fails when `TEST_DATABASE_URL` is missing. CI runs it as a separate required step alongside the existing tests. `pnpm test` and `pnpm check` keep their existing scope; run `pnpm test:e2e` explicitly for these scenarios.
+
 ## Structure
 
 | Path                         | Purpose                                                      |

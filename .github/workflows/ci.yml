@@ -41,4 +41,5 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm --filter @luma/ui exec playwright install --with-deps chromium
       - run: pnpm test
+      - run: pnpm test:e2e
       - run: pnpm build
