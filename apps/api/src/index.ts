@@ -42,7 +42,10 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
 }
 
 try {
-  await app.listen({ host: config.host, port: config.port });
+  const address = await app.listen({ host: config.host, port: config.port });
+  // Supervisors can discover an ephemeral listener without reserving its port.
+  process.send?.({ type: 'listening', address });
+  process.channel?.unref();
 } catch {
   app.log.error('API startup failed');
   await app.close();

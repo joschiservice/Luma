@@ -35,7 +35,14 @@ async function provision(t) {
 
 test('built API supports the identity lifecycle over HTTP and survives restart', async (t) => {
   const db = await provision(t);
-  let api = await startApi(t, db);
+  const [first, second] = await Promise.all([startApi(t, db), startApi(t, db)]);
+  assert.notStrictEqual(first.origin, second.origin);
+  second.process.child.kill('SIGTERM');
+  assert.deepStrictEqual(await second.process.wait(), {
+    code: 0,
+    signal: null,
+  });
+  let api = first;
   assert.deepStrictEqual((await api.request('/health')).body, { status: 'ok' });
   await api.request('/v1/organizations', { status: 401 });
   const alice = await signup(api, 'alice');

@@ -20,8 +20,8 @@ export function readApiConfig(
   env: Readonly<Record<string, string | undefined>>,
 ): ApiConfig {
   const port = env.PORT ?? '3001';
-  if (!/^\d+$/.test(port) || Number(port) < 1 || Number(port) > 65535) {
-    throw new Error('PORT must be an integer between 1 and 65535');
+  if (!/^\d+$/.test(port) || Number(port) < 0 || Number(port) > 65535) {
+    throw new Error('PORT must be an integer between 0 and 65535');
   }
   const host = env.HOST ?? '127.0.0.1';
   if (!host.trim()) throw new Error('HOST must not be empty');

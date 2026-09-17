@@ -1,7 +1,6 @@
 import { assert, vi } from 'vitest';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { Pool } from 'pg';
 
@@ -130,23 +129,25 @@ export async function database(t) {
 }
 
 export async function startApi(t, db) {
-  const listener = createServer();
-  await new Promise((resolve, reject) => {
-    listener.once('error', reject);
-    listener.listen(0, '127.0.0.1', resolve);
-  });
-  const port = listener.address().port;
-  await new Promise((resolve) => listener.close(resolve));
-  const origin = `http://127.0.0.1:${port}`;
-  const process = startProcess(t, 'dist/index.js', {
-    HOST: '127.0.0.1',
-    PORT: String(port),
-    LOG_LEVEL: 'silent',
-    IDENTITY_DATABASE_URL: db.runtimeUrl,
-    BETTER_AUTH_SECRET: secret,
-    BETTER_AUTH_URL: origin,
-    OBSERVABILITY_ENVIRONMENT: 'test',
-  });
+  const browserOrigin = 'http://localhost:3000';
+  const process = startProcess(
+    t,
+    'dist/index.js',
+    {
+      HOST: '127.0.0.1',
+      PORT: '0',
+      LOG_LEVEL: 'silent',
+      IDENTITY_DATABASE_URL: db.runtimeUrl,
+      BETTER_AUTH_SECRET: secret,
+      BETTER_AUTH_URL: browserOrigin,
+      OBSERVABILITY_ENVIRONMENT: 'test',
+    },
+    true,
+  );
+  const { address: origin } = await process.message('listening');
+  const address = new URL(origin);
+  assert.strictEqual(address.hostname, '127.0.0.1');
+  assert.ok(Number(address.port) > 0, 'API must report its assigned port');
   await until(async () => {
     if (process.result) throw new Error(`API exited: ${process.output}`);
     try {
@@ -165,7 +166,7 @@ export async function startApi(t, db) {
       const response = await fetch(`${origin}${path}`, {
         method,
         headers: {
-          origin,
+          origin: browserOrigin,
           ...(cookie ? { cookie } : {}),
           ...(body ? { 'content-type': 'application/json' } : {}),
         },
