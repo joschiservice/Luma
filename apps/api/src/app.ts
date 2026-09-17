@@ -1,3 +1,9 @@
+import { Pool } from 'pg';
+import { createTenantDatabase } from './modules/platform/composition.js';
+import { createPolicies } from './modules/policies/composition.js';
+import { createAuditLog } from './modules/audit/composition.js';
+import { createExecution } from './modules/execution/composition.js';
+import type { EffectRegistry } from './modules/connectors/index.js';
 import { randomUUID } from 'node:crypto';
 import type { Observation, Observability } from './modules/platform/index.js';
 import { apiContract } from '@luma/api-contract';
@@ -233,4 +239,62 @@ declare module 'fastify' {
   interface FastifyRequest {
     observation: Observation | null;
   }
+}
+
+/** Creates the policy and execution services used by workflow activities. */
+export function createSafetyServices(
+  databaseUrl: string,
+  identity: Pick<IdentityService, 'refreshContext'>,
+  registry: EffectRegistry,
+) {
+  const pool = new Pool({
+    connectionString: databaseUrl,
+    max: 10,
+    connectionTimeoutMillis: 5000,
+    statement_timeout: 5000,
+  });
+  const db = createTenantDatabase(pool);
+  const audit = createAuditLog(db);
+  const policies = createPolicies(
+    db,
+    identity.refreshContext,
+    async (evidence) => {
+      const item = evidence.document;
+      await audit.append({
+        id: item.id,
+        tenantId: item.tenantId,
+        eventKey: item.id,
+        eventType: evidence.type,
+        schemaVersion: 1,
+        occurredAt: 'evaluatedAt' in item ? item.evaluatedAt : item.createdAt,
+        actor: {
+          kind: 'user',
+          id: 'actorId' in item ? item.actorId : item.approverId,
+        },
+        correlationId: item.correlationId,
+        proposalId: item.proposalId,
+        actionHash: item.actionHash,
+        policyDecisionId: 'actorId' in item ? item.id : item.decisionId,
+        evidenceRefs: [],
+        details: {
+          outcome: item.outcome,
+          policyVersion: item.policyVersion,
+          ...('reason' in item
+            ? { reason: item.reason }
+            : { requesterId: item.requesterId, expiresAt: item.expiresAt }),
+        },
+      });
+    },
+  );
+  return {
+    policies,
+    execution: createExecution(
+      db,
+      policies,
+      audit,
+      registry,
+      identity.refreshContext,
+    ),
+    close: () => pool.end(),
+  };
 }

@@ -75,6 +75,17 @@ export function createIdentityService(repository: IdentityRepository) {
   }
   return {
     authenticate,
+    async refreshContext(context: TenantContext) {
+      requireTenant(context, context.tenantId);
+      return repository.withUser(context.actor.id, (tx) =>
+        resolve(
+          tx,
+          { userId: context.actor.id, sessionId: context.actor.sessionId },
+          context.tenantId,
+          context.requestId,
+        ),
+      );
+    },
     async listOrganizations(credentials: Credentials) {
       const session = await authenticate(credentials);
       return repository.withUser(session.userId, (tx) =>

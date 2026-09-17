@@ -62,12 +62,24 @@ describe.skipIf(!databaseUrl)(
       const url = new URL(databaseUrl!);
       url.pathname = `/${database}`;
       owner = new Pool({ connectionString: url.toString() });
-      await owner.query(
-        await readFile(
-          new URL('../migrations/0001_identity.sql', import.meta.url),
-          'utf8',
-        ),
-      );
+      const roleSetup = await admin.connect();
+      try {
+        // Roles are cluster-wide even though each suite owns a separate database.
+        await roleSetup.query(
+          "SELECT pg_advisory_lock(hashtext('luma_test_role_setup'))",
+        );
+        await owner.query(
+          await readFile(
+            new URL('../migrations/0001_identity.sql', import.meta.url),
+            'utf8',
+          ),
+        );
+      } finally {
+        await roleSetup.query(
+          "SELECT pg_advisory_unlock(hashtext('luma_test_role_setup'))",
+        );
+        roleSetup.release();
+      }
       await admin.query(
         `CREATE ROLE "${login}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`,
       );

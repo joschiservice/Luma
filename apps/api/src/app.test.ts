@@ -210,6 +210,7 @@ function fixture() {
     posthog,
   });
   const identity: IdentityService = {
+    refreshContext: vi.fn(async (context) => context),
     authenticate: vi.fn(),
     listOrganizations: vi.fn(),
     createOrganization: vi.fn(),
