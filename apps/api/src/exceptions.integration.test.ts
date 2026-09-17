@@ -3,11 +3,25 @@ import { detectionFixtures } from './test-support/detection-fixtures.js';
 import { randomUUID } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { Pool } from 'pg';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 import { createDetectionServices } from './app.js';
 import { makeTenantContext } from './modules/identity/composition.js';
 import { defaultConfiguration } from './modules/exceptions/index.js';
-import type { DetectionRequest, Evidence } from './modules/exceptions/index.js';
+import type {
+  DetectionRequest,
+  Evidence,
+  VerificationEvaluator,
+  VerificationResult,
+  Incident,
+} from './modules/exceptions/index.js';
 import corpus from '../../../docs/fixtures/exceptions-v0.json' with { type: 'json' };
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -18,6 +32,8 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
   let runtime: Pool;
   let services: ReturnType<typeof createDetectionServices>;
   let now = new Date(corpus.now);
+  let runtimeUrl: string;
+  const evaluate = vi.fn<VerificationEvaluator['evaluate']>();
   const tenantId = randomUUID(),
     otherTenant = randomUUID(),
     connectionId = randomUUID();
@@ -101,10 +117,15 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
     url.username = name;
     url.password = password;
     runtime = new Pool({ connectionString: url.toString() });
-    services = createDetectionServices(url.toString(), () => now);
+    runtimeUrl = url.toString();
+    services = createDetectionServices(runtimeUrl, () => now, {
+      version: 'fixture-postcondition-v1',
+      evaluate,
+    });
   });
   beforeEach(async () => {
     now = new Date(corpus.now);
+    evaluate.mockReset();
     await owner.query(
       'TRUNCATE exception_outbox,exception_evaluations,exception_evidence,exceptions,exception_inputs,exception_sources,exception_configurations,exception_uncertainty CASCADE',
     );
@@ -419,67 +440,149 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
       ).size,
     ).toBe(4);
   });
-  it('requires fresh independent passed verification and keeps uncertain effects unresolved', async () => {
-    const first = await services.exceptions.ingest(context(), request());
-    const incident = first.incident!;
-    const proof = {
-      kind: 'verification' as const,
+  function verification(incident: Incident): VerificationResult {
+    return {
       reason: 'Complete authoritative reread proves the postcondition',
-      fingerprint: incident.fingerprint,
-      configVersion: incident.configVersion,
-      evaluatorVersion: 'fixture-postcondition-v1',
-      outcome: 'passed' as const,
+      outcome: 'passed',
       complete: true,
       authoritative: true,
-      evidenceRefs: ['verification-1'],
       evidence: [
         {
           ...request('verification-1').evidence[0]!,
           facts: { scanComplete: true, checkpointAdvanced: true },
         },
       ],
+      bindings: [
+        {
+          evidenceKey: 'verification-1',
+          exceptionClass: incident.exceptionClass,
+          subject: structuredClone(incident.subject),
+          postcondition: 'complete_scan_checkpoint_advanced',
+        },
+      ],
     };
+  }
+  it('rejects caller-authored verified dispositions and fails closed without an evaluator', async () => {
+    const incident = (await services.exceptions.ingest(context(), request()))
+      .incident!;
+    const forged = {
+      ...verification(incident),
+      kind: 'verification',
+      fingerprint: incident.fingerprint,
+      configVersion: incident.configVersion,
+      evaluatorVersion: 'claimed',
+      evidenceRefs: ['verification-1'],
+    };
+    expect(() =>
+      services.exceptions.resolve(
+        context(),
+        incident.id,
+        forged as unknown as Parameters<typeof services.exceptions.resolve>[2],
+      ),
+    ).toThrow();
+    const unconfigured = createDetectionServices(runtimeUrl, () => now);
+    try {
+      await expect(
+        unconfigured.exceptions.verify(context(), incident.id),
+      ).rejects.toThrow('not configured');
+    } finally {
+      await unconfigured.close();
+    }
+    expect(evaluate).not.toHaveBeenCalled();
+    expect((await services.exceptions.list(context()))[0]?.state).toBe(
+      'detected',
+    );
+  });
+  it.each([
+    'class',
+    'subject',
+    'scope',
+    'rule',
+    'postcondition',
+    'connection',
+    'tenant',
+  ] as const)(
+    'rejects evaluator evidence with a different %s',
+    async (field) => {
+      const incident = (await services.exceptions.ingest(context(), request()))
+        .incident!;
+      const proof = verification(incident),
+        binding = proof.bindings[0]!;
+      if (field === 'class') binding.exceptionClass = 'workflow_failure';
+      if (field === 'subject') binding.subject.subjectId = randomUUID();
+      if (field === 'scope') binding.subject.scope = ['orders.read'];
+      if (field === 'rule') binding.subject.ruleIdentity = 'another-rule';
+      if (field === 'postcondition')
+        binding.postcondition = 'equivalent_inventory_agrees';
+      if (field === 'connection')
+        proof.evidence[0]!.connectionId = randomUUID();
+      if (field === 'tenant') proof.evidence[0]!.tenantId = otherTenant;
+      evaluate.mockResolvedValue(proof);
+      await expect(
+        services.exceptions.verify(context(), incident.id),
+      ).rejects.toThrow();
+      expect((await services.exceptions.list(context()))[0]?.state).toBe(
+        'detected',
+      );
+      expect(
+        (
+          await owner.query(
+            "SELECT * FROM exception_outbox WHERE document->>'type'='exception.resolved'",
+          )
+        ).rowCount,
+      ).toBe(0);
+    },
+  );
+  it('rejects verification if detection changes during the authoritative read', async () => {
+    const incident = (await services.exceptions.ingest(context(), request()))
+      .incident!;
+    evaluate.mockImplementation(async () => {
+      await services.exceptions.ingest(context(), request('event-2'));
+      return verification(incident);
+    });
+    await expect(
+      services.exceptions.verify(context(), incident.id),
+    ).rejects.toThrow('changed during verification');
     expect(
-      await services.exceptions.resolve(context(), incident.id, {
-        ...proof,
-        outcome: 'inconclusive',
-      }),
-    ).toBe(false);
-    expect(
-      await services.exceptions.resolve(context(), incident.id, {
-        ...proof,
-        outcome: 'failed',
-      }),
-    ).toBe(false);
-    expect(
-      await services.exceptions.resolve(context(), incident.id, {
-        ...proof,
-        complete: false,
-      }),
-    ).toBe(false);
-    expect(
-      await services.exceptions.resolve(context(), incident.id, {
-        ...proof,
-        authoritative: false,
-      }),
-    ).toBe(false);
-    expect(
-      await services.exceptions.resolve(context(), incident.id, {
-        ...proof,
-        evidenceRefs: ['event-1'],
-        evidence: request().evidence,
-      }),
-    ).toBe(false);
+      (await services.exceptions.list(context()))[0]?.occurrenceCount,
+    ).toBe(2);
+    expect((await services.exceptions.list(context()))[0]?.state).toBe(
+      'detected',
+    );
+  });
+  it('requires fresh independent passed verification and keeps uncertain effects unresolved', async () => {
+    const incident = (await services.exceptions.ingest(context(), request()))
+      .incident!;
+    const proof = verification(incident);
+    for (const change of [
+      { outcome: 'inconclusive' as const },
+      { outcome: 'failed' as const },
+      { complete: false },
+      { authoritative: false },
+    ]) {
+      evaluate.mockResolvedValue({ ...proof, ...change });
+      expect(await services.exceptions.verify(context(), incident.id)).toBe(
+        false,
+      );
+    }
+    evaluate.mockResolvedValue({
+      ...proof,
+      evidence: request().evidence,
+      bindings: [{ ...proof.bindings[0]!, evidenceKey: 'event-1' }],
+    });
+    expect(await services.exceptions.verify(context(), incident.id)).toBe(
+      false,
+    );
     expect((await services.exceptions.list(context()))[0]?.state).toBe(
       'detected',
     );
     now = new Date(now.getTime() + 301_000);
-    expect(
-      await services.exceptions.resolve(context(), incident.id, proof),
-    ).toBe(false);
-    const fresh = {
+    evaluate.mockResolvedValue(proof);
+    expect(await services.exceptions.verify(context(), incident.id)).toBe(
+      false,
+    );
+    evaluate.mockResolvedValue({
       ...proof,
-      evidenceRefs: ['verification-2'],
       evidence: [
         {
           ...proof.evidence[0]!,
@@ -487,19 +590,25 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
           observedAt: now.toISOString(),
         },
       ],
-    };
-    expect(
-      await services.exceptions.resolve(context(), incident.id, fresh),
-    ).toBe(true);
+      bindings: [{ ...proof.bindings[0]!, evidenceKey: 'verification-2' }],
+    });
+    expect(await services.exceptions.verify(context(), incident.id)).toBe(true);
+    expect(evaluate).toHaveBeenLastCalledWith(
+      expect.objectContaining({ tenantId }),
+      expect.objectContaining({ id: incident.id, subject: incident.subject }),
+    );
     const resolved = (await services.exceptions.list(context()))[0]!;
     expect(resolved.state).toBe('resolved');
     expect(resolved.resolution?.kind).toBe('verification');
+    if (resolved.resolution?.kind === 'verification')
+      expect(resolved.resolution.evaluatorVersion).toBe(
+        'fixture-postcondition-v1',
+      );
     expect(resolved.resolution?.auditId).toBeDefined();
-    const recurrence = await services.exceptions.ingest(
-      context(),
-      request('event-2'),
-    );
-    expect(recurrence.incident?.previousExceptionId).toBe(incident.id);
+    expect(
+      (await services.exceptions.ingest(context(), request('event-2'))).incident
+        ?.previousExceptionId,
+    ).toBe(incident.id);
   });
   it('keeps connection scopes independent and rejects evidence outside the declared scope', async () => {
     const first = await services.exceptions.ingest(context(), request());

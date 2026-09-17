@@ -1,5 +1,9 @@
 import { createHash } from 'node:crypto';
-import type { DetectionRequest, Resolution } from '../application/detection.js';
+import type {
+  DetectionRequest,
+  Resolution,
+  HumanDisposition,
+} from '../application/detection.js';
 import { z } from 'zod';
 import { identity } from '../domain/evaluate.js';
 import type { ExceptionClass, EvaluationInput } from '../domain/facts.js';
@@ -170,6 +174,13 @@ export const evidenceSchema = z
   })
   .strict();
 
+const humanDispositionSchema = z
+  .object({
+    kind: z.literal('human_disposition'),
+    reason: ref,
+    evidenceRefs: z.array(ref).min(1),
+  })
+  .strict();
 export const resolutionSchema = z.discriminatedUnion('kind', [
   z
     .object({
@@ -190,6 +201,36 @@ export const resolutionSchema = z.discriminatedUnion('kind', [
       complete: z.boolean(),
       authoritative: z.boolean(),
       evidence: z.array(evidenceSchema).min(1),
+      incidentVersion: z.number().int().positive(),
+      bindings: z
+        .array(
+          z
+            .object({
+              evidenceKey: ref,
+              exceptionClass: z.enum([
+                'sync_failure',
+                'stuck_fulfillment',
+                'inventory_mismatch',
+                'workflow_failure',
+              ]),
+              subject: z
+                .object({
+                  ruleIdentity: ref,
+                  subjectKind: ref,
+                  subjectId: z.string().uuid(),
+                  scope: z.array(ref),
+                })
+                .strict(),
+              postcondition: z.enum([
+                'complete_scan_checkpoint_advanced',
+                'fulfillment_disposition_verified',
+                'equivalent_inventory_agrees',
+                'workflow_business_postcondition_verified',
+              ]),
+            })
+            .strict(),
+        )
+        .min(1),
     })
     .strict(),
 ]);
@@ -218,5 +259,6 @@ export const detectionBoundary = {
   },
   hash: (value: string) => createHash('sha256').update(value).digest('hex'),
   id: (value: string) => z.string().uuid().parse(value),
+  disposition: (value: HumanDisposition) => humanDispositionSchema.parse(value),
   resolution: (value: Resolution) => resolutionSchema.parse(value),
 };

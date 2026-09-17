@@ -1,6 +1,6 @@
 # Exception detection
 
-`createDetectionServices(databaseUrl, now?)` in `apps/api/src/app.ts` composes the exception repository and ingestion pipeline. Use the injected clock for reproducible replay. Call `close()` when the worker stops.
+`createDetectionServices(databaseUrl, now?, verifier?)` in `apps/api/src/app.ts` composes the exception repository and ingestion pipeline. Use the injected clock for reproducible replay. Call `close()` when the worker stops.
 
 The pipeline evaluates the four [V0 taxonomy](exception-taxonomy.md) classes: sync failure, stuck fulfillment, inventory mismatch and workflow failure. It records every accepted evaluation with its rule version, configuration version, decision, evidence references and delivery correlation ID. Inventory evaluations also retain the exact signed difference, left minus right.
 
@@ -31,12 +31,15 @@ State changes and append-only audit events commit together in `exception_outbox`
 
 ## Resolution
 
-`exceptions.resolve` accepts an owner/admin context and either:
+`exceptions.resolve` accepts an owner/admin context, an explicit human disposition, a reason and existing tenant evidence references. The record identifies the actor and is not counted as autonomous verified success. Caller-supplied verification results are rejected.
 
-- `human_disposition`: an explicit reason and existing tenant evidence references. The record identifies the actor and is not counted as autonomous verified success.
-- `verification`: a trusted evaluator's postcondition result, fingerprint, configuration version and fresh independent evidence. Passed, complete, authoritative evidence must be observed at or after the latest detection and within the configured freshness window. The service records failed, partial, stale or inconclusive verification without resolving the incident. Return value `true` means resolved; `false` means verification was insufficient.
+`exceptions.verify(context, incidentId)` requests verification from the `VerificationEvaluator` installed by the composition root. It fails closed when no evaluator is configured. The evaluator receives the tenant context and persisted incident, reads authoritative state, and checks the business postcondition. Neither evidence nor success flags come from the verification request.
 
-The evaluator owns the business postcondition check, such as a complete successful scan advancing its checkpoint or two equivalent stock pools agreeing. Do not submit an accepted write receipt as verification. The resolution and audit reference persist atomically. There is no repair or redispatch operation in detection.
+Each evaluator evidence item must bind to the incident's class, canonical subject, rule identity and ordered scope. Its connection must match that scope. The required postconditions are `complete_scan_checkpoint_advanced`, `fulfillment_disposition_verified`, `equivalent_inventory_agrees` and `workflow_business_postcondition_verified`, respectively. The evaluator must establish these findings from source data; an accepted write receipt is insufficient.
+
+Passed, complete, authoritative evidence must be independent of detection evidence, observed at or after the latest detection and within the configured freshness window. Failed, partial, stale or inconclusive results leave the incident open and return `false`. Mismatched evidence is rejected. A version check under the tenant lock rejects results if the incident changed while the evaluator was reading; external reads run outside the transaction.
+
+Successful verification returns `true` and atomically persists resolution, evaluator version, evidence bindings and an audit reference. There is no repair or redispatch operation in detection.
 
 ## Validation
 

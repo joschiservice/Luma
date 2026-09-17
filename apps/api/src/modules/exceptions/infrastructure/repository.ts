@@ -1,3 +1,4 @@
+import { verificationPostconditions } from '../application/detection.js';
 import { randomUUID } from 'node:crypto';
 import type { SqlTransaction, TenantDatabase } from '../../platform/index.js';
 import { decimalString, decimalUnits } from '../domain/facts.js';
@@ -233,6 +234,15 @@ export function createDetectionRepository(
         );
         return { decision, incident, reviewRequired };
       }),
+    get: (tenantId, incidentId) =>
+      db.transaction(tenantId, async (tx) => {
+        const result = await tx.query<{ document: Incident; version: number }>(
+          'SELECT document,version FROM exceptions WHERE tenant_id=$1 AND id=$2',
+          [tenantId, incidentId],
+        );
+        const row = result.rows[0];
+        return row ? { incident: row.document, version: row.version } : null;
+      }),
     list: (tenantId) =>
       db.transaction(tenantId, async (tx) =>
         (
@@ -257,8 +267,8 @@ export function createDetectionRepository(
     resolve: (tenantId, incidentId, disposition, actorId, now) =>
       db.transaction(tenantId, async (tx) => {
         await lock(tx, tenantId);
-        const found = await tx.query<{ document: Incident }>(
-          'SELECT document FROM exceptions WHERE tenant_id=$1 AND id=$2',
+        const found = await tx.query<{ document: Incident; version: number }>(
+          'SELECT document,version FROM exceptions WHERE tenant_id=$1 AND id=$2',
           [tenantId, incidentId],
         );
         const incident = found.rows[0]?.document;
@@ -266,6 +276,46 @@ export function createDetectionRepository(
         if (incident.state === 'resolved')
           throw new Error('Exception already resolved');
         if (disposition.kind === 'verification') {
+          if (found.rows[0]!.version !== disposition.incidentVersion)
+            throw new Error('Incident changed during verification');
+          const subject = incident.subject;
+          const bindings = new Map(
+            disposition.bindings.map((binding) => [
+              binding.evidenceKey,
+              binding,
+            ]),
+          );
+          if (
+            bindings.size !== disposition.bindings.length ||
+            bindings.size !== disposition.evidence.length ||
+            disposition.evidence.some((e) => {
+              const binding = bindings.get(e.key);
+              const connectionMatches =
+                incident.exceptionClass === 'sync_failure'
+                  ? e.connectionId === subject.subjectId
+                  : incident.exceptionClass === 'stuck_fulfillment'
+                    ? e.connectionId === subject.scope[0]
+                    : incident.exceptionClass === 'inventory_mismatch'
+                      ? e.connectionId !== null &&
+                        subject.scope.slice(1).includes(e.connectionId)
+                      : e.connectionId === null;
+              return (
+                !binding ||
+                binding.exceptionClass !== incident.exceptionClass ||
+                binding.subject.ruleIdentity !== subject.ruleIdentity ||
+                binding.subject.subjectKind !== subject.subjectKind ||
+                binding.subject.subjectId !== subject.subjectId ||
+                JSON.stringify(binding.subject.scope) !==
+                  JSON.stringify(subject.scope) ||
+                binding.postcondition !==
+                  verificationPostconditions[incident.exceptionClass] ||
+                !connectionMatches
+              );
+            })
+          )
+            throw new Error(
+              'Verification evidence is not bound to the incident postcondition',
+            );
           if (
             disposition.fingerprint !== incident.fingerprint ||
             disposition.configVersion !== incident.configVersion

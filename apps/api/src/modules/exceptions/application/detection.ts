@@ -40,6 +40,32 @@ export interface VerifiedDisposition {
   complete: boolean;
   authoritative: boolean;
   evidence: Evidence[];
+  bindings: VerificationBinding[];
+  incidentVersion: number;
+}
+export const verificationPostconditions = {
+  sync_failure: 'complete_scan_checkpoint_advanced',
+  stuck_fulfillment: 'fulfillment_disposition_verified',
+  inventory_mismatch: 'equivalent_inventory_agrees',
+  workflow_failure: 'workflow_business_postcondition_verified',
+} as const;
+export interface VerificationBinding {
+  evidenceKey: string;
+  exceptionClass: ExceptionClass;
+  subject: Incident['subject'];
+  postcondition: (typeof verificationPostconditions)[ExceptionClass];
+}
+export type VerificationResult = Pick<
+  VerifiedDisposition,
+  'reason' | 'outcome' | 'complete' | 'authoritative' | 'evidence' | 'bindings'
+>;
+/** Installed by the composition root. Reads authoritative state and checks the business postcondition. */
+export interface VerificationEvaluator {
+  version: string;
+  evaluate(
+    context: TenantContext,
+    incident: Readonly<Incident>,
+  ): Promise<VerificationResult>;
 }
 export type Resolution = HumanDisposition | VerifiedDisposition;
 export interface DetectionRequest {
@@ -88,6 +114,10 @@ export interface Evaluation {
 }
 export interface DetectionRepository {
   record(value: Evaluation): Promise<DetectionResult>;
+  get(
+    tenantId: string,
+    incidentId: string,
+  ): Promise<{ incident: Incident; version: number } | null>;
   list(tenantId: string): Promise<Incident[]>;
   evidence(tenantId: string, incidentId: string): Promise<Evidence[]>;
   resolve(
@@ -106,7 +136,9 @@ export function createDetectionService(
     hash(value: string): string;
     id(value: string): string;
     resolution(value: Resolution): Resolution;
+    disposition(value: HumanDisposition): HumanDisposition;
   },
+  verifier?: VerificationEvaluator,
 ) {
   return {
     async ingest(context: TenantContext, request: DetectionRequest) {
@@ -182,16 +214,47 @@ export function createDetectionService(
       requireTenant(context, context.tenantId);
       return repository.evidence(context.tenantId, boundary.id(incidentId));
     },
+    async verify(context: TenantContext, incidentId: string) {
+      requireRole(context, ['owner', 'admin']);
+      if (!verifier)
+        throw new Error('Verification evaluator is not configured');
+      const id = boundary.id(incidentId);
+      const snapshot = await repository.get(context.tenantId, id);
+      if (!snapshot) throw new Error('Exception not found');
+      if (snapshot.incident.state === 'resolved')
+        throw new Error('Exception already resolved');
+      const result = await verifier.evaluate(
+        context,
+        structuredClone(snapshot.incident),
+      );
+      const proof = boundary.resolution({
+        ...result,
+        kind: 'verification',
+        fingerprint: snapshot.incident.fingerprint,
+        configVersion: snapshot.incident.configVersion,
+        evaluatorVersion: verifier.version,
+        incidentVersion: snapshot.version,
+        evidenceRefs: result.evidence.map((e) => e.key),
+      });
+      if (proof.kind !== 'verification')
+        throw new Error('Invalid verification result');
+      for (const evidence of proof.evidence)
+        requireTenant(context, evidence.tenantId);
+      return repository.resolve(
+        context.tenantId,
+        id,
+        proof,
+        context.actor.id,
+        now().toISOString(),
+      );
+    },
     resolve(
       context: TenantContext,
       incidentId: string,
-      disposition: Resolution,
+      disposition: HumanDisposition,
     ) {
       requireRole(context, ['owner', 'admin']);
-      const parsed = boundary.resolution(disposition);
-      if (parsed.kind === 'verification')
-        for (const evidence of parsed.evidence)
-          requireTenant(context, evidence.tenantId);
+      const parsed = boundary.disposition(disposition);
       return repository.resolve(
         context.tenantId,
         boundary.id(incidentId),

@@ -6,6 +6,8 @@ export type {
   DetectionResult,
   Evidence,
   Incident,
+  VerificationEvaluator,
+  VerificationResult,
 } from './application/detection.js';
 export {
   defaultConfiguration,

@@ -1,3 +1,4 @@
+import type { VerificationEvaluator } from './modules/exceptions/index.js';
 import { createExceptions } from './modules/exceptions/composition.js';
 import { createDetectionPipeline } from './modules/workflows/index.js';
 import { Pool } from 'pg';
@@ -326,9 +327,14 @@ export function createSafetyServices(
 export function createDetectionServices(
   databaseUrl: string,
   now: () => Date = () => new Date(),
+  verifier?: VerificationEvaluator,
 ) {
   const pool = new Pool({ connectionString: databaseUrl });
-  const exceptions = createExceptions(createTenantDatabase(pool), now);
+  const exceptions = createExceptions(
+    createTenantDatabase(pool),
+    now,
+    verifier,
+  );
   return {
     exceptions,
     pipeline: createDetectionPipeline(exceptions, (value) =>
