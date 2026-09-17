@@ -6,6 +6,11 @@ import { IdentityError } from '../domain/context.js';
 export function credentials(request: FastifyRequest) {
   return request.headers.cookie ? { cookie: request.headers.cookie } : {};
 }
+function tenantContext(request: FastifyRequest) {
+  if (!request.tenantContext)
+    throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+  return request.tenantContext;
+}
 export function identityRoutes(service?: IdentityService) {
   const use = () => {
     if (!service)
@@ -25,49 +30,36 @@ export function identityRoutes(service?: IdentityService) {
       status: 201,
       body: await use().createOrganization(credentials(request), body),
     }),
-    context: async ({ request, params }) => ({
+    context: async ({ request }) => ({
       status: 200,
-      body: await use().resolveTenant(
-        credentials(request),
-        params.organizationId,
-        request.id,
-      ),
+      body: tenantContext(request),
     }),
-    listMembers: async ({ request, params }) => ({
+    listMembers: async ({ request }) => ({
       status: 200,
       body: {
-        items: await use().listMembers(
-          credentials(request),
-          params.organizationId,
-          request.id,
-        ),
+        items: await use().listMembers(tenantContext(request)),
       },
     }),
-    addMember: async ({ request, params, body }) => {
-      const member = await use().changeMember(
-        credentials(request),
-        params.organizationId,
-        request.id,
-        { action: 'add', ...body },
-      );
+    addMember: async ({ request, body }) => {
+      const member = await use().changeMember(tenantContext(request), {
+        action: 'add',
+        ...body,
+      });
       return { status: 201, body: member! };
     },
     updateMember: async ({ request, params, body }) => {
-      const member = await use().changeMember(
-        credentials(request),
-        params.organizationId,
-        request.id,
-        { action: 'update', memberId: params.memberId, role: body.role },
-      );
+      const member = await use().changeMember(tenantContext(request), {
+        action: 'update',
+        memberId: params.memberId,
+        role: body.role,
+      });
       return { status: 200, body: member! };
     },
     removeMember: async ({ request, params }) => {
-      await use().changeMember(
-        credentials(request),
-        params.organizationId,
-        request.id,
-        { action: 'remove', memberId: params.memberId },
-      );
+      await use().changeMember(tenantContext(request), {
+        action: 'remove',
+        memberId: params.memberId,
+      });
       return { status: 204, body: undefined };
     },
   });
