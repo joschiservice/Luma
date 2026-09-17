@@ -28,6 +28,7 @@ export interface TelemetrySettings {
   environment: 'development' | 'test' | 'staging' | 'production';
   release: string;
   sampleRate: number;
+  approvedModels?: readonly string[];
   tenantHashKey?: string;
   sentryDsn?: string;
   langfuse?: { publicKey: string; secretKey: string; baseUrl: string };
@@ -56,6 +57,12 @@ export function createObservability(
     posthog?: Pick<PostHog, 'capture' | 'isFeatureEnabled' | 'shutdown'>;
   } = {},
 ): Observability {
+  const approvedModels = new Set([
+    'test-model',
+    ...(settings.approvedModels ?? []).filter((model) =>
+      /^[a-z0-9][a-z0-9._:/-]{0,159}$/.test(model),
+    ),
+  ]);
   const sentry = settings.sentryDsn
     ? Sentry.init({
         ...(testing.sentryTransport
@@ -214,7 +221,7 @@ export function createObservability(
         }
       },
       generation(usage) {
-        if (operation !== 'model.generate' || usage.model !== 'test-model')
+        if (operation !== 'model.generate' || !approvedModels.has(usage.model))
           return;
         if (
           ![usage.inputTokens, usage.outputTokens].every(
@@ -223,6 +230,20 @@ export function createObservability(
         )
           return;
         span.setAttributes({
+          ...(usage.costUsd != null &&
+          Number.isFinite(usage.costUsd) &&
+          usage.costUsd >= 0
+            ? {
+                'langfuse.observation.cost_details': JSON.stringify({
+                  total: usage.costUsd,
+                }),
+              }
+            : {}),
+          ...(usage.latencyMs != null &&
+          Number.isFinite(usage.latencyMs) &&
+          usage.latencyMs >= 0
+            ? { 'model.latency_ms': usage.latencyMs }
+            : {}),
           'langfuse.observation.model.name': usage.model,
           'langfuse.observation.usage_details': JSON.stringify({
             input: usage.inputTokens,

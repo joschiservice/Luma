@@ -85,3 +85,5 @@ export function readIdentityConfig(
 
 export { readObservabilityConfig } from './observability.js';
 export type { ObservabilityConfig } from './observability.js';
+export { readModelGatewayConfig } from './model-gateway.js';
+export type { ModelGatewayConfig } from './model-gateway.js';

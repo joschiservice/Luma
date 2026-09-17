@@ -1,5 +1,6 @@
 import {
   readApiConfig,
+  readModelGatewayConfig,
   readIdentityConfig,
   readObservabilityConfig,
 } from '@luma/config';
@@ -8,7 +9,13 @@ import { buildRuntimeApp } from './app.js';
 
 const config = readApiConfig(process.env);
 const identityConfig = readIdentityConfig(process.env);
-const observability = createObservability(readObservabilityConfig(process.env));
+const modelSettings = readModelGatewayConfig(process.env);
+const observability = createObservability({
+  ...readObservabilityConfig(process.env),
+  approvedModels: Object.values(modelSettings.routes).map(
+    (route) => route.model,
+  ),
+});
 const app = buildRuntimeApp(
   identityConfig,
   {
@@ -22,6 +29,7 @@ const app = buildRuntimeApp(
     },
   },
   observability,
+  modelSettings,
 );
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {

@@ -1,11 +1,19 @@
 import { Pool } from 'pg';
-import { createTenantDatabase } from './modules/platform/composition.js';
+import type { ModelGatewayConfig } from '@luma/config';
+import {
+  createModelGateway,
+  createTenantDatabase,
+} from './modules/platform/composition.js';
 import { createPolicies } from './modules/policies/composition.js';
 import { createAuditLog } from './modules/audit/composition.js';
 import { createExecution } from './modules/execution/composition.js';
 import type { EffectRegistry } from './modules/connectors/index.js';
 import { randomUUID } from 'node:crypto';
-import type { Observation, Observability } from './modules/platform/index.js';
+import type {
+  ModelGateway,
+  Observation,
+  Observability,
+} from './modules/platform/index.js';
 import { apiContract } from '@luma/api-contract';
 import type { ApiError } from '@luma/api-contract';
 import { openApiDocument } from '@luma/api-contract/openapi';
@@ -24,6 +32,7 @@ import { IdentityError } from './modules/identity/index.js';
 import type { IdentityService } from './modules/identity/index.js';
 
 export interface AppDependencies {
+  modelGateway?: ModelGateway;
   identity?: IdentityService;
   trustedOrigins?: readonly string[];
   providerCatalog?: ProviderCatalog;
@@ -43,6 +52,7 @@ export function buildApp(
     genReqId: () => randomUUID(),
     logController: new LogController({ disableRequestLogging: true }),
   });
+  app.decorate('modelGateway', dependencies.modelGateway ?? null);
   app.decorateRequest('observation', null);
   app.addHook('onResponse', async (request, reply) => {
     const observation = request.observation;
@@ -222,10 +232,18 @@ export function buildRuntimeApp(
   settings: Parameters<typeof createIdentity>[0],
   options: FastifyServerOptions = {},
   observability?: Observability,
+  modelSettings?: ModelGatewayConfig,
 ) {
+  if (modelSettings && !observability)
+    throw new Error('Model gateway requires observability');
+  const modelGateway =
+    modelSettings && observability
+      ? createModelGateway(modelSettings, observability)
+      : undefined;
   const identity = createIdentity(settings);
   const app = buildApp(options, {
     ...(observability ? { observability } : {}),
+    ...(modelGateway ? { modelGateway } : {}),
     identity: identity.service,
     trustedOrigins: settings.trustedOrigins,
     checkReadiness: identity.checkReadiness,
@@ -236,6 +254,9 @@ export function buildRuntimeApp(
 }
 
 declare module 'fastify' {
+  interface FastifyInstance {
+    modelGateway: ModelGateway | null;
+  }
   interface FastifyRequest {
     observation: Observation | null;
   }
