@@ -47,6 +47,10 @@ Apps depend on packages through `workspace:*`; packages must not import apps. Ke
 
 API build output is `apps/api/dist`; run with `pnpm --filter @luma/api start` after `pnpm build`. Shared config exports compiled JavaScript and declarations. Web builds produce `apps/web/dist/client` and `apps/web/dist/server`; a hosting adapter is a later deployment concern.
 
+## Backend module boundaries
+
+[ADR-001](docs/architecture/001-module-boundaries.md) defines module ownership, public interfaces, allowed dependencies, layering and event rules. Implement features under `apps/api/src/modules/<name>` as needed. `pnpm lint` enforces the boundary policy; `pnpm test:architecture` checks its regression fixtures and acyclic dependency map. Both run in CI through the existing gates.
+
 ## Environment
 
 Optional overrides belong in the consuming app's `.env`; copy its `.env.example` first. API dev/start commands load that file; Vite loads web environment files. Real `.env` files are ignored. Document every new setting in the corresponding example, validate server settings at startup, and inject production secrets through the deployment environment.

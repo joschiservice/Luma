@@ -11,13 +11,14 @@
     "build": "turbo run build build:storybook",
     "typecheck": "turbo run typecheck",
     "lint": "eslint . --max-warnings 0",
-    "test": "turbo run test",
+    "test": "pnpm test:architecture && turbo run test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "storybook": "pnpm --filter @luma/ui storybook",
     "test:ui": "pnpm --filter @luma/ui test",
-    "build:storybook": "turbo run build:storybook"
+    "build:storybook": "turbo run build:storybook",
+    "test:architecture": "node --test tooling/architecture/*.test.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
