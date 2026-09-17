@@ -81,6 +81,10 @@ Implementation ADRs live in [docs/architecture](docs/architecture/README.md), th
 
 The [model gateway guide](docs/model-gateway.md) covers provider-independent generation, configured routes, structured output, tool proposals, data policy and Langfuse metadata. Model calls are disabled by default. Vercel routes support public/synthetic input; tenant input requires an approved EU adapter.
 
+## Connector capabilities
+
+The [connector SDK guide](docs/connectors.md) defines typed capability inputs/outputs, discovery, provider identities, errors, retry metadata, provenance hooks and the execution bridge. An in-memory provider demonstrates inventory reads and conditional writes through the same API/browser interface.
+
 ## Safe execution
 
 The [execution guide](docs/execution.md) covers policy checks, approval, tenant-scoped idempotency, durable attempts, verification and append-only audit evidence. Workflow activities use the execution service for connector writes.
