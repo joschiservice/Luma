@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readApiConfig } from './index.js';
+import { readApiConfig, readIdentityConfig } from './index.js';
 
 describe('readApiConfig', () => {
   it('provides local defaults without requiring secrets', () => {
@@ -24,4 +24,42 @@ describe('readApiConfig', () => {
     expect(() => readApiConfig({ HOST: ' ' })).toThrow('HOST');
     expect(() => readApiConfig({ LOG_LEVEL: 'verbose' })).toThrow('LOG_LEVEL');
   });
+});
+
+const authEnvironment = {
+  IDENTITY_DATABASE_URL: 'postgresql://runtime:local@localhost/luma',
+  BETTER_AUTH_SECRET: 'test-secret-with-at-least-32-characters',
+  BETTER_AUTH_URL: 'http://localhost:3001',
+  AUTH_TRUSTED_ORIGINS: 'http://localhost:3000',
+};
+it('requires explicit identity credentials and exact trusted origins', () => {
+  expect(readIdentityConfig(authEnvironment).trustedOrigins).toEqual([
+    'http://localhost:3001',
+    'http://localhost:3000',
+  ]);
+  for (const key of [
+    'IDENTITY_DATABASE_URL',
+    'BETTER_AUTH_SECRET',
+    'BETTER_AUTH_URL',
+  ]) {
+    expect(() =>
+      readIdentityConfig({ ...authEnvironment, [key]: undefined }),
+    ).toThrow();
+  }
+  for (const AUTH_TRUSTED_ORIGINS of [
+    '*',
+    'https://*.example.com',
+    'https://example.com/path',
+    'https://user:pass@example.com',
+  ]) {
+    expect(() =>
+      readIdentityConfig({ ...authEnvironment, AUTH_TRUSTED_ORIGINS }),
+    ).toThrow();
+  }
+  expect(() =>
+    readIdentityConfig({ ...authEnvironment, NODE_ENV: 'production' }),
+  ).toThrow('HTTPS');
+  expect(() =>
+    readIdentityConfig({ ...authEnvironment, BETTER_AUTH_SECRET: 'short' }),
+  ).toThrow('32');
 });

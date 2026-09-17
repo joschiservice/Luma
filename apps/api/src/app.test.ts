@@ -161,3 +161,18 @@ describe('HTTP foundation', () => {
     },
   );
 });
+
+it('protects newly registered routes when no identity service is configured', async () => {
+  const app = buildApp();
+  app.get('/v1/private', async () => ({ secret: 'must not leak' }));
+  app.post('/health', async () => ({ secret: 'must not leak' }));
+  for (const [method, url] of [
+    ['GET', '/v1/private'],
+    ['POST', '/health'],
+  ] as const) {
+    const response = await app.inject({ method, url });
+    expect(response.statusCode).toBe(503);
+    expect(response.body).not.toContain('must not leak');
+  }
+  await app.close();
+});

@@ -12,13 +12,24 @@
     },
     "test": {
       "dependsOn": ["^build"],
-      "outputs": []
+      "outputs": [],
+      "env": ["TEST_DATABASE_URL"],
+      "cache": false
     },
     "dev": {
       "dependsOn": ["^build"],
       "cache": false,
       "persistent": true,
-      "env": ["HOST", "PORT", "LOG_LEVEL", "NODE_ENV"]
+      "env": [
+        "HOST",
+        "PORT",
+        "LOG_LEVEL",
+        "NODE_ENV",
+        "IDENTITY_DATABASE_URL",
+        "BETTER_AUTH_SECRET",
+        "BETTER_AUTH_URL",
+        "AUTH_TRUSTED_ORIGINS"
+      ]
     },
     "build:storybook": {
       "dependsOn": ["^build"],

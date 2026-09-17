@@ -8,7 +8,7 @@ export const openApiDocument = generateOpenApi(
       title: 'Luma API',
       version: '1.0.0',
       description:
-        'Browse the connector provider catalog and check Luma service availability. These endpoints are public and return JSON.',
+        'Manage your organizations and memberships, resolve organization access, browse connector providers and check service availability. Organization endpoints require a session cookie.',
     },
   },
   { setOperationId: 'concatenated-path' },
