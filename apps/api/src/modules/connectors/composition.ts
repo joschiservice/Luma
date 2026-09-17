@@ -14,3 +14,10 @@ export type {
   ShopifyEvidence,
 } from './infrastructure/shopify/adapter.js';
 export { mapShopifyWebhook } from './infrastructure/shopify/webhooks.js';
+
+export { createJtlConnector } from './infrastructure/jtl/adapter.js';
+export type {
+  JtlConnectorOptions,
+  JtlEvidence,
+} from './infrastructure/jtl/adapter.js';
+export type { JtlConnection } from './infrastructure/jtl/client.js';

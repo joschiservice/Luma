@@ -16,6 +16,8 @@ The connectors module exposes typed capabilities through its public `index.ts`. 
 
 Each key selects its own `CapabilityInput<K>` and `CapabilityOutput<K>`. V0 order writes cancel an order; they do not create orders or edit arbitrary provider fields. Adapters advertise only operations they can implement with these semantics. Adding a different operation requires a contract change.
 
+The [JTL-Wawi read adapter](jtl.md) implements all four read capabilities for on-premise and cloud connections with shared normalization and scoped evidence.
+
 The [Shopify read adapter](shopify.md) implements all four read capabilities with scoped credentials, pagination, normalized evidence and webhook refresh hints.
 
 Decimals are strings with at most fourteen integer and six fractional digits. Preserve negative/fractional inventory, unknown/null values and source revisions. Order-line `cancelledQuantity` is null when the source cannot distinguish cancellations from refunds or edits. External IDs remain opaque and case-sensitive. `scopeKey` is the parent namespace for local IDs, or an empty string for account-wide IDs. Tenant, connection, provider and resource complete the source identity. Canonical IDs are resolved explicitly through tenant-owned mappings; SKU text is not identity.
