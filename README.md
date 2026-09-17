@@ -77,6 +77,10 @@ Link the Linear issue, describe behavior and validation, and keep PRs scoped. Ru
 
 Implementation ADRs live in [docs/architecture](docs/architecture/README.md), the authoritative source reviewed and versioned with code. The [Linear decision register](https://linear.app/auren-labs/document/architecture-decision-register-305db9bed1de) contains summaries, issue links and repository references only; do not maintain full ADR copies there. Strategic product and business decisions remain in Notion. The web bootstrap follows [TanStack Start's setup guide](https://tanstack.com/start/latest/docs/framework/react/build-from-scratch). The [HTTP API guide](docs/api.md) covers contracts, clients, errors and OpenAPI. The [identity guide](docs/identity.md) covers authentication, tenant guards, database roles and migrations. The [observability guide](docs/observability.md) covers Sentry, Langfuse, PostHog, correlation and data redaction.
 
+## Connector capabilities
+
+The [connector SDK guide](docs/connectors.md) defines typed capability inputs/outputs, discovery, provider identities, errors, retry metadata, provenance hooks and the execution bridge. An in-memory provider demonstrates inventory reads and conditional writes through the same API/browser interface.
+
 ## Safe execution
 
 The [execution guide](docs/execution.md) covers policy checks, approval, tenant-scoped idempotency, durable attempts, verification and append-only audit evidence. Workflow activities use the execution service for connector writes.
