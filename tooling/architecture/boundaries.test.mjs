@@ -25,6 +25,10 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
   {
     valid: [
       sample(
+        moduleFile('connectors', 'api/routes.ts'),
+        "import { apiContract } from '@luma/api-contract';",
+      ),
+      sample(
         moduleFile('orders', 'infrastructure/repository.ts'),
         "import { join } from 'node:path';",
       ),
@@ -66,6 +70,22 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
       ),
     ],
     invalid: [
+      ...[
+        'domain/model.ts',
+        'application/query.ts',
+        'index.ts',
+        'infrastructure/repository.ts',
+        'composition.ts',
+      ].map((layer) =>
+        invalid(
+          moduleFile('connectors', layer),
+          "import { apiContract } from '@luma/api-contract';",
+        ),
+      ),
+      invalid(
+        moduleFile('connectors', 'api/routes.ts'),
+        "import { createApiClient } from '@luma/api-contract/client';",
+      ),
       ...['infrastructure/repository.ts', 'composition.ts'].flatMap((layer) =>
         ['node:module', 'module'].flatMap((specifier) =>
           [

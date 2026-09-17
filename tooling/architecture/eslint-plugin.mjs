@@ -46,6 +46,7 @@ export function violation(from, to) {
     return 'Use a registered module and domain/application/infrastructure/api layer.';
   }
   if (!target) {
+    if (source.layer === 'api' && to === 'packages/api-contract/') return null;
     // No paths back into the bootstrap, web app, or shared workspace runtime code.
     if (to.startsWith('apps/') || to.startsWith('packages/')) {
       return 'Backend modules may share runtime code only through registered module interfaces.';

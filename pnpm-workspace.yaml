@@ -4,3 +4,8 @@ packages:
 
 onlyBuiltDependencies:
   - esbuild
+
+# ts-rest's stable adapter still declares Fastify 4; API integration tests cover 5.
+peerDependencyRules:
+  allowedVersions:
+    '@ts-rest/fastify@3.52.1>fastify': '5.12.5'
