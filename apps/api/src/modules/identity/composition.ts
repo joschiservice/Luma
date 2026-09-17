@@ -39,3 +39,5 @@ export function createIdentity(
     },
   };
 }
+
+export { makeTenantContext } from './domain/context.js';

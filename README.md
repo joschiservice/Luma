@@ -81,7 +81,7 @@ API build output is `apps/api/dist`; run with `pnpm --filter @luma/api start` af
 
 ## Exception taxonomy
 
-The [V0 exception taxonomy](docs/exception-taxonomy.md) defines four detection classes, evidence requirements, safe recovery and verification. Its versioned synthetic golden cases cover positive, negative and uncertain outcomes for the detection pipeline.
+The [V0 exception taxonomy](docs/exception-taxonomy.md) defines four detection classes, evidence requirements, safe recovery and verification. Its versioned synthetic golden cases cover positive, negative and uncertain outcomes for the detection pipeline. The [detection guide](docs/exception-detection.md) covers ingestion, immutable evidence, tenant-scoped persistence, deduplication and resolution.
 
 ## Tenant isolation and data residency
 

@@ -76,7 +76,7 @@ export async function database(t) {
   t.onTestFinished(async () => {
     try {
       await owner?.end();
-      await admin.query(`DROP DATABASE IF EXISTS "${id}" WITH (FORCE)`);
+      await admin.query(`DROP DATABASE IF EXISTS "${id}"`);
       await admin.query(`DROP ROLE IF EXISTS "${id}"`);
     } finally {
       await admin.end();

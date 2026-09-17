@@ -1,3 +1,5 @@
+import { createExceptions } from './modules/exceptions/composition.js';
+import { createDetectionPipeline } from './modules/workflows/index.js';
 import { Pool } from 'pg';
 import type { ModelGatewayConfig } from '@luma/config';
 import {
@@ -8,7 +10,7 @@ import { createPolicies } from './modules/policies/composition.js';
 import { createAuditLog } from './modules/audit/composition.js';
 import { createExecution } from './modules/execution/composition.js';
 import type { EffectRegistry } from './modules/connectors/index.js';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import type {
   ModelGateway,
   Observation,
@@ -315,6 +317,22 @@ export function createSafetyServices(
       audit,
       registry,
       identity.refreshContext,
+    ),
+    close: () => pool.end(),
+  };
+}
+
+/** Create tenant-scoped detection services for connector ingestion and durable workflow events. */
+export function createDetectionServices(
+  databaseUrl: string,
+  now: () => Date = () => new Date(),
+) {
+  const pool = new Pool({ connectionString: databaseUrl });
+  const exceptions = createExceptions(createTenantDatabase(pool), now);
+  return {
+    exceptions,
+    pipeline: createDetectionPipeline(exceptions, (value) =>
+      createHash('sha256').update(value).digest('hex'),
     ),
     close: () => pool.end(),
   };

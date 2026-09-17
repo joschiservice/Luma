@@ -2,116 +2,10 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
+import { factSchemas as schemas } from './validation.js';
+import { evaluate } from '../domain/evaluate.js';
+import { parseInput } from './validation.js';
 const timestamp = z.string().datetime();
-const decimal = z.string().regex(/^-?\d{1,14}(?:\.\d{1,6})?$/);
-const common = {
-  tenantId: z.string().min(1),
-  evidenceTenantId: z.string().min(1),
-  subjectId: z.string().min(1),
-  evidenceRefs: z.array(z.string().min(1)).min(1),
-};
-const schemas = {
-  sync_failure: z
-    .object({
-      ...common,
-      connectionId: z.string().min(1),
-      capability: z.enum([
-        'inventory.read',
-        'orders.read',
-        'fulfillment.read',
-        'products.read',
-      ]),
-      active: z.boolean(),
-      status: z.enum(['failed', 'success']),
-      errorCode: z
-        .enum([
-          'authentication',
-          'permission_denied',
-          'invalid_response',
-          'unsupported_capability',
-          'unsupported_version',
-          'transient',
-          'timeout',
-          'rate_limited',
-          'internal',
-        ])
-        .nullable(),
-      firstFailureAt: timestamp,
-      retryExhausted: z.boolean(),
-      scanComplete: z.boolean(),
-    })
-    .strict(),
-  stuck_fulfillment: z
-    .object({
-      ...common,
-      connectionId: z.string().min(1),
-      status: z.enum([
-        'pending',
-        'processing',
-        'shipped',
-        'delivered',
-        'cancelled',
-        'failed',
-        'unknown',
-      ]),
-      observedAt: timestamp,
-      lastProgressAt: timestamp.nullable(),
-      quantity: decimal.nullable(),
-      unit: z.string().min(1),
-      mapped: z.boolean(),
-      complete: z.boolean(),
-      eligibility: z.enum(['eligible', 'exempt', 'unknown']),
-      progressBasis: z.enum([
-        'note_created_or_package_shipped',
-        'source_updated',
-      ]),
-      otherOperationShippedQuantity: decimal,
-    })
-    .strict(),
-  inventory_mismatch: z
-    .object({
-      ...common,
-      connectionIds: z.tuple([z.string().min(1), z.string().min(1)]),
-      canonicalLocationId: z.string().min(1),
-      leftAvailable: decimal.nullable(),
-      rightAvailable: decimal.nullable(),
-      leftUnit: z.string().min(1),
-      rightUnit: z.string().min(1),
-      leftObservedAt: timestamp,
-      rightObservedAt: timestamp,
-      leftBasis: z.enum(['provider_reported', 'derived', 'unknown']),
-      rightBasis: z.enum(['provider_reported', 'derived', 'unknown']),
-      mappedSku: z.boolean(),
-      equivalentPool: z.boolean(),
-      complete: z.boolean(),
-      projectionCurrent: z.boolean(),
-      authority: z.enum(['left', 'right']).nullable(),
-      sellingSource: z.enum(['left', 'right']),
-      tolerance: decimal.refine((value) => !value.startsWith('-')),
-    })
-    .strict(),
-  workflow_failure: z
-    .object({
-      ...common,
-      runId: z.string().min(1),
-      stepKey: z.string().min(1),
-      attempt: z.number().int().positive(),
-      status: z.enum([
-        'failed',
-        'timed_out',
-        'running',
-        'succeeded',
-        'cancelled',
-        'interrupted',
-      ]),
-      durable: z.boolean(),
-      retryExhausted: z.boolean(),
-      effect: z.enum(['none', 'unknown']),
-      executionId: z.string().min(1).nullable(),
-      errorCode: z.string().min(1),
-    })
-    .strict(),
-};
 const className = z.enum([
   'sync_failure',
   'stuck_fulfillment',
@@ -169,14 +63,30 @@ const corpusSchema = z
 const corpus = corpusSchema.parse(
   JSON.parse(
     readFileSync(
-      new URL('../../../docs/fixtures/exceptions-v0.json', import.meta.url),
+      new URL(
+        '../../../../../../docs/fixtures/exceptions-v0.json',
+        import.meta.url,
+      ),
       'utf8',
     ),
   ),
 );
 
-// These checks protect the handoff corpus. Detector behavior is evaluated by LUMA-19.
+// Execute the production evaluator against the versioned acceptance corpus.
 describe('V0 exception acceptance corpus', () => {
+  it.each(corpus.cases)('$id evaluates the golden decision', (testCase) => {
+    expect(
+      evaluate(
+        parseInput(testCase.exceptionClass, {
+          ...corpus.bases[testCase.exceptionClass],
+          ...testCase.input,
+        }),
+        corpus.now,
+        corpus.thresholds,
+      ),
+    ).toEqual(testCase.expected);
+  });
+
   it('has unique case IDs and every decision outcome for every class', () => {
     expect(new Set(corpus.cases.map(({ id }) => id)).size).toBe(
       corpus.cases.length,

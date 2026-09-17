@@ -2,7 +2,7 @@
 
 Version: `v0.1`. Owner: exceptions. Implementation handoff: [LUMA-19](https://linear.app/auren-labs/issue/LUMA-19). Decision: [LUMA-15](https://linear.app/auren-labs/issue/LUMA-15).
 
-Four classes use the names and lifecycle in [ADR-002](architecture/002-canonical-commerce-model.md). Rules consume normalized evidence, never provider payloads. [Golden cases](fixtures/exceptions-v0.json) specify inputs and expected decisions; they are synthetic acceptance vectors, not customer incidents. Fixture integrity checks run in `pnpm test`. LUMA-19 must run its detector against these expected results and add persistence/concurrency tests.
+Four classes use the names and lifecycle in [ADR-002](architecture/002-canonical-commerce-model.md). Rules consume normalized evidence, never provider payloads. [Golden cases](fixtures/exceptions-v0.json) specify inputs and expected decisions; they are synthetic acceptance vectors, not customer incidents. The production evaluator and fixture integrity checks run in `pnpm test`. The [detection pipeline](exception-detection.md) adds PostgreSQL persistence and concurrency tests.
 
 ## Evidence and confidence
 
@@ -133,7 +133,7 @@ If a connector failure causes a workflow failure, preserve both subjects and lin
 
 `fixtures/exceptions-v0.json` supplies fixed `now`, versioned thresholds, per-class base facts and named cases. Materialize a case with a **shallow** merge of its class base and `input`; arrays replace whole arrays. Each base supplies tenant, subject and synthetic evidence keys. Fixtures are normalized rule facts, not serialized connector responses or database rows. Labels such as `tenant-a` are test identities; persistence tests must map them to stable valid UUIDs.
 
-`expected` specifies decision, severity (null without detection) and reason. The fixture test validates shape, clocks, IDs and positive/negative/uncertain coverage. It does not claim a production detector exists. LUMA-19 must assert every expected result using its real evaluator and retain the following sequence assertions:
+`expected` specifies decision, severity (null without detection) and reason. The fixture test validates shape, clocks, IDs and positive/negative/uncertain coverage. The production evaluator asserts every expected result. Persistence tests cover replay, conflicts, isolation, uncertainty and resolution. The following sequence requirements also govern downstream recovery integrations:
 
 | Sequence                                                              | Required result                                                   |
 | --------------------------------------------------------------------- | ----------------------------------------------------------------- |
