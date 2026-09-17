@@ -51,7 +51,8 @@ export interface OrderSnapshot {
     id: ExternalId;
     sku: ExternalId | null;
     quantity: Quantity;
-    cancelledQuantity: Quantity;
+    /** Null when the source cannot distinguish cancellations from refunds or edits. */
+    cancelledQuantity: Quantity | null;
   }[];
 }
 export interface InventorySnapshot {

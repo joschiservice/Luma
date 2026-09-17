@@ -1,0 +1,80 @@
+{
+  "order": {
+    "id": "gid://shopify/Order/1",
+    "updatedAt": "2026-09-17T00:00:00Z",
+    "name": "#1001",
+    "cancelledAt": null,
+    "closed": false,
+    "displayFinancialStatus": "PAID"
+  },
+  "orderLines": [
+    {
+      "id": "gid://shopify/LineItem/11",
+      "quantity": 3,
+      "variant": { "inventoryItem": { "id": "gid://shopify/InventoryItem/31" } }
+    },
+    { "id": "gid://shopify/LineItem/12", "quantity": 1, "variant": null }
+  ],
+  "product": {
+    "id": "gid://shopify/Product/2",
+    "updatedAt": "2026-09-16T00:00:00Z",
+    "title": "Blue mug",
+    "status": "ACTIVE"
+  },
+  "variants": [
+    {
+      "id": "gid://shopify/ProductVariant/21",
+      "sku": "MUG-Blue",
+      "inventoryItem": { "id": "gid://shopify/InventoryItem/31" }
+    }
+  ],
+  "inventoryItem": { "id": "gid://shopify/InventoryItem/31", "tracked": true },
+  "levels": [
+    {
+      "id": "gid://shopify/InventoryLevel/41?inventory_item_id=31",
+      "updatedAt": "2026-09-17T00:00:00Z",
+      "location": { "id": "gid://shopify/Location/41" },
+      "quantities": [
+        { "name": "on_hand", "quantity": 3 },
+        { "name": "committed", "quantity": 5 },
+        { "name": "available", "quantity": -2 }
+      ]
+    },
+    {
+      "id": "gid://shopify/InventoryLevel/42?inventory_item_id=31",
+      "updatedAt": "2026-09-17T00:00:00Z",
+      "location": { "id": "gid://shopify/Location/42" },
+      "quantities": [{ "name": "available", "quantity": 0 }]
+    }
+  ],
+  "work": [
+    {
+      "id": "gid://shopify/FulfillmentOrder/51",
+      "updatedAt": "2026-09-15T00:00:00Z",
+      "status": "IN_PROGRESS"
+    }
+  ],
+  "workLines": [
+    {
+      "id": "gid://shopify/FulfillmentOrderLineItem/61",
+      "remainingQuantity": 2,
+      "lineItem": { "id": "gid://shopify/LineItem/11" }
+    }
+  ],
+  "shipments": [
+    {
+      "id": "gid://shopify/Fulfillment/71",
+      "updatedAt": "2026-09-16T00:00:00Z",
+      "status": "SUCCESS",
+      "deliveredAt": null,
+      "inTransitAt": "2026-09-16T00:00:00Z"
+    }
+  ],
+  "shipmentLines": [
+    {
+      "id": "gid://shopify/FulfillmentLineItem/81",
+      "quantity": 1,
+      "lineItem": { "id": "gid://shopify/LineItem/11" }
+    }
+  ]
+}

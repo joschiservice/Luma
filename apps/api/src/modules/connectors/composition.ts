@@ -7,3 +7,10 @@ export function createConnectors(
 ) {
   return createProviderRoutes(catalog);
 }
+
+export { createShopifyConnector } from './infrastructure/shopify/adapter.js';
+export type {
+  ShopifyConnectorOptions,
+  ShopifyEvidence,
+} from './infrastructure/shopify/adapter.js';
+export { mapShopifyWebhook } from './infrastructure/shopify/webhooks.js';

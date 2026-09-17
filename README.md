@@ -79,7 +79,7 @@ Implementation ADRs live in [docs/architecture](docs/architecture/README.md), th
 
 ## Connector capabilities
 
-The [connector SDK guide](docs/connectors.md) defines typed capability inputs/outputs, discovery, provider identities, errors, retry metadata, provenance hooks and the execution bridge. An in-memory provider demonstrates inventory reads and conditional writes through the same API/browser interface.
+The [connector SDK guide](docs/connectors.md) defines typed capability inputs/outputs, discovery, provider identities, errors, retry metadata, provenance hooks and the execution bridge. An in-memory provider demonstrates inventory reads and conditional writes through the same API/browser interface. The [Shopify adapter](docs/shopify.md) supplies read-only order, product, inventory and fulfillment observations.
 
 ## Safe execution
 
