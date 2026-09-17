@@ -9,6 +9,8 @@ import type {
   ModelAdapter,
   ModelDataPolicy,
   ModelGateway,
+  ModelMessage,
+  ModelToolCall,
   ModelRequest,
   ModelRoutingPolicy,
   ModelRoute,
@@ -514,4 +516,135 @@ it('excludes unapproved model names and invalid costs from telemetry', async () 
   expect(
     spans.getFinishedSpans()[1]!.attributes['model.latency_ms'],
   ).toBeUndefined();
+});
+
+describe('tool history', () => {
+  const call: ModelToolCall = {
+    id: 'call-1',
+    name: 'lookup',
+    arguments: { answer: 'x' },
+  };
+  const assistant = (...toolCalls: ModelToolCall[]): ModelMessage => ({
+    role: 'assistant',
+    content: '',
+    toolCalls,
+  });
+  const result = (callId: string): ModelMessage => ({
+    role: 'tool',
+    callId,
+    content: 'result',
+  });
+  const tools = [
+    { name: 'lookup', description: 'Read a value', input: answer },
+  ];
+  const invalid: Array<[string, ModelMessage[]]> = [
+    ['empty call ID', [assistant({ ...call, id: '' }), result('')]],
+    ['blank call ID', [assistant({ ...call, id: ' ' }), result(' ')]],
+    ['duplicate calls in a turn', [assistant(call, call), result(call.id)]],
+    [
+      'reused call ID across turns',
+      [assistant(call), result(call.id), assistant(call), result(call.id)],
+    ],
+    ['orphan result', [result(call.id)]],
+    ['empty result ID', [assistant(call), result('')]],
+    ['wrong result ID', [assistant(call), result('other')]],
+    ['result before its call', [result(call.id), assistant(call)]],
+    ['duplicate result', [assistant(call), result(call.id), result(call.id)]],
+    ['missing result', [assistant(call)]],
+    [
+      'partially completed batch',
+      [assistant(call, { ...call, id: 'call-2' }), result(call.id)],
+    ],
+    [
+      'interrupted results',
+      [assistant(call), { role: 'user', content: 'continue' }, result(call.id)],
+    ],
+    [
+      'new assistant turn before results',
+      [
+        assistant(call),
+        assistant({ ...call, id: 'call-2' }),
+        result(call.id),
+        result('call-2'),
+      ],
+    ],
+    [
+      'undeclared tool',
+      [assistant({ ...call, name: 'removed' }), result(call.id)],
+    ],
+    [
+      'invalid arguments',
+      [assistant({ ...call, arguments: { answer: 5 } }), result(call.id)],
+    ],
+  ];
+  it.each(invalid)('rejects %s before provider I/O', async (_name, history) => {
+    const { gateway, root, transport } = setup();
+    await expect(
+      gateway.generate(root.context, {
+        ...request,
+        tools,
+        messages: [...request.messages, ...history],
+      }),
+    ).rejects.toMatchObject({
+      code: 'invalid_request',
+      message: 'Model generation failed: invalid_request',
+    });
+    expect(transport).not.toHaveBeenCalled();
+  });
+  it('rejects historical calls when no tools are declared', async () => {
+    const { gateway, root, transport } = setup();
+    await expect(
+      gateway.generate(root.context, {
+        ...request,
+        messages: [assistant(call), result(call.id)],
+      }),
+    ).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(transport).not.toHaveBeenCalled();
+  });
+  it('sanitizes argument parser errors before provider I/O', async () => {
+    const { gateway, root, transport } = setup();
+    await expect(
+      gateway.generate(root.context, {
+        ...request,
+        tools: [
+          {
+            name: 'lookup',
+            description: '',
+            input: {
+              ...answer,
+              parse: () => {
+                throw new Error('private argument contents');
+              },
+            },
+          },
+        ],
+        messages: [assistant(call), result(call.id)],
+      }),
+    ).rejects.toThrow('Model generation failed: invalid_request');
+    expect(transport).not.toHaveBeenCalled();
+  });
+  it('accepts complete batches in any result order and successive tool turns', async () => {
+    const { gateway, root, transport } = setup();
+    const messages: ModelMessage[] = [
+      ...request.messages,
+      assistant(call, { ...call, id: 'call-2' }),
+      result('call-2'),
+      result(call.id),
+      { role: 'assistant', content: 'First batch complete.' },
+      { role: 'user', content: 'Continue.' },
+      assistant({ ...call, id: 'call-3' }),
+      result('call-3'),
+    ];
+    expect(
+      (await gateway.generate(root.context, { ...request, tools, messages }))
+        .output,
+    ).toEqual({ answer: 'synthetic-secret' });
+    expect(transport).toHaveBeenCalledTimes(1);
+    const sent = JSON.parse(String(transport.mock.calls[0]?.[1]?.body));
+    expect(
+      sent.messages
+        .filter((message: { role: string }) => message.role === 'tool')
+        .map((message: { tool_call_id: string }) => message.tool_call_id),
+    ).toEqual(['call-2', 'call-1', 'call-3']);
+  });
 });

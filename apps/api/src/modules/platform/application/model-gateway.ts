@@ -181,6 +181,7 @@ export function createRoutedModelGateway(
             (request.output && !validName(request.output.name))
           )
             throw new ModelGatewayError('invalid_request');
+          validateToolHistory(request.messages, tools);
           const started = now();
           try {
             const result = await adapter.generate(route, request);
@@ -237,4 +238,35 @@ export function createRoutedModelGateway(
       );
     },
   };
+}
+
+/** Each assistant tool batch must receive one result per call before another turn. */
+function validateToolHistory(
+  messages: readonly ModelMessage[],
+  tools: readonly ModelTool[],
+): void {
+  const declared = new Map(tools.map((tool) => [tool.name, tool]));
+  const seen = new Set<string>();
+  const pending = new Set<string>();
+  try {
+    for (const message of messages) {
+      if (message.role === 'tool') {
+        if (!pending.delete(message.callId)) throw new Error();
+        continue;
+      }
+      if (pending.size) throw new Error();
+      if (message.role !== 'assistant') continue;
+      for (const call of message.toolCalls ?? []) {
+        const tool = declared.get(call.name);
+        if (!call.id.trim() || seen.has(call.id) || !tool) throw new Error();
+        tool.input.parse(call.arguments);
+        seen.add(call.id);
+        pending.add(call.id);
+      }
+    }
+    if (pending.size) throw new Error();
+  } catch {
+    // Schema parser errors may include historical tool arguments.
+    throw new ModelGatewayError('invalid_request');
+  }
 }
