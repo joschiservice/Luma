@@ -28,7 +28,13 @@ export function violation(from, to) {
     return 'Apps must communicate through public API contracts, not source imports.';
   }
   if (!source && target) {
-    if (!['apps/api/src/app.ts', 'apps/api/src/index.ts'].includes(from)) {
+    if (
+      ![
+        'apps/api/src/app.ts',
+        'apps/api/src/app.test.ts',
+        'apps/api/src/index.ts',
+      ].includes(from)
+    ) {
       return 'Only the API composition root may wire backend modules.';
     }
     if (
