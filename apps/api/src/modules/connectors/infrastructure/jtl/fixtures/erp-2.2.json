@@ -1,0 +1,1741 @@
+{
+  "sourceUrl": "https://developer.jtl-software.com/openapi/erp/2.2.json",
+  "sourceSha256": "e6e48c4046dfbd1136b54ccba59074d9a02175a9f26525944c922ff883c8ee5e",
+  "version": "2.2",
+  "paths": {
+    "/v2/sales-orders": {
+      "parameters": [
+        {
+          "name": "pageNumber",
+          "in": "query"
+        },
+        {
+          "name": "pageSize",
+          "in": "query"
+        },
+        {
+          "name": "sortBy",
+          "in": "query"
+        },
+        {
+          "name": "sortDescending",
+          "in": "query"
+        },
+        {
+          "name": "estimatedDeliveryDateAfter",
+          "in": "query"
+        },
+        {
+          "name": "estimatedDeliveryDateBefore",
+          "in": "query"
+        },
+        {
+          "name": "lastShippingDateAfter",
+          "in": "query"
+        },
+        {
+          "name": "lastShippingDateBefore",
+          "in": "query"
+        },
+        {
+          "name": "salesOrderDateAfter",
+          "in": "query"
+        },
+        {
+          "name": "salesOrderDateBefore",
+          "in": "query"
+        },
+        {
+          "name": "printDateAfter",
+          "in": "query"
+        },
+        {
+          "name": "printDateBefore",
+          "in": "query"
+        },
+        {
+          "name": "mailDateAfter",
+          "in": "query"
+        },
+        {
+          "name": "mailDateBefore",
+          "in": "query"
+        },
+        {
+          "name": "paymentMailDateAfter",
+          "in": "query"
+        },
+        {
+          "name": "paymentMailDateBefore",
+          "in": "query"
+        },
+        {
+          "name": "dateOfPaymentAfter",
+          "in": "query"
+        },
+        {
+          "name": "dateOfPaymentBefore",
+          "in": "query"
+        },
+        {
+          "name": "paymentDateAfter",
+          "in": "query"
+        },
+        {
+          "name": "paymentDateBefore",
+          "in": "query"
+        },
+        {
+          "name": "cancelledDateAfter",
+          "in": "query"
+        },
+        {
+          "name": "cancelledDateBefore",
+          "in": "query"
+        },
+        {
+          "name": "x-tenant-id",
+          "in": "header"
+        }
+      ],
+      "response": {
+        "$ref": "#/components/schemas/JTL.Framework.Api.Abstraction.Models.PagedListOfJTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.SalesOrderListItem"
+      }
+    },
+    "/v2/sales-orders/{salesOrderId}/line-items": {
+      "parameters": [
+        {
+          "name": "salesOrderId",
+          "in": "path"
+        },
+        {
+          "name": "x-companyid",
+          "in": "header"
+        },
+        {
+          "name": "x-tenant-id",
+          "in": "header"
+        }
+      ],
+      "response": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/JTL.Wawi.Rest.Contracts.Models.V1.SalesOrder.SalesOrderLineItem"
+        }
+      }
+    },
+    "/v2/items": {
+      "parameters": [
+        {
+          "name": "searchTerm",
+          "in": "query"
+        },
+        {
+          "name": "searchOperator",
+          "in": "query"
+        },
+        {
+          "name": "searchField",
+          "in": "query"
+        },
+        {
+          "name": "extendedFilter",
+          "in": "query"
+        },
+        {
+          "name": "pageNumber",
+          "in": "query"
+        },
+        {
+          "name": "pageSize",
+          "in": "query"
+        },
+        {
+          "name": "sortBy",
+          "in": "query"
+        },
+        {
+          "name": "sortDescending",
+          "in": "query"
+        },
+        {
+          "name": "createdDateAfter",
+          "in": "query"
+        },
+        {
+          "name": "createdDateBefore",
+          "in": "query"
+        },
+        {
+          "name": "modifiedDateAfter",
+          "in": "query"
+        },
+        {
+          "name": "modifiedDateBefore",
+          "in": "query"
+        },
+        {
+          "name": "modifiedTimestampAfter",
+          "in": "query"
+        },
+        {
+          "name": "modifiedTimestampBefore",
+          "in": "query"
+        },
+        {
+          "name": "releaseDateAfter",
+          "in": "query"
+        },
+        {
+          "name": "releaseDateBefore",
+          "in": "query"
+        },
+        {
+          "name": "lastPurchaseDateAfter",
+          "in": "query"
+        },
+        {
+          "name": "lastPurchaseDateBefore",
+          "in": "query"
+        },
+        {
+          "name": "x-tenant-id",
+          "in": "header"
+        }
+      ],
+      "response": {
+        "$ref": "#/components/schemas/JTL.Framework.Api.Abstraction.Models.PagedListOfJTL.Wawi.Item.PublicApi.DataTransferObjects.V2.ItemOverview.ItemListItem"
+      }
+    },
+    "/v2/warehouses/{warehouseId}/items/{itemId}/stocks": {
+      "parameters": [
+        {
+          "name": "warehouseId",
+          "in": "path"
+        },
+        {
+          "name": "itemId",
+          "in": "path"
+        },
+        {
+          "name": "x-tenant-id",
+          "in": "header"
+        }
+      ],
+      "response": {
+        "$ref": "#/components/schemas/JTL.Wawi.Warenlagerverwaltung.PublicApi.DataTransferObjects.V2.Stocks.WarehouseItemStock"
+      }
+    },
+    "/v2/delivery-notes": {
+      "parameters": [
+        {
+          "name": "salesOrderNumber",
+          "in": "query"
+        },
+        {
+          "name": "salesOrderNumberId",
+          "in": "query"
+        },
+        {
+          "name": "customerId",
+          "in": "query"
+        },
+        {
+          "name": "IsExisting",
+          "in": "query"
+        },
+        {
+          "name": "pageNumber",
+          "in": "query"
+        },
+        {
+          "name": "pageSize",
+          "in": "query"
+        },
+        {
+          "name": "x-companyid",
+          "in": "header"
+        },
+        {
+          "name": "x-tenant-id",
+          "in": "header"
+        }
+      ],
+      "response": {
+        "$ref": "#/components/schemas/JTL.Wawi.Rest.Contracts.Models.PagedListOfJTL.Wawi.Rest.Contracts.Models.V1.DeliveryNote.DeliveryNote"
+      }
+    },
+    "/v2/delivery-notes/{deliveryNoteId}": {
+      "parameters": [
+        {
+          "name": "deliveryNoteId",
+          "in": "path"
+        },
+        {
+          "name": "x-tenant-id",
+          "in": "header"
+        }
+      ],
+      "response": {
+        "$ref": "#/components/schemas/JTL.Wawi.Delivery.PublicApi.DataTransferObjects.V2.Delivery.DeliveryNote"
+      }
+    },
+    "/v2/delivery-notes/{deliveryNoteId}/line-items": {
+      "parameters": [
+        {
+          "name": "deliveryNoteId",
+          "in": "path"
+        },
+        {
+          "name": "pageNumber",
+          "in": "query"
+        },
+        {
+          "name": "pageSize",
+          "in": "query"
+        },
+        {
+          "name": "sortBy",
+          "in": "query"
+        },
+        {
+          "name": "sortDescending",
+          "in": "query"
+        },
+        {
+          "name": "x-tenant-id",
+          "in": "header"
+        }
+      ],
+      "response": {
+        "$ref": "#/components/schemas/JTL.Framework.Api.Abstraction.Models.PagedListOfJTL.Wawi.Delivery.PublicApi.DataTransferObjects.V2.Delivery.DeliveryNoteLineItem"
+      }
+    }
+  },
+  "schemas": {
+    "JTL.Framework.Api.Abstraction.Models.PagedListOfJTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.SalesOrderListItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["totalItems", "pageNumber", "pageSize", "items"],
+      "properties": {
+        "totalItems": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "pageNumber": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "pageSize": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.SalesOrderListItem"
+          }
+        },
+        "totalPages": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "hasPreviousPage": {
+          "type": "boolean"
+        },
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "nextPageNumber": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "previousPageNumber": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.SalesOrderListItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "assignedUserId",
+        "createdByUserId",
+        "currencyFactor",
+        "deliveryCompleteStatus",
+        "departureCountryCurrencyFactor",
+        "departureCountryCurrencyIso",
+        "externalSalesInvoiceType",
+        "extraWeight",
+        "isIntraCommunityDelivery",
+        "isCancelled",
+        "isPending",
+        "itemDescriptionType",
+        "languageIso",
+        "needsOnlineSynchronisation",
+        "readOnlyType",
+        "salesOrderDate",
+        "salesOrderNumber",
+        "salesOrderStatus",
+        "shippingPriority",
+        "isExemptFromVat",
+        "companyId",
+        "salesInvoiceStatus",
+        "customerGroupName",
+        "salesInvoiceCorrectionTotalGrossAmount",
+        "alreadyPaidAmount",
+        "totalQuantity",
+        "paymentStatus",
+        "deliveryStatus",
+        "deliverability",
+        "platformType"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.VerkaufAuftragKey"
+        },
+        "accountsReceivableNumber": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "assignedUserId": {
+          "$ref": "#/components/schemas/JTL.Identity.Abstractions.BenutzerKey"
+        },
+        "companyName": {
+          "type": "string"
+        },
+        "createdByUserId": {
+          "$ref": "#/components/schemas/JTL.Identity.Abstractions.BenutzerKey"
+        },
+        "currencyFactor": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "currencyIso": {
+          "type": "string"
+        },
+        "customerId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.KundeKey"
+        },
+        "customerNumber": {
+          "type": "string"
+        },
+        "deliveryCompleteStatus": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.DeliveryCompleteStatus"
+        },
+        "departureCountryIso": {
+          "type": "string"
+        },
+        "departureCountryCurrencyFactor": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "departureCountryCurrencyIso": {
+          "type": "string"
+        },
+        "ebayUsername": {
+          "type": "string"
+        },
+        "estimatedDeliveryDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "externalSalesInvoiceType": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.ExternalSalesInvoiceType"
+        },
+        "externalSalesOrderNumber": {
+          "type": "string"
+        },
+        "extraWeight": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "isIntraCommunityDelivery": {
+          "type": "boolean"
+        },
+        "isCancelled": {
+          "type": "boolean"
+        },
+        "isPending": {
+          "type": "boolean"
+        },
+        "itemDescriptionType": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.ItemDescriptionType"
+        },
+        "languageIso": {
+          "type": "string"
+        },
+        "lastShippingDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "needsOnlineSynchronisation": {
+          "type": "boolean"
+        },
+        "onHoldReasonId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.RueckhaltegrundKey"
+        },
+        "paymentMethodId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.ZahlungsartKey"
+        },
+        "paymentDueDateInDays": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "processColourCode": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "processColourName": {
+          "type": "string"
+        },
+        "processStatusName": {
+          "type": "string"
+        },
+        "readOnlyType": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.ReadOnlyType"
+        },
+        "salesChannelId": {
+          "type": "string"
+        },
+        "platformId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.PlattformKey"
+        },
+        "shopId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.ShopKey"
+        },
+        "salesOrderDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "salesOrderNumber": {
+          "type": "string"
+        },
+        "salesOrderStatus": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "shippingMethodId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.VersandartKey"
+        },
+        "shippingPriority": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "shopPaymentModule": {
+          "type": "string"
+        },
+        "taxSetting": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.TaxSetting"
+        },
+        "totalGrossAmount": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "isExemptFromVat": {
+          "type": "boolean"
+        },
+        "companyId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.FirmaKey"
+        },
+        "onlineSalesOrderId": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "comment": {
+          "type": "string"
+        },
+        "printDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "mailDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "paymentMailDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "dateOfPayment": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "paymentDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "onHoldReasonName": {
+          "type": "string"
+        },
+        "salesInvoiceStatus": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.InvoiceStatus"
+        },
+        "billingAddressCompany": {
+          "type": "string"
+        },
+        "billingAddressAdditionalCompanyLine": {
+          "type": "string"
+        },
+        "billingAddressSalutation": {
+          "type": "string"
+        },
+        "billingAddressTitle": {
+          "type": "string"
+        },
+        "billingAddressFirstName": {
+          "type": "string"
+        },
+        "billingAddressLastName": {
+          "type": "string"
+        },
+        "billingAddressStreet": {
+          "type": "string"
+        },
+        "billingAddressAdditionalAddressLine": {
+          "type": "string"
+        },
+        "billingAddressPostalCode": {
+          "type": "string"
+        },
+        "billingAddressCity": {
+          "type": "string"
+        },
+        "billingAddressCountryName": {
+          "type": "string"
+        },
+        "billingAddressPhoneNumber": {
+          "type": "string"
+        },
+        "billingAddressMobilePhoneNumber": {
+          "type": "string"
+        },
+        "billingAddressFax": {
+          "type": "string"
+        },
+        "billingAddressEmailAddress": {
+          "type": "string"
+        },
+        "billingAddressPostId": {
+          "type": "string"
+        },
+        "billingAddressState": {
+          "type": "string"
+        },
+        "billingAddressCountryIso": {
+          "type": "string"
+        },
+        "shipmentAddressCompany": {
+          "type": "string"
+        },
+        "shipmentAddressAdditionalCompanyLine": {
+          "type": "string"
+        },
+        "shipmentAddressSalutation": {
+          "type": "string"
+        },
+        "shipmentAddressTitle": {
+          "type": "string"
+        },
+        "shipmentAddressFirstName": {
+          "type": "string"
+        },
+        "shipmentAddressLastName": {
+          "type": "string"
+        },
+        "shipmentAddressStreet": {
+          "type": "string"
+        },
+        "shipmentAddressAdditionalAddressLine": {
+          "type": "string"
+        },
+        "shipmentAddressPostalCode": {
+          "type": "string"
+        },
+        "shipmentAddressCity": {
+          "type": "string"
+        },
+        "shipmentAddressCountryName": {
+          "type": "string"
+        },
+        "shipmentAddressPhoneNumber": {
+          "type": "string"
+        },
+        "shipmentAddressMobilePhoneNumber": {
+          "type": "string"
+        },
+        "shipmentAddressFax": {
+          "type": "string"
+        },
+        "shipmentAddressEmailAddress": {
+          "type": "string"
+        },
+        "shipmentAddressPostId": {
+          "type": "string"
+        },
+        "shipmentAddressState": {
+          "type": "string"
+        },
+        "shipmentAddressCountryIso": {
+          "type": "string"
+        },
+        "assignedUserName": {
+          "type": "string"
+        },
+        "salesChannelName": {
+          "type": "string"
+        },
+        "customerGroupName": {
+          "type": "string"
+        },
+        "paymentMethodName": {
+          "type": "string"
+        },
+        "shippingMethodName": {
+          "type": "string"
+        },
+        "shippingCountryTotalGrossAmount": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "customerComment": {
+          "type": "string"
+        },
+        "paymentReference": {
+          "type": "string"
+        },
+        "salesInvoiceCorrectionTotalGrossAmount": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "alreadyPaidAmount": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "stillToPay": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "totalNetAmount": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "totalQuantity": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "wMSLocked": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "wMSPartialShipment": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "wMSPrePicking": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "paymentStatus": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.InvoicePaymentStatus"
+        },
+        "deliveryStatus": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.DeliveryStatus"
+        },
+        "deliverability": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.Deliverability"
+        },
+        "platformType": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "salesInvoiceNumbers": {
+          "type": "string"
+        },
+        "cancelledDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "cancellationComment": {
+          "type": "string"
+        },
+        "cancellationUserName": {
+          "type": "string"
+        },
+        "cancellationReason": {
+          "type": "string"
+        },
+        "amazonUserId": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "createdByUserName": {
+          "type": "string"
+        }
+      }
+    },
+    "JTL.Data.Contracts.Keys.VerkaufAuftragKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
+    "JTL.Identity.Abstractions.BenutzerKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
+    "JTL.Data.Contracts.Keys.KundeKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.DeliveryCompleteStatus": {
+      "type": "integer",
+      "format": "int32",
+      "enum": [0, 1, 2]
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.ExternalSalesInvoiceType": {
+      "type": "integer",
+      "format": "int32",
+      "enum": [0, 1, 2]
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.ItemDescriptionType": {
+      "type": "integer",
+      "format": "int32",
+      "enum": [0, 1, 2]
+    },
+    "JTL.Data.Contracts.Keys.RueckhaltegrundKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
+    "JTL.Data.Contracts.Keys.ZahlungsartKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.ReadOnlyType": {
+      "type": "integer",
+      "format": "int32",
+      "enum": [0, 1, 2]
+    },
+    "JTL.Data.Contracts.Keys.PlattformKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
+    "JTL.Data.Contracts.Keys.ShopKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
+    "JTL.Data.Contracts.Keys.VersandartKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.TaxSetting": {
+      "type": "integer",
+      "format": "int32",
+      "enum": [0, 10, 15, 20]
+    },
+    "JTL.Data.Contracts.Keys.FirmaKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.InvoiceStatus": {
+      "type": "integer",
+      "format": "int32",
+      "enum": [0, 1, 2]
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.InvoicePaymentStatus": {
+      "type": "integer",
+      "format": "int32",
+      "enum": [0, 1, 2, 3]
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.DeliveryStatus": {
+      "type": "integer",
+      "format": "int32",
+      "enum": [0, 1, 2, 3, 4, 5, 6, 7]
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.Deliverability": {
+      "type": "integer",
+      "format": "int32",
+      "enum": [0, 1, 2]
+    },
+    "JTL.Wawi.Rest.Contracts.Models.V1.SalesOrder.SalesOrderLineItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "salesOrderId",
+        "itemId",
+        "name",
+        "sKU",
+        "type",
+        "quantity",
+        "quantityDelivered",
+        "quantityReturned",
+        "salesUnit",
+        "salesPriceNet",
+        "salesPriceGross",
+        "discount",
+        "purchasePriceNet",
+        "taxRate",
+        "notice"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.VerkaufAuftragPositionKey"
+        },
+        "salesOrderId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.VerkaufAuftragKey"
+        },
+        "itemId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.ArtikelKey"
+        },
+        "name": {
+          "type": "string"
+        },
+        "sKU": {
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/components/schemas/JTL.Wawi.Rest.Contracts.Models.V1.SalesOrder.SalesOrderLineItemType"
+        },
+        "quantity": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "quantityDelivered": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "quantityReturned": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "salesUnit": {
+          "type": "string"
+        },
+        "salesPriceNet": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "salesPriceGross": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "discount": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "purchasePriceNet": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "taxRate": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "notice": {
+          "type": "string"
+        }
+      }
+    },
+    "JTL.Data.Contracts.Keys.VerkaufAuftragPositionKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
+    "JTL.Data.Contracts.Keys.ArtikelKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
+    "JTL.Wawi.Rest.Contracts.Models.V1.SalesOrder.SalesOrderLineItemType": {
+      "type": "integer",
+      "format": "int32",
+      "enum": [
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+        20, 21
+      ]
+    },
+    "JTL.Framework.Api.Abstraction.Models.PagedListOfJTL.Wawi.Item.PublicApi.DataTransferObjects.V2.ItemOverview.ItemListItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["totalItems", "pageNumber", "pageSize", "items"],
+      "properties": {
+        "totalItems": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "pageNumber": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "pageSize": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/JTL.Wawi.Item.PublicApi.DataTransferObjects.V2.ItemOverview.ItemListItem"
+          }
+        },
+        "totalPages": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "hasPreviousPage": {
+          "type": "boolean"
+        },
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "nextPageNumber": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "previousPageNumber": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "JTL.Wawi.Item.PublicApi.DataTransferObjects.V2.ItemOverview.ItemListItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sKU",
+        "isDeliveryTimeAutomatic",
+        "salesPriceNet",
+        "suggestedRetailPrice",
+        "amazonPrice",
+        "ebayPrice",
+        "buffer",
+        "allowNegativeStock",
+        "isInventoryManagementActive",
+        "isDivisible",
+        "hasBatch",
+        "hasBestBeforeDate",
+        "isSerialNumberManaged",
+        "isActive",
+        "isOnPriceList",
+        "isTopItem",
+        "isNew",
+        "isBillOfMaterials",
+        "isBillOfMaterialsComponent",
+        "isVariationParent",
+        "isVariationChild",
+        "hasMinimumStock",
+        "isBlockedForOrderSuggestions",
+        "isShopActive",
+        "isOrderProcessProhibited",
+        "isFulfillmentActive",
+        "isFulfillmentOwn"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.ArtikelKey"
+        },
+        "billOfMaterialsId": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "parentItemId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.ArtikelKey"
+        },
+        "itemIdForCategoryItemId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.ArtikelKey"
+        },
+        "sKU": {
+          "type": "string"
+        },
+        "sortNumber": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "name": {
+          "type": "string"
+        },
+        "unit": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "shortDescription": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        },
+        "labels": {
+          "type": "string"
+        },
+        "series": {
+          "type": "string"
+        },
+        "gTIN": {
+          "type": "string"
+        },
+        "manufacturerNumber": {
+          "type": "string"
+        },
+        "iSBN": {
+          "type": "string"
+        },
+        "defaultAsin": {
+          "type": "string"
+        },
+        "taricCode": {
+          "type": "string"
+        },
+        "uPC": {
+          "type": "string"
+        },
+        "uNNumber": {
+          "type": "string"
+        },
+        "hazardNumber": {
+          "type": "string"
+        },
+        "amazonFnsku": {
+          "type": "string"
+        },
+        "jfsku": {
+          "type": "string"
+        },
+        "countryOfOrigin": {
+          "type": "string"
+        },
+        "manufacturerName": {
+          "type": "string"
+        },
+        "deliveryStatus": {
+          "type": "string"
+        },
+        "isDeliveryTimeAutomatic": {
+          "type": "boolean"
+        },
+        "manualDeliveryTimeDays": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "width": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "height": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "length": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "shippingWeight": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "weight": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "createdDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "modifiedDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "modifiedTimestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "releaseDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "lastPurchaseDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "lastEditor": {
+          "type": "string"
+        },
+        "salesPriceNet": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "salesPriceGross": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "suggestedRetailPrice": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "averagePurchasePriceNet": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "lastPurchasePrice": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "amazonPrice": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "ebayPrice": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "profit": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "profitPercent": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "specialPriceStatus": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "basePriceValue": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "basePriceUnit": {
+          "type": "string"
+        },
+        "measurementUnit": {
+          "type": "string"
+        },
+        "stockTotal": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "stockOwn": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "stockIncoming": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "stockOnPurchaseList": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "stockInOrders": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "stockAvailable": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "stockReservedTotal": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "stockInAmazonOffers": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "ebayStock": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "minimumOrderQuantity": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "purchaseInterval": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "buffer": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "minimumStock": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "allowNegativeStock": {
+          "type": "boolean"
+        },
+        "isInventoryManagementActive": {
+          "type": "boolean"
+        },
+        "isDivisible": {
+          "type": "boolean"
+        },
+        "hasBatch": {
+          "type": "boolean"
+        },
+        "hasBestBeforeDate": {
+          "type": "boolean"
+        },
+        "isSerialNumberManaged": {
+          "type": "boolean"
+        },
+        "serialNumberTrackingMode": {
+          "$ref": "#/components/schemas/JTL.Wawi.Item.PublicApi.DataTransferObjects.V2.ItemOverview.SerialNumberTrackingMode"
+        },
+        "isActive": {
+          "type": "boolean"
+        },
+        "isOnPriceList": {
+          "type": "boolean"
+        },
+        "isTopItem": {
+          "type": "boolean"
+        },
+        "isNew": {
+          "type": "boolean"
+        },
+        "isBillOfMaterials": {
+          "type": "boolean"
+        },
+        "isBillOfMaterialsComponent": {
+          "type": "boolean"
+        },
+        "isVariationParent": {
+          "type": "boolean"
+        },
+        "isVariationChild": {
+          "type": "boolean"
+        },
+        "hasMinimumStock": {
+          "type": "boolean"
+        },
+        "isBlockedForOrderSuggestions": {
+          "type": "boolean"
+        },
+        "isShopActive": {
+          "type": "boolean"
+        },
+        "isOrderProcessProhibited": {
+          "type": "boolean"
+        },
+        "salesPackagingUnit": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "conditionId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.ZustandKey"
+        },
+        "conditionName": {
+          "type": "string"
+        },
+        "isFulfillmentActive": {
+          "type": "boolean"
+        },
+        "isFulfillmentOwn": {
+          "type": "boolean"
+        },
+        "taxClassId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.SteuerklasseKey"
+        },
+        "taxClassName": {
+          "type": "string"
+        },
+        "manufacturerId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.HerstellerKey"
+        },
+        "productGroupId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.WarengruppeKey"
+        },
+        "productGroupName": {
+          "type": "string"
+        },
+        "defaultSupplierId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.LieferantKey"
+        },
+        "defaultSupplier": {
+          "type": "string"
+        },
+        "shippingClassId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.VersandklasseKey"
+        },
+        "shippingClassName": {
+          "type": "string"
+        },
+        "defaultImageId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.BildKey"
+        },
+        "defaultImageUrl": {
+          "type": "string"
+        },
+        "additionalProcessingTime": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "metaDescription": {
+          "type": "string"
+        },
+        "titleTag": {
+          "type": "string"
+        },
+        "metaKeywords": {
+          "type": "string"
+        },
+        "languageId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.SpracheKey"
+        },
+        "companyId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.FirmaKey"
+        }
+      }
+    },
+    "JTL.Wawi.Item.PublicApi.DataTransferObjects.V2.ItemOverview.SerialNumberTrackingMode": {
+      "type": "integer",
+      "format": "int32",
+      "enum": [0, 1, 2, 3]
+    },
+    "JTL.Data.Contracts.Keys.ZustandKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
+    "JTL.Data.Contracts.Keys.SteuerklasseKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
+    "JTL.Data.Contracts.Keys.HerstellerKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
+    "JTL.Data.Contracts.Keys.WarengruppeKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
+    "JTL.Data.Contracts.Keys.LieferantKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
+    "JTL.Data.Contracts.Keys.VersandklasseKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
+    "JTL.Data.Contracts.Keys.BildKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
+    "JTL.Data.Contracts.Keys.SpracheKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
+    "JTL.Wawi.Warenlagerverwaltung.PublicApi.DataTransferObjects.V2.Stocks.WarehouseItemStock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["totalQuantity", "lockedQuantity"],
+      "properties": {
+        "totalQuantity": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "lockedQuantity": {
+          "type": "number",
+          "format": "decimal"
+        }
+      }
+    },
+    "JTL.Wawi.Rest.Contracts.Models.PagedListOfJTL.Wawi.Rest.Contracts.Models.V1.DeliveryNote.DeliveryNote": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["totalItems", "pageNumber", "pageSize", "items"],
+      "properties": {
+        "totalItems": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "pageNumber": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "pageSize": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/JTL.Wawi.Rest.Contracts.Models.V1.DeliveryNote.DeliveryNote"
+          }
+        },
+        "totalPages": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "hasPreviousPage": {
+          "type": "boolean"
+        },
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "nextPageNumber": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "previousPageNumber": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "JTL.Wawi.Rest.Contracts.Models.V1.DeliveryNote.DeliveryNote": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "number", "deliveryNoteDate", "packages"],
+      "properties": {
+        "id": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.LieferscheinKey"
+        },
+        "number": {
+          "type": "string"
+        },
+        "deliveryNoteDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "packages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/JTL.Wawi.Rest.Contracts.Models.V1.DeliveryNote.DeliveryNotePackage"
+          }
+        }
+      }
+    },
+    "JTL.Data.Contracts.Keys.LieferscheinKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
+    "JTL.Wawi.Rest.Contracts.Models.V1.DeliveryNote.DeliveryNotePackage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "packageDate",
+        "trackingID",
+        "weights",
+        "shippingMethodId",
+        "shippedDate",
+        "trackingUrl",
+        "comment"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.VersandKey"
+        },
+        "packageDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "trackingID": {
+          "type": "string"
+        },
+        "weights": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "shippingMethodId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.VersandartKey"
+        },
+        "shippedDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "trackingUrl": {
+          "type": "string"
+        },
+        "comment": {
+          "type": "string"
+        }
+      }
+    },
+    "JTL.Data.Contracts.Keys.VersandKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
+    "JTL.Wawi.Delivery.PublicApi.DataTransferObjects.V2.Delivery.DeliveryNote": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "number",
+        "deliveryNoteDate",
+        "salesOrderId",
+        "packages"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.LieferscheinKey"
+        },
+        "number": {
+          "type": "string"
+        },
+        "deliveryNoteDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "salesOrderId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.VerkaufAuftragKey"
+        },
+        "packages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/JTL.Wawi.Delivery.PublicApi.DataTransferObjects.V2.Delivery.DeliveryNotePackage"
+          }
+        }
+      }
+    },
+    "JTL.Wawi.Delivery.PublicApi.DataTransferObjects.V2.Delivery.DeliveryNotePackage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "packageDate",
+        "trackingID",
+        "weights",
+        "shippingMethodId",
+        "shippedDate",
+        "trackingUrl",
+        "comment",
+        "deliveryNoteId",
+        "weight"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.VersandKey"
+        },
+        "packageDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "trackingID": {
+          "type": "string"
+        },
+        "weights": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "shippingMethodId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.VersandartKey"
+        },
+        "shippedDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "trackingUrl": {
+          "type": "string"
+        },
+        "comment": {
+          "type": "string"
+        },
+        "deliveryNoteId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.LieferscheinKey"
+        },
+        "weight": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "shippingDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "trackingNumber": {
+          "type": "string"
+        }
+      }
+    },
+    "JTL.Framework.Api.Abstraction.Models.PagedListOfJTL.Wawi.Delivery.PublicApi.DataTransferObjects.V2.Delivery.DeliveryNoteLineItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["totalItems", "pageNumber", "pageSize", "items"],
+      "properties": {
+        "totalItems": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "pageNumber": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "pageSize": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/JTL.Wawi.Delivery.PublicApi.DataTransferObjects.V2.Delivery.DeliveryNoteLineItem"
+          }
+        },
+        "totalPages": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "hasPreviousPage": {
+          "type": "boolean"
+        },
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "nextPageNumber": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "previousPageNumber": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "JTL.Wawi.Delivery.PublicApi.DataTransferObjects.V2.Delivery.DeliveryNoteLineItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "deliveryNoteId", "quantity"],
+      "properties": {
+        "id": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.LieferscheinPosKey"
+        },
+        "deliveryNoteId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.LieferscheinKey"
+        },
+        "salesOrderLineItemId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.VerkaufAuftragPositionKey"
+        },
+        "quantity": {
+          "type": "number",
+          "format": "decimal"
+        }
+      }
+    },
+    "JTL.Data.Contracts.Keys.LieferscheinPosKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    }
+  }
+}

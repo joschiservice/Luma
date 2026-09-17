@@ -1,0 +1,82 @@
+{
+  "orders": [
+    {
+      "id": 10,
+      "salesOrderNumber": "SO-10",
+      "isCancelled": false,
+      "deliveryStatus": 4,
+      "paymentStatus": 2,
+      "billingAddressEmailAddress": "excluded@example.test"
+    }
+  ],
+  "orderLines": [
+    {
+      "id": 101,
+      "salesOrderId": 10,
+      "itemId": 20,
+      "quantity": 3.5,
+      "salesUnit": "stk"
+    },
+    {
+      "id": 102,
+      "salesOrderId": 10,
+      "itemId": 0,
+      "quantity": 1,
+      "salesUnit": "kg"
+    }
+  ],
+  "items": [
+    {
+      "id": 20,
+      "sKU": "Mixed-Case-SKU",
+      "name": "Sample item",
+      "unit": "stk",
+      "isActive": true,
+      "isInventoryManagementActive": true,
+      "modifiedTimestamp": "2026-09-16T12:00:00Z",
+      "stockTotal": 3.5,
+      "stockReservedTotal": 5,
+      "stockAvailable": -1.5
+    }
+  ],
+  "notes": [{ "id": 30 }, { "id": 31 }],
+  "details": [
+    {
+      "id": 30,
+      "salesOrderId": 10,
+      "deliveryNoteDate": "2026-09-16T12:00:00Z",
+      "packages": [
+        {
+          "id": 40,
+          "deliveryNoteId": 30,
+          "shippingDate": "2026-09-16T13:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": 31,
+      "salesOrderId": 10,
+      "deliveryNoteDate": "2026-09-17T12:00:00Z",
+      "packages": [{ "id": 41, "deliveryNoteId": 31, "shippingDate": null }]
+    }
+  ],
+  "noteLines": [
+    [
+      {
+        "id": 301,
+        "deliveryNoteId": 30,
+        "salesOrderLineItemId": 101,
+        "quantity": 1.5
+      }
+    ],
+    [
+      {
+        "id": 302,
+        "deliveryNoteId": 31,
+        "salesOrderLineItemId": 101,
+        "quantity": 2
+      }
+    ]
+  ],
+  "warehouseStock": { "totalQuantity": 2.5, "lockedQuantity": 1 }
+}
