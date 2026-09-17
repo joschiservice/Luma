@@ -19,7 +19,8 @@
     "test:ui": "pnpm --filter @luma/ui test",
     "build:storybook": "turbo run build:storybook",
     "test:architecture": "node --test tooling/architecture/*.test.mjs",
-    "test:e2e": "pnpm exec turbo run build --filter=@luma/api... && pnpm --filter @luma/api test:e2e"
+    "test:e2e": "pnpm exec turbo run build --filter=@luma/api... && pnpm --filter @luma/api test:e2e",
+    "test:browser": "pnpm exec turbo run build --filter=@luma/api... && pnpm --filter @luma/api test:browser"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

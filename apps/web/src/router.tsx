@@ -1,6 +1,7 @@
 import { createRouter } from '@tanstack/react-router';
 import { setupRouterSsrQueryIntegration } from '@tanstack/react-router-ssr-query';
 import { createQueryClient } from './lib/query-client';
+import { clearPrivate } from './features/identity/data';
 import { routeTree } from './routeTree.gen';
 
 export function getRouter() {
@@ -9,6 +10,21 @@ export function getRouter() {
     routeTree,
     context: { queryClient },
     scrollRestoration: true,
+  });
+  router.subscribe('onBeforeNavigate', ({ fromLocation, toLocation }) => {
+    const previous = fromLocation?.pathname.match(
+      /^\/app\/([0-9a-f-]{36})(?:\/|$)/i,
+    )?.[1];
+    const next = toLocation.pathname.match(
+      /^\/app\/([0-9a-f-]{36})(?:\/|$)/i,
+    )?.[1];
+    if (previous && previous !== next) void clearPrivate(queryClient, previous);
+    if (
+      fromLocation?.pathname.startsWith('/app') &&
+      !toLocation.pathname.startsWith('/app')
+    ) {
+      void clearPrivate(queryClient);
+    }
   });
   // Installs the provider and handles server dehydration/client hydration.
   setupRouterSsrQueryIntegration({ router, queryClient });

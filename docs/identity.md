@@ -80,3 +80,72 @@ The integration suite creates a uniquely named database and login, applies the m
 Better Auth 1.7.5 uses Drizzle 0.45.2. `.pnpmfile.cjs` supplies Better Call 1.4.0's optional Zod 4 peer as a private dependency so it can coexist with ts-rest's Zod 3. Strict peer checks remain enabled. Reassess the hook when upgrading either dependency.
 
 References: [Better Auth organization plugin](https://better-auth.com/docs/plugins/organization), [Fastify integration](https://better-auth.com/docs/integrations/fastify), [ADR-003](architecture/003-tenant-isolation-and-data-residency.md).
+
+## Exception Desk web entry
+
+The web app provides self-service email/password registration and sign-in at
+`/sign-up` and `/sign-in`. `/app` opens workspace creation for users without a
+workspace, the overview for users with one, or a selector for users with several.
+Workspace URLs use organization UUIDs. Each tab selects its own workspace.
+
+Protected routes use TanStack Start's `ssr: false`: session and membership reads
+run in the browser through the same-origin API proxy. The server renders no
+private content and forwards no session cookies for rendering. Each router still
+owns its own QueryClient. Do not add server-side identity reads without forwarding
+only the current request's cookies to a configured, trusted API origin.
+
+Session and access reads refetch on focus and navigation. Private queries use the
+`['private', 'organization', organizationId, ...]` prefix; switching workspaces
+cancels and removes the previous workspace's queries. Session loss removes all
+private queries. No query persistence or offline mutation queue is configured.
+Creation requests are never automatically retried. After an uncertain workspace
+creation, inspect the refreshed workspace list before starting another creation.
+
+### Production proxy
+
+Serve the web app and API under one HTTPS origin. Set `BETTER_AUTH_URL` to that
+public origin and include it in `AUTH_TRUSTED_ORIGINS`. Forward `/api/` to the
+trusted API service, removing only the `/api` prefix. Preserve `Cookie`, `Origin`
+and every `Set-Cookie` header. Disable caching for auth and organization responses.
+Never rewrite an untrusted Origin into a trusted one. For example, with Nginx:
+
+```nginx
+location /api/ {
+    proxy_pass http://luma_api/;
+    proxy_set_header Host $host;
+    proxy_set_header Origin $http_origin;
+    proxy_set_header Cookie $http_cookie;
+    proxy_cache off;
+    add_header Cache-Control "no-store" always;
+}
+```
+
+`luma_api` is the deployment's fixed private API upstream. Forward all remaining
+paths to the TanStack Start server. Keep secure, HttpOnly session cookies intact;
+do not expose session tokens to JavaScript or browser storage. The development
+Vite proxy applies the same path rewrite and preserves Origin and cookies.
+
+### Browser acceptance suite
+
+With the disposable PostgreSQL setup from the repository README:
+
+```sh
+pnpm --filter @luma/api exec playwright install chromium
+TEST_DATABASE_URL=postgresql://postgres:luma_test_only@127.0.0.1:55432/luma_test pnpm test:browser
+```
+
+Use Node 24. The suite starts the compiled API with a restricted database login
+and the actual Vite app at `http://127.0.0.1:3107`; keep that port free. It creates
+and removes its own database, users and workspaces. Registration, sign-in,
+organization writes and session revocation use real backend calls. Selected
+network failures are injected at the browser boundary. Screenshots are written
+to the system temporary directory. No production credentials are needed.
+
+Verified on 18 September 2026 with Node 24, PostgreSQL 17 and Chromium:
+`pnpm check`, `pnpm test:e2e` (3 scenarios), and `pnpm test:browser`
+(3 scenarios) passed. Browser coverage includes zero/one/multiple workspaces,
+registration with and without a session, uncertain writes, rejected origins,
+return-path validation, tenant switching with a delayed response, separate tabs,
+access revocation, recoverable service failures, sign-out, and keyboard navigation
+at 1440×1000 and 390×844. The delayed-query unit check also verifies cancellation
+and removal of the previous tenant's cache entries.

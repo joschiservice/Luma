@@ -12,8 +12,14 @@ export function Home() {
           what matters.
         </h1>
         <p className="description">
-          Your operations workspace is taking shape.
+          A clearer view of your commerce operations.
         </p>
+        <div className="landing-actions">
+          <a className="action-link" href="/sign-up">
+            Create account ↗
+          </a>
+          <a href="/sign-in">Sign in</a>
+        </div>
       </div>
       <footer>Built for the work ahead.</footer>
     </main>
