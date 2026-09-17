@@ -57,10 +57,12 @@ export function createJtlConnector(
   const units = { stk: 'each', Stück: 'each', each: 'each', ...options.units };
   if (Object.values(units).some((value) => !value.trim()))
     fail('invalid_input');
-  const unit = (value: string) =>
-    Object.hasOwn(units, value)
-      ? (units[value as keyof typeof units] ?? value)
-      : value;
+  const unit = (value: string | undefined) =>
+    !value?.trim()
+      ? 'unknown'
+      : Object.hasOwn(units, value)
+        ? (units[value as keyof typeof units] ?? value)
+        : value;
   const client = createClient(options);
   const now = options.now ?? (() => new Date());
   const nextId = options.id ?? randomUUID;

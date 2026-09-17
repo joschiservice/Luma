@@ -44,7 +44,7 @@ export const item = z.object({
   id,
   sKU: z.string(),
   name: z.string().nullable().optional(),
-  unit: z.string().min(1),
+  unit: z.string().optional(),
   isActive: z.boolean(),
   isInventoryManagementActive: z.boolean(),
   modifiedTimestamp: timestamp.nullable().optional(),

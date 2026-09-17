@@ -10,6 +10,7 @@ type Schema = {
   type?: string;
   format?: string;
   properties?: Record<string, Schema>;
+  required?: string[];
   items?: Schema;
 };
 const schemas: Record<string, Schema> = api.schemas;
@@ -80,6 +81,17 @@ describe('JTL 2.2 published contract', () => {
       validate({ sku: 'incorrect-casing' }, response('/v2/items', true)),
     ).toThrow('Unknown provider field');
   });
+  it('accepts the optional item unit from the published contract', () => {
+    const schema = resolve(response('/v2/items', true));
+    expect(schema.properties?.unit).toEqual({ type: 'string' });
+    expect(schema.required).not.toContain('unit');
+    const item = structuredClone(commerce.items[0]!);
+    Reflect.deleteProperty(item, 'unit');
+    const parsed = s.item.parse(cloudPayload(item));
+    expect(parsed.unit).toBeUndefined();
+    validate(parsed, schema);
+  });
+
   it('retains the documented fulfillment filter and paged child endpoint', () => {
     expect(api.paths['/v2/delivery-notes'].parameters).toContainEqual({
       name: 'salesOrderNumberId',

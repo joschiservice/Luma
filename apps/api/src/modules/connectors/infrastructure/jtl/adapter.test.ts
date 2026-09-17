@@ -278,6 +278,36 @@ describe('JTL read adapter', () => {
     ).toMatchObject({ ok: false, error: { code: 'invalid_input' } });
   });
 
+  it.each([undefined, '', '   '])(
+    'preserves item observations with unit %j as unknown',
+    async (value) => {
+      const f = fixture({ units: { unknown: 'each' } });
+      if (value === undefined) Reflect.deleteProperty(f.data.items[0]!, 'unit');
+      else f.data.items[0]!.unit = value;
+      expect(await f.read('products.read')).toMatchObject({
+        ok: true,
+        value: {
+          items: [{ data: { skus: [{ id: ref('20'), unit: 'unknown' }] } }],
+        },
+      });
+      expect(await f.read('inventory.read')).toMatchObject({
+        ok: true,
+        value: {
+          items: [
+            { data: { unit: 'unknown', onHand: '3.5', available: '-1.5' } },
+          ],
+        },
+      });
+      expect(
+        await f.read('inventory.read', { limit: 10, location: ref('7') }),
+      ).toMatchObject({
+        ok: true,
+        value: { items: [{ data: { unit: 'unknown', onHand: '2.5' } }] },
+      });
+      expect(f.recordObservations).toHaveBeenCalledTimes(3);
+    },
+  );
+
   it('preserves unknown statuses, untracked stock and missing values', async () => {
     const f = fixture();
     f.data.orders[0]!.paymentStatus = 99;

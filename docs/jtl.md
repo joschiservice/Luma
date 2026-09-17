@@ -31,7 +31,7 @@ Inventory comparisons require explicit mappings between equivalent stock pools. 
 
 Order-line IDs include the order ID as their scope. Inventory observations use the item ID scoped to the location. All observations include tenant, connection, provider, observation time, adapter version and schema version. Source revision is null. Order and delivery-note creation dates are not update timestamps.
 
-Unit labels `stk`, `Stück` and `each` map to `each`. Other nonempty labels are retained. Supply `units` for installation-specific canonical aliases; this does not convert quantities. Unknown unit mappings must block cross-provider comparisons. JSON decimal tokens are preserved before JavaScript numeric rounding; unsupported precision is rejected rather than rounded.
+Unit labels `stk`, `Stück` and `each` map to `each`. Missing or blank item units normalize to `unknown`; they do not default to `each` or pass through configured aliases. Other nonempty labels are retained. Supply `units` for installation-specific canonical aliases; this does not convert quantities. Unknown unit mappings must block cross-provider comparisons. JSON decimal tokens are preserved before JavaScript numeric rounding; unsupported precision is rejected rather than rounded.
 
 Delivery notes do not expose operations that have not yet produced a note, carrier delivery confirmation, or a reliable failure code. No absence, zero timestamp or tracking label is treated as shipment or deletion evidence. A partly shipped note remains processing because the API does not link individual packages to line quantities. Missing order-line links or duplicate links within one delivery note reject the page rather than omit or overwrite quantities.
 
