@@ -55,6 +55,10 @@ API build output is `apps/api/dist`; run with `pnpm --filter @luma/api start` af
 
 [ADR-002](docs/architecture/002-canonical-commerce-model.md) defines the V0 entities, tenant-scoped identifiers, source snapshots, lifecycle fields and constraints for future Drizzle migrations. It covers JTL/Shopify comparison, raw payload retention, exception deduplication and the proposal → execution → verification → audit trail.
 
+## Tenant isolation and data residency
+
+[ADR-003](docs/architecture/003-tenant-isolation-and-data-residency.md) defines trusted organization context, scoped repositories plus PostgreSQL RLS, EU-only V0 placement, regional service boundaries and the future dedicated database path. Its SQL/API conventions and acceptance checks govern LUMA-7/8 and later persistence adapters; the current bootstrap has no tenant endpoints or database.
+
 ## Environment
 
 Optional overrides belong in the consuming app's `.env`; copy its `.env.example` first. API dev/start commands load that file; Vite loads web environment files. Real `.env` files are ignored. Document every new setting in the corresponding example, validate server settings at startup, and inject production secrets through the deployment environment.
