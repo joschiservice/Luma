@@ -37,7 +37,13 @@ export function createClient(options: ShopifyTransportOptions) {
     query: string,
     variables: Record<string, unknown>,
   ): Promise<Record<string, unknown>> => {
-    const token = await options.accessToken();
+    let token: string;
+    try {
+      token = await options.accessToken();
+    } catch (error) {
+      if (error instanceof ConnectorError) throw error;
+      fail('transient', 1000);
+    }
     if (!token || /[\r\n]/.test(token)) fail('authentication');
     const signal = AbortSignal.timeout(timeoutMs);
     let transportTimedOut = false;

@@ -44,8 +44,17 @@ Raw capture is off by default. Set a positive `rawRetentionMs` to pass allowlist
 
 ## Errors and verification
 
-HTTP authentication/permission/not-found errors, rate limits, server failures, network failures, timeouts and malformed responses map to the SDK error codes. HTTP `Retry-After` and GraphQL throttle cost produce delay advice. SDK retries are explicitly disabled; the adapter performs no automatic retries and returns `effect: none` for reads. GraphQL errors reject partial data, and an unexpected `X-Shopify-API-Version` rejects silent version fallback. Raw provider error text is discarded.
+HTTP authentication/permission/not-found errors, rate limits, server failures, network failures, timeouts and malformed responses map to the SDK error codes. HTTP `Retry-After` and GraphQL throttle cost produce delay advice. SDK retries are explicitly disabled; the adapter performs no automatic retries and returns `effect: none` for reads. GraphQL errors reject partial data, and an unexpected `X-Shopify-API-Version` rejects silent version fallback. Unclassified token-store failures return `transient` with delay advice; explicitly classified connector errors are preserved. Empty credentials return `authentication`. Raw provider error text is discarded.
 
 `infrastructure/shopify/fixtures/commerce.json` is a synthetic deterministic fixture for a split order, an unmapped variant and stock across two locations. Adapter tests exercise the public capability runtime, pagination, isolation, filters, unknown values, evidence capture failures, transport errors and webhook signatures. They require no Shopify account. A live shop smoke test still requires an installation with the scopes above.
+
+Query contract tests validate every emitted operation against `fixtures/admin-2026-07.graphql`, an offline snapshot extracted from Shopify’s versioned public schema. The snapshot retains the adapter’s fields, their complete argument definitions and referenced types. Negative cases reject unknown fields, unknown arguments and incompatible variable types. A separate version assertion requires a fixture refresh when `API_VERSION` changes.
+
+Regenerate the snapshot from the repository root, then review the schema diff and rerun the tests:
+
+```sh
+pnpm --filter @luma/api exec node scripts/update-shopify-schema.mjs 2026-07
+pnpm exec prettier --write apps/api/src/modules/connectors/infrastructure/shopify/fixtures/admin-2026-07.graphql
+```
 
 References: [orders and historical access](https://shopify.dev/docs/api/admin-graphql/latest/queries/orders), [inventory items](https://shopify.dev/docs/api/admin-graphql/latest/objects/InventoryItem), [fulfillment orders](https://shopify.dev/docs/api/admin-graphql/latest/objects/FulfillmentOrder), [order shipments](https://shopify.dev/docs/api/admin-graphql/latest/objects/Order#field-Order.fields.fulfillments), [webhook verification](https://shopify.dev/docs/apps/build/webhooks/verify-deliveries), [API limits](https://shopify.dev/docs/api/usage/limits).

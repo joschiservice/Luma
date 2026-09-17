@@ -1,7 +1,11 @@
 import { createHmac } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { buildSchema, parse, validate } from 'graphql';
 import { describe, expect, it, vi } from 'vitest';
 import type { TenantContext } from '../../../identity/index.js';
 import { createCapabilityRuntime } from '../../application/capabilities.js';
+import { ConnectorError } from '../../domain/capabilities.js';
+import { API_VERSION } from './client.js';
 import type { ReadCapability } from '../../domain/capabilities.js';
 import { createShopifyConnector } from './adapter.js';
 import type { ShopifyConnectorOptions } from './adapter.js';
@@ -448,6 +452,39 @@ describe('Shopify read capabilities', () => {
 });
 
 describe('Shopify failures', () => {
+  it('returns retry advice when token storage fails without dispatching or exposing the error', async () => {
+    const f = fixture();
+    f.accessToken.mockRejectedValueOnce(
+      new Error('secret-store unavailable: private-token'),
+    );
+    expect(await f.read('orders.read')).toEqual({
+      ok: false,
+      error: {
+        code: 'transient',
+        effect: 'none',
+        retry: 'after_delay',
+        retryAfterMs: 1000,
+      },
+    });
+    expect(f.fetch).not.toHaveBeenCalled();
+    expect(f.recordObservations).not.toHaveBeenCalled();
+    expect(JSON.stringify(f.record.mock.calls)).not.toContain('private-token');
+    expect(await f.read('orders.read')).toMatchObject({ ok: true });
+  });
+  it('preserves classified token errors and treats empty credentials as authentication failures', async () => {
+    const f = fixture();
+    const failure = {
+      code: 'authentication',
+      effect: 'none',
+      retry: 'never',
+    } as const;
+    f.accessToken.mockRejectedValueOnce(new ConnectorError(failure));
+    expect(await f.read('orders.read')).toEqual({ ok: false, error: failure });
+    f.accessToken.mockResolvedValueOnce('');
+    expect(await f.read('orders.read')).toEqual({ ok: false, error: failure });
+    expect(f.fetch).not.toHaveBeenCalled();
+  });
+
   it.each([
     [401, 'authentication'],
     [403, 'permission_denied'],
@@ -576,5 +613,50 @@ describe('Shopify webhook refresh hints', () => {
     expect(() =>
       mapShopifyWebhook({ ...options, shop: 'other.myshopify.com' }),
     ).toThrow('authentication');
+  });
+});
+
+describe('Shopify query contract', () => {
+  // Pin the fixture independently so changing the API version requires a schema refresh.
+  const schemaVersion = '2026-07';
+  const schema = buildSchema(
+    readFileSync(
+      new URL('./fixtures/admin-2026-07.graphql', import.meta.url),
+      'utf8',
+    ),
+  );
+
+  it('validates all emitted operations against the matching Shopify schema', async () => {
+    expect(API_VERSION).toBe(schemaVersion);
+    const f = fixture();
+    for (const capability of [
+      'orders.read',
+      'products.read',
+      'inventory.read',
+      'fulfillment.read',
+    ] as const) {
+      expect(await f.read(capability)).toMatchObject({ ok: true });
+    }
+    const operations = new Set(
+      f.fetch.mock.calls.map(
+        ([, init]) =>
+          (JSON.parse(String(init?.body)) as { query: string }).query,
+      ),
+    );
+    expect(operations.size).toBe(13);
+    for (const query of operations) {
+      expect(
+        validate(schema, parse(query)).map((error) => error.message),
+        query,
+      ).toEqual([]);
+    }
+  });
+
+  it.each([
+    'query { orders(first: 1) { nodes { misspelledField } } }',
+    'query { orders(invalidArgument: 1) { nodes { id } } }',
+    'query($first: String) { orders(first: $first) { nodes { id } } }',
+  ])('rejects incompatible operations: %s', (query) => {
+    expect(validate(schema, parse(query)).length).toBeGreaterThan(0);
   });
 });
