@@ -239,18 +239,23 @@ describe.skipIf(!databaseUrl)(
     it('persists intent, policy and preparation before the effect; success requires verification', async () => {
       const proposal = action({
         proposedBy: {
-          kind: 'agent',
-          id: 'planner',
-          initiatingUserId: alice.actor.id,
-          model: {
-            provider: 'fixture',
-            name: 'test',
-            version: '1',
-            promptVersion: '2',
-            runId: randomUUID(),
-          },
+          kind: 'user',
+          id: alice.actor.id,
+          initiatingUserId: alice.actor.initiatingUserId,
         },
       });
+      const executor: EffectAdapter['executor'] = {
+        kind: 'agent',
+        id: 'trusted-executor',
+        model: {
+          provider: 'fixture',
+          name: 'test',
+          version: '1',
+          promptVersion: '2',
+          runId: randomUUID(),
+        },
+      };
+      resolve.mockResolvedValue({ ...adapter, executor });
       execute.mockImplementation(async (intent, key) => {
         expect(key).toBe(`v0:${proposal.id}`);
         expect(intent).toEqual(proposal);
@@ -267,11 +272,12 @@ describe.skipIf(!databaseUrl)(
       const result = await safety.execution.execute(alice, proposal);
       expect(result.state).toBe('succeeded');
       if ('record' in result) {
-        expect(result.record.intent.proposedBy.model?.promptVersion).toBe('2');
+        expect(result.record.intent.proposedBy).toEqual(proposal.proposedBy);
+        expect(result.record.attempt.executor.model?.promptVersion).toBe('2');
         expect(result.record.attempt).toMatchObject({
           number: 1,
           mechanism: 'api',
-          executor: adapter.executor,
+          executor,
           verification: { outcome: 'passed' },
         });
       }
@@ -282,12 +288,104 @@ describe.skipIf(!databaseUrl)(
         'execution.prepared',
         'execution.completed',
       ]);
+      expect(
+        (await audit(proposal.id)).find(
+          (entry) => entry.eventType === 'execution.prepared',
+        ),
+      ).toMatchObject({ proposedBy: proposal.proposedBy, executor });
       expect(execute).toHaveBeenCalledTimes(1);
     });
-    it('denies missing permissions, unavailable capabilities, stale evidence and foreign tenants', async () => {
-      expect((await safety.execution.execute(member, action())).state).toBe(
-        'denied',
+    it('rejects forged proposer provenance before persisting intent or audit', async () => {
+      const model = {
+        provider: 'fixture',
+        name: 'forged',
+        version: '1',
+        promptVersion: '1',
+        runId: randomUUID(),
+      };
+      const claims: ProposedAction['proposedBy'][] = [
+        { kind: 'user', id: bob.actor.id },
+        { kind: 'user', id: alice.actor.id, initiatingUserId: bob.actor.id },
+        { kind: 'user', id: alice.actor.id, model },
+        { kind: 'service', id: alice.actor.id },
+        { kind: 'connector', id: alice.actor.id },
+        {
+          kind: 'agent',
+          id: alice.actor.id,
+          initiatingUserId: alice.actor.id,
+          model,
+        },
+      ];
+      for (const proposedBy of claims) {
+        const proposal = action({ proposedBy });
+        await expect(safety.execution.execute(alice, proposal)).rejects.toThrow(
+          'Proposer must match the authenticated user',
+        );
+        expect(
+          (
+            await owner.query(
+              'SELECT id FROM execution_intents WHERE tenant_id=$1 AND id=$2',
+              [tenantId, proposal.id],
+            )
+          ).rowCount,
+        ).toBe(0);
+        expect(await audit(proposal.id)).toEqual([]);
+      }
+      expect(resolve).not.toHaveBeenCalled();
+      expect(execute).not.toHaveBeenCalled();
+    });
+    it('keeps rejection binding when adapter risk is lowered or the response expires', async () => {
+      const proposal = action();
+      resolve.mockResolvedValue({ ...adapter, minimumRisk: 'high' });
+      const waiting = await safety.execution.execute(alice, proposal);
+      expect(waiting.state).toBe('approval_required');
+      if (!('decision' in waiting)) throw new Error('Missing decision');
+      const rejection = await safety.policies.respond(
+        bob,
+        waiting.decision.id,
+        'rejected',
+        new Date(Date.now() + 60_000).toISOString(),
       );
+      resolve.mockResolvedValue(adapter);
+      for (const expired of [false, true]) {
+        if (expired)
+          await owner.query(
+            "UPDATE policy_approvals SET document=jsonb_set(document,'{expiresAt}',to_jsonb('2020-01-01T00:00:00.000Z'::text)) WHERE id=$1",
+            [rejection.id],
+          );
+        const result = await safety.execution.execute(alice, proposal);
+        expect(result).toMatchObject({
+          state: 'denied',
+          decision: { reason: 'approval_rejected' },
+        });
+      }
+      expect(execute).not.toHaveBeenCalled();
+      expect(
+        (
+          await owner.query(
+            'SELECT id FROM executed_actions WHERE tenant_id=$1 AND proposal_id=$2',
+            [tenantId, proposal.id],
+          )
+        ).rowCount,
+      ).toBe(0);
+      expect(
+        (await audit(proposal.id)).filter(
+          (entry) => entry.details.reason === 'approval_rejected',
+        ),
+      ).toHaveLength(2);
+      expect((await safety.execution.execute(alice, action())).state).toBe(
+        'succeeded',
+      );
+    });
+    it('denies missing permissions, unavailable capabilities, stale evidence and foreign tenants', async () => {
+      expect(
+        (
+          await safety.execution.execute(
+            member,
+            action({ proposedBy: { kind: 'user', id: member.actor.id } }),
+          )
+        ).state,
+      ).toBe('denied');
       expect(
         (
           await safety.execution.execute(
@@ -402,9 +500,14 @@ describe.skipIf(!databaseUrl)(
         bobMembership,
       ]);
       try {
-        expect((await safety.execution.execute(bob, action())).state).toBe(
-          'denied',
-        );
+        expect(
+          (
+            await safety.execution.execute(
+              bob,
+              action({ proposedBy: { kind: 'user', id: bob.actor.id } }),
+            )
+          ).state,
+        ).toBe('denied');
         expect(execute).not.toHaveBeenCalled();
       } finally {
         await owner.query("UPDATE memberships SET role='admin' WHERE id=$1", [
@@ -655,6 +758,7 @@ describe.skipIf(!databaseUrl)(
           await safety.execution.execute(outsider, {
             ...proposal,
             tenantId: outsider.tenantId,
+            proposedBy: { kind: 'user', id: outsider.actor.id },
           })
         ).state,
       ).toBe('succeeded');

@@ -133,6 +133,16 @@ export function createExecutionService(deps: ExecutionDependencies) {
       requireTenant(context, action.tenantId);
       context = await deps.refreshContext(context);
       requireTenant(context, action.tenantId);
+      // Only user provenance can be authenticated by the current identity context.
+      const proposer = action.proposedBy;
+      if (
+        proposer.kind !== context.actor.type ||
+        proposer.id !== context.actor.id ||
+        (proposer.initiatingUserId !== undefined &&
+          proposer.initiatingUserId !== context.actor.initiatingUserId) ||
+        proposer.model !== undefined
+      )
+        throw new Error('Proposer must match the authenticated user');
       await deps.repository.bindIntent(action, hash);
       const previous = await existing(context.tenantId, action.id, hash);
       if (previous) {

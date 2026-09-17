@@ -68,15 +68,16 @@ export function createPolicyService(deps: PolicyDependencies) {
       ) {
         outcome = 'denied';
         reason = 'stale_intent';
+      } else if (approval?.outcome === 'rejected') {
+        // Rejection remains binding when risk metadata or the response expiry changes.
+        outcome = 'denied';
+        reason = 'approval_rejected';
       } else if (action.risk !== 'low' || capability.minimumRisk !== 'low') {
         const bound =
           approval &&
           approval.requesterId === fresh.actor.id &&
           Date.parse(approval.expiresAt) > now.getTime();
-        if (bound && approval.outcome === 'rejected') {
-          outcome = 'denied';
-          reason = 'approval_rejected';
-        } else if (!bound || approval.outcome !== 'approved') {
+        if (!bound || approval.outcome !== 'approved') {
           outcome = 'approval_required';
           reason = 'approval_required';
         }
