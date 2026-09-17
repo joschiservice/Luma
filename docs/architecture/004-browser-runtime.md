@@ -1,0 +1,79 @@
+# ADR-004: Browser runtime and managed provider
+
+Status: proposed for review; provisional V0 selection. Decision: 2026-09-17, [LUMA-2](https://linear.app/auren-labs/issue/LUMA-2).
+
+## Context and decision
+
+Choose **Browserbase as the provisional V0 managed browser provider**, with **Playwright over CDP as the portability boundary**. Keep **Anchor as the BYOC/on-prem alternative** when a customer requires execution in their infrastructure.
+
+Luma prefers API execution, then deterministic browser automation, selective AI-assisted interaction, and human escalation. Provider selection does not establish reliability against a particular JTL/Shopify workflow. The first browser-backed product issue must supply that evidence. This decision specifies the infrastructure contract; it adds no provider adapter, SDK dependency or synthetic benchmark.
+
+## Options and evidence
+
+Documentation checked on 2026-09-17. Prices and plan entitlements must be reconfirmed before provisioning.
+
+| Option                           | Evidence and tradeoff                                                                                                                                                                     | Decision                                                                                    |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Browserbase                      | Frankfurt browser compute, persistent contexts, reconnectable sessions and debugging tools cover the expected V0 capabilities. Published entry pricing is materially below Anchor Growth. | Provisional managed provider.                                                               |
+| Anchor                           | Documents Frankfurt residency on Growth and BYOC/on-prem on Enterprise. Those deployment options matter when a customer needs infrastructure control.                                     | Retain as an explicit alternative; implement only for demonstrated need.                    |
+| Self-managed Playwright/Chromium | Keeps direct browser control but leaves provisioning, patching, isolation, session lifecycle and diagnostics to Luma.                                                                     | Useful development baseline; no managed-runtime implementation or comparison benchmark now. |
+
+Supporting evidence and its limits:
+
+- Browserbase documents `eu-central-1` (Frankfurt), but defaults sessions to `us-west-2`. Always set and verify placement explicitly. Browser location alone does not establish profile, artifact or telemetry residency. [Browser regions](https://docs.browserbase.com/optimizations/latency/multi-region).
+- Persistent contexts reuse cookies and application data. They remain until deletion or invalidation; target-system authentication can still expire. [Contexts](https://docs.browserbase.com/platform/browser/core-features/contexts).
+- Keep-alive sessions survive client disconnects, remain subject to timeout and require explicit release. This is reconnect support, not browser-crash recovery. [Keep alive](https://docs.browserbase.com/platform/browser/long-sessions/keep-alive).
+- Session creation exposes recording/logging controls; live view supports inspection and interaction. Disable capture by default and authorize access before using diagnostics. [Session API](https://docs.browserbase.com/reference/api/create-a-session), [live view](https://docs.browserbase.com/platform/browser/observability/session-live-view).
+- Browserbase lists Developer at $20/month and Startup at $99/month. Anchor lists Growth at $2,000/month; its security documentation places Frankfurt residency on Growth. This supports a lower expected entry cost, not a verified price for Luma's complete residency/retention requirements or cost per operation. Confirm Browserbase's required plan and contractual controls before activation. [Browserbase pricing](https://www.browserbase.com/pricing), [Anchor plans](https://anchorbrowser.io/), [Anchor security](https://docs.anchorbrowser.io/security).
+- Anchor documents BYOC and on-prem deployment on Enterprise. [Deployment options](https://llms.anchorbrowser.io/self-host-byoc).
+- Browserbase maintains Stagehand for selective AI-assisted interaction. Adoption remains subject to Luma's model routing and data policy; vendor examples do not authorize their default model endpoints. [Stagehand overview](https://www.browserbase.com/pricing), [Luma model gateway](../model-gateway.md).
+- Playwright's CDP connection supports Chromium and has lower fidelity than its native protocol. Validate required browser operations on the real workflow; do not assume all Playwright features transfer unchanged. [Playwright CDP contract](https://playwright.dev/docs/api/class-browsertype#browser-type-connect-over-cdp).
+
+## Minimal BrowserRuntime contract
+
+Contract notation below describes expected operations, not a new shared package. Place the technical port and provider lifecycle adapters in `platform` when first needed. Inject the port into connector infrastructure. Keep provider SDKs, project IDs, raw responses and region mapping inside the adapter; core workflows consume the existing [connector capabilities](../connectors.md) and [execution service](../execution.md).
+
+Respect [ADR-001](001-module-boundaries.md): platform does not import identity. The caller resolves trusted identity and passes a technical scope containing `tenantId`, `connectionId`, `dataRegion`, `requestId` and `executionAttemptId`. The runtime checks ownership of every session, identity and artifact reference against that scope. IDs are opaque Luma references, not client-supplied provider IDs. Playwright objects stay in infrastructure; domain/application contracts expose neither `Page` nor vendor types.
+
+| Operation               | Inputs                                                                                                                               | Result and required behavior                                                                                                                                                                                                                                                                                                          |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `createSession`         | Scope; allocation key; bounded timeout; identity mode (`ephemeral`, `create`, `reuse`); identity reference for reuse; capture policy | Session reference, optional identity reference, expiry and capabilities (`reconnect`, `persistentIdentity`, supported artifact kinds). Repeated allocation keys resolve the same allocation or an explicit unresolved outcome; never blindly allocate after an ambiguous timeout. Unsupported requested capabilities fail explicitly. |
+| `connect` / `reconnect` | Scope; session reference                                                                                                             | Current CDP connection grant for the infrastructure consumer. Reconnect attaches to the same live session; an expired/lost session returns `session_expired` and never silently starts a replacement. Grants contain secrets and are neither journaled nor logged.                                                                    |
+| `releaseConnection`     | Scope; connection grant                                                                                                              | Detach this client while preserving the session only until its configured expiry. Provider disconnect semantics remain inside infrastructure.                                                                                                                                                                                         |
+| `persistIdentity`       | Scope; session and identity references                                                                                               | Confirm saved state, or report pending/failure. The adapter may save on termination; callers must await confirmation before reuse. Serialize access to one tenant/connection/account profile. Never promise that saved state means a valid login.                                                                                     |
+| `getArtifacts`          | Scope; session reference; requested kinds                                                                                            | Availability (`pending`, `ready`, `unavailable`, `expired`) and tenant-scoped object references for downloads or approved captures. Import into approved regional storage with media type, size, checksum and expiry; expose no durable provider download URLs.                                                                       |
+| `terminateSession`      | Scope; session reference                                                                                                             | Idempotent release with confirmed terminal state or explicit pending/unknown outcome. Retry cleanup safely; enforce expiry and reconcile orphaned allocations. Termination does not imply identity deletion.                                                                                                                          |
+| `deleteIdentity`        | Scope; identity reference                                                                                                            | Confirm deletion or report pending/failure. Revoke reuse immediately; connector disconnect and retention handling invoke this cleanup.                                                                                                                                                                                                |
+| `getMetadata`           | Scope; session reference                                                                                                             | Session state, logical region, timestamps/expiry, correlation IDs, adapter name/version, sanitized provider correlation reference, normalized failure code and available usage measurements with units. No page content, cookies, credentials or connection grants.                                                                   |
+
+Normalize failures as `unsupported`, `region_unavailable`, `not_found`, `authentication`, `permission_denied`, `session_expired`, `rate_limited`, `timeout`, `unavailable` or `internal`, with retry advice and optional delay. Do not expose provider error bodies. Runtime retries concern lifecycle operations only. A browser disconnect after a commerce write leaves its effect unknown: execution reconciles authoritative state before any redispatch. Reconnect is never evidence that a write failed or succeeded.
+
+## Isolation, capture and fallback
+
+Apply [ADR-003](003-tenant-isolation-and-data-residency.md) before tenant activation. Approve browser compute, profiles/cookies, credentials, downloads, recordings, logs, proxies, support access and subprocessors for the full regional path. Configure Frankfurt explicitly and fail closed if required controls are unavailable; no fallback to a US session. Record the provider plan, contractual evidence, retention settings and deletion behavior in the first implementation issue.
+
+Allocate isolated sessions and identities per tenant, connection and target account. Recheck authority and placement when resuming work. Keep credentials in regional secret storage and reference them indirectly. Recording, console/network capture and screenshots are off unless explicitly approved with retention. Treat CDP and live-view URLs as credentials; live control requires authorized handoff and audit. Provider diagnostics supplement Luma's append-only audit evidence.
+
+Use deterministic Playwright steps first. A selector failure may propose AI-assisted recovery only within the same authorized intent, risk policy and approved regional model route. It must not replay an uncertain write, bypass approval or widen the action. Record mechanism/model provenance and verify the postcondition through execution. Escalate to a person when authentication, MFA, network access or safe recovery cannot be established.
+
+## Deferred product validation
+
+The first genuine browser-backed product issue (including [LUMA-25](https://linear.app/auren-labs/issue/LUMA-25) if it needs browser execution) owns this evidence. Define target-specific latency, recovery and cost thresholds before validation; attach measured results and a retain/reconsider decision to that issue.
+
+| Assumption                       | Evidence to record against the actual target system                                                                 |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Authentication persists          | Login reuse, expiry/revocation, profile isolation and required reauthentication.                                    |
+| Failures are recoverable         | Client disconnect, browser loss and expiry; authoritative reconciliation after an uncertain write; cleanup outcome. |
+| Latency is acceptable            | Session setup, operation and verification timings, including recovery paths.                                        |
+| UI changes can be handled safely | Real selector failures, deterministic-to-AI fallback decisions, retained approvals and verified outcomes.           |
+| Files work where required        | Actual upload/download formats, integrity, regional storage and expiry; mark not applicable if unused.              |
+| Economics are viable             | Total browser, idle-session, proxy, model and recovery costs per verified resolved operation at observed volume.    |
+| Target access is feasible        | Actual anti-bot, MFA, customer-network and human-handoff constraints.                                               |
+
+Do not run a generic 20–50 browser concurrency benchmark, generic download/login demo, arbitrary local-versus-provider startup comparison or artificial DOM-break comparison. Do not build a full Anchor adapter for this decision. These do not answer the deferred product questions.
+
+## Re-evaluation, consequences and reversal cost
+
+Reconsider Browserbase or add Anchor when a customer requires BYOC/on-prem, EU/privacy controls cannot be met economically, real workflows exceed agreed instability/recovery thresholds, vendor limitations leak materially into core logic, or measured cost becomes disproportionate at meaningful volume. The issue supplying that evidence must propose a successor ADR or an update to this decision.
+
+The boundary limits vendor coupling but does not make provider replacement free. A switch replaces lifecycle/configuration and artifact adapters, revalidates CDP behavior and regional controls, and may require new authenticated profiles. Do not assume contexts or recordings can migrate. Drain or reconcile active attempts, retain audit references and repeat the target-specific acceptance checks before cutover. Core capability contracts, policy/approval and verification remain owned by their existing modules.

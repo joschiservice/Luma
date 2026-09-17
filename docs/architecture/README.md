@@ -4,11 +4,12 @@ This directory is the source of truth for implementation ADRs. Review and versio
 
 ## Register
 
-| ADR                                               | Decision                                     | Status   | Issue                                                |
-| ------------------------------------------------- | -------------------------------------------- | -------- | ---------------------------------------------------- |
-| [001](001-module-boundaries.md)                   | Modular monolith boundaries                  | Accepted | [LUMA-4](https://linear.app/auren-labs/issue/LUMA-4) |
-| [002](002-canonical-commerce-model.md)            | Canonical commerce data model v0             | Accepted | [LUMA-5](https://linear.app/auren-labs/issue/LUMA-5) |
-| [003](003-tenant-isolation-and-data-residency.md) | Tenant isolation and regional data residency | Proposed | [LUMA-6](https://linear.app/auren-labs/issue/LUMA-6) |
+| ADR                                               | Decision                                               | Status   | Issue                                                |
+| ------------------------------------------------- | ------------------------------------------------------ | -------- | ---------------------------------------------------- |
+| [001](001-module-boundaries.md)                   | Modular monolith boundaries                            | Accepted | [LUMA-4](https://linear.app/auren-labs/issue/LUMA-4) |
+| [002](002-canonical-commerce-model.md)            | Canonical commerce data model v0                       | Accepted | [LUMA-5](https://linear.app/auren-labs/issue/LUMA-5) |
+| [003](003-tenant-isolation-and-data-residency.md) | Tenant isolation and regional data residency           | Proposed | [LUMA-6](https://linear.app/auren-labs/issue/LUMA-6) |
+| [004](004-browser-runtime.md)                     | Browserbase V0 with Playwright/CDP; Anchor alternative | Proposed | [LUMA-2](https://linear.app/auren-labs/issue/LUMA-2) |
 
 ## Baseline
 
@@ -25,7 +26,6 @@ Carried forward from the [Linear architecture register](https://linear.app/auren
 ## Pending decisions
 
 - Restate versus Temporal for durable execution.
-- Browserbase versus Anchor, compared with a raw Playwright baseline.
 - V0 PostgreSQL hosting: Neon Frankfurt versus an AWS-managed alternative.
 
 ## Maintaining ADRs
