@@ -25,6 +25,10 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
   {
     valid: [
       sample(
+        filename('apps/api/src/app.test.ts'),
+        "import { createObservability } from './modules/platform/composition.js';",
+      ),
+      sample(
         moduleFile('connectors', 'api/routes.ts'),
         "import { apiContract } from '@luma/api-contract';",
       ),
@@ -70,6 +74,10 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
       ),
     ],
     invalid: [
+      invalid(
+        filename('apps/api/src/app.test.ts'),
+        "import { adapter } from './modules/platform/infrastructure/adapter.js';",
+      ),
       ...[
         'domain/model.ts',
         'application/query.ts',

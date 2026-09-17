@@ -82,3 +82,6 @@ export function readIdentityConfig(
   }
   return { databaseUrl, secret, baseURL: base.origin, trustedOrigins };
 }
+
+export { readObservabilityConfig } from './observability.js';
+export type { ObservabilityConfig } from './observability.js';

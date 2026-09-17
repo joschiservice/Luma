@@ -58,3 +58,7 @@ pnpm check
 Contract tests reject a stale artifact and check concrete schemas, parameters, error responses and unique operation IDs. API tests cover real HTTP with the typed client, path/query validation, response validation, sanitized failures, parser errors and readiness failures/timeouts. Web tests exercise the Query consumer and reject malformed responses before caching.
 
 The stable ts-rest packages are pinned to 3.52.1 with Zod 3.25.76 isolated to the transport packages; existing web forms keep Zod 4. The stable adapter declares a Fastify 4 peer even though the repository uses Fastify 5.12.5. A version-specific `peerDependencyRules.allowedVersions` exception permits this pairing; strict peer checking remains enabled elsewhere. Real HTTP and error-path tests cover the integration. Review/remove this exception when upgrading ts-rest; it is not upstream certification of Fastify 5 support. See the [ts-rest adapter](https://ts-rest.com/server/fastify) and [upstream Fastify 5 work](https://github.com/ts-rest/ts-rest/pull/702).
+
+## Request tracing
+
+Responses include a server-generated `x-request-id`. When observability is wired, `x-trace-id` identifies the trace in Sentry and Langfuse. Send a UUIDv4 `x-luma-action-id` to correlate related requests from one user action. Invalid action IDs are ignored. These IDs provide diagnostics, not authentication or tenant access. See the [observability guide](observability.md).

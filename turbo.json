@@ -28,7 +28,17 @@
         "IDENTITY_DATABASE_URL",
         "BETTER_AUTH_SECRET",
         "BETTER_AUTH_URL",
-        "AUTH_TRUSTED_ORIGINS"
+        "AUTH_TRUSTED_ORIGINS",
+        "OBSERVABILITY_ENVIRONMENT",
+        "OBSERVABILITY_RELEASE",
+        "OBSERVABILITY_SAMPLE_RATE",
+        "OBSERVABILITY_TENANT_HASH_KEY",
+        "SENTRY_DSN",
+        "LANGFUSE_PUBLIC_KEY",
+        "LANGFUSE_SECRET_KEY",
+        "LANGFUSE_BASE_URL",
+        "POSTHOG_API_KEY",
+        "POSTHOG_HOST"
       ]
     },
     "build:storybook": {
