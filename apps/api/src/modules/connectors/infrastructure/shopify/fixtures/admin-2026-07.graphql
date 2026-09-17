@@ -1,0 +1,318 @@
+# Generated from https://shopify.dev/admin-graphql-direct-proxy/2026-07
+# Adapter surface only; regenerate with scripts/update-shopify-schema.mjs.
+schema {
+  query: QueryRoot
+}
+
+type QueryRoot {
+  inventoryItems(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+    query: String
+  ): InventoryItemConnection!
+  node(id: ID!): Node
+  orders(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+    sortKey: OrderSortKeys = PROCESSED_AT
+    query: String
+    savedSearchId: ID
+  ): OrderConnection!
+  products(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+    sortKey: ProductSortKeys = ID
+    query: String
+    savedSearchId: ID
+  ): ProductConnection!
+}
+
+"""
+The `Int` scalar type represents non-fractional signed whole numeric values. Int can represent values between -(2^31) and 2^31 - 1.
+"""
+scalar Int
+
+"""
+The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text.
+"""
+scalar String
+
+"""
+The `Boolean` scalar type represents `true` or `false`.
+"""
+scalar Boolean
+
+type InventoryItemConnection {
+  nodes: [InventoryItem!]!
+  pageInfo: PageInfo!
+}
+
+type InventoryItem implements Node {
+  id: ID!
+  inventoryLevels(
+    includeInactive: Boolean = false
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+    query: String
+  ): InventoryLevelConnection!
+  tracked: Boolean!
+}
+
+interface Node {
+  id: ID!
+}
+
+"""
+The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID.
+"""
+scalar ID
+
+type InventoryLevelConnection {
+  nodes: [InventoryLevel!]!
+  pageInfo: PageInfo!
+}
+
+type InventoryLevel implements Node {
+  id: ID!
+  location: Location!
+  quantities(names: [String!]!): [InventoryQuantity!]!
+  updatedAt: DateTime!
+}
+
+type Location implements Node {
+  id: ID!
+}
+
+type InventoryQuantity implements Node {
+  id: ID!
+  name: String!
+  quantity: Int!
+}
+
+scalar DateTime
+
+type PageInfo {
+  endCursor: String
+  hasNextPage: Boolean!
+}
+
+enum OrderSortKeys {
+  CREATED_AT
+  CURRENT_TOTAL_PRICE
+  CUSTOMER_NAME
+  DESTINATION
+  FINANCIAL_STATUS
+  FULFILLMENT_STATUS
+  ID
+  ORDER_NUMBER
+  PO_NUMBER
+  PROCESSED_AT
+  RELEVANCE
+  TOTAL_ITEMS_QUANTITY
+  TOTAL_PRICE
+  UPDATED_AT
+}
+
+type OrderConnection {
+  nodes: [Order!]!
+  pageInfo: PageInfo!
+}
+
+type Order implements Node {
+  cancelledAt: DateTime
+  closed: Boolean!
+  displayFinancialStatus: OrderDisplayFinancialStatus
+  fulfillmentOrders(
+    displayable: Boolean = false
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+    query: String
+  ): FulfillmentOrderConnection!
+  fulfillments(first: Int, query: String): [Fulfillment!]!
+  id: ID!
+  lineItems(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+  ): LineItemConnection!
+  name: String!
+  updatedAt: DateTime!
+}
+
+enum OrderDisplayFinancialStatus {
+  PENDING
+  AUTHORIZED
+  PARTIALLY_PAID
+  PARTIALLY_REFUNDED
+  VOIDED
+  PAID
+  REFUNDED
+  EXPIRED
+}
+
+type FulfillmentOrderConnection {
+  nodes: [FulfillmentOrder!]!
+  pageInfo: PageInfo!
+}
+
+type FulfillmentOrder implements Node {
+  id: ID!
+  lineItems(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+  ): FulfillmentOrderLineItemConnection!
+  status: FulfillmentOrderStatus!
+  updatedAt: DateTime!
+}
+
+type FulfillmentOrderLineItemConnection {
+  nodes: [FulfillmentOrderLineItem!]!
+  pageInfo: PageInfo!
+}
+
+type FulfillmentOrderLineItem implements Node {
+  id: ID!
+  lineItem: LineItem!
+  remainingQuantity: Int!
+}
+
+type LineItem implements Node {
+  id: ID!
+  quantity: Int!
+  variant: ProductVariant
+}
+
+type ProductVariant implements Node {
+  id: ID!
+  inventoryItem: InventoryItem!
+  sku: String
+}
+
+enum FulfillmentOrderStatus {
+  OPEN
+  IN_PROGRESS
+  CANCELLED
+  INCOMPLETE
+  CLOSED
+  SCHEDULED
+  ON_HOLD
+}
+
+type Fulfillment implements Node {
+  deliveredAt: DateTime
+  fulfillmentLineItems(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+  ): FulfillmentLineItemConnection!
+  id: ID!
+  inTransitAt: DateTime
+  status: FulfillmentStatus!
+  updatedAt: DateTime!
+}
+
+type FulfillmentLineItemConnection {
+  nodes: [FulfillmentLineItem!]!
+  pageInfo: PageInfo!
+}
+
+type FulfillmentLineItem implements Node {
+  id: ID!
+  lineItem: LineItem!
+  quantity: Int
+}
+
+enum FulfillmentStatus {
+  PENDING
+  OPEN
+  SUCCESS
+  CANCELLED
+  ERROR
+  FAILURE
+}
+
+type LineItemConnection {
+  nodes: [LineItem!]!
+  pageInfo: PageInfo!
+}
+
+enum ProductSortKeys {
+  CREATED_AT
+  ID
+  INVENTORY_TOTAL
+  PRODUCT_TYPE
+  PUBLISHED_AT
+  RELEVANCE
+  TITLE
+  UPDATED_AT
+  VENDOR
+}
+
+type ProductConnection {
+  nodes: [Product!]!
+  pageInfo: PageInfo!
+}
+
+type Product implements Node {
+  id: ID!
+  status: ProductStatus!
+  title: String!
+  updatedAt: DateTime!
+  variants(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+    sortKey: ProductVariantSortKeys = POSITION
+  ): ProductVariantConnection!
+}
+
+enum ProductStatus {
+  ACTIVE
+  ARCHIVED
+  DRAFT
+  UNLISTED
+}
+
+enum ProductVariantSortKeys {
+  FULL_TITLE
+  ID
+  INVENTORY_LEVELS_AVAILABLE
+  INVENTORY_MANAGEMENT
+  INVENTORY_POLICY
+  INVENTORY_QUANTITY
+  NAME
+  POPULAR
+  POSITION
+  RELEVANCE
+  SKU
+  TITLE
+}
+
+type ProductVariantConnection {
+  nodes: [ProductVariant!]!
+  pageInfo: PageInfo!
+}
