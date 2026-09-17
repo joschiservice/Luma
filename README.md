@@ -79,6 +79,10 @@ API build output is `apps/api/dist`; run with `pnpm --filter @luma/api start` af
 
 [ADR-002](docs/architecture/002-canonical-commerce-model.md) defines the V0 entities, tenant-scoped identifiers, source snapshots, lifecycle fields and constraints for future Drizzle migrations. It covers JTL/Shopify comparison, raw payload retention, exception deduplication and the proposal → execution → verification → audit trail.
 
+## Exception taxonomy
+
+The [V0 exception taxonomy](docs/exception-taxonomy.md) defines four detection classes, evidence requirements, safe recovery and verification. Its versioned synthetic golden cases cover positive, negative and uncertain outcomes for the detection pipeline.
+
 ## Tenant isolation and data residency
 
 [ADR-003](docs/architecture/003-tenant-isolation-and-data-residency.md) defines trusted organization context, scoped repositories plus PostgreSQL RLS, EU-only V0 placement, regional service boundaries and the future dedicated database path. Its SQL/API conventions and acceptance checks govern LUMA-7/8 and later persistence adapters; the [identity implementation](docs/identity.md) provides authentication, organization routes and PostgreSQL isolation.
