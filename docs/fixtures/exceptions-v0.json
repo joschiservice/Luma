@@ -195,6 +195,32 @@
       }
     },
     {
+      "id": "sync-cross-tenant",
+      "exceptionClass": "sync_failure",
+      "input": {
+        "evidenceTenantId": "tenant-b"
+      },
+      "expected": {
+        "decision": "reject",
+        "severity": null,
+        "reason": "tenant_mismatch"
+      }
+    },
+    {
+      "id": "sync-incomplete-success",
+      "exceptionClass": "sync_failure",
+      "input": {
+        "status": "success",
+        "errorCode": null,
+        "scanComplete": false
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "incomplete_evidence"
+      }
+    },
+    {
       "id": "fulfillment-split-boundary",
       "exceptionClass": "stuck_fulfillment",
       "input": {},
@@ -324,6 +350,54 @@
         "decision": "defer",
         "severity": null,
         "reason": "unknown_progress"
+      }
+    },
+    {
+      "id": "fulfillment-cross-tenant",
+      "exceptionClass": "stuck_fulfillment",
+      "input": {
+        "evidenceTenantId": "tenant-b"
+      },
+      "expected": {
+        "decision": "reject",
+        "severity": null,
+        "reason": "tenant_mismatch"
+      }
+    },
+    {
+      "id": "fulfillment-unmapped",
+      "exceptionClass": "stuck_fulfillment",
+      "input": {
+        "mapped": false
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "unmapped_fulfillment"
+      }
+    },
+    {
+      "id": "fulfillment-incomplete",
+      "exceptionClass": "stuck_fulfillment",
+      "input": {
+        "complete": false
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "incomplete_evidence"
+      }
+    },
+    {
+      "id": "fulfillment-negative-quantity",
+      "exceptionClass": "stuck_fulfillment",
+      "input": {
+        "quantity": "-1"
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "invalid_quantity"
       }
     },
     {
@@ -688,6 +762,48 @@
       "exceptionClass": "workflow_failure",
       "input": {
         "status": "interrupted",
+        "effect": "unknown",
+        "executionId": "execution-1",
+        "retryExhausted": false
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "high",
+        "reason": "reconciliation_required"
+      }
+    },
+    {
+      "id": "workflow-cross-tenant",
+      "exceptionClass": "workflow_failure",
+      "input": {
+        "evidenceTenantId": "tenant-b"
+      },
+      "expected": {
+        "decision": "reject",
+        "severity": null,
+        "reason": "tenant_mismatch"
+      }
+    },
+    {
+      "id": "workflow-unknown-effect-cancelled",
+      "exceptionClass": "workflow_failure",
+      "input": {
+        "status": "cancelled",
+        "effect": "unknown",
+        "executionId": "execution-1",
+        "retryExhausted": false
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "high",
+        "reason": "reconciliation_required"
+      }
+    },
+    {
+      "id": "workflow-unknown-effect-succeeded",
+      "exceptionClass": "workflow_failure",
+      "input": {
+        "status": "succeeded",
         "effect": "unknown",
         "executionId": "execution-1",
         "retryExhausted": false

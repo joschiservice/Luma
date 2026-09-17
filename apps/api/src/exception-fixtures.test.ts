@@ -177,7 +177,7 @@ const corpus = corpusSchema.parse(
 
 // These checks protect the handoff corpus. Detector behavior is evaluated by LUMA-19.
 describe('V0 exception acceptance corpus', () => {
-  it('has unique case IDs and positive, negative and uncertain cases for every class', () => {
+  it('has unique case IDs and every decision outcome for every class', () => {
     expect(new Set(corpus.cases.map(({ id }) => id)).size).toBe(
       corpus.cases.length,
     );
@@ -187,9 +187,89 @@ describe('V0 exception acceptance corpus', () => {
           .filter((c) => c.exceptionClass === name)
           .map((c) => c.expected.decision),
       );
-      for (const outcome of ['detect', 'clear', 'defer'] as const)
+      for (const outcome of ['detect', 'clear', 'defer', 'reject'] as const)
         expect(outcomes.has(outcome)).toBe(true);
     }
+  });
+
+  it.each(className.options)(
+    '%s includes tenant rejection before detection',
+    (name) => {
+      expect(corpus.cases).toContainEqual(
+        expect.objectContaining({
+          exceptionClass: name,
+          input: { evidenceTenantId: 'tenant-b' },
+          expected: {
+            decision: 'reject',
+            severity: null,
+            reason: 'tenant_mismatch',
+          },
+        }),
+      );
+    },
+  );
+
+  // Pin the branch inputs as well as outcomes so unrelated cases cannot satisfy coverage.
+  it.each([
+    {
+      id: 'sync-incomplete-success',
+      exceptionClass: 'sync_failure',
+      input: { status: 'success', errorCode: null, scanComplete: false },
+      expected: {
+        decision: 'defer',
+        severity: null,
+        reason: 'incomplete_evidence',
+      },
+    },
+    ...(['cancelled', 'succeeded'] as const).map((status) => ({
+      id: `workflow-unknown-effect-${status}`,
+      exceptionClass: 'workflow_failure',
+      input: {
+        status,
+        effect: 'unknown',
+        executionId: 'execution-1',
+        retryExhausted: false,
+      },
+      expected: {
+        decision: 'detect',
+        severity: 'high',
+        reason: 'reconciliation_required',
+      },
+    })),
+    {
+      id: 'fulfillment-unmapped',
+      exceptionClass: 'stuck_fulfillment',
+      input: { mapped: false },
+      expected: {
+        decision: 'defer',
+        severity: null,
+        reason: 'unmapped_fulfillment',
+      },
+    },
+    {
+      id: 'fulfillment-incomplete',
+      exceptionClass: 'stuck_fulfillment',
+      input: { complete: false },
+      expected: {
+        decision: 'defer',
+        severity: null,
+        reason: 'incomplete_evidence',
+      },
+    },
+    {
+      id: 'fulfillment-negative-quantity',
+      exceptionClass: 'stuck_fulfillment',
+      input: { quantity: '-1' },
+      expected: {
+        decision: 'defer',
+        severity: null,
+        reason: 'invalid_quantity',
+      },
+    },
+  ])('$id covers its documented branch and precedence', (requiredCase) => {
+    expect(corpus.cases.find(({ id }) => id === requiredCase.id)).toEqual(
+      requiredCase,
+    );
   });
 
   it.each(corpus.cases)(
