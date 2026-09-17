@@ -38,7 +38,8 @@ pnpm build
 | Path                         | Purpose                                                      |
 | ---------------------------- | ------------------------------------------------------------ |
 | `apps/web`                   | TanStack Start + React; minimal server-rendered landing page |
-| `apps/api`                   | Fastify process and service-free `/health` endpoint          |
+| `apps/api`                   | Fastify + ts-rest HTTP server and public sample catalog      |
+| `packages/api-contract`      | Shared schemas, typed client and generated OpenAPI           |
 | `packages/ui`                | Reusable React components and Storybook component tests      |
 | `packages/config`            | Validated server environment configuration                   |
 | `packages/typescript-config` | Strict shared TypeScript settings for Node and React         |
@@ -73,7 +74,7 @@ Branch from `main`: `feature/luma-<id>-<summary>`, `fix/luma-<id>-<summary>`, or
 
 Link the Linear issue, describe behavior and validation, and keep PRs scoped. Run `pnpm check` before review. Commit `pnpm-lock.yaml` and the generated `apps/web/src/routeTree.gen.ts`; never edit the latter manually. Squash merge after review and passing CI. Once a GitHub remote exists, configure `Quality gates` as a required check on `main` and require review.
 
-Implementation ADRs live in [docs/architecture](docs/architecture/README.md), the authoritative source reviewed and versioned with code. The [Linear decision register](https://linear.app/auren-labs/document/architecture-decision-register-305db9bed1de) contains summaries, issue links and repository references only; do not maintain full ADR copies there. Strategic product and business decisions remain in Notion. The web bootstrap follows [TanStack Start's setup guide](https://tanstack.com/start/latest/docs/framework/react/build-from-scratch). Contract-first API work belongs to LUMA-7; authentication and observability have separate follow-ups.
+Implementation ADRs live in [docs/architecture](docs/architecture/README.md), the authoritative source reviewed and versioned with code. The [Linear decision register](https://linear.app/auren-labs/document/architecture-decision-register-305db9bed1de) contains summaries, issue links and repository references only; do not maintain full ADR copies there. Strategic product and business decisions remain in Notion. The web bootstrap follows [TanStack Start's setup guide](https://tanstack.com/start/latest/docs/framework/react/build-from-scratch). The [HTTP API guide](docs/api.md) covers contracts, clients, errors and OpenAPI. Authentication and observability have separate follow-ups.
 
 ## UI workshop
 
