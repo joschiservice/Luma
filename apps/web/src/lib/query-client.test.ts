@@ -1,3 +1,4 @@
+import { QueryObserver } from '@tanstack/react-query';
 import { describe, expect, it } from 'vitest';
 import { createQueryClient } from './query-client';
 
@@ -13,4 +14,39 @@ describe('request-scoped Query clients', () => {
       second.clear();
     }
   });
+});
+
+it('notifies a mounted session observer when a private request returns 401', async () => {
+  const client = createQueryClient();
+  const sessionKey = ['private', 'session'];
+  client.setQueryData(sessionKey, { user: { name: 'Ada' } });
+  client.setQueryData(['private', 'organization', 'previous'], 'private data');
+  const observer = new QueryObserver(client, {
+    queryKey: sessionKey,
+    enabled: false,
+  });
+  let session: unknown;
+  const unsubscribe = observer.subscribe((result) => {
+    session = result.data;
+  });
+  const error = Object.assign(new Error('Session expired'), { status: 401 });
+  try {
+    await expect(
+      client.fetchQuery({
+        queryKey: ['private', 'organizations'],
+        queryFn: () => {
+          throw error;
+        },
+        retry: false,
+      }),
+    ).rejects.toThrow('Session expired');
+    await expect.poll(() => session).toBeNull();
+    expect(
+      client.getQueryData(['private', 'organization', 'previous']),
+    ).toBeUndefined();
+    expect(client.getQueryData(['private', 'organizations'])).toBeUndefined();
+  } finally {
+    unsubscribe();
+    client.clear();
+  }
 });

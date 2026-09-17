@@ -11,7 +11,11 @@ export function createQueryClient() {
           error.status === 401
         ) {
           void client.cancelQueries({ queryKey: ['private'] }).then(() => {
-            client.removeQueries({ queryKey: ['private'] });
+            // Keep the observed session query so mounted guards receive session loss.
+            client.removeQueries({
+              queryKey: ['private'],
+              predicate: (entry) => entry.queryKey[1] !== 'session',
+            });
             client.setQueryData(['private', 'session'], null);
           });
         }

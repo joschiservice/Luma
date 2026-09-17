@@ -1,4 +1,4 @@
-/* global document, window, innerWidth */
+/* global document, window, innerWidth, requestAnimationFrame */
 import { it, expect } from 'vitest';
 import { chromium } from 'playwright';
 import { database, startApi, startProcess } from './helpers.mjs';
@@ -398,4 +398,46 @@ it('handles missing sessions, uncertain registration, conflicts and permission f
     .getByRole('button', { name: 'Create account', exact: true })
     .click();
   await heading(page, 'Sign in to Luma');
+});
+
+it('preserves workspace drafts during session revalidation and clears them on session loss', async (t) => {
+  const { db, page } = await fixture(t);
+  await register(page);
+  const name = page.getByLabel('Workspace name');
+  await name.fill('Draft workspace');
+  let release;
+  let received;
+  const held = new Promise((resolve) => {
+    release = resolve;
+  });
+  const requested = new Promise((resolve) => {
+    received = resolve;
+  });
+  t.onTestFinished(() => release());
+  await page.route('**/api/auth/get-session', async (route) => {
+    const response = await route.fetch();
+    received();
+    await held;
+    await route.fulfill({ response });
+  });
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await requested;
+  expect(await name.isVisible()).toBe(true);
+  expect(await name.inputValue()).toBe('Draft workspace');
+  await name.fill('Updated draft workspace');
+  const refreshed = page.waitForResponse('**/api/auth/get-session');
+  release();
+  await refreshed;
+  await page.evaluate(
+    () =>
+      new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(resolve)),
+      ),
+  );
+  expect(await name.inputValue()).toBe('Updated draft workspace');
+  await page.unroute('**/api/auth/get-session');
+  await db.owner.query('DELETE FROM sessions');
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await heading(page, 'Sign in to Luma');
+  expect(await name.count()).toBe(0);
 });

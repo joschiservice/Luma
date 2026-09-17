@@ -29,7 +29,7 @@ export function Protected() {
     return (
       <Failure error={session.error} retry={() => void session.refetch()} />
     );
-  if (session.isPending || session.isFetching) return <Pending />;
+  if (session.isPending) return <Pending />;
   if (!session.data) return <SignInRedirect />;
   return <Outlet />;
 }
