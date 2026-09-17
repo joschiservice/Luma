@@ -7,7 +7,17 @@ import type { FastifyServerOptions } from 'fastify';
 import { createConnectors } from './modules/connectors/composition.js';
 import type { ProviderCatalog } from './modules/connectors/index.js';
 
+import {
+  createIdentity,
+  identityRoutes,
+  registerIdentityGuards,
+} from './modules/identity/composition.js';
+import { IdentityError } from './modules/identity/index.js';
+import type { IdentityService } from './modules/identity/index.js';
+
 export interface AppDependencies {
+  identity?: IdentityService;
+  trustedOrigins?: readonly string[];
   providerCatalog?: ProviderCatalog;
   /** Returns whether the services required to handle requests are available. */
   checkReadiness?: () => Promise<boolean>;
@@ -20,6 +30,11 @@ export function buildApp(
 ) {
   const app = Fastify(options);
   const s = initServer();
+  registerIdentityGuards(
+    app,
+    dependencies.identity,
+    dependencies.trustedOrigins,
+  );
   let draining = false;
   app.addHook('preClose', async () => {
     draining = true;
@@ -29,6 +44,13 @@ export function buildApp(
     reply.header('cache-control', 'no-store');
   });
   app.setErrorHandler((error, request, reply) => {
+    if (error instanceof IdentityError) {
+      return reply.status(error.statusCode).send({
+        code: error.code,
+        message: error.message,
+        requestId: request.id,
+      });
+    }
     const status =
       typeof error === 'object' && error !== null && 'statusCode' in error
         ? error.statusCode
@@ -62,6 +84,7 @@ export function buildApp(
     s.registerRouter(
       apiContract,
       {
+        identity: identityRoutes(dependencies.identity),
         system: {
           health: async () => ({ status: 200, body: { status: 'ok' } }),
           ready: async ({ request }) => {
@@ -113,5 +136,20 @@ export function buildApp(
     );
   });
   app.get('/openapi.json', async () => openApiDocument);
+  return app;
+}
+
+export function buildRuntimeApp(
+  settings: Parameters<typeof createIdentity>[0],
+  options: FastifyServerOptions = {},
+) {
+  const identity = createIdentity(settings);
+  const app = buildApp(options, {
+    identity: identity.service,
+    trustedOrigins: settings.trustedOrigins,
+    checkReadiness: identity.checkReadiness,
+  });
+  identity.register(app);
+  app.addHook('onClose', identity.close);
   return app;
 }

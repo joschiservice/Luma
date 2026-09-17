@@ -1,6 +1,6 @@
 # HTTP API foundation
 
-LUMA-7 adds one contract shared by Fastify, the web client and OpenAPI. No database or credentials are required.
+One contract is shared by Fastify, the web client and OpenAPI. Follow the [identity setup](identity.md) to configure PostgreSQL and authentication before starting the API.
 
 ## Run and consume
 
@@ -35,15 +35,15 @@ Business endpoints use `/v1`. Additive changes may stay in v1; removing/renaming
 
 New resources add schemas and routes to the shared contract, implement the owning module's application port and API mapping, then wire its composition factory in `app.ts`. Only module API layers may import the root contract export; inner layers remain framework independent. Declare every intended response status and use strict mutation objects to reject unexpected tenant/region fields.
 
-Tenant resources must follow ADR-003: `/v1/organizations/:organizationId/<resource>`, camelCase fields and UUID organization IDs. Shared schemas reserve `EU | US | APAC`; they do not enable provisioning. LUMA-8 must provide session/membership/state/placement guards before tenant routes are served. Never treat path IDs or caller-supplied region/context as authorization. Provisioning rejects inactive regions with `422 REGION_UNAVAILABLE`; wrong-cell execution uses `503 REGION_UNAVAILABLE`.
+Tenant resources must follow ADR-003: `/v1/organizations/:organizationId/<resource>`, camelCase fields and UUID organization IDs. Shared schemas reserve `EU | US | APAC`; only EU provisioning is enabled. Identity guards verify session, membership, organization state and placement before tenant routes are served. Never treat path IDs or caller-supplied region/context as authorization. Provisioning rejects inactive regions with `422 REGION_UNAVAILABLE`; wrong-cell execution uses `503 REGION_UNAVAILABLE`.
 
 ## Errors and probes
 
 Errors have `{ code, message, requestId }`; `x-request-id` matches the server request ID. Validation returns `400 VALIDATION_ERROR`. Unknown resources/routes return `404 NOT_FOUND`. Parser failures normalize 400/413/415. Unexpected exceptions and invalid handler output return sanitized `500 INTERNAL_ERROR`, with details only in server logs. Client response schemas are validated at runtime. Responses use `Cache-Control: no-store`.
 
-Future authenticated routes must declare `401 UNAUTHENTICATED`, `403 FORBIDDEN`, `404 NOT_FOUND` for inaccessible tenants/resources, and regional errors where applicable. Authentication and authorization are not implemented by this foundation.
+Authenticated routes declare `401 UNAUTHENTICATED`, `403 FORBIDDEN`, `404 NOT_FOUND` for inaccessible tenants/resources, and regional errors where applicable. See the [identity guide](identity.md) for session routes and tenant authorization.
 
-`/health` reports process liveness without probing dependencies. `/ready` defaults to ready because there are no backing services yet. `buildApp` accepts an injected readiness check, returning 503 on false, exceptions or a one-second timeout. Future checks must bound/cancel their own I/O; the HTTP timeout does not cancel an underlying dependency operation. Shutdown marks the app as draining before closing connections; pending readiness checks cannot return ready after draining begins. Existing SIGINT/SIGTERM handling closes Fastify.
+`/health` reports process liveness without probing dependencies. `/ready` checks the identity database, schema and restricted runtime role. `buildApp` accepts an injected readiness check, returning 503 on false, exceptions or a one-second timeout. Future checks must bound/cancel their own I/O; the HTTP timeout does not cancel an underlying dependency operation. Shutdown marks the app as draining before closing connections; pending readiness checks cannot return ready after draining begins. Existing SIGINT/SIGTERM handling closes Fastify.
 
 ## OpenAPI and verification
 

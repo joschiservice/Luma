@@ -1,8 +1,17 @@
-import { readApiConfig } from '@luma/config';
-import { buildApp } from './app.js';
+import { readApiConfig, readIdentityConfig } from '@luma/config';
+import { buildRuntimeApp } from './app.js';
 
 const config = readApiConfig(process.env);
-const app = buildApp({ logger: { level: config.logLevel } });
+const app = buildRuntimeApp(readIdentityConfig(process.env), {
+  logger: {
+    level: config.logLevel,
+    redact: [
+      'req.headers.cookie',
+      'req.headers.authorization',
+      'res.headers.set-cookie',
+    ],
+  },
+});
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.once(signal, () => {
@@ -17,5 +26,6 @@ try {
   await app.listen({ host: config.host, port: config.port });
 } catch (error) {
   app.log.error(error);
+  await app.close();
   process.exitCode = 1;
 }
