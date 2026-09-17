@@ -1,0 +1,257 @@
+import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
+
+const timestamp = z.string().datetime();
+const decimal = z.string().regex(/^-?\d{1,14}(?:\.\d{1,6})?$/);
+const common = {
+  tenantId: z.string().min(1),
+  evidenceTenantId: z.string().min(1),
+  subjectId: z.string().min(1),
+  evidenceRefs: z.array(z.string().min(1)).min(1),
+};
+const schemas = {
+  sync_failure: z
+    .object({
+      ...common,
+      connectionId: z.string().min(1),
+      capability: z.enum([
+        'inventory.read',
+        'orders.read',
+        'fulfillment.read',
+        'products.read',
+      ]),
+      active: z.boolean(),
+      status: z.enum(['failed', 'success']),
+      errorCode: z
+        .enum([
+          'authentication',
+          'permission_denied',
+          'invalid_response',
+          'unsupported_capability',
+          'unsupported_version',
+          'transient',
+          'timeout',
+          'rate_limited',
+          'internal',
+        ])
+        .nullable(),
+      firstFailureAt: timestamp,
+      retryExhausted: z.boolean(),
+      scanComplete: z.boolean(),
+    })
+    .strict(),
+  stuck_fulfillment: z
+    .object({
+      ...common,
+      connectionId: z.string().min(1),
+      status: z.enum([
+        'pending',
+        'processing',
+        'shipped',
+        'delivered',
+        'cancelled',
+        'failed',
+        'unknown',
+      ]),
+      observedAt: timestamp,
+      lastProgressAt: timestamp.nullable(),
+      quantity: decimal.nullable(),
+      unit: z.string().min(1),
+      mapped: z.boolean(),
+      complete: z.boolean(),
+      eligibility: z.enum(['eligible', 'exempt', 'unknown']),
+      progressBasis: z.enum([
+        'note_created_or_package_shipped',
+        'source_updated',
+      ]),
+      otherOperationShippedQuantity: decimal,
+    })
+    .strict(),
+  inventory_mismatch: z
+    .object({
+      ...common,
+      connectionIds: z.tuple([z.string().min(1), z.string().min(1)]),
+      canonicalLocationId: z.string().min(1),
+      leftAvailable: decimal.nullable(),
+      rightAvailable: decimal.nullable(),
+      leftUnit: z.string().min(1),
+      rightUnit: z.string().min(1),
+      leftObservedAt: timestamp,
+      rightObservedAt: timestamp,
+      leftBasis: z.enum(['provider_reported', 'derived', 'unknown']),
+      rightBasis: z.enum(['provider_reported', 'derived', 'unknown']),
+      mappedSku: z.boolean(),
+      equivalentPool: z.boolean(),
+      complete: z.boolean(),
+      projectionCurrent: z.boolean(),
+      authority: z.enum(['left', 'right']).nullable(),
+      sellingSource: z.enum(['left', 'right']),
+      tolerance: decimal.refine((value) => !value.startsWith('-')),
+    })
+    .strict(),
+  workflow_failure: z
+    .object({
+      ...common,
+      runId: z.string().min(1),
+      stepKey: z.string().min(1),
+      attempt: z.number().int().positive(),
+      status: z.enum([
+        'failed',
+        'timed_out',
+        'running',
+        'succeeded',
+        'cancelled',
+        'interrupted',
+      ]),
+      durable: z.boolean(),
+      retryExhausted: z.boolean(),
+      effect: z.enum(['none', 'unknown']),
+      executionId: z.string().min(1).nullable(),
+      errorCode: z.string().min(1),
+    })
+    .strict(),
+};
+const className = z.enum([
+  'sync_failure',
+  'stuck_fulfillment',
+  'inventory_mismatch',
+  'workflow_failure',
+]);
+const decision = z.discriminatedUnion('decision', [
+  z
+    .object({
+      decision: z.literal('detect'),
+      severity: z.enum(['medium', 'high']),
+      reason: z.string().min(1),
+    })
+    .strict(),
+  ...(['clear', 'defer', 'reject'] as const).map((value) =>
+    z
+      .object({
+        decision: z.literal(value),
+        severity: z.null(),
+        reason: z.string().min(1),
+      })
+      .strict(),
+  ),
+]);
+const corpusSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    ruleVersion: z.literal('v0.1'),
+    synthetic: z.literal(true),
+    now: timestamp,
+    thresholds: z
+      .object({
+        freshnessSeconds: z.number().int().positive(),
+        pairSkewSeconds: z.number().int().positive(),
+        syncFailureSeconds: z.number().int().positive(),
+        stuckSeconds: z.number().int().positive(),
+        uncertaintySeconds: z.number().int().positive(),
+      })
+      .strict(),
+    bases: z.object(schemas).strict(),
+    cases: z
+      .array(
+        z
+          .object({
+            id: z.string().min(1),
+            exceptionClass: className,
+            input: z.record(z.unknown()),
+            expected: decision,
+          })
+          .strict(),
+      )
+      .min(1),
+  })
+  .strict();
+const corpus = corpusSchema.parse(
+  JSON.parse(
+    readFileSync(
+      new URL('../../../docs/fixtures/exceptions-v0.json', import.meta.url),
+      'utf8',
+    ),
+  ),
+);
+
+// These checks protect the handoff corpus. Detector behavior is evaluated by LUMA-19.
+describe('V0 exception acceptance corpus', () => {
+  it('has unique case IDs and positive, negative and uncertain cases for every class', () => {
+    expect(new Set(corpus.cases.map(({ id }) => id)).size).toBe(
+      corpus.cases.length,
+    );
+    for (const name of className.options) {
+      const outcomes = new Set(
+        corpus.cases
+          .filter((c) => c.exceptionClass === name)
+          .map((c) => c.expected.decision),
+      );
+      for (const outcome of ['detect', 'clear', 'defer'] as const)
+        expect(outcomes.has(outcome)).toBe(true);
+    }
+  });
+
+  it.each(corpus.cases)(
+    '$id has valid normalized facts and evidence',
+    (testCase) => {
+      const facts = schemas[testCase.exceptionClass].parse({
+        ...corpus.bases[testCase.exceptionClass],
+        ...testCase.input,
+      });
+      expect(new Set(facts.evidenceRefs).size).toBe(facts.evidenceRefs.length);
+      if (facts.tenantId !== facts.evidenceTenantId) {
+        expect(testCase.expected).toEqual({
+          decision: 'reject',
+          severity: null,
+          reason: 'tenant_mismatch',
+        });
+      }
+      if ('effect' in facts && facts.effect === 'unknown')
+        expect(facts.executionId).not.toBeNull();
+    },
+  );
+
+  it('rejects malformed fixture facts instead of silently coercing them', () => {
+    const base = corpus.bases.inventory_mismatch;
+    for (const invalid of [
+      0,
+      'NaN',
+      '1e3',
+      '0.0000001',
+      '100000000000000',
+      '',
+    ]) {
+      expect(
+        schemas.inventory_mismatch.safeParse({
+          ...base,
+          leftAvailable: invalid,
+        }).success,
+      ).toBe(false);
+    }
+    expect(
+      schemas.inventory_mismatch.safeParse({ ...base, leftAvailable: null })
+        .success,
+    ).toBe(true);
+    expect(
+      schemas.inventory_mismatch.safeParse({ ...base, tolerance: '-1' })
+        .success,
+    ).toBe(false);
+    expect(
+      schemas.inventory_mismatch.safeParse({
+        ...base,
+        leftObservedAt: 'yesterday',
+      }).success,
+    ).toBe(false);
+    expect(
+      schemas.inventory_mismatch.safeParse({ ...base, available: '5' }).success,
+    ).toBe(false);
+    expect(
+      decision.safeParse({
+        decision: 'clear',
+        severity: 'high',
+        reason: 'within_tolerance',
+      }).success,
+    ).toBe(false);
+  });
+});

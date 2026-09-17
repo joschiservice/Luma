@@ -1,0 +1,702 @@
+{
+  "schemaVersion": 1,
+  "ruleVersion": "v0.1",
+  "synthetic": true,
+  "now": "2026-09-17T12:00:00Z",
+  "thresholds": {
+    "freshnessSeconds": 300,
+    "pairSkewSeconds": 60,
+    "syncFailureSeconds": 900,
+    "stuckSeconds": 7200,
+    "uncertaintySeconds": 1800
+  },
+  "bases": {
+    "sync_failure": {
+      "tenantId": "tenant-a",
+      "evidenceTenantId": "tenant-a",
+      "subjectId": "subject-1",
+      "evidenceRefs": ["observation-1"],
+      "connectionId": "jtl-a",
+      "capability": "inventory.read",
+      "active": true,
+      "status": "failed",
+      "errorCode": "authentication",
+      "firstFailureAt": "2026-09-17T11:45:00Z",
+      "retryExhausted": false,
+      "scanComplete": false
+    },
+    "stuck_fulfillment": {
+      "tenantId": "tenant-a",
+      "evidenceTenantId": "tenant-a",
+      "subjectId": "subject-1",
+      "evidenceRefs": ["observation-1"],
+      "connectionId": "jtl-a",
+      "status": "processing",
+      "observedAt": "2026-09-17T12:00:00Z",
+      "lastProgressAt": "2026-09-17T10:00:00Z",
+      "quantity": "2",
+      "unit": "each",
+      "mapped": true,
+      "complete": true,
+      "eligibility": "eligible",
+      "progressBasis": "note_created_or_package_shipped",
+      "otherOperationShippedQuantity": "1"
+    },
+    "inventory_mismatch": {
+      "tenantId": "tenant-a",
+      "evidenceTenantId": "tenant-a",
+      "subjectId": "subject-1",
+      "evidenceRefs": ["jtl-observation-1", "shopify-observation-1"],
+      "connectionIds": ["jtl-a", "shopify-a"],
+      "canonicalLocationId": "pool-1",
+      "leftAvailable": "3",
+      "rightAvailable": "5",
+      "leftUnit": "each",
+      "rightUnit": "each",
+      "leftObservedAt": "2026-09-17T12:00:00Z",
+      "rightObservedAt": "2026-09-17T12:00:00Z",
+      "leftBasis": "provider_reported",
+      "rightBasis": "provider_reported",
+      "mappedSku": true,
+      "equivalentPool": true,
+      "complete": true,
+      "projectionCurrent": true,
+      "authority": "left",
+      "sellingSource": "right",
+      "tolerance": "0"
+    },
+    "workflow_failure": {
+      "tenantId": "tenant-a",
+      "evidenceTenantId": "tenant-a",
+      "subjectId": "subject-1",
+      "evidenceRefs": ["observation-1"],
+      "runId": "run-1",
+      "stepKey": "sync-inventory",
+      "attempt": 3,
+      "status": "failed",
+      "durable": true,
+      "retryExhausted": true,
+      "effect": "none",
+      "executionId": null,
+      "errorCode": "timeout"
+    }
+  },
+  "cases": [
+    {
+      "id": "sync-authentication",
+      "exceptionClass": "sync_failure",
+      "input": {},
+      "expected": {
+        "decision": "detect",
+        "severity": "high",
+        "reason": "hard_read_failure"
+      }
+    },
+    {
+      "id": "sync-permission",
+      "exceptionClass": "sync_failure",
+      "input": {
+        "errorCode": "permission_denied"
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "high",
+        "reason": "hard_read_failure"
+      }
+    },
+    {
+      "id": "sync-pagination",
+      "exceptionClass": "sync_failure",
+      "input": {
+        "errorCode": "invalid_response",
+        "scanComplete": false
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "high",
+        "reason": "hard_read_failure"
+      }
+    },
+    {
+      "id": "sync-retry-boundary",
+      "exceptionClass": "sync_failure",
+      "input": {
+        "errorCode": "timeout",
+        "retryExhausted": true
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "medium",
+        "reason": "retry_window_exhausted"
+      }
+    },
+    {
+      "id": "sync-before-boundary",
+      "exceptionClass": "sync_failure",
+      "input": {
+        "errorCode": "timeout",
+        "retryExhausted": true,
+        "firstFailureAt": "2026-09-17T11:45:01Z"
+      },
+      "expected": {
+        "decision": "clear",
+        "severity": null,
+        "reason": "retry_window_open"
+      }
+    },
+    {
+      "id": "sync-retry-pending",
+      "exceptionClass": "sync_failure",
+      "input": {
+        "errorCode": "rate_limited"
+      },
+      "expected": {
+        "decision": "clear",
+        "severity": null,
+        "reason": "retry_window_open"
+      }
+    },
+    {
+      "id": "sync-disabled",
+      "exceptionClass": "sync_failure",
+      "input": {
+        "active": false
+      },
+      "expected": {
+        "decision": "clear",
+        "severity": null,
+        "reason": "inactive_connection"
+      }
+    },
+    {
+      "id": "sync-healthy",
+      "exceptionClass": "sync_failure",
+      "input": {
+        "status": "success",
+        "errorCode": null,
+        "scanComplete": true
+      },
+      "expected": {
+        "decision": "clear",
+        "severity": null,
+        "reason": "read_succeeded"
+      }
+    },
+    {
+      "id": "sync-unclassified",
+      "exceptionClass": "sync_failure",
+      "input": {
+        "errorCode": "internal"
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "unclassified_error"
+      }
+    },
+    {
+      "id": "fulfillment-split-boundary",
+      "exceptionClass": "stuck_fulfillment",
+      "input": {},
+      "expected": {
+        "decision": "detect",
+        "severity": "medium",
+        "reason": "progress_timeout"
+      }
+    },
+    {
+      "id": "fulfillment-before-boundary",
+      "exceptionClass": "stuck_fulfillment",
+      "input": {
+        "lastProgressAt": "2026-09-17T10:00:01Z"
+      },
+      "expected": {
+        "decision": "clear",
+        "severity": null,
+        "reason": "progress_within_window"
+      }
+    },
+    {
+      "id": "fulfillment-failed",
+      "exceptionClass": "stuck_fulfillment",
+      "input": {
+        "status": "failed"
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "high",
+        "reason": "operation_failed"
+      }
+    },
+    {
+      "id": "fulfillment-shipped",
+      "exceptionClass": "stuck_fulfillment",
+      "input": {
+        "status": "shipped"
+      },
+      "expected": {
+        "decision": "clear",
+        "severity": null,
+        "reason": "terminal_operation"
+      }
+    },
+    {
+      "id": "fulfillment-zero-work",
+      "exceptionClass": "stuck_fulfillment",
+      "input": {
+        "quantity": "0"
+      },
+      "expected": {
+        "decision": "clear",
+        "severity": null,
+        "reason": "no_remaining_work"
+      }
+    },
+    {
+      "id": "fulfillment-held",
+      "exceptionClass": "stuck_fulfillment",
+      "input": {
+        "status": "pending",
+        "eligibility": "exempt"
+      },
+      "expected": {
+        "decision": "clear",
+        "severity": null,
+        "reason": "explicit_exemption"
+      }
+    },
+    {
+      "id": "fulfillment-unknown-hold",
+      "exceptionClass": "stuck_fulfillment",
+      "input": {
+        "status": "pending",
+        "eligibility": "unknown"
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "unknown_eligibility"
+      }
+    },
+    {
+      "id": "fulfillment-missing-progress",
+      "exceptionClass": "stuck_fulfillment",
+      "input": {
+        "lastProgressAt": null
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "unknown_progress"
+      }
+    },
+    {
+      "id": "fulfillment-closed-unknown",
+      "exceptionClass": "stuck_fulfillment",
+      "input": {
+        "status": "unknown"
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "unknown_status"
+      }
+    },
+    {
+      "id": "fulfillment-stale",
+      "exceptionClass": "stuck_fulfillment",
+      "input": {
+        "observedAt": "2026-09-17T11:54:59Z"
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "stale_evidence"
+      }
+    },
+    {
+      "id": "fulfillment-future-progress",
+      "exceptionClass": "stuck_fulfillment",
+      "input": {
+        "lastProgressAt": "2026-09-17T12:00:01Z"
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "unknown_progress"
+      }
+    },
+    {
+      "id": "inventory-oversell",
+      "exceptionClass": "inventory_mismatch",
+      "input": {},
+      "expected": {
+        "decision": "detect",
+        "severity": "high",
+        "reason": "oversell_risk"
+      }
+    },
+    {
+      "id": "inventory-no-authority",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "authority": null
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "medium",
+        "reason": "quantity_mismatch"
+      }
+    },
+    {
+      "id": "inventory-equal-zero",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "leftAvailable": "0",
+        "rightAvailable": "0"
+      },
+      "expected": {
+        "decision": "clear",
+        "severity": null,
+        "reason": "within_tolerance"
+      }
+    },
+    {
+      "id": "inventory-negative-fraction",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "leftAvailable": "-1.5",
+        "rightAvailable": "0"
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "high",
+        "reason": "oversell_risk"
+      }
+    },
+    {
+      "id": "inventory-equal-negative",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "leftAvailable": "-1.5",
+        "rightAvailable": "-1.5"
+      },
+      "expected": {
+        "decision": "clear",
+        "severity": null,
+        "reason": "within_tolerance"
+      }
+    },
+    {
+      "id": "inventory-decimal-precision",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "leftAvailable": "99999999999999.000001",
+        "rightAvailable": "99999999999999.000002"
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "high",
+        "reason": "oversell_risk"
+      }
+    },
+    {
+      "id": "inventory-tolerance-boundary",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "leftAvailable": "3.5",
+        "rightAvailable": "4",
+        "tolerance": "0.5"
+      },
+      "expected": {
+        "decision": "clear",
+        "severity": null,
+        "reason": "within_tolerance"
+      }
+    },
+    {
+      "id": "inventory-fraction-above-tolerance",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "leftAvailable": "3.499999",
+        "rightAvailable": "4",
+        "tolerance": "0.5"
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "high",
+        "reason": "oversell_risk"
+      }
+    },
+    {
+      "id": "inventory-null",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "leftAvailable": null
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "unknown_quantity"
+      }
+    },
+    {
+      "id": "inventory-units",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "leftUnit": "kg"
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "incomparable_units"
+      }
+    },
+    {
+      "id": "inventory-unknown-unit",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "leftUnit": "unknown",
+        "rightUnit": "unknown"
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "incomparable_units"
+      }
+    },
+    {
+      "id": "inventory-unmapped-sku",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "mappedSku": false
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "unmapped_sku"
+      }
+    },
+    {
+      "id": "inventory-aggregate-pool",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "equivalentPool": false
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "incomparable_pool"
+      }
+    },
+    {
+      "id": "inventory-warehouse-on-hand",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "leftAvailable": null,
+        "leftBasis": "unknown"
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "unknown_quantity"
+      }
+    },
+    {
+      "id": "inventory-derived",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "leftBasis": "derived"
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "incomparable_basis"
+      }
+    },
+    {
+      "id": "inventory-freshness-boundary",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "leftObservedAt": "2026-09-17T11:55:00Z",
+        "rightObservedAt": "2026-09-17T11:55:00Z"
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "high",
+        "reason": "oversell_risk"
+      }
+    },
+    {
+      "id": "inventory-stale",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "leftObservedAt": "2026-09-17T11:54:59Z",
+        "rightObservedAt": "2026-09-17T11:54:59Z"
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "stale_evidence"
+      }
+    },
+    {
+      "id": "inventory-skew-boundary",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "leftObservedAt": "2026-09-17T11:59:00Z"
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "high",
+        "reason": "oversell_risk"
+      }
+    },
+    {
+      "id": "inventory-skew",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "leftObservedAt": "2026-09-17T11:58:59Z"
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "observation_skew"
+      }
+    },
+    {
+      "id": "inventory-future",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "leftObservedAt": "2026-09-17T12:00:01Z"
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "future_evidence"
+      }
+    },
+    {
+      "id": "inventory-partial",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "complete": false
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "incomplete_evidence"
+      }
+    },
+    {
+      "id": "inventory-out-of-order",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "projectionCurrent": false
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "ambiguous_projection"
+      }
+    },
+    {
+      "id": "inventory-cross-tenant",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "evidenceTenantId": "tenant-b"
+      },
+      "expected": {
+        "decision": "reject",
+        "severity": null,
+        "reason": "tenant_mismatch"
+      }
+    },
+    {
+      "id": "workflow-exhausted",
+      "exceptionClass": "workflow_failure",
+      "input": {},
+      "expected": {
+        "decision": "detect",
+        "severity": "high",
+        "reason": "terminal_failure"
+      }
+    },
+    {
+      "id": "workflow-timeout",
+      "exceptionClass": "workflow_failure",
+      "input": {
+        "status": "timed_out"
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "high",
+        "reason": "terminal_failure"
+      }
+    },
+    {
+      "id": "workflow-retry-pending",
+      "exceptionClass": "workflow_failure",
+      "input": {
+        "retryExhausted": false
+      },
+      "expected": {
+        "decision": "clear",
+        "severity": null,
+        "reason": "retry_pending"
+      }
+    },
+    {
+      "id": "workflow-healthy",
+      "exceptionClass": "workflow_failure",
+      "input": {
+        "status": "succeeded",
+        "retryExhausted": false
+      },
+      "expected": {
+        "decision": "clear",
+        "severity": null,
+        "reason": "healthy_workflow"
+      }
+    },
+    {
+      "id": "workflow-cancelled",
+      "exceptionClass": "workflow_failure",
+      "input": {
+        "status": "cancelled"
+      },
+      "expected": {
+        "decision": "clear",
+        "severity": null,
+        "reason": "intentional_cancellation"
+      }
+    },
+    {
+      "id": "workflow-no-durable-event",
+      "exceptionClass": "workflow_failure",
+      "input": {
+        "durable": false
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "missing_durable_evidence"
+      }
+    },
+    {
+      "id": "workflow-crash-after-dispatch",
+      "exceptionClass": "workflow_failure",
+      "input": {
+        "status": "interrupted",
+        "effect": "unknown",
+        "executionId": "execution-1",
+        "retryExhausted": false
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "high",
+        "reason": "reconciliation_required"
+      }
+    }
+  ]
+}
