@@ -1,0 +1,83 @@
+# ADR-001: Modular monolith boundaries
+
+Status: accepted for the initial backend. Decision: 2026-09-17, LUMA-4.
+
+## Context and options
+
+Luma must detect, diagnose, resolve and verify commerce exceptions across JTL and Shopify without recreating an ERP. The locked stack is one TypeScript/Node backend, Fastify, ts-rest, PostgreSQL/Drizzle and Better Auth. External systems initially remain authoritative for many commerce objects.
+
+Choose explicit modules inside `apps/api/src/modules`, with dependency injection and a directed acyclic import graph. A flat service directory would make ownership hard to enforce. A package or microservice per module would add build, deployment and distributed transaction overhead before there is evidence for it. Create module directories only when implementing their first use case; this decision does not scaffold empty services.
+
+## Module map and allowed imports
+
+Rows are consumers; listed providers are the only permitted cross-module imports, including type-only imports and event schemas. Dependencies are not transitive permissions. No module may import workflows. `identity` includes organizations and tenancy.
+
+| Module     | Owns / public interface intent                                                                                                 | May import                                                                                |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| platform   | Technical primitives, clock/ID/event ports, database connection and telemetry adapters; health                                 | none                                                                                      |
+| identity   | Users, organizations, membership, tenant/actor context; identity and permission queries                                        | platform                                                                                  |
+| audit      | Append-only evidence and audit queries; append/query ports                                                                     | platform                                                                                  |
+| orders     | Canonical orders, lines and fulfillment references; ingest/query use cases                                                     | platform, identity                                                                        |
+| inventory  | Canonical SKU, stock positions and reservations; ingest/query use cases                                                        | platform, identity                                                                        |
+| connectors | Connections, secret references, external IDs, raw payloads/provenance, typed capabilities and normalized external observations | platform, identity                                                                        |
+| policies   | Policy versions, risk/permission decisions, approval requests and grants; evaluate/approve use cases                           | platform, identity                                                                        |
+| execution  | Action attempts, idempotency, mechanism selection, verification and compensation; execute/status use cases                     | platform, identity, policies, connectors, audit                                           |
+| exceptions | Incident lifecycle, diagnosis, proposed resolution and human escalation; detect/query/transition use cases                     | platform, identity, orders, inventory                                                     |
+| workflows  | Cross-module process coordination, durable progress and retries; start/resume process use cases                                | platform, identity, orders, inventory, exceptions, policies, execution, connectors, audit |
+
+Orders and inventory do not call each other. Workflows combine their snapshots. Connectors expose provider-independent observations/capabilities; workflows map observations into owner-specific ingestion commands. Core modules must not branch on Shopify/JTL payloads. Execution owns action mechanics; workflows own the longer business process. Exceptions propose actions; execution checks current authorization, policy and approval before each external effect. Approval is not permission to bypass verification or audit.
+
+Audit accepts generic evidence envelopes, not imports from every producer. Producers use an injected append port or committed events wired by the composition root. Platform must remain technical: it cannot own policies, commerce models, approvals or a generic business service locator.
+
+## Public interfaces and layering
+
+Each module uses this layout, adding files only as needed:
+
+```text
+modules/<name>/
+  index.ts                 # explicit public DTOs, ports, event schemas and use-case types
+  composition.ts           # factory wiring this module's adapters and handlers
+  domain/                  # entities, value objects and pure rules
+  application/             # use cases and ports they need
+  infrastructure/          # database, vendor and durable-runtime adapters
+  api/                     # HTTP handlers and transport mapping
+```
+
+- `domain` imports its own domain and the platform public primitives only.
+- `application` imports its own application/domain and allowed providers' public interfaces.
+- `infrastructure` imports its own infrastructure/application/domain and allowed providers' interfaces.
+- `api` imports its own api/application/domain and allowed providers' interfaces; inject use cases rather than constructing repositories.
+- `index.ts` exposes selected domain/application contracts with explicit named exports. No infrastructure, HTTP handlers, ORM tables, singleton instances or composition factories.
+- `composition.ts` may wire all its own layers and consume allowed providers through their public interfaces. Only `apps/api/src/app.ts` and `index.ts` wire module entry points; no other root-level backend helpers may reach into modules.
+
+All cross-module imports use `../<provider>/index.js` (with the relative depth appropriate to the caller). Never deep-import a provider, including from tests, or import its composition factory from another module. Factories receive provider interfaces from the root. Internal imports use relative, explicit file paths; aliases are not part of the backend convention.
+
+Domain, application and public entry points have no external runtime/framework imports. Inject clocks, I/O and vendor adapters. Colocated tests may import Vitest. Introduce any pure-library exception explicitly in the rule and this decision after review.
+
+A public use case takes explicit tenant/actor context plus a validated command/query and returns a DTO or typed result. Never expose Drizzle rows or Fastify requests. Identity owns tenant/actor semantics; platform may own opaque identifier primitives without taking an identity dependency. HTTP contracts belong to the shared contract package planned in LUMA-7; web/desktop consume those contracts, never backend source. Transport DTOs must not become the domain model.
+
+## Data, events and transactions
+
+Each module owns its tables, migrations, repository interfaces and writes. A shared PostgreSQL connection does not permit direct access to another module's tables or repositories. Read through owner interfaces or build an explicitly owned projection. Keep transactions within an owner; workflows coordinate multiple owners with idempotent steps and explicit compensation rather than a transaction passed between modules.
+
+Events describe committed facts, not commands disguised as notifications. The producing module owns a versioned public schema. Include event ID, type/version, tenant ID, occurrence time, correlation/causation IDs and minimal payload; use references for raw data and never carry credentials. Consumers import producer schemas only along the dependency map. A reverse dependency requires moving coordination to workflows or revising the ADR, not a string-topic workaround.
+
+In-process dispatch is sufficient for ephemeral notifications. If a downstream effect must survive a crash, persist the business change and outbox record atomically, then dispatch after commit. Assume at-least-once delivery; consumers deduplicate by tenant/event ID, retry safely and expose terminal failures. Ordering is only promised per aggregate when explicitly implemented. Do not perform remote effects in a database transaction or let listener registration order define correctness. Durable workflows use provider-neutral ports pending the Restate/Temporal decision. Audit history is append-only evidence, not default event sourcing.
+
+Example: connectors records an external observation; workflows invokes orders/inventory ingestion, asks exceptions to diagnose, then requests execution. Execution checks policies, invokes a connector capability, verifies the result and records evidence. Workflows updates the exception outcome through its interface. No reverse import is needed.
+
+## Shared primitives and enforcement
+
+Keep a primitive with its semantic owner. Share only after a concrete second consumer exists. Platform owns technical interfaces; identity owns tenant context; audit owns evidence contracts; connectors owns capability descriptions; policies owns approval/decision semantics. Existing `packages/config` remains startup configuration, consumed by the composition root. Inject configuration into modules. `packages/ui` remains presentation-only. Packages must not import apps, and apps must not import another app's source.
+
+`tooling/architecture/policy.mjs` is the executable dependency/layer map. The local ESLint rule runs in `pnpm lint` and CI. It checks module registration, public entry points, import directions, layer directions, external dependencies in inner layers, static imports/re-exports, type imports, literal dynamic imports and `require`. Nonliteral module imports are rejected. `pnpm test:architecture` exercises allowed and forbidden imports and checks the graph for cycles; it is included in `pnpm test`.
+
+This is a source-level guard, not a security sandbox. Review must still enforce table ownership, event semantics, tenant scoping, explicit public exports, package responsibilities and runtime capability authorization. Do not introduce import aliases, computed loaders, ESLint suppressions or alternate module roots to evade the policy. A new module, dependency, alias or exception requires updating the ADR, executable policy and regression tests together.
+
+## Consequences, reversal cost and evidence
+
+The graph makes ownership reviewable while keeping a single deployable backend. Workflows bears explicit coordination work; public DTOs may duplicate transport/storage shapes. Dependencies can be changed with a reviewed ADR and policy update; moving a module to its own process later additionally requires replacing injected ports with transport and validating delivery/transaction guarantees.
+
+Evidence: the existing backend contains only startup and a service-free health endpoint, so no domain migration is needed. Boundary regression tests cover legal imports and violations, and CI runs them with the existing repository gates. This decision makes no claim about throughput or durable-runtime reliability; provider spikes and LUMA-7/LUMA-16 remain separate work.
+
+Sources: [Linear architecture register](https://linear.app/auren-labs/document/architecture-decision-register-305db9bed1de), [strategic decision log](https://app.notion.com/p/3dd56a47048481afa32bfc5e75ba94b1), [product architecture](https://app.notion.com/p/3dd56a4704848195bbaad3dbd757e9af).
