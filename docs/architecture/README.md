@@ -4,10 +4,11 @@ This directory is the source of truth for implementation ADRs. Review and versio
 
 ## Register
 
-| ADR                                    | Decision                         | Status   | Issue                                                |
-| -------------------------------------- | -------------------------------- | -------- | ---------------------------------------------------- |
-| [001](001-module-boundaries.md)        | Modular monolith boundaries      | Accepted | [LUMA-4](https://linear.app/auren-labs/issue/LUMA-4) |
-| [002](002-canonical-commerce-model.md) | Canonical commerce data model v0 | Accepted | [LUMA-5](https://linear.app/auren-labs/issue/LUMA-5) |
+| ADR                                               | Decision                                     | Status   | Issue                                                |
+| ------------------------------------------------- | -------------------------------------------- | -------- | ---------------------------------------------------- |
+| [001](001-module-boundaries.md)                   | Modular monolith boundaries                  | Accepted | [LUMA-4](https://linear.app/auren-labs/issue/LUMA-4) |
+| [002](002-canonical-commerce-model.md)            | Canonical commerce data model v0             | Accepted | [LUMA-5](https://linear.app/auren-labs/issue/LUMA-5) |
+| [003](003-tenant-isolation-and-data-residency.md) | Tenant isolation and regional data residency | Proposed | [LUMA-6](https://linear.app/auren-labs/issue/LUMA-6) |
 
 ## Baseline
 
