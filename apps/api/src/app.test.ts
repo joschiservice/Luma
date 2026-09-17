@@ -499,3 +499,67 @@ describe('observability baseline', () => {
     }
   });
 });
+
+it('composes model-backed work with routes selected by startup configuration', async () => {
+  const { readModelGatewayConfig } = await import('@luma/config');
+  const { createModelGateway } =
+    await import('./modules/platform/composition.js');
+  for (const [model, provider] of [
+    ['anthropic/claude-sonnet-4.5', 'anthropic'],
+    ['openai/gpt-4.1', 'openai'],
+  ]) {
+    const settings = readModelGatewayConfig({
+      AI_GATEWAY_API_KEY: 'test-key',
+      MODEL_GATEWAY_ROUTES: JSON.stringify({
+        reasoning: {
+          adapter: 'vercel',
+          model,
+          providers: [provider],
+          zeroDataRetention: true,
+        },
+      }),
+    });
+    const observability = createObservability({
+      environment: 'test',
+      release: 'test',
+      sampleRate: 1,
+      approvedModels: [model!],
+    });
+    const models: string[] = [];
+    const gateway = createModelGateway(settings, observability, {
+      transport: async (_url, init) => {
+        models.push(JSON.parse(String(init?.body)).model);
+        return Response.json({
+          choices: [{ finish_reason: 'stop', message: { content: 'summary' } }],
+          usage: { prompt_tokens: 2, completion_tokens: 1 },
+        });
+      },
+    });
+    const app = buildApp({}, { modelGateway: gateway, observability });
+    try {
+      const root = observability.request(randomUUID());
+      const output = await observability.run(
+        root.context,
+        'workflow.run',
+        async (context) =>
+          app.modelGateway!.generate(context, {
+            profile: 'reasoning',
+            dataPolicy: {
+              classification: 'public',
+              region: 'unrestricted',
+              zeroDataRetention: true,
+            },
+            messages: [
+              { role: 'user', content: 'Summarize this synthetic fixture.' },
+            ],
+            maxOutputTokens: 64,
+          }),
+      );
+      expect(output.output).toBe('summary');
+      expect(models).toEqual([model]);
+      root.end();
+    } finally {
+      await app.close();
+    }
+  }
+});

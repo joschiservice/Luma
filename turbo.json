@@ -21,6 +21,9 @@
       "cache": false,
       "persistent": true,
       "env": [
+        "MODEL_GATEWAY_ROUTES",
+        "MODEL_GATEWAY_TIMEOUT_MS",
+        "AI_GATEWAY_API_KEY",
         "HOST",
         "PORT",
         "LOG_LEVEL",

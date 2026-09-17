@@ -14,7 +14,7 @@ Rows are consumers; listed providers are the only permitted cross-module imports
 
 | Module     | Owns / public interface intent                                                                                                 | May import                                                                                |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
-| platform   | Technical primitives, clock/ID/event ports, database connection and telemetry adapters; health                                 | none                                                                                      |
+| platform   | Technical primitives, clock/ID/event ports, database, telemetry and model gateway ports/adapters; health                       | none                                                                                      |
 | identity   | Users, organizations, membership, tenant/actor context; identity and permission queries                                        | platform                                                                                  |
 | audit      | Append-only evidence and audit queries; append/query ports                                                                     | platform                                                                                  |
 | orders     | Canonical orders, lines and fulfillment references; ingest/query use cases                                                     | platform, identity                                                                        |

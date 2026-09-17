@@ -21,9 +21,11 @@ export interface Observation {
   readonly context: TraceContext;
   end(status?: 'ok' | 'error'): void;
   generation(usage: {
-    model: 'test-model';
+    model: string;
     inputTokens: number;
     outputTokens: number;
+    costUsd?: number | null;
+    latencyMs?: number;
   }): void;
 }
 

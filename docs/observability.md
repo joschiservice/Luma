@@ -52,7 +52,7 @@ await observability.run(context, 'workflow.run', async (workflow) => {
 });
 ```
 
-The model allowlist currently contains `test-model`. LUMA-24 must add approved provider model identifiers when implementing the real gateway. Observations record model identity and token counts, never arguments or return values. Span names, product event names and flag keys are explicit allowlists; extend them in code review instead of using customer content as names.
+The model allowlist contains `test-model` and the model identifiers from validated startup routes. The [model gateway](model-gateway.md) records model identity, token counts, latency and reported cost, never arguments or return values. Span names, product event names and flag keys are explicit allowlists; extend them in code review instead of using customer content as names.
 
 The API binds telemetry to `request.tenantContext` after the identity guard succeeds. Handlers pass `request.observation.context` to application services. For background work, use `forTenant(context, authorizedTenantId, 'EU')` after reauthorization. It exports an environment-specific HMAC as `tenant_ref`; raw organization/user IDs are not exported. This pseudonym is still restricted metadata. Startup rejects enabled exporters without a hash secret. The adapter rejects unsupported placement. With all exporters disabled and no hash key, local requests retain correlation without tenant metadata. Never derive tenant context from a header, body or analytics ID. Reauthorize any persisted workflow envelope before resuming it; trace context alone grants no authority.
 
@@ -60,7 +60,7 @@ The API binds telemetry to `request.tenantContext` after the identity guard succ
 
 ## Data policy
 
-Only deployment metadata, opaque correlation IDs, tenant HMACs, fixed operation names, status, timing, approved model names and token counts enter telemetry. There is no general-purpose metadata bag. Do not add emails, names, addresses, commerce identifiers, prompts, completions, tool arguments/results, URLs, query strings, request bodies, headers, cookies or credentials.
+Only deployment metadata, opaque correlation IDs, tenant HMACs, fixed operation names, status, timing, approved model names, token counts, model latency and reported cost enter telemetry. There is no general-purpose metadata bag. Do not add emails, names, addresses, commerce identifiers, prompts, completions, tool arguments/results, URLs, query strings, request bodies, headers, cookies or credentials.
 
 Sentry default integrations and automatic instrumentation are disabled. Errors use a fixed message plus correlation IDs; raw exception messages, stacks, breadcrumbs and request context are excluded. Langfuse exports only this adapter's tracer and masks input/output/metadata fields as a second boundary. Media upload is disabled. PostHog disables GeoIP, exception autocapture, automatic flag events and person profiles. Application HTTP logs contain generated request IDs, trace IDs and status; default request logging is disabled.
 
