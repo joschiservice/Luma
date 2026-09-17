@@ -25,6 +25,14 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
   {
     valid: [
       sample(
+        moduleFile('orders', 'infrastructure/repository.ts'),
+        "import { join } from 'node:path';",
+      ),
+      sample(
+        moduleFile('orders', 'composition.ts'),
+        "const driver = require('pg');",
+      ),
+      sample(
         moduleFile('orders'),
         "import type { Order } from '../domain/order.js';",
       ),
@@ -58,6 +66,20 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
       ),
     ],
     invalid: [
+      ...['infrastructure/repository.ts', 'composition.ts'].flatMap((layer) =>
+        ['node:module', 'module'].flatMap((specifier) =>
+          [
+            `import { createRequire } from '${specifier}'; const load = createRequire(import.meta.url); load('../../inventory/index.js');`,
+            `import { createRequire as makeLoader } from '${specifier}'; const load = makeLoader(import.meta.url); load('../../inventory/index.js');`,
+            `import * as nodeModule from '${specifier}'; const load = nodeModule.createRequire(import.meta.url); load('../../inventory/index.js');`,
+            `import nodeModule from '${specifier}'; const load = nodeModule.createRequire(import.meta.url); load('../../inventory/index.js');`,
+            `const { createRequire } = await import('${specifier}'); const load = createRequire(import.meta.url); load('../../inventory/index.js');`,
+            `const { createRequire } = require('${specifier}'); const load = createRequire(import.meta.url); load('../../inventory/index.js');`,
+            `export { createRequire as makeLoader } from '${specifier}';`,
+            `export * from '${specifier}';`,
+          ].map((code) => invalid(moduleFile('orders', layer), code)),
+        ),
+      ),
       invalid(
         moduleFile('orders'),
         "import { stock } from '../../inventory/index.js';",

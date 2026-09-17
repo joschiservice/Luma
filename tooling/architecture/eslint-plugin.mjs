@@ -83,6 +83,15 @@ const rule = {
           report(node, 'Module imports must use static string specifiers.');
         return;
       }
+      // Reject the loader provider itself so aliases, namespace imports and
+      // dynamically obtained createRequire functions cannot evade this rule.
+      if (source && (value === 'node:module' || value === 'module')) {
+        report(
+          node,
+          'Backend modules must not use alternate Node loaders; use standard imports or literal require calls.',
+        );
+        return;
+      }
       let to;
       if (value.startsWith('.')) {
         to = normalize(
