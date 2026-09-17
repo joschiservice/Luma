@@ -57,11 +57,16 @@ export const Default: Story = {
         true,
       ),
     );
-    for (let index = 0; index < 3; index++) {
-      await userEvent.tab();
-      await expect(
-        dialog.contains(canvasElement.ownerDocument.activeElement),
-      ).toBe(true);
+    // Focus guards return focus to the popup on the next animation frame.
+    for (const shift of [false, true]) {
+      for (let index = 0; index < 3; index++) {
+        await userEvent.tab({ shift });
+        await waitFor(() =>
+          expect(
+            dialog.contains(canvasElement.ownerDocument.activeElement),
+          ).toBe(true),
+        );
+      }
     }
     await userEvent.keyboard('{Escape}');
     await waitFor(() =>
