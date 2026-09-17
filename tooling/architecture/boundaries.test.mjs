@@ -25,6 +25,14 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
   {
     valid: [
       sample(
+        filename('apps/api/src/exceptions.integration.test.ts'),
+        "import { createExceptions } from './modules/exceptions/composition.js';",
+      ),
+      sample(
+        filename('apps/api/src/test-support/detection-fixtures.ts'),
+        "import { createJtlConnector } from '../modules/connectors/composition.js';",
+      ),
+      sample(
         filename('apps/api/src/app.test.ts'),
         "import { createObservability } from './modules/platform/composition.js';",
       ),
@@ -74,6 +82,14 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
       ),
     ],
     invalid: [
+      invalid(
+        filename('apps/api/src/exceptions.integration.test.ts'),
+        "import { createDetectionRepository } from './modules/exceptions/infrastructure/repository.js';",
+      ),
+      invalid(
+        filename('apps/api/src/test-support/detection-fixtures.ts'),
+        "import { createJtlConnector } from '../modules/connectors/infrastructure/jtl/adapter.js';",
+      ),
       invalid(
         filename('apps/api/src/app.test.ts'),
         "import { adapter } from './modules/platform/infrastructure/adapter.js';",
