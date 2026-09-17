@@ -33,6 +33,8 @@ export function violation(from, to) {
         'apps/api/src/app.ts',
         'apps/api/src/app.test.ts',
         'apps/api/src/exceptions.integration.test.ts',
+        'apps/api/src/connections.integration.test.ts',
+        'apps/api/src/connections.test.ts',
         'apps/api/src/test-support/detection-fixtures.ts',
         'apps/api/src/index.ts',
       ].includes(from)

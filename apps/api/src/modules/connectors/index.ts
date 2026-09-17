@@ -41,3 +41,11 @@ export type {
   CapabilityRuntime,
   CapabilityReader,
 } from './application/capabilities.js';
+export type {
+  InstalledConnection,
+  InstallationTarget,
+} from './domain/installation.js';
+export type ConnectionManagement = Omit<
+  import('./application/installations.js').InstallationService,
+  'credential'
+>;
