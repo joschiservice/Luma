@@ -54,13 +54,7 @@ function TenantShell({ organizationId }: { organizationId: string }) {
         retry={() => void organizations.refetch()}
       />
     );
-  if (
-    access.isPending ||
-    access.isFetching ||
-    organizations.isPending ||
-    organizations.isFetching
-  )
-    return <Pending />;
+  if (access.isPending || organizations.isPending) return <Pending />;
   const organization = organizations.data.find(
     (org) => org.id === organizationId,
   );

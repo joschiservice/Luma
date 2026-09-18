@@ -57,3 +57,5 @@ export function createInstallationService(
 export type { StoredInstallation } from './application/installations.js';
 export { createShippingMethodEffects } from './application/shipping-method-effects.js';
 export type { ShippingMethodEffectBinding } from './application/shipping-method-effects.js';
+
+export { connectionRoutes } from './api/installations.js';

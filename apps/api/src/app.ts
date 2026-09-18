@@ -36,7 +36,10 @@ import { openApiDocument } from '@luma/api-contract/openapi';
 import { initServer } from '@ts-rest/fastify';
 import Fastify, { LogController } from 'fastify';
 import type { FastifyServerOptions } from 'fastify';
-import { createConnectors } from './modules/connectors/composition.js';
+import {
+  connectionRoutes,
+  createConnectors,
+} from './modules/connectors/composition.js';
 import type { ProviderCatalog } from './modules/connectors/index.js';
 
 import {
@@ -48,6 +51,7 @@ import { IdentityError } from './modules/identity/index.js';
 import type { IdentityService } from './modules/identity/index.js';
 
 export interface AppDependencies {
+  connections?: import('./modules/connectors/index.js').ConnectionManagement;
   modelGateway?: ModelGateway;
   identity?: IdentityService;
   trustedOrigins?: readonly string[];
@@ -186,6 +190,7 @@ export function buildApp(
       apiContract,
       {
         identity: identityRoutes(dependencies.identity),
+        connections: connectionRoutes(dependencies.connections),
         system: {
           health: async () => ({ status: 200, body: { status: 'ok' } }),
           ready: async ({ request }) => {
@@ -249,6 +254,9 @@ export function buildRuntimeApp(
   options: FastifyServerOptions = {},
   observability?: Observability,
   modelSettings?: ModelGatewayConfig,
+  connections?: (
+    identity: IdentityService,
+  ) => import('./modules/connectors/index.js').ConnectionManagement,
 ) {
   if (modelSettings && !observability)
     throw new Error('Model gateway requires observability');
@@ -260,6 +268,7 @@ export function buildRuntimeApp(
   const app = buildApp(options, {
     ...(observability ? { observability } : {}),
     ...(modelGateway ? { modelGateway } : {}),
+    ...(connections ? { connections: connections(identity.service) } : {}),
     identity: identity.service,
     trustedOrigins: settings.trustedOrigins,
     checkReadiness: identity.checkReadiness,
