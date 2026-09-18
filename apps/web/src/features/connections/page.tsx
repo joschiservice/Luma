@@ -322,7 +322,10 @@ export function ConnectionCard({
           <Dialog
             open={dialog === 'disconnect'}
             onOpenChange={(open) => {
-              if (!pending) setDialog(open ? 'disconnect' : null);
+              if (!pending) {
+                if (open) setMessage('');
+                setDialog(open ? 'disconnect' : null);
+              }
             }}
           >
             <DialogTrigger
