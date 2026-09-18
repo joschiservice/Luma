@@ -35,6 +35,23 @@ const authEnvironment = {
   BETTER_AUTH_URL: 'http://localhost:3001',
   AUTH_TRUSTED_ORIGINS: 'http://localhost:3000',
 };
+it('accepts distinct cookie namespaces and rejects invalid cookie names', () => {
+  expect(
+    readIdentityConfig({
+      ...authEnvironment,
+      BETTER_AUTH_COOKIE_PREFIX: 'luma-worktree_1',
+    }).cookiePrefix,
+  ).toBe('luma-worktree_1');
+  expect(readIdentityConfig(authEnvironment).cookiePrefix).toBeUndefined();
+  for (const value of ['', 'has spaces', 'cookie;path=/', 'x'.repeat(65)]) {
+    expect(() =>
+      readIdentityConfig({
+        ...authEnvironment,
+        BETTER_AUTH_COOKIE_PREFIX: value,
+      }),
+    ).toThrow('BETTER_AUTH_COOKIE_PREFIX');
+  }
+});
 it('requires explicit identity credentials and exact trusted origins', () => {
   expect(readIdentityConfig(authEnvironment).trustedOrigins).toEqual([
     'http://localhost:3001',

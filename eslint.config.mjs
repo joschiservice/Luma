@@ -9,6 +9,7 @@ export default tseslint.config(
   {
     ignores: [
       '**/dist/**',
+      '**/.luma/**',
       '**/storybook-static/**',
       '**/.output/**',
       '**/.tanstack/**',

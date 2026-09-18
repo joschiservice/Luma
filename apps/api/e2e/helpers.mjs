@@ -1,3 +1,4 @@
+import { createServer } from 'node:net';
 import { assert, vi } from 'vitest';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -202,4 +203,15 @@ export async function signup(api, name) {
     .join('; ');
   assert.ok(cookie, 'Signup must issue a session cookie');
   return { cookie, userId: response.body.user.id };
+}
+
+export async function availablePort() {
+  const listener = createServer();
+  await new Promise((resolve, reject) => {
+    listener.once('error', reject);
+    listener.listen(0, '127.0.0.1', resolve);
+  });
+  const port = listener.address().port;
+  await new Promise((resolve) => listener.close(resolve));
+  return port;
 }

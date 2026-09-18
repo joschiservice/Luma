@@ -4,25 +4,28 @@ TypeScript modular monolith foundation. Node.js 24, pnpm 12, Turborepo.
 
 ## Start locally
 
+Install [mise](https://mise.jdx.dev/getting-started.html) and start a Docker-compatible container runtime with Compose v2, then:
+
 ```sh
-nvm install
-nvm use
-corepack enable
-corepack install
-pnpm install --frozen-lockfile
-pnpm --filter @luma/ui exec playwright install chromium
-# Complete docs/identity.md setup before starting the API.
-pnpm dev
+mise trust
+mise install
+mise run setup
+mise run dev
 ```
 
-`packageManager` pins pnpm. If Corepack is unavailable, install the pinned version with `npm install --global pnpm@12.4.2`.
+With mise activated in your shell, the last two commands are `pnpm run setup` and `pnpm dev`.
+Setup installs dependencies and Chromium, starts PostgreSQL 17, applies migrations,
+provisions restricted database logins, and seeds a demo workspace. No manual SQL,
+environment edits, or provider credentials are needed. Node and pnpm are pinned in
+`mise.toml`; `.nvmrc` and `packageManager` retain support for existing tooling.
 
-Web: http://localhost:3000. API: http://127.0.0.1:3001/health.
-No secrets, database, or external services are needed. Stop both with Ctrl+C.
+The command prints this checkout's web and API URLs. Demo credentials are stored
+in `.luma/demo.json`. Ctrl+C stops app processes; `pnpm dev:down` stops local
+services and preserves database data. Each worktree has its own ports, credentials,
+Compose project and volumes. See [local development](docs/development.md) for
+workflow workers, configuration, diagnostics, and manually managed services.
 
 ## Quality gates
-
-Run these from the repository root, including on a clean checkout:
 
 ```sh
 pnpm format:check
@@ -30,31 +33,32 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm test:e2e
+pnpm test:browser
 ```
 
-`pnpm check` runs all five. `pnpm format` applies formatting. CI runs the same gates after a frozen-lockfile install on Node 24. Typechecking generates the web route tree automatically; shared libraries build before dependent tasks. Tests use Vitest and fail if no tests are found.
+`pnpm check` runs formatting, lint, typechecking, tests and builds. `pnpm test:full`
+runs all gates including backend and browser E2E with one disposable PostgreSQL 17
+container. CI runs the same command. Install Chromium first with `pnpm run setup`
+(on Linux CI, use Playwright's `--with-deps` option).
 
-## Backend end-to-end tests
+`pnpm test`, `pnpm test:e2e` and `pnpm test:browser` automatically start PostgreSQL
+through Testcontainers and remove it afterwards. If `TEST_DATABASE_URL` is set,
+they use that disposable test cluster instead. The supplied login must be able to
+create databases and roles. Tests create isolated databases and restricted runtime
+logins; they never use the development database by default. External provider
+credentials are not needed. Container startup failures fail the command.
 
-`pnpm test:e2e` builds the API and its dependencies, then runs a dedicated Vitest suite with three process-level scenarios:
+`pnpm test:local` runs the existing test suites without provisioning services;
+database integration suites skip when `TEST_DATABASE_URL` is absent. Use it for
+an explicitly limited, container-free check, not as a substitute for `pnpm test`.
+`pnpm test:ui` and `pnpm storybook` also work independently of the API.
 
-- Start the compiled API against a freshly migrated database; sign up, create an organization, check tenant access, restart, and sign out over HTTP.
-- Run the migration command on an empty database and rerun it without changes. Reject a modified applied migration and roll back pending changes without losing existing data.
-- Kill an execution worker with `SIGKILL` after its fixture provider commits an effect. Start a fresh worker and verify reconciliation, audit delivery, and no duplicate effect.
-
-Use Node 24 and a disposable PostgreSQL 17 instance. `TEST_DATABASE_URL` must connect as an administrator that can create databases and roles. Each test creates a separate database and restricted runtime login, then removes them during cleanup. The migration role groups remain in the test cluster. External effects use a local, durable fixture ledger; no provider credentials are needed.
-
-```sh
-docker run --rm --detach --name luma-e2e-postgres \
-  -p 127.0.0.1:55432:5432 \
-  -e POSTGRES_PASSWORD=luma_test_only -e POSTGRES_DB=luma_test postgres:17-alpine
-# Wait until this reports that PostgreSQL accepts connections.
-docker exec luma-e2e-postgres pg_isready -U postgres -d luma_test
-TEST_DATABASE_URL=postgresql://postgres:luma_test_only@127.0.0.1:55432/luma_test pnpm test:e2e
-docker stop luma-e2e-postgres
-```
-
-The command fails when `TEST_DATABASE_URL` is missing. CI runs it as a separate required step alongside the existing tests. `pnpm test` and `pnpm check` keep their existing scope; run `pnpm test:e2e` explicitly for these scenarios.
+Backend E2E covers HTTP identity lifecycle across restarts, migration checksum and
+rollback behavior, and execution-worker crash recovery. Browser E2E starts the
+real API and Vite app on available ports and exercises identity and connection
+flows. Shared packages rebuild while developing; typechecking generates the web
+route tree automatically.
 
 ## Structure
 
@@ -91,15 +95,15 @@ The [diagnosis guide](docs/exception-diagnosis.md) covers persisted evidence-bac
 
 ## Environment
 
-Configure PostgreSQL and the required authentication settings using the [identity setup](docs/identity.md) before starting the API. Other overrides belong in the consuming app's `.env`; copy its `.env.example` first. API dev/start commands load that file; Vite loads web environment files. Real `.env` files are ignored. Document every new setting in the corresponding example, validate server settings at startup, and inject production secrets through the deployment environment.
+`pnpm run setup` configures the managed local environment in `.luma/`. For existing PostgreSQL installations, follow the [identity setup](docs/identity.md) and run `pnpm dev:manual`. Other overrides belong in the consuming app's `.env`; copy its `.env.example` first. API dev/start commands load that file; Vite loads web environment files. Real `.env` files are ignored. Document every new setting in the corresponding example, validate server settings at startup, and inject production secrets through the deployment environment.
 
-API defaults: `HOST=127.0.0.1`, `PORT=3001`, `LOG_LEVEL=info`. Containers must explicitly set `HOST=0.0.0.0`. `PORT` must be 1–65535; `LOG_LEVEL` must be a supported Fastify/Pino level. `VITE_*` variables are public: never use them for credentials. Server configuration must not be imported into the web client.
+API defaults: `HOST=127.0.0.1`, `PORT=3001`, `LOG_LEVEL=info`. Containers must explicitly set `HOST=0.0.0.0`. `PORT` must be 0–65535 (0 requests an available port); `LOG_LEVEL` must be a supported Fastify/Pino level. `VITE_*` variables are public: never use them for credentials. Server configuration must not be imported into the web client.
 
 Turborepo runs in strict environment mode. Add new runtime variable names to task `env` in `turbo.json`, especially variables used during builds so their values affect cache keys. Environment files already invalidate task caches. Builds and tests must not depend on production secrets.
 
 ## Contribution conventions
 
-Branch from `main`: `feature/luma-<id>-<summary>`, `fix/luma-<id>-<summary>`, or `chore/luma-<id>-<summary>`. Use Conventional Commits, for example `chore(repo): bootstrap workspace`. PR titles should be concise and include the issue, for example `LUMA-3: Bootstrap monorepo`.
+Branch from `main`: `feat/LUMA-<id>-<short-description>`. Use Conventional Commits, for example `chore(repo): bootstrap workspace`. PR titles should be concise and include the issue, for example `LUMA-3: Bootstrap monorepo`.
 
 Link the Linear issue, describe behavior and validation, and keep PRs scoped. Run `pnpm check` before review. Commit `pnpm-lock.yaml` and the generated `apps/web/src/routeTree.gen.ts`; never edit the latter manually. Squash merge after review and passing CI. Once a GitHub remote exists, configure `Quality gates` as a required check on `main` and require review.
 

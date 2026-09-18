@@ -36,6 +36,7 @@ export interface IdentityConfig {
   secret: string;
   baseURL: string;
   trustedOrigins: string[];
+  cookiePrefix?: string;
 }
 export function readIdentityConfig(
   env: Readonly<Record<string, string | undefined>>,
@@ -80,7 +81,18 @@ export function readIdentityConfig(
     if (env.NODE_ENV === 'production' && parsed.protocol !== 'https:')
       throw new Error('Production auth origins must use HTTPS');
   }
-  return { databaseUrl, secret, baseURL: base.origin, trustedOrigins };
+  const cookiePrefix = env.BETTER_AUTH_COOKIE_PREFIX;
+  if (cookiePrefix !== undefined && !/^[a-zA-Z0-9_-]{1,64}$/.test(cookiePrefix))
+    throw new Error(
+      'BETTER_AUTH_COOKIE_PREFIX must contain 1–64 letters, numbers, underscores or hyphens',
+    );
+  return {
+    databaseUrl,
+    secret,
+    baseURL: base.origin,
+    trustedOrigins,
+    ...(cookiePrefix === undefined ? {} : { cookiePrefix }),
+  };
 }
 
 export { readObservabilityConfig } from './observability.js';

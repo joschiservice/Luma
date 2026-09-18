@@ -4,6 +4,10 @@ LUMA-29 uses Temporal for exception process progress and retry scheduling. Postg
 
 ## Run the worker
 
+For the managed local environment, run `pnpm dev:workflows`. It starts PostgreSQL,
+the Temporal development server and UI, and watches the API, web and worker.
+See [local development](development.md). The steps below cover manual setup.
+
 Apply the existing database migrations. Configure `apps/api/.env` using `.env.example`:
 
 - `IDENTITY_DATABASE_URL` and the existing identity settings authenticate membership queries.

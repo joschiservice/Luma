@@ -1,0 +1,15 @@
+[tools]
+node = "24.21.0"
+pnpm = "12.4.2"
+
+[tasks.setup]
+description = "Install dependencies and prepare the local database and demo workspace"
+run = "pnpm run setup"
+
+[tasks.dev]
+description = "Start the API and web app"
+run = "pnpm dev"
+
+[tasks.check]
+description = "Run all checks with a disposable test database"
+run = "pnpm test:full"

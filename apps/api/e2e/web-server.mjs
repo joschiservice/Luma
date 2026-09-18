@@ -7,7 +7,7 @@ const server = await createServer({
   root: webRoot,
   server: {
     host: '127.0.0.1',
-    port: 3107,
+    port: Number(process.env.TEST_WEB_PORT),
     strictPort: true,
     proxy: {
       '/api': {

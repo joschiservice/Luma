@@ -15,6 +15,7 @@ describe.skipIf(!databaseUrl)(
     const admin = new Pool({ connectionString: databaseUrl });
     let owner: Pool;
     let runtime: Pool;
+    let runtimeUrl: string;
     let app: ReturnType<typeof buildRuntimeApp>;
     const origin = 'http://localhost:3001';
     const secret = 'integration-test-secret-at-least-32-characters';
@@ -86,6 +87,7 @@ describe.skipIf(!databaseUrl)(
       await admin.query(`GRANT luma_identity TO "${login}"`);
       url.username = login;
       url.password = password;
+      runtimeUrl = url.toString();
       runtime = new Pool({ connectionString: url.toString(), max: 1 });
       app = buildRuntimeApp({
         databaseUrl: url.toString(),
@@ -109,6 +111,60 @@ describe.skipIf(!databaseUrl)(
       await admin.query(`DROP DATABASE IF EXISTS "${database}"`);
       await admin.query(`DROP ROLE IF EXISTS "${login}"`);
       await admin.end();
+    });
+    it('keeps sessions separate when two apps share a hostname', async () => {
+      const apps = ['checkout-a', 'checkout-b'].map((cookiePrefix) =>
+        buildRuntimeApp({
+          databaseUrl: runtimeUrl,
+          secret,
+          baseURL: origin,
+          trustedOrigins: [origin],
+          cookiePrefix,
+        }),
+      );
+      try {
+        const cookies: string[] = [];
+        for (const [index, instance] of apps.entries()) {
+          const response = await instance.inject({
+            method: 'POST',
+            url: '/auth/sign-in/email',
+            headers: { origin },
+            payload: {
+              email: `${index === 0 ? 'alice' : 'bob'}@example.test`,
+              password: 'test-password-long-enough',
+            },
+          });
+          expect(response.statusCode, response.body).toBe(200);
+          const value = response.headers['set-cookie'];
+          cookies.push(
+            ...(Array.isArray(value) ? value : [value!]).map(
+              (item) => item.split(';')[0]!,
+            ),
+          );
+        }
+        expect(
+          cookies.some((cookie) =>
+            cookie.startsWith('checkout-a.session_token='),
+          ),
+        ).toBe(true);
+        expect(
+          cookies.some((cookie) =>
+            cookie.startsWith('checkout-b.session_token='),
+          ),
+        ).toBe(true);
+        for (const [index, instance] of apps.entries()) {
+          const response = await instance.inject({
+            url: '/v1/organizations',
+            headers: headers(cookies.join('; ')),
+          });
+          expect(response.statusCode, response.body).toBe(200);
+          expect(
+            response.json().items.map((item: { id: string }) => item.id),
+          ).toEqual([index === 0 ? orgA : orgB]);
+        }
+      } finally {
+        await Promise.all(apps.map((instance) => instance.close()));
+      }
     });
     it('authenticates sessions and lists only the caller’s organizations', async () => {
       const list = await app.inject({
