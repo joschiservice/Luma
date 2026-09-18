@@ -5,7 +5,8 @@ import type {
   CapabilityDependencies,
   ConnectorConnection,
 } from '../application/capabilities.js';
-import type { ReadCapability } from '../domain/capabilities.js';
+import type { InstallationCapability } from '../domain/installation.js';
+import type { CapabilityHandler } from '../application/capabilities.js';
 import { ConnectorError } from '../domain/capabilities.js';
 import { createShopifyConnector } from './shopify/adapter.js';
 import type { ShopifyEvidence } from './shopify/adapter.js';
@@ -32,12 +33,18 @@ export function createInstalledRuntime(options: InstalledRuntimeOptions) {
       const capabilities: ConnectorConnection['capabilities'] = {};
       for (const capability of connection.permissions) {
         if (!connection.granted.includes(capability)) continue;
-        const build = async (cap: ReadCapability) => {
+        const build = async (cap: InstallationCapability) => {
           const current = await installations.credential(context, id, cap);
           const target = current.connection.target;
           const token = async () => {
             if (target.kind === 'jtl-onprem')
               await options.approveJtlEndpoint(context, target.baseUrl);
+            if (cap === 'orders.shipping-method.write')
+              await installations.credential(
+                context,
+                id,
+                'orders.shipping-method.read',
+              );
             const latest = await installations.credential(context, id, cap);
             if (
               latest.connection.credentialVersion !==
@@ -64,6 +71,7 @@ export function createInstalledRuntime(options: InstalledRuntimeOptions) {
             });
           return createJtlConnector({
             ...common,
+            shippingMethodActions: true,
             connection:
               target.kind === 'jtl-cloud'
                 ? {
@@ -95,7 +103,15 @@ export function createInstalledRuntime(options: InstalledRuntimeOptions) {
             return null;
           throw error;
         }
-        const handler = adapter.capabilities[capability]!;
+        if (
+          capability === 'orders.shipping-method.write' &&
+          (!connection.permissions.includes('orders.shipping-method.read') ||
+            !connection.granted.includes('orders.shipping-method.read'))
+        )
+          continue;
+        const handler = adapter.capabilities[capability] as
+          CapabilityHandler<InstallationCapability> | undefined;
+        if (!handler) continue;
         Object.assign(capabilities, {
           [capability]: {
             ...handler,
@@ -104,7 +120,15 @@ export function createInstalledRuntime(options: InstalledRuntimeOptions) {
               input: Parameters<typeof handler.run>[1],
             ) => {
               const fresh = await build(capability);
-              return fresh.capabilities[capability]!.run(invocation, input);
+              const current = fresh.capabilities[capability] as
+                CapabilityHandler<InstallationCapability> | undefined;
+              if (!current)
+                throw new ConnectorError({
+                  code: 'unsupported_capability',
+                  effect: 'none',
+                  retry: 'never',
+                });
+              return current.run(invocation, input);
             },
           },
         });

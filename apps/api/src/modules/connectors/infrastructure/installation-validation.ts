@@ -1,10 +1,12 @@
 import { z } from 'zod';
 
-export const readPermissions = z.enum([
+export const installationPermissions = z.enum([
   'orders.read',
   'products.read',
   'inventory.read',
   'fulfillment.read',
+  'orders.shipping-method.read',
+  'orders.shipping-method.write',
 ]);
 const header = z
   .string()
@@ -55,19 +57,30 @@ export const installationInput = z
     label: z.string().trim().min(1).max(120),
     target: installationTarget,
     permissions: z
-      .array(readPermissions)
+      .array(installationPermissions)
       .min(1)
-      .max(4)
+      .max(6)
       .refine((v) => new Set(v).size === v.length),
     credentials: installationCredentials,
   })
   .strict()
   .refine(
     (v) => v.target.kind !== 'jtl-onprem' || !!v.credentials.challengeCode,
+  )
+  .refine(
+    (v) =>
+      v.target.kind !== 'shopify' ||
+      !v.permissions.some((p) => p.startsWith('orders.shipping-method.')),
+  )
+  .refine(
+    (v) =>
+      !v.permissions.includes('orders.shipping-method.write') ||
+      v.permissions.includes('orders.shipping-method.read'),
   );
 
 export const installationBoundary = {
   input: (value: unknown) => installationInput.parse(value),
   credentials: (value: unknown) => installationCredentials.parse(value),
-  permissions: (value: unknown) => z.array(readPermissions).max(4).parse(value),
+  permissions: (value: unknown) =>
+    z.array(installationPermissions).max(6).parse(value),
 };

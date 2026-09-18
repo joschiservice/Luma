@@ -7,7 +7,6 @@ import type {
   InventorySnapshot,
   FulfillmentSnapshot,
   ConnectorFailure,
-  ReadCapability,
 } from '../../connectors/index.js';
 import { decimalUnits, decimalString } from '../../exceptions/index.js';
 import type {
@@ -271,7 +270,7 @@ export function createDetectionPipeline(
       input: {
         event: Evidence;
         connectionId: string;
-        capability: ReadCapability;
+        capability: Facts<'sync_failure'>['capability'];
         active: boolean;
         status: 'failed' | 'success';
         error: ConnectorFailure | null;

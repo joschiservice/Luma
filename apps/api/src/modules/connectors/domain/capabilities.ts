@@ -89,7 +89,23 @@ export interface WriteReceipt {
   evidenceRefs: string[];
   providerRequestId: string | null;
 }
+export interface ShippingMethodSnapshot {
+  shippingMethod: ExternalId;
+  isCancelled: boolean;
+}
 export interface CapabilityContract {
+  'orders.shipping-method.read': {
+    input: PageQuery & { order: ExternalId };
+    output: Page<ShippingMethodSnapshot>;
+  };
+  'orders.shipping-method.write': {
+    input: {
+      order: ExternalId;
+      expectedShippingMethod: ExternalId;
+      shippingMethod: ExternalId;
+    };
+    output: WriteReceipt;
+  };
   'orders.read': { input: PageQuery; output: Page<OrderSnapshot> };
   'orders.write': {
     input: { order: ExternalId; operation: 'cancel'; expectedRevision: string };

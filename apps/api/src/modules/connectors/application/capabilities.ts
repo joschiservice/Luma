@@ -1,3 +1,4 @@
+import { equalJson } from '../domain/equal-json.js';
 import { requireTenant } from '../../identity/index.js';
 import type { TenantContext } from '../../identity/index.js';
 import { ConnectorError } from '../domain/capabilities.js';
@@ -284,7 +285,7 @@ export function createCapabilityRuntime(deps: CapabilityDependencies) {
             connection,
             binding.capability,
           );
-          const boundIntent = JSON.stringify(intent);
+          const boundIntent = structuredClone(intent);
           const boundInput = structuredClone(input);
           return {
             capability: binding.capability,
@@ -295,7 +296,7 @@ export function createCapabilityRuntime(deps: CapabilityDependencies) {
             checkPreconditions: (action) =>
               binding.checkPreconditions(context, action),
             async execute(action, idempotencyKey) {
-              if (JSON.stringify(action) !== boundIntent)
+              if (!equalJson(action, boundIntent))
                 throw new ConnectorError(failure('conflict'));
               const result = await invoke(
                 context,

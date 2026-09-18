@@ -1,4 +1,4 @@
-# JTL-Wawi read adapter
+# JTL-Wawi connector
 
 `createJtlConnector` from the connectors composition entry implements `orders.read`, `products.read`, `inventory.read` and `fulfillment.read`. It targets the JTL ERP **2.2** response contract with shared normalization for on-premise and cloud connections. Workflows use `CapabilityReader`; no provider logic belongs in the consuming domain.
 
@@ -15,7 +15,7 @@ On-premise `baseUrl` is the API database root, for example `http://127.0.0.1:588
 
 Credentials resolve on every HTTP request, allowing rotation. The host owns app registration, OAuth token acquisition/refresh and encrypted tenant-scoped credential storage. Register read access for sales orders and their lines, items, warehouse stock, delivery notes and their lines. A licence or permission failure returns `permission_denied`, not an empty page. Confirm that the installation supports the 2.2 endpoints before activation; older API versions are not interchangeable.
 
-Requests are GET-only, reject redirects and time out after 15 seconds. `timeoutMs` accepts 1–120,000 milliseconds. There are no global environment credentials or automatically registered connections.
+Read requests use GET, reject redirects and time out after 15 seconds. `timeoutMs` accepts 1–120,000 milliseconds. There are no global environment credentials or automatically registered connections.
 
 ## Mapping
 
@@ -61,3 +61,23 @@ pnpm exec prettier --write apps/api/src/modules/connectors/infrastructure/jtl/fi
 ```
 
 References: [JTL ERP 2.2 OpenAPI](https://developer.jtl-software.com/openapi/erp/2.2.json), [authentication](https://developer.jtl-software.com/cloud/guides/essentials/authentication/oauth2-flow), [versioning](https://developer.jtl-software.com/cloud/guides/essentials/common-patterns/versioning).
+
+## Shipping-method correction
+
+For a diagnosed `stuck_fulfillment` caused by an incorrect shipping method, `orders.shipping-method.write` changes the sales order to an explicitly mapped replacement method. It requires the order ID, expected current method and replacement method. All references use an empty scope. The replacement must differ from the current method. Cancelled orders, missing methods and stale expected methods reject the action.
+
+Enable `shippingMethodActions: true` only after confirming the installation supports the ERP 2.2 sales-order detail and PATCH endpoints and their idempotency behavior. Installed connections require requested and verified `orders.shipping-method.read` and `orders.shipping-method.write` permissions. The health verifier must confirm JTL `salesorders.read` and `salesorders.write` grants and endpoint support without performing a write. These beta endpoints require an installation-specific sandbox smoke test before activation.
+
+The adapter persists a fresh pre-action observation, then sends only `shippingMethodId` and `disableAutomaticWorkflows: true` to `PATCH sales-orders/{id}`. Credentials, grants and connection state are checked again before the PATCH. The action has **high** minimum risk and runs through the existing execution policy and approval service.
+
+JTL documents an `Idempotency-Key` header on this endpoint. Luma hashes tenant, connection, provider destination, capability and the logical execution key into that header. Execution must reserve the key durably and bind it to immutable intent. The adapter has no local deduplication cache and never retries automatically. A timeout, network loss, malformed response, throttling or server error after dispatch has an unknown effect and requires read-only reconciliation. The PATCH response is an acceptance receipt, not verification. Provider key retention is not specified in the published schema; never redispatch an uncertain attempt after a retention window.
+
+The endpoint has no documented atomic revision precondition. The fresh method comparison detects prior edits but cannot prevent an operator or another integration changing the order between GET and PATCH. Restrict execution to an operationally controlled order with concurrent processing excluded; do not claim compare-and-swap protection. Disabling automatic workflows suppresses workflow triggers for this update, but does not lock shipment processing.
+
+`orders.shipping-method.read` requires `{ order, limit: 1 }` and persists one allowlisted snapshot with the method and cancellation flag. Its evidence is for action verification; it is not a complete canonical order snapshot for ingestion. No customer addresses, arbitrary text or credentials are retained.
+
+`createShippingMethodEffects(runtime, binding)` from connector composition binds this action to the execution service. The host supplies tenant-owned canonical order/method mapping, diagnosis evidence validation and current eligibility checks. The intent target is `order`; `expectedPostcondition.shippingMethodId` must equal the mapped replacement external ID. Verification uses the installed read capability, requires a fresh complete observation of that order, and checks the method and cancellation state. Read or persistence failures remain inconclusive. Verification never writes.
+
+To undo, create a separate policy-evaluated and approved intent with a new logical key, the replacement as the expected current method, and the recorded original method as the destination. Recheck eligibility and verify again. Never automatically compensate an uncertain attempt. A passed method check proves the correction only; resolving the fulfillment incident still requires fresh fulfillment progress evidence or explicit human disposition.
+
+Synthetic tests cover both authentication modes, provider payloads, permission/revocation gates, changed intent, stale state, correction/undo, key reuse across adapter recreation, lost responses and failed verification. The offline schema fixture pins the PATCH body/response and idempotency header against the [published ERP 2.2 contract](https://developer.jtl-software.com/openapi/erp/2.2.json).

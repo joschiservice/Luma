@@ -14,6 +14,7 @@ import type {
 } from '../../domain/capabilities.js';
 import { API_VERSION, createClient, fail, parse } from './client.js';
 import type { JtlTransportOptions } from './client.js';
+import { createJtlShippingMethodCapabilities } from './shipping-method.js';
 import { outputs } from './outputs.js';
 import * as s from './schemas.js';
 
@@ -36,6 +37,8 @@ export interface JtlConnectorOptions extends JtlTransportOptions {
   /** Persist the validated batch before resolving. */
   recordObservations(evidence: JtlEvidence): Promise<void>;
   rawRetentionMs?: number;
+  /** Enable only after confirming sales-order read/write grants and endpoint support. */
+  shippingMethodActions?: boolean;
   /** Map configured JTL unit labels to canonical units without converting quantities. */
   units?: Record<string, string>;
   now?: () => Date;
@@ -66,9 +69,9 @@ export function createJtlConnector(
   const client = createClient(options);
   const now = options.now ?? (() => new Date());
   const nextId = options.id ?? randomUUID;
-  function handler<K extends ReadCapability>(
-    capability: K,
-  ): CapabilityHandler<K> {
+  function handler<
+    K extends Exclude<ReadCapability, 'orders.shipping-method.read'>,
+  >(capability: K): CapabilityHandler<K> {
     return {
       descriptor: {
         version: '0',
@@ -420,6 +423,9 @@ export function createJtlConnector(
     mechanism: 'api',
     executor: { kind: 'connector', id: 'jtl/0' },
     capabilities: {
+      ...(options.shippingMethodActions
+        ? createJtlShippingMethodCapabilities(options)
+        : {}),
       'orders.read': handler('orders.read'),
       'products.read': handler('products.read'),
       'inventory.read': handler('inventory.read'),

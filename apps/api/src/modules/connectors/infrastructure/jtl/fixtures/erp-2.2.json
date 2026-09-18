@@ -310,6 +310,51 @@
       "response": {
         "$ref": "#/components/schemas/JTL.Framework.Api.Abstraction.Models.PagedListOfJTL.Wawi.Delivery.PublicApi.DataTransferObjects.V2.Delivery.DeliveryNoteLineItem"
       }
+    },
+    "/v2/sales-orders/{salesOrderId}": {
+      "parameters": [
+        {
+          "name": "salesOrderId",
+          "in": "path"
+        },
+        {
+          "name": "x-companyid",
+          "in": "header"
+        },
+        {
+          "name": "x-tenant-id",
+          "in": "header"
+        }
+      ],
+      "response": {
+        "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.SalesOrder"
+      }
+    }
+  },
+  "shippingMethodWrite": {
+    "parameters": [
+      {
+        "name": "salesOrderId",
+        "in": "path"
+      },
+      {
+        "name": "x-companyid",
+        "in": "header"
+      },
+      {
+        "name": "Idempotency-Key",
+        "in": "header"
+      },
+      {
+        "name": "x-tenant-id",
+        "in": "header"
+      }
+    ],
+    "request": {
+      "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.UpdateSalesOrderCommandRequest"
+    },
+    "response": {
+      "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.UpdateSalesOrderCommandResponse"
     }
   },
   "schemas": {
@@ -1736,6 +1781,1203 @@
       "type": "string",
       "format": "uuid",
       "additionalProperties": false
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.SalesOrder": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "isCancelled",
+        "isPending",
+        "itemDescriptionType",
+        "readOnlyType",
+        "salesOrderStatus",
+        "salesOrderNumber",
+        "departureCountry",
+        "externalDetails",
+        "paymentDetails",
+        "shippingDetails",
+        "taxDetails"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.VerkaufAuftragKey"
+        },
+        "customerId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.KundeKey"
+        },
+        "paymentInfo": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.SalesOrderPaymentInfo"
+        },
+        "text": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.SalesOrderText"
+        },
+        "salesOrderDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "isCancelled": {
+          "type": "boolean"
+        },
+        "isPending": {
+          "type": "boolean"
+        },
+        "itemDescriptionType": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.ItemDescriptionType"
+        },
+        "readOnlyType": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.ReadOnlyType"
+        },
+        "salesOrderStatus": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "salesOrderNumber": {
+          "type": "string"
+        },
+        "departureCountry": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.SalesOrderDepartureCountry"
+        },
+        "externalDetails": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.SalesOrderExternalDetails"
+        },
+        "paymentDetails": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.SalesOrderPaymentDetails"
+        },
+        "shippingDetails": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.SalesOrderShippingDetails"
+        },
+        "taxDetails": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.SalesOrderTaxDetails"
+        },
+        "processColourId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.FarbeKey"
+        },
+        "onHoldReasonId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.RueckhaltegrundKey"
+        },
+        "cartonItemId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.ArtikelKey"
+        },
+        "paymentMethodId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.ZahlungsartKey"
+        },
+        "shippingMethodId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.VersandartKey"
+        },
+        "processStatusId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.VorgangsstatusKey"
+        },
+        "languageIso": {
+          "type": "string"
+        },
+        "customerSalesOrderNumber": {
+          "type": "string"
+        },
+        "vatId": {
+          "type": "string"
+        },
+        "companyId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.FirmaKey"
+        },
+        "shipmentAddress": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.SalesOrderAddress"
+        },
+        "billingAddress": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.SalesOrderAddress"
+        },
+        "lineItems": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.SalesOrderLineItem"
+          }
+        },
+        "keyFigures": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.SalesOrderKeyFigures"
+        },
+        "invoices": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.SalesOrderInvoice"
+          }
+        }
+      }
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.SalesOrderPaymentInfo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["paymentInfoType"],
+      "properties": {
+        "accountHolder": {
+          "type": "string"
+        },
+        "bankName": {
+          "type": "string"
+        },
+        "bIC": {
+          "type": "string"
+        },
+        "creditorId": {
+          "type": "string"
+        },
+        "dueDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "endToEndId": {
+          "type": "string"
+        },
+        "iBAN": {
+          "type": "string"
+        },
+        "mandateReference": {
+          "type": "string"
+        },
+        "paymentInfo": {
+          "type": "string"
+        },
+        "paymentInfoType": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "paymentReference": {
+          "type": "string"
+        },
+        "referenceEmail": {
+          "type": "string"
+        }
+      }
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.SalesOrderText": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "comment": {
+          "type": "string"
+        },
+        "customerComment": {
+          "type": "string"
+        },
+        "printText": {
+          "type": "string"
+        },
+        "processStatus": {
+          "type": "string"
+        }
+      }
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.SalesOrderDepartureCountry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["currencyFactor"],
+      "properties": {
+        "countryIso": {
+          "type": "string"
+        },
+        "currencyIso": {
+          "type": "string"
+        },
+        "currencyFactor": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "state": {
+          "type": "string"
+        }
+      }
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.SalesOrderExternalDetails": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["externalInvoiceType"],
+      "properties": {
+        "externalCreatedDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "externalInvoiceType": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.ExternalSalesInvoiceType"
+        },
+        "externalSalesOrderNumber": {
+          "type": "string"
+        }
+      }
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.SalesOrderPaymentDetails": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cashDiscount",
+        "cashDiscountDays",
+        "financingCosts",
+        "paymentDueDateInDays",
+        "currencyFactor"
+      ],
+      "properties": {
+        "cashDiscount": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "cashDiscountDays": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "financingCosts": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "paymentDueDateInDays": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "currencyIso": {
+          "type": "string"
+        },
+        "currencyFactor": {
+          "type": "number",
+          "format": "decimal"
+        }
+      }
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.SalesOrderShippingDetails": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["extraWeight", "maxDeliveryDays", "shippingPriority"],
+      "properties": {
+        "deliveryFromDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "estimatedDeliveryDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "extraWeight": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "maxDeliveryDays": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "shippingDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "shippingPriority": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.SalesOrderTaxDetails": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["taxReference", "specialTaxTreatment", "taxSetting"],
+      "properties": {
+        "taxReference": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.TaxReference"
+        },
+        "specialTaxTreatment": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.SpecialTaxTreatment"
+        },
+        "taxSetting": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.TaxSetting"
+        }
+      }
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.TaxReference": {
+      "type": "integer",
+      "format": "int32",
+      "enum": [0, 1]
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.SpecialTaxTreatment": {
+      "type": "integer",
+      "format": "int32",
+      "enum": [0, 1, 2, 3]
+    },
+    "JTL.Data.Contracts.Keys.FarbeKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
+    "JTL.Data.Contracts.Keys.VorgangsstatusKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.SalesOrderAddress": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["salesOrderId", "type"],
+      "properties": {
+        "salesOrderId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.VerkaufAuftragKey"
+        },
+        "type": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.AddressType"
+        },
+        "customerId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.KundeKey"
+        },
+        "salutation": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "firstName": {
+          "type": "string"
+        },
+        "lastName": {
+          "type": "string"
+        },
+        "company": {
+          "type": "string"
+        },
+        "additionalCompanyLine": {
+          "type": "string"
+        },
+        "street": {
+          "type": "string"
+        },
+        "additionalAddressLine": {
+          "type": "string"
+        },
+        "city": {
+          "type": "string"
+        },
+        "postalCode": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "countryIso": {
+          "type": "string"
+        },
+        "postId": {
+          "type": "string"
+        },
+        "emailAddress": {
+          "type": "string"
+        },
+        "phoneNumber": {
+          "type": "string"
+        },
+        "mobilePhoneNumber": {
+          "type": "string"
+        },
+        "fax": {
+          "type": "string"
+        },
+        "country": {
+          "type": "string"
+        },
+        "customsDocumentsRequired": {
+          "type": "boolean"
+        },
+        "vatId": {
+          "type": "string"
+        }
+      }
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.AddressType": {
+      "type": "integer",
+      "format": "int32",
+      "enum": [0, 1, 2]
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.SalesOrderLineItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "salesOrderId",
+        "isReserved",
+        "type",
+        "lineItemType",
+        "quantity",
+        "salesPriceNet",
+        "salesPriceGross",
+        "discountPercent",
+        "purchasePriceNet",
+        "taxRate",
+        "totalSalesPriceNet",
+        "totalSalesPriceGross",
+        "sortOrder",
+        "hasUpload",
+        "configurationItemType",
+        "billOfMaterialsType"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.VerkaufAuftragPositionKey"
+        },
+        "salesOrderId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.VerkaufAuftragKey"
+        },
+        "itemId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.ArtikelKey"
+        },
+        "sku": {
+          "type": "string"
+        },
+        "isReserved": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        },
+        "fnSku": {
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.LineItemType"
+        },
+        "lineItemType": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.LineItemType"
+        },
+        "quantity": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "salesUnit": {
+          "type": "string"
+        },
+        "salesPriceNet": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "salesPriceGross": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "discountPercent": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "purchasePriceNet": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "taxRate": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "taxClassId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.SteuerklasseKey"
+        },
+        "taxCodeId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.SteuerschluesselKey"
+        },
+        "note": {
+          "type": "string"
+        },
+        "totalSalesPriceNet": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "totalSalesPriceGross": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "sortOrder": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "standardName": {
+          "type": "string"
+        },
+        "hasUpload": {
+          "type": "boolean"
+        },
+        "parentSalesOrderLineItemId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.VerkaufAuftragPositionKey"
+        },
+        "configurationItemType": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.ConfigurationItemType"
+        },
+        "billOfMaterialsType": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.BillOfMaterialsType"
+        }
+      }
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.LineItemType": {
+      "type": "integer",
+      "format": "int32",
+      "enum": [
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+        20, 21
+      ]
+    },
+    "JTL.Data.Contracts.Keys.SteuerschluesselKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.ConfigurationItemType": {
+      "type": "integer",
+      "format": "int32",
+      "enum": [0, 1, 2]
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.BillOfMaterialsType": {
+      "type": "integer",
+      "format": "int32",
+      "enum": [0, 1, 2]
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.SalesOrderKeyFigures": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "salesOrderId",
+        "alreadyPaidAmount",
+        "creditsTotalGrossAmount",
+        "deliveryStatus",
+        "invoiceStatus",
+        "invoicesTotalGrossAmount",
+        "invoicesTotalNetAmount",
+        "isCashOnDelivery",
+        "isFullyReturned",
+        "isLockedForDelivery",
+        "packageCount",
+        "paymentStatus",
+        "shippedPackageCount",
+        "stillToPay",
+        "stillToPayWithoutCancellation",
+        "totalGrossAmount",
+        "totalNetAmount",
+        "totalGrossAmountExcludingShipping",
+        "totalNetAmountExcludingShipping",
+        "totalQuantity",
+        "shippingCostNet",
+        "shippingCostGross",
+        "vatAmounts"
+      ],
+      "properties": {
+        "salesOrderId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.VerkaufAuftragKey"
+        },
+        "alreadyPaidAmount": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "creditsTotalGrossAmount": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "dateOfPayment": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "deliveryStatus": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.DeliveryStatus"
+        },
+        "emailedDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "invoiceNumbers": {
+          "type": "string"
+        },
+        "invoiceStatus": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.InvoiceStatus"
+        },
+        "invoicesTotalGrossAmount": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "invoicesTotalNetAmount": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "isCashOnDelivery": {
+          "type": "boolean"
+        },
+        "isFullyReturned": {
+          "type": "boolean"
+        },
+        "isLockedForDelivery": {
+          "type": "boolean"
+        },
+        "lastShippingDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "packageCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "paymentMailDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "paymentStatus": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.InvoicePaymentStatus"
+        },
+        "printedDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "shippedPackageCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "shippingMailDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "stillToPay": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "stillToPayWithoutCancellation": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "totalGrossAmount": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "totalNetAmount": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "totalGrossAmountExcludingShipping": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "totalNetAmountExcludingShipping": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "totalQuantity": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "shippingCostNet": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "shippingCostGross": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "vatAmounts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.SalesOrderVatAmountPerRate"
+          }
+        }
+      }
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.SalesOrderVatAmountPerRate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["taxRate", "vatAmount"],
+      "properties": {
+        "taxRate": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "vatAmount": {
+          "type": "number",
+          "format": "decimal"
+        }
+      }
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.SalesOrderInvoice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "salesInvoiceNumber",
+        "createdDate",
+        "isCancelled",
+        "isDraft"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.RechnungKey"
+        },
+        "salesInvoiceNumber": {
+          "type": "string"
+        },
+        "createdDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "isCancelled": {
+          "type": "boolean"
+        },
+        "isDraft": {
+          "type": "boolean"
+        }
+      }
+    },
+    "JTL.Data.Contracts.Keys.RechnungKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.UpdateSalesOrderCommandRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "disableAutomaticWorkflows": {
+          "type": "boolean"
+        },
+        "useBillingAddressAsShipmentAddress": {
+          "type": "boolean"
+        },
+        "cartonItemId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.ArtikelKey"
+        },
+        "companyId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.FirmaKey"
+        },
+        "customerId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.KundeKey"
+        },
+        "onHoldReasonId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.RueckhaltegrundKey"
+        },
+        "paymentMethodId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.ZahlungsartKey"
+        },
+        "processColourId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.FarbeKey"
+        },
+        "processStatusId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.VorgangsstatusKey"
+        },
+        "shippingMethodId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.VersandartKey"
+        },
+        "billingAddress": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.UpdateUpdateSalesOrderAddress"
+        },
+        "shipmentAddress": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.UpdateUpdateSalesOrderAddress"
+        },
+        "departureCountry": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.UpdateUpdateSalesOrderDepartureCountry"
+        },
+        "externalDetails": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.UpdateUpdateSalesOrderExternalDetails"
+        },
+        "lineItems": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.UpdateUpdateSalesOrderLineItem"
+          }
+        },
+        "paymentDetails": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.UpdateUpdateSalesOrderPaymentDetails"
+        },
+        "paymentInfo": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.UpdateUpdateSalesOrderPaymentInfo"
+        },
+        "shippingDetails": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.UpdateUpdateSalesOrderShippingDetails"
+        },
+        "taxDetails": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.UpdateUpdateSalesOrderTaxDetails"
+        },
+        "text": {
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.UpdateUpdateSalesOrderText"
+        },
+        "customerSalesOrderNumber": {
+          "type": "string"
+        },
+        "itemDescriptionType": {
+          "type": "integer",
+          "format": "int32",
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.ItemDescriptionType"
+        },
+        "languageIso": {
+          "type": "string"
+        },
+        "readOnlyType": {
+          "type": "integer",
+          "format": "int32",
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.ReadOnlyType"
+        },
+        "salesOrderDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "vatId": {
+          "type": "string"
+        }
+      }
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.UpdateUpdateSalesOrderAddress": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "salutation": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "firstName": {
+          "type": "string"
+        },
+        "lastName": {
+          "type": "string"
+        },
+        "company": {
+          "type": "string"
+        },
+        "additionalCompanyLine": {
+          "type": "string"
+        },
+        "street": {
+          "type": "string"
+        },
+        "additionalAddressLine": {
+          "type": "string"
+        },
+        "city": {
+          "type": "string"
+        },
+        "postalCode": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "countryIso": {
+          "type": "string"
+        },
+        "postId": {
+          "type": "string"
+        },
+        "emailAddress": {
+          "type": "string"
+        },
+        "phoneNumber": {
+          "type": "string"
+        },
+        "mobilePhoneNumber": {
+          "type": "string"
+        },
+        "fax": {
+          "type": "string"
+        },
+        "vatId": {
+          "type": "string"
+        }
+      }
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.UpdateUpdateSalesOrderDepartureCountry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "countryIso": {
+          "type": "string"
+        },
+        "currencyIso": {
+          "type": "string"
+        },
+        "currencyFactor": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "stateCode": {
+          "type": "string"
+        }
+      }
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.UpdateUpdateSalesOrderExternalDetails": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "externalCreatedDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "externalInvoiceType": {
+          "type": "integer",
+          "format": "int32",
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.ExternalSalesInvoiceType"
+        },
+        "externalSalesOrderNumber": {
+          "type": "string"
+        }
+      }
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.UpdateUpdateSalesOrderLineItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "salesOrderLineItemId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.VerkaufAuftragPositionKey"
+        },
+        "itemId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.ArtikelKey"
+        },
+        "parentSalesOrderLineItemId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.VerkaufAuftragPositionKey"
+        },
+        "taxClassId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.SteuerklasseKey"
+        },
+        "taxCodeId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.SteuerschluesselKey"
+        },
+        "billOfMaterialsType": {
+          "type": "integer",
+          "format": "int32",
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.BillOfMaterialsType"
+        },
+        "configurationItemType": {
+          "type": "integer",
+          "format": "int32",
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.ConfigurationItemType"
+        },
+        "discountPercent": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "fnSku": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        },
+        "purchasePriceNet": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "quantity": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "salesPriceGross": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "salesPriceNet": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "salesUnit": {
+          "type": "string"
+        },
+        "sku": {
+          "type": "string"
+        },
+        "taxRate": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "type": {
+          "type": "integer",
+          "format": "int32",
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.LineItemType"
+        },
+        "lineItemType": {
+          "type": "integer",
+          "format": "int32",
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.LineItemType"
+        },
+        "variants": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.UpdateUpdateSalesOrderLineItemVariant"
+          }
+        }
+      }
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.UpdateUpdateSalesOrderLineItemVariant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "itemVariantId"],
+      "properties": {
+        "extraWeight": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "name": {
+          "type": "string"
+        },
+        "surchargeNet": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "value": {
+          "type": "string"
+        },
+        "itemVariantId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.VariationKey"
+        },
+        "itemVariantValueId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.VariationWertKey"
+        }
+      }
+    },
+    "JTL.Data.Contracts.Keys.VariationKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
+    "JTL.Data.Contracts.Keys.VariationWertKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.UpdateUpdateSalesOrderPaymentDetails": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cashDiscount": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "cashDiscountDays": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "paymentDueDateInDays": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "currencyIso": {
+          "type": "string"
+        },
+        "currencyFactor": {
+          "type": "number",
+          "format": "decimal"
+        }
+      }
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.UpdateUpdateSalesOrderPaymentInfo": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "accountHolder": {
+          "type": "string"
+        },
+        "bankName": {
+          "type": "string"
+        },
+        "bIC": {
+          "type": "string"
+        },
+        "creditorId": {
+          "type": "string"
+        },
+        "dueDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "endToEndId": {
+          "type": "string"
+        },
+        "iBAN": {
+          "type": "string"
+        },
+        "mandateReference": {
+          "type": "string"
+        },
+        "paymentInfo": {
+          "type": "string"
+        },
+        "paymentInfoType": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "paymentReference": {
+          "type": "string"
+        },
+        "referenceEmail": {
+          "type": "string"
+        }
+      }
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.UpdateUpdateSalesOrderShippingDetails": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "deliveryFromDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "estimatedDeliveryDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "extraWeight": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "maxDeliveryDays": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "shippingDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "shippingPriority": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.UpdateUpdateSalesOrderTaxDetails": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "taxReference": {
+          "type": "integer",
+          "format": "int32",
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.TaxReference"
+        },
+        "specialTaxTreatment": {
+          "type": "integer",
+          "format": "int32",
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.SpecialTaxTreatment"
+        },
+        "taxSetting": {
+          "type": "integer",
+          "format": "int32",
+          "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.Shared.TaxSetting"
+        }
+      }
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.UpdateUpdateSalesOrderText": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "comment": {
+          "type": "string"
+        },
+        "customerComment": {
+          "type": "string"
+        },
+        "printText": {
+          "type": "string"
+        },
+        "processStatus": {
+          "type": "string"
+        }
+      }
+    },
+    "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.UpdateSalesOrderCommandResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["salesOrderId"],
+      "properties": {
+        "salesOrderId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.VerkaufAuftragKey"
+        }
+      }
     }
   }
 }

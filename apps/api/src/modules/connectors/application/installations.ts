@@ -5,7 +5,7 @@ import {
 } from '../../identity/index.js';
 import type { TenantContext } from '../../identity/index.js';
 import { ConnectorError } from '../domain/capabilities.js';
-import type { ReadCapability } from '../domain/capabilities.js';
+import type { InstallationCapability } from '../domain/installation.js';
 import type {
   InstallationInput,
   InstalledConnection,
@@ -34,7 +34,7 @@ export interface InstallationDependencies {
   boundary: {
     input(value: unknown): InstallationInput;
     credentials(value: unknown): InstallationCredentials;
-    permissions(value: unknown): ReadCapability[];
+    permissions(value: unknown): InstallationCapability[];
   };
   repository: InstallationRepository;
   cipher: SecretCipher;
@@ -43,7 +43,7 @@ export interface InstallationDependencies {
   verify(
     connection: InstalledConnection,
     credentials: InstallationCredentials,
-  ): Promise<ReadCapability[]>;
+  ): Promise<InstallationCapability[]>;
   id(): string;
   now(): Date;
 }
@@ -174,7 +174,7 @@ export function createInstallationService(deps: InstallationDependencies) {
         ['revoked', 'disconnected'].includes(record.connection.status)
       )
         throw conflict();
-      let granted: ReadCapability[] = [];
+      let granted: InstallationCapability[] = [];
       let status: InstalledConnection['status'] = 'degraded';
       try {
         granted = deps.boundary.permissions(
@@ -242,7 +242,7 @@ export function createInstallationService(deps: InstallationDependencies) {
     async credential(
       context: TenantContext,
       id: string,
-      capability: ReadCapability,
+      capability: InstallationCapability,
     ) {
       const fresh = await authorize(context);
       const record = await get(fresh, id);

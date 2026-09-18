@@ -1,4 +1,6 @@
 import type { ReadCapability } from './capabilities.js';
+export type InstallationCapability =
+  ReadCapability | 'orders.shipping-method.write';
 export type InstallationTarget =
   | { kind: 'shopify'; shop: string }
   | { kind: 'jtl-cloud'; jtlTenantId: string }
@@ -10,7 +12,7 @@ export type InstallationCredentials = {
 export type InstallationInput = {
   label: string;
   target: InstallationTarget;
-  permissions: ReadCapability[];
+  permissions: InstallationCapability[];
   credentials: InstallationCredentials;
 };
 export type InstalledConnection = {
@@ -18,8 +20,8 @@ export type InstalledConnection = {
   tenantId: string;
   label: string;
   target: InstallationTarget;
-  permissions: ReadCapability[];
-  granted: ReadCapability[];
+  permissions: InstallationCapability[];
+  granted: InstallationCapability[];
   status: 'pending' | 'active' | 'degraded' | 'disconnected' | 'revoked';
   version: number;
   credentialVersion: number;

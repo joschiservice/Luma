@@ -86,6 +86,7 @@ export function createClient(options: JtlTransportOptions) {
     async request(
       path: string,
       query: Record<string, string> = {},
+      write?: { body: unknown; idempotencyKey: string },
     ): Promise<unknown> {
       const url = new URL(path, base);
       for (const [key, value] of Object.entries(query))
@@ -112,10 +113,15 @@ export function createClient(options: JtlTransportOptions) {
         headers['x-appversion'] = connection.appVersion;
         headers['x-challengecode'] = connection.challengeCode;
       }
+      if (write) {
+        headers['Content-Type'] = 'application/json';
+        headers['Idempotency-Key'] = write.idempotencyKey;
+      }
       const signal = AbortSignal.timeout(timeoutMs);
       try {
         const response = await (options.fetch ?? globalThis.fetch)(url, {
-          method: 'GET',
+          method: write ? 'PATCH' : 'GET',
+          ...(write ? { body: JSON.stringify(write.body) } : {}),
           headers,
           redirect: 'error',
           signal,
@@ -123,7 +129,8 @@ export function createClient(options: JtlTransportOptions) {
         if (response.status === 401) fail('authentication');
         if ([402, 403].includes(response.status)) fail('permission_denied');
         if (response.status === 404) fail('not_found');
-        if (response.status === 409) fail('conflict');
+        if ([409, 412].includes(response.status)) fail('conflict');
+        if (write && response.status === 400) fail('invalid_input');
         if (response.status === 429 || response.status === 503) {
           const value = response.headers.get('retry-after');
           const seconds = value === null ? NaN : Number(value);
@@ -156,6 +163,32 @@ export function createClient(options: JtlTransportOptions) {
           fail('invalid_response');
         }
       } catch (error) {
+        if (write) {
+          const code =
+            error instanceof ConnectorError
+              ? error.failure.code
+              : signal.aborted ||
+                  (error instanceof Error &&
+                    ['AbortError', 'TimeoutError'].includes(error.name))
+                ? 'timeout'
+                : 'transient';
+          // A failed response does not establish that the provider rolled back its write.
+          if (
+            !(error instanceof ConnectorError) ||
+            ![
+              'authentication',
+              'permission_denied',
+              'not_found',
+              'conflict',
+              'invalid_input',
+            ].includes(code)
+          )
+            throw new ConnectorError({
+              code,
+              effect: 'unknown',
+              retry: 'reconcile',
+            });
+        }
         if (error instanceof ConnectorError) throw error;
         if (
           signal.aborted ||
