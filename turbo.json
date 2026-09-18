@@ -51,7 +51,10 @@
         "TEMPORAL_API_KEY",
         "WEB_PORT",
         "API_PROXY_TARGET",
-        "BETTER_AUTH_COOKIE_PREFIX"
+        "BETTER_AUTH_COOKIE_PREFIX",
+        "CONNECTIONS_ACTIVE_KEY_ID",
+        "CONNECTIONS_KEYS",
+        "JTL_ALLOWED_ENDPOINTS"
       ]
     },
     "build:storybook": {

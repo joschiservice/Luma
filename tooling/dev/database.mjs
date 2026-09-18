@@ -17,7 +17,7 @@ export async function provision(saved, migrationUrl) {
       "SELECT pg_advisory_xact_lock(hashtext('luma_local_roles'))",
     );
     for (const [name, password, grants] of [
-      ['luma_api', saved.apiPassword, 'luma_identity'],
+      ['luma_api', saved.apiPassword, 'luma_identity,luma_connectors'],
       [
         'luma_worker',
         saved.workerPassword,

@@ -6,6 +6,29 @@ import { root, run } from './process.mjs';
 
 export const stateDirectory = join(root, '.luma');
 const statePath = join(stateDirectory, 'state.json');
+const connectionKeyPath = join(stateDirectory, 'connection-key');
+
+export async function connectionKey(path = connectionKeyPath) {
+  await mkdir(stateDirectory, { recursive: true, mode: 0o700 });
+  try {
+    await writeFile(path, randomBytes(32).toString('base64'), {
+      mode: 0o600,
+      flag: 'wx',
+    });
+  } catch (error) {
+    if (error.code !== 'EEXIST') throw error;
+  }
+  const key = await readFile(path, 'utf8');
+  if (
+    !/^[A-Za-z0-9+/]{43}=$/.test(key) ||
+    Buffer.from(key, 'base64').toString('base64') !== key
+  )
+    throw new Error(
+      'Local connection key is invalid. Restore .luma/connection-key from backup.',
+    );
+  return key;
+}
+
 export const project = `luma-${createHash('sha256').update(root).digest('hex').slice(0, 12)}`;
 
 export async function freePort() {
@@ -78,6 +101,8 @@ export async function environment(saved, workflows = false) {
     `postgresql://${user}:${password}@127.0.0.1:${dbPort}/luma`;
   const webOrigin = `http://127.0.0.1:${saved.webPort}`;
   const generated = {
+    CONNECTIONS_ACTIVE_KEY_ID: 'local',
+    CONNECTIONS_KEYS: JSON.stringify({ local: await connectionKey() }),
     HOST: '127.0.0.1',
     PORT: String(saved.apiPort),
     WEB_PORT: String(saved.webPort),

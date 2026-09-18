@@ -1,5 +1,6 @@
 import {
   readApiConfig,
+  readConnectionsConfig,
   readWorkflowConfig,
   readModelGatewayConfig,
   readIdentityConfig,
@@ -47,6 +48,7 @@ if (process.argv.includes('--workflow-worker')) {
     },
     observability,
     modelSettings,
+    readConnectionsConfig(process.env),
   );
 
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {

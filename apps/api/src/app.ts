@@ -15,7 +15,7 @@ import {
 } from './modules/exceptions/composition.js';
 import { createDetectionPipeline } from './modules/workflows/index.js';
 import { Pool } from 'pg';
-import type { ModelGatewayConfig } from '@luma/config';
+import type { ConnectionsConfig, ModelGatewayConfig } from '@luma/config';
 import {
   createModelGateway,
   createTenantDatabase,
@@ -39,6 +39,8 @@ import type { FastifyServerOptions } from 'fastify';
 import {
   connectionRoutes,
   createConnectors,
+  createInstalledConnections,
+  createInstallationVerifier,
 } from './modules/connectors/composition.js';
 import type { ProviderCatalog } from './modules/connectors/index.js';
 
@@ -254,9 +256,11 @@ export function buildRuntimeApp(
   options: FastifyServerOptions = {},
   observability?: Observability,
   modelSettings?: ModelGatewayConfig,
-  connections?: (
-    identity: IdentityService,
-  ) => import('./modules/connectors/index.js').ConnectionManagement,
+  connections?:
+    | ConnectionsConfig
+    | ((
+        identity: IdentityService,
+      ) => import('./modules/connectors/index.js').ConnectionManagement),
 ) {
   if (modelSettings && !observability)
     throw new Error('Model gateway requires observability');
@@ -265,14 +269,56 @@ export function buildRuntimeApp(
       ? createModelGateway(modelSettings, observability)
       : undefined;
   const identity = createIdentity(settings);
+  const connectionPool =
+    connections && typeof connections !== 'function'
+      ? new Pool({
+          connectionString: settings.databaseUrl,
+          max: 10,
+          connectionTimeoutMillis: 5000,
+          statement_timeout: 5000,
+          idle_in_transaction_session_timeout: 10000,
+        })
+      : undefined;
+  const connectionService =
+    typeof connections === 'function'
+      ? connections(identity.service)
+      : connections && connectionPool
+        ? createInstalledConnections(createTenantDatabase(connectionPool), {
+            ...connections,
+            refreshContext: identity.service.refreshContext,
+            verify: createInstallationVerifier({
+              jtlEndpoints: connections.jtlEndpoints,
+            }),
+          })
+        : undefined;
   const app = buildApp(options, {
     ...(observability ? { observability } : {}),
     ...(modelGateway ? { modelGateway } : {}),
-    ...(connections ? { connections: connections(identity.service) } : {}),
+    ...(connectionService ? { connections: connectionService } : {}),
     identity: identity.service,
     trustedOrigins: settings.trustedOrigins,
-    checkReadiness: identity.checkReadiness,
+    checkReadiness: async () => {
+      if (!(await identity.checkReadiness())) return false;
+      if (connectionPool) {
+        const result = await connectionPool.query<{ safe: boolean }>(`SELECT
+          NOT r.rolsuper AND NOT r.rolbypassrls
+          AND pg_has_role(current_user, 'luma_connectors', 'MEMBER')
+          AND NOT EXISTS (SELECT FROM pg_class c WHERE c.oid IN ('connector_installations'::regclass, 'connector_lifecycle_events'::regclass) AND pg_has_role(current_user, c.relowner, 'MEMBER')) AS safe
+          FROM pg_roles r WHERE r.rolname = current_user`);
+        if (result.rows[0]?.safe !== true) return false;
+        await connectionPool.query(
+          'SELECT id FROM connector_installations LIMIT 0',
+        );
+      }
+      return true;
+    },
   });
+  if (connectionPool) {
+    connectionPool.on('error', () =>
+      app.log.error('Connection database connection failed'),
+    );
+    app.addHook('onClose', () => connectionPool.end());
+  }
   identity.register(app);
   app.addHook('onClose', identity.close);
   return app;

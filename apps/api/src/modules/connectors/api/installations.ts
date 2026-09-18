@@ -12,7 +12,7 @@ export function connectionRoutes(service?: ConnectionManagement) {
     if (!service)
       throw new IdentityError(
         503,
-        'REGION_UNAVAILABLE',
+        'SERVICE_UNAVAILABLE',
         'Connection service is unavailable',
       );
     return { service, context: request.tenantContext };
