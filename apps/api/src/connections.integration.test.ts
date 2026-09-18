@@ -2,9 +2,9 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createInstalledConnections } from './modules/connectors/composition.js';
-import { createTenantDatabase } from './modules/platform/composition.js';
-import { makeTenantContext } from './modules/identity/composition.js';
+import { createInstalledConnections } from '#modules/connectors/composition';
+import { createTenantDatabase } from '#modules/platform/composition';
+import { makeTenantContext } from '#modules/identity/composition';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 describe.skipIf(!databaseUrl)('installed connections on PostgreSQL', () => {

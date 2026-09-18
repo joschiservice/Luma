@@ -1,9 +1,16 @@
-export { IdentityError, requireTenant, requireRole } from './domain/context.js';
+export {
+  IdentityError,
+  requireTenant,
+  requireRole,
+} from '#modules/identity/domain/context';
 export type {
   TenantContext,
   SessionIdentity,
   Role,
   Membership,
   Organization,
-} from './domain/context.js';
-export type { IdentityService, Credentials } from './application/identity.js';
+} from '#modules/identity/domain/context';
+export type {
+  IdentityService,
+  Credentials,
+} from '#modules/identity/application/identity';

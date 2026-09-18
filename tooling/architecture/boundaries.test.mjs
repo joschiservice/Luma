@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import path from 'node:path';
 import { describe, it, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { RuleTester } from 'eslint';
@@ -18,6 +19,25 @@ const invalid = (file, code) => ({
   ...sample(file, code),
   errors: [{ messageId: 'boundary' }],
 });
+
+// Run every relative-import boundary case through the native package imports too.
+function withPackageImport(entry) {
+  const sourceRoot = filename('apps/api/src/');
+  if (!entry.filename.startsWith(sourceRoot)) return [entry];
+  const code = entry.code.replace(
+    /(['"])(\.[^'"]+\.js)\1/g,
+    (match, quote, specifier) => {
+      const target = path.resolve(path.dirname(entry.filename), specifier);
+      if (!target.startsWith(sourceRoot)) return match;
+      const relative = path
+        .relative(sourceRoot, target)
+        .replaceAll(path.sep, '/')
+        .slice(0, -3);
+      return `${quote}#${relative}${quote}`;
+    },
+  );
+  return code === entry.code ? [entry] : [entry, { ...entry, code }];
+}
 
 new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
   'boundaries',
@@ -91,7 +111,7 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
         moduleFile('orders', 'domain/order.test.ts'),
         "import { expect } from 'vitest';",
       ),
-    ],
+    ].flatMap(withPackageImport),
     invalid: [
       ...[
         'connections.test.ts',
@@ -189,6 +209,20 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
       ),
       invalid(moduleFile('orders'), 'const adapter = import(name);'),
       invalid(moduleFile('orders'), "import x from '#internal/orders';"),
+      invalid(
+        moduleFile('orders'),
+        "import x from '#modules/orders/../inventory/index';",
+      ),
+      invalid(
+        moduleFile('orders'),
+        "import x from '#modules/orders/%2e%2e/inventory/index';",
+      ),
+      invalid(moduleFile('orders'), "import x from '#modules/orders//index';"),
+      invalid(
+        moduleFile('orders'),
+        "import x from '#test-support/detection-fixtures';",
+      ),
+      invalid(moduleFile('orders'), "import x from '#app';"),
       invalid(moduleFile('orders'), "import { config } from '@luma/config';"),
       invalid(moduleFile('orders'), "import { app } from '../../../app.js';"),
       invalid(moduleFile('orders'), "import x from '../../unknown/index.js';"),
@@ -210,7 +244,7 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
         filename('apps/api/src/helper.ts'),
         "import { orders } from './modules/orders/index.js';",
       ),
-    ],
+    ].flatMap(withPackageImport),
   },
 );
 

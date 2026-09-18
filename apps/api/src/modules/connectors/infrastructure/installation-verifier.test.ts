@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createInstallationVerifier } from './installation-verifier.js';
-import type { InstalledConnection } from '../domain/installation.js';
+import { createInstallationVerifier } from '#modules/connectors/infrastructure/installation-verifier';
+import type { InstalledConnection } from '#modules/connectors/domain/installation';
 const connection: InstalledConnection = {
   id: 'connection',
   tenantId: 'tenant',

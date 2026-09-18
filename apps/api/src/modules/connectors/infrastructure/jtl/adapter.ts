@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type {
   CapabilityHandler,
   ConnectorConnection,
-} from '../../application/capabilities.js';
+} from '#modules/connectors/application/capabilities';
 import type {
   CapabilityInput,
   CapabilityOutput,
@@ -11,12 +11,17 @@ import type {
   Observation,
   ReadCapability,
   SourceIdentity,
-} from '../../domain/capabilities.js';
-import { API_VERSION, createClient, fail, parse } from './client.js';
-import type { JtlTransportOptions } from './client.js';
-import { createJtlShippingMethodCapabilities } from './shipping-method.js';
-import { outputs } from './outputs.js';
-import * as s from './schemas.js';
+} from '#modules/connectors/domain/capabilities';
+import {
+  API_VERSION,
+  createClient,
+  fail,
+  parse,
+} from '#modules/connectors/infrastructure/jtl/client';
+import type { JtlTransportOptions } from '#modules/connectors/infrastructure/jtl/client';
+import { createJtlShippingMethodCapabilities } from '#modules/connectors/infrastructure/jtl/shipping-method';
+import { outputs } from '#modules/connectors/infrastructure/jtl/outputs';
+import * as s from '#modules/connectors/infrastructure/jtl/schemas';
 
 const ref = (id: number | string, scopeKey = ''): ExternalId => ({
   externalId: String(id),

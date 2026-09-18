@@ -1,20 +1,17 @@
-import type {
-  IdentityService,
-  TenantContext,
-} from './modules/identity/index.js';
-import { IdentityError } from './modules/identity/index.js';
+import type { IdentityService, TenantContext } from '#modules/identity/index';
+import { IdentityError } from '#modules/identity/index';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { apiErrorSchema } from '@luma/api-contract';
 import { createApiClient } from '@luma/api-contract/client';
 import { openApiDocument } from '@luma/api-contract/openapi';
-import { buildApp } from './app.js';
+import { buildApp } from '#app';
 import { randomUUID } from 'node:crypto';
 import { Writable } from 'node:stream';
 import {
   InMemorySpanExporter,
   SimpleSpanProcessor,
 } from '@opentelemetry/sdk-trace-node';
-import { createObservability } from './modules/platform/composition.js';
+import { createObservability } from '#modules/platform/composition';
 
 describe('HTTP foundation', () => {
   const apps: ReturnType<typeof buildApp>[] = [];
@@ -503,8 +500,7 @@ describe('observability baseline', () => {
 
 it('composes model-backed work with routes selected by startup configuration', async () => {
   const { readModelGatewayConfig } = await import('@luma/config');
-  const { createModelGateway } =
-    await import('./modules/platform/composition.js');
+  const { createModelGateway } = await import('#modules/platform/composition');
   for (const [model, provider] of [
     ['anthropic/claude-sonnet-4.5', 'anthropic'],
     ['openai/gpt-4.1', 'openai'],

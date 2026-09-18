@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { expect, it } from 'vitest';
 import { InMemorySpanExporter } from '@opentelemetry/sdk-trace-node';
-import { createObservability } from './observability.js';
+import { createObservability } from '#modules/platform/infrastructure/observability';
 
 it('exports the same trace to real Sentry and Langfuse SDKs with safe error metadata', async () => {
   const envelopes: unknown[] = [];

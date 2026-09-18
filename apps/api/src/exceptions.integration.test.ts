@@ -1,6 +1,6 @@
-import type { ModelGateway } from './modules/platform/index.js';
-import { parseInput } from './modules/exceptions/composition.js';
-import { detectionFixtures } from './test-support/detection-fixtures.js';
+import type { ModelGateway } from '#modules/platform/index';
+import { parseInput } from '#modules/exceptions/composition';
+import { detectionFixtures } from '#test-support/detection-fixtures';
 import { randomUUID } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { Pool } from 'pg';
@@ -13,16 +13,16 @@ import {
   it,
   vi,
 } from 'vitest';
-import { createDetectionServices } from './app.js';
-import { makeTenantContext } from './modules/identity/composition.js';
-import { defaultConfiguration } from './modules/exceptions/index.js';
+import { createDetectionServices } from '#app';
+import { makeTenantContext } from '#modules/identity/composition';
+import { defaultConfiguration } from '#modules/exceptions/index';
 import type {
   DetectionRequest,
   Evidence,
   VerificationEvaluator,
   VerificationResult,
   Incident,
-} from './modules/exceptions/index.js';
+} from '#modules/exceptions/index';
 import corpus from '../../../docs/fixtures/exceptions-v0.json' with { type: 'json' };
 
 const databaseUrl = process.env.TEST_DATABASE_URL;

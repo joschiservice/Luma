@@ -1,10 +1,13 @@
 import { Pool } from 'pg';
 import type { FastifyInstance } from 'fastify';
-import { createIdentityService } from './application/identity.js';
-import { createRepository } from './infrastructure/repository.js';
-import type { AuthSettings } from './infrastructure/auth.js';
-import { registerAuthHandler } from './api/auth-handler.js';
-export { identityRoutes, registerIdentityGuards } from './api/routes.js';
+import { createIdentityService } from '#modules/identity/application/identity';
+import { createRepository } from '#modules/identity/infrastructure/repository';
+import type { AuthSettings } from '#modules/identity/infrastructure/auth';
+import { registerAuthHandler } from '#modules/identity/api/auth-handler';
+export {
+  identityRoutes,
+  registerIdentityGuards,
+} from '#modules/identity/api/routes';
 export function createIdentity(
   settings: AuthSettings & { databaseUrl: string },
 ) {
@@ -40,4 +43,4 @@ export function createIdentity(
   };
 }
 
-export { makeTenantContext } from './domain/context.js';
+export { makeTenantContext } from '#modules/identity/domain/context';

@@ -1,4 +1,4 @@
-import type { TenantContext } from '../../identity/index.js';
+import type { TenantContext } from '#modules/identity/index';
 
 export interface EffectIntent {
   tenantId: string;

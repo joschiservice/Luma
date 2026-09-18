@@ -4,7 +4,7 @@ import type { BetterAuthPlugin } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { organization } from 'better-auth/plugins';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import * as schema from './schema.js';
+import * as schema from '#modules/identity/infrastructure/schema';
 export interface AuthSettings {
   secret: string;
   baseURL: string;

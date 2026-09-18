@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
-import type { ModelSchema } from '../../platform/index.js';
-import type { ReasoningSelection } from '../application/diagnosis.js';
+import type { ModelSchema } from '#modules/platform/index';
+import type { ReasoningSelection } from '#modules/exceptions/application/diagnosis';
 const selection = z
   .object({
     hypotheses: z

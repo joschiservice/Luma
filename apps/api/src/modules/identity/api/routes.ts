@@ -1,8 +1,8 @@
 import { initServer } from '@ts-rest/fastify';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { apiContract } from '@luma/api-contract';
-import type { IdentityService } from '../application/identity.js';
-import { IdentityError } from '../domain/context.js';
+import type { IdentityService } from '#modules/identity/application/identity';
+import { IdentityError } from '#modules/identity/domain/context';
 export function credentials(request: FastifyRequest) {
   return request.headers.cookie ? { cookie: request.headers.cookie } : {};
 }
@@ -126,6 +126,7 @@ export function registerIdentityGuards(
 }
 declare module 'fastify' {
   interface FastifyRequest {
-    tenantContext: import('../domain/context.js').TenantContext | null;
+    tenantContext:
+      import('#modules/identity/domain/context').TenantContext | null;
   }
 }

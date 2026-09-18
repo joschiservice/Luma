@@ -1,17 +1,17 @@
-import { createDiagnosisService } from './application/diagnosis.js';
-import type { DiagnosisOptions } from './application/diagnosis.js';
-import { createDiagnosisRepository } from './infrastructure/diagnosis-repository.js';
+import { createDiagnosisService } from '#modules/exceptions/application/diagnosis';
+import type { DiagnosisOptions } from '#modules/exceptions/application/diagnosis';
+import { createDiagnosisRepository } from '#modules/exceptions/infrastructure/diagnosis-repository';
 import {
   boundedInvestigation,
   selectionSchema,
   diagnosisTrace,
-} from './infrastructure/diagnosis-boundary.js';
-import { parseDiagnosis } from './api/diagnosis.js';
-import { detectionBoundary } from './infrastructure/validation.js';
-import type { TenantDatabase } from '../platform/index.js';
-import type { VerificationEvaluator } from './application/detection.js';
-import { createDetectionService } from './application/detection.js';
-import { createDetectionRepository } from './infrastructure/repository.js';
+} from '#modules/exceptions/infrastructure/diagnosis-boundary';
+import { parseDiagnosis } from '#modules/exceptions/api/diagnosis';
+import { detectionBoundary } from '#modules/exceptions/infrastructure/validation';
+import type { TenantDatabase } from '#modules/platform/index';
+import type { VerificationEvaluator } from '#modules/exceptions/application/detection';
+import { createDetectionService } from '#modules/exceptions/application/detection';
+import { createDetectionRepository } from '#modules/exceptions/infrastructure/repository';
 export function createExceptions(
   db: TenantDatabase,
   now: () => Date = () => new Date(),
@@ -25,7 +25,7 @@ export function createExceptions(
   );
 }
 
-export { parseInput } from './infrastructure/validation.js';
+export { parseInput } from '#modules/exceptions/infrastructure/validation';
 
 export function createDiagnoses(
   db: TenantDatabase,

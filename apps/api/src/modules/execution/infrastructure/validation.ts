@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import type { ProposedAction } from '../../policies/index.js';
+import type { ProposedAction } from '#modules/policies/index';
 const text = z.string().min(1).max(200);
 const refs = z.array(z.string().uuid()).min(1).max(100);
 const fields = z

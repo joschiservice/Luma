@@ -1,16 +1,16 @@
-import { requireRole, requireTenant } from '../../identity/index.js';
-import type { TenantContext } from '../../identity/index.js';
+import { requireRole, requireTenant } from '#modules/identity/index';
+import type { TenantContext } from '#modules/identity/index';
 import type {
   PolicyService,
   ProposedAction,
   Provenance,
   PolicyDecision,
-} from '../../policies/index.js';
+} from '#modules/policies/index';
 import type {
   EffectRegistry,
   VerificationResult,
-} from '../../connectors/index.js';
-import type { AuditEntry, AuditLog } from '../../audit/index.js';
+} from '#modules/connectors/index';
+import type { AuditEntry, AuditLog } from '#modules/audit/index';
 
 export interface ExecutionRecord {
   id: string;

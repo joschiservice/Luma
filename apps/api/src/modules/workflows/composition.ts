@@ -1,6 +1,6 @@
-export { createExceptionActivities } from './application/runtime.js';
+export { createExceptionActivities } from '#modules/workflows/application/runtime';
 export {
   createExceptionWorker,
   createExceptionClient,
-} from './infrastructure/runtime.js';
-export type { TemporalSettings } from './infrastructure/runtime.js';
+} from '#modules/workflows/infrastructure/runtime';
+export type { TemporalSettings } from '#modules/workflows/infrastructure/runtime';

@@ -2,34 +2,34 @@ import {
   createExceptionActivities,
   createExceptionClient,
   createExceptionWorker,
-} from './modules/workflows/composition.js';
-import type { TemporalSettings } from './modules/workflows/composition.js';
-import type { WorkflowBindings } from './modules/workflows/index.js';
+} from '#modules/workflows/composition';
+import type { TemporalSettings } from '#modules/workflows/composition';
+import type { WorkflowBindings } from '#modules/workflows/index';
 import type {
   DiagnosisOptions,
   VerificationEvaluator,
-} from './modules/exceptions/index.js';
+} from '#modules/exceptions/index';
 import {
   createDiagnoses,
   createExceptions,
-} from './modules/exceptions/composition.js';
-import { createDetectionPipeline } from './modules/workflows/index.js';
+} from '#modules/exceptions/composition';
+import { createDetectionPipeline } from '#modules/workflows/index';
 import { Pool } from 'pg';
 import type { ConnectionsConfig, ModelGatewayConfig } from '@luma/config';
 import {
   createModelGateway,
   createTenantDatabase,
-} from './modules/platform/composition.js';
-import { createPolicies } from './modules/policies/composition.js';
-import { createAuditLog } from './modules/audit/composition.js';
-import { createExecution } from './modules/execution/composition.js';
-import type { EffectRegistry } from './modules/connectors/index.js';
+} from '#modules/platform/composition';
+import { createPolicies } from '#modules/policies/composition';
+import { createAuditLog } from '#modules/audit/composition';
+import { createExecution } from '#modules/execution/composition';
+import type { EffectRegistry } from '#modules/connectors/index';
 import { randomUUID, createHash } from 'node:crypto';
 import type {
   ModelGateway,
   Observation,
   Observability,
-} from './modules/platform/index.js';
+} from '#modules/platform/index';
 import { apiContract } from '@luma/api-contract';
 import type { ApiError } from '@luma/api-contract';
 import { openApiDocument } from '@luma/api-contract/openapi';
@@ -41,19 +41,19 @@ import {
   createConnectors,
   createInstalledConnections,
   createInstallationVerifier,
-} from './modules/connectors/composition.js';
-import type { ProviderCatalog } from './modules/connectors/index.js';
+} from '#modules/connectors/composition';
+import type { ProviderCatalog } from '#modules/connectors/index';
 
 import {
   createIdentity,
   identityRoutes,
   registerIdentityGuards,
-} from './modules/identity/composition.js';
-import { IdentityError } from './modules/identity/index.js';
-import type { IdentityService } from './modules/identity/index.js';
+} from '#modules/identity/composition';
+import { IdentityError } from '#modules/identity/index';
+import type { IdentityService } from '#modules/identity/index';
 
 export interface AppDependencies {
-  connections?: import('./modules/connectors/index.js').ConnectionManagement;
+  connections?: import('#modules/connectors/index').ConnectionManagement;
   modelGateway?: ModelGateway;
   identity?: IdentityService;
   trustedOrigins?: readonly string[];
@@ -260,7 +260,7 @@ export function buildRuntimeApp(
     | ConnectionsConfig
     | ((
         identity: IdentityService,
-      ) => import('./modules/connectors/index.js').ConnectionManagement),
+      ) => import('#modules/connectors/index').ConnectionManagement),
 ) {
   if (modelSettings && !observability)
     throw new Error('Model gateway requires observability');

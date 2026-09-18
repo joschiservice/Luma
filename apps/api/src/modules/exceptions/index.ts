@@ -1,4 +1,4 @@
-export { createDetectionService } from './application/detection.js';
+export { createDetectionService } from '#modules/exceptions/application/detection';
 export type {
   DetectionService,
   DetectionRequest,
@@ -8,25 +8,28 @@ export type {
   Incident,
   VerificationEvaluator,
   VerificationResult,
-} from './application/detection.js';
+} from '#modules/exceptions/application/detection';
 export {
   defaultConfiguration,
   decimalUnits,
   decimalString,
-} from './domain/facts.js';
+} from '#modules/exceptions/domain/facts';
 export type {
   Configuration,
   EvaluationInput,
   Facts,
   ExceptionClass,
-} from './domain/facts.js';
+} from '#modules/exceptions/domain/facts';
 
-export { createDiagnosisService } from './application/diagnosis.js';
+export { createDiagnosisService } from '#modules/exceptions/application/diagnosis';
 export type {
   DiagnosisService,
   DiagnosisOptions,
   DiagnosisRepository,
   DiagnosisRereader,
   ReasoningSelection,
-} from './application/diagnosis.js';
-export type { Diagnosis, DiagnosisInput } from './domain/diagnosis.js';
+} from '#modules/exceptions/application/diagnosis';
+export type {
+  Diagnosis,
+  DiagnosisInput,
+} from '#modules/exceptions/domain/diagnosis';

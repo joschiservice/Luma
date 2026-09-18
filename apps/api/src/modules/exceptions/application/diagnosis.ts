@@ -1,12 +1,15 @@
-import { requireTenant } from '../../identity/index.js';
-import type { TenantContext } from '../../identity/index.js';
+import { requireTenant } from '#modules/identity/index';
+import type { TenantContext } from '#modules/identity/index';
 import type {
   ModelGateway,
   ModelSchema,
   TraceContext,
-} from '../../platform/index.js';
-import { diagnose } from '../domain/diagnosis.js';
-import type { Diagnosis, DiagnosisInput } from '../domain/diagnosis.js';
+} from '#modules/platform/index';
+import { diagnose } from '#modules/exceptions/domain/diagnosis';
+import type {
+  Diagnosis,
+  DiagnosisInput,
+} from '#modules/exceptions/domain/diagnosis';
 
 export interface DiagnosisRepository {
   current(

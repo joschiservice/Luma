@@ -1,11 +1,14 @@
-export type { Provider, ProviderCatalog } from './application/providers.js';
+export type {
+  Provider,
+  ProviderCatalog,
+} from '#modules/connectors/application/providers';
 export type {
   EffectAdapter,
   EffectRegistry,
   EffectIntent,
   VerificationResult,
-} from './application/effects.js';
-export { ConnectorError } from './domain/capabilities.js';
+} from '#modules/connectors/application/effects';
+export { ConnectorError } from '#modules/connectors/domain/capabilities';
 export type {
   ExternalId,
   SourceIdentity,
@@ -28,8 +31,8 @@ export type {
   ConnectorErrorCode,
   ConnectorFailure,
   CapabilityResult,
-} from './domain/capabilities.js';
-export { createCapabilityRuntime } from './application/capabilities.js';
+} from '#modules/connectors/domain/capabilities';
+export { createCapabilityRuntime } from '#modules/connectors/application/capabilities';
 export type {
   CapabilityDescriptor,
   InvocationContext,
@@ -41,13 +44,13 @@ export type {
   WriteRequest,
   CapabilityRuntime,
   CapabilityReader,
-} from './application/capabilities.js';
+} from '#modules/connectors/application/capabilities';
 export type {
   InstalledConnection,
   InstallationCapability,
   InstallationTarget,
-} from './domain/installation.js';
+} from '#modules/connectors/domain/installation';
 export type ConnectionManagement = Omit<
-  import('./application/installations.js').InstallationService,
+  import('#modules/connectors/application/installations').InstallationService,
   'credential'
 >;

@@ -1,7 +1,7 @@
-import { equalJson } from '../domain/equal-json.js';
-import { requireTenant } from '../../identity/index.js';
-import type { TenantContext } from '../../identity/index.js';
-import { ConnectorError } from '../domain/capabilities.js';
+import { equalJson } from '#modules/connectors/domain/equal-json';
+import { requireTenant } from '#modules/identity/index';
+import type { TenantContext } from '#modules/identity/index';
+import { ConnectorError } from '#modules/connectors/domain/capabilities';
 import type {
   Capability,
   CapabilityInput,
@@ -10,13 +10,13 @@ import type {
   ConnectorFailure,
   ReadCapability,
   WriteCapability,
-} from '../domain/capabilities.js';
+} from '#modules/connectors/domain/capabilities';
 import type {
   EffectAdapter,
   EffectIntent,
   EffectRegistry,
   VerificationResult,
-} from './effects.js';
+} from '#modules/connectors/application/effects';
 
 export interface CapabilityDescriptor {
   version: '0';

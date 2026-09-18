@@ -4,12 +4,17 @@ import type {
   CapabilityHandler,
   ConnectorConnection,
   InvocationContext,
-} from '../../application/capabilities.js';
-import type { CapabilityOutput } from '../../domain/capabilities.js';
-import { ConnectorError } from '../../domain/capabilities.js';
-import type { JtlConnectorOptions } from './adapter.js';
-import { API_VERSION, createClient, fail, parse } from './client.js';
-import { externalId, id } from './schemas.js';
+} from '#modules/connectors/application/capabilities';
+import type { CapabilityOutput } from '#modules/connectors/domain/capabilities';
+import { ConnectorError } from '#modules/connectors/domain/capabilities';
+import type { JtlConnectorOptions } from '#modules/connectors/infrastructure/jtl/adapter';
+import {
+  API_VERSION,
+  createClient,
+  fail,
+  parse,
+} from '#modules/connectors/infrastructure/jtl/client';
+import { externalId, id } from '#modules/connectors/infrastructure/jtl/schemas';
 
 const ref = z.object({ externalId, scopeKey: z.literal('') }).strict();
 export const shippingMethodState = z.object({

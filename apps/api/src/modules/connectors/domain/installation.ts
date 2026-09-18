@@ -1,4 +1,4 @@
-import type { ReadCapability } from './capabilities.js';
+import type { ReadCapability } from '#modules/connectors/domain/capabilities';
 export type InstallationCapability =
   ReadCapability | 'orders.shipping-method.write';
 export type InstallationTarget =

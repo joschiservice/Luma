@@ -5,9 +5,12 @@ export type {
   Operation,
   ProductEvent,
   FeatureFlag,
-} from './application/observability.js';
-export type { TenantDatabase, SqlTransaction } from './application/database.js';
-export { ModelGatewayError } from './application/model-gateway.js';
+} from '#modules/platform/application/observability';
+export type {
+  TenantDatabase,
+  SqlTransaction,
+} from '#modules/platform/application/database';
+export { ModelGatewayError } from '#modules/platform/application/model-gateway';
 export type {
   JsonValue,
   ModelSchema,
@@ -24,4 +27,4 @@ export type {
   ModelRoutingPolicy,
   ModelAdapter,
   ModelErrorCode,
-} from './application/model-gateway.js';
+} from '#modules/platform/application/model-gateway';

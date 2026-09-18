@@ -1,5 +1,5 @@
-import type { TenantDatabase } from '../../platform/index.js';
-import type { AuditLog, AuditEntry } from '../application/audit.js';
+import type { TenantDatabase } from '#modules/platform/index';
+import type { AuditLog, AuditEntry } from '#modules/audit/application/audit';
 export function createAuditLog(db: TenantDatabase): AuditLog {
   return {
     append: (entry) =>

@@ -2,17 +2,17 @@ import { createHmac } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { buildSchema, parse, validate } from 'graphql';
 import { describe, expect, it, vi } from 'vitest';
-import type { TenantContext } from '../../../identity/index.js';
-import { createCapabilityRuntime } from '../../application/capabilities.js';
-import { ConnectorError } from '../../domain/capabilities.js';
-import { API_VERSION } from './client.js';
-import type { ReadCapability } from '../../domain/capabilities.js';
-import { createShopifyConnector } from './adapter.js';
-import type { ShopifyConnectorOptions } from './adapter.js';
-import { mapShopifyWebhook } from './webhooks.js';
+import type { TenantContext } from '#modules/identity/index';
+import { createCapabilityRuntime } from '#modules/connectors/application/capabilities';
+import { ConnectorError } from '#modules/connectors/domain/capabilities';
+import { API_VERSION } from '#modules/connectors/infrastructure/shopify/client';
+import type { ReadCapability } from '#modules/connectors/domain/capabilities';
+import { createShopifyConnector } from '#modules/connectors/infrastructure/shopify/adapter';
+import type { ShopifyConnectorOptions } from '#modules/connectors/infrastructure/shopify/adapter';
+import { mapShopifyWebhook } from '#modules/connectors/infrastructure/shopify/webhooks';
 import commerce from './fixtures/commerce.json' with { type: 'json' };
 
-vi.mock('../../../identity/index.js', () => ({
+vi.mock('#modules/identity/index', () => ({
   requireTenant(context: TenantContext, tenantId: string) {
     if (context.tenantId !== tenantId) throw new Error('Tenant mismatch');
   },

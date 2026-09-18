@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { ConnectorError } from '../../domain/capabilities.js';
-import type { ConnectorErrorCode } from '../../domain/capabilities.js';
+import { ConnectorError } from '#modules/connectors/domain/capabilities';
+import type { ConnectorErrorCode } from '#modules/connectors/domain/capabilities';
 
 export const API_VERSION = '2.2';
 export type JtlConnection =

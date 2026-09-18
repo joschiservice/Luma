@@ -31,6 +31,7 @@ describe.skipIf(!databaseUrl)('connections through the API CLI', () => {
   async function start(configured = true) {
     child = fork(new URL('./index.ts', import.meta.url), [], {
       execArgv: [
+        '--conditions=luma-source',
         '--import',
         'tsx',
         '--import',

@@ -1,9 +1,9 @@
-import type { TenantDatabase, SqlTransaction } from '../../platform/index.js';
-import type { AuditEntry } from '../../audit/index.js';
+import type { TenantDatabase, SqlTransaction } from '#modules/platform/index';
+import type { AuditEntry } from '#modules/audit/index';
 import type {
   ExecutionRepository,
   ExecutionRecord,
-} from '../application/execution.js';
+} from '#modules/execution/application/execution';
 async function outbox(tx: SqlTransaction, entry: AuditEntry) {
   await tx.query(
     'INSERT INTO execution_outbox(id, tenant_id, proposal_id, document) VALUES ($1,$2,$3,$4)',

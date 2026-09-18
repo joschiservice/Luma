@@ -27,6 +27,18 @@ keep `.nvmrc`, `mise.toml`, and `package.json` in sync.
 | `pnpm dev:manual`    | Watch app processes using your app `.env` files and existing services.                                             |
 | `pnpm test:full`     | Run every CI gate against a disposable Testcontainers database.                                                    |
 
+## API imports
+
+Use native package imports such as `#modules/identity/index` and
+`#modules/workflows/composition` without file extensions. The module boundary
+rules still apply; cross-module imports must use the provider's `index` entry.
+
+The API development scripts and Vitest select the `luma-source` condition to load
+TypeScript source. When running API source directly, include
+`--conditions=luma-source`, for example
+`pnpm --filter @luma/api exec tsx --conditions=luma-source src/index.ts`.
+Production commands use the default mapping to compiled files in `dist`.
+
 ## Configuration and worktrees
 
 Each checkout has a Compose project derived from its absolute path. Compose

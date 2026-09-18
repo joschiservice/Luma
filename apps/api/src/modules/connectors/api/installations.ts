@@ -1,8 +1,8 @@
 import { initServer } from '@ts-rest/fastify';
 import type { FastifyRequest } from 'fastify';
 import { apiContract, installedConnectionSchema } from '@luma/api-contract';
-import { IdentityError } from '../../identity/index.js';
-import type { InstallationService } from '../application/installations.js';
+import { IdentityError } from '#modules/identity/index';
+import type { InstallationService } from '#modules/connectors/application/installations';
 type ConnectionManagement = Omit<InstallationService, 'credential'>;
 
 export function connectionRoutes(service?: ConnectionManagement) {

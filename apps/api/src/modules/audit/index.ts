@@ -1,1 +1,1 @@
-export type { AuditEntry, AuditLog } from './application/audit.js';
+export type { AuditEntry, AuditLog } from '#modules/audit/application/audit';

@@ -1,16 +1,16 @@
 import { randomUUID } from 'node:crypto';
-import type { TenantDatabase } from '../platform/index.js';
-import type { AuditLog } from '../audit/index.js';
-import type { PolicyService } from '../policies/index.js';
-import type { EffectRegistry } from '../connectors/index.js';
-import type { ExecutionDependencies } from './application/execution.js';
-import { createExecutionService } from './application/execution.js';
-import { createExecutionRepository } from './infrastructure/repository.js';
+import type { TenantDatabase } from '#modules/platform/index';
+import type { AuditLog } from '#modules/audit/index';
+import type { PolicyService } from '#modules/policies/index';
+import type { EffectRegistry } from '#modules/connectors/index';
+import type { ExecutionDependencies } from '#modules/execution/application/execution';
+import { createExecutionService } from '#modules/execution/application/execution';
+import { createExecutionRepository } from '#modules/execution/infrastructure/repository';
 import {
   parseAction,
   parseEvidence,
   parseVerification,
-} from './infrastructure/validation.js';
+} from '#modules/execution/infrastructure/validation';
 export function createExecution(
   db: TenantDatabase,
   policies: PolicyService,

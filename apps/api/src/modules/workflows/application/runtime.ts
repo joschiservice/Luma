@@ -1,13 +1,13 @@
-import type { TenantContext, IdentityService } from '../../identity/index.js';
-import { requireRole, requireTenant } from '../../identity/index.js';
+import type { TenantContext, IdentityService } from '#modules/identity/index';
+import { requireRole, requireTenant } from '#modules/identity/index';
 import type {
   DetectionRequest,
   DetectionService,
   Diagnosis,
   DiagnosisService,
-} from '../../exceptions/index.js';
-import type { ExecutionService } from '../../execution/index.js';
-import type { ProposedAction } from '../../policies/index.js';
+} from '#modules/exceptions/index';
+import type { ExecutionService } from '#modules/execution/index';
+import type { ProposedAction } from '#modules/policies/index';
 
 export type WorkflowSource = { kind: 'detection' | 'incident'; id: string };
 /** References only: payloads and authorization decisions are loaded inside activities. */

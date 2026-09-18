@@ -1,17 +1,17 @@
-import type { TenantContext } from '../../identity/index.js';
-import type { InstallationService } from '../application/installations.js';
-import { createCapabilityRuntime } from '../application/capabilities.js';
+import type { TenantContext } from '#modules/identity/index';
+import type { InstallationService } from '#modules/connectors/application/installations';
+import { createCapabilityRuntime } from '#modules/connectors/application/capabilities';
 import type {
   CapabilityDependencies,
   ConnectorConnection,
-} from '../application/capabilities.js';
-import type { InstallationCapability } from '../domain/installation.js';
-import type { CapabilityHandler } from '../application/capabilities.js';
-import { ConnectorError } from '../domain/capabilities.js';
-import { createShopifyConnector } from './shopify/adapter.js';
-import type { ShopifyEvidence } from './shopify/adapter.js';
-import { createJtlConnector } from './jtl/adapter.js';
-import type { JtlEvidence } from './jtl/adapter.js';
+} from '#modules/connectors/application/capabilities';
+import type { InstallationCapability } from '#modules/connectors/domain/installation';
+import type { CapabilityHandler } from '#modules/connectors/application/capabilities';
+import { ConnectorError } from '#modules/connectors/domain/capabilities';
+import { createShopifyConnector } from '#modules/connectors/infrastructure/shopify/adapter';
+import type { ShopifyEvidence } from '#modules/connectors/infrastructure/shopify/adapter';
+import { createJtlConnector } from '#modules/connectors/infrastructure/jtl/adapter';
+import type { JtlEvidence } from '#modules/connectors/infrastructure/jtl/adapter';
 
 export interface InstalledRuntimeOptions {
   installations: InstallationService;

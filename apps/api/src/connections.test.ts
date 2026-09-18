@@ -1,13 +1,13 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
-import { makeTenantContext } from './modules/identity/composition.js';
+import { makeTenantContext } from '#modules/identity/composition';
 import {
   createInstallationService,
   createSecretCipher,
   createInstalledRuntime,
-} from './modules/connectors/composition.js';
-import type { StoredInstallation } from './modules/connectors/composition.js';
-import type { InstallationCapability } from './modules/connectors/index.js';
+} from '#modules/connectors/composition';
+import type { StoredInstallation } from '#modules/connectors/composition';
+import type { InstallationCapability } from '#modules/connectors/index';
 
 const context = (
   tenantId: string = randomUUID(),

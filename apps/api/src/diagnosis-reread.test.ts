@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
-import { makeTenantContext } from './modules/identity/composition.js';
-import { createDiagnosisRereader } from './modules/workflows/index.js';
-import type { DiagnosisInput } from './modules/exceptions/index.js';
-import { defaultConfiguration } from './modules/exceptions/index.js';
+import { makeTenantContext } from '#modules/identity/composition';
+import { createDiagnosisRereader } from '#modules/workflows/index';
+import type { DiagnosisInput } from '#modules/exceptions/index';
+import { defaultConfiguration } from '#modules/exceptions/index';
 import type {
   CapabilityReader,
   CapabilityRequest,
   ReadCapability,
-} from './modules/connectors/index.js';
+} from '#modules/connectors/index';
 const context = makeTenantContext(
   { userId: 'operator', sessionId: 'session' },
   {

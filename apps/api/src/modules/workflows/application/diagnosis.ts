@@ -1,15 +1,15 @@
-import { requireTenant } from '../../identity/index.js';
-import type { TenantContext } from '../../identity/index.js';
+import { requireTenant } from '#modules/identity/index';
+import type { TenantContext } from '#modules/identity/index';
 import type {
   CapabilityReader,
   CapabilityRequest,
   CapabilityOutput,
   ReadCapability,
-} from '../../connectors/index.js';
+} from '#modules/connectors/index';
 import type {
   DiagnosisInput,
   DiagnosisRereader,
-} from '../../exceptions/index.js';
+} from '#modules/exceptions/index';
 
 export interface DiagnosisReadPlan {
   requests: CapabilityRequest<ReadCapability>[];

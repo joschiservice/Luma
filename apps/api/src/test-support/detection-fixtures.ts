@@ -1,7 +1,7 @@
-import { createJtlConnector } from '../modules/connectors/composition.js';
-import { createShopifyConnector } from '../modules/connectors/composition.js';
-import { createCapabilityRuntime } from '../modules/connectors/index.js';
-import type { TenantContext } from '../modules/identity/index.js';
+import { createJtlConnector } from '#modules/connectors/composition';
+import { createShopifyConnector } from '#modules/connectors/composition';
+import { createCapabilityRuntime } from '#modules/connectors/index';
+import type { TenantContext } from '#modules/identity/index';
 import { readFileSync } from 'node:fs';
 const jtl = JSON.parse(
   readFileSync(

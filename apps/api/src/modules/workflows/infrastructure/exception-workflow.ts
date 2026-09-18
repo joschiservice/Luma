@@ -13,7 +13,7 @@ import type {
   ExceptionActivities,
   ExceptionWorkflowInput,
   WorkflowProgress,
-} from '../application/runtime.js';
+} from '#modules/workflows/application/runtime';
 
 export const progressQuery = defineQuery<WorkflowProgress>('progress');
 /** A wake-up hint only. The execution service reads the persisted approval. */
