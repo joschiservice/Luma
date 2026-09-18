@@ -7,12 +7,13 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "dev": "tsx watch --env-file-if-exists=.env src/index.ts",
+    "dev": "tsx watch --include '../../packages/config/dist/**/*.js' --include '../../packages/api-contract/dist/**/*.js' --env-file-if-exists=.env src/index.ts",
     "start": "node --env-file-if-exists=.env dist/index.js",
     "db:migrate": "node --env-file-if-exists=.env scripts/migrate.mjs",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "test:browser": "vitest run --config vitest.browser.config.ts",
-    "worker": "node --env-file-if-exists=.env dist/index.js --workflow-worker"
+    "worker": "node --env-file-if-exists=.env dist/index.js --workflow-worker",
+    "dev:worker": "tsx watch --include '../../packages/config/dist/**/*.js' --include 'src/modules/workflows/infrastructure/exception-workflow.ts' --env-file-if-exists=.env src/index.ts --workflow-worker"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",

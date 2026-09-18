@@ -1,11 +1,13 @@
 /* global document, window, innerWidth, requestAnimationFrame */
 import { it, expect } from 'vitest';
 import { chromium } from 'playwright';
-import { database, startApi, startProcess } from './helpers.mjs';
+import { database, startApi, startProcess, availablePort } from './helpers.mjs';
 
-const origin = 'http://127.0.0.1:3107';
+let origin;
 const password = 'browser-test-password-123';
 async function fixture(t) {
+  const port = await availablePort();
+  origin = `http://127.0.0.1:${port}`;
   const db = await database(t);
   await db.migrate();
   await db.grantRuntime();
@@ -13,7 +15,7 @@ async function fixture(t) {
   const web = startProcess(
     t,
     'e2e/web-server.mjs',
-    { TEST_API_ORIGIN: api.origin },
+    { TEST_API_ORIGIN: api.origin, TEST_WEB_PORT: String(port) },
     true,
   );
   await web.message('listening');

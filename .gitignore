@@ -13,3 +13,6 @@ storybook-static/
 
 # Temporary backend E2E fixtures
 apps/api/.e2e-*/
+
+# Worktree-local development state and credentials
+.luma/

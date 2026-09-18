@@ -9,6 +9,8 @@ export interface AuthSettings {
   secret: string;
   baseURL: string;
   trustedOrigins: string[];
+  /** Separates sessions for applications sharing a hostname. */
+  cookiePrefix?: string;
   /** Reviewed server plugins, e.g. regional SSO/SCIM adapters. */
   plugins?: BetterAuthPlugin[];
 }
@@ -27,6 +29,7 @@ export function createAuth(
     account: { accountLinking: { enabled: false } },
     session: { cookieCache: { enabled: false } },
     advanced: {
+      ...(settings.cookiePrefix ? { cookiePrefix: settings.cookiePrefix } : {}),
       database: {
         generateId: ({ model }) =>
           model === 'organization' && provisionId ? provisionId : randomUUID(),

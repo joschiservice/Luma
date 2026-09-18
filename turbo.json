@@ -48,12 +48,53 @@
         "TEMPORAL_TASK_QUEUE",
         "TEMPORAL_DATA_REGION",
         "TEMPORAL_TLS",
-        "TEMPORAL_API_KEY"
+        "TEMPORAL_API_KEY",
+        "WEB_PORT",
+        "API_PROXY_TARGET",
+        "BETTER_AUTH_COOKIE_PREFIX"
       ]
     },
     "build:storybook": {
       "dependsOn": ["^build"],
       "outputs": ["storybook-static/**"]
+    },
+    "dev:worker": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "persistent": true,
+      "env": [
+        "MODEL_GATEWAY_ROUTES",
+        "MODEL_GATEWAY_TIMEOUT_MS",
+        "AI_GATEWAY_API_KEY",
+        "HOST",
+        "PORT",
+        "LOG_LEVEL",
+        "NODE_ENV",
+        "IDENTITY_DATABASE_URL",
+        "BETTER_AUTH_SECRET",
+        "BETTER_AUTH_URL",
+        "AUTH_TRUSTED_ORIGINS",
+        "OBSERVABILITY_ENVIRONMENT",
+        "OBSERVABILITY_RELEASE",
+        "OBSERVABILITY_SAMPLE_RATE",
+        "OBSERVABILITY_TENANT_HASH_KEY",
+        "SENTRY_DSN",
+        "LANGFUSE_PUBLIC_KEY",
+        "LANGFUSE_SECRET_KEY",
+        "LANGFUSE_BASE_URL",
+        "POSTHOG_API_KEY",
+        "POSTHOG_HOST",
+        "WORKFLOW_DATABASE_URL",
+        "TEMPORAL_ADDRESS",
+        "TEMPORAL_NAMESPACE",
+        "TEMPORAL_TASK_QUEUE",
+        "TEMPORAL_DATA_REGION",
+        "TEMPORAL_TLS",
+        "TEMPORAL_API_KEY",
+        "WEB_PORT",
+        "API_PROXY_TARGET",
+        "BETTER_AUTH_COOKIE_PREFIX"
+      ]
     }
   }
 }

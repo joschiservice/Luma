@@ -9,6 +9,8 @@ strictPeerDependencies: true
 allowBuilds:
   '@swc/core': false
   esbuild: true
+  cpu-features: false
+  ssh2: false
   protobufjs: false
 
 # ts-rest's stable adapter still declares Fastify 4; API integration tests cover 5.
