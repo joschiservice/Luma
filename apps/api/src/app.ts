@@ -1,5 +1,11 @@
-import type { VerificationEvaluator } from './modules/exceptions/index.js';
-import { createExceptions } from './modules/exceptions/composition.js';
+import type {
+  DiagnosisOptions,
+  VerificationEvaluator,
+} from './modules/exceptions/index.js';
+import {
+  createDiagnoses,
+  createExceptions,
+} from './modules/exceptions/composition.js';
 import { createDetectionPipeline } from './modules/workflows/index.js';
 import { Pool } from 'pg';
 import type { ModelGatewayConfig } from '@luma/config';
@@ -328,6 +334,7 @@ export function createDetectionServices(
   databaseUrl: string,
   now: () => Date = () => new Date(),
   verifier?: VerificationEvaluator,
+  diagnosisOptions: DiagnosisOptions = {},
 ) {
   const pool = new Pool({ connectionString: databaseUrl });
   const exceptions = createExceptions(
@@ -337,6 +344,11 @@ export function createDetectionServices(
   );
   return {
     exceptions,
+    diagnoses: createDiagnoses(
+      createTenantDatabase(pool),
+      now,
+      diagnosisOptions,
+    ),
     pipeline: createDetectionPipeline(exceptions, (value) =>
       createHash('sha256').update(value).digest('hex'),
     ),

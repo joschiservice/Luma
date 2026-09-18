@@ -1,3 +1,4 @@
+import { queueDiagnosis } from './diagnosis-repository.js';
 import { verificationPostconditions } from '../application/detection.js';
 import { randomUUID } from 'node:crypto';
 import type { SqlTransaction, TenantDatabase } from '../../platform/index.js';
@@ -232,6 +233,25 @@ export function createDetectionRepository(
             },
           ],
         );
+        if (incident && incident.state !== 'resolved') {
+          await queueDiagnosis(
+            tx,
+            {
+              exceptionId: incident.id,
+              firstDetectedAt: incident.firstDetectedAt,
+              reviewRequired,
+              subject: {
+                kind: incident.subject.subjectKind,
+                id: incident.subject.subjectId,
+                scope: incident.subject.scope,
+              },
+              input,
+              configuration,
+              evidence: request.evidence,
+            },
+            now,
+          );
+        }
         return { decision, incident, reviewRequired };
       }),
     get: (tenantId, incidentId) =>

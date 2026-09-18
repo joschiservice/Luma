@@ -208,3 +208,5 @@ export const apiContract = c.router(
     },
   },
 );
+export { diagnosisSchema } from './diagnosis.js';
+export type { Diagnosis } from './diagnosis.js';

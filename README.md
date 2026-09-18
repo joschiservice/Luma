@@ -83,6 +83,8 @@ API build output is `apps/api/dist`; run with `pnpm --filter @luma/api start` af
 
 The [V0 exception taxonomy](docs/exception-taxonomy.md) defines four detection classes, evidence requirements, safe recovery and verification. Its versioned synthetic golden cases cover positive, negative and uncertain outcomes for the detection pipeline. The [detection guide](docs/exception-detection.md) covers ingestion, immutable evidence, tenant-scoped persistence, deduplication and resolution.
 
+The [diagnosis guide](docs/exception-diagnosis.md) covers persisted evidence-backed investigations, revision invalidation, bounded rereads and optional Model Gateway reasoning.
+
 ## Tenant isolation and data residency
 
 [ADR-003](docs/architecture/003-tenant-isolation-and-data-residency.md) defines trusted organization context, scoped repositories plus PostgreSQL RLS, EU-only V0 placement, regional service boundaries and the future dedicated database path. Its SQL/API conventions and acceptance checks govern LUMA-7/8 and later persistence adapters; the [identity implementation](docs/identity.md) provides authentication, organization routes and PostgreSQL isolation.

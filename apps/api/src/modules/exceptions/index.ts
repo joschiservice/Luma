@@ -20,3 +20,13 @@ export type {
   Facts,
   ExceptionClass,
 } from './domain/facts.js';
+
+export { createDiagnosisService } from './application/diagnosis.js';
+export type {
+  DiagnosisService,
+  DiagnosisOptions,
+  DiagnosisRepository,
+  DiagnosisRereader,
+  ReasoningSelection,
+} from './application/diagnosis.js';
+export type { Diagnosis, DiagnosisInput } from './domain/diagnosis.js';
