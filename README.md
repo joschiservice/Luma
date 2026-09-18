@@ -1,6 +1,6 @@
 # Luma
 
-TypeScript modular monolith foundation. Node.js 24, pnpm 10, Turborepo.
+TypeScript modular monolith foundation. Node.js 24, pnpm 12, Turborepo.
 
 ## Start locally
 
@@ -15,7 +15,7 @@ pnpm --filter @luma/ui exec playwright install chromium
 pnpm dev
 ```
 
-`packageManager` pins pnpm. If Corepack is unavailable, install the pinned version with `npm install --global pnpm@10.34.5`.
+`packageManager` pins pnpm. If Corepack is unavailable, install the pinned version with `npm install --global pnpm@12.4.2`.
 
 Web: http://localhost:3000. API: http://127.0.0.1:3001/health.
 No secrets, database, or external services are needed. Stop both with Ctrl+C.

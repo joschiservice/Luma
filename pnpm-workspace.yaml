@@ -2,8 +2,14 @@ packages:
   - apps/*
   - packages/*
 
-onlyBuiltDependencies:
-  - esbuild
+minimumReleaseAge: 0
+saveExact: true
+strictPeerDependencies: true
+
+allowBuilds:
+  '@swc/core': false
+  esbuild: true
+  protobufjs: false
 
 # ts-rest's stable adapter still declares Fastify 4; API integration tests cover 5.
 peerDependencyRules:
