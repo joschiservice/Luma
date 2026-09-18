@@ -9,7 +9,7 @@ import { defaultConfiguration } from '../../apps/api/dist/modules/exceptions/ind
 import { parseInput } from '../../apps/api/dist/modules/exceptions/composition.js';
 import { stateDirectory } from './environment.mjs';
 
-export async function seed(saved, env) {
+export async function seed(saved, env, outputDirectory = stateDirectory) {
   const settings = {
     databaseUrl: env.IDENTITY_DATABASE_URL,
     secret: env.BETTER_AUTH_SECRET,
@@ -79,8 +79,17 @@ export async function seed(saved, env) {
       'local-seed',
     );
     const connectionId = '11111111-1111-4111-8111-111111111111';
+    const incidents = await detection.exceptions.list(context);
+    const evidence = await Promise.all(
+      incidents.map((incident) =>
+        detection.exceptions.evidence(context, incident.id),
+      ),
+    );
+    const existingKeys = new Set(evidence.flat().map((item) => item.key));
     for (const kind of ['sync_failure', 'workflow_failure']) {
       const key = `local-demo-${kind}-v1`;
+      // Ingesting persisted evidence again records another evaluation.
+      if (existingKeys.has(key)) continue;
       await detection.exceptions.ingest(context, {
         key,
         input: parseInput(kind, {
@@ -114,7 +123,7 @@ export async function seed(saved, env) {
     }
     expect(await request('/auth/sign-out', {}), 200);
     await writeFile(
-      join(stateDirectory, 'demo.json'),
+      join(outputDirectory, 'demo.json'),
       `${JSON.stringify({ email, password: saved.seedPassword, organizationId: organization.id }, null, 2)}\n`,
       { mode: 0o600 },
     );
