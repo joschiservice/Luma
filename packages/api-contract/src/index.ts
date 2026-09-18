@@ -1,3 +1,5 @@
+import { caseQuerySchema, caseListSchema, caseDetailSchema } from './cases.js';
+export * from './cases.js';
 import {
   installedConnectionSchema,
   installationInput,
@@ -219,6 +221,38 @@ const connectionsContract = c.router(
 
 export const apiContract = c.router(
   {
+    exceptions: c.router(
+      {
+        list: {
+          method: 'GET',
+          path: '/v1/organizations/:organizationId/exceptions',
+          pathParams: organizationParamsSchema,
+          query: caseQuerySchema,
+          responses: { 200: caseListSchema },
+          summary: 'List cases in your organization',
+          description:
+            'Filter attention, active work or history by class, severity and state. Results sort by severity, oldest attention request or detection, then ID. Use the returned cursor with the same filters. Refresh from the first page as cases change.',
+        },
+        get: {
+          method: 'GET',
+          path: '/v1/organizations/:organizationId/exceptions/:exceptionId',
+          pathParams: organizationParamsSchema.extend({
+            exceptionId: z.string().uuid(),
+          }),
+          responses: { 200: caseDetailSchema },
+          summary: 'Read a case investigation',
+          description:
+            'Returns the current persisted investigation and up to 100 evidence references. Recommendations require review; they do not authorize execution. Unavailable cases return not found.',
+        },
+      },
+      {
+        commonResponses: {
+          401: apiErrorSchema,
+          404: apiErrorSchema,
+          503: apiErrorSchema,
+        },
+      },
+    ),
     identity: identityContract,
     connections: connectionsContract,
     system: {

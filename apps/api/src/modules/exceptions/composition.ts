@@ -45,3 +45,13 @@ export function createDiagnoses(
     options,
   );
 }
+
+import { createCaseService } from '#modules/exceptions/application/cases';
+import { createCaseReader } from '#modules/exceptions/infrastructure/cases';
+export function createCases(
+  db: TenantDatabase,
+  now: () => Date = () => new Date(),
+) {
+  return createCaseService(createCaseReader(db, now));
+}
+export { caseRoutes } from '#modules/exceptions/api/cases';
