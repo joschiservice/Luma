@@ -1,10 +1,10 @@
-import type { TenantDatabase } from '../../platform/index.js';
-import type { PolicyRepository } from '../application/policies.js';
+import type { TenantDatabase } from '#modules/platform/index';
+import type { PolicyRepository } from '#modules/policies/application/policies';
 import type {
   Approval,
   PolicyDecision,
   PolicyEvidence,
-} from '../domain/action.js';
+} from '#modules/policies/domain/action';
 export function createPolicyRepository(db: TenantDatabase): PolicyRepository {
   return {
     pending: (tenantId) =>

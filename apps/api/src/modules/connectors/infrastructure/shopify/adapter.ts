@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type {
   CapabilityHandler,
   ConnectorConnection,
-} from '../../application/capabilities.js';
+} from '#modules/connectors/application/capabilities';
 import type {
   CapabilityInput,
   CapabilityOutput,
@@ -14,10 +14,15 @@ import type {
   Page,
   ReadCapability,
   SourceIdentity,
-} from '../../domain/capabilities.js';
-import { API_VERSION, createClient, fail, parse } from './client.js';
-import type { ShopifyTransportOptions } from './client.js';
-import * as s from './schemas.js';
+} from '#modules/connectors/domain/capabilities';
+import {
+  API_VERSION,
+  createClient,
+  fail,
+  parse,
+} from '#modules/connectors/infrastructure/shopify/client';
+import type { ShopifyTransportOptions } from '#modules/connectors/infrastructure/shopify/client';
+import * as s from '#modules/connectors/infrastructure/shopify/schemas';
 
 const pageFields = 'pageInfo { hasNextPage endCursor }';
 const ref = (externalId: string, scopeKey = ''): ExternalId => ({

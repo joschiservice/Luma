@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { buildRuntimeApp } from './app.js';
+import { buildRuntimeApp } from '#app';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 describe.skipIf(!databaseUrl)(

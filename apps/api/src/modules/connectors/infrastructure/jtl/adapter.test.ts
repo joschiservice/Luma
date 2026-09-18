@@ -1,16 +1,19 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { TenantContext } from '../../../identity/index.js';
-import { createCapabilityRuntime } from '../../application/capabilities.js';
+import type { TenantContext } from '#modules/identity/index';
+import { createCapabilityRuntime } from '#modules/connectors/application/capabilities';
 import type {
   CapabilityInput,
   ReadCapability,
-} from '../../domain/capabilities.js';
-import { createJtlConnector } from './adapter.js';
-import type { JtlConnectorOptions } from './adapter.js';
+} from '#modules/connectors/domain/capabilities';
+import { createJtlConnector } from '#modules/connectors/infrastructure/jtl/adapter';
+import type { JtlConnectorOptions } from '#modules/connectors/infrastructure/jtl/adapter';
 import commerce from './fixtures/commerce.json' with { type: 'json' };
-import { cloudId, cloudPayload } from './fixtures/cloud.js';
+import {
+  cloudId,
+  cloudPayload,
+} from '#modules/connectors/infrastructure/jtl/fixtures/cloud';
 
-vi.mock('../../../identity/index.js', () => ({
+vi.mock('#modules/identity/index', () => ({
   requireTenant(context: TenantContext, tenantId: string) {
     if (context.tenantId !== tenantId) throw new Error('Tenant mismatch');
   },

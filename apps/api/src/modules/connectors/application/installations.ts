@@ -2,15 +2,15 @@ import {
   IdentityError,
   requireRole,
   requireTenant,
-} from '../../identity/index.js';
-import type { TenantContext } from '../../identity/index.js';
-import { ConnectorError } from '../domain/capabilities.js';
-import type { InstallationCapability } from '../domain/installation.js';
+} from '#modules/identity/index';
+import type { TenantContext } from '#modules/identity/index';
+import { ConnectorError } from '#modules/connectors/domain/capabilities';
+import type { InstallationCapability } from '#modules/connectors/domain/installation';
 import type {
   InstallationInput,
   InstalledConnection,
   InstallationCredentials,
-} from '../domain/installation.js';
+} from '#modules/connectors/domain/installation';
 
 export interface StoredInstallation {
   connection: InstalledConnection;

@@ -2,7 +2,10 @@
   "extends": "@luma/typescript-config/node.json",
   "compilerOptions": {
     "types": ["node"],
-    "noEmit": true
+    "noEmit": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "customConditions": ["luma-source"]
   },
   "include": ["src/**/*.ts"]
 }

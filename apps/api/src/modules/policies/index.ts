@@ -4,9 +4,9 @@ export type {
   PolicyDecision,
   ProposedAction,
   Provenance,
-} from './domain/action.js';
+} from '#modules/policies/domain/action';
 export type {
   PolicyService,
   PolicyRepository,
   PolicyDependencies,
-} from './application/policies.js';
+} from '#modules/policies/application/policies';

@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
-import { makeTenantContext } from './modules/identity/composition.js';
-import { IdentityError } from './modules/identity/index.js';
-import { createExceptionActivities } from './modules/workflows/composition.js';
+import { makeTenantContext } from '#modules/identity/composition';
+import { IdentityError } from '#modules/identity/index';
+import { createExceptionActivities } from '#modules/workflows/composition';
 import type {
   ExceptionWorkflowInput,
   ProposalReference,
-} from './modules/workflows/index.js';
-import type { Diagnosis, Incident } from './modules/exceptions/index.js';
-import type { ProposedAction } from './modules/policies/index.js';
-import type { ExecutionRecord } from './modules/execution/index.js';
+} from '#modules/workflows/index';
+import type { Diagnosis, Incident } from '#modules/exceptions/index';
+import type { ProposedAction } from '#modules/policies/index';
+import type { ExecutionRecord } from '#modules/execution/index';
 
 const context = makeTenantContext(
   { userId: 'requester', sessionId: 'session' },
@@ -252,7 +252,7 @@ describe('durable activity boundaries', () => {
 it('deduplicates starts and scopes commands to the current tenant', async () => {
   const { TestWorkflowEnvironment } = await import('@temporalio/testing');
   const { createExceptionClient } =
-    await import('./modules/workflows/composition.js');
+    await import('#modules/workflows/composition');
   const env = await TestWorkflowEnvironment.createLocal();
   const identity = {
     refreshContext: vi.fn(async (value: typeof context) => value),

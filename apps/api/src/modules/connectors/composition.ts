@@ -1,14 +1,14 @@
 import { randomUUID } from 'node:crypto';
-import type { TenantDatabase } from '../platform/index.js';
-import { createInstallationService as createService } from './application/installations.js';
-import type { InstallationDependencies } from './application/installations.js';
-import { createInstallationRepository } from './infrastructure/installation-repository.js';
-import { createSecretCipher } from './infrastructure/secret-cipher.js';
+import type { TenantDatabase } from '#modules/platform/index';
+import { createInstallationService as createService } from '#modules/connectors/application/installations';
+import type { InstallationDependencies } from '#modules/connectors/application/installations';
+import { createInstallationRepository } from '#modules/connectors/infrastructure/installation-repository';
+import { createSecretCipher } from '#modules/connectors/infrastructure/secret-cipher';
 
-import { installationBoundary } from './infrastructure/installation-validation.js';
-import { createProviderCatalog } from './application/providers.js';
-import type { ProviderCatalog } from './application/providers.js';
-import { createProviderRoutes } from './api/routes.js';
+import { installationBoundary } from '#modules/connectors/infrastructure/installation-validation';
+import { createProviderCatalog } from '#modules/connectors/application/providers';
+import type { ProviderCatalog } from '#modules/connectors/application/providers';
+import { createProviderRoutes } from '#modules/connectors/api/routes';
 
 export function createConnectors(
   catalog: ProviderCatalog = createProviderCatalog(),
@@ -16,19 +16,19 @@ export function createConnectors(
   return createProviderRoutes(catalog);
 }
 
-export { createShopifyConnector } from './infrastructure/shopify/adapter.js';
+export { createShopifyConnector } from '#modules/connectors/infrastructure/shopify/adapter';
 export type {
   ShopifyConnectorOptions,
   ShopifyEvidence,
-} from './infrastructure/shopify/adapter.js';
-export { mapShopifyWebhook } from './infrastructure/shopify/webhooks.js';
+} from '#modules/connectors/infrastructure/shopify/adapter';
+export { mapShopifyWebhook } from '#modules/connectors/infrastructure/shopify/webhooks';
 
-export { createJtlConnector } from './infrastructure/jtl/adapter.js';
+export { createJtlConnector } from '#modules/connectors/infrastructure/jtl/adapter';
 export type {
   JtlConnectorOptions,
   JtlEvidence,
-} from './infrastructure/jtl/adapter.js';
-export type { JtlConnection } from './infrastructure/jtl/client.js';
+} from '#modules/connectors/infrastructure/jtl/adapter';
+export type { JtlConnection } from '#modules/connectors/infrastructure/jtl/client';
 
 export function createInstalledConnections(
   db: TenantDatabase,
@@ -46,18 +46,18 @@ export function createInstalledConnections(
     now: () => new Date(),
   });
 }
-export { createInstalledRuntime } from './infrastructure/installed-runtime.js';
-export type { InstalledRuntimeOptions } from './infrastructure/installed-runtime.js';
+export { createInstalledRuntime } from '#modules/connectors/infrastructure/installed-runtime';
+export type { InstalledRuntimeOptions } from '#modules/connectors/infrastructure/installed-runtime';
 export { createSecretCipher };
 export function createInstallationService(
   deps: Omit<InstallationDependencies, 'boundary'>,
 ) {
   return createService({ ...deps, boundary: installationBoundary });
 }
-export type { StoredInstallation } from './application/installations.js';
-export { createShippingMethodEffects } from './application/shipping-method-effects.js';
-export type { ShippingMethodEffectBinding } from './application/shipping-method-effects.js';
+export type { StoredInstallation } from '#modules/connectors/application/installations';
+export { createShippingMethodEffects } from '#modules/connectors/application/shipping-method-effects';
+export type { ShippingMethodEffectBinding } from '#modules/connectors/application/shipping-method-effects';
 
-export { connectionRoutes } from './api/installations.js';
+export { connectionRoutes } from '#modules/connectors/api/installations';
 
-export { createInstallationVerifier } from './infrastructure/installation-verifier.js';
+export { createInstallationVerifier } from '#modules/connectors/infrastructure/installation-verifier';

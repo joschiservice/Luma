@@ -1,6 +1,10 @@
-import { evaluate } from './evaluate.js';
-import { decimalString, decimalUnits } from './facts.js';
-import type { Configuration, Decision, EvaluationInput } from './facts.js';
+import { evaluate } from '#modules/exceptions/domain/evaluate';
+import { decimalString, decimalUnits } from '#modules/exceptions/domain/facts';
+import type {
+  Configuration,
+  Decision,
+  EvaluationInput,
+} from '#modules/exceptions/domain/facts';
 
 export const diagnosisVersion = 'diagnosis-v1';
 export interface Finding {

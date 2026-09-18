@@ -1,6 +1,6 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
-import type { SecretCipher } from '../application/installations.js';
-import { installationCredentials } from './installation-validation.js';
+import type { SecretCipher } from '#modules/connectors/application/installations';
+import { installationCredentials } from '#modules/connectors/infrastructure/installation-validation';
 
 /** Keys are supplied by the deployment secret manager and never stored with ciphertext. */
 export function createSecretCipher(

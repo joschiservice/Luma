@@ -1,13 +1,13 @@
-import { equalJson } from '../domain/equal-json.js';
-import { requireTenant } from '../../identity/index.js';
-import type { TenantContext } from '../../identity/index.js';
-import type { CapabilityInput } from '../domain/capabilities.js';
-import type { CapabilityRuntime } from './capabilities.js';
+import { equalJson } from '#modules/connectors/domain/equal-json';
+import { requireTenant } from '#modules/identity/index';
+import type { TenantContext } from '#modules/identity/index';
+import type { CapabilityInput } from '#modules/connectors/domain/capabilities';
+import type { CapabilityRuntime } from '#modules/connectors/application/capabilities';
 import type {
   EffectIntent,
   EffectRegistry,
   VerificationResult,
-} from './effects.js';
+} from '#modules/connectors/application/effects';
 
 type Input = CapabilityInput<'orders.shipping-method.write'>;
 export interface ShippingMethodEffectBinding {

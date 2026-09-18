@@ -2,7 +2,7 @@ import { EventEmitter } from 'node:events';
 import { Readable } from 'node:stream';
 import { request } from 'node:https';
 import { beforeEach, expect, it, vi } from 'vitest';
-import { approvedJtlFetch } from './approved-jtl-fetch.js';
+import { approvedJtlFetch } from '#modules/connectors/infrastructure/approved-jtl-fetch';
 vi.mock('node:https', () => ({ request: vi.fn() }));
 const endpoint = {
   tenantId: 'tenant',

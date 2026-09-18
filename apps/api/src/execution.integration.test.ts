@@ -14,10 +14,10 @@ import {
   buildRuntimeApp,
   createSafetyServices,
   createExceptionWorkflowRuntime,
-} from './app.js';
-import { createAuditLog } from './modules/audit/composition.js';
-import type { AuditEntry } from './modules/audit/index.js';
-import { createTenantDatabase } from './modules/platform/composition.js';
+} from '#app';
+import { createAuditLog } from '#modules/audit/composition';
+import type { AuditEntry } from '#modules/audit/index';
+import { createTenantDatabase } from '#modules/platform/composition';
 import { TestWorkflowEnvironment } from '@temporalio/testing';
 type Safety = ReturnType<typeof createSafetyServices>;
 type TenantContext = Parameters<Safety['execution']['execute']>[0];

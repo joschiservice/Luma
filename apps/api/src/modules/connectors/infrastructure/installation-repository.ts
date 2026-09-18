@@ -1,6 +1,6 @@
-import type { TenantDatabase } from '../../platform/index.js';
-import type { InstallationRepository } from '../application/installations.js';
-import type { InstalledConnection } from '../domain/installation.js';
+import type { TenantDatabase } from '#modules/platform/index';
+import type { InstallationRepository } from '#modules/connectors/application/installations';
+import type { InstalledConnection } from '#modules/connectors/domain/installation';
 
 export function createInstallationRepository(
   db: TenantDatabase,

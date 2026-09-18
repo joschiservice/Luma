@@ -3,10 +3,13 @@ import type {
   DetectionRequest,
   Resolution,
   HumanDisposition,
-} from '../application/detection.js';
+} from '#modules/exceptions/application/detection';
 import { z } from 'zod';
-import { identity } from '../domain/evaluate.js';
-import type { ExceptionClass, EvaluationInput } from '../domain/facts.js';
+import { identity } from '#modules/exceptions/domain/evaluate';
+import type {
+  ExceptionClass,
+  EvaluationInput,
+} from '#modules/exceptions/domain/facts';
 
 const timestamp = z.string().datetime();
 const decimal = z.string().regex(/^-?\d{1,14}(?:\.\d{1,6})?$/);

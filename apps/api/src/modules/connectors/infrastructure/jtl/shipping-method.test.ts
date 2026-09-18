@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { TenantContext } from '../../../identity/index.js';
-import { createCapabilityRuntime } from '../../application/capabilities.js';
-import { createShippingMethodEffects } from '../../application/shipping-method-effects.js';
-import type { EffectIntent } from '../../application/effects.js';
-import { createJtlConnector } from './adapter.js';
-import type { JtlConnectorOptions } from './adapter.js';
-import { cloudId } from './fixtures/cloud.js';
+import type { TenantContext } from '#modules/identity/index';
+import { createCapabilityRuntime } from '#modules/connectors/application/capabilities';
+import { createShippingMethodEffects } from '#modules/connectors/application/shipping-method-effects';
+import type { EffectIntent } from '#modules/connectors/application/effects';
+import { createJtlConnector } from '#modules/connectors/infrastructure/jtl/adapter';
+import type { JtlConnectorOptions } from '#modules/connectors/infrastructure/jtl/adapter';
+import { cloudId } from '#modules/connectors/infrastructure/jtl/fixtures/cloud';
 
-vi.mock('../../../identity/index.js', () => ({
+vi.mock('#modules/identity/index', () => ({
   requireTenant(context: TenantContext, tenantId: string) {
     if (context.tenantId !== tenantId) throw new Error('Tenant mismatch');
   },

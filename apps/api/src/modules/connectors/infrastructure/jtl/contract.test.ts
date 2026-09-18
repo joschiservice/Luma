@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { TenantContext } from '../../../identity/index.js';
-import { createJtlConnector } from './adapter.js';
-import { cloudPayload } from './fixtures/cloud.js';
+import type { TenantContext } from '#modules/identity/index';
+import { createJtlConnector } from '#modules/connectors/infrastructure/jtl/adapter';
+import { cloudPayload } from '#modules/connectors/infrastructure/jtl/fixtures/cloud';
 import {
   shippingMethodState,
   shippingMethodResponse,
-} from './shipping-method.js';
-import { API_VERSION } from './client.js';
-import * as s from './schemas.js';
+} from '#modules/connectors/infrastructure/jtl/shipping-method';
+import { API_VERSION } from '#modules/connectors/infrastructure/jtl/client';
+import * as s from '#modules/connectors/infrastructure/jtl/schemas';
 import api from './fixtures/erp-2.2.json' with { type: 'json' };
 import commerce from './fixtures/commerce.json' with { type: 'json' };
 

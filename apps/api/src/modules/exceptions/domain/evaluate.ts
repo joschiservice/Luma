@@ -1,5 +1,9 @@
-import { decimalUnits } from './facts.js';
-import type { Configuration, Decision, EvaluationInput } from './facts.js';
+import { decimalUnits } from '#modules/exceptions/domain/facts';
+import type {
+  Configuration,
+  Decision,
+  EvaluationInput,
+} from '#modules/exceptions/domain/facts';
 
 const result = (
   decision: 'clear' | 'defer' | 'reject',

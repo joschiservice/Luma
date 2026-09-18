@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import type { TenantDatabase } from '../platform/index.js';
-import { createPolicyService } from './application/policies.js';
-import type { PolicyDependencies } from './application/policies.js';
-import { createPolicyRepository } from './infrastructure/repository.js';
+import type { TenantDatabase } from '#modules/platform/index';
+import { createPolicyService } from '#modules/policies/application/policies';
+import type { PolicyDependencies } from '#modules/policies/application/policies';
+import { createPolicyRepository } from '#modules/policies/infrastructure/repository';
 export function createPolicies(
   db: TenantDatabase,
   refreshContext: PolicyDependencies['refreshContext'],

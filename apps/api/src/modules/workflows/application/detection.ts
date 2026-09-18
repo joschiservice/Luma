@@ -1,5 +1,5 @@
-import { requireTenant } from '../../identity/index.js';
-import type { TenantContext } from '../../identity/index.js';
+import { requireTenant } from '#modules/identity/index';
+import type { TenantContext } from '#modules/identity/index';
 import type {
   ExternalId,
   SourceIdentity,
@@ -7,14 +7,14 @@ import type {
   InventorySnapshot,
   FulfillmentSnapshot,
   ConnectorFailure,
-} from '../../connectors/index.js';
-import { decimalUnits, decimalString } from '../../exceptions/index.js';
+} from '#modules/connectors/index';
+import { decimalUnits, decimalString } from '#modules/exceptions/index';
 import type {
   Configuration,
   DetectionService,
   Evidence,
   Facts,
-} from '../../exceptions/index.js';
+} from '#modules/exceptions/index';
 
 export interface InventoryMapping {
   tenantId: string;

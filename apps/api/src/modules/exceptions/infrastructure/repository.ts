@@ -1,15 +1,15 @@
-import { queueDiagnosis } from './diagnosis-repository.js';
-import { verificationPostconditions } from '../application/detection.js';
+import { queueDiagnosis } from '#modules/exceptions/infrastructure/diagnosis-repository';
+import { verificationPostconditions } from '#modules/exceptions/application/detection';
 import { randomUUID } from 'node:crypto';
-import type { SqlTransaction, TenantDatabase } from '../../platform/index.js';
-import { decimalString, decimalUnits } from '../domain/facts.js';
-import type { Configuration } from '../domain/facts.js';
-import { identity } from '../domain/evaluate.js';
+import type { SqlTransaction, TenantDatabase } from '#modules/platform/index';
+import { decimalString, decimalUnits } from '#modules/exceptions/domain/facts';
+import type { Configuration } from '#modules/exceptions/domain/facts';
+import { identity } from '#modules/exceptions/domain/evaluate';
 import type {
   DetectionRepository,
   Evidence,
   Incident,
-} from '../application/detection.js';
+} from '#modules/exceptions/application/detection';
 
 async function lock(tx: SqlTransaction, tenantId: string) {
   // One tenant lock serializes fingerprint, source-key and resolution races together.

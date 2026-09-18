@@ -8,9 +8,12 @@ import type {
   ExceptionActivities,
   ExceptionWorkflowInput,
   WorkflowProgress,
-} from '../application/runtime.js';
-import { temporalActivities, workflowPath } from './runtime.js';
-import { IdentityError } from '../../identity/index.js';
+} from '#modules/workflows/application/runtime';
+import {
+  temporalActivities,
+  workflowPath,
+} from '#modules/workflows/infrastructure/runtime';
+import { IdentityError } from '#modules/identity/index';
 
 let env: TestWorkflowEnvironment;
 let bundle: WorkflowBundleWithSourceMap;

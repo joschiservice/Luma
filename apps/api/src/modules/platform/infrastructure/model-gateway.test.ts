@@ -4,7 +4,7 @@ import {
   InMemorySpanExporter,
   SimpleSpanProcessor,
 } from '@opentelemetry/sdk-trace-node';
-import { createRoutedModelGateway } from '../application/model-gateway.js';
+import { createRoutedModelGateway } from '#modules/platform/application/model-gateway';
 import type {
   ModelAdapter,
   ModelDataPolicy,
@@ -15,9 +15,9 @@ import type {
   ModelRoutingPolicy,
   ModelRoute,
   ModelSchema,
-} from '../application/model-gateway.js';
-import { createObservability } from './observability.js';
-import { createVercelModelAdapter } from './vercel-model-adapter.js';
+} from '#modules/platform/application/model-gateway';
+import { createObservability } from '#modules/platform/infrastructure/observability';
+import { createVercelModelAdapter } from '#modules/platform/infrastructure/vercel-model-adapter';
 
 const answer: ModelSchema<{ answer: string }> = {
   name: 'answer',

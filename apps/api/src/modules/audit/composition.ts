@@ -1,1 +1,1 @@
-export { createAuditLog } from './infrastructure/repository.js';
+export { createAuditLog } from '#modules/audit/infrastructure/repository';

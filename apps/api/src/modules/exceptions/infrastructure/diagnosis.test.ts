@@ -1,12 +1,15 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { diagnose } from '../domain/diagnosis.js';
-import type { DiagnosisInput } from '../domain/diagnosis.js';
-import { defaultConfiguration } from '../domain/facts.js';
-import type { ExceptionClass } from '../domain/facts.js';
-import { identity } from '../domain/evaluate.js';
-import { parseInput } from './validation.js';
-import { boundedInvestigation, selectionSchema } from './diagnosis-boundary.js';
+import { diagnose } from '#modules/exceptions/domain/diagnosis';
+import type { DiagnosisInput } from '#modules/exceptions/domain/diagnosis';
+import { defaultConfiguration } from '#modules/exceptions/domain/facts';
+import type { ExceptionClass } from '#modules/exceptions/domain/facts';
+import { identity } from '#modules/exceptions/domain/evaluate';
+import { parseInput } from '#modules/exceptions/infrastructure/validation';
+import {
+  boundedInvestigation,
+  selectionSchema,
+} from '#modules/exceptions/infrastructure/diagnosis-boundary';
 const corpus = JSON.parse(
   readFileSync(
     new URL(

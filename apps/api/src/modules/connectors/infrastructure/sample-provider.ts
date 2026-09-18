@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import type { ConnectorConnection } from '../application/capabilities.js';
-import { ConnectorError } from '../domain/capabilities.js';
+import type { ConnectorConnection } from '#modules/connectors/application/capabilities';
+import { ConnectorError } from '#modules/connectors/domain/capabilities';
 
 const externalId = z
   .object({ externalId: z.string().min(1), scopeKey: z.string() })

@@ -1,7 +1,7 @@
 import { createAdminApiClient } from '@shopify/admin-api-client';
 import { z } from 'zod';
-import { ConnectorError } from '../../domain/capabilities.js';
-import type { ConnectorErrorCode } from '../../domain/capabilities.js';
+import { ConnectorError } from '#modules/connectors/domain/capabilities';
+import type { ConnectorErrorCode } from '#modules/connectors/domain/capabilities';
 
 export const API_VERSION = '2026-07';
 export function fail(code: ConnectorErrorCode, retryAfterMs?: number): never {

@@ -1,21 +1,21 @@
 import { randomUUID } from 'node:crypto';
 import { describe, expect, expectTypeOf, it, vi } from 'vitest';
-import type { TenantContext } from '../../identity/index.js';
-import { createCapabilityRuntime } from '../application/capabilities.js';
+import type { TenantContext } from '#modules/identity/index';
+import { createCapabilityRuntime } from '#modules/connectors/application/capabilities';
 import type {
   CapabilityEvent,
   CapabilityReader,
-} from '../application/capabilities.js';
-import { ConnectorError } from '../domain/capabilities.js';
+} from '#modules/connectors/application/capabilities';
+import { ConnectorError } from '#modules/connectors/domain/capabilities';
 import type {
   CapabilityInput,
   CapabilityOutput,
-} from '../domain/capabilities.js';
-import type { EffectIntent } from '../application/effects.js';
-import { createSampleConnector } from './sample-provider.js';
+} from '#modules/connectors/domain/capabilities';
+import type { EffectIntent } from '#modules/connectors/application/effects';
+import { createSampleConnector } from '#modules/connectors/infrastructure/sample-provider';
 
 // Identity's brand and membership checks have their own tests; these fixtures isolate connector scoping.
-vi.mock('../../identity/index.js', () => ({
+vi.mock('#modules/identity/index', () => ({
   requireTenant(context: TenantContext, tenantId: string) {
     if (context.tenantId !== tenantId) throw new Error('Tenant mismatch');
   },

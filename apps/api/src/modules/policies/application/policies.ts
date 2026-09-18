@@ -1,11 +1,11 @@
-import { requireRole, requireTenant } from '../../identity/index.js';
-import type { TenantContext } from '../../identity/index.js';
+import { requireRole, requireTenant } from '#modules/identity/index';
+import type { TenantContext } from '#modules/identity/index';
 import type {
   Approval,
   PolicyDecision,
   ProposedAction,
   PolicyEvidence,
-} from '../domain/action.js';
+} from '#modules/policies/domain/action';
 
 export interface PolicyRepository {
   pending(tenantId: string): Promise<PolicyEvidence[]>;

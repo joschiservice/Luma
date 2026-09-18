@@ -1,10 +1,10 @@
 import { z } from 'zod';
-import { ModelGatewayError } from '../application/model-gateway.js';
+import { ModelGatewayError } from '#modules/platform/application/model-gateway';
 import type {
   JsonValue,
   ModelAdapter,
   ModelMessage,
-} from '../application/model-gateway.js';
+} from '#modules/platform/application/model-gateway';
 
 const responseSchema = z.object({
   choices: z

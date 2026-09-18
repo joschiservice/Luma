@@ -1,5 +1,5 @@
 import type { Pool } from 'pg';
-import type { TenantDatabase } from '../application/database.js';
+import type { TenantDatabase } from '#modules/platform/application/database';
 export function createTenantDatabase(pool: Pool): TenantDatabase {
   return {
     async transaction(tenantId, operation) {

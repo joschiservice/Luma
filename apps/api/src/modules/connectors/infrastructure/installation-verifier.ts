@@ -1,15 +1,18 @@
 import { z } from 'zod';
-import type { InstallationDependencies } from '../application/installations.js';
-import type { InstallationCapability } from '../domain/installation.js';
-import { ConnectorError } from '../domain/capabilities.js';
+import type { InstallationDependencies } from '#modules/connectors/application/installations';
+import type { InstallationCapability } from '#modules/connectors/domain/installation';
+import { ConnectorError } from '#modules/connectors/domain/capabilities';
 import {
   createClient as shopifyClient,
   parse as shopifyParse,
-} from './shopify/client.js';
-import { createClient as jtlClient, parse as jtlParse } from './jtl/client.js';
-import * as jtl from './jtl/schemas.js';
-import { approvedJtlFetch } from './approved-jtl-fetch.js';
-import type { ApprovedJtlEndpoint } from './approved-jtl-fetch.js';
+} from '#modules/connectors/infrastructure/shopify/client';
+import {
+  createClient as jtlClient,
+  parse as jtlParse,
+} from '#modules/connectors/infrastructure/jtl/client';
+import * as jtl from '#modules/connectors/infrastructure/jtl/schemas';
+import { approvedJtlFetch } from '#modules/connectors/infrastructure/approved-jtl-fetch';
+import type { ApprovedJtlEndpoint } from '#modules/connectors/infrastructure/approved-jtl-fetch';
 
 export function createInstallationVerifier(options: {
   jtlEndpoints: readonly ApprovedJtlEndpoint[];

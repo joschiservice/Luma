@@ -1,6 +1,6 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
-import type { ReadCapability } from '../../domain/capabilities.js';
-import { fail } from './client.js';
+import type { ReadCapability } from '#modules/connectors/domain/capabilities';
+import { fail } from '#modules/connectors/infrastructure/shopify/client';
 
 const topics: Record<string, ReadCapability[]> = {
   'orders/create': ['orders.read', 'fulfillment.read'],

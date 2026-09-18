@@ -21,7 +21,7 @@ import type {
   Observation,
   TraceContext,
   Operation,
-} from '../application/observability.js';
+} from '#modules/platform/application/observability';
 
 // This adapter accepts only deployment settings; it does not read ambient environment.
 export interface TelemetrySettings {

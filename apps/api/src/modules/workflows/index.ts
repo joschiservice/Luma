@@ -1,10 +1,10 @@
-export { createDetectionPipeline } from './application/detection.js';
+export { createDetectionPipeline } from '#modules/workflows/application/detection';
 export type {
   InventoryMapping,
   FulfillmentMapping,
-} from './application/detection.js';
-export { createDiagnosisRereader } from './application/diagnosis.js';
-export type { DiagnosisReadPlan } from './application/diagnosis.js';
+} from '#modules/workflows/application/detection';
+export { createDiagnosisRereader } from '#modules/workflows/application/diagnosis';
+export type { DiagnosisReadPlan } from '#modules/workflows/application/diagnosis';
 export type {
   ExceptionActivities,
   ExceptionWorkflowInput,
@@ -12,4 +12,4 @@ export type {
   WorkflowBindings,
   WorkflowProgress,
   WorkflowSource,
-} from './application/runtime.js';
+} from '#modules/workflows/application/runtime';

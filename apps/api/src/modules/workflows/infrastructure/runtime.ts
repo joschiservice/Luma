@@ -14,15 +14,15 @@ import {
 import { NativeConnection, Worker } from '@temporalio/worker';
 import type { NativeConnectionOptions } from '@temporalio/worker';
 import { z } from 'zod';
-import { IdentityError, requireRole } from '../../identity/index.js';
-import type { IdentityService, TenantContext } from '../../identity/index.js';
-import { WorkflowInputError } from '../application/runtime.js';
+import { IdentityError, requireRole } from '#modules/identity/index';
+import type { IdentityService, TenantContext } from '#modules/identity/index';
+import { WorkflowInputError } from '#modules/workflows/application/runtime';
 import type {
   ExceptionActivities,
   ExceptionWorkflowInput,
   WorkflowProgress,
   WorkflowSource,
-} from '../application/runtime.js';
+} from '#modules/workflows/application/runtime';
 
 export interface TemporalSettings {
   address: string;

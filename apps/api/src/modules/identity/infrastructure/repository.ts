@@ -3,12 +3,15 @@ import { APIError } from 'better-auth/api';
 import { and, eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import type { Pool } from 'pg';
-import { IdentityError } from '../domain/context.js';
-import type { Organization, Membership } from '../domain/context.js';
-import type { IdentityRepository } from '../application/identity.js';
-import { createAuth } from './auth.js';
-import type { AuthSettings } from './auth.js';
-import * as schema from './schema.js';
+import { IdentityError } from '#modules/identity/domain/context';
+import type {
+  Organization,
+  Membership,
+} from '#modules/identity/domain/context';
+import type { IdentityRepository } from '#modules/identity/application/identity';
+import { createAuth } from '#modules/identity/infrastructure/auth';
+import type { AuthSettings } from '#modules/identity/infrastructure/auth';
+import * as schema from '#modules/identity/infrastructure/schema';
 const organizationDto = (
   row: typeof schema.organization.$inferSelect,
 ): Organization => {

@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dependencies, layers } from './policy.mjs';
 
@@ -7,6 +8,34 @@ const modulePrefix = 'apps/api/src/modules/';
 const codeExtension = /\.(?:[cm]?[jt]sx?)$/;
 const normalize = (file) =>
   file.replaceAll(path.sep, '/').replace(codeExtension, '.ts');
+const apiImports = JSON.parse(
+  readFileSync(new URL('../../apps/api/package.json', import.meta.url), 'utf8'),
+).imports;
+
+function apiImportTarget(specifier) {
+  for (const [pattern, conditions] of Object.entries(apiImports)) {
+    const prefix = pattern.endsWith('*') ? pattern.slice(0, -1) : null;
+    const subpath = prefix === null ? '' : specifier.slice(prefix.length);
+    if (prefix === null ? specifier !== pattern : !specifier.startsWith(prefix))
+      continue;
+    if (
+      prefix !== null &&
+      (codeExtension.test(subpath) ||
+        !/^[\w./-]+$/.test(subpath) ||
+        subpath
+          .split('/')
+          .some((part) => ['', '.', '..', 'node_modules'].includes(part)))
+    )
+      return null;
+    return normalize(
+      path.posix.join(
+        'apps/api',
+        conditions['luma-source'].replace('*', subpath),
+      ),
+    );
+  }
+  return null;
+}
 
 function moduleInfo(file) {
   if (!file.startsWith(modulePrefix)) return null;
@@ -107,7 +136,16 @@ const rule = {
         return;
       }
       let to;
-      if (value.startsWith('.')) {
+      if (value.startsWith('#') && from.startsWith('apps/api/')) {
+        to = apiImportTarget(value);
+        if (!to) {
+          report(
+            node,
+            'Use a declared API package import with a canonical path.',
+          );
+          return;
+        }
+      } else if (value.startsWith('.')) {
         to = normalize(
           path.posix.normalize(
             path.posix.join(path.posix.dirname(from), value),
@@ -117,7 +155,7 @@ const rule = {
         const [name, ...subpath] = value.slice(6).split('/');
         to = `packages/${name}/${subpath.join('/')}`;
       } else {
-        // Backend aliases and absolute imports obscure ownership; use relative paths.
+        // Only package imports with known source targets can be checked for ownership.
         if (
           source &&
           (value.startsWith('/') ||
@@ -125,7 +163,10 @@ const rule = {
             value.startsWith('@/') ||
             value.startsWith('~/'))
         ) {
-          report(node, 'Use relative imports inside the backend.');
+          report(
+            node,
+            'Use declared API package imports or relative imports inside the backend.',
+          );
         } else if (
           source &&
           ['domain', 'application', 'index.ts'].includes(source.layer) &&

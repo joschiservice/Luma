@@ -3,14 +3,20 @@ import type { FastifyInstance } from 'fastify';
 import { initServer } from '@ts-rest/fastify';
 import { apiContract } from '@luma/api-contract';
 import { afterEach, expect, it, vi } from 'vitest';
-import { createIdentityService } from '../application/identity.js';
+import { createIdentityService } from '#modules/identity/application/identity';
 import type {
   IdentityRepository,
   IdentityTransaction,
-} from '../application/identity.js';
-import type { Membership, Organization } from '../domain/context.js';
-import { IdentityError } from '../domain/context.js';
-import { identityRoutes, registerIdentityGuards } from './routes.js';
+} from '#modules/identity/application/identity';
+import type {
+  Membership,
+  Organization,
+} from '#modules/identity/domain/context';
+import { IdentityError } from '#modules/identity/domain/context';
+import {
+  identityRoutes,
+  registerIdentityGuards,
+} from '#modules/identity/api/routes';
 
 const organization: Organization = {
   id: '11111111-1111-4111-8111-111111111111',

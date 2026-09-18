@@ -1,8 +1,14 @@
 import { createHash } from 'node:crypto';
-import type { SqlTransaction, TenantDatabase } from '../../platform/index.js';
-import { diagnose, diagnosisVersion } from '../domain/diagnosis.js';
-import type { Diagnosis, DiagnosisInput } from '../domain/diagnosis.js';
-import type { DiagnosisRepository } from '../application/diagnosis.js';
+import type { SqlTransaction, TenantDatabase } from '#modules/platform/index';
+import {
+  diagnose,
+  diagnosisVersion,
+} from '#modules/exceptions/domain/diagnosis';
+import type {
+  Diagnosis,
+  DiagnosisInput,
+} from '#modules/exceptions/domain/diagnosis';
+import type { DiagnosisRepository } from '#modules/exceptions/application/diagnosis';
 
 /** Called under the detection tenant lock, so pending state commits with its evidence. */
 export async function queueDiagnosis(

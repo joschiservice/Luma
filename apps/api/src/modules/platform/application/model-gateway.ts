@@ -1,4 +1,7 @@
-import type { Observability, TraceContext } from './observability.js';
+import type {
+  Observability,
+  TraceContext,
+} from '#modules/platform/application/observability';
 
 export type JsonValue =
   null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };

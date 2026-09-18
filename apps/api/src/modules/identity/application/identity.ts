@@ -3,14 +3,14 @@ import {
   makeTenantContext,
   requireRole,
   requireTenant,
-} from '../domain/context.js';
+} from '#modules/identity/domain/context';
 import type {
   Membership,
   Organization,
   Role,
   SessionIdentity,
   TenantContext,
-} from '../domain/context.js';
+} from '#modules/identity/domain/context';
 export type Credentials = Readonly<Record<string, string>>;
 export interface IdentityTransaction {
   listOrganizations(): Promise<Organization[]>;

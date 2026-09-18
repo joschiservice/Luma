@@ -2,9 +2,9 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
-import { factSchemas as schemas } from './validation.js';
-import { evaluate } from '../domain/evaluate.js';
-import { parseInput } from './validation.js';
+import { factSchemas as schemas } from '#modules/exceptions/infrastructure/validation';
+import { evaluate } from '#modules/exceptions/domain/evaluate';
+import { parseInput } from '#modules/exceptions/infrastructure/validation';
 const timestamp = z.string().datetime();
 const className = z.enum([
   'sync_failure',

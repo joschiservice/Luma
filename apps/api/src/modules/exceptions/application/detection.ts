@@ -1,12 +1,16 @@
-import { requireRole, requireTenant } from '../../identity/index.js';
-import type { TenantContext } from '../../identity/index.js';
+import { requireRole, requireTenant } from '#modules/identity/index';
+import type { TenantContext } from '#modules/identity/index';
 import type {
   Configuration,
   Decision,
   EvaluationInput,
   ExceptionClass,
-} from '../domain/facts.js';
-import { evaluate, fingerprintMaterial, identity } from '../domain/evaluate.js';
+} from '#modules/exceptions/domain/facts';
+import {
+  evaluate,
+  fingerprintMaterial,
+  identity,
+} from '#modules/exceptions/domain/evaluate';
 
 export interface Evidence {
   key: string;

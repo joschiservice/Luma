@@ -1,6 +1,6 @@
 import { apiContract } from '@luma/api-contract';
 import { initServer } from '@ts-rest/fastify';
-import type { ProviderCatalog } from '../application/providers.js';
+import type { ProviderCatalog } from '#modules/connectors/application/providers';
 
 export function createProviderRoutes(catalog: ProviderCatalog) {
   return initServer().router(apiContract.connectorProviders, {
