@@ -15,6 +15,9 @@ import {
   createSafetyServices,
   createExceptionWorkflowRuntime,
 } from './app.js';
+import { createAuditLog } from './modules/audit/composition.js';
+import type { AuditEntry } from './modules/audit/index.js';
+import { createTenantDatabase } from './modules/platform/composition.js';
 import { TestWorkflowEnvironment } from '@temporalio/testing';
 type Safety = ReturnType<typeof createSafetyServices>;
 type TenantContext = Parameters<Safety['execution']['execute']>[0];
@@ -618,6 +621,47 @@ describe.skipIf(!databaseUrl)(
         await owner.query("UPDATE memberships SET role='admin' WHERE id=$1", [
           bobMembership,
         ]);
+      }
+    });
+    it('deduplicates concurrent audit appends without accepting conflicting evidence', async () => {
+      const log = createAuditLog(createTenantDatabase(runtime));
+      for (let round = 0; round < 8; round++) {
+        const entry: AuditEntry = {
+          id: randomUUID(),
+          tenantId,
+          eventKey: randomUUID(),
+          proposalId: randomUUID(),
+          eventType: 'execution.prepared',
+          schemaVersion: 1,
+          occurredAt: new Date().toISOString(),
+          actor: { kind: 'user', id: alice.actor.id },
+          correlationId: randomUUID(),
+          actionHash: 'fixture',
+          evidenceRefs: [],
+          details: {},
+        };
+        const results = await Promise.allSettled(
+          Array.from({ length: 16 }, () => log.append(entry)),
+        );
+        expect(results).toEqual(
+          Array.from({ length: 16 }, () => ({
+            status: 'fulfilled',
+            value: undefined,
+          })),
+        );
+        expect(await log.list(tenantId, entry.proposalId)).toEqual([entry]);
+        for (const conflict of [
+          { ...entry, details: { outcome: 'changed' } },
+          { ...entry, id: randomUUID() },
+          { ...entry, eventKey: randomUUID() },
+          { ...entry, tenantId: outsider.tenantId },
+        ]) {
+          await expect(log.append(conflict)).rejects.toThrow(
+            'conflicts with existing evidence',
+          );
+        }
+        expect(await log.list(tenantId, entry.proposalId)).toEqual([entry]);
+        expect(await log.list(outsider.tenantId, entry.proposalId)).toEqual([]);
       }
     });
     it('serializes concurrent delivery, survives restart and rejects conflicting intent', async () => {

@@ -128,10 +128,15 @@ export async function database(t) {
   };
 }
 
-export async function startApi(t, db, browserOrigin = 'http://localhost:3000') {
+export async function startApi(
+  t,
+  db,
+  browserOrigin = 'http://localhost:3000',
+  script = 'dist/index.js',
+) {
   const process = startProcess(
     t,
-    'dist/index.js',
+    script,
     {
       HOST: '127.0.0.1',
       PORT: '0',
