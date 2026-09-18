@@ -1,4 +1,5 @@
 import {
+  ActivityCancellationType,
   CancellationScope,
   condition,
   defineQuery,
@@ -17,7 +18,7 @@ import type {
 export const progressQuery = defineQuery<WorkflowProgress>('progress');
 /** A wake-up hint only. The execution service reads the persisted approval. */
 export const approvalChanged = defineSignal('approvalChanged');
-const activities = proxyActivities<ExceptionActivities>({
+const activityOptions = {
   startToCloseTimeout: '1 minute',
   scheduleToCloseTimeout: '5 minutes',
   retry: {
@@ -25,6 +26,12 @@ const activities = proxyActivities<ExceptionActivities>({
     maximumInterval: '30 seconds',
     maximumAttempts: 5,
   },
+};
+const activities = proxyActivities<ExceptionActivities>(activityOptions);
+const execution = proxyActivities<Pick<ExceptionActivities, 'execute'>>({
+  ...activityOptions,
+  // Recovery must not race a provider write that is still running.
+  cancellationType: ActivityCancellationType.WAIT_CANCELLATION_COMPLETED,
 });
 
 export async function exceptionWorkflow(
@@ -87,7 +94,10 @@ export async function exceptionWorkflow(
       finish('executing');
       // On cancellation, an activity may have dispatched before recording its result.
       dispatched = true;
-      result = await activities.execute(input, exceptionId, proposal);
+      result = await execution.execute(input, exceptionId, proposal);
+      // Completion can win the activity cancellation race; still honor workflow cancellation.
+      if (CancellationScope.current().consideredCancelled)
+        await CancellationScope.current().cancelRequested;
       if (result.state !== 'approval_required') break;
       dispatched = false;
       progress = {
@@ -114,7 +124,10 @@ export async function exceptionWorkflow(
       ? finish('resolved')
       : finish('escalated', 'verification_requires_review');
   } catch (error) {
-    if (isCancellation(error)) {
+    if (
+      isCancellation(error) ||
+      CancellationScope.current().consideredCancelled
+    ) {
       if (dispatched && progress.proposalId) {
         await CancellationScope.nonCancellable(async () => {
           try {
@@ -124,6 +137,8 @@ export async function exceptionWorkflow(
           }
         });
       }
+      if (CancellationScope.current().consideredCancelled)
+        await CancellationScope.current().cancelRequested;
       throw error;
     }
     if (dispatched && progress.proposalId) {

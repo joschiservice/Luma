@@ -247,41 +247,84 @@ it('recovers committed approval without a notification', async () => {
   expect(await run(activities)).toMatchObject({ phase: 'resolved' });
   expect(activities.execute).toHaveBeenCalledTimes(2);
 }, 40_000);
-it('reconciles on cancellation after execution started', async () => {
-  const activities = fixture();
-  let entered!: () => void;
-  const executing = new Promise<void>((resolve) => {
-    entered = resolve;
-  });
-  let finish!: () => void;
-  const pending = new Promise<void>((resolve) => {
-    finish = resolve;
-  });
-  activities.execute.mockImplementation(async () => {
-    entered();
-    await pending;
-    return { state: 'reconciliation_required' };
-  });
-  const taskQueue = randomUUID();
-  const worker = await Worker.create({
-    connection: env.nativeConnection,
-    taskQueue,
-    workflowBundle: bundle,
-    activities,
-  });
-  await worker.runUntil(async () => {
-    const handle = await env.client.workflow.start('exceptionWorkflow', {
-      workflowId: randomUUID(),
-      taskQueue,
-      args: [input],
+it.each(['succeeded', 'reconciliation_required', 'lost_completion'] as const)(
+  'waits for in-flight execution before cancellation recovery: %s',
+  async (outcome) => {
+    const activities = fixture();
+    let entered!: () => void;
+    const executing = new Promise<void>((resolve) => {
+      entered = resolve;
     });
-    await executing;
-    await handle.cancel();
-    await expect(handle.result()).rejects.toThrow();
-    expect(activities.reconcile).toHaveBeenCalledTimes(1);
-    finish();
-  });
-}, 15_000);
+    let finish!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    let committed = false;
+    activities.execute.mockImplementation(async () => {
+      entered();
+      await pending;
+      committed = true;
+      if (outcome === 'lost_completion')
+        throw ApplicationFailure.nonRetryable(
+          'completion lost after provider commit',
+        );
+      return { state: outcome };
+    });
+    activities.reconcile.mockImplementation(async () => {
+      expect(committed).toBe(true);
+      return { state: 'succeeded' };
+    });
+    const taskQueue = randomUUID();
+    const worker = await Worker.create({
+      connection: env.nativeConnection,
+      taskQueue,
+      workflowBundle: bundle,
+      activities,
+    });
+    await worker.runUntil(async () => {
+      const handle = await env.client.workflow.start('exceptionWorkflow', {
+        workflowId: randomUUID(),
+        taskQueue,
+        args: [input],
+      });
+      try {
+        await executing;
+        await handle.cancel();
+        // Wait until a workflow task has processed cancellation, not merely until the request was accepted.
+        await vi.waitFor(
+          async () => {
+            const events = (await handle.fetchHistory()).events ?? [];
+            const cancelIndex = events.findIndex(
+              (event) => event.workflowExecutionCancelRequestedEventAttributes,
+            );
+            expect(cancelIndex).toBeGreaterThanOrEqual(0);
+            expect(
+              events
+                .slice(cancelIndex + 1)
+                .some((event) => event.workflowTaskCompletedEventAttributes),
+            ).toBe(true);
+          },
+          { timeout: 10_000 },
+        );
+        expect(activities.reconcile).not.toHaveBeenCalled();
+        expect((await handle.describe()).status.name).toBe('RUNNING');
+        finish();
+        await expect(handle.result()).rejects.toThrow();
+        expect((await handle.describe()).status.name).toBe('CANCELLED');
+        expect(activities.reconcile).toHaveBeenCalledTimes(1);
+        expect(activities.execute).toHaveBeenCalledTimes(1);
+        expect(activities.verify).not.toHaveBeenCalled();
+        await Worker.runReplayHistory(
+          { workflowBundle: bundle },
+          await handle.fetchHistory(),
+        );
+      } finally {
+        finish();
+      }
+    });
+  },
+  15_000,
+);
 
 it('sanitizes stored activity failures and does not retry denied authorization', async () => {
   const activities = fixture();
