@@ -4,8 +4,10 @@ export function createAuditLog(db: TenantDatabase): AuditLog {
   return {
     append: (entry) =>
       db.transaction(entry.tenantId, async (tx) => {
+        // Concurrent replays can collide on the primary key as well as the event key.
+        // Accept a duplicate only when the stored evidence matches below.
         await tx.query(
-          'INSERT INTO audit_entries(id, tenant_id, event_key, proposal_id, document) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (tenant_id, event_key) DO NOTHING',
+          'INSERT INTO audit_entries(id, tenant_id, event_key, proposal_id, document) VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING',
           [entry.id, entry.tenantId, entry.eventKey, entry.proposalId, entry],
         );
         const result = await tx.query<{ matches: boolean }>(
