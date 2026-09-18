@@ -101,3 +101,5 @@ export { readModelGatewayConfig } from './model-gateway.js';
 export type { ModelGatewayConfig } from './model-gateway.js';
 export { readWorkflowConfig } from './workflows.js';
 export type { WorkflowConfig } from './workflows.js';
+export { readConnectionsConfig } from './connections.js';
+export type { ConnectionsConfig } from './connections.js';

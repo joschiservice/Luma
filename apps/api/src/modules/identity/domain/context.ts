@@ -40,7 +40,8 @@ export class IdentityError extends Error {
       | 'FORBIDDEN'
       | 'NOT_FOUND'
       | 'CONFLICT'
-      | 'REGION_UNAVAILABLE',
+      | 'REGION_UNAVAILABLE'
+      | 'SERVICE_UNAVAILABLE',
     message: string,
   ) {
     super(message);

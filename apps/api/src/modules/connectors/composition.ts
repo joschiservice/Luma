@@ -59,3 +59,5 @@ export { createShippingMethodEffects } from './application/shipping-method-effec
 export type { ShippingMethodEffectBinding } from './application/shipping-method-effects.js';
 
 export { connectionRoutes } from './api/installations.js';
+
+export { createInstallationVerifier } from './infrastructure/installation-verifier.js';

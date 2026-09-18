@@ -21,6 +21,7 @@ export const apiErrorSchema = z.object({
     'NOT_FOUND',
     'CONFLICT',
     'REGION_UNAVAILABLE',
+    'SERVICE_UNAVAILABLE',
     'NOT_READY',
     'INTERNAL_ERROR',
     'PAYLOAD_TOO_LARGE',
