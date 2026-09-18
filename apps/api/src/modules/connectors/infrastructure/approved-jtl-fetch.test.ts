@@ -71,14 +71,14 @@ it('rejects other destinations, API roots, credentials and writes before opening
   ]) {
     await expect(fetch(url)).rejects.toThrow('not approved');
   }
-  await expect(
-    fetch(`${endpoint.baseUrl}items`, { method: 'POST' }),
-  ).rejects.toThrow('not approved');
+  for (const method of ['POST', 'PATCH']) {
+    await expect(
+      fetch(`${endpoint.baseUrl}items`, { method, body: '{}' }),
+    ).rejects.toThrow('not approved');
+  }
   expect(request).not.toHaveBeenCalled();
 });
 it('rejects oversized provider responses', async () => {
   respond(Buffer.alloc(1024 * 1024 + 1));
-  await expect(fetch(`${endpoint.baseUrl}items`)).rejects.toThrow(
-    'verification limit',
-  );
+  await expect(fetch(`${endpoint.baseUrl}items`)).rejects.toThrow('size limit');
 });

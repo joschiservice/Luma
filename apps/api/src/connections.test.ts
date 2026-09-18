@@ -1,3 +1,6 @@
+import { request } from 'node:https';
+import { EventEmitter } from 'node:events';
+import { Readable } from 'node:stream';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import { makeTenantContext } from './modules/identity/composition.js';
@@ -9,6 +12,33 @@ import {
 import type { StoredInstallation } from './modules/connectors/composition.js';
 import type { InstallationCapability } from './modules/connectors/index.js';
 
+vi.mock('node:https', () => ({ request: vi.fn() }));
+function pinnedProvider(fetch: typeof globalThis.fetch) {
+  vi.mocked(request).mockImplementation((url, options, callback) => {
+    const req = new EventEmitter();
+    return Object.assign(req, {
+      end: (body?: string) => {
+        void fetch(String(url), {
+          method: options.method ?? 'GET',
+          headers: options.headers as Record<string, string>,
+          ...(body ? { body } : {}),
+        })
+          .then(async (response) => {
+            callback!(
+              Object.assign(
+                Readable.from([Buffer.from(await response.arrayBuffer())]),
+                {
+                  statusCode: response.status,
+                  headers: Object.fromEntries(response.headers),
+                },
+              ) as never,
+            );
+          })
+          .catch((error) => req.emit('error', error));
+      },
+    }) as never;
+  });
+}
 const context = (
   tenantId: string = randomUUID(),
   role: 'admin' | 'member' = 'admin',
@@ -223,6 +253,7 @@ describe('installed connection lifecycle', () => {
             : { items: [], totalItems: 0, pageNumber: 1, pageSize: 1 },
         ),
       );
+      if (kind === 'jtl-onprem') pinnedProvider(fetch);
       const approve = vi.fn(async () => {});
       const recordObservations = vi.fn(async () => {});
       const record = vi.fn(async () => {});
@@ -231,6 +262,13 @@ describe('installed connection lifecycle', () => {
         record,
         recordObservations,
         approveJtlEndpoint: approve,
+        jtlEndpoints: [
+          {
+            tenantId: ctx.tenantId,
+            baseUrl: 'https://erp.example.test/db/',
+            addresses: ['10.0.0.5'],
+          },
+        ],
         fetch,
       });
       const read = () =>
@@ -295,6 +333,7 @@ describe('installed connection lifecycle', () => {
           record,
           recordObservations,
           approveJtlEndpoint: vi.fn(),
+          jtlEndpoints: [],
           fetch,
         });
         if (operation === 'discover') {
@@ -331,6 +370,7 @@ describe('installed connection lifecycle', () => {
       record: vi.fn(),
       recordObservations: vi.fn(),
       approveJtlEndpoint: vi.fn(),
+      jtlEndpoints: [],
       fetch: vi.fn(),
     });
     await expect(runtime.discover(ctx, connection.id)).rejects.toBe(error);
@@ -353,6 +393,7 @@ describe('installed connection lifecycle', () => {
       record: vi.fn(),
       recordObservations: vi.fn(),
       approveJtlEndpoint: vi.fn(),
+      jtlEndpoints: [],
       fetch,
     });
     expect(
@@ -446,6 +487,7 @@ describe('installed shipping-method permissions', () => {
       record: vi.fn(),
       recordObservations: vi.fn(),
       approveJtlEndpoint: vi.fn(),
+      jtlEndpoints: [],
     });
     expect(await runtime.discover(f.ctx, connection.id)).toEqual([]);
     await f.service.check(f.ctx, connection.id, 1);
@@ -471,5 +513,167 @@ describe('installed shipping-method permissions', () => {
     });
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(fetch.mock.calls[0]?.[1]?.method).toBe('GET');
+  });
+});
+
+describe('installed JTL address pins', () => {
+  const target = {
+    kind: 'jtl-onprem' as const,
+    baseUrl: 'https://erp.example.test/db/',
+    appId: 'app',
+    appVersion: '1',
+  };
+  function assertPin(address: string) {
+    const options = vi.mocked(request).mock.calls.at(-1)![1];
+    const callback = vi.fn();
+    (
+      options.lookup as (
+        host: string,
+        options: { all: boolean },
+        callback: (...args: unknown[]) => void,
+      ) => void
+    )('erp.example.test', { all: true }, callback);
+    expect(callback).toHaveBeenCalledWith(null, [{ address, family: 4 }]);
+  }
+  it('pins every page, rechecks tenant approval and never uses the generic transport', async () => {
+    const f = fixture();
+    const installed = await f.service.install(f.ctx, {
+      ...input,
+      target,
+      credentials: { token: 'private-token', challengeCode: 'challenge' },
+    });
+    await f.service.check(f.ctx, installed.id, 1);
+    const provider = vi.fn<typeof globalThis.fetch>(async (url) => {
+      const pageNumber = Number(
+        new URL(String(url)).searchParams.get('pageNumber'),
+      );
+      return Response.json({
+        items: [
+          {
+            id: pageNumber,
+            sKU: 'SKU',
+            isActive: true,
+            isInventoryManagementActive: true,
+          },
+        ],
+        totalItems: 2,
+        pageNumber,
+        pageSize: 1,
+      });
+    });
+    pinnedProvider(provider);
+    const genericFetch = vi.fn();
+    const endpoints = [
+      {
+        tenantId: f.ctx.tenantId,
+        baseUrl: target.baseUrl,
+        addresses: ['10.0.0.5'],
+      },
+    ];
+    const runtime = createInstalledRuntime({
+      installations: f.service,
+      record: vi.fn(),
+      recordObservations: vi.fn(),
+      approveJtlEndpoint: vi.fn(),
+      jtlEndpoints: endpoints,
+      fetch: genericFetch,
+    });
+    const read = (cursor?: string) =>
+      runtime.read(f.ctx, {
+        connectionId: installed.id,
+        capability: 'products.read',
+        version: '0',
+        input: { limit: 1, ...(cursor ? { cursor } : {}) },
+      });
+    const first = await read();
+    expect(first.ok).toBe(true);
+    if (!first.ok || !first.value.nextCursor)
+      throw new Error('Expected a second page');
+    assertPin('10.0.0.5');
+    endpoints[0]!.addresses = ['10.0.0.6'];
+    expect(await read(first.value.nextCursor)).toMatchObject({
+      ok: true,
+      value: { nextCursor: null },
+    });
+    assertPin('10.0.0.6');
+    endpoints[0]!.tenantId = randomUUID();
+    expect(await read()).toMatchObject({
+      ok: false,
+      error: { code: 'permission_denied' },
+    });
+    endpoints.length = 0;
+    expect(await read()).toMatchObject({
+      ok: false,
+      error: { code: 'permission_denied' },
+    });
+    expect(provider).toHaveBeenCalledTimes(2);
+    expect(genericFetch).not.toHaveBeenCalled();
+  });
+  it('pins both precondition GET and authorized PATCH and preserves the write body', async () => {
+    const f = fixture();
+    f.verify.mockResolvedValue([
+      'orders.shipping-method.read',
+      'orders.shipping-method.write',
+    ]);
+    const installed = await f.service.install(f.ctx, {
+      ...input,
+      target,
+      credentials: { token: 'private-token', challengeCode: 'challenge' },
+      permissions: [
+        'orders.shipping-method.read',
+        'orders.shipping-method.write',
+      ],
+    });
+    await f.service.check(f.ctx, installed.id, 1);
+    const provider = vi.fn<typeof globalThis.fetch>(async (_url, init) => {
+      assertPin('10.0.0.5');
+      return Response.json(
+        init?.method === 'PATCH'
+          ? { salesOrderId: '10' }
+          : { id: '10', shippingMethodId: '7', isCancelled: false },
+      );
+    });
+    pinnedProvider(provider);
+    const genericFetch = vi.fn();
+    const runtime = createInstalledRuntime({
+      installations: f.service,
+      record: vi.fn(),
+      recordObservations: vi.fn(),
+      approveJtlEndpoint: vi.fn(),
+      jtlEndpoints: [
+        {
+          tenantId: f.ctx.tenantId,
+          baseUrl: target.baseUrl,
+          addresses: ['10.0.0.5'],
+        },
+      ],
+      fetch: genericFetch,
+    });
+    const ref = (externalId: string) => ({ externalId, scopeKey: '' });
+    expect(
+      await runtime.write(f.ctx, {
+        connectionId: installed.id,
+        capability: 'orders.shipping-method.write',
+        version: '0',
+        idempotencyKey: 'logical-key',
+        input: {
+          order: ref('10'),
+          expectedShippingMethod: ref('7'),
+          shippingMethod: ref('8'),
+        },
+      }),
+    ).toMatchObject({ ok: true });
+    expect(provider).toHaveBeenCalledTimes(2);
+    const init = provider.mock.calls[1]![1]!;
+    expect(init.method).toBe('PATCH');
+    expect(JSON.parse(String(init.body))).toEqual({
+      shippingMethodId: '8',
+      disableAutomaticWorkflows: true,
+    });
+    const headers = new Headers(init.headers);
+    expect(headers.get('authorization')).toBe('Wawi private-token');
+    expect(headers.get('x-challengecode')).toBe('challenge');
+    expect(headers.get('idempotency-key')).toMatch(/^[a-f0-9]{64}$/);
+    expect(genericFetch).not.toHaveBeenCalled();
   });
 });
