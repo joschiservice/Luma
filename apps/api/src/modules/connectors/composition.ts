@@ -55,3 +55,5 @@ export function createInstallationService(
   return createService({ ...deps, boundary: installationBoundary });
 }
 export type { StoredInstallation } from './application/installations.js';
+export { createShippingMethodEffects } from './application/shipping-method-effects.js';
+export type { ShippingMethodEffectBinding } from './application/shipping-method-effects.js';

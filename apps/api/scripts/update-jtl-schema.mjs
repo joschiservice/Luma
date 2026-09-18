@@ -54,6 +54,7 @@ for (const path of [
   '/v2/delivery-notes',
   '/v2/delivery-notes/{deliveryNoteId}',
   '/v2/delivery-notes/{deliveryNoteId}/line-items',
+  '/v2/sales-orders/{salesOrderId}',
 ]) {
   const get = api.paths[path].get;
   paths[path] = {
@@ -64,6 +65,15 @@ for (const path of [
     response: schema(get.responses['200'].content['application/json'].schema),
   };
 }
+const patch = api.paths['/v2/sales-orders/{salesOrderId}'].patch;
+const shippingMethodWrite = {
+  parameters: patch.parameters.map(({ name, in: location }) => ({
+    name,
+    in: location,
+  })),
+  request: schema(patch.requestBody.content['application/json'].schema),
+  response: schema(patch.responses['200'].content['application/json'].schema),
+};
 await writeFile(
   new URL(
     '../src/modules/connectors/infrastructure/jtl/fixtures/erp-2.2.json',
@@ -75,6 +85,7 @@ await writeFile(
       sourceSha256: createHash('sha256').update(source).digest('hex'),
       version: api.info.version,
       paths,
+      shippingMethodWrite,
       schemas,
     },
     null,

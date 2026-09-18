@@ -7,7 +7,7 @@ import {
   createInstalledRuntime,
 } from './modules/connectors/composition.js';
 import type { StoredInstallation } from './modules/connectors/composition.js';
-import type { ReadCapability } from './modules/connectors/index.js';
+import type { InstallationCapability } from './modules/connectors/index.js';
 
 const context = (
   tenantId: string = randomUUID(),
@@ -35,7 +35,7 @@ function fixture() {
   const records = new Map<string, StoredInstallation>();
   const events: unknown[] = [];
   const refreshContext = vi.fn(async (c: ReturnType<typeof context>) => c);
-  const verify = vi.fn(async (): Promise<ReadCapability[]> => [
+  const verify = vi.fn(async (): Promise<InstallationCapability[]> => [
     'products.read',
   ]);
   const service = createInstallationService({
@@ -398,4 +398,78 @@ it('authenticates ciphertext binding and retains old key support during key rota
   expect(() =>
     createSecretCipher('old', new Map([['old', randomBytes(16)]])),
   ).toThrow();
+});
+
+describe('installed shipping-method permissions', () => {
+  const actionInput = {
+    label: 'JTL',
+    target: {
+      kind: 'jtl-cloud',
+      jtlTenantId: 'aaaaaaaa-aaaa-4aaa-8aaa-000000000001',
+    },
+    credentials: { token: 'secret' },
+    permissions: [
+      'orders.shipping-method.read',
+      'orders.shipping-method.write',
+    ],
+  };
+  it('requires JTL and the authoritative read permission', async () => {
+    const f = fixture();
+    await expect(
+      f.service.install(f.ctx, { ...actionInput, target: input.target }),
+    ).rejects.toThrow();
+    await expect(
+      f.service.install(f.ctx, {
+        ...actionInput,
+        permissions: ['orders.shipping-method.write'],
+      }),
+    ).rejects.toThrow();
+  });
+  it('requires verified grants and rechecks revocation before PATCH', async () => {
+    const f = fixture();
+    f.verify.mockResolvedValue([
+      'orders.shipping-method.read',
+      'orders.shipping-method.write',
+    ]);
+    const connection = await f.service.install(f.ctx, actionInput);
+    const fetch = vi.fn<typeof globalThis.fetch>(async () => {
+      await f.service.disconnect(f.ctx, connection.id, 2, 'revoked');
+      return Response.json({
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-000000000010',
+        shippingMethodId: 'aaaaaaaa-aaaa-4aaa-8aaa-000000000007',
+        isCancelled: false,
+      });
+    });
+    const runtime = createInstalledRuntime({
+      installations: f.service,
+      fetch,
+      record: vi.fn(),
+      recordObservations: vi.fn(),
+      approveJtlEndpoint: vi.fn(),
+    });
+    expect(await runtime.discover(f.ctx, connection.id)).toEqual([]);
+    await f.service.check(f.ctx, connection.id, 1);
+    expect(
+      (await runtime.discover(f.ctx, connection.id)).map((c) => c.capability),
+    ).toEqual(actionInput.permissions);
+    const ref = (externalId: string) => ({ externalId, scopeKey: '' });
+    expect(
+      await runtime.write(f.ctx, {
+        connectionId: connection.id,
+        capability: 'orders.shipping-method.write',
+        version: '0',
+        idempotencyKey: 'key',
+        input: {
+          order: ref('aaaaaaaa-aaaa-4aaa-8aaa-000000000010'),
+          expectedShippingMethod: ref('aaaaaaaa-aaaa-4aaa-8aaa-000000000007'),
+          shippingMethod: ref('aaaaaaaa-aaaa-4aaa-8aaa-000000000008'),
+        },
+      }),
+    ).toMatchObject({
+      ok: false,
+      error: { code: 'unavailable', effect: 'none' },
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch.mock.calls[0]?.[1]?.method).toBe('GET');
+  });
 });

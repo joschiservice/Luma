@@ -17,6 +17,7 @@ export type {
   InventorySnapshot,
   FulfillmentSnapshot,
   ProductSnapshot,
+  ShippingMethodSnapshot,
   WriteReceipt,
   CapabilityContract,
   Capability,
@@ -43,6 +44,7 @@ export type {
 } from './application/capabilities.js';
 export type {
   InstalledConnection,
+  InstallationCapability,
   InstallationTarget,
 } from './domain/installation.js';
 export type ConnectionManagement = Omit<

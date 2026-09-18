@@ -89,9 +89,9 @@ export function createShopifyConnector(
   const now = options.now ?? (() => new Date());
   const id = options.id ?? randomUUID;
 
-  function handler<K extends ReadCapability>(
-    capability: K,
-  ): CapabilityHandler<K> {
+  function handler<
+    K extends Exclude<ReadCapability, 'orders.shipping-method.read'>,
+  >(capability: K): CapabilityHandler<K> {
     return {
       descriptor: {
         version: '0',

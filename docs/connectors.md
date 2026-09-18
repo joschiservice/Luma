@@ -26,6 +26,8 @@ Decimals are strings with at most fourteen integer and six fractional digits. Pr
 
 Read results contain observations and pagination metadata. `nextCursor` is opaque and bound to the connection and query. `completeness: complete` means the requested page is fully represented; only a successful scan of every page establishes collection completeness. A failed scan, filtered query or partial page cannot establish deletion. Tombstones are explicit. Each observation includes source identity, observation ID/time, source revision/time, adapter version and schema version. Persist observations with stable ingestion keys before canonical projection; never overwrite absent fields from a partial provider event.
 
+Two additional JTL capabilities support shipping-method correction: `orders.shipping-method.read` reads one order's method with `{ order, limit: 1 }`; `orders.shipping-method.write` accepts the order, expected current method and replacement method. See the [JTL action guide](jtl.md#shipping-method-correction) for permission setup, verification and reversal.
+
 ## Implement an adapter
 
 Implement a `ConnectorConnection` with current tenant/connection identity, state, provider, adapter version, executor provenance and a partial capability-handler map. Each handler supplies:
@@ -60,7 +62,7 @@ Supply `runtime.effects(binding)` as an `EffectRegistry` to the existing executi
 
 The bridge carries minimum risk and executor/mechanism provenance to execution. Execution owns policy, approval, durable reservation, audit and verification. Inject the low-level `write` port only into trusted execution adapters, never HTTP handlers or workflow activities. A write requires a nonempty idempotency key; possession of that key is not authorization. The SDK does not persist reservations or authorize direct writes.
 
-Adapters must enforce expected revisions atomically with the provider effect. Namespace provider keys by tenant and connection and bind them to immutable intent. `provider_key` means the provider deduplicates that key; `conditional_write` means an atomic precondition prevents unsafe replay; `none` promises neither. The sample deduplication is in-memory and survives only its instance.
+Capabilities that accept expected revisions must enforce them atomically with the provider effect. The JTL shipping-method capability accepts an expected field value instead; its documented preflight comparison is not atomic and requires controlled order processing. Namespace provider keys by tenant and connection and bind them to immutable intent. `provider_key` means the provider deduplicates that key; `conditional_write` means an atomic precondition prevents unsafe replay; `none` promises neither. The sample deduplication is in-memory and survives only its instance.
 
 A receipt means accepted, not verified success. `verify` must read authoritative state and persist fresh observation evidence, then check the proposal's expected postcondition. It must never write. The existing execution service handles verification freshness and ambiguous attempts. API and browser implementations satisfy the same handler and effect interfaces; mechanism metadata exists for audit and risk, not consumer branching.
 

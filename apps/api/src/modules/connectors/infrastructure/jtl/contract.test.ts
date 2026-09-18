@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { cloudPayload } from './fixtures/cloud.js';
+import {
+  shippingMethodState,
+  shippingMethodResponse,
+} from './shipping-method.js';
 import { API_VERSION } from './client.js';
 import * as s from './schemas.js';
 import api from './fixtures/erp-2.2.json' with { type: 'json' };
@@ -13,6 +17,7 @@ type Schema = {
   required?: string[];
   items?: Schema;
 };
+const cloudIdForContract = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000010';
 const schemas: Record<string, Schema> = api.schemas;
 function resolve(schema: Schema): Schema {
   if (!schema.$ref) return schema;
@@ -51,6 +56,33 @@ function response(path: keyof typeof api.paths, list = false): Schema {
 }
 
 describe('JTL 2.2 published contract', () => {
+  it('pins the shipping-method PATCH, authoritative read and provider idempotency header', () => {
+    validate(
+      shippingMethodState.parse({
+        id: cloudIdForContract,
+        shippingMethodId: cloudIdForContract,
+        isCancelled: false,
+      }),
+      response('/v2/sales-orders/{salesOrderId}'),
+    );
+    validate(
+      { shippingMethodId: cloudIdForContract, disableAutomaticWorkflows: true },
+      api.shippingMethodWrite.request,
+    );
+    validate(
+      shippingMethodResponse.parse({ salesOrderId: cloudIdForContract }),
+      api.shippingMethodWrite.response,
+    );
+    expect(api.shippingMethodWrite.parameters).toContainEqual({
+      name: 'Idempotency-Key',
+      in: 'header',
+    });
+    expect(
+      api.shippingMethodWrite.parameters.some(
+        (p) => p.name.toLowerCase() === 'if-match',
+      ),
+    ).toBe(false);
+  });
   it('pins the schema version and validates the consumed response projections', () => {
     expect(api.version).toBe(API_VERSION);
     validate(
