@@ -148,9 +148,9 @@ it('registers, creates EU workspaces, restores links, switches tabs and revokes 
   await page.keyboard.press('Enter');
   await page.getByRole('dialog').waitFor();
   await page.keyboard.press('Escape');
-  expect(
-    await menu.evaluate((element) => element === document.activeElement),
-  ).toBe(true);
+  await expect
+    .poll(() => menu.evaluate((element) => element === document.activeElement))
+    .toBe(true);
   await menu.click();
   await page
     .getByRole('dialog')

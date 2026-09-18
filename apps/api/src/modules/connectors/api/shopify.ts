@@ -7,7 +7,7 @@ import type { ShopifyOAuth } from '#modules/connectors/application/shopify';
 export function registerShopifyRoutes(
   app: FastifyInstance,
   oauth?: ShopifyOAuth,
-  identity?: IdentityService,
+  identity?: Pick<IdentityService, 'resolveTenant'>,
 ) {
   app.get('/v1/shopify/callback', async (request, reply) => {
     if (!oauth || !identity)
@@ -18,13 +18,13 @@ export function registerShopifyRoutes(
       );
     const query = request.url.split('?')[1] ?? '';
     const tenant = oauth.callbackTenant(query);
-    const context = await identity.resolveTenant(
-      request.headers.cookie ? { cookie: request.headers.cookie } : {},
-      tenant,
-      request.id,
-    );
     let result: string;
     try {
+      const context = await identity.resolveTenant(
+        request.headers.cookie ? { cookie: request.headers.cookie } : {},
+        tenant,
+        request.id,
+      );
       result = await oauth.callback(context, query);
     } catch {
       result = 'failed';
