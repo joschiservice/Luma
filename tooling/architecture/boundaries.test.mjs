@@ -209,6 +209,18 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
       ),
       invalid(moduleFile('orders'), 'const adapter = import(name);'),
       invalid(moduleFile('orders'), "import x from '#internal/orders';"),
+      ...['ts', 'tsx', 'mts', 'cts', 'js', 'jsx', 'mjs', 'cjs'].flatMap(
+        (extension) => [
+          invalid(
+            moduleFile('identity'),
+            `import type { TenantContext } from '#modules/identity/domain/context.${extension}';`,
+          ),
+          invalid(
+            filename('apps/api/src/app.test.ts'),
+            `import { detectionFixtures } from '#test-support/detection-fixtures.${extension}';`,
+          ),
+        ],
+      ),
       invalid(
         moduleFile('orders'),
         "import x from '#modules/orders/../inventory/index';",

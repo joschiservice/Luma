@@ -20,7 +20,8 @@ function apiImportTarget(specifier) {
       continue;
     if (
       prefix !== null &&
-      (!/^[\w./-]+$/.test(subpath) ||
+      (codeExtension.test(subpath) ||
+        !/^[\w./-]+$/.test(subpath) ||
         subpath
           .split('/')
           .some((part) => ['', '.', '..', 'node_modules'].includes(part)))
