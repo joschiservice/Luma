@@ -12,6 +12,8 @@ import { createShopifyConnector } from '#modules/connectors/infrastructure/shopi
 import type { ShopifyEvidence } from '#modules/connectors/infrastructure/shopify/adapter';
 import { createJtlConnector } from '#modules/connectors/infrastructure/jtl/adapter';
 import type { JtlEvidence } from '#modules/connectors/infrastructure/jtl/adapter';
+import { approvedJtlFetch } from '#modules/connectors/infrastructure/approved-jtl-fetch';
+import type { ApprovedJtlEndpoint } from '#modules/connectors/infrastructure/approved-jtl-fetch';
 
 export interface InstalledRuntimeOptions {
   installations: InstallationService;
@@ -19,6 +21,9 @@ export interface InstalledRuntimeOptions {
   recordObservations(evidence: ShopifyEvidence | JtlEvidence): Promise<void>;
   /** Enforce deployment-specific network allowlists before any JTL on-premise request. */
   approveJtlEndpoint(context: TenantContext, baseUrl: string): Promise<void>;
+  /** Use the same tenant-specific address pins as installation verification. */
+  jtlEndpoints: readonly ApprovedJtlEndpoint[];
+  /** Transport override for Shopify and JTL Cloud only. */
   fetch?: typeof globalThis.fetch;
 }
 export function createInstalledRuntime(options: InstalledRuntimeOptions) {
@@ -71,6 +76,28 @@ export function createInstalledRuntime(options: InstalledRuntimeOptions) {
             });
           return createJtlConnector({
             ...common,
+            ...(target.kind === 'jtl-onprem'
+              ? {
+                  fetch: async (
+                    ...args: Parameters<typeof globalThis.fetch>
+                  ) => {
+                    const endpoint = options.jtlEndpoints.find(
+                      (e) =>
+                        e.tenantId === context.tenantId &&
+                        e.baseUrl === target.baseUrl,
+                    );
+                    if (!endpoint)
+                      throw new ConnectorError({
+                        code: 'permission_denied',
+                        effect: 'none',
+                        retry: 'never',
+                      });
+                    return approvedJtlFetch(endpoint, {
+                      allowWrites: cap === 'orders.shipping-method.write',
+                    })(...args);
+                  },
+                }
+              : {}),
             shippingMethodActions: true,
             connection:
               target.kind === 'jtl-cloud'

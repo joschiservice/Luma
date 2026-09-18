@@ -10,25 +10,32 @@ export interface ApprovedJtlEndpoint {
 /** Pin the socket address while retaining TLS hostname verification for the approved API root. */
 export function approvedJtlFetch(
   endpoint: ApprovedJtlEndpoint,
+  options: { allowWrites?: boolean } = {},
 ): typeof globalThis.fetch {
   const base = new URL(endpoint.baseUrl);
   return async (input, init) => {
     const url = new URL(
       input instanceof Request ? input.url : input.toString(),
     );
+    const method = init?.method ?? 'GET';
     if (
       url.origin !== base.origin ||
       !url.pathname.startsWith(base.pathname) ||
       url.username ||
       url.password ||
-      (init?.method ?? 'GET') !== 'GET'
+      (method !== 'GET' &&
+        !(
+          options.allowWrites &&
+          method === 'PATCH' &&
+          typeof init?.body === 'string'
+        ))
     )
       throw new Error('JTL destination is not approved');
     return new Promise<Response>((resolve, reject) => {
       const req = request(
         url,
         {
-          method: 'GET',
+          method,
           headers: Object.fromEntries(new Headers(init?.headers)),
           signal: init?.signal ?? AbortSignal.timeout(15000),
           agent: false,
@@ -48,7 +55,7 @@ export function approvedJtlFetch(
             size += chunk.length;
             if (size > 1024 * 1024)
               response.destroy(
-                new Error('JTL response exceeds the verification limit'),
+                new Error('JTL response exceeds the size limit'),
               );
             else chunks.push(chunk);
           });
@@ -73,7 +80,7 @@ export function approvedJtlFetch(
         },
       );
       req.on('error', reject);
-      req.end();
+      req.end(method === 'PATCH' ? init?.body : undefined);
     });
   };
 }
