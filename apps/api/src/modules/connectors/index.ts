@@ -52,5 +52,5 @@ export type {
 } from '#modules/connectors/domain/installation';
 export type ConnectionManagement = Omit<
   import('#modules/connectors/application/installations').InstallationService,
-  'credential'
+  'credential' | 'recordFailure'
 >;

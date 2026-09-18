@@ -66,6 +66,8 @@ export function identityRoutes(service?: IdentityService) {
 }
 // Deliberate public surface: newly registered routes require tenant authorization.
 const publicRoutes = new Set([
+  'GET /v1/shopify/callback',
+  'POST /v1/shopify/uninstall/:organizationId/:connectionId',
   'GET /health',
   'GET /ready',
   'GET /openapi.json',

@@ -38,6 +38,7 @@ import Fastify, { LogController } from 'fastify';
 import type { FastifyServerOptions } from 'fastify';
 import {
   connectionRoutes,
+  registerShopifyRoutes,
   createConnectors,
   createInstalledConnections,
   createInstallationVerifier,
@@ -53,6 +54,7 @@ import { IdentityError } from '#modules/identity/index';
 import type { IdentityService } from '#modules/identity/index';
 
 export interface AppDependencies {
+  shopify?: import('#modules/connectors/composition').ShopifyOAuth;
   connections?: import('#modules/connectors/index').ConnectionManagement;
   modelGateway?: ModelGateway;
   identity?: IdentityService;
@@ -192,7 +194,10 @@ export function buildApp(
       apiContract,
       {
         identity: identityRoutes(dependencies.identity),
-        connections: connectionRoutes(dependencies.connections),
+        connections: connectionRoutes(
+          dependencies.connections,
+          dependencies.shopify,
+        ),
         system: {
           health: async () => ({ status: 200, body: { status: 'ok' } }),
           ready: async ({ request }) => {
@@ -247,6 +252,7 @@ export function buildApp(
       },
     );
   });
+  registerShopifyRoutes(app, dependencies.shopify, dependencies.identity);
   app.get('/openapi.json', async () => openApiDocument);
   return app;
 }
@@ -279,22 +285,27 @@ export function buildRuntimeApp(
           idle_in_transaction_session_timeout: 10000,
         })
       : undefined;
+  const installedConnections =
+    connections && typeof connections !== 'function' && connectionPool
+      ? createInstalledConnections(createTenantDatabase(connectionPool), {
+          ...connections,
+          refreshContext: identity.service.refreshContext,
+          verify: createInstallationVerifier({
+            jtlEndpoints: connections.jtlEndpoints,
+          }),
+        })
+      : undefined;
   const connectionService =
     typeof connections === 'function'
       ? connections(identity.service)
-      : connections && connectionPool
-        ? createInstalledConnections(createTenantDatabase(connectionPool), {
-            ...connections,
-            refreshContext: identity.service.refreshContext,
-            verify: createInstallationVerifier({
-              jtlEndpoints: connections.jtlEndpoints,
-            }),
-          })
-        : undefined;
+      : installedConnections;
   const app = buildApp(options, {
     ...(observability ? { observability } : {}),
     ...(modelGateway ? { modelGateway } : {}),
     ...(connectionService ? { connections: connectionService } : {}),
+    ...(installedConnections?.shopify
+      ? { shopify: installedConnections.shopify }
+      : {}),
     identity: identity.service,
     trustedOrigins: settings.trustedOrigins,
     checkReadiness: async () => {
@@ -309,6 +320,14 @@ export function buildRuntimeApp(
         await connectionPool.query(
           'SELECT id FROM connector_installations LIMIT 0',
         );
+        if (installedConnections?.shopify) {
+          await connectionPool.query(
+            'SELECT digest FROM shopify_oauth_states LIMIT 0',
+          );
+          await connectionPool.query(
+            'SELECT connection_id FROM shopify_installation_bindings LIMIT 0',
+          );
+        }
       }
       return true;
     },

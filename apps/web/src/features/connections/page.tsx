@@ -1,7 +1,8 @@
+import { ShopifyForm } from './shopify';
 import { useRef, useState } from 'react';
 import { useForm } from '@tanstack/react-form';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useParams } from '@tanstack/react-router';
+import { useParams, useSearch } from '@tanstack/react-router';
 import {
   installationInput,
   installationCredentials,
@@ -57,9 +58,22 @@ const statuses = {
 
 export function ConnectionsPage() {
   const { organizationId } = useParams({ from: '/app/$organizationId' });
-  return <Connections key={organizationId} organizationId={organizationId} />;
+  const { shopify } = useSearch({ from: '/app/$organizationId/connections' });
+  return (
+    <Connections
+      key={organizationId}
+      organizationId={organizationId}
+      shopifyResult={shopify}
+    />
+  );
 }
-export function Connections({ organizationId }: { organizationId: string }) {
+export function Connections({
+  organizationId,
+  shopifyResult,
+}: {
+  organizationId: string;
+  shopifyResult?: string | undefined;
+}) {
   const access = useQuery(contextOptions(organizationId));
   const query = useQuery(connectionsOptions(organizationId));
   const client = useQueryClient();
@@ -79,6 +93,17 @@ export function Connections({ organizationId }: { organizationId: string }) {
     <div className="connections-page">
       <p className="eyebrow">Exception Desk / Your systems</p>
       <h1>Connections</h1>
+      {shopifyResult ? (
+        <p role="status">
+          {shopifyResult === 'connected'
+            ? 'Shopify connected. Read access is ready.'
+            : shopifyResult === 'denied'
+              ? 'Shopify access was not approved. Connect again when ready.'
+              : shopifyResult === 'permissions'
+                ? 'Shopify needs attention. Confirm the requested permissions and reconnect.'
+                : 'Shopify authorization could not be completed. Connect again.'}
+        </p>
+      ) : null}
       <p className="desk-intro">
         Connect your commerce systems. See what Luma is permitted to read and
         change.
@@ -149,7 +174,9 @@ export function Connections({ organizationId }: { organizationId: string }) {
                   disabled={!canManage}
                   onClick={() => setProvider(kind)}
                 >
-                  Set up {providers[kind]}
+                  {kind === 'shopify'
+                    ? 'Connect Shopify'
+                    : `Set up ${providers[kind]}`}
                 </Button>
               </article>
             ))}
@@ -168,10 +195,13 @@ export function Connections({ organizationId }: { organizationId: string }) {
             Connect {provider ? providers[provider] : 'system'}
           </DialogTitle>
           <DialogDescription>
-            Use credentials issued for this account. Luma stores them securely
-            and never displays them again.
+            {provider === 'shopify'
+              ? 'Enter your shop hostname, then approve access in Shopify.'
+              : 'Use credentials issued for this account. Luma stores them securely and never displays them again.'}
           </DialogDescription>
-          {provider ? (
+          {provider === 'shopify' ? (
+            <ShopifyForm organizationId={organizationId} />
+          ) : provider ? (
             <SetupForm
               key={provider}
               provider={provider}
@@ -256,12 +286,16 @@ export function ConnectionCard({
       <p className="connection-target">{target}</p>
       <p>
         {terminal
-          ? 'Access stopped. Create a new installation to reconnect.'
+          ? connection.target.kind === 'shopify'
+            ? 'Access stopped. Reconnect Shopify to restore reads.'
+            : 'Access stopped. Create a new installation to reconnect.'
           : connection.status === 'active'
             ? 'Credentials and requested permissions validated. Observation freshness is unknown.'
             : connection.status === 'pending'
               ? 'Validate access before Luma can use this connection.'
-              : 'Check missing provider scopes, expired credentials or provider availability. Replace credentials if needed, then validate again.'}
+              : connection.target.kind === 'shopify'
+                ? 'Confirm the app permissions and reconnect Shopify to restore access.'
+                : 'Check missing provider scopes, expired credentials or provider availability. Replace credentials if needed, then validate again.'}
       </p>
       <h4>
         {permitted.some((p) => p.endsWith('.write'))
@@ -284,41 +318,63 @@ export function ConnectionCard({
           </li>
         ))}
       </ul>
+      {canManage && connection.target.kind === 'shopify' ? (
+        <Dialog>
+          <DialogTrigger render={<Button variant="outline" />}>
+            Reconnect Shopify
+          </DialogTrigger>
+          <DialogContent className="connection-dialog">
+            <DialogTitle>Reconnect Shopify</DialogTitle>
+            <DialogDescription>
+              Approve access again to restore this connection.
+            </DialogDescription>
+            <ShopifyForm
+              organizationId={organizationId}
+              shop={connection.target.shop}
+              label={connection.label}
+            />
+          </DialogContent>
+        </Dialog>
+      ) : null}
       {canManage && !terminal ? (
         <div className="connection-actions">
-          <Button disabled={pending} onClick={() => void run('check')}>
-            {pending ? 'Please wait…' : 'Validate access'}
-          </Button>
-          <Dialog
-            open={dialog === 'rotate'}
-            onOpenChange={(open) => setDialog(open ? 'rotate' : null)}
-          >
-            <DialogTrigger
-              render={<Button variant="outline" disabled={pending} />}
+          {connection.target.kind !== 'shopify' ? (
+            <Button disabled={pending} onClick={() => void run('check')}>
+              {pending ? 'Please wait…' : 'Validate access'}
+            </Button>
+          ) : null}
+          {connection.target.kind !== 'shopify' ? (
+            <Dialog
+              open={dialog === 'rotate'}
+              onOpenChange={(open) => setDialog(open ? 'rotate' : null)}
             >
-              Replace credentials
-            </DialogTrigger>
-            <DialogContent className="connection-dialog">
-              <DialogTitle>Replace credentials</DialogTitle>
-              <DialogDescription>
-                Current credentials will stop working in Luma. Reads and writes
-                pause until the replacement passes validation. The account and
-                endpoint stay the same.
-              </DialogDescription>
-              <SetupForm
-                provider={connection.target.kind}
-                organizationId={organizationId}
-                connection={connection}
-                done={async () => {
-                  setDialog(null);
-                  setMessage(
-                    'Credentials replaced. Validate access to restore capabilities.',
-                  );
-                  await refresh();
-                }}
-              />
-            </DialogContent>
-          </Dialog>
+              <DialogTrigger
+                render={<Button variant="outline" disabled={pending} />}
+              >
+                Replace credentials
+              </DialogTrigger>
+              <DialogContent className="connection-dialog">
+                <DialogTitle>Replace credentials</DialogTitle>
+                <DialogDescription>
+                  Current credentials will stop working in Luma. Reads and
+                  writes pause until the replacement passes validation. The
+                  account and endpoint stay the same.
+                </DialogDescription>
+                <SetupForm
+                  provider={connection.target.kind}
+                  organizationId={organizationId}
+                  connection={connection}
+                  done={async () => {
+                    setDialog(null);
+                    setMessage(
+                      'Credentials replaced. Validate access to restore capabilities.',
+                    );
+                    await refresh();
+                  }}
+                />
+              </DialogContent>
+            </Dialog>
+          ) : null}
           <Dialog
             open={dialog === 'disconnect'}
             onOpenChange={(open) => {
@@ -339,7 +395,9 @@ export function ConnectionCard({
                 Luma will delete stored credentials and stop new reads and
                 writes. Requests already sent may finish. This does not revoke
                 the provider token; revoke it with the provider if needed.
-                Reconnecting requires a new installation.
+                {connection.target.kind === 'shopify'
+                  ? 'Use Reconnect Shopify to restore access.'
+                  : 'Reconnecting requires a new installation.'}
               </DialogDescription>
               <div className="connection-actions">
                 <Button

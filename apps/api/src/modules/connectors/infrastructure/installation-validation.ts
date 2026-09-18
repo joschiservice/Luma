@@ -52,6 +52,18 @@ export const installationCredentials = z
     challengeCode: header.refine((s) => s.length <= 30).optional(),
   })
   .strict();
+export const storedCredentials = installationCredentials.extend({
+  shopify: z
+    .object({
+      app: z.string().min(1),
+      refreshToken: header,
+      expiresAt: z.string().datetime(),
+      refreshExpiresAt: z.string().datetime(),
+      scopes: z.array(z.string()),
+    })
+    .strict()
+    .optional(),
+});
 export const installationInput = z
   .object({
     label: z.string().trim().min(1).max(120),

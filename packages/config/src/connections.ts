@@ -1,3 +1,5 @@
+import { readShopifyConfig } from './shopify.js';
+import type { ShopifyConfig } from './shopify.js';
 import { isIP } from 'node:net';
 
 export interface JtlEndpoint {
@@ -6,6 +8,7 @@ export interface JtlEndpoint {
   addresses: string[];
 }
 export interface ConnectionsConfig {
+  shopify?: ShopifyConfig;
   activeKeyId: string;
   keys: ReadonlyMap<string, Uint8Array>;
   jtlEndpoints: JtlEndpoint[];
@@ -15,6 +18,9 @@ export interface ConnectionsConfig {
 export function readConnectionsConfig(
   env: Readonly<Record<string, string | undefined>>,
 ): ConnectionsConfig | undefined {
+  const shopify = readShopifyConfig(env);
+  if (shopify && !env.CONNECTIONS_KEYS)
+    throw new Error('Shopify requires connection encryption keys');
   if (!env.CONNECTIONS_KEYS && !env.CONNECTIONS_ACTIVE_KEY_ID) return undefined;
   const invalid = () =>
     new Error(
@@ -97,5 +103,5 @@ export function readConnectionsConfig(
       addresses: [...entry.addresses],
     });
   }
-  return { activeKeyId, keys, jtlEndpoints };
+  return { activeKeyId, keys, jtlEndpoints, ...(shopify ? { shopify } : {}) };
 }

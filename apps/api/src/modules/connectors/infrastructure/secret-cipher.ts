@@ -1,6 +1,6 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import type { SecretCipher } from '#modules/connectors/application/installations';
-import { installationCredentials } from '#modules/connectors/infrastructure/installation-validation';
+import { storedCredentials } from '#modules/connectors/infrastructure/installation-validation';
 
 /** Keys are supplied by the deployment secret manager and never stored with ciphertext. */
 export function createSecretCipher(
@@ -49,7 +49,7 @@ export function createSecretCipher(
         const decipher = createDecipheriv('aes-256-gcm', key, iv);
         decipher.setAAD(Buffer.from(binding));
         decipher.setAuthTag(tag);
-        return installationCredentials.parse(
+        return storedCredentials.parse(
           JSON.parse(
             Buffer.concat([
               decipher.update(Buffer.from(envelope.ciphertext, 'base64')),

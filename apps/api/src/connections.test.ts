@@ -677,3 +677,21 @@ describe('installed JTL address pins', () => {
     expect(genericFetch).not.toHaveBeenCalled();
   });
 });
+
+it('records Shopify authorization failures without overwriting newer credentials', async () => {
+  const f = fixture();
+  const installed = await f.service.install(f.ctx, input);
+  await f.service.check(f.ctx, installed.id, 1);
+  await f.service.rotate(f.ctx, installed.id, 2, { token: 'new-token' });
+  await f.service.check(f.ctx, installed.id, 3);
+  await f.service.recordFailure(f.ctx, installed.id, 1, 'authentication');
+  expect((await f.service.list(f.ctx))[0]!.status).toBe('active');
+  await f.service.recordFailure(f.ctx, installed.id, 2, 'permission_denied');
+  expect((await f.service.list(f.ctx))[0]!.status).toBe('degraded');
+  await f.service.check(f.ctx, installed.id, 5);
+  await f.service.recordFailure(f.ctx, installed.id, 2, 'authentication');
+  expect((await f.service.list(f.ctx))[0]!.status).toBe('revoked');
+  await expect(
+    f.service.credential(f.ctx, installed.id, 'products.read'),
+  ).rejects.toThrow();
+});

@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
+import { parseEnv } from 'node:util';
 import { join } from 'node:path';
 import { root, run } from './process.mjs';
 
@@ -99,7 +100,19 @@ export async function environment(saved, workflows = false) {
     throw new Error('PostgreSQL has no published port. Run pnpm run setup.');
   const database = (user, password) =>
     `postgresql://${user}:${password}@127.0.0.1:${dbPort}/luma`;
-  const webOrigin = `http://127.0.0.1:${saved.webPort}`;
+  let apiEnv = {};
+  try {
+    apiEnv = parseEnv(await readFile(join(root, 'apps/api/.env'), 'utf8'));
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+  const localOrigin = `http://127.0.0.1:${saved.webPort}`;
+  const webOrigin = apiEnv.SHOPIFY_WEB_ORIGIN || localOrigin;
+  if (
+    new URL(webOrigin).origin !== webOrigin ||
+    !['http:', 'https:'].includes(new URL(webOrigin).protocol)
+  )
+    throw new Error('SHOPIFY_WEB_ORIGIN must be an exact HTTP origin');
   const generated = {
     CONNECTIONS_ACTIVE_KEY_ID: 'local',
     CONNECTIONS_KEYS: JSON.stringify({ local: await connectionKey() }),
@@ -112,7 +125,8 @@ export async function environment(saved, workflows = false) {
     BETTER_AUTH_SECRET: saved.authSecret,
     BETTER_AUTH_COOKIE_PREFIX: project,
     BETTER_AUTH_URL: webOrigin,
-    AUTH_TRUSTED_ORIGINS: webOrigin,
+    AUTH_TRUSTED_ORIGINS: [...new Set([webOrigin, localOrigin])].join(','),
+    __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS: new URL(webOrigin).hostname,
     TEMPORAL_NAMESPACE: 'default',
     TEMPORAL_TASK_QUEUE: 'luma-exceptions-v1',
     TEMPORAL_DATA_REGION: 'EU',

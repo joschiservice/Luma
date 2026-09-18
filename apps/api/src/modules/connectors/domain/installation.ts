@@ -7,6 +7,15 @@ export type InstallationTarget =
   | { kind: 'jtl-onprem'; baseUrl: string; appId: string; appVersion: string };
 export type InstallationCredentials = {
   token: string;
+  shopify?:
+    | {
+        app: string;
+        refreshToken: string;
+        expiresAt: string;
+        refreshExpiresAt: string;
+        scopes: string[];
+      }
+    | undefined;
   challengeCode?: string | undefined;
 };
 export type InstallationInput = {
