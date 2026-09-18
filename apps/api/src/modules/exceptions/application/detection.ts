@@ -206,6 +206,13 @@ export function createDetectionService(
         now: clock,
       });
     },
+    async get(context: TenantContext, incidentId: string) {
+      requireTenant(context, context.tenantId);
+      return (
+        (await repository.get(context.tenantId, boundary.id(incidentId)))
+          ?.incident ?? null
+      );
+    },
     list(context: TenantContext) {
       requireTenant(context, context.tenantId);
       return repository.list(context.tenantId);

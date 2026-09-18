@@ -9,7 +9,7 @@ The exceptions module produces versioned investigations from detection's immutab
 3. A worker calls `diagnoses.run(context, exceptionId)`. The engine assembles deterministic facts, constraints, possible causes, impact and next steps for all four taxonomy classes.
 4. Read the persisted result. `history` retains earlier revisions with `superseded: true`. The worker cannot publish over a newer revision or a resolved incident.
 
-The durable runtime in LUMA-29 owns scheduling and authorization refresh. LUMA-32 owns HTTP routes; LUMA-21 consumes structured fields rather than interpreting prose. Apply migration `0005_exception_diagnosis.sql` with the normal migration command. Existing incidents acquire pending diagnoses on their next detection evaluation.
+The [durable runtime](exception-workflows.md) owns scheduling and authorization refresh. LUMA-32 owns HTTP routes; LUMA-21 consumes structured fields rather than interpreting prose. Apply migration `0005_exception_diagnosis.sql` with the normal migration command. Existing incidents acquire pending diagnoses on their next detection evaluation.
 
 ## Results and lifecycle
 

@@ -117,7 +117,7 @@ The [connector SDK guide](docs/connectors.md) defines typed capability inputs/ou
 
 [ADR-004](docs/architecture/004-browser-runtime.md) proposes Browserbase for V0 browser execution, Playwright/CDP as the portability boundary and Anchor for BYOC/on-prem needs. It specifies the minimal runtime contract and validation required by the first browser-backed workflow.
 
-The [execution guide](docs/execution.md) covers policy checks, approval, tenant-scoped idempotency, durable attempts, verification and append-only audit evidence. Workflow activities use the execution service for connector writes.
+The [execution guide](docs/execution.md) covers policy checks, approval, tenant-scoped idempotency, durable attempts, verification and append-only audit evidence. Workflow activities use the execution service for connector writes. The [Temporal runtime guide](docs/exception-workflows.md) covers worker startup, durable approvals, progress and recovery.
 
 ## UI workshop
 

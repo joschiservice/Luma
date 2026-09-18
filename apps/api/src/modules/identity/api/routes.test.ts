@@ -87,7 +87,7 @@ function fixture() {
       router,
     );
   });
-  return { app, tx, getSession };
+  return { app, tx, getSession, service };
 }
 
 it.each(['context', 'members'])(
@@ -180,3 +180,33 @@ it.each(['revoked', 'demoted', 'suspended'] as const)(
     expect(tx.updateMember).not.toHaveBeenCalled();
   },
 );
+
+it('rehydrates workflow identity from current membership without a serialized session', async () => {
+  const { service, tx, getSession } = fixture();
+  const context = await service.resolveWorkflowContext(
+    owner.userId,
+    organization.id,
+    'workflow-request',
+  );
+  expect(context.actor.role).toBe('owner');
+  expect(context.actor.sessionId).toBe('workflow:workflow-request');
+  expect(getSession).not.toHaveBeenCalled();
+  tx.findMembership.mockResolvedValue({ ...owner, role: 'member' });
+  expect(
+    (
+      await service.resolveWorkflowContext(
+        owner.userId,
+        organization.id,
+        'workflow-request',
+      )
+    ).actor.role,
+  ).toBe('member');
+  tx.findMembership.mockResolvedValue(null);
+  await expect(
+    service.resolveWorkflowContext(
+      owner.userId,
+      organization.id,
+      'workflow-request',
+    ),
+  ).rejects.toThrow('Organization not found');
+});
