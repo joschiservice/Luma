@@ -10,17 +10,18 @@
     "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
+    "@luma/api-contract": "workspace:*",
     "@luma/ui": "workspace:*",
     "@tanstack/react-form": "1.33.5",
     "@tanstack/react-query": "5.103.0",
     "@tanstack/react-router": "^1.168.0",
     "@tanstack/react-router-ssr-query": "1.167.2",
     "@tanstack/react-start": "1.168.54",
+    "better-auth": "1.7.5",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "ts-pattern": "5.9.0",
-    "zod": "4.6.5",
-    "@luma/api-contract": "workspace:*"
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",

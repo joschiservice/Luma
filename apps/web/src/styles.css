@@ -54,3 +54,351 @@ footer {
   padding-top: 24px;
   border-top: 1px solid var(--border);
 }
+
+/* Application layouts share the UI package's paper and forest palette. */
+a {
+  text-underline-offset: 4px;
+}
+a:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 5px;
+}
+button,
+input,
+label,
+p,
+summary,
+nav,
+.action-link {
+  font-family: var(--font-sans);
+}
+.wordmark {
+  text-decoration: none;
+  font-family: var(--font-heading);
+}
+h2 {
+  font-family: var(--font-heading);
+  font-size: clamp(28px, 3vw, 38px);
+  font-weight: normal;
+  line-height: 1.15;
+}
+p {
+  line-height: 1.65;
+}
+.action-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 30px;
+  padding: 14px 20px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-radius: var(--radius);
+  text-decoration: none;
+  font-size: 14px;
+}
+.landing-actions {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  margin-top: 30px;
+}
+.auth-page {
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  padding: 0;
+}
+.auth-story {
+  padding: clamp(32px, 5vw, 80px);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  display: flex;
+  flex-direction: column;
+}
+.auth-story .eyebrow {
+  margin-top: 110px;
+  color: var(--border);
+}
+.auth-story h1 {
+  font-size: clamp(48px, 5.6vw, 84px);
+}
+.auth-story .wordmark span {
+  color: #efa77b;
+}
+.folio {
+  font: 11px var(--font-sans);
+  letter-spacing: 0.15em;
+  margin-top: auto;
+  padding-top: 90px;
+}
+.auth-panel {
+  width: min(100%, 490px);
+  padding: 70px 40px;
+  margin: auto;
+}
+.auth-panel h2 {
+  margin: 14px 0 30px;
+}
+.auth-panel > p:last-child {
+  font-size: 14px;
+  margin-top: 28px;
+}
+.form-field {
+  margin-bottom: 20px;
+}
+.form-field label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.field-help {
+  font-size: 13px;
+  margin: 5px 0;
+  min-height: 8px;
+  color: var(--muted-foreground);
+}
+[aria-invalid='true'] + .field-help {
+  color: var(--destructive);
+}
+.form-message {
+  font-size: 14px;
+}
+.workspace-page {
+  max-width: 1100px;
+  margin: auto;
+}
+.workspace-page header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 80px;
+}
+.workspace-page h1,
+.status-page h1 {
+  font-size: clamp(40px, 5vw, 66px);
+}
+.workspace-page > .action-link {
+  align-self: flex-start;
+}
+.workspace-list {
+  padding: 0;
+  list-style: none;
+  margin: 32px 0;
+}
+.workspace-list a {
+  display: flex;
+  justify-content: space-between;
+  padding: 24px;
+  border-top: 1px solid var(--border);
+  text-decoration: none;
+  font-size: 24px;
+}
+.workspace-list a:hover {
+  background: var(--secondary);
+}
+.creation-panel {
+  max-width: 560px;
+}
+.creation-panel form {
+  margin: 30px 0;
+}
+.status-page {
+  align-items: flex-start;
+  gap: 20px;
+}
+.desk {
+  display: flex;
+  min-height: 100svh;
+}
+.desk-sidebar {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  width: 244px;
+  padding: 38px 26px;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+.desk-sidebar .wordmark span {
+  color: #efa77b;
+}
+.desk-sidebar .eyebrow {
+  font-size: 10px;
+  margin: 10px 0 60px;
+  color: var(--border);
+}
+.desk nav {
+  display: grid;
+  gap: 8px;
+}
+.desk nav a {
+  padding: 13px 16px;
+  text-decoration: none;
+  border-radius: 4px;
+  font-size: 14px;
+}
+.desk-sidebar nav a.active {
+  background: #315448;
+}
+.sidebar-note {
+  margin-top: auto;
+  padding-top: 80px;
+  font-family: var(--font-heading);
+  font-size: 24px;
+  color: var(--border);
+}
+.desk-body {
+  flex: 1;
+  min-width: 0;
+}
+.desk-header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 26px 40px;
+  min-height: 96px;
+  border-bottom: 1px solid var(--border);
+}
+.account-menu {
+  margin-left: auto;
+  position: relative;
+  font-size: 14px;
+}
+summary {
+  cursor: pointer;
+  padding: 8px 0;
+}
+.account-menu > a,
+.switcher-options {
+  position: absolute;
+  z-index: 10;
+  padding: 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 20px #193e3410;
+  min-width: 180px;
+}
+.account-menu > a {
+  right: 0;
+}
+.workspace-switcher {
+  position: relative;
+  font-size: 14px;
+  max-width: min(60%, 340px);
+  overflow-wrap: anywhere;
+}
+.switcher-options {
+  display: grid;
+  gap: 14px;
+  width: max-content;
+  max-width: 300px;
+}
+.desk-content {
+  min-height: auto;
+  padding: clamp(32px, 5vw, 76px);
+  display: block;
+}
+.desk-content h1 {
+  font-size: clamp(46px, 5.4vw, 80px);
+  margin: 36px 0 24px;
+}
+.desk-content h1 em {
+  font-style: normal;
+  color: var(--brand);
+}
+.desk-intro {
+  font-size: 17px;
+  color: var(--muted-foreground);
+}
+.next-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 30px;
+  border-top: 1px solid var(--border);
+  margin-top: 60px;
+  padding-top: 34px;
+  max-width: 780px;
+}
+.next-step h2 {
+  margin: 12px 0;
+}
+.next-step .action-link {
+  margin-top: 16px;
+}
+.step-number {
+  color: var(--brand);
+  font: 18px var(--font-heading);
+  padding-top: 5px;
+}
+.mobile-nav {
+  display: none;
+}
+.skip-link {
+  position: fixed;
+  left: 16px;
+  top: -100px;
+  z-index: 100;
+  padding: 14px;
+  background: var(--card);
+}
+.skip-link:focus {
+  top: 10px;
+}
+.navigation-drawer nav {
+  display: grid;
+  gap: 20px;
+}
+@media (max-width: 760px) {
+  .auth-page {
+    display: block;
+  }
+  .auth-story {
+    padding: 24px;
+  }
+  .auth-story .eyebrow,
+  .auth-story h1,
+  .auth-story > p:not(.wordmark),
+  .folio {
+    display: none;
+  }
+  .auth-panel {
+    padding: 40px 24px;
+  }
+  .desk-sidebar {
+    display: none;
+  }
+  .mobile-nav {
+    display: block;
+  }
+  .desk-header {
+    padding: 16px;
+    gap: 14px;
+  }
+  .desk-content {
+    padding: 34px 24px;
+  }
+  .account-menu summary {
+    max-width: 100px;
+    overflow-wrap: anywhere;
+  }
+  .workspace-page header {
+    margin-bottom: 48px;
+  }
+  .next-step {
+    margin-top: 38px;
+    gap: 16px;
+  }
+}
+.navigation-drawer {
+  top: 0;
+  left: 0;
+  width: min(320px, calc(100vw - 32px));
+  height: 100dvh;
+  max-height: 100dvh;
+  transform: none;
+  translate: none;
+  border-radius: 0;
+  align-content: start;
+}

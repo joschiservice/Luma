@@ -1,0 +1,119 @@
+import { createAuthClient } from 'better-auth/client';
+import { queryOptions, type QueryClient } from '@tanstack/react-query';
+import { z } from 'zod';
+import { createWebApiClient } from '../../lib/api-client';
+
+export const auth = createAuthClient({
+  basePath: '/api/auth',
+  fetchOptions: { retry: 0 },
+});
+const api = createWebApiClient();
+export const sessionKey = ['private', 'session'] as const;
+export class IdentityError extends Error {
+  constructor(public status: number) {
+    super('Identity request failed');
+  }
+}
+export function returnPath(value: unknown): string {
+  if (typeof value !== 'string' || /[\\\s%]/.test(value)) return '/app';
+  try {
+    const url = new URL(value, 'https://luma.invalid');
+    if (
+      !value.startsWith('/') ||
+      url.origin !== 'https://luma.invalid' ||
+      !(url.pathname === '/app' || url.pathname.startsWith('/app/'))
+    )
+      return '/app';
+    return url.pathname + url.search + url.hash;
+  } catch {
+    return '/app';
+  }
+}
+export const authSearch = z.object({
+  returnTo: z.unknown().optional().transform(returnPath),
+});
+export const workspaceName = z
+  .string()
+  .trim()
+  .min(1, 'Enter a workspace name.')
+  .max(200, 'Use 200 characters or fewer.');
+export function organizationSlug(name: string) {
+  const stem =
+    name
+      .normalize('NFKD')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 70)
+      .replace(/-$/, '') || 'workspace';
+  return `${stem}-${crypto.randomUUID().slice(0, 8)}`;
+}
+export async function clearPrivate(
+  client: QueryClient,
+  organizationId?: string,
+) {
+  const queryKey = organizationId
+    ? ['private', 'organization', organizationId]
+    : ['private'];
+  await client.cancelQueries({ queryKey });
+  client.removeQueries({ queryKey });
+}
+const privateOptions = {
+  staleTime: 0,
+  gcTime: 0,
+  retry: false,
+  refetchOnMount: 'always',
+  refetchOnWindowFocus: 'always',
+} as const;
+export const sessionOptions = () =>
+  queryOptions({
+    ...privateOptions,
+    queryKey: sessionKey,
+    queryFn: async ({ signal }) => {
+      const result = await auth.getSession({
+        fetchOptions: { signal, cache: 'no-store' },
+      });
+      if (result.error) throw new IdentityError(result.error.status);
+      return result.data
+        ? { user: { id: result.data.user.id, name: result.data.user.name } }
+        : null;
+    },
+  });
+export const organizationsOptions = () =>
+  queryOptions({
+    ...privateOptions,
+    queryKey: ['private', 'organizations'],
+    queryFn: async ({ signal }) => {
+      const result = await api.identity.listOrganizations({
+        fetchOptions: { signal, cache: 'no-store' },
+      });
+      if (result.status !== 200) throw new IdentityError(result.status);
+      return result.body.items;
+    },
+  });
+export const contextOptions = (organizationId: string) =>
+  queryOptions({
+    ...privateOptions,
+    queryKey: ['private', 'organization', organizationId, 'context'],
+    queryFn: async ({ signal }) => {
+      if (!z.uuid().safeParse(organizationId).success)
+        throw new IdentityError(404);
+      const result = await api.identity.context({
+        params: { organizationId },
+        fetchOptions: { signal, cache: 'no-store' },
+      });
+      if (result.status !== 200) throw new IdentityError(result.status);
+      return result.body;
+    },
+  });
+export async function createOrganization(name: string) {
+  const result = await api.identity.createOrganization({
+    body: {
+      name: workspaceName.parse(name),
+      slug: organizationSlug(name),
+      dataRegion: 'EU',
+    },
+  });
+  if (result.status !== 201) throw new IdentityError(result.status);
+  return result.body;
+}

@@ -10,33 +10,174 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppRouteImport } from './routes/app'
+import { Route as SignInRouteImport } from './routes/sign-in'
+import { Route as SignOutRouteImport } from './routes/sign-out'
+import { Route as SignUpRouteImport } from './routes/sign-up'
+import { Route as AppIndexRouteImport } from './routes/app.index'
+import { Route as AppOrganizationIdRouteImport } from './routes/app.$organizationId'
+import { Route as AppOrganizationIdConnectionsRouteImport } from './routes/app.$organizationId.connections'
+import { Route as AppOrganizationIdExceptionsRouteImport } from './routes/app.$organizationId.exceptions'
+import { Route as AppOrganizationIdOverviewRouteImport } from './routes/app.$organizationId.overview'
+import { Route as AppWorkspacesIndexRouteImport } from './routes/app.workspaces.index'
+import { Route as AppWorkspacesNewRouteImport } from './routes/app.workspaces.new'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppRoute = AppRouteImport.update({
+  id: '/app',
+  path: '/app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignInRoute = SignInRouteImport.update({
+  id: '/sign-in',
+  path: '/sign-in',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignOutRoute = SignOutRouteImport.update({
+  id: '/sign-out',
+  path: '/sign-out',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignUpRoute = SignUpRouteImport.update({
+  id: '/sign-up',
+  path: '/sign-up',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppIndexRoute = AppIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppOrganizationIdRoute = AppOrganizationIdRouteImport.update({
+  id: '/$organizationId',
+  path: '/$organizationId',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppOrganizationIdConnectionsRoute =
+  AppOrganizationIdConnectionsRouteImport.update({
+    id: '/connections',
+    path: '/connections',
+    getParentRoute: () => AppOrganizationIdRoute,
+  } as any)
+const AppOrganizationIdExceptionsRoute =
+  AppOrganizationIdExceptionsRouteImport.update({
+    id: '/exceptions',
+    path: '/exceptions',
+    getParentRoute: () => AppOrganizationIdRoute,
+  } as any)
+const AppOrganizationIdOverviewRoute =
+  AppOrganizationIdOverviewRouteImport.update({
+    id: '/overview',
+    path: '/overview',
+    getParentRoute: () => AppOrganizationIdRoute,
+  } as any)
+const AppWorkspacesIndexRoute = AppWorkspacesIndexRouteImport.update({
+  id: '/workspaces/',
+  path: '/workspaces/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppWorkspacesNewRoute = AppWorkspacesNewRouteImport.update({
+  id: '/workspaces/new',
+  path: '/workspaces/new',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/app': typeof AppRouteWithChildren
+  '/sign-in': typeof SignInRoute
+  '/sign-out': typeof SignOutRoute
+  '/sign-up': typeof SignUpRoute
+  '/app/$organizationId': typeof AppOrganizationIdRouteWithChildren
+  '/app/': typeof AppIndexRoute
+  '/app/$organizationId/connections': typeof AppOrganizationIdConnectionsRoute
+  '/app/$organizationId/exceptions': typeof AppOrganizationIdExceptionsRoute
+  '/app/$organizationId/overview': typeof AppOrganizationIdOverviewRoute
+  '/app/workspaces/new': typeof AppWorkspacesNewRoute
+  '/app/workspaces/': typeof AppWorkspacesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/sign-in': typeof SignInRoute
+  '/sign-out': typeof SignOutRoute
+  '/sign-up': typeof SignUpRoute
+  '/app/$organizationId': typeof AppOrganizationIdRouteWithChildren
+  '/app': typeof AppIndexRoute
+  '/app/$organizationId/connections': typeof AppOrganizationIdConnectionsRoute
+  '/app/$organizationId/exceptions': typeof AppOrganizationIdExceptionsRoute
+  '/app/$organizationId/overview': typeof AppOrganizationIdOverviewRoute
+  '/app/workspaces/new': typeof AppWorkspacesNewRoute
+  '/app/workspaces': typeof AppWorkspacesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/app': typeof AppRouteWithChildren
+  '/sign-in': typeof SignInRoute
+  '/sign-out': typeof SignOutRoute
+  '/sign-up': typeof SignUpRoute
+  '/app/$organizationId': typeof AppOrganizationIdRouteWithChildren
+  '/app/': typeof AppIndexRoute
+  '/app/$organizationId/connections': typeof AppOrganizationIdConnectionsRoute
+  '/app/$organizationId/exceptions': typeof AppOrganizationIdExceptionsRoute
+  '/app/$organizationId/overview': typeof AppOrganizationIdOverviewRoute
+  '/app/workspaces/new': typeof AppWorkspacesNewRoute
+  '/app/workspaces/': typeof AppWorkspacesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/app'
+    | '/sign-in'
+    | '/sign-out'
+    | '/sign-up'
+    | '/app/$organizationId'
+    | '/app/'
+    | '/app/$organizationId/connections'
+    | '/app/$organizationId/exceptions'
+    | '/app/$organizationId/overview'
+    | '/app/workspaces/new'
+    | '/app/workspaces/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/sign-in'
+    | '/sign-out'
+    | '/sign-up'
+    | '/app/$organizationId'
+    | '/app'
+    | '/app/$organizationId/connections'
+    | '/app/$organizationId/exceptions'
+    | '/app/$organizationId/overview'
+    | '/app/workspaces/new'
+    | '/app/workspaces'
+  id:
+    | '__root__'
+    | '/'
+    | '/app'
+    | '/sign-in'
+    | '/sign-out'
+    | '/sign-up'
+    | '/app/$organizationId'
+    | '/app/'
+    | '/app/$organizationId/connections'
+    | '/app/$organizationId/exceptions'
+    | '/app/$organizationId/overview'
+    | '/app/workspaces/new'
+    | '/app/workspaces/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AppRoute: typeof AppRouteWithChildren
+  SignInRoute: typeof SignInRoute
+  SignOutRoute: typeof SignOutRoute
+  SignUpRoute: typeof SignUpRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +189,123 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/app': {
+      id: '/app'
+      path: '/app'
+      fullPath: '/app'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sign-in': {
+      id: '/sign-in'
+      path: '/sign-in'
+      fullPath: '/sign-in'
+      preLoaderRoute: typeof SignInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sign-out': {
+      id: '/sign-out'
+      path: '/sign-out'
+      fullPath: '/sign-out'
+      preLoaderRoute: typeof SignOutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sign-up': {
+      id: '/sign-up'
+      path: '/sign-up'
+      fullPath: '/sign-up'
+      preLoaderRoute: typeof SignUpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/app/': {
+      id: '/app/'
+      path: '/'
+      fullPath: '/app/'
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/$organizationId': {
+      id: '/app/$organizationId'
+      path: '/$organizationId'
+      fullPath: '/app/$organizationId'
+      preLoaderRoute: typeof AppOrganizationIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/$organizationId/connections': {
+      id: '/app/$organizationId/connections'
+      path: '/connections'
+      fullPath: '/app/$organizationId/connections'
+      preLoaderRoute: typeof AppOrganizationIdConnectionsRouteImport
+      parentRoute: typeof AppOrganizationIdRoute
+    }
+    '/app/$organizationId/exceptions': {
+      id: '/app/$organizationId/exceptions'
+      path: '/exceptions'
+      fullPath: '/app/$organizationId/exceptions'
+      preLoaderRoute: typeof AppOrganizationIdExceptionsRouteImport
+      parentRoute: typeof AppOrganizationIdRoute
+    }
+    '/app/$organizationId/overview': {
+      id: '/app/$organizationId/overview'
+      path: '/overview'
+      fullPath: '/app/$organizationId/overview'
+      preLoaderRoute: typeof AppOrganizationIdOverviewRouteImport
+      parentRoute: typeof AppOrganizationIdRoute
+    }
+    '/app/workspaces/': {
+      id: '/app/workspaces/'
+      path: '/workspaces'
+      fullPath: '/app/workspaces/'
+      preLoaderRoute: typeof AppWorkspacesIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/workspaces/new': {
+      id: '/app/workspaces/new'
+      path: '/workspaces/new'
+      fullPath: '/app/workspaces/new'
+      preLoaderRoute: typeof AppWorkspacesNewRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
+interface AppOrganizationIdRouteChildren {
+  AppOrganizationIdConnectionsRoute: typeof AppOrganizationIdConnectionsRoute
+  AppOrganizationIdExceptionsRoute: typeof AppOrganizationIdExceptionsRoute
+  AppOrganizationIdOverviewRoute: typeof AppOrganizationIdOverviewRoute
+}
+
+const AppOrganizationIdRouteChildren: AppOrganizationIdRouteChildren = {
+  AppOrganizationIdConnectionsRoute: AppOrganizationIdConnectionsRoute,
+  AppOrganizationIdExceptionsRoute: AppOrganizationIdExceptionsRoute,
+  AppOrganizationIdOverviewRoute: AppOrganizationIdOverviewRoute,
+}
+
+const AppOrganizationIdRouteWithChildren =
+  AppOrganizationIdRoute._addFileChildren(AppOrganizationIdRouteChildren)
+
+interface AppRouteChildren {
+  AppOrganizationIdRoute: typeof AppOrganizationIdRouteWithChildren
+  AppIndexRoute: typeof AppIndexRoute
+  AppWorkspacesNewRoute: typeof AppWorkspacesNewRoute
+  AppWorkspacesIndexRoute: typeof AppWorkspacesIndexRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppOrganizationIdRoute: AppOrganizationIdRouteWithChildren,
+  AppIndexRoute: AppIndexRoute,
+  AppWorkspacesNewRoute: AppWorkspacesNewRoute,
+  AppWorkspacesIndexRoute: AppWorkspacesIndexRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AppRoute: AppRouteWithChildren,
+  SignInRoute: SignInRoute,
+  SignOutRoute: SignOutRoute,
+  SignUpRoute: SignUpRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
