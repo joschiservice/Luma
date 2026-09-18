@@ -85,9 +85,12 @@ describe('bounded diagnosis rereads', () => {
       await reader.read(context, snapshot, new AbortController().signal),
     ).toEqual({ status: 'completed', retryAfter: null });
     expect(read).toHaveBeenCalledWith(context, request);
-    expect(publish).toHaveBeenCalledWith(context, snapshot, [
-      { items: [], nextCursor: 'next', completeness: 'partial' },
-    ]);
+    expect(publish).toHaveBeenCalledWith(
+      context,
+      snapshot,
+      [{ items: [], nextCursor: 'next', completeness: 'partial' }],
+      expect.any(AbortSignal),
+    );
   });
   it('honors retained provider backoff without making a request', async () => {
     const retryAfter = '2026-09-17T12:01:00Z';
@@ -158,5 +161,261 @@ describe('bounded diagnosis rereads', () => {
     });
     expect(read).toHaveBeenCalledTimes(1);
     expect(publish).not.toHaveBeenCalled();
+  });
+  it('rejects unrelated capabilities and resource subsets of a sync scan before any read', async () => {
+    for (const outside of [
+      { ...request, capability: 'orders.read' as const },
+      {
+        ...request,
+        input: { limit: 1, sku: { externalId: 'unrelated', scopeKey: '' } },
+      },
+    ]) {
+      const { reader, read, publish } = setup([request, outside]);
+      await expect(
+        reader.read(context, snapshot, new AbortController().signal),
+      ).rejects.toThrow('scope');
+      expect(read).not.toHaveBeenCalled();
+      expect(publish).not.toHaveBeenCalled();
+    }
+  });
+
+  it('binds inventory reads to both mapped SKU and stock pool, including source namespaces', async () => {
+    const sku = { externalId: 'sku-1', scopeKey: 'catalog' };
+    const location = { externalId: 'pool-1', scopeKey: 'stock' };
+    const value: DiagnosisInput = {
+      ...snapshot,
+      subject: {
+        kind: 'sku',
+        id: 'canonical-sku',
+        scope: ['canonical-pool', 'connection', 'second'],
+      },
+      input: {
+        exceptionClass: 'inventory_mismatch',
+        facts: {
+          tenantId: 'tenant',
+          evidenceTenantId: 'tenant',
+          subjectId: 'canonical-sku',
+          evidenceRefs: ['event', 'mapping'],
+          connectionIds: ['connection', 'second'],
+          canonicalLocationId: 'canonical-pool',
+          leftAvailable: '4',
+          rightAvailable: '12',
+          leftUnit: 'each',
+          rightUnit: 'each',
+          leftObservedAt: now.toISOString(),
+          rightObservedAt: now.toISOString(),
+          leftBasis: 'provider_reported',
+          rightBasis: 'provider_reported',
+          mappedSku: true,
+          equivalentPool: true,
+          complete: true,
+          projectionCurrent: true,
+          authority: 'left',
+          sellingSource: 'right',
+          tolerance: '0',
+        },
+      },
+      evidence: [
+        ...snapshot.evidence,
+        {
+          ...snapshot.evidence[0]!,
+          key: 'mapping',
+          connectionId: null,
+          adapterVersion: 'canonical-mapping-v1',
+          facts: {
+            tenantId: 'tenant',
+            skuId: 'canonical-sku',
+            locationId: 'canonical-pool',
+            left: {
+              source: { tenantId: 'tenant', connectionId: 'connection' },
+              sku,
+              location,
+            },
+            right: {
+              source: { tenantId: 'tenant', connectionId: 'second' },
+              sku: { ...sku, externalId: 'other-sku' },
+              location,
+            },
+          },
+        },
+      ],
+    };
+    const scoped = { ...request, input: { limit: 1, sku, location } };
+    const valid = setup([
+      scoped,
+      {
+        ...scoped,
+        connectionId: 'second',
+        input: { limit: 1, sku: { ...sku, externalId: 'other-sku' }, location },
+      },
+    ]);
+    expect(
+      await valid.reader.read(context, value, new AbortController().signal),
+    ).toMatchObject({ status: 'completed' });
+    expect(valid.read).toHaveBeenCalledTimes(2);
+    for (const input of [
+      { limit: 1 },
+      { limit: 1, sku },
+      { limit: 1, sku: { ...sku, scopeKey: 'another-catalog' }, location },
+      {
+        limit: 1,
+        sku,
+        location: { ...location, externalId: 'unrelated-pool' },
+      },
+    ]) {
+      const denied = setup([{ ...request, input }]);
+      await expect(
+        denied.reader.read(context, value, new AbortController().signal),
+      ).rejects.toThrow('scope');
+      expect(denied.read).not.toHaveBeenCalled();
+    }
+    for (const changes of [
+      { evidence: snapshot.evidence },
+      { subject: { ...value.subject, id: 'different-canonical-sku' } },
+      { evidence: [...value.evidence, value.evidence[1]!] },
+    ]) {
+      const denied = setup([scoped]);
+      await expect(
+        denied.reader.read(
+          context,
+          { ...value, ...changes },
+          new AbortController().signal,
+        ),
+      ).rejects.toThrow('scope');
+      expect(denied.read).not.toHaveBeenCalled();
+    }
+  });
+  it('restricts fulfillment rereads to the mapped order and rejects workflow connector reads', async () => {
+    const order = { externalId: 'order-1', scopeKey: 'shop' };
+    const value: DiagnosisInput = {
+      ...snapshot,
+      subject: { kind: 'fulfillment', id: 'operation', scope: ['connection'] },
+      input: {
+        exceptionClass: 'stuck_fulfillment',
+        facts: {
+          tenantId: 'tenant',
+          evidenceTenantId: 'tenant',
+          subjectId: 'operation',
+          evidenceRefs: ['event', 'mapping'],
+          connectionId: 'connection',
+          status: 'failed',
+          observedAt: now.toISOString(),
+          lastProgressAt: null,
+          quantity: '1',
+          unit: 'each',
+          mapped: true,
+          complete: true,
+          eligibility: 'eligible',
+          progressBasis: 'source_updated',
+          otherOperationShippedQuantity: '0',
+        },
+      },
+      evidence: [
+        ...snapshot.evidence,
+        {
+          ...snapshot.evidence[0]!,
+          key: 'mapping',
+          connectionId: null,
+          adapterVersion: 'canonical-mapping-v1',
+          facts: {
+            tenantId: 'tenant',
+            fulfillmentId: 'operation',
+            source: { tenantId: 'tenant', connectionId: 'connection' },
+            order,
+          },
+        },
+      ],
+    };
+    const scoped: CapabilityRequest<ReadCapability> = {
+      ...request,
+      capability: 'fulfillment.read',
+      input: { limit: 1, order },
+    };
+    expect(
+      await setup([scoped]).reader.read(
+        context,
+        value,
+        new AbortController().signal,
+      ),
+    ).toMatchObject({ status: 'completed' });
+    for (const outside of [
+      request,
+      { ...scoped, input: { limit: 1 } },
+      {
+        ...scoped,
+        input: { limit: 1, order: { ...order, scopeKey: 'other-shop' } },
+      },
+    ]) {
+      const denied = setup([outside]);
+      await expect(
+        denied.reader.read(context, value, new AbortController().signal),
+      ).rejects.toThrow('scope');
+      expect(denied.read).not.toHaveBeenCalled();
+    }
+    const workflow: DiagnosisInput = {
+      ...snapshot,
+      input: {
+        exceptionClass: 'workflow_failure',
+        facts: {
+          tenantId: 'tenant',
+          evidenceTenantId: 'tenant',
+          subjectId: 'run',
+          evidenceRefs: ['event'],
+          runId: 'run',
+          stepKey: 'step',
+          attempt: 1,
+          status: 'failed',
+          durable: true,
+          retryExhausted: true,
+          effect: 'unknown',
+          executionId: 'execution',
+          errorCode: 'timeout',
+        },
+      },
+    };
+    const denied = setup();
+    await expect(
+      denied.reader.read(context, workflow, new AbortController().signal),
+    ).rejects.toThrow('scope');
+    expect(denied.read).not.toHaveBeenCalled();
+  });
+  it('cancels publication already in progress before it commits', async () => {
+    const controller = new AbortController();
+    let release!: () => void;
+    let started!: () => void;
+    const entered = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const commit = vi.fn();
+    const reader = createDiagnosisRereader(
+      {
+        discover: async () => [],
+        read: async () => ({
+          ok: true,
+          value: { items: [], nextCursor: null, completeness: 'complete' },
+        }),
+      },
+      {
+        plan: async () => ({ requests: [request], notBefore: null }),
+        publish: async (_context, _snapshot, _pages, signal) => {
+          expect(signal).toBe(controller.signal);
+          started();
+          await gate;
+          signal.throwIfAborted();
+          commit();
+        },
+      },
+      () => now,
+    );
+    const pending = reader.read(context, snapshot, controller.signal);
+    const rejected = expect(pending).rejects.toThrow();
+    await entered;
+    controller.abort();
+    release();
+    await rejected;
+    expect(commit).not.toHaveBeenCalled();
   });
 });
