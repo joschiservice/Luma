@@ -137,7 +137,7 @@ describe('JTL shipping-method correction', () => {
       const patch = f.fetch.mock.calls[1]!;
       expect(patch[0].toString()).toContain(`sales-orders/${f.ids.order}`);
       expect(JSON.parse(String(patch[1]?.body))).toEqual({
-        shippingMethodId: cloud ? f.ids.after : 8,
+        shippingMethodId: f.ids.after,
         disableAutomaticWorkflows: true,
       });
       expect(new Headers(patch[1]?.headers).get('Idempotency-Key')).toMatch(
@@ -164,6 +164,40 @@ describe('JTL shipping-method correction', () => {
       expect(f.effects()).toBe(2);
     },
   );
+  it('accepts reordered mapping and intent fields throughout execution', async () => {
+    const f = fixture();
+    const effect = (await f.effectsRegistry().resolve(context, f.intent))!;
+    const reorderedRef = (value: { externalId: string; scopeKey: string }) => ({
+      scopeKey: value.scopeKey,
+      externalId: value.externalId,
+    });
+    f.binding.map.mockResolvedValue({
+      shippingMethod: reorderedRef(f.input.shippingMethod),
+      expectedShippingMethod: reorderedRef(f.input.expectedShippingMethod),
+      order: reorderedRef(f.input.order),
+    });
+    const reorderedIntent: EffectIntent = {
+      expectedPostcondition: { ...f.intent.expectedPostcondition },
+      preconditions: {
+        validUntil: f.intent.preconditions.validUntil,
+        evidenceRefs: [...f.intent.preconditions.evidenceRefs],
+      },
+      parameters: {},
+      target: { id: f.intent.target.id, kind: f.intent.target.kind },
+      capabilityVersion: f.intent.capabilityVersion,
+      capability: f.intent.capability,
+      connectionId: f.intent.connectionId,
+      tenantId: f.intent.tenantId,
+    };
+    expect(await effect.checkPreconditions(reorderedIntent)).toBe(true);
+    await expect(
+      effect.execute(reorderedIntent, 'reordered'),
+    ).resolves.toMatchObject({ evidenceRefs: [expect.any(String)] });
+    expect(await effect.verify(reorderedIntent)).toMatchObject({
+      outcome: 'passed',
+    });
+    expect(f.effects()).toBe(1);
+  });
   it('does not expose actions by default', () => {
     const f = fixture();
     f.options.shippingMethodActions = false;

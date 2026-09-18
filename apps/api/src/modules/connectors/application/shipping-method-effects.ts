@@ -1,3 +1,4 @@
+import { equalJson } from '../domain/equal-json.js';
 import { requireTenant } from '../../identity/index.js';
 import type { TenantContext } from '../../identity/index.js';
 import type { CapabilityInput } from '../domain/capabilities.js';
@@ -49,16 +50,15 @@ export function createShippingMethodEffects(
       const mapped = await map(context, intent);
       if (!mapped) return null;
       const boundInput = structuredClone(mapped);
-      const boundIntent = JSON.stringify(intent);
+      const boundIntent = structuredClone(intent);
       return runtime
         .effects({
           capability: 'orders.shipping-method.write',
           map: async () => boundInput,
           async checkPreconditions(context, intent) {
             return (
-              JSON.stringify(intent) === boundIntent &&
-              JSON.stringify(await map(context, intent)) ===
-                JSON.stringify(boundInput) &&
+              equalJson(intent, boundIntent) &&
+              equalJson(await map(context, intent), boundInput) &&
               binding.checkPreconditions(context, intent)
             );
           },
@@ -69,12 +69,12 @@ export function createShippingMethodEffects(
               observedAt: now().toISOString(),
               evaluatorVersion: 'shipping-method/1',
             });
-            if (JSON.stringify(intent) !== boundIntent) return inconclusive();
+            if (!equalJson(intent, boundIntent)) return inconclusive();
             const current = await map(context, intent);
             const input = boundInput;
             if (
-              JSON.stringify(intent) !== boundIntent ||
-              JSON.stringify(current) !== JSON.stringify(boundInput)
+              !equalJson(intent, boundIntent) ||
+              !equalJson(current, boundInput)
             )
               return inconclusive();
             const startedAt = now().getTime();

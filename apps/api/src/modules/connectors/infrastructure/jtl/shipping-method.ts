@@ -189,10 +189,7 @@ export function createJtlShippingMethodCapabilities(
         {},
         {
           body: {
-            shippingMethodId:
-              options.connection.kind === 'onprem'
-                ? providerId(input.shippingMethod.externalId)
-                : input.shippingMethod.externalId,
+            shippingMethodId: input.shippingMethod.externalId,
             disableAutomaticWorkflows: true,
           },
           idempotencyKey: key,
@@ -219,7 +216,4 @@ export function createJtlShippingMethodCapabilities(
     'orders.shipping-method.read': read,
     'orders.shipping-method.write': write,
   };
-}
-function providerId(value: string): number | string {
-  return /^[1-9]\d*$/.test(value) ? Number(value) : value;
 }
