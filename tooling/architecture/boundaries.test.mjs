@@ -24,12 +24,15 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
   plugin.rules.boundaries,
   {
     valid: [
-      ...['connections.test.ts', 'connections.integration.test.ts'].map(
-        (name) =>
-          sample(
-            filename(`apps/api/src/${name}`),
-            "import { createInstalledConnections } from './modules/connectors/composition.js';",
-          ),
+      ...[
+        'connections.test.ts',
+        'connections.integration.test.ts',
+        'diagnosis-reread.test.ts',
+      ].map((name) =>
+        sample(
+          filename(`apps/api/src/${name}`),
+          "import { createInstalledConnections } from './modules/connectors/composition.js';",
+        ),
       ),
       sample(
         filename('apps/api/src/exceptions.integration.test.ts'),
@@ -89,12 +92,15 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
       ),
     ],
     invalid: [
-      ...['connections.test.ts', 'connections.integration.test.ts'].map(
-        (name) =>
-          invalid(
-            filename(`apps/api/src/${name}`),
-            "import { createSecretCipher } from './modules/connectors/infrastructure/secret-cipher.js';",
-          ),
+      ...[
+        'connections.test.ts',
+        'connections.integration.test.ts',
+        'diagnosis-reread.test.ts',
+      ].map((name) =>
+        invalid(
+          filename(`apps/api/src/${name}`),
+          "import { createSecretCipher } from './modules/connectors/infrastructure/secret-cipher.js';",
+        ),
       ),
       invalid(
         filename('apps/api/src/exceptions.integration.test.ts'),

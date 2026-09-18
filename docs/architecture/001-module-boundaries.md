@@ -50,6 +50,8 @@ modules/<name>/
 - `index.ts` exposes selected domain/application contracts with explicit named exports. No infrastructure, HTTP handlers, ORM tables, singleton instances or composition factories.
 - `composition.ts` may wire all its own layers and consume allowed providers through their public interfaces. Only `apps/api/src/app.ts` and `index.ts` wire module entry points; no other root-level backend helpers may reach into modules.
 
+Registered integration fixtures may wire module public/composition entry points: `app.test.ts`, `exceptions.integration.test.ts`, `diagnosis-reread.test.ts`, the connection test files and `test-support/detection-fixtures.ts`. They cannot import another module’s internal layers. The diagnosis reread fixture verifies the workflow-to-connector read boundary with a trusted identity context.
+
 All cross-module imports use `../<provider>/index.js` (with the relative depth appropriate to the caller). Never deep-import a provider, including from tests, or import its composition factory from another module. Factories receive provider interfaces from the root. Internal imports use relative, explicit file paths; aliases are not part of the backend convention.
 
 Domain, application and public entry points have no external runtime/framework imports. Inject clocks, I/O and vendor adapters. Colocated tests may import Vitest. Introduce any pure-library exception explicitly in the rule and this decision after review.

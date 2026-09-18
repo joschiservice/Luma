@@ -1,3 +1,4 @@
+import type { ModelGateway } from './modules/platform/index.js';
 import { parseInput } from './modules/exceptions/composition.js';
 import { detectionFixtures } from './test-support/detection-fixtures.js';
 import { randomUUID } from 'node:crypto';
@@ -622,5 +623,375 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
     other.evidence[0]!.connectionId = connection;
     const second = await services.exceptions.ingest(context(), other);
     expect(second.incident?.id).not.toBe(first.incident?.id);
+  });
+  it('persists pending diagnoses, deduplicates revisions and protects tenant reads', async () => {
+    const incident = (await services.exceptions.ingest(context(), request()))
+      .incident!;
+    expect(await services.diagnoses.get(context(), incident.id)).toMatchObject({
+      status: 'pending',
+      revision: 1,
+    });
+    const ready = await services.diagnoses.run(context(), incident.id);
+    expect(ready).toMatchObject({
+      status: 'ready',
+      revision: 1,
+      superseded: false,
+    });
+    expect(ready!.facts.length).toBeGreaterThan(0);
+    await services.exceptions.ingest(context(), request());
+    expect(await services.diagnoses.run(context(), incident.id)).toEqual(ready);
+    expect(
+      await services.diagnoses.history(context(), incident.id),
+    ).toHaveLength(1);
+    expect(
+      await services.diagnoses.get(context(otherTenant), incident.id),
+    ).toBeNull();
+    expect(
+      await services.diagnoses.history(context(otherTenant), incident.id),
+    ).toEqual([]);
+    const next = request('event-2');
+    await services.exceptions.ingest(context(), next);
+    expect(await services.diagnoses.get(context(), incident.id)).toMatchObject({
+      status: 'pending',
+      revision: 2,
+    });
+    expect(
+      (await services.diagnoses.history(context(), incident.id))[0],
+    ).toMatchObject({ superseded: true });
+    await services.exceptions.ingest(context(), request());
+    expect(await services.diagnoses.get(context(), incident.id)).toMatchObject({
+      revision: 2,
+    });
+    next.configuration.version = 'configuration-2';
+    await services.exceptions.ingest(context(), next);
+    expect(await services.diagnoses.get(context(), incident.id)).toMatchObject({
+      status: 'pending',
+      revision: 3,
+      provenance: { configVersion: 'configuration-2' },
+    });
+    expect((await services.exceptions.list(context()))[0]?.state).toBe(
+      'detected',
+    );
+    await runtime.query('BEGIN');
+    try {
+      await runtime.query("SELECT set_config('app.tenant_id',$1,true)", [
+        otherTenant,
+      ]);
+      expect(
+        (await runtime.query('SELECT * FROM exception_diagnoses')).rowCount,
+      ).toBe(0);
+    } finally {
+      await runtime.query('ROLLBACK');
+    }
+  });
+  it('does not publish an older asynchronous model result over newer evidence', async () => {
+    let release!: () => void;
+    let started!: () => void;
+    const waiting = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const gateway = {
+      async generate<T>() {
+        started();
+        await gate;
+        return {
+          output: { hypotheses: [] } as T,
+          toolCalls: [],
+          metadata: {
+            adapter: 'bedrock-eu' as const,
+            model: 'fixture',
+            latencyMs: 1,
+            inputTokens: 1,
+            outputTokens: 1,
+            costUsd: null,
+          },
+        };
+      },
+    };
+    const withModel = createDetectionServices(
+      runtimeUrl,
+      () => now,
+      undefined,
+      { model: { gateway, profile: 'diagnosis' } },
+    );
+    try {
+      const incident = (await services.exceptions.ingest(context(), request()))
+        .incident!;
+      const pending = withModel.diagnoses.run(context(), incident.id);
+      await waiting;
+      await services.exceptions.ingest(context(), request('new-evidence'));
+      release();
+      expect(await pending).toMatchObject({ status: 'pending', revision: 2 });
+      expect(
+        (await services.diagnoses.history(context(), incident.id))[0],
+      ).toMatchObject({ superseded: true, status: 'pending' });
+    } finally {
+      release();
+      await withModel.close();
+    }
+  });
+  it.each([
+    'invented_evidence',
+    'unsafe_action',
+    'invalid_schema',
+    'failure',
+    'valid',
+  ] as const)(
+    'preserves deterministic facts with model outcome %s',
+    async (mode) => {
+      const generate = vi.fn(
+        async <T>(
+          _trace: unknown,
+          modelRequest: {
+            output?: { parse(value: unknown): T };
+            dataPolicy: unknown;
+            tools?: unknown;
+          },
+        ) => {
+          expect(modelRequest.dataPolicy).toEqual({
+            classification: 'sensitive',
+            region: 'EU',
+            zeroDataRetention: true,
+          });
+          expect(modelRequest.tools).toBeUndefined();
+          if (mode === 'failure') throw new Error('private provider error');
+          const output =
+            mode === 'invalid_schema'
+              ? { confidence: 0.99 }
+              : {
+                  hypotheses: [
+                    {
+                      code: 'connection_access_or_provider',
+                      evidenceRefs: [
+                        mode === 'invented_evidence'
+                          ? 'other-tenant-evidence'
+                          : 'event-1',
+                      ],
+                    },
+                  ],
+                };
+          return {
+            output: output as T,
+            toolCalls:
+              mode === 'unsafe_action'
+                ? [{ id: 'write', name: 'inventory.write', arguments: {} }]
+                : [],
+            metadata: {
+              adapter: 'bedrock-eu' as const,
+              model: 'fixture',
+              latencyMs: 1,
+              inputTokens: 1,
+              outputTokens: 1,
+              costUsd: null,
+            },
+          };
+        },
+      );
+      const withModel = createDetectionServices(
+        runtimeUrl,
+        () => now,
+        undefined,
+        {
+          model: {
+            gateway: { generate: generate as ModelGateway['generate'] },
+            profile: 'diagnosis',
+          },
+        },
+      );
+      try {
+        const incident = (
+          await services.exceptions.ingest(context(), request())
+        ).incident!;
+        await withModel.diagnoses.get(context(), incident.id);
+        expect(generate).not.toHaveBeenCalled();
+        const value = await withModel.diagnoses.run(context(), incident.id);
+        expect(value).toMatchObject({
+          status: 'ready',
+          provenance: {
+            model: {
+              status:
+                mode === 'valid'
+                  ? 'used'
+                  : mode === 'failure'
+                    ? 'unavailable'
+                    : 'rejected',
+            },
+          },
+        });
+        expect(value!.facts[0]?.code).toBe('scan_result');
+        expect(JSON.stringify(value)).not.toContain('private provider error');
+        await withModel.diagnoses.run(context(), incident.id);
+        expect(generate).toHaveBeenCalledTimes(1);
+      } finally {
+        await withModel.close();
+      }
+    },
+  );
+  it('publishes insufficient evidence on a later incomplete scan and preserves facts if rereading fails', async () => {
+    const incident = (await services.exceptions.ingest(context(), request()))
+      .incident!;
+    await services.diagnoses.run(context(), incident.id);
+    const next = request('incomplete');
+    if (next.input.exceptionClass === 'sync_failure') {
+      next.input.facts.status = 'success';
+      next.input.facts.errorCode = null;
+    }
+    await services.exceptions.ingest(context(), next);
+    const read = vi.fn(async () => {
+      throw new Error('provider secret');
+    });
+    const withRead = createDetectionServices(runtimeUrl, () => now, undefined, {
+      rereader: { read },
+    });
+    try {
+      expect(
+        await withRead.diagnoses.run(context(), incident.id),
+      ).toMatchObject({
+        status: 'failed',
+        reason: 'authoritative_read_failed',
+        facts: [{ code: 'scan_result' }],
+        provenance: { reread: { status: 'failed' } },
+      });
+      expect(read).toHaveBeenCalledTimes(1);
+      const recovered = await services.diagnoses.run(context(), incident.id);
+      expect(recovered).toMatchObject({
+        status: 'insufficient_evidence',
+        reason: 'incomplete_evidence',
+      });
+      expect((await services.exceptions.list(context()))[0]?.state).not.toBe(
+        'resolved',
+      );
+    } finally {
+      await withRead.close();
+    }
+  });
+  it('retains normalized mapping provenance and expires inventory recommendations without model calls', async () => {
+    const data = await detectionFixtures(context(), now);
+    const left = data.jtlInventory.items[0]!,
+      right = data.shopifyInventory.items[0]!;
+    left.data.available = '4';
+    right.data.available = '12';
+    const result = await services.pipeline.inventory(context(), {
+      left,
+      right,
+      mapping: {
+        tenantId,
+        version: 'mapping-v1',
+        publishedAt: corpus.now,
+        skuId: randomUUID(),
+        locationId: randomUUID(),
+        left: {
+          source: left.source,
+          sku: left.data.sku,
+          location: left.data.location,
+        },
+        right: {
+          source: right.source,
+          sku: right.data.sku,
+          location: right.data.location,
+        },
+        authority: 'left',
+        sellingSource: 'right',
+      },
+      complete: true,
+      projectionCurrent: true,
+      configuration: defaultConfiguration,
+    });
+    const id = result.incident!.id;
+    expect(await services.diagnoses.run(context(), id)).toMatchObject({
+      status: 'ready',
+      impact: { exposedQuantity: '8.000000', cost: null },
+      provenance: { mappingVersions: ['mapping-v1'] },
+    });
+    expect(
+      (await services.diagnoses.get(context(), id))!.provenance.evidence,
+    ).toHaveLength(3);
+    now = new Date(now.getTime() + 301_000);
+    expect(await services.diagnoses.get(context(), id)).toMatchObject({
+      status: 'insufficient_evidence',
+      superseded: true,
+      reason: 'stale_evidence',
+      nextSteps: [],
+    });
+    expect((await services.exceptions.list(context()))[0]!.state).toBe(
+      'detected',
+    );
+  });
+  it('respects persisted retry-after when a read is rate limited', async () => {
+    const incident = (await services.exceptions.ingest(context(), request()))
+      .incident!;
+    const next = request('incomplete');
+    if (next.input.exceptionClass === 'sync_failure') {
+      next.input.facts.status = 'success';
+      next.input.facts.errorCode = null;
+    }
+    await services.exceptions.ingest(context(), next);
+    const read = vi.fn(async () => ({
+      status: 'rate_limited' as const,
+      retryAfter: new Date(now.getTime() + 60_000).toISOString(),
+    }));
+    const withRead = createDetectionServices(runtimeUrl, () => now, undefined, {
+      rereader: { read },
+    });
+    try {
+      expect(
+        await withRead.diagnoses.run(context(), incident.id),
+      ).toMatchObject({
+        status: 'failed',
+        reason: 'authoritative_read_rate_limited',
+      });
+      await withRead.diagnoses.run(context(), incident.id);
+      expect(read).toHaveBeenCalledTimes(1);
+      now = new Date(now.getTime() + 60_000);
+      await withRead.diagnoses.run(context(), incident.id);
+      expect(read).toHaveBeenCalledTimes(2);
+    } finally {
+      await withRead.close();
+    }
+  });
+  it('does not create a diagnosis for a negative or deferred detection without an incident', async () => {
+    const next = request();
+    if (next.input.exceptionClass === 'sync_failure') {
+      next.input.facts.active = false;
+    }
+    expect(
+      (await services.exceptions.ingest(context(), next)).incident,
+    ).toBeNull();
+    expect(
+      (await owner.query('SELECT * FROM exception_diagnoses')).rowCount,
+    ).toBe(0);
+  });
+  it('reevaluates newest evidence on configuration changes and never restores old recommendations', async () => {
+    const incident = (await services.exceptions.ingest(context(), request()))
+      .incident!;
+    await services.diagnoses.run(context(), incident.id);
+    now = new Date(now.getTime() + 1000);
+    const next = request('newest');
+    next.evidence[0]!.observedAt = now.toISOString();
+    await services.exceptions.ingest(context(), next);
+    await services.diagnoses.run(context(), incident.id);
+    const configUpdate = request();
+    configUpdate.configuration.version = 'config-2';
+    await services.exceptions.ingest(context(), configUpdate);
+    expect(await services.diagnoses.get(context(), incident.id)).toMatchObject({
+      status: 'pending',
+      revision: 3,
+      provenance: { configVersion: 'config-2', evidence: [{ id: 'newest' }] },
+    });
+    await services.diagnoses.run(context(), incident.id);
+    await services.exceptions.ingest(context(), request());
+    expect(await services.diagnoses.get(context(), incident.id)).toMatchObject({
+      status: 'pending',
+      revision: 4,
+      provenance: { configVersion: 'v0.1', evidence: [{ id: 'newest' }] },
+    });
+    expect(
+      (await services.diagnoses.history(context(), incident.id))
+        .slice(0, 3)
+        .every((d) => d.superseded),
+    ).toBe(true);
   });
 });
