@@ -13,7 +13,9 @@ import {
   it,
   vi,
 } from 'vitest';
-import { createDetectionServices } from '#app';
+import { buildApp, createDetectionServices } from '#app';
+import { caseQuerySchema, caseDetailSchema } from '@luma/api-contract';
+import type { IdentityService } from '#modules/identity/index';
 import { makeTenantContext } from '#modules/identity/composition';
 import { defaultConfiguration } from '#modules/exceptions/index';
 import type {
@@ -138,6 +140,134 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
     await admin.query(`DROP DATABASE IF EXISTS "${name}"`);
     await admin.query(`DROP ROLE IF EXISTS "${name}"`);
     await admin.end();
+  });
+  it('serves persisted pending and ready investigations without running a model', async () => {
+    const result = await services.exceptions.ingest(context(), request());
+    const id = result.incident!.id;
+    const app = buildApp(
+      {},
+      {
+        cases: services.cases,
+        identity: {
+          resolveTenant: async () => context(),
+        } as unknown as IdentityService,
+      },
+    );
+    try {
+      const pending = await app.inject(
+        `/v1/organizations/${tenantId}/exceptions/${id}`,
+      );
+      expect(pending.statusCode).toBe(200);
+      expect(caseDetailSchema.parse(pending.json()).diagnosisStatus).toBe(
+        'pending',
+      );
+      const attention = await services.cases.list(
+        context(),
+        caseQuerySchema.parse({}),
+      );
+      expect(attention.items).toEqual([]);
+      await services.diagnoses.run(context(), id);
+      const ready = await app.inject(
+        `/v1/organizations/${tenantId}/exceptions/${id}`,
+      );
+      expect(ready.statusCode).toBe(200);
+      expect(ready.json().diagnosisStatus).toBe('ready');
+      expect(ready.json().diagnosis.facts.length).toBeGreaterThan(0);
+      const list = await app.inject(
+        `/v1/organizations/${tenantId}/exceptions?view=active`,
+      );
+      expect(list.statusCode).toBe(200);
+      expect(list.json().items[0].id).toBe(id);
+      expect(list.json().items[0]).not.toHaveProperty('diagnosis');
+      expect(await services.cases.get(context(otherTenant), id)).toBeNull();
+      expect(
+        (
+          await services.cases.list(
+            context(otherTenant),
+            caseQuerySchema.parse({ view: 'active' }),
+          )
+        ).items,
+      ).toEqual([]);
+      const bad = await app.inject(
+        `/v1/organizations/${tenantId}/exceptions?cursor=bad`,
+      );
+      expect(bad.statusCode).toBe(400);
+    } finally {
+      await app.close();
+    }
+  });
+  it('paginates stable ties and rejects cursors from other filters or tenants', async () => {
+    for (let i = 0; i < 4; i++) {
+      const value = request(`page-${i}`);
+      if (value.input.exceptionClass !== 'sync_failure')
+        throw new Error('fixture');
+      value.input.facts.connectionId = randomUUID();
+      value.input.facts.subjectId = value.input.facts.connectionId;
+      value.evidence[0]!.connectionId = value.input.facts.connectionId;
+      await services.exceptions.ingest(context(), value);
+    }
+    const query = caseQuerySchema.parse({ view: 'active', limit: 2 });
+    const first = await services.cases.list(context(), query);
+    const second = await services.cases.list(context(), {
+      ...query,
+      cursor: first.nextCursor!,
+    });
+    expect(first.items).toHaveLength(2);
+    expect(second.items).toHaveLength(2);
+    expect(second.nextCursor).toBeNull();
+    const ids = [...first.items, ...second.items].map((x) => x.id);
+    expect(ids).toEqual([...ids].sort());
+    expect(new Set(ids).size).toBe(4);
+    await expect(
+      services.cases.list(context(otherTenant), {
+        ...query,
+        cursor: first.nextCursor!,
+      }),
+    ).rejects.toThrow('Invalid cursor');
+    await expect(
+      services.cases.list(context(), {
+        ...query,
+        view: 'history',
+        cursor: first.nextCursor!,
+      }),
+    ).rejects.toThrow('Invalid cursor');
+    await owner.query(
+      "UPDATE exceptions SET state='escalated',document=jsonb_set(document,'{state}','\"escalated\"') WHERE id=$1",
+      [ids[0]],
+    );
+    const needs = await services.cases.list(
+      context(),
+      caseQuerySchema.parse({}),
+    );
+    expect(needs.items.map((x) => x.id)).toEqual([ids[0]]);
+    expect(needs.items[0]?.attention.reason).toBe('uncertainty');
+  });
+  it('limits the case reader role to scoped reads', async () => {
+    const incident = (await services.exceptions.ingest(context(), request()))
+      .incident!;
+    const client = await owner.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('SET LOCAL ROLE luma_case_reader');
+      await client.query("SELECT set_config('app.tenant_id',$1,true)", [
+        otherTenant,
+      ]);
+      expect((await client.query('SELECT id FROM exceptions')).rows).toEqual(
+        [],
+      );
+      await client.query("SELECT set_config('app.tenant_id',$1,true)", [
+        tenantId,
+      ]);
+      expect((await client.query('SELECT id FROM exceptions')).rows).toEqual([
+        { id: incident.id },
+      ]);
+      await expect(
+        client.query("UPDATE exceptions SET state='failed'"),
+      ).rejects.toThrow('permission denied');
+    } finally {
+      await client.query('ROLLBACK');
+      client.release();
+    }
   });
   it('atomically deduplicates concurrent deliveries and new delivery IDs', async () => {
     const results = await Promise.all(
@@ -440,6 +570,17 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
         ),
       ).size,
     ).toBe(4);
+    const cases = await services.cases.list(
+      context(),
+      caseQuerySchema.parse({ view: 'active' }),
+    );
+    expect(new Set(cases.items.map((item) => item.class)).size).toBe(4);
+    for (const item of cases.items) {
+      expect(
+        caseDetailSchema.safeParse(await services.cases.get(context(), item.id))
+          .success,
+      ).toBe(true);
+    }
   });
   function verification(incident: Incident): VerificationResult {
     return {
@@ -909,7 +1050,21 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
     expect(
       (await services.diagnoses.get(context(), id))!.provenance.evidence,
     ).toHaveLength(3);
+    expect(await services.cases.get(context(), id)).toMatchObject({
+      freshness: 'fresh',
+      attention: { required: true, reason: 'manual_intervention' },
+      diagnosis: { impact: { exposedQuantity: '8.000000' } },
+    });
     now = new Date(now.getTime() + 301_000);
+    expect(await services.cases.get(context(), id)).toMatchObject({
+      freshness: 'stale',
+      attention: { required: false },
+      diagnosis: {
+        nextSteps: [],
+        superseded: true,
+        status: 'insufficient_evidence',
+      },
+    });
     expect(await services.diagnoses.get(context(), id)).toMatchObject({
       status: 'insufficient_evidence',
       superseded: true,

@@ -1,5 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { Unavailable } from '../features/identity/shell';
+import { Inbox } from '../features/exceptions/page';
+import { inboxSearch } from '../features/exceptions/data';
 export const Route = createFileRoute('/app/$organizationId/exceptions')({
-  component: () => <Unavailable feature="Exceptions" />,
+  validateSearch: inboxSearch,
+  component: Inbox,
 });

@@ -23,7 +23,7 @@ With an administrative connection, provision a separate runtime login:
 ```sql
 CREATE ROLE luma_api LOGIN PASSWORD 'local_password'
   NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
-GRANT luma_identity TO luma_api;
+GRANT luma_identity,luma_case_reader TO luma_api;
 ```
 
 Copy `apps/api/.env.example` to `apps/api/.env`. Set `IDENTITY_DATABASE_URL` to the restricted login, generate `BETTER_AUTH_SECRET` with `openssl rand -base64 32`, and set the public auth origin in `BETTER_AUTH_URL`. `AUTH_TRUSTED_ORIGINS` lists exact browser origins, including `http://localhost:3000` for Vite. Production origins require HTTPS. Never give the API migration credentials.
