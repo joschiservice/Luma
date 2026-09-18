@@ -82,7 +82,19 @@ export function createInstalledRuntime(options: InstalledRuntimeOptions) {
           });
         };
         // Adapter parsing and descriptors stay authoritative; each invocation resolves fresh credentials.
-        const adapter = await build(capability);
+        let adapter: ConnectorConnection;
+        try {
+          adapter = await build(capability);
+        } catch (error) {
+          // Lifecycle changes can invalidate the snapshot before credentials resolve.
+          if (
+            error instanceof ConnectorError &&
+            (error.failure.code === 'unavailable' ||
+              error.failure.code === 'permission_denied')
+          )
+            return null;
+          throw error;
+        }
         const handler = adapter.capabilities[capability]!;
         Object.assign(capabilities, {
           [capability]: {

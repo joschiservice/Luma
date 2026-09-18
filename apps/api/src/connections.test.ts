@@ -264,6 +264,85 @@ describe('installed connection lifecycle', () => {
       expect(JSON.stringify(record.mock.calls)).not.toContain('token');
     },
   );
+  it.each(['revoked', 'disconnected', 'rotated', 'grants-cleared'] as const)(
+    'returns unavailable when a connection is %s during resolution',
+    async (change) => {
+      for (const operation of ['read', 'discover'] as const) {
+        const { service, ctx, records } = fixture();
+        const connection = await service.install(ctx, input);
+        await service.check(ctx, connection.id, 1);
+        const list = service.list.bind(service);
+        vi.spyOn(service, 'list').mockImplementationOnce(async (context) => {
+          const snapshot = await list(context);
+          if (change === 'rotated') {
+            await service.rotate(ctx, connection.id, 2, {
+              token: 'replacement',
+            });
+          } else if (change === 'grants-cleared') {
+            records.get(
+              `${ctx.tenantId}/${connection.id}`,
+            )!.connection.granted = [];
+          } else {
+            await service.disconnect(ctx, connection.id, 2, change);
+          }
+          return snapshot;
+        });
+        const fetch = vi.fn();
+        const record = vi.fn();
+        const recordObservations = vi.fn();
+        const runtime = createInstalledRuntime({
+          installations: service,
+          record,
+          recordObservations,
+          approveJtlEndpoint: vi.fn(),
+          fetch,
+        });
+        if (operation === 'discover') {
+          await expect(runtime.discover(ctx, connection.id)).resolves.toEqual(
+            [],
+          );
+        } else {
+          await expect(
+            runtime.read(ctx, {
+              connectionId: connection.id,
+              capability: 'products.read',
+              version: '0',
+              input: { limit: 1 },
+            }),
+          ).resolves.toEqual({
+            ok: false,
+            error: { code: 'unavailable', effect: 'none', retry: 'never' },
+          });
+        }
+        expect(fetch).not.toHaveBeenCalled();
+        expect(record).not.toHaveBeenCalled();
+        expect(recordObservations).not.toHaveBeenCalled();
+      }
+    },
+  );
+  it('preserves unexpected credential resolution failures', async () => {
+    const { service, ctx } = fixture();
+    const connection = await service.install(ctx, input);
+    await service.check(ctx, connection.id, 1);
+    const error = new Error('Credential store unavailable');
+    vi.spyOn(service, 'credential').mockRejectedValue(error);
+    const runtime = createInstalledRuntime({
+      installations: service,
+      record: vi.fn(),
+      recordObservations: vi.fn(),
+      approveJtlEndpoint: vi.fn(),
+      fetch: vi.fn(),
+    });
+    await expect(runtime.discover(ctx, connection.id)).rejects.toBe(error);
+    await expect(
+      runtime.read(ctx, {
+        connectionId: connection.id,
+        capability: 'products.read',
+        version: '0',
+        input: { limit: 1 },
+      }),
+    ).rejects.toBe(error);
+  });
   it('discovers only permitted capabilities and blocks a held runtime after revocation', async () => {
     const { service, ctx } = fixture();
     const connection = await service.install(ctx, input);
