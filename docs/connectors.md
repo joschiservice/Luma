@@ -2,6 +2,8 @@
 
 The connectors module exposes typed capabilities through its public `index.ts`. Consumers select a connection and capability; adapters own provider mapping, credentials and API/browser interaction. The contract version is `0`. Normalized observation schemas use version `1`.
 
+The [installed connection guide](installed-connections.md) covers tenant setup, encrypted credentials, health checks, rotation and permission-gated adapter composition.
+
 ## Capabilities
 
 | Capability          | Input                                                            | Output                                         |
