@@ -196,6 +196,69 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
       await app.close();
     }
   });
+  it.each([100, 101])(
+    'keeps cases with %i persisted evidence entries readable',
+    async (count) => {
+      const value = request();
+      value.evidence = Array.from({ length: count }, (_, i) => ({
+        ...value.evidence[0]!,
+        key: `evidence-${String(i).padStart(3, '0')}`,
+        source: {
+          provider: `provider-${i}`,
+          resource: 'inventory',
+          externalId: `stock-${i}`,
+          scopeKey: 'pool',
+        },
+      }));
+      value.input.facts.evidenceRefs = value.evidence.map((e) => e.key);
+      const id = (await services.exceptions.ingest(context(), value)).incident!
+        .id;
+      const persisted = async () =>
+        (
+          await owner.query(
+            'SELECT document FROM exception_diagnoses WHERE tenant_id=$1 AND exception_id=$2',
+            [tenantId, id],
+          )
+        ).rows[0].document;
+      const original = await persisted();
+      expect(original.provenance.evidence).toHaveLength(count);
+      const app = buildApp(
+        {},
+        {
+          cases: services.cases,
+          identity: {
+            resolveTenant: async () => context(),
+          } as unknown as IdentityService,
+        },
+      );
+      try {
+        const detail = await app.inject(
+          `/v1/organizations/${tenantId}/exceptions/${id}`,
+        );
+        expect(detail.statusCode).toBe(200);
+        const body = caseDetailSchema.parse(detail.json());
+        expect(body.diagnosisStatus).toBe('pending');
+        expect(body.diagnosis!.provenance.evidence).toHaveLength(100);
+        expect(body.diagnosis!.attention.evidenceRefs).toHaveLength(100);
+        expect(body.sources).toHaveLength(100);
+        expect(body.diagnosis!.nextSteps).toEqual([]);
+        if (count > 100)
+          expect(body.diagnosis!.constraints).toContain(
+            'Only 100 of 101 evidence references are shown. Findings and recommendations are withheld until the full evidence can be reviewed.',
+          );
+        const list = await app.inject(
+          `/v1/organizations/${tenantId}/exceptions?view=active`,
+        );
+        expect(list.statusCode).toBe(200);
+        expect(list.json().items[0].id).toBe(id);
+        expect(list.json().items[0].sources).toHaveLength(100);
+        expect(await services.cases.get(context(otherTenant), id)).toBeNull();
+        expect(await persisted()).toEqual(original);
+      } finally {
+        await app.close();
+      }
+    },
+  );
   it('paginates stable ties and rejects cursors from other filters or tenants', async () => {
     for (let i = 0; i < 4; i++) {
       const value = request(`page-${i}`);

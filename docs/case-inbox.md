@@ -36,9 +36,11 @@ connection API. An empty attention queue never implies healthy operations.
 
 This implements the read slice needed from LUMA-32. Decision commands, executable
 proposal projections, paginated historical evidence and streaming history remain
-in their owning follow-up slices. The current diagnosis bounds its evidence at
-100 references; the inbox displays that complete current set. The canonical
-exception and diagnosis tables remain the only source of case data.
+in their owning follow-up slices. Case reads display at most 100 evidence
+references. Oversized investigations explicitly report the omitted count and
+withhold findings, impact and recommendations; pending investigations remain
+pending. Reads preserve the complete persisted evidence. The canonical exception
+and diagnosis tables remain the only source of case data.
 
 ## Database access
 

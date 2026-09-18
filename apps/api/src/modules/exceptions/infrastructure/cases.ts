@@ -63,6 +63,40 @@ function contextKey(tenantId: string, query: CaseQuery) {
 function project(row: Row, now: Date): CaseDetail {
   const incident = row.document;
   const diagnosis = row.diagnosis ? structuredClone(row.diagnosis) : null;
+  if (diagnosis && diagnosis.provenance.evidence.length > 100) {
+    const count = diagnosis.provenance.evidence.length;
+    // Pending snapshots bypass diagnosis validation. Bound the read without deleting
+    // persisted evidence or presenting conclusions supported by an incomplete set.
+    diagnosis.provenance.evidence = diagnosis.provenance.evidence.slice(0, 100);
+    diagnosis.provenance.mappingVersions =
+      diagnosis.provenance.mappingVersions.slice(0, 100);
+    diagnosis.status =
+      diagnosis.status === 'pending' ? 'pending' : 'insufficient_evidence';
+    diagnosis.reason = 'evidence_display_limit';
+    diagnosis.summary =
+      'The full evidence must be reviewed before drawing conclusions.';
+    diagnosis.constraints = [
+      `Only 100 of ${count} evidence references are shown. Findings and recommendations are withheld until the full evidence can be reviewed.`,
+    ];
+    diagnosis.facts = [];
+    diagnosis.hypotheses = [];
+    diagnosis.nextSteps = [];
+    diagnosis.impact = {
+      observed: [],
+      potential: [],
+      exposedQuantity: null,
+      unit: null,
+      cost: null,
+    };
+    const visibleRefs = new Set(diagnosis.provenance.evidence.map((e) => e.id));
+    diagnosis.attention = {
+      ...diagnosis.attention,
+      suggested: false,
+      evidenceRefs: diagnosis.attention.evidenceRefs.filter((id) =>
+        visibleRefs.has(id),
+      ),
+    };
+  }
   const expiry = diagnosis?.provenance.validUntil;
   const stale = expiry != null && Date.parse(expiry) < now.getTime();
   if (diagnosis && (stale || incident.state === 'resolved')) {
