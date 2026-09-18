@@ -125,6 +125,19 @@ export function createExecutionService(deps: ExecutionDependencies) {
     return observation;
   }
   return {
+    async get(
+      context: TenantContext,
+      proposalId: string,
+    ): Promise<ExecutionResult | null> {
+      requireTenant(context, context.tenantId);
+      const fresh = await deps.refreshContext(context);
+      requireTenant(fresh, context.tenantId);
+      requireRole(fresh, ['owner', 'admin']);
+      const record = await deps.repository.get(fresh.tenantId, proposalId);
+      if (!record) return null;
+      await flush(fresh.tenantId, proposalId);
+      return result(record);
+    },
     async execute(
       context: TenantContext,
       input: unknown,

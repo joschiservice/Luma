@@ -1,3 +1,10 @@
+import {
+  createExceptionActivities,
+  createExceptionClient,
+  createExceptionWorker,
+} from './modules/workflows/composition.js';
+import type { TemporalSettings } from './modules/workflows/composition.js';
+import type { WorkflowBindings } from './modules/workflows/index.js';
 import type {
   DiagnosisOptions,
   VerificationEvaluator,
@@ -354,4 +361,68 @@ export function createDetectionServices(
     ),
     close: () => pool.end(),
   };
+}
+
+/** Wire durable activities to the same tenant-scoped services used by commands. */
+export function createExceptionWorkflowRuntime(
+  settings: TemporalSettings,
+  identity: Pick<IdentityService, 'refreshContext' | 'resolveWorkflowContext'>,
+  detection: Pick<
+    ReturnType<typeof createDetectionServices>,
+    'exceptions' | 'diagnoses'
+  >,
+  safety: Pick<ReturnType<typeof createSafetyServices>, 'execution'>,
+  bindings: WorkflowBindings,
+) {
+  const activities = createExceptionActivities({
+    identity,
+    ...detection,
+    ...safety,
+    bindings,
+  });
+  return {
+    createClient: () => createExceptionClient(settings, identity),
+    createWorker: () => createExceptionWorker(settings, activities),
+  };
+}
+
+/** Start a worker for persisted incidents and diagnoses. */
+export async function createDefaultExceptionWorker(
+  identitySettings: Parameters<typeof createIdentity>[0],
+  settings: import('@luma/config').WorkflowConfig,
+) {
+  const identity = createIdentity(identitySettings);
+  const detection = createDetectionServices(settings.databaseUrl);
+  const safety = createSafetyServices(settings.databaseUrl, identity.service, {
+    resolve: async () => null,
+  });
+  const closeServices = async () => {
+    await Promise.all([identity.close(), detection.close(), safety.close()]);
+  };
+  try {
+    const runtime = createExceptionWorkflowRuntime(
+      settings.temporal,
+      identity.service,
+      detection,
+      safety,
+      {
+        loadDetection: async () => null,
+      },
+    );
+    const worker = await runtime.createWorker();
+    return {
+      run: worker.run,
+      shutdown: worker.shutdown,
+      close: async () => {
+        try {
+          await worker.close();
+        } finally {
+          await closeServices();
+        }
+      },
+    };
+  } catch (error) {
+    await closeServices();
+    throw error;
+  }
 }

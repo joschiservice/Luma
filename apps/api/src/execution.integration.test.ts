@@ -10,7 +10,12 @@ import {
   it,
   vi,
 } from 'vitest';
-import { buildRuntimeApp, createSafetyServices } from './app.js';
+import {
+  buildRuntimeApp,
+  createSafetyServices,
+  createExceptionWorkflowRuntime,
+} from './app.js';
+import { TestWorkflowEnvironment } from '@temporalio/testing';
 type Safety = ReturnType<typeof createSafetyServices>;
 type TenantContext = Parameters<Safety['execution']['execute']>[0];
 type EffectRegistry = Parameters<typeof createSafetyServices>[2];
@@ -271,6 +276,11 @@ describe.skipIf(!databaseUrl)(
       });
       const result = await safety.execution.execute(alice, proposal);
       expect(result.state).toBe('succeeded');
+      expect((await safety.execution.get(alice, proposal.id))?.state).toBe(
+        'succeeded',
+      );
+      expect(await safety.execution.get(outsider, proposal.id)).toBeNull();
+      expect(execute).toHaveBeenCalledTimes(1);
       if ('record' in result) {
         expect(result.record.intent.proposedBy).toEqual(proposal.proposedBy);
         expect(result.record.attempt.executor.model?.promptVersion).toBe('2');
@@ -495,11 +505,106 @@ describe.skipIf(!databaseUrl)(
       );
       expect(execute).not.toHaveBeenCalled();
     });
+    it('runs Temporal recovery against the persisted execution service without a second effect', async () => {
+      const env = await TestWorkflowEnvironment.createLocal();
+      const proposal = action();
+      const incidentId = randomUUID();
+      const diagnosis = {
+        exceptionId: incidentId,
+        revision: 1,
+        status: 'ready',
+        superseded: false,
+        detectorDecision: { decision: 'detect' },
+        provenance: {
+          validUntil: proposal.expiresAt,
+          reread: { retryAfter: null },
+        },
+      };
+      const businessVerify = vi.fn().mockResolvedValue(true);
+      const processRuntime = createExceptionWorkflowRuntime(
+        {
+          address: env.address,
+          namespace: 'default',
+          taskQueue: randomUUID(),
+          dataRegion: 'EU',
+        },
+        {
+          refreshContext,
+          resolveWorkflowContext: async (userId, organizationId) =>
+            context(cookies.get(userId)!, organizationId),
+        },
+        {
+          exceptions: {
+            get: vi
+              .fn()
+              .mockResolvedValue({ id: incidentId, state: 'detected' }),
+            ingest: vi.fn(),
+            list: vi.fn(),
+            evidence: vi.fn(),
+            resolve: vi.fn(),
+            verify: businessVerify,
+          },
+          diagnoses: {
+            get: vi.fn().mockResolvedValue(diagnosis),
+            run: vi.fn().mockResolvedValue(diagnosis),
+            history: vi.fn(),
+          },
+        },
+        safety,
+        {
+          loadDetection: vi.fn(),
+          proposals: {
+            prepare: async () => proposal,
+            get: async () => ({
+              exceptionId: incidentId,
+              revision: 1,
+              action: proposal,
+            }),
+          },
+        },
+      );
+      const client = await processRuntime.createClient();
+      const worker = await processRuntime.createWorker();
+      const running = worker.run();
+      try {
+        execute.mockRejectedValueOnce(
+          new Error('provider committed before connection loss'),
+        );
+        const source = { kind: 'incident' as const, id: incidentId };
+        const started = await client.start(alice, source);
+        expect(await client.start(alice, source)).toEqual(started);
+        await vi.waitFor(
+          async () =>
+            expect(await client.progress(alice, source)).toMatchObject({
+              phase: 'resolved',
+            }),
+          { timeout: 15_000 },
+        );
+        expect(execute).toHaveBeenCalledTimes(1);
+        expect(verify).toHaveBeenCalledTimes(1);
+        expect(businessVerify).toHaveBeenCalledTimes(1);
+        expect((await safety.execution.get(alice, proposal.id))?.state).toBe(
+          'succeeded',
+        );
+        expect(
+          (await audit(proposal.id)).map((entry) => entry.eventType),
+        ).toContain('execution.reconciled');
+      } finally {
+        worker.shutdown();
+        await running;
+        await worker.close();
+        await client.close();
+        await env.teardown();
+      }
+    }, 30_000);
     it('rechecks revoked roles instead of trusting the original context', async () => {
       await owner.query("UPDATE memberships SET role='member' WHERE id=$1", [
         bobMembership,
       ]);
       try {
+        await expect(safety.execution.get(bob, randomUUID())).rejects.toThrow(
+          'Insufficient organization role',
+        );
         expect(
           (
             await safety.execution.execute(

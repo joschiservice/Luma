@@ -5,3 +5,11 @@ export type {
 } from './application/detection.js';
 export { createDiagnosisRereader } from './application/diagnosis.js';
 export type { DiagnosisReadPlan } from './application/diagnosis.js';
+export type {
+  ExceptionActivities,
+  ExceptionWorkflowInput,
+  ProposalReference,
+  WorkflowBindings,
+  WorkflowProgress,
+  WorkflowSource,
+} from './application/runtime.js';

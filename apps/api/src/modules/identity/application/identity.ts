@@ -75,6 +75,21 @@ export function createIdentityService(repository: IdentityRepository) {
   }
   return {
     authenticate,
+    /** Reauthorize the initiating user of a trusted durable workflow. */
+    async resolveWorkflowContext(
+      userId: string,
+      tenantId: string,
+      requestId: string,
+    ) {
+      return repository.withUser(userId, (tx) =>
+        resolve(
+          tx,
+          { userId, sessionId: `workflow:${requestId}` },
+          tenantId,
+          requestId,
+        ),
+      );
+    },
     async refreshContext(context: TenantContext) {
       requireTenant(context, context.tenantId);
       return repository.withUser(context.actor.id, (tx) =>

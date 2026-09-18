@@ -11,10 +11,12 @@
     "start": "node --env-file-if-exists=.env dist/index.js",
     "db:migrate": "node --env-file-if-exists=.env scripts/migrate.mjs",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
-    "test:browser": "vitest run --config vitest.browser.config.ts"
+    "test:browser": "vitest run --config vitest.browser.config.ts",
+    "worker": "node --env-file-if-exists=.env dist/index.js --workflow-worker"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",
+    "@temporalio/testing": "1.24.0",
     "@types/pg": "8.20.0",
     "graphql": "^16.14.2",
     "playwright": "1.63.0",
@@ -29,6 +31,10 @@
     "@sentry/node": "10.75.0",
     "@sentry/opentelemetry": "10.75.0",
     "@shopify/admin-api-client": "2.0.0",
+    "@temporalio/client": "1.24.0",
+    "@temporalio/common": "1.24.0",
+    "@temporalio/worker": "1.24.0",
+    "@temporalio/workflow": "1.24.0",
     "@ts-rest/core": "3.52.1",
     "@ts-rest/fastify": "3.52.1",
     "better-auth": "1.7.5",

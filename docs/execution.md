@@ -1,6 +1,6 @@
 # Policy, execution and audit
 
-Workflow activities call `execution.execute(context, proposal)` through `createSafetyServices` in `apps/api/src/app.ts`. The composition root supplies identity and a trusted connector registry. An activity receives the execution service; connector write adapters stay in composition and execution. No provider writes or Temporal worker are registered by this foundation.
+Workflow activities call `execution.execute(context, proposal)` through `createSafetyServices` in `apps/api/src/app.ts`. The composition root supplies identity and a trusted connector registry. An activity receives the execution service; connector write adapters stay in composition and execution. The [durable workflow runtime](exception-workflows.md) registers Temporal activities around these services. Production connector writes require an installed effect adapter.
 
 ## Policy and approval
 
@@ -26,7 +26,7 @@ A request returning successfully is not verification. `verify` performs a fresh 
 
 `execution.reconcile(context, proposalId)` performs reads only. Passed verification can resolve a prepared/unknown attempt. A negative or inconclusive read cannot prove a delayed request will not commit, so it leaves the attempt blocked. If reconciliation cannot establish success, escalate for human review; do not blindly retry.
 
-After a crash or audit outage, redeliver the same activity input. The service flushes its pending evidence without repeating the effect. Policy outboxes are drained on policy evaluation/approval; execution outboxes are drained on execution/reconciliation. An operator or workflow recovery job must redeliver interrupted work; this change does not install a background dispatcher. If the process died after the remote commit but before local completion, the durable prepared record forces reconciliation.
+After a crash or audit outage, redeliver the same activity input. The service flushes its pending evidence without repeating the effect. Policy outboxes are drained on policy evaluation/approval; execution outboxes are drained on execution/reconciliation. The Temporal runtime redelivers interrupted activities and routes prepared/unknown attempts to reconciliation. Operator recovery remains available for escalated work. If the process died after the remote commit but before local completion, the durable prepared record forces reconciliation.
 
 Parameters and postconditions must contain only the minimum non-sensitive command data. Keep credentials, customer payloads, screenshots and chain-of-thought outside these records. Use tenant-owned UUID references to controlled evidence storage.
 

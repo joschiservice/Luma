@@ -28,6 +28,7 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
         'connections.test.ts',
         'connections.integration.test.ts',
         'diagnosis-reread.test.ts',
+        'workflow-runtime.test.ts',
       ].map((name) =>
         sample(
           filename(`apps/api/src/${name}`),
@@ -96,6 +97,7 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
         'connections.test.ts',
         'connections.integration.test.ts',
         'diagnosis-reread.test.ts',
+        'workflow-runtime.test.ts',
       ].map((name) =>
         invalid(
           filename(`apps/api/src/${name}`),

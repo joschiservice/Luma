@@ -41,7 +41,14 @@
         "LANGFUSE_SECRET_KEY",
         "LANGFUSE_BASE_URL",
         "POSTHOG_API_KEY",
-        "POSTHOG_HOST"
+        "POSTHOG_HOST",
+        "WORKFLOW_DATABASE_URL",
+        "TEMPORAL_ADDRESS",
+        "TEMPORAL_NAMESPACE",
+        "TEMPORAL_TASK_QUEUE",
+        "TEMPORAL_DATA_REGION",
+        "TEMPORAL_TLS",
+        "TEMPORAL_API_KEY"
       ]
     },
     "build:storybook": {
