@@ -47,10 +47,29 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
   await page
     .getByRole('button', { name: 'Create workspace', exact: true })
     .click();
-  await page
-    .getByRole('heading', { name: 'Welcome to your Exception Desk.' })
-    .waitFor();
+  await page.getByRole('heading', { name: 'Room to focus.' }).waitFor();
   const organizationId = new URL(page.url()).pathname.split('/')[2];
+  await page
+    .getByRole('heading', { name: 'Connect your first system.' })
+    .waitFor();
+  expect(await page.getByText('Unavailable', { exact: true }).count()).toBe(2);
+  await page.getByLabel('Resolution window').selectOption('7d');
+  await page.waitForURL('**/overview?window=7d');
+  await page.reload();
+  expect(await page.getByLabel('Resolution window').inputValue()).toBe('7d');
+  const overviewDenied = await context.request.get(
+    `/api/v1/organizations/${randomUUID()}/operations/overview`,
+  );
+  expect(overviewDenied.status()).toBe(404);
+  const anonymous = await browser.newContext({ baseURL: origin });
+  expect(
+    (
+      await anonymous.request.get(
+        `/api/v1/organizations/${organizationId}/operations/overview`,
+      )
+    ).status(),
+  ).toBe(401);
+  await anonymous.close();
   const inbox = `/app/${organizationId}/exceptions`;
   await page.goto(inbox);
   await page.getByText('Nothing needs you.', { exact: true }).waitFor();
@@ -248,5 +267,69 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
   await page
     .getByText('Inbox could not be refreshed', { exact: true })
     .waitFor();
+  await services.diagnoses.run(tenant, ids[1]);
+  await page.goto(`/app/${organizationId}/overview`);
+  await page.locator('.operations-decisions a').first().waitFor();
+  const authoritative = await context.request.get(
+    `/api/v1/organizations/${organizationId}/operations/overview`,
+  );
+  expect(authoritative.status()).toBe(200);
+  const summary = await authoritative.json();
+  expect(
+    await page.locator('.operations-metrics strong').first().textContent(),
+  ).toBe(String(summary.attentionCount));
+  expect(
+    await page.locator('.operations-decisions a').first().getAttribute('href'),
+  ).toContain(summary.prioritizedDecisions[0].id);
+  await page.unroute('**/api/v1/organizations/*/exceptions?**');
+  await page.locator('.operations-decisions a').first().click();
+  await page.getByRole('article', { name: 'Case investigation' }).waitFor();
+  expect(new URL(page.url()).searchParams.get('view')).toBe('needs_you');
+  await page.goto(`/app/${organizationId}/overview`);
+  await page.locator('.operations-decisions a').first().waitFor();
+  await page.route(
+    '**/api/v1/organizations/*/operations/overview?**',
+    (route) =>
+      route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: '{}',
+      }),
+  );
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page
+    .getByText('Operations overview unavailable', { exact: true })
+    .waitFor();
+  expect(await page.locator('.operations-metrics').count()).toBe(0);
+  await page.unroute('**/api/v1/organizations/*/operations/overview?**');
+  await page.getByRole('button', { name: 'Retry', exact: true }).click();
+  await page.locator('.operations-decisions a').first().waitFor();
+  await context.setOffline(true);
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page
+    .getByText('Updates paused while offline', { exact: true })
+    .waitFor();
+  expect(await page.locator('.operations-metrics').count()).toBe(0);
+  expect(
+    await page
+      .getByRole('button', { name: 'Refresh', exact: true })
+      .isDisabled(),
+  ).toBe(true);
+  await context.setOffline(false);
+  await page.locator('.operations-decisions a').first().waitFor();
+  await page.screenshot({
+    path: '/tmp/luma33-overview-desktop.png',
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: '/tmp/luma33-overview-mobile.png',
+    fullPage: true,
+  });
   expect(errors).toEqual([]);
 });

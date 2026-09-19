@@ -16,3 +16,5 @@ export type {
 
 export { createCommerceIngestion } from '#modules/workflows/application/commerce';
 export type { ProjectionOutcome } from '#modules/workflows/application/commerce';
+
+export type { OperationsOverviewService } from '#modules/workflows/application/overview';

@@ -1,0 +1,52 @@
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useSearch,
+} from '@tanstack/react-router';
+import { useQuery } from '@tanstack/react-query';
+import { OperationsOverview } from '@luma/ui/components/operations-overview';
+import { overviewOptions } from './data';
+export function OverviewPage() {
+  const { organizationId } = useParams({
+    from: '/app/$organizationId/overview',
+  });
+  const { window } = useSearch({ from: '/app/$organizationId/overview' });
+  const navigate = useNavigate({ from: '/app/$organizationId/overview' });
+  const result = useQuery(overviewOptions(organizationId, window));
+  return (
+    <OperationsOverview
+      data={result.isError || result.isPaused ? undefined : result.data}
+      paused={result.isPaused}
+      loading={result.isPending}
+      error={result.isError}
+      refreshing={result.isFetching}
+      window={window}
+      onWindowChange={(value) => void navigate({ search: { window: value } })}
+      onRefresh={() => void result.refetch()}
+      connectionsLink={
+        <Link to="/app/$organizationId/connections" params={{ organizationId }}>
+          Manage connections →
+        </Link>
+      }
+      inboxLink={
+        <Link
+          to="/app/$organizationId/exceptions"
+          params={{ organizationId }}
+          search={{ view: 'needs_you' }}
+        >
+          Open attention inbox →
+        </Link>
+      }
+      decisionLink={(item) => (
+        <Link
+          to="/app/$organizationId/exceptions/$exceptionId"
+          params={{ organizationId, exceptionId: item.id }}
+          search={{ view: 'needs_you' }}
+        >
+          {item.summary}
+        </Link>
+      )}
+    />
+  );
+}

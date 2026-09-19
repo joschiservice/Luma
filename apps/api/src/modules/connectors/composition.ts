@@ -79,3 +79,5 @@ export { registerShopifyRoutes } from '#modules/connectors/api/shopify';
 export { createShopifyOAuth };
 export type { ShopifyOAuth } from '#modules/connectors/infrastructure/shopify/oauth';
 export { createSourceRecords } from '#modules/connectors/infrastructure/source-records';
+
+export { createConnectionCoverage } from '#modules/connectors/infrastructure/coverage';

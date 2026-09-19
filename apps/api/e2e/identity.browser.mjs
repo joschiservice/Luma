@@ -56,7 +56,7 @@ async function createWorkspace(page, name) {
   await page
     .getByRole('button', { name: 'Create workspace', exact: true })
     .click();
-  await heading(page, 'Welcome to your Exception Desk.');
+  await heading(page, 'Room to focus.');
   return new URL(page.url()).pathname.split('/')[2];
 }
 async function signIn(page, email = 'ada@example.test') {
@@ -80,7 +80,7 @@ it('registers, creates EU workspaces, restores links, switches tabs and revokes 
   expect(row.rows[0].data_region).toBe('EU');
   await page.screenshot({ path: '/tmp/luma-30-desktop.png', fullPage: true });
   await page.goto('/app');
-  await page.waitForURL(`**/app/${first}/overview`);
+  await page.waitForURL(`**/app/${first}/overview*`);
   await page.goto('/sign-out');
   await heading(page, 'Sign in to Luma');
   await page.goto(`/app/${first}/exceptions`);
@@ -95,10 +95,10 @@ it('registers, creates EU workspaces, restores links, switches tabs and revokes 
   await page.goto('/app');
   await heading(page, 'Choose your workspace.');
   await page.getByRole('link', { name: 'North Studio' }).click();
-  await page.waitForURL(`**/app/${first}/overview`);
+  await page.waitForURL(`**/app/${first}/overview*`);
   const tab = await context.newPage();
   await tab.goto(`/app/${second}/overview`);
-  await heading(tab, 'Welcome to your Exception Desk.');
+  await heading(tab, 'Room to focus.');
   expect(await page.locator('.workspace-switcher summary').textContent()).toBe(
     'North Studio',
   );
@@ -107,8 +107,8 @@ it('registers, creates EU workspaces, restores links, switches tabs and revokes 
   );
   await page.locator('.workspace-switcher summary').click();
   await page.getByRole('link', { name: 'South Studio', exact: true }).click();
-  await page.waitForURL(`**/app/${second}/overview`);
-  await heading(page, 'Welcome to your Exception Desk.');
+  await page.waitForURL(`**/app/${second}/overview*`);
+  await heading(page, 'Room to focus.');
   // Deliver the previous workspace's access response after a browser-history switch.
   let release;
   let received;
@@ -131,8 +131,8 @@ it('registers, creates EU workspaces, restores links, switches tabs and revokes 
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
   await requested;
   await page.goBack();
-  await page.waitForURL(`**/app/${first}/overview`);
-  await heading(page, 'Welcome to your Exception Desk.');
+  await page.waitForURL(`**/app/${first}/overview*`);
+  await heading(page, 'Room to focus.');
   release();
   await page.unroute(`**/api/v1/organizations/${second}/context`);
   expect(await page.locator('.workspace-switcher summary').textContent()).toBe(
@@ -140,8 +140,8 @@ it('registers, creates EU workspaces, restores links, switches tabs and revokes 
   );
   await page.locator('.workspace-switcher summary').click();
   await page.getByRole('link', { name: 'South Studio', exact: true }).click();
-  await page.waitForURL(`**/app/${second}/overview`);
-  await heading(page, 'Welcome to your Exception Desk.');
+  await page.waitForURL(`**/app/${second}/overview*`);
+  await heading(page, 'Room to focus.');
   await page.setViewportSize({ width: 390, height: 844 });
   const menu = page.getByRole('button', { name: 'Menu', exact: true });
   await menu.focus();
@@ -210,7 +210,7 @@ it('keeps failures recoverable and hides inaccessible tenant content', async (t)
   await page.unroute('**/api/v1/organizations');
   await page.getByRole('link', { name: 'Check workspace list' }).click();
   await page.getByRole('link', { name: 'Created once' }).click();
-  await heading(page, 'Welcome to your Exception Desk.');
+  await heading(page, 'Room to focus.');
   const organizationId = new URL(page.url()).pathname.split('/')[2];
   await db.owner.query(
     "UPDATE organizations SET status = 'suspended' WHERE id = $1",
@@ -251,7 +251,7 @@ it('keeps failures recoverable and hides inaccessible tenant content', async (t)
   expect(page.url()).toContain(`/app/${organizationId}/overview`);
   await page.unroute('**/api/v1/organizations/*/context');
   await page.getByRole('button', { name: 'Try again' }).click();
-  await heading(page, 'Welcome to your Exception Desk.');
+  await heading(page, 'Room to focus.');
   await page.route('**/api/auth/sign-out', (route) => route.abort('failed'));
   await page.goto('/sign-out');
   await heading(page, 'Sign-out not confirmed');
@@ -381,7 +381,7 @@ it('handles missing sessions, uncertain registration, conflicts and permission f
   expect(page.url()).toContain(`/app/${id}/overview`);
   await page.unroute('**/api/auth/get-session');
   await page.getByRole('button', { name: 'Try again' }).click();
-  await heading(page, 'Welcome to your Exception Desk.');
+  await heading(page, 'Room to focus.');
   await page.goto('/sign-out');
   await heading(page, 'Sign in to Luma');
   // Registration can succeed without issuing a session under another account policy.

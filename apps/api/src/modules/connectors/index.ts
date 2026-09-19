@@ -59,3 +59,5 @@ export type {
   SourceRecords,
   CommerceObservation,
 } from '#modules/connectors/application/source-records';
+
+export type { CoverageReader } from '#modules/connectors/application/coverage';

@@ -43,9 +43,7 @@ async function fixture(t) {
   await page
     .getByRole('button', { name: 'Create workspace', exact: true })
     .click();
-  await page
-    .getByRole('heading', { name: 'Welcome to your Exception Desk.' })
-    .waitFor();
+  await page.getByRole('heading', { name: 'Room to focus.' }).waitFor();
   const organizationId = new URL(page.url()).pathname.split('/')[2];
   await page.getByRole('link', { name: 'Connections', exact: true }).click();
   await page.getByText('No connections yet', { exact: true }).waitFor();
