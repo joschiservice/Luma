@@ -25,7 +25,7 @@ export async function provision(saved, migrationUrl) {
       [
         'luma_worker',
         saved.workerPassword,
-        'luma_exceptions,luma_policies,luma_execution,luma_audit',
+        'luma_exceptions,luma_policies,luma_execution,luma_audit,luma_connectors,luma_orders,luma_inventory',
       ],
     ]) {
       const exists = await client.query(

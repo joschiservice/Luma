@@ -13,3 +13,6 @@ export type {
   WorkflowProgress,
   WorkflowSource,
 } from '#modules/workflows/application/runtime';
+
+export { createCommerceIngestion } from '#modules/workflows/application/commerce';
+export type { ProjectionOutcome } from '#modules/workflows/application/commerce';

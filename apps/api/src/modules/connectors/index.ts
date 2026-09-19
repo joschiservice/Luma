@@ -54,3 +54,8 @@ export type ConnectionManagement = Omit<
   import('#modules/connectors/application/installations').InstallationService,
   'credential' | 'recordFailure'
 >;
+
+export type {
+  SourceRecords,
+  CommerceObservation,
+} from '#modules/connectors/application/source-records';
