@@ -1,3 +1,6 @@
+import { createConnectionCoverage } from '#modules/connectors/composition';
+import { createTenantDatabase } from '#modules/platform/composition';
+import { createOperationsOverview } from '#modules/workflows/composition';
 import type { ModelGateway } from '#modules/platform/index';
 import { parseInput } from '#modules/exceptions/composition';
 import { detectionFixtures } from '#test-support/detection-fixtures';
@@ -40,7 +43,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
   const tenantId = randomUUID(),
     otherTenant = randomUUID(),
     connectionId = randomUUID();
-  function context(id = tenantId) {
+  function context(id: string = tenantId) {
     return makeTenantContext(
       { userId: 'operator', sessionId: 'session' },
       {
@@ -116,7 +119,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
     await admin.query(
       `CREATE ROLE "${name}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`,
     );
-    await admin.query(`GRANT luma_exceptions TO "${name}"`);
+    await admin.query(`GRANT luma_exceptions,luma_case_reader TO "${name}"`);
     url.username = name;
     url.password = password;
     runtime = new Pool({ connectionString: url.toString() });
@@ -140,6 +143,210 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
     await admin.query(`DROP DATABASE IF EXISTS "${name}"`);
     await admin.query(`DROP ROLE IF EXISTS "${name}"`);
     await admin.end();
+  });
+  it('serves scoped overview counts, bounded priority and explicit metric availability', async () => {
+    for (let i = 0; i < 7; i++) {
+      const value = request(`overview-${i}`);
+      if (value.input.exceptionClass !== 'sync_failure')
+        throw new Error('fixture');
+      value.input.facts.connectionId = randomUUID();
+      value.input.facts.subjectId = value.input.facts.connectionId;
+      value.evidence[0]!.connectionId = value.input.facts.connectionId;
+      const incident = (await services.exceptions.ingest(context(), value))
+        .incident!;
+      await owner.query(
+        `UPDATE exceptions SET state='escalated',
+        document=document || $2::jsonb WHERE id=$1`,
+        [
+          incident.id,
+          { state: 'escalated', severity: i === 0 ? 'medium' : 'high' },
+        ],
+      );
+    }
+    const service = createOperationsOverview(
+      services.cases,
+      createConnectionCoverage(createTenantDatabase(runtime)),
+      () => now,
+    );
+    const app = buildApp(
+      {},
+      {
+        operations: service,
+        identity: {
+          resolveTenant: async (_credentials: unknown, id: string) =>
+            context(id),
+        } as unknown as IdentityService,
+      },
+    );
+    try {
+      const response = await app.inject(
+        `/v1/organizations/${tenantId}/operations/overview?window=7d`,
+      );
+      expect(response.statusCode).toBe(200);
+      const body = response.json();
+      expect(body).toMatchObject({
+        attentionCount: 7,
+        activeCount: 7,
+        automaticallyResolved: null,
+        automation: null,
+        connections: [],
+      });
+      expect(Date.parse(body.window.end) - Date.parse(body.window.start)).toBe(
+        7 * 86400000,
+      );
+      expect(body.prioritizedDecisions).toHaveLength(5);
+      expect(
+        body.prioritizedDecisions.every(
+          (item: { severity: string }) => item.severity === 'high',
+        ),
+      ).toBe(true);
+      const expected = await services.cases.list(
+        context(),
+        caseQuerySchema.parse({ limit: 5 }),
+      );
+      expect(body.prioritizedDecisions).toEqual(expected.items);
+      expect(
+        (
+          await app.inject(
+            `/v1/organizations/${otherTenant}/operations/overview`,
+          )
+        ).json(),
+      ).toMatchObject({
+        attentionCount: 0,
+        activeCount: 0,
+        prioritizedDecisions: [],
+      });
+      expect(
+        (
+          await app.inject(
+            `/v1/organizations/${tenantId}/operations/overview?window=invalid`,
+          )
+        ).statusCode,
+      ).toBe(400);
+    } finally {
+      await app.close();
+    }
+  });
+  it('counts verified resolutions only within the selected half-open window', async () => {
+    const incident = (await services.exceptions.ingest(context(), request()))
+      .incident!;
+    const end = now.toISOString();
+    const at = new Date(now.getTime() - 86400000).toISOString();
+    await owner.query(
+      `UPDATE exceptions SET state='resolved',document=document || $2::jsonb WHERE id=$1`,
+      [
+        incident.id,
+        {
+          state: 'resolved',
+          resolution: {
+            kind: 'verification',
+            actorId: 'fixture',
+            auditId: 'fixture',
+            evidenceRefs: ['fixture'],
+            outcome: 'passed',
+            complete: true,
+            authoritative: true,
+            at,
+          },
+        },
+      ],
+    );
+    expect(await services.cases.overview(context(), at, end)).toMatchObject({
+      verifiedResolutions: 1,
+      attentionCount: 0,
+      activeCount: 0,
+    });
+    expect(
+      await services.cases.overview(
+        context(),
+        new Date(Date.parse(at) + 1).toISOString(),
+        end,
+      ),
+    ).toMatchObject({ verifiedResolutions: 0 });
+    expect(
+      await services.cases.overview(
+        context(),
+        new Date(Date.parse(at) - 86400000).toISOString(),
+        at,
+      ),
+    ).toMatchObject({ verifiedResolutions: 0 });
+  });
+  it('requires per-capability observations and keeps connector secrets inaccessible to overview readers', async () => {
+    const id = randomUUID();
+    await owner.query(
+      `INSERT INTO connector_installations(tenant_id,id,version,document,secret) VALUES($1,$2,1,$3,'encrypted-fixture')`,
+      [
+        tenantId,
+        id,
+        {
+          tenantId,
+          id,
+          version: 1,
+          status: 'active',
+          label: 'Shopify',
+          granted: ['orders.read', 'inventory.read'],
+          permissions: ['orders.read', 'inventory.read'],
+        },
+      ],
+    );
+    const coverage = createConnectionCoverage(createTenantDatabase(runtime));
+    const asOf = now.toISOString();
+    try {
+      expect(await coverage(context(), asOf)).toMatchObject([
+        { freshness: 'unobserved', lastObservedAt: null },
+      ]);
+      const insert = async (capability: string, observedAt: string) =>
+        owner.query(
+          `INSERT INTO connector_observations(id,tenant_id,connection_id,ingest_key,document) VALUES($1,$2,$3,$5,$4)`,
+          [
+            randomUUID(),
+            tenantId,
+            id,
+            {
+              capability,
+              observation: {
+                source: { tenantId, connectionId: id },
+                observedAt,
+              },
+            },
+            randomUUID(),
+          ],
+        );
+      await insert('orders.read', asOf);
+      expect(await coverage(context(), asOf)).toMatchObject([
+        { freshness: 'unobserved' },
+      ]);
+      await insert(
+        'inventory.read',
+        new Date(now.getTime() - 86400001).toISOString(),
+      );
+      expect(await coverage(context(), asOf)).toMatchObject([
+        { freshness: 'stale' },
+      ]);
+      await insert(
+        'inventory.read',
+        new Date(now.getTime() + 60000).toISOString(),
+      );
+      expect(await coverage(context(), asOf)).toMatchObject([
+        { freshness: 'stale' },
+      ]);
+      await insert('inventory.read', asOf);
+      expect(await coverage(context(), asOf)).toMatchObject([
+        { freshness: 'fresh', lastObservedAt: asOf },
+      ]);
+      expect(await coverage(context(otherTenant), asOf)).toEqual([]);
+      await expect(
+        runtime.query('SELECT secret FROM connector_installations'),
+      ).rejects.toThrow('permission denied');
+    } finally {
+      await owner.query(
+        'DELETE FROM connector_observations WHERE connection_id=$1',
+        [id],
+      );
+      await owner.query('DELETE FROM connector_installations WHERE id=$1', [
+        id,
+      ]);
+    }
   });
   it('serves persisted pending and ready investigations without running a model', async () => {
     const result = await services.exceptions.ingest(context(), request());

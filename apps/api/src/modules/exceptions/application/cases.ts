@@ -36,7 +36,14 @@ export interface CaseSummary {
 export interface CaseDetail extends CaseSummary {
   diagnosis: Diagnosis | null;
 }
+export interface CaseOverview {
+  attentionCount: number;
+  activeCount: number;
+  verifiedResolutions: number;
+  prioritizedDecisions: CaseSummary[];
+}
 export interface CaseReader {
+  overview(tenantId: string, start: string, end: string): Promise<CaseOverview>;
   list(
     tenantId: string,
     query: CaseQuery,
@@ -49,6 +56,10 @@ export interface CaseReader {
 }
 export function createCaseService(reader: CaseReader) {
   return {
+    overview(context: TenantContext, start: string, end: string) {
+      requireTenant(context, context.tenantId);
+      return reader.overview(context.tenantId, start, end);
+    },
     list(context: TenantContext, query: CaseQuery) {
       requireTenant(context, context.tenantId);
       return reader.list(context.tenantId, query);

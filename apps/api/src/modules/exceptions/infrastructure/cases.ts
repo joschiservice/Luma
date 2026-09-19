@@ -169,6 +169,39 @@ export function createCaseReader(
   now: () => Date,
 ): CaseReader {
   return {
+    overview: (tenantId, start, end) =>
+      db.transaction(tenantId, async (tx) => {
+        // Counts and the bounded queue share one database snapshot and attention projection.
+        const result = await tx.query<{
+          attention_count: number;
+          active_count: number;
+          verified_resolutions: number;
+          decisions: Row[];
+        }>(
+          `${projection}
+        SELECT
+          (SELECT count(*)::integer FROM ordered WHERE attention_reason IS NOT NULL) AS attention_count,
+          (SELECT count(*)::integer FROM ordered WHERE document->>'state'<>'resolved') AS active_count,
+          (SELECT count(*)::integer FROM ordered WHERE document->>'state'='resolved'
+            AND document->'resolution'->>'kind'='verification'
+            AND (document->'resolution'->>'at')::timestamptz >= $3::timestamptz
+            AND (document->'resolution'->>'at')::timestamptz < $2::timestamptz) AS verified_resolutions,
+          COALESCE((SELECT jsonb_agg(q) FROM (SELECT * FROM ordered WHERE attention_reason IS NOT NULL
+            ORDER BY rank,sort_at::timestamptz,document->>'id' LIMIT 5) q),'[]'::jsonb) AS decisions`,
+          [tenantId, end, start],
+        );
+        const row = result.rows[0]!;
+        return {
+          attentionCount: row.attention_count,
+          activeCount: row.active_count,
+          verifiedResolutions: row.verified_resolutions,
+          prioritizedDecisions: row.decisions.map((value) => {
+            const { diagnosis, ...summary } = project(value, new Date(end));
+            void diagnosis;
+            return summary;
+          }),
+        };
+      }),
     list: (tenantId, query) =>
       db.transaction(tenantId, async (tx) => {
         const clock = now();

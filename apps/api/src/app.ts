@@ -1,3 +1,8 @@
+import { createConnectionCoverage } from '#modules/connectors/composition';
+import {
+  createOperationsOverview,
+  operationsRoutes,
+} from '#modules/workflows/composition';
 import { createSourceRecords } from '#modules/connectors/composition';
 import { createCommerceProjections as createOrderProjections } from '#modules/orders/composition';
 import { createCommerceProjections as createInventoryProjections } from '#modules/inventory/composition';
@@ -60,6 +65,7 @@ import { IdentityError } from '#modules/identity/index';
 import type { IdentityService } from '#modules/identity/index';
 
 export interface AppDependencies {
+  operations?: import('#modules/workflows/index').OperationsOverviewService;
   shopify?: import('#modules/connectors/composition').ShopifyOAuth;
   cases?: import('#modules/exceptions/index').CaseService;
   connections?: import('#modules/connectors/index').ConnectionManagement;
@@ -201,6 +207,7 @@ export function buildApp(
       apiContract,
       {
         exceptions: caseRoutes(dependencies.cases),
+        operations: operationsRoutes(dependencies.operations),
         identity: identityRoutes(dependencies.identity),
         connections: connectionRoutes(
           dependencies.connections,
@@ -312,8 +319,13 @@ export function buildRuntimeApp(
     max: 5,
     statement_timeout: 5000,
   });
+  const cases = createCases(createTenantDatabase(casePool));
   const app = buildApp(options, {
-    cases: createCases(createTenantDatabase(casePool)),
+    cases,
+    operations: createOperationsOverview(
+      cases,
+      createConnectionCoverage(createTenantDatabase(casePool)),
+    ),
     ...(observability ? { observability } : {}),
     ...(modelGateway ? { modelGateway } : {}),
     ...(connectionService ? { connections: connectionService } : {}),

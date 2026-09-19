@@ -1,6 +1,550 @@
 {
   "openapi": "3.0.2",
   "paths": {
+    "/v1/organizations/{organizationId}/operations/overview": {
+      "get": {
+        "description": "Returns current attention and active counts, up to five decisions ordered by severity then oldest request, and verified resolutions in the selected rolling window [start, end). Connection freshness requires observations for every permitted read capability within 24 hours. Null automation metrics mean eligibility or human-work attribution is unavailable. Counts describe persisted cases; fresh observations do not establish complete source coverage.",
+        "summary": "Read your operations overview",
+        "tags": ["operations"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "window",
+            "in": "query",
+            "schema": {
+              "default": "24h",
+              "type": "string",
+              "enum": ["24h", "7d"]
+            }
+          }
+        ],
+        "operationId": "operations.overview",
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "generatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "window": {
+                      "type": "object",
+                      "properties": {
+                        "start": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "end": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": ["start", "end"]
+                    },
+                    "freshnessThresholdHours": {
+                      "type": "number",
+                      "enum": [24]
+                    },
+                    "connections": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "active",
+                              "degraded",
+                              "disconnected",
+                              "revoked"
+                            ]
+                          },
+                          "lastObservedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "freshness": {
+                            "type": "string",
+                            "enum": ["fresh", "stale", "unobserved"]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label",
+                          "status",
+                          "lastObservedAt",
+                          "freshness"
+                        ]
+                      }
+                    },
+                    "attentionCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "activeCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "verifiedResolutions": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "automaticallyResolved": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "nullable": true
+                    },
+                    "automation": {
+                      "type": "object",
+                      "properties": {
+                        "numerator": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "denominator": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["numerator", "denominator"],
+                      "nullable": true
+                    },
+                    "prioritizedDecisions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "schemaVersion": {
+                            "type": "number",
+                            "enum": [1]
+                          },
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "revision": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": 0
+                          },
+                          "class": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "detected",
+                              "diagnosed",
+                              "proposed",
+                              "awaiting_approval",
+                              "allowed",
+                              "executing",
+                              "verifying",
+                              "resolved",
+                              "failed",
+                              "escalated"
+                            ]
+                          },
+                          "severity": {
+                            "type": "string",
+                            "enum": ["high", "medium"]
+                          },
+                          "summary": {
+                            "type": "string",
+                            "maxLength": 2000
+                          },
+                          "subject": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string"
+                              },
+                              "id": {
+                                "type": "string"
+                              },
+                              "scope": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                },
+                                "maxItems": 100
+                              }
+                            },
+                            "required": ["kind", "id", "scope"]
+                          },
+                          "sources": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "maxItems": 100
+                          },
+                          "detectedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "lastActivityAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "attention": {
+                            "type": "object",
+                            "properties": {
+                              "required": {
+                                "type": "boolean"
+                              },
+                              "reason": {
+                                "type": "string",
+                                "enum": [
+                                  "approval",
+                                  "manual_intervention",
+                                  "uncertainty"
+                                ],
+                                "nullable": true
+                              },
+                              "explanation": {
+                                "type": "string"
+                              },
+                              "requestedAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "required",
+                              "reason",
+                              "explanation",
+                              "requestedAt"
+                            ]
+                          },
+                          "freshness": {
+                            "type": "string",
+                            "enum": ["fresh", "stale", "unknown"]
+                          },
+                          "diagnosisStatus": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "ready",
+                              "insufficient_evidence",
+                              "failed"
+                            ]
+                          },
+                          "resolution": {
+                            "type": "string",
+                            "enum": ["verified", "human_disposition"],
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "schemaVersion",
+                          "id",
+                          "revision",
+                          "class",
+                          "state",
+                          "severity",
+                          "summary",
+                          "subject",
+                          "sources",
+                          "detectedAt",
+                          "lastActivityAt",
+                          "attention",
+                          "freshness",
+                          "diagnosisStatus",
+                          "resolution"
+                        ]
+                      },
+                      "maxItems": 5
+                    }
+                  },
+                  "required": [
+                    "generatedAt",
+                    "window",
+                    "freshnessThresholdHours",
+                    "connections",
+                    "attentionCount",
+                    "activeCount",
+                    "verifiedResolutions",
+                    "automaticallyResolved",
+                    "automation",
+                    "prioritizedDecisions"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/organizations/{organizationId}/exceptions": {
       "get": {
         "description": "Filter attention, active work or history by class, severity and state. Results sort by severity, oldest attention request or detection, then ID. Use the returned cursor with the same filters. Refresh from the first page as cases change.",
