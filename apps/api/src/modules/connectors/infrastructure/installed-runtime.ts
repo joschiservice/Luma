@@ -52,8 +52,9 @@ export function createInstalledRuntime(options: InstalledRuntimeOptions) {
               );
             const latest = await installations.credential(context, id, cap);
             if (
+              target.kind !== 'shopify' &&
               latest.connection.credentialVersion !==
-              current.connection.credentialVersion
+                current.connection.credentialVersion
             )
               throw new ConnectorError({
                 code: 'conflict',
@@ -155,7 +156,30 @@ export function createInstalledRuntime(options: InstalledRuntimeOptions) {
                   effect: 'none',
                   retry: 'never',
                 });
-              return current.run(invocation, input);
+              if (connection.target.kind !== 'shopify')
+                return current.run(invocation, input);
+              const snapshot = await installations.credential(
+                context,
+                id,
+                capability,
+              );
+              try {
+                return await current.run(invocation, input);
+              } catch (error) {
+                if (
+                  error instanceof ConnectorError &&
+                  (error.failure.code === 'authentication' ||
+                    error.failure.code === 'permission_denied')
+                ) {
+                  await installations.recordFailure(
+                    context,
+                    id,
+                    snapshot.connection.credentialVersion,
+                    error.failure.code,
+                  );
+                }
+                throw error;
+              }
             },
           },
         });

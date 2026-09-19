@@ -159,6 +159,24 @@ const connectionVersion = z
   .strict();
 const connectionsContract = c.router(
   {
+    shopifyStart: {
+      method: 'POST',
+      path: '/v1/organizations/:organizationId/connections/shopify/authorize',
+      pathParams: organizationParamsSchema,
+      body: z
+        .object({
+          shop: z
+            .string()
+            .max(253)
+            .regex(/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.myshopify\.com$/),
+          label: z.string().trim().min(1).max(120),
+        })
+        .strict(),
+      responses: { 200: z.object({ authorizationUrl: z.string().url() }) },
+      summary: 'Connect or reconnect Shopify',
+      description:
+        'Owners and admins receive a Shopify authorization URL. Approve access in Shopify to connect the store to this workspace.',
+    },
     list: {
       method: 'GET',
       path: '/v1/organizations/:organizationId/connections',

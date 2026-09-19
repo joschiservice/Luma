@@ -29,7 +29,23 @@ const schema = buildClientSchema(body.data);
 
 // Retain provider definitions for the adapter's surface, including every argument and its type.
 const fields = {
-  QueryRoot: ['node', 'orders', 'products', 'inventoryItems'],
+  QueryRoot: [
+    'node',
+    'orders',
+    'products',
+    'inventoryItems',
+    'shop',
+    'currentAppInstallation',
+    'webhookSubscriptions',
+  ],
+  Mutation: ['webhookSubscriptionCreate'],
+  Shop: ['id', 'myshopifyDomain'],
+  AppInstallation: ['id', 'accessScopes'],
+  AccessScope: ['handle'],
+  WebhookSubscriptionConnection: ['nodes'],
+  WebhookSubscription: ['id', 'uri'],
+  WebhookSubscriptionCreatePayload: ['webhookSubscription', 'userErrors'],
+  UserError: ['message'],
   Node: ['id'],
   Order: [
     'id',
@@ -119,7 +135,7 @@ function include(name) {
   });
 }
 for (const name of Object.keys(fields)) include(name);
-const document = `# Generated from ${source}\n# Adapter surface only; regenerate with scripts/update-shopify-schema.mjs.\nschema { query: QueryRoot }\n\n${[...definitions.values()].map(print).join('\n\n')}\n`;
+const document = `# Generated from ${source}\n# Adapter surface only; regenerate with scripts/update-shopify-schema.mjs.\nschema { query: QueryRoot mutation: Mutation }\n\n${[...definitions.values()].map(print).join('\n\n')}\n`;
 assertValidSchema(buildSchema(document));
 const destination = new URL(
   `../src/modules/connectors/infrastructure/shopify/fixtures/admin-${version}.graphql`,

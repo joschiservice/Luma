@@ -1,3 +1,5 @@
+import type { ShopifyAppConfig as ShopifyConfig } from '#modules/connectors/application/shopify';
+import { createShopifyOAuth } from '#modules/connectors/infrastructure/shopify/oauth';
 import { randomUUID } from 'node:crypto';
 import type { TenantDatabase } from '#modules/platform/index';
 import { createInstallationService as createService } from '#modules/connectors/application/installations';
@@ -33,18 +35,29 @@ export type { JtlConnection } from '#modules/connectors/infrastructure/jtl/clien
 export function createInstalledConnections(
   db: TenantDatabase,
   options: Pick<InstallationDependencies, 'refreshContext' | 'verify'> & {
+    shopify?: ShopifyConfig;
     activeKeyId: string;
     keys: ReadonlyMap<string, Uint8Array>;
   },
 ) {
-  return createInstallationService({
+  const cipher = createSecretCipher(options.activeKeyId, options.keys);
+  const shopify = options.shopify
+    ? createShopifyOAuth(db, options.shopify, {
+        cipher,
+        refreshContext: options.refreshContext,
+        verify: options.verify,
+      })
+    : undefined;
+  const service = createInstallationService({
+    ...(shopify ? { shopifyCredential: shopify.credential } : {}),
     repository: createInstallationRepository(db),
-    cipher: createSecretCipher(options.activeKeyId, options.keys),
+    cipher,
     refreshContext: options.refreshContext,
     verify: options.verify,
     id: randomUUID,
     now: () => new Date(),
   });
+  return { ...service, shopify };
 }
 export { createInstalledRuntime } from '#modules/connectors/infrastructure/installed-runtime';
 export type { InstalledRuntimeOptions } from '#modules/connectors/infrastructure/installed-runtime';
@@ -61,3 +74,7 @@ export type { ShippingMethodEffectBinding } from '#modules/connectors/applicatio
 export { connectionRoutes } from '#modules/connectors/api/installations';
 
 export { createInstallationVerifier } from '#modules/connectors/infrastructure/installation-verifier';
+
+export { registerShopifyRoutes } from '#modules/connectors/api/shopify';
+export { createShopifyOAuth };
+export type { ShopifyOAuth } from '#modules/connectors/infrastructure/shopify/oauth';

@@ -68,11 +68,13 @@ async function save(page, label) {
   return card;
 }
 
-it('connects all supported targets, validates, replaces invalid credentials and disconnects', async (t) => {
+it('connects JTL targets, validates, replaces invalid credentials and disconnects', async (t) => {
   const { page, context, db, errors, organizationId } = await fixture(t);
   expect(await page.title()).toBe('Luma');
-  await setup(page, 'Shopify', 'Main shop', 'invalid-test-token');
-  await page.getByLabel('Shop hostname').fill('north.myshopify.com');
+  await setup(page, 'JTL Cloud', 'Main shop', 'invalid-test-token');
+  await page
+    .getByLabel('JTL Cloud tenant ID')
+    .fill('22222222-2222-4222-8222-222222222222');
   const shop = await save(page, 'Main shop');
   await shop.getByRole('button', { name: 'Validate access' }).click();
   await shop.getByText('Needs attention', { exact: true }).waitFor();
@@ -164,7 +166,7 @@ it('connects all supported targets, validates, replaces invalid credentials and 
   await page.getByText('You can view connections.', { exact: false }).waitFor();
   expect(
     await page
-      .getByRole('button', { name: 'Set up Shopify', exact: true })
+      .getByRole('button', { name: 'Connect Shopify', exact: true })
       .isDisabled(),
   ).toBe(true);
   expect(
@@ -199,8 +201,10 @@ it('connects all supported targets, validates, replaces invalid credentials and 
 
 it('preserves non-secret input on errors, handles stale versions and unavailable service', async (t) => {
   const { page, context, organizationId } = await fixture(t);
-  await setup(page, 'Shopify', 'Keep this name');
-  await page.getByLabel('Shop hostname').fill('draft.myshopify.com');
+  await setup(page, 'JTL Cloud', 'Keep this name');
+  await page
+    .getByLabel('JTL Cloud tenant ID')
+    .fill('22222222-2222-4222-8222-222222222222');
   await page.route('**/api/v1/organizations/*/connections', (route) =>
     route.request().method() === 'POST'
       ? route.fulfill({
@@ -264,3 +268,35 @@ it('preserves non-secret input on errors, handles stale versions and unavailable
   await page.getByRole('button', { name: 'Refresh list' }).click();
   await card.waitFor();
 }, 120_000);
+
+it('starts Shopify authorization without token fields and reports callback outcomes', async (t) => {
+  const { page, errors } = await fixture(t);
+  await page
+    .getByRole('button', { name: 'Connect Shopify', exact: true })
+    .click();
+  expect(await page.getByLabel('Access token', { exact: true }).count()).toBe(
+    0,
+  );
+  await page.getByLabel('Connection name').fill('Dev shop');
+  await page.getByLabel('Shop hostname').fill('dev-shop.myshopify.com');
+  await page.route('**/connections/shopify/authorize', (route) =>
+    route.fulfill({
+      status: 200,
+      json: {
+        authorizationUrl:
+          'https://dev-shop.myshopify.com/admin/oauth/authorize?state=opaque-state',
+      },
+    }),
+  );
+  await page.route('https://dev-shop.myshopify.com/**', (route) =>
+    route.fulfill({ status: 200, body: 'Shopify approval' }),
+  );
+  const returnUrl = page.url();
+  await page.getByRole('button', { name: 'Continue to Shopify' }).click();
+  await page.waitForURL('https://dev-shop.myshopify.com/**');
+  await page.goto(returnUrl + '?shopify=denied');
+  await page
+    .getByText('Shopify access was not approved. Connect again when ready.')
+    .waitFor();
+  expect(errors).toEqual([]);
+}, 120000);

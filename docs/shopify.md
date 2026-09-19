@@ -58,3 +58,144 @@ pnpm exec prettier --write apps/api/src/modules/connectors/infrastructure/shopif
 ```
 
 References: [orders and historical access](https://shopify.dev/docs/api/admin-graphql/latest/queries/orders), [inventory items](https://shopify.dev/docs/api/admin-graphql/latest/objects/InventoryItem), [fulfillment orders](https://shopify.dev/docs/api/admin-graphql/latest/objects/FulfillmentOrder), [order shipments](https://shopify.dev/docs/api/admin-graphql/latest/objects/Order#field-Order.fields.fulfillments), [webhook verification](https://shopify.dev/docs/apps/build/webhooks/verify-deliveries), [API limits](https://shopify.dev/docs/api/usage/limits).
+
+## Connect Shopify
+
+Owners and admins choose **Connect Shopify**, name the connection, and enter the
+store's permanent `*.myshopify.com` hostname. Shopify asks them to approve read
+access. On return, Luma verifies access and enables the connection. No merchant
+app creation or token entry is required. **Reconnect Shopify** reauthorizes the
+same connection, including disconnected or revoked installations.
+
+The app requests `read_orders`, `read_products`, `read_inventory`,
+`read_merchant_managed_fulfillment_orders` and
+`read_third_party_fulfillment_orders`. It does not request write scopes or
+`read_assigned_fulfillment_orders`: Luma is not a fulfillment service. Historical
+orders beyond 60 days require separately approved `read_all_orders`; add this
+only when historical reconciliation is approved and supported.
+
+### Development app and store
+
+1. Create a Luma development app and development store in Shopify's Dev Dashboard.
+   Use synthetic orders, products, inventory and fulfillment data. Coordinate
+   shared pilot fixtures with LUMA-31; do not use production customer data.
+2. Configure the app as non-embedded. Enable the legacy installation flow
+   (`use_legacy_install_flow = true`) for the standalone authorization-code grant.
+   Set the scopes above and webhook API version `2026-07`.
+3. Run `mise run setup`, then expose this checkout's printed **web** port through
+   a public HTTPS tunnel. The web server proxies `/api` to the local API. For
+   Tailscale, use `tailscale funnel --bg http://127.0.0.1:<web-port>` after granting
+   Funnel to your account. Use a neutral device hostname if certificate
+   transparency records should not contain your personal machine name.
+4. Put the following in `apps/api/.env`, which is ignored by Git:
+
+   ```dotenv
+   SHOPIFY_CLIENT_ID=<development app client ID>
+   SHOPIFY_CLIENT_SECRET=<development app client secret>
+   SHOPIFY_APP_ENVIRONMENT=development
+   SHOPIFY_CALLBACK_URL=https://<public-host>/api/v1/shopify/callback
+   SHOPIFY_WEB_ORIGIN=https://<public-host>
+   ```
+
+5. Set Shopify's app URL to the web origin and allow the **exact** callback URL.
+   Publish the app configuration version. Restart `mise run dev`; the managed
+   development environment uses `SHOPIFY_WEB_ORIGIN` for auth and allows that
+   host through Vite. Sign in through the public HTTPS origin before connecting.
+   Manually managed environments must also set `BETTER_AUTH_URL` and
+   `AUTH_TRUSTED_ORIGINS` to that origin, and permit its hostname in Vite.
+6. Open Connections, connect the development store, approve access, and confirm
+   **Validated**. Luma registers an installation-specific `app/uninstalled`
+   subscription before activation. Keep the tunnel running for webhook delivery.
+7. After testing, stop public exposure with `tailscale funnel --https=443 off`.
+
+The managed setup provides connection encryption keys. Other environments must
+configure `CONNECTIONS_ACTIVE_KEY_ID` and `CONNECTIONS_KEYS` and apply migration
+`0006_shopify_oauth.sql`. Never put app secrets in `VITE_*` variables.
+
+### Optional live pilot and public production app
+
+Use a separate custom-distribution app only for an eligible live merchant pilot.
+Custom distribution has merchant restrictions and cannot be converted to public
+distribution. The merchant later installs the public app and reconnects. Use a
+separate database/environment for the pilot; do not share credentials with the
+local development app.
+
+Production uses **one Luma-owned public app** for unrelated merchants. Each shop
+has its own installation and offline token pair. Set all five Shopify settings
+to production values, use a stable public HTTPS origin, and keep app credentials
+in the deployment secret manager. Code is shared; credentials, redirects,
+encryption keys and installations are separate per environment.
+
+Before public launch:
+
+- Complete Shopify public-app review and distribution approval.
+- Obtain protected customer data access required for order reads. Request only
+  the data needed by Luma; the adapter excludes customer and address fields.
+- Implement and register the required `customers/data_request`,
+  `customers/redact`, and `shop/redact` privacy webhooks with verified signatures
+  and the applicable data-access/deletion workflows. The uninstall endpoint does
+  not replace these compliance handlers.
+- Verify production scopes, callback allowlists, uninstall delivery, encrypted
+  backups, key rotation and recovery with the approved app.
+
+### Authorization and recovery guarantees
+
+The start route requires a current owner/admin and trusted request origin. State
+is random, stored as a hash, expires after ten minutes, and is consumed once. It
+binds the current login session, operator, tenant, shop and app environment.
+Callbacks require Shopify's HMAC over the complete decoded, sorted query;
+duplicate parameters and mismatches are rejected. Credentials never enter the
+browser response, query cache or request logs.
+
+Tokens use `expiring=1`. Access tokens, refresh tokens, provider expiry metadata,
+app binding and granted scopes share the existing tenant-bound AES-GCM envelope.
+PostgreSQL advisory and installation-row locks serialize authorization and
+refresh across processes. Both rotated credentials and their lifecycle event
+commit together. A token is refreshed within 60 seconds of expiry on the next
+read, including workflow reads with no browser session. Temporary failures keep
+the stored pair for retry; rejected or expired refresh credentials revoke the
+connection and require reconnect. An uncertain authorization exchange can require
+reconnect because a remote token issue and local database commit cannot be one
+transaction.
+
+One app/shop pair is reserved to one workspace. Reconnect reuses its connection
+ID; another tenant cannot claim it. Existing duplicate manual installations must
+be resolved before migration. Manual token setup remains available to internal
+fixtures and deployments without OAuth configured; the normal UI uses OAuth.
+
+A signed uninstall request checks the stored shop/app binding and current token
+before revoking, so delayed deliveries cannot disable a newer working install.
+Expired tokens are refreshed before that check. Revocation deletes the encrypted
+secret and disables capabilities. Failed verification is retried by Shopify;
+requests already sent may finish. Provider authentication and permission errors
+also update connection health, without storing raw provider errors.
+
+### Validation record
+
+Automated coverage includes PostgreSQL RLS, callback HMAC and replay, operator and
+session binding, app isolation, cancellation, missing scopes, concurrent refresh,
+rotated credentials, transient failures, revocation, uninstall and reconnect.
+Browser coverage checks Connect Shopify without credential fields and callback
+recovery messages.
+
+Live smoke test, 2026-09-18: Shopify development store
+`luma-dev-store-1dmrgwsn.myshopify.com`, development app version `luma-2`, API
+`2026-07`. Safari completed Connect Shopify and reconnect through a public HTTPS
+callback. The connection became active with all four read capabilities and kept
+its ID on reconnect. Both token expiries and all five scopes were present in the
+encrypted credential envelope. An installation-specific uninstall subscription
+was registered. After signing out a separate test login, the installed runtime
+resolved workflow identity and successfully read two products and two inventory
+observations; orders and fulfillment returned valid empty pages. Expiry/rotation,
+uninstall and replay were exercised with automated fixtures; the live test did
+not wait for the one-hour token expiry or uninstall the development app.
+
+The first live attempt exposed an incorrect GraphQL scalar in uninstall webhook
+registration. The mutation now uses `String!`, and OAuth integration tests validate
+emitted operations against the versioned Shopify schema snapshot.
+
+References: [standalone authentication](https://shopify.dev/docs/apps/build/authentication-authorization/authenticate-standalone-apps),
+[access tokens and rotation](https://shopify.dev/docs/apps/build/authentication-authorization/access-tokens),
+[app distribution](https://shopify.dev/docs/apps/launch/distribution),
+[protected customer data](https://shopify.dev/docs/apps/launch/protected-customer-data),
+[privacy webhooks](https://shopify.dev/docs/apps/build/privacy-law-compliance).

@@ -44,6 +44,10 @@ export interface InstallationDependencies {
     connection: InstalledConnection,
     credentials: InstallationCredentials,
   ): Promise<InstallationCapability[]>;
+  shopifyCredential?(
+    context: TenantContext,
+    id: string,
+  ): Promise<InstallationCredentials>;
   id(): string;
   now(): Date;
 }
@@ -238,6 +242,37 @@ export function createInstallationService(deps: InstallationDependencies) {
         status,
       );
     },
+    /** Record provider authorization failures only for the credentials that failed. */
+    async recordFailure(
+      context: TenantContext,
+      id: string,
+      credentialVersion: number,
+      code: 'authentication' | 'permission_denied',
+    ) {
+      const fresh = await authorize(context);
+      const record = await get(fresh, id);
+      if (
+        record.connection.target.kind !== 'shopify' ||
+        record.connection.status !== 'active' ||
+        record.connection.credentialVersion !== credentialVersion
+      )
+        return;
+      await deps.repository.save(
+        {
+          connection: {
+            ...record.connection,
+            status: code === 'authentication' ? 'revoked' : 'degraded',
+            granted: [],
+            version: record.connection.version + 1,
+            updatedAt: deps.now().toISOString(),
+          },
+          secret: code === 'authentication' ? null : record.secret,
+        },
+        record.connection.version,
+        fresh.actor.id,
+        'shopify_access_failed',
+      );
+    },
     /** Trusted adapter port. Never expose credentials through HTTP or workflow interfaces. */
     async credential(
       context: TenantContext,
@@ -261,6 +296,31 @@ export function createInstallationService(deps: InstallationDependencies) {
           effect: 'none',
           retry: 'never',
         });
+      if (
+        record.connection.target.kind === 'shopify' &&
+        deps.shopifyCredential
+      ) {
+        await deps.shopifyCredential(fresh, id);
+        const latest = await get(fresh, id);
+        if (latest.connection.status !== 'active' || !latest.secret)
+          throw unavailable();
+        if (
+          !latest.connection.permissions.includes(capability) ||
+          !latest.connection.granted.includes(capability)
+        )
+          throw new ConnectorError({
+            code: 'permission_denied',
+            effect: 'none',
+            retry: 'never',
+          });
+        return {
+          connection: latest.connection,
+          credentials: deps.cipher.open(
+            latest.secret,
+            secretBinding(latest.connection),
+          ),
+        };
+      }
       return {
         connection: record.connection,
         credentials: deps.cipher.open(

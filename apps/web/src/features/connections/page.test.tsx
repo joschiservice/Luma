@@ -62,3 +62,14 @@ it('shows members capability information without management controls', () => {
   expect(html).toContain('Read and write access');
   expect(html).not.toContain('<button');
 });
+
+it('offers Shopify reconnect for revoked installations without manual credentials', () => {
+  const html = render({
+    ...fixture,
+    target: { kind: 'shopify', shop: 'dev.myshopify.com' },
+    status: 'revoked',
+  });
+  expect(html).toContain('Reconnect Shopify');
+  expect(html).not.toContain('Replace credentials');
+  expect(html).not.toContain('Validate access');
+});
