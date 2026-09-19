@@ -16,7 +16,8 @@ export function OverviewPage() {
   const result = useQuery(overviewOptions(organizationId, window));
   return (
     <OperationsOverview
-      data={result.isError ? undefined : result.data}
+      data={result.isError || result.isPaused ? undefined : result.data}
+      paused={result.isPaused}
       loading={result.isPending}
       error={result.isError}
       refreshing={result.isFetching}

@@ -19,7 +19,12 @@ even if another capability has recent data. Installation or credential update
 times never establish freshness. A recent observation does not prove complete
 source coverage. The UI distinguishes onboarding, missing observations, stale
 data, inactive connections, active work, explicit attention and healthy observed
-operations. Failures hide previous health claims and totals until retry succeeds.
+operations. Intentionally disconnected installations remain visible as history but
+do not affect monitored health. Revoked, degraded and pending connections still
+require attention. When all connections are retired, health remains unknown.
+Failures hide previous health claims and totals until retry succeeds. Offline
+queries show a paused notice and hide health and totals, including before the
+first load. Reconnection resumes the query automatically.
 
 Automation eligibility and human-work attribution are not persisted yet. Both
 `automaticallyResolved` and `automation` therefore return null. The UI displays

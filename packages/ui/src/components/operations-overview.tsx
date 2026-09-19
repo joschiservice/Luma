@@ -9,6 +9,7 @@ import { CaseLoading, CaseNotice } from './case-investigation';
 export interface OperationsOverviewProps {
   data?: Summary | undefined;
   loading?: boolean;
+  paused?: boolean;
   error?: boolean;
   refreshing?: boolean;
   window: '24h' | '7d';
@@ -28,19 +29,26 @@ export function overviewState(data: Summary) {
       description:
         'Start with Shopify or JTL-Wawi. Observations will bring your operations into view.',
     };
-  if (data.connections.some((c) => c.status !== 'active'))
+  const monitored = data.connections.filter((c) => c.status !== 'disconnected');
+  if (!monitored.length)
+    return {
+      title: 'No connected systems.',
+      description:
+        'Your previous connections are disconnected. Connect a system to monitor operations again.',
+    };
+  if (monitored.some((c) => c.status !== 'active'))
     return {
       title: 'Check your connections.',
       description:
         'Some systems are not active. Review their connection status before relying on operational health.',
     };
-  if (data.connections.some((c) => c.freshness === 'unobserved'))
+  if (monitored.some((c) => c.freshness === 'unobserved'))
     return {
       title: 'Waiting for observations.',
       description:
         'Health is unknown. At least one system has no observations for a permitted read capability.',
     };
-  if (data.connections.some((c) => c.freshness === 'stale'))
+  if (monitored.some((c) => c.freshness === 'stale'))
     return {
       title: 'Your data needs a refresh.',
       description:
@@ -61,12 +69,13 @@ export function overviewState(data: Summary) {
   return {
     title: 'Observed operations look healthy.',
     description:
-      'Connections have recent observations and no active cases are recorded. Source coverage may still be incomplete.',
+      'Monitored connections have recent observations and no active cases are recorded. Source coverage may still be incomplete.',
   };
 }
 export function OperationsOverview({
   data,
   loading,
+  paused,
   error,
   refreshing,
   window,
@@ -96,12 +105,21 @@ export function OperationsOverview({
               <option value="7d">Last 7 days</option>
             </select>
           </label>
-          <Button variant="outline" onClick={onRefresh} disabled={refreshing}>
+          <Button
+            variant="outline"
+            onClick={onRefresh}
+            disabled={refreshing || paused}
+          >
             {error ? 'Retry' : 'Refresh'}
           </Button>
         </div>
       </header>
-      {loading ? (
+      {paused ? (
+        <CaseNotice title="Updates paused while offline">
+          Current health and totals are unavailable. Reconnect to refresh the
+          overview automatically.
+        </CaseNotice>
+      ) : loading ? (
         <CaseLoading />
       ) : error ? (
         <CaseNotice error title="Operations overview unavailable">
@@ -221,11 +239,13 @@ export function OperationsOverview({
                         <strong>{c.label}</strong>
                         <span>
                           {c.status} ·{' '}
-                          {c.freshness === 'unobserved'
-                            ? 'Missing observations'
-                            : c.freshness === 'stale'
-                              ? 'Stale data'
-                              : 'Recent observations'}
+                          {c.status === 'disconnected'
+                            ? 'Not monitored'
+                            : c.freshness === 'unobserved'
+                              ? 'Missing observations'
+                              : c.freshness === 'stale'
+                                ? 'Stale data'
+                                : 'Recent observations'}
                         </span>
                       </div>
                       <small>

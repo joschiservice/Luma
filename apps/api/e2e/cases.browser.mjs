@@ -304,6 +304,19 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
   await page.unroute('**/api/v1/organizations/*/operations/overview?**');
   await page.getByRole('button', { name: 'Retry', exact: true }).click();
   await page.locator('.operations-decisions a').first().waitFor();
+  await context.setOffline(true);
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page
+    .getByText('Updates paused while offline', { exact: true })
+    .waitFor();
+  expect(await page.locator('.operations-metrics').count()).toBe(0);
+  expect(
+    await page
+      .getByRole('button', { name: 'Refresh', exact: true })
+      .isDisabled(),
+  ).toBe(true);
+  await context.setOffline(false);
+  await page.locator('.operations-decisions a').first().waitFor();
   await page.screenshot({
     path: '/tmp/luma33-overview-desktop.png',
     fullPage: true,

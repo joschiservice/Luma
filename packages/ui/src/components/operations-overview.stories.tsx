@@ -165,3 +165,76 @@ export const ServiceFailure: Story = {
     await expect(args.onRefresh).toHaveBeenCalled();
   },
 };
+
+const retired: Summary['connections'][number] = {
+  ...data.connections[0]!,
+  id: '33333333-3333-4333-8333-333333333333',
+  label: 'Previous store',
+  status: 'disconnected',
+  freshness: 'unobserved',
+  lastObservedAt: null,
+};
+export const HealthyWithRetiredConnection: Story = {
+  args: { data: { ...data, connections: [...data.connections, retired] } },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByText('Observed operations look healthy.'),
+    ).toBeVisible();
+    await expect(
+      canvas.getByText('disconnected · Not monitored'),
+    ).toBeVisible();
+    await expect(
+      canvas.queryByText('Check your connections.'),
+    ).not.toBeInTheDocument();
+  },
+};
+export const AllConnectionsRetired: Story = {
+  args: { data: { ...data, connections: [retired] } },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByRole('heading', { name: 'No connected systems.' }),
+    ).toBeVisible();
+    await expect(
+      canvas.queryByText('Observed operations look healthy.'),
+    ).not.toBeInTheDocument();
+  },
+};
+export const RevokedConnection: Story = {
+  args: {
+    data: {
+      ...data,
+      connections: [...data.connections, { ...retired, status: 'revoked' }],
+    },
+  },
+  play: async ({ canvasElement }) => {
+    await expect(
+      within(canvasElement).getByText('Check your connections.'),
+    ).toBeVisible();
+  },
+};
+export const OfflineAfterSuccess: Story = {
+  args: { paused: true },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByText('Updates paused while offline'),
+    ).toBeVisible();
+    await expect(
+      canvas.queryByText('Observed operations look healthy.'),
+    ).not.toBeInTheDocument();
+    await expect(canvas.queryByText('75%')).not.toBeInTheDocument();
+    await expect(
+      canvas.getByRole('button', { name: 'Refresh' }),
+    ).toBeDisabled();
+  },
+};
+export const OfflineBeforeFirstLoad: Story = {
+  args: { paused: true, loading: true, data: undefined },
+  play: async ({ canvasElement }) => {
+    await expect(
+      within(canvasElement).getByText('Updates paused while offline'),
+    ).toBeVisible();
+  },
+};
