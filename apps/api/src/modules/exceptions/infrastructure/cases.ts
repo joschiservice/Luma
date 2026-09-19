@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type {
   CaseDetail,
   CaseQuery,
+  CaseEvidencePage,
 } from '#modules/exceptions/application/cases';
 import type { TenantDatabase } from '#modules/platform/index';
 import type { CaseReader } from '#modules/exceptions/application/cases';
@@ -169,6 +170,83 @@ export function createCaseReader(
   now: () => Date,
 ): CaseReader {
   return {
+    evidence: (tenantId, id, query) =>
+      db.transaction(tenantId, async (tx) => {
+        const found = await tx.query(
+          'SELECT id FROM exceptions WHERE tenant_id=$1 AND id=$2',
+          [tenantId, id],
+        );
+        if (!found.rowCount) return null;
+        const key = createHash('sha256')
+          .update(
+            JSON.stringify([
+              'case-evidence-v1',
+              tenantId,
+              id,
+              query.limit,
+              'id:C:asc',
+            ]),
+          )
+          .digest('hex');
+        let after: string | null = null;
+        if (query.cursor) {
+          try {
+            const bytes = Buffer.from(query.cursor, 'base64url');
+            if (bytes.toString('base64url') !== query.cursor)
+              throw new Error('Invalid encoding');
+            const cursor = z
+              .object({ context: z.string(), id: z.string().min(1).max(512) })
+              .strict()
+              .parse(JSON.parse(bytes.toString('utf8')));
+            if (cursor.context !== key)
+              throw new Error('Cursor context mismatch');
+            after = cursor.id;
+          } catch {
+            throw Object.assign(new Error('Invalid cursor context'), {
+              statusCode: 400,
+            });
+          }
+        }
+        // Select only provenance fields. Provider payloads and arbitrary facts never cross this boundary.
+        const result = await tx.query<{
+          item: CaseEvidencePage['items'][number];
+        }>(
+          `
+          WITH refs AS (
+            SELECT ref.id FROM exception_evidence e
+            JOIN exception_inputs i ON i.tenant_id=e.tenant_id AND i.evidence_key=e.evidence_key
+            CROSS JOIN LATERAL jsonb_array_elements_text(i.document->'facts'->'evidenceRefs') AS ref(id)
+            WHERE e.tenant_id=$1 AND e.exception_id=$2
+            UNION
+            SELECT jsonb_array_elements_text(document->'resolution'->'evidenceRefs')
+            FROM exceptions WHERE tenant_id=$1 AND id=$2
+          )
+          SELECT jsonb_build_object(
+            'id',s.evidence_key, 'observedAt',s.document->'observedAt',
+            'sourceUpdatedAt',s.document->'sourceUpdatedAt',
+            'adapterVersion',s.document->'adapterVersion', 'schemaVersion',s.document->'schemaVersion',
+            'source',s.document->'source',
+            'completeness',CASE s.document->'facts'->'complete'
+              WHEN 'true'::jsonb THEN 'complete' WHEN 'false'::jsonb THEN 'incomplete' ELSE 'unknown' END
+          ) AS item
+          FROM refs JOIN exception_sources s ON s.tenant_id=$1 AND s.evidence_key=refs.id
+          WHERE ($3::text IS NULL OR s.evidence_key COLLATE "C" > $3::text COLLATE "C")
+          ORDER BY s.evidence_key COLLATE "C" LIMIT $4`,
+          [tenantId, id, after, query.limit + 1],
+        );
+        const items = result.rows.slice(0, query.limit).map((row) => row.item);
+        const last = items.at(-1);
+        return {
+          schemaVersion: 1,
+          items,
+          nextCursor:
+            result.rows.length > query.limit && last
+              ? Buffer.from(
+                  JSON.stringify({ context: key, id: last.id }),
+                ).toString('base64url')
+              : null,
+        };
+      }),
     overview: (tenantId, start, end) =>
       db.transaction(tenantId, async (tx) => {
         // Counts and the bounded queue share one database snapshot and attention projection.

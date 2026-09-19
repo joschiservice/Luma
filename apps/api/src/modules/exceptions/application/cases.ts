@@ -42,7 +42,23 @@ export interface CaseOverview {
   verifiedResolutions: number;
   prioritizedDecisions: CaseSummary[];
 }
+export interface CaseEvidenceQuery {
+  cursor?: string | undefined;
+  limit: number;
+}
+export interface CaseEvidencePage {
+  schemaVersion: 1;
+  items: (Diagnosis['provenance']['evidence'][number] & {
+    completeness: 'complete' | 'incomplete' | 'unknown';
+  })[];
+  nextCursor: string | null;
+}
 export interface CaseReader {
+  evidence(
+    tenantId: string,
+    id: string,
+    query: CaseEvidenceQuery,
+  ): Promise<CaseEvidencePage | null>;
   overview(tenantId: string, start: string, end: string): Promise<CaseOverview>;
   list(
     tenantId: string,
@@ -56,6 +72,10 @@ export interface CaseReader {
 }
 export function createCaseService(reader: CaseReader) {
   return {
+    evidence(context: TenantContext, id: string, query: CaseEvidenceQuery) {
+      requireTenant(context, context.tenantId);
+      return reader.evidence(context.tenantId, id, query);
+    },
     overview(context: TenantContext, start: string, end: string) {
       requireTenant(context, context.tenantId);
       return reader.overview(context.tenantId, start, end);

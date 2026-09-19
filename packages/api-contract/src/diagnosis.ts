@@ -4,6 +4,25 @@ const ref = z.string().min(1).max(512);
 const text = z.string().min(1).max(2000);
 const refs = z.array(ref).max(100);
 const finding = z.object({ code: ref, text, evidenceRefs: refs }).strict();
+export const evidenceReferenceSchema = z
+  .object({
+    id: ref,
+    observedAt: z.string().datetime(),
+    sourceUpdatedAt: z.string().datetime().nullable(),
+    adapterVersion: ref,
+    schemaVersion: z.number().int().positive(),
+    source: z
+      .object({
+        provider: ref,
+        resource: ref,
+        externalId: ref,
+        scopeKey: z.string(),
+      })
+      .strict()
+      .nullable(),
+  })
+  .strict();
+
 /** Persisted investigation. Attention and next steps are suggestions, not permission to act. */
 export const diagnosisSchema = z
   .object({
@@ -84,28 +103,7 @@ export const diagnosisSchema = z
         ruleVersion: ref,
         configVersion: ref,
         mappingVersions: refs,
-        evidence: z
-          .array(
-            z
-              .object({
-                id: ref,
-                observedAt: z.string().datetime(),
-                sourceUpdatedAt: z.string().datetime().nullable(),
-                adapterVersion: ref,
-                schemaVersion: z.number().int().positive(),
-                source: z
-                  .object({
-                    provider: ref,
-                    resource: ref,
-                    externalId: ref,
-                    scopeKey: z.string(),
-                  })
-                  .strict()
-                  .nullable(),
-              })
-              .strict(),
-          )
-          .max(100),
+        evidence: z.array(evidenceReferenceSchema).max(100),
         validUntil: z.string().datetime().nullable(),
         model: z
           .object({

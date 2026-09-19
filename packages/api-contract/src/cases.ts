@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { diagnosisSchema } from './diagnosis.js';
+import { diagnosisSchema, evidenceReferenceSchema } from './diagnosis.js';
 
 export const caseClasses = [
   'sync_failure',
@@ -73,3 +73,21 @@ export const caseDetailSchema = caseSummarySchema.extend({
 });
 export type CaseSummary = z.infer<typeof caseSummarySchema>;
 export type CaseDetail = z.infer<typeof caseDetailSchema>;
+
+/** Historical evidence references, including observations outside the current diagnosis. */
+export const caseEvidenceQuerySchema = z
+  .object({
+    cursor: z.string().min(1).max(2048).optional(),
+    limit: z.coerce.number().int().min(1).max(100).default(25),
+  })
+  .strict();
+export const caseEvidenceSchema = evidenceReferenceSchema.extend({
+  completeness: z.enum(['complete', 'incomplete', 'unknown']),
+});
+export const caseEvidencePageSchema = z.object({
+  schemaVersion: z.literal(1),
+  items: z.array(caseEvidenceSchema).max(100),
+  nextCursor: z.string().nullable(),
+});
+export type CaseEvidenceQuery = z.infer<typeof caseEvidenceQuerySchema>;
+export type CaseEvidencePage = z.infer<typeof caseEvidencePageSchema>;

@@ -17,7 +17,14 @@ import {
   vi,
 } from 'vitest';
 import { buildApp, createDetectionServices } from '#app';
-import { caseQuerySchema, caseDetailSchema } from '@luma/api-contract';
+import {
+  caseQuerySchema,
+  caseDetailSchema,
+  caseEvidencePageSchema,
+} from '@luma/api-contract';
+import { IdentityError } from '#modules/identity/index';
+import { createApiClient } from '@luma/api-contract/client';
+import { createCases } from '#modules/exceptions/composition';
 import type { IdentityService } from '#modules/identity/index';
 import { makeTenantContext } from '#modules/identity/composition';
 import { defaultConfiguration } from '#modules/exceptions/index';
@@ -466,6 +473,224 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
       }
     },
   );
+  it('paginates immutable historical evidence through the typed client without running investigations', async () => {
+    const value = request();
+    value.evidence = Array.from({ length: 125 }, (_, i) => ({
+      ...value.evidence[0]!,
+      key: `evidence-${String(i).padStart(3, '0')}`,
+      facts: {
+        complete: i === 0 ? true : i === 1 ? false : null,
+        secret: 'not-public',
+      },
+    }));
+    value.input.facts.evidenceRefs = value.evidence.map((e) => e.key);
+    const id = (await services.exceptions.ingest(context(), value)).incident!
+      .id;
+    const later = request('later-observation');
+    later.evidence.push(value.evidence[0]!);
+    later.input.facts.evidenceRefs.push(value.evidence[0]!.key);
+    await services.exceptions.ingest(context(), later);
+    const run = vi.spyOn(services.diagnoses, 'run');
+    const resolveTenant = vi
+      .fn<IdentityService['resolveTenant']>()
+      .mockResolvedValue(context());
+    const app = buildApp(
+      {},
+      {
+        cases: services.cases,
+        identity: { resolveTenant } as unknown as IdentityService,
+      },
+    );
+    try {
+      const baseUrl = await app.listen({ host: '127.0.0.1', port: 0 });
+      const client = createApiClient({ baseUrl });
+      const params = { organizationId: tenantId, exceptionId: id };
+      const first = await client.exceptions.evidence({ params, query: {} });
+      expect(first.status).toBe(200);
+      if (first.status !== 200) throw new Error('Expected evidence');
+      expect(first.body.items).toHaveLength(25);
+      expect(first.body.items.slice(0, 3).map((e) => e.completeness)).toEqual([
+        'complete',
+        'incomplete',
+        'unknown',
+      ]);
+      expect(first.body.items[0]).toMatchObject({
+        id: 'evidence-000',
+        sourceUpdatedAt: null,
+        observedAt: corpus.now,
+      });
+      expect(JSON.stringify(first.body)).not.toContain('not-public');
+      const items = [...first.body.items];
+      let cursor = first.body.nextCursor;
+      while (cursor) {
+        const response = await client.exceptions.evidence({
+          params,
+          query: { cursor },
+        });
+        expect(response.status).toBe(200);
+        const page = caseEvidencePageSchema.parse(response.body);
+        items.push(...page.items);
+        cursor = page.nextCursor;
+      }
+      expect(items.map((e) => e.id)).toEqual([
+        ...value.evidence.map((e) => e.key),
+        'later-observation',
+      ]);
+      const detail = await services.cases.get(context(), id);
+      expect(detail!.diagnosis!.provenance.evidence.map((e) => e.id)).toEqual([
+        'evidence-000',
+        'later-observation',
+      ]);
+      expect(run).not.toHaveBeenCalled();
+      expect(
+        (await client.exceptions.evidence({ params, query: { limit: 100 } }))
+          .status,
+      ).toBe(200);
+      for (const query of [
+        { limit: 101 },
+        { limit: 0 },
+        { cursor: 'bad' },
+        { cursor: first.body.nextCursor!, limit: 24 },
+        { cursor: first.body.nextCursor! + '=' },
+        {
+          cursor: Buffer.from(
+            JSON.stringify({ context: 'wrong', id: 'evidence-000' }),
+          ).toString('base64url'),
+        },
+      ])
+        expect(
+          (await client.exceptions.evidence({ params, query })).status,
+        ).toBe(400);
+      const other = request('other-case');
+      if (other.input.exceptionClass !== 'sync_failure')
+        throw new Error('Fixture');
+      const otherConnection = randomUUID();
+      other.input.facts.connectionId = otherConnection;
+      other.input.facts.subjectId = otherConnection;
+      other.evidence[0]!.connectionId = otherConnection;
+      const otherId = (await services.exceptions.ingest(context(), other))
+        .incident!.id;
+      expect(
+        (
+          await client.exceptions.evidence({
+            params: { ...params, exceptionId: otherId },
+            query: { cursor: first.body.nextCursor! },
+          })
+        ).status,
+      ).toBe(400);
+      const listCursor = (
+        await services.cases.list(
+          context(),
+          caseQuerySchema.parse({ view: 'active', limit: 1 }),
+        )
+      ).nextCursor;
+      expect(listCursor).not.toBeNull();
+      expect(
+        (
+          await client.exceptions.evidence({
+            params,
+            query: { cursor: listCursor! },
+          })
+        ).status,
+      ).toBe(400);
+
+      expect(
+        await services.cases.evidence(context(otherTenant), id, { limit: 25 }),
+      ).toBeNull();
+      const foreignId = (
+        await services.exceptions.ingest(
+          context(otherTenant),
+          request('foreign-evidence', otherTenant),
+        )
+      ).incident!.id;
+      const missing = await client.exceptions.evidence({
+        params: { ...params, exceptionId: randomUUID() },
+        query: {},
+      });
+      const foreign = await client.exceptions.evidence({
+        params: { ...params, exceptionId: foreignId },
+        query: {},
+      });
+      expect(missing.status).toBe(404);
+      expect(foreign.status).toBe(404);
+      expect(foreign.body).toMatchObject({
+        code: 'NOT_FOUND',
+        message: 'Case not found',
+      });
+      resolveTenant.mockResolvedValueOnce(context(otherTenant));
+      expect(
+        (
+          await client.exceptions.evidence({
+            params: { organizationId: otherTenant, exceptionId: foreignId },
+            query: { cursor: first.body.nextCursor! },
+          })
+        ).status,
+      ).toBe(400);
+      resolveTenant.mockRejectedValueOnce(
+        new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue'),
+      );
+      expect(
+        (
+          await client.exceptions.evidence({
+            params,
+            query: { cursor: first.body.nextCursor! },
+          })
+        ).status,
+      ).toBe(401);
+      resolveTenant.mockRejectedValueOnce(
+        new IdentityError(404, 'NOT_FOUND', 'Organization not found'),
+      );
+      const denied = await client.exceptions.evidence({ params, query: {} });
+      expect(denied.status).toBe(404);
+      for (const response of [missing, foreign, denied])
+        expect(response.body).toMatchObject({
+          code: 'NOT_FOUND',
+          message: 'Case not found',
+        });
+    } finally {
+      run.mockRestore();
+      await app.close();
+    }
+  });
+  it('includes verification evidence and grants only scoped SELECT access for evidence reads', async () => {
+    const incident = (await services.exceptions.ingest(context(), request()))
+      .incident!;
+    evaluate.mockResolvedValue(verification(incident));
+    expect(await services.exceptions.verify(context(), incident.id)).toBe(true);
+    const client = await owner.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('SET LOCAL ROLE luma_case_reader');
+      const reader = createCases({
+        transaction: async (tenant, operation) => {
+          await client.query("SELECT set_config('app.tenant_id',$1,true)", [
+            tenant,
+          ]);
+          return operation(client);
+        },
+      });
+      const page = await reader.evidence(context(), incident.id, { limit: 25 });
+      expect(page!.items.map((e) => e.id)).toEqual([
+        'event-1',
+        'verification-1',
+      ]);
+      expect(
+        await reader.evidence(context(otherTenant), incident.id, { limit: 25 }),
+      ).toBeNull();
+      for (const table of [
+        'exception_evidence',
+        'exception_inputs',
+        'exception_sources',
+      ])
+        expect((await client.query(`SELECT * FROM ${table}`)).rows).toEqual([]);
+      await expect(
+        client.query('DELETE FROM exception_evidence'),
+      ).rejects.toThrow('permission denied');
+    } finally {
+      await client.query('ROLLBACK');
+      client.release();
+    }
+  });
   it('paginates stable ties and rejects cursors from other filters or tenants', async () => {
     for (let i = 0; i < 4; i++) {
       const value = request(`page-${i}`);

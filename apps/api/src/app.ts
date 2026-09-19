@@ -162,7 +162,13 @@ export function buildApp(
     if (error instanceof IdentityError) {
       return reply.status(error.statusCode).send({
         code: error.code,
-        message: error.message,
+        message:
+          error.statusCode === 404 &&
+          request.routeOptions.url?.startsWith(
+            '/v1/organizations/:organizationId/exceptions',
+          )
+            ? 'Case not found'
+            : error.message,
         requestId: request.id,
       });
     }

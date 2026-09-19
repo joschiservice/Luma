@@ -54,3 +54,28 @@ it('throws on undocumented statuses instead of asserting a false response type',
     client.connectorProviders.get({ params: { providerId: 'shopify' } }),
   ).rejects.toThrow();
 });
+
+it('documents bounded tenant-scoped case evidence and validates its query', async () => {
+  const { caseEvidenceQuerySchema } = await import('./cases.js');
+  expect(caseEvidenceQuerySchema.parse({})).toEqual({ limit: 25 });
+  for (const query of [
+    { limit: 101 },
+    { limit: 0 },
+    { limit: 1.5 },
+    { cursor: '' },
+    { extra: true },
+  ])
+    expect(caseEvidenceQuerySchema.safeParse(query).success).toBe(false);
+  const document = JSON.parse(JSON.stringify(openApiDocument));
+  const operation =
+    document.paths[
+      '/v1/organizations/{organizationId}/exceptions/{exceptionId}/evidence'
+    ].get;
+  expect(operation.operationId).toBe('exceptions.evidence');
+  expect(operation.responses).toHaveProperty('401');
+  expect(operation.responses).toHaveProperty('404');
+  expect(
+    operation.responses['200'].content['application/json'].schema.properties
+      .items.maxItems,
+  ).toBe(100);
+});
