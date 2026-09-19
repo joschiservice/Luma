@@ -49,6 +49,9 @@ if (process.argv.includes('--workflow-worker')) {
     observability,
     modelSettings,
     readConnectionsConfig(process.env),
+    process.env.WORKFLOW_DATABASE_URL
+      ? readWorkflowConfig(process.env)
+      : undefined,
   );
 
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {

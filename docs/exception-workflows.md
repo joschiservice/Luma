@@ -66,7 +66,7 @@ Only fresh authoritative business verification through `exceptions.verify` resol
 
 Temporal history contains source/tenant/user/correlation IDs, diagnosis revision/status, proposal ID/expiry, policy decision ID and finite result codes. It does not contain evidence documents, connector payloads, proposal parameters, credentials, model prompts or arbitrary provider errors. Activity failures are sanitized before persistence. Namespace access must be limited to trusted workers/operators because they can invoke workflows directly.
 
-Process progress is a Temporal projection, not a second incident lifecycle table. The canonical incident is changed only through the exceptions service. Escalation results remain inspectable through `client.progress`; they do not falsely mark the incident resolved. Interrupted workflow statuses report an escalation. LUMA-32 exposes these commands and progress through the tenant-scoped HTTP boundary; this runtime adds no public routes.
+Process progress is a Temporal projection, not a second incident lifecycle table. The canonical incident is changed only through the exceptions service. Escalation results remain inspectable through `client.progress`; they do not falsely mark the incident resolved. Interrupted workflow statuses report an escalation. The [case decision and progress API](case-decisions.md) exposes persisted review, decisions, execution and verification, audit history and authenticated SSE. Workflow source bindings connect both incident-started and detection-started runs to their case.
 
 ## Validation
 

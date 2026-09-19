@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
-import { expect, it } from 'vitest';
-import { createApiClient } from './client.js';
+import { expect, it, vi } from 'vitest';
+import { createApiClient, subscribeToCaseProgress } from './client.js';
 import { dataRegionSchema, organizationParamsSchema } from './index.js';
 import { openApiDocument } from './openapi.js';
 
@@ -78,4 +78,77 @@ it('documents bounded tenant-scoped case evidence and validates its query', asyn
     operation.responses['200'].content['application/json'].schema.properties
       .items.maxItems,
   ).toBe(100);
+});
+
+it('documents decision conflicts and authenticated resync streams', () => {
+  const document = JSON.parse(JSON.stringify(openApiDocument));
+  const base = '/v1/organizations/{organizationId}/exceptions/{exceptionId}';
+  expect(document.paths[`${base}/decisions`].post.responses).toHaveProperty(
+    '409',
+  );
+  expect(
+    document.paths[`${base}/events`].get.responses['200'].content,
+  ).toHaveProperty('text/event-stream');
+  expect(document.paths[`${base}/events`].get.responses).toHaveProperty('401');
+  expect(document.paths[`${base}/events`].get.responses).toHaveProperty('429');
+});
+it('validates SSE snapshots and closes malformed streams while allowing transport reconnects', () => {
+  const listeners = new Map<string, (event: unknown) => void>();
+  const close = vi.fn();
+  const create = vi.fn();
+  vi.stubGlobal(
+    'EventSource',
+    class {
+      constructor(url: string, options: unknown) {
+        create(url, options);
+      }
+      addEventListener(name: string, callback: (event: unknown) => void) {
+        listeners.set(name, callback);
+      }
+      close = close;
+    },
+  );
+  try {
+    const onResync = vi.fn(),
+      onError = vi.fn();
+    const stop = subscribeToCaseProgress({
+      baseUrl: 'https://luma.example/api/',
+      organizationId: 'org',
+      exceptionId: 'case',
+      onResync,
+      onError,
+    });
+    expect(create).toHaveBeenCalledWith(
+      'https://luma.example/api/v1/organizations/org/exceptions/case/events',
+      { withCredentials: true },
+    );
+    listeners.get('error')!({});
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(close).not.toHaveBeenCalled();
+    const progress = {
+      schemaVersion: 1,
+      caseRevision: 1,
+      state: 'detected',
+      diagnosisRevision: 0,
+      execution: null,
+      resolution: null,
+      workflow: { availability: 'unavailable', progress: null },
+    };
+    listeners.get('resync')!({
+      data: JSON.stringify({
+        schemaVersion: 1,
+        exceptionId: '11111111-1111-4111-8111-111111111111',
+        refetch: true,
+        progress,
+      }),
+    });
+    expect(onResync).toHaveBeenCalledWith(progress);
+    listeners.get('resync')!({ data: 'invalid' });
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledTimes(2);
+    stop();
+    expect(close).toHaveBeenCalledTimes(2);
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });

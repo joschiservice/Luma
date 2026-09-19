@@ -1,3 +1,4 @@
+import { caseStreamEventSchema } from './desk.js';
 import { initClient } from '@ts-rest/core';
 import type { ClientArgs, InitClientReturn } from '@ts-rest/core';
 import { apiContract } from './index.js';
@@ -14,4 +15,32 @@ export function createApiClient(options: ClientArgs): ApiClient {
     validateResponse: true,
     throwOnUnknownStatus: true,
   });
+}
+
+/** Reconnects automatically. Refetch case, review, progress and timeline on each resync. */
+export function subscribeToCaseProgress(options: {
+  baseUrl: string;
+  organizationId: string;
+  exceptionId: string;
+  onResync: (event: import('./desk.js').CaseProgress) => void;
+  onError: () => void;
+}) {
+  const source = new EventSource(
+    `${options.baseUrl.replace(/\/$/, '')}/v1/organizations/${encodeURIComponent(options.organizationId)}/exceptions/${encodeURIComponent(options.exceptionId)}/events`,
+    { withCredentials: true },
+  );
+  source.addEventListener('resync', (event) => {
+    try {
+      if (!('data' in event) || typeof event.data !== 'string')
+        throw new Error('Invalid case stream event');
+      options.onResync(
+        caseStreamEventSchema.parse(JSON.parse(event.data)).progress,
+      );
+    } catch {
+      source.close();
+      options.onError();
+    }
+  });
+  source.addEventListener('error', options.onError);
+  return () => source.close();
 }

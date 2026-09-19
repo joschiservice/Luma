@@ -55,3 +55,9 @@ export function createCases(
   return createCaseService(createCaseReader(db, now));
 }
 export { caseRoutes } from '#modules/exceptions/api/cases';
+
+import { createEscalationService } from '#modules/exceptions/application/escalation';
+import { createEscalationRepository } from '#modules/exceptions/infrastructure/escalation';
+export function createCaseEscalation(db: TenantDatabase) {
+  return createEscalationService(createEscalationRepository(db));
+}

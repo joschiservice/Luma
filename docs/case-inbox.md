@@ -49,11 +49,13 @@ Coverage reports whether any observations exist, not whether they are complete o
 healthy. Connection availability is read independently through the existing
 connection API. An empty attention queue never implies healthy operations.
 
-This implements the read slice needed from LUMA-32. Decision commands, executable
-proposal projections and streaming history remain in their owning follow-up
-slices. Case detail reads display at most 100 evidence references. Oversized investigations explicitly report the omitted count and
-withhold findings, impact and recommendations; pending investigations remain
-pending. Reads preserve the complete persisted evidence. The canonical exception
+Case detail reads display at most 100 evidence references. Oversized investigations
+explicitly report the omitted count and withhold findings, impact and recommendations;
+pending investigations remain pending. Evidence pagination preserves access to the
+complete persisted references. Proposal review, decisions, execution and audit reads,
+and authenticated SSE are described in [case decisions and progress](case-decisions.md).
+The inbox UI's decision controls and live timeline remain separate frontend work.
+The canonical exception
 and diagnosis tables remain the only source of case data.
 
 ## Database access

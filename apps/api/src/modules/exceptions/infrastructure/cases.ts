@@ -24,19 +24,30 @@ type Row = {
 const projection = `WITH cases AS (
  SELECT e.document,e.version,d.document AS diagnosis,
  CASE WHEN e.state='resolved' THEN NULL
- WHEN e.state='awaiting_approval' THEN 'approval'
  WHEN e.state='escalated' OR u.review_required THEN 'uncertainty'
+ WHEN e.state='awaiting_approval' OR pa.document->>'outcome'='approval_required' THEN 'approval'
  WHEN d.document->>'status'='ready'
    AND (d.document->'provenance'->>'validUntil' IS NULL OR (d.document->'provenance'->>'validUntil')::timestamptz >= $2::timestamptz)
    AND d.document->'nextSteps' @> '[{"kind":"manual_intervention"}]'::jsonb THEN 'manual_intervention'
  ELSE NULL END AS attention_reason,
- COALESCE(u.first_deferred_at::text,d.document->'provenance'->>'generatedAt',e.document->>'firstDetectedAt') AS attention_at,
- GREATEST(e.document->>'lastDetectedAt',d.document->'provenance'->>'generatedAt',e.document->'resolution'->>'at') AS activity,
+ COALESCE(CASE WHEN e.state='escalated' THEN command.at ELSE pa.document->>'evaluatedAt' END,u.first_deferred_at::text,d.document->'provenance'->>'generatedAt',e.document->>'firstDetectedAt') AS attention_at,
+ GREATEST(e.document->>'lastDetectedAt',d.document->'provenance'->>'generatedAt',e.document->'resolution'->>'at',command.at,pa.document->>'evaluatedAt') AS activity,
  CASE WHEN e.document->>'severity'='high' THEN 0 ELSE 1 END AS rank
  FROM exceptions e
  LEFT JOIN exception_diagnosis_heads h ON h.tenant_id=e.tenant_id AND h.exception_id=e.id
  LEFT JOIN exception_diagnoses d ON d.tenant_id=h.tenant_id AND d.exception_id=h.exception_id AND d.revision=h.revision
  LEFT JOIN exception_uncertainty u ON u.tenant_id=e.tenant_id AND u.fingerprint=e.fingerprint
+ LEFT JOIN LATERAL (SELECT document->>'createdAt' AS at FROM case_commands WHERE tenant_id=e.tenant_id AND exception_id=e.id ORDER BY created_at DESC,id DESC LIMIT 1) command ON true
+ LEFT JOIN LATERAL (
+   SELECT pd.document FROM case_proposals p
+   JOIN LATERAL (SELECT * FROM policy_decisions WHERE tenant_id=p.tenant_id AND proposal_id=p.id AND action_hash=p.action_hash ORDER BY created_at DESC,id DESC LIMIT 1) pd ON true
+   WHERE p.tenant_id=e.tenant_id AND p.exception_id=e.id AND p.diagnosis_revision=h.revision
+   AND d.document->>'status'='ready'
+   AND (d.document->'provenance'->>'validUntil' IS NULL OR (d.document->'provenance'->>'validUntil')::timestamptz>$2::timestamptz)
+   AND (p.document->>'expiresAt')::timestamptz>$2::timestamptz
+   AND (p.document->'preconditions'->>'validUntil')::timestamptz>$2::timestamptz
+   AND NOT EXISTS(SELECT 1 FROM policy_approvals a WHERE a.tenant_id=p.tenant_id AND a.proposal_id=p.id AND a.action_hash=p.action_hash AND a.policy_version=pd.document->>'policyVersion')
+ ) pa ON true
  WHERE e.tenant_id=$1
 ), ordered AS (SELECT *, CASE WHEN attention_reason IS NULL THEN document->>'firstDetectedAt' ELSE attention_at END AS sort_at FROM cases)`;
 const cursorSchema = z

@@ -1,6 +1,2637 @@
 {
   "openapi": "3.0.2",
   "paths": {
+    "/v1/organizations/{organizationId}/exceptions/{exceptionId}/review": {
+      "get": {
+        "description": "Returns an immutable proposal, its current policy result and permitted decisions. Unavailable capabilities cannot be approved. Manual recommendations remain in the case investigation.",
+        "summary": "Review a case proposal",
+        "tags": ["caseDesk"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "exceptionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "operationId": "caseDesk.review",
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemaVersion": {
+                      "type": "number",
+                      "enum": [1]
+                    },
+                    "caseRevision": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "exclusiveMinimum": 0
+                    },
+                    "diagnosisRevision": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "permittedDecisions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": ["approve", "reject", "escalate"]
+                      },
+                      "maxItems": 3
+                    },
+                    "proposal": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "version": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": 0
+                        },
+                        "diagnosisRevision": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": 0
+                        },
+                        "capability": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 512
+                        },
+                        "capabilityVersion": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 512
+                        },
+                        "available": {
+                          "type": "boolean"
+                        },
+                        "connectionId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "target": {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 512
+                            },
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            }
+                          },
+                          "required": ["kind", "id"]
+                        },
+                        "parameters": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "oneOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 1000
+                              },
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "boolean"
+                              },
+                              {
+                                "type": "string",
+                                "format": "null",
+                                "nullable": true
+                              }
+                            ],
+                            "nullable": true
+                          }
+                        },
+                        "expectedPostcondition": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "oneOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 1000
+                              },
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "boolean"
+                              },
+                              {
+                                "type": "string",
+                                "format": "null",
+                                "nullable": true
+                              }
+                            ],
+                            "nullable": true
+                          }
+                        },
+                        "preconditions": {
+                          "type": "object",
+                          "properties": {
+                            "evidenceRefs": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 512
+                              },
+                              "maxItems": 100
+                            },
+                            "validUntil": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          },
+                          "required": ["evidenceRefs", "validUntil"]
+                        },
+                        "risk": {
+                          "type": "string",
+                          "enum": ["low", "medium", "high"]
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "requestedBy": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 512
+                        },
+                        "policy": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "policyVersion": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 512
+                            },
+                            "outcome": {
+                              "type": "string",
+                              "enum": ["allowed", "denied", "approval_required"]
+                            },
+                            "reason": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 512
+                            },
+                            "evaluatedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "validUntil": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "policyVersion",
+                            "outcome",
+                            "reason",
+                            "evaluatedAt",
+                            "validUntil"
+                          ],
+                          "nullable": true
+                        },
+                        "approval": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "outcome": {
+                              "type": "string",
+                              "enum": ["approved", "rejected"]
+                            },
+                            "actorId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 512
+                            },
+                            "createdAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          },
+                          "required": ["id", "outcome", "actorId", "createdAt"],
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "version",
+                        "diagnosisRevision",
+                        "capability",
+                        "capabilityVersion",
+                        "available",
+                        "connectionId",
+                        "target",
+                        "parameters",
+                        "expectedPostcondition",
+                        "preconditions",
+                        "risk",
+                        "expiresAt",
+                        "requestedBy",
+                        "policy",
+                        "approval"
+                      ],
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "schemaVersion",
+                    "caseRevision",
+                    "diagnosisRevision",
+                    "permittedDecisions",
+                    "proposal"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/exceptions/{exceptionId}/decisions": {
+      "post": {
+        "description": "Use a unique commandId and the current case, diagnosis, proposal and policy versions from review. Exact retries return the committed receipt. Conflicts return 409. Approval records a decision; it does not mean execution or verification succeeded.",
+        "summary": "Approve, reject or escalate a case",
+        "tags": ["caseDesk"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "exceptionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "operationId": "caseDesk.decide",
+        "requestBody": {
+          "description": "Body",
+          "content": {
+            "application/json": {
+              "schema": {
+                "discriminator": {
+                  "propertyName": "kind"
+                },
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "commandId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": ["approve"]
+                      },
+                      "caseRevision": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "exclusiveMinimum": 0
+                      },
+                      "diagnosisRevision": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "proposalId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "proposalVersion": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "exclusiveMinimum": 0
+                      },
+                      "decisionId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1000
+                      }
+                    },
+                    "required": [
+                      "commandId",
+                      "kind",
+                      "caseRevision",
+                      "diagnosisRevision",
+                      "proposalId",
+                      "proposalVersion",
+                      "decisionId",
+                      "reason"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "commandId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": ["reject"]
+                      },
+                      "caseRevision": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "exclusiveMinimum": 0
+                      },
+                      "diagnosisRevision": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "proposalId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "proposalVersion": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "exclusiveMinimum": 0
+                      },
+                      "decisionId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1000
+                      }
+                    },
+                    "required": [
+                      "commandId",
+                      "kind",
+                      "caseRevision",
+                      "diagnosisRevision",
+                      "proposalId",
+                      "proposalVersion",
+                      "decisionId",
+                      "reason"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "commandId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": ["escalate"]
+                      },
+                      "caseRevision": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "exclusiveMinimum": 0
+                      },
+                      "diagnosisRevision": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1000
+                      }
+                    },
+                    "required": [
+                      "commandId",
+                      "kind",
+                      "caseRevision",
+                      "diagnosisRevision",
+                      "reason"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "exceptionId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["approve", "reject", "escalate"]
+                    },
+                    "actorId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512
+                    },
+                    "caseRevision": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "exclusiveMinimum": 0
+                    },
+                    "approvalId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    },
+                    "reason": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 1000
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "exceptionId",
+                    "kind",
+                    "actorId",
+                    "caseRevision",
+                    "approvalId",
+                    "reason",
+                    "createdAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/exceptions/{exceptionId}/decisions/{commandId}": {
+      "get": {
+        "description": "After a timeout, read the receipt using the original command ID or retry the identical request. Receipts are visible to their submitting actor.",
+        "summary": "Recover a decision result",
+        "tags": ["caseDesk"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "exceptionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "commandId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "operationId": "caseDesk.receipt",
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "exceptionId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["approve", "reject", "escalate"]
+                    },
+                    "actorId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512
+                    },
+                    "caseRevision": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "exclusiveMinimum": 0
+                    },
+                    "approvalId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    },
+                    "reason": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 1000
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "exceptionId",
+                    "kind",
+                    "actorId",
+                    "caseRevision",
+                    "approvalId",
+                    "reason",
+                    "createdAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/exceptions/{exceptionId}/progress": {
+      "get": {
+        "description": "Returns persisted execution and canonical resolution separately from workflow phase. An unavailable workflow service does not imply success or no activity.",
+        "summary": "Read execution and verification progress",
+        "tags": ["caseDesk"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "exceptionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "operationId": "caseDesk.progress",
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemaVersion": {
+                      "type": "number",
+                      "enum": [1]
+                    },
+                    "caseRevision": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "exclusiveMinimum": 0
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "detected",
+                        "diagnosed",
+                        "proposed",
+                        "awaiting_approval",
+                        "allowed",
+                        "executing",
+                        "verifying",
+                        "resolved",
+                        "failed",
+                        "escalated"
+                      ]
+                    },
+                    "diagnosisRevision": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "execution": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "proposalId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "state": {
+                          "type": "string",
+                          "enum": ["prepared", "unknown", "succeeded", "failed"]
+                        },
+                        "attemptId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "attempt": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": 0
+                        },
+                        "requestedBy": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 512
+                        },
+                        "executor": {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["service", "agent", "connector", "user"]
+                            },
+                            "id": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 512
+                            }
+                          },
+                          "required": ["kind", "id"]
+                        },
+                        "startedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "finishedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        },
+                        "effectEvidenceRefs": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          },
+                          "maxItems": 100
+                        },
+                        "verification": {
+                          "type": "object",
+                          "properties": {
+                            "outcome": {
+                              "type": "string",
+                              "enum": ["passed", "failed", "inconclusive"]
+                            },
+                            "observationRefs": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 512
+                              },
+                              "maxItems": 100
+                            },
+                            "observedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "evaluatorVersion": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 512
+                            }
+                          },
+                          "required": [
+                            "outcome",
+                            "observationRefs",
+                            "observedAt",
+                            "evaluatorVersion"
+                          ],
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "proposalId",
+                        "state",
+                        "attemptId",
+                        "attempt",
+                        "requestedBy",
+                        "executor",
+                        "startedAt",
+                        "finishedAt",
+                        "effectEvidenceRefs",
+                        "verification"
+                      ],
+                      "nullable": true
+                    },
+                    "resolution": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["verification", "human_disposition"]
+                        },
+                        "at": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "actorId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 512
+                        },
+                        "evidenceRefs": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          },
+                          "maxItems": 100
+                        }
+                      },
+                      "required": ["kind", "at", "actorId", "evidenceRefs"],
+                      "nullable": true
+                    },
+                    "workflow": {
+                      "type": "object",
+                      "properties": {
+                        "availability": {
+                          "type": "string",
+                          "enum": ["available", "not_started", "unavailable"]
+                        },
+                        "progress": {
+                          "type": "object",
+                          "properties": {
+                            "phase": {
+                              "type": "string",
+                              "enum": [
+                                "detecting",
+                                "diagnosing",
+                                "proposing",
+                                "executing",
+                                "awaiting_approval",
+                                "reconciling",
+                                "verifying",
+                                "resolved",
+                                "no_incident",
+                                "escalated",
+                                "denied"
+                              ]
+                            },
+                            "exceptionId": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "proposalId": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "decisionId": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "reason": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 512
+                            }
+                          },
+                          "required": ["phase"],
+                          "nullable": true
+                        }
+                      },
+                      "required": ["availability", "progress"]
+                    }
+                  },
+                  "required": [
+                    "schemaVersion",
+                    "caseRevision",
+                    "state",
+                    "diagnosisRevision",
+                    "execution",
+                    "resolution",
+                    "workflow"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/exceptions/{exceptionId}/timeline": {
+      "get": {
+        "description": "Returns up to 100 persisted events, ordered by timestamp and ID. Reuse cursors with the same organization, case and page size. Refresh from the first page and deduplicate by ID as events arrive.",
+        "summary": "Read case audit history",
+        "tags": ["caseDesk"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "exceptionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "default": 25,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ],
+        "operationId": "caseDesk.timeline",
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "type": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          },
+                          "occurredAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "actorId": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512,
+                            "nullable": true
+                          },
+                          "proposalId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "nullable": true
+                          },
+                          "outcome": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512,
+                            "nullable": true
+                          },
+                          "evidenceRefs": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 512
+                            },
+                            "maxItems": 100
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "type",
+                          "occurredAt",
+                          "actorId",
+                          "proposalId",
+                          "outcome",
+                          "evidenceRefs"
+                        ]
+                      },
+                      "maxItems": 100
+                    },
+                    "nextCursor": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": ["items", "nextCursor"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/organizations/{organizationId}/operations/overview": {
       "get": {
         "description": "Returns current attention and active counts, up to five decisions ordered by severity then oldest request, and verified resolutions in the selected rolling window [start, end). Connection freshness requires observations for every permitted read capability within 24 hours. Null automation metrics mean eligibility or human-work attribution is unavailable. Counts describe persisted cases; fresh observations do not establish complete source coverage.",
@@ -317,6 +2948,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -352,6 +2984,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -387,6 +3020,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -422,6 +3056,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -457,6 +3092,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -492,6 +3128,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -527,6 +3164,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -822,6 +3460,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -857,6 +3496,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -892,6 +3532,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -927,6 +3568,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -962,6 +3604,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -997,6 +3640,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -1032,6 +3676,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -1215,6 +3860,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -1250,6 +3896,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -1285,6 +3932,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -1320,6 +3968,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -1355,6 +4004,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -1390,6 +4040,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -1425,6 +4076,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -2246,6 +4898,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -2281,6 +4934,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -2316,6 +4970,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -2351,6 +5006,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -2386,6 +5042,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -2421,6 +5078,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -2456,6 +5114,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -2547,6 +5206,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -2582,6 +5242,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -2617,6 +5278,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -2652,6 +5314,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -2687,6 +5350,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -2722,6 +5386,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -2757,6 +5422,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -2792,6 +5458,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -2827,6 +5494,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -2931,6 +5599,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -2966,6 +5635,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -3001,6 +5671,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -3036,6 +5707,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -3071,6 +5743,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -3106,6 +5779,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -3141,6 +5815,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -3176,6 +5851,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -3211,6 +5887,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -3246,6 +5923,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -3362,6 +6040,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -3397,6 +6076,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -3432,6 +6112,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -3467,6 +6148,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -3502,6 +6184,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -3537,6 +6220,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -3572,6 +6256,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -3607,6 +6292,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -3642,6 +6328,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -3735,6 +6422,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -3770,6 +6458,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -3805,6 +6494,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -3840,6 +6530,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -3875,6 +6566,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -3910,6 +6602,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -3945,6 +6638,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -3980,6 +6674,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -4015,6 +6710,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -4120,6 +6816,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -4155,6 +6852,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -4190,6 +6888,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -4225,6 +6924,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -4260,6 +6960,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -4295,6 +6996,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -4330,6 +7032,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -4365,6 +7068,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -4400,6 +7104,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -4511,6 +7216,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -4546,6 +7252,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -4581,6 +7288,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -4616,6 +7324,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -4651,6 +7360,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -4686,6 +7396,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -4721,6 +7432,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -4756,6 +7468,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -4791,6 +7504,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -4857,6 +7571,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -4892,6 +7607,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -4927,6 +7643,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -4962,6 +7679,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -4997,6 +7715,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -5032,6 +7751,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -5067,6 +7787,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -5102,6 +7823,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -5137,6 +7859,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -5234,6 +7957,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -5269,6 +7993,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -5304,6 +8029,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -5339,6 +8065,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -5374,6 +8101,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -5409,6 +8137,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -5444,6 +8173,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -5479,6 +8209,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -5514,6 +8245,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -5549,6 +8281,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -5774,6 +8507,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -5809,6 +8543,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -5844,6 +8579,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -5879,6 +8615,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -5914,6 +8651,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -5949,6 +8687,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -5984,6 +8723,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -6019,6 +8759,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -6054,6 +8795,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -6089,6 +8831,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -6422,6 +9165,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -6457,6 +9201,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -6492,6 +9237,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -6527,6 +9273,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -6562,6 +9309,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -6597,6 +9345,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -6632,6 +9381,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -6667,6 +9417,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -6702,6 +9453,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -6737,6 +9489,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -6981,6 +9734,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -7016,6 +9770,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -7051,6 +9806,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -7086,6 +9842,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -7121,6 +9878,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -7156,6 +9914,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -7191,6 +9950,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -7226,6 +9986,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -7261,6 +10022,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -7296,6 +10058,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -7560,6 +10323,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -7595,6 +10359,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -7630,6 +10395,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -7665,6 +10431,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -7700,6 +10467,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -7735,6 +10503,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -7770,6 +10539,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -7805,6 +10575,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -7840,6 +10611,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -7875,6 +10647,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -8120,6 +10893,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -8155,6 +10929,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -8190,6 +10965,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -8225,6 +11001,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -8260,6 +11037,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -8295,6 +11073,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -8330,6 +11109,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -8365,6 +11145,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -8400,6 +11181,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -8435,6 +11217,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -8497,6 +11280,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -8532,6 +11316,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -8567,6 +11352,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -8602,6 +11388,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -8665,6 +11452,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -8700,6 +11488,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -8735,6 +11524,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -8770,6 +11560,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -8805,6 +11596,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -8894,6 +11686,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -8929,6 +11722,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -8964,6 +11758,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -8999,6 +11794,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -9082,6 +11878,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -9117,6 +11914,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -9152,6 +11950,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -9187,6 +11986,7 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -9222,6 +12022,308 @@
                         "NOT_READY",
                         "INTERNAL_ERROR",
                         "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/exceptions/{exceptionId}/events": {
+      "get": {
+        "description": "Authenticated SSE emits resync events with a current progress snapshot every five seconds. Refetch case, review and timeline on each event and reconnect. Last-Event-ID always resynchronizes current state; events are not an audit replay. Sessions and membership are checked before each snapshot. Streams reconnect after one minute. Slow consumers are disconnected. Use the timeline endpoint for persisted history.",
+        "summary": "Follow case progress",
+        "tags": ["caseEvents"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "exceptionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Last-Event-ID",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Reconnects with a fresh authoritative snapshot."
+          }
+        ],
+        "operationId": "caseEvents.events",
+        "responses": {
+          "200": {
+            "description": "SSE resync events carrying a CaseProgress snapshot and refetch: true.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "429",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
                         "UNSUPPORTED_MEDIA_TYPE"
                       ]
                     },
@@ -9244,6 +12346,6 @@
   "info": {
     "title": "Luma API",
     "version": "1.0.0",
-    "description": "Manage your organizations and memberships, resolve organization access, browse connector providers and check service availability. Organization endpoints require a session cookie."
+    "description": "Read cases, evidence, proposals, execution and audit history. Make permitted decisions and follow authenticated progress streams. Manage organizations, memberships and installed connections. Organization endpoints require a session cookie."
   }
 }

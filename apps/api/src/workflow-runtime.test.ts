@@ -122,6 +122,7 @@ function fixture() {
       reconcile: vi.fn().mockResolvedValue({ state: 'succeeded' }),
     },
     bindings: {
+      recordWorkflow: vi.fn(),
       loadDetection: vi.fn(),
       proposals: {
         prepare: vi.fn().mockResolvedValue(action),
@@ -137,6 +138,11 @@ describe('durable activity boundaries', () => {
   it('reconstructs authorization for every step and returns only references', async () => {
     const { deps, activities } = fixture();
     expect(await activities.detect(input)).toBe('incident');
+    expect(deps.bindings.recordWorkflow).toHaveBeenCalledWith(
+      context,
+      'incident',
+      input.source,
+    );
     expect(await activities.diagnose(input, 'incident')).toEqual({
       status: 'ready',
       revision: 1,
@@ -251,7 +257,7 @@ describe('durable activity boundaries', () => {
 
 it('deduplicates starts and scopes commands to the current tenant', async () => {
   const { TestWorkflowEnvironment } = await import('@temporalio/testing');
-  const { createExceptionClient } =
+  const { createExceptionClient, createDeskWorkflowReader } =
     await import('#modules/workflows/composition');
   const env = await TestWorkflowEnvironment.createLocal();
   const identity = {
@@ -266,7 +272,17 @@ it('deduplicates starts and scopes commands to the current tenant', async () => 
     },
     identity,
   );
+  const reader = createDeskWorkflowReader(
+    {
+      address: env.address,
+      namespace: 'default',
+      taskQueue: 'scope-test',
+      dataRegion: 'EU',
+    },
+    identity,
+  );
   try {
+    expect(await reader.get(context, 'missing-incident')).toBeNull();
     const first = await client.start(context, input.source);
     expect(await client.start(context, input.source)).toEqual(first);
     const other = makeTenantContext(
@@ -289,6 +305,31 @@ it('deduplicates starts and scopes commands to the current tenant', async () => 
     expect(await client.start(other, input.source)).not.toEqual(first);
     await env.client.workflow.getHandle(first.workflowId).terminate();
     expect(await client.start(context, input.source)).toEqual(first);
+    const member = makeTenantContext(
+      { userId: 'reader', sessionId: 'reader-session' },
+      {
+        id: 'tenant',
+        name: 'Fixture',
+        slug: 'fixture',
+        dataRegion: 'EU',
+        status: 'active',
+      },
+      {
+        id: 'reader-membership',
+        organizationId: 'tenant',
+        userId: 'reader',
+        role: 'member',
+      },
+      'reader-request',
+    );
+    expect(await reader.get(member, 'incident')).toMatchObject({
+      phase: 'escalated',
+      reason: 'workflow_interrupted',
+    });
+    await expect(client.start(member, input.source)).rejects.toMatchObject({
+      statusCode: 403,
+    });
+    expect(await reader.get(other, 'missing-incident')).toBeNull();
     const history = await env.client.workflow
       .getHandle(first.workflowId)
       .fetchHistory();
@@ -307,6 +348,7 @@ it('deduplicates starts and scopes commands to the current tenant', async () => 
       'Organization not found',
     );
   } finally {
+    await reader.close();
     await client.close();
     await env.teardown();
   }
