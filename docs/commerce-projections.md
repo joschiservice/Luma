@@ -63,6 +63,9 @@ Canonical identities have indexed reconciliation keys. Validated versioned
 snapshots retain normalized order/fulfillment lines; generated SQL columns expose
 order statuses, display numbers, parent IDs and exact inventory quantities for
 indexed queries. Composite keys and forced RLS protect tenant and source scope.
+Migration `0008` requires every snapshot to reference a stored observation in the
+same tenant and connection. Invalid provenance rolls back the snapshot and its
+publication. Existing tenant/observation indexes support these foreign keys.
 Restricted roles cannot update or delete observations, mappings or snapshots.
 The projection pointer, immutable snapshot and append-only publication event commit
 together. Snapshots include a mapping signature, so resolving a previously unknown

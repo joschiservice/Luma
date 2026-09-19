@@ -169,6 +169,130 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
       'TRUNCATE connector_observations,connector_source_mappings,orders_entities,inventory_entities CASCADE',
     );
   });
+  it.each(['orders', 'inventory'] as const)(
+    '%s rejects missing, cross-connection and cross-tenant observation references atomically',
+    async (module) => {
+      const input: CommerceObservation =
+        module === 'orders'
+          ? {
+              capability: 'orders.read',
+              observation: {
+                ...stock().observation,
+                source: { ...stock().observation.source, resource: 'order' },
+                data: {
+                  displayNumber: null,
+                  status: 'open',
+                  paymentStatus: 'unknown',
+                  lines: [],
+                },
+              },
+            }
+          : stock();
+      await services.sources.record(context(), 'valid-provenance', input);
+      const otherConnectionInput = structuredClone(input);
+      otherConnectionInput.observation.id = randomUUID();
+      otherConnectionInput.observation.source.connectionId = secondConnection;
+      await services.sources.record(
+        context(),
+        'other-connection',
+        otherConnectionInput,
+      );
+      const otherTenantInput = structuredClone(input);
+      otherTenantInput.observation.id = randomUUID();
+      otherTenantInput.observation.source.tenantId = otherTenant;
+      await services.sources.record(
+        context(otherTenant),
+        'other-tenant',
+        otherTenantInput,
+      );
+
+      const entityId =
+        module === 'orders'
+          ? await services.orders.identify(
+              context(),
+              'order',
+              'provenance-order',
+            )
+          : await services.inventory.identify(
+              context(),
+              'position',
+              'provenance-position',
+            );
+      const skuId = await services.inventory.identify(
+        context(),
+        'sku',
+        'provenance-sku',
+      );
+      const locationId = await services.inventory.identify(
+        context(),
+        'location',
+        'provenance-location',
+      );
+      const base = {
+        schemaVersion: 1 as const,
+        entityId,
+        connectionId: connection,
+        normalizerVersion: 'commerce/1',
+        mappingVersion: 'a'.repeat(64),
+        sourceRevision: null,
+        sourceUpdatedAt: input.observation.sourceUpdatedAt,
+        observedAt: input.observation.observedAt,
+        deleted: false,
+      };
+      const project = (observationId: string) =>
+        module === 'orders'
+          ? services.orders.project(context(), {
+              ...base,
+              observationId,
+              kind: 'order',
+              data: {
+                type: 'order',
+                displayNumber: null,
+                status: 'open',
+                paymentStatus: 'unknown',
+                lines: [],
+              },
+            })
+          : services.inventory.project(context(), {
+              ...base,
+              observationId,
+              kind: 'position',
+              data: {
+                type: 'position',
+                skuId,
+                locationId,
+                unit: 'each',
+                onHand: null,
+                reserved: null,
+                available: '3',
+                availabilityBasis: 'provider_reported',
+              },
+            });
+      expect(await project(input.observation.id)).toBe('applied');
+      const service = services[module];
+      const initial = await service.current(context(), entityId);
+      for (const observationId of [
+        randomUUID(),
+        otherConnectionInput.observation.id,
+        otherTenantInput.observation.id,
+      ]) {
+        await expect(project(observationId)).rejects.toMatchObject({
+          code: '23503',
+          constraint: `${module}_snapshot_observation_fk`,
+        });
+        expect(await service.current(context(), entityId)).toEqual(initial);
+        expect(await service.history(context(), entityId)).toHaveLength(1);
+        expect(
+          (
+            await owner.query(
+              `SELECT id FROM ${module}_projection_events WHERE tenant_id=$1`,
+              [tenant],
+            )
+          ).rowCount,
+        ).toBe(1);
+      }
+    },
+  );
   it('retains unmapped observations, then compares equivalent stock without merging sources', async () => {
     const input = stock();
     const pending = await services.ingestion.ingest(
