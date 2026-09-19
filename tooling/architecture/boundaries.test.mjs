@@ -48,6 +48,7 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
         'connections.test.ts',
         'connections.integration.test.ts',
         'shopify-oauth.integration.test.ts',
+        'commerce.integration.test.ts',
         'diagnosis-reread.test.ts',
         'workflow-runtime.test.ts',
       ].map((name) =>
@@ -118,6 +119,7 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
         'connections.test.ts',
         'connections.integration.test.ts',
         'shopify-oauth.integration.test.ts',
+        'commerce.integration.test.ts',
         'diagnosis-reread.test.ts',
         'workflow-runtime.test.ts',
       ].map((name) =>

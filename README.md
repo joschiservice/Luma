@@ -83,6 +83,9 @@ API build output is `apps/api/dist`; run with `pnpm --filter @luma/api start` af
 
 [ADR-002](docs/architecture/002-canonical-commerce-model.md) defines the V0 entities, tenant-scoped identifiers, source snapshots, lifecycle fields and constraints for future Drizzle migrations. It covers JTL/Shopify comparison, raw payload retention, exception deduplication and the proposal → execution → verification → audit trail.
 
+The [commerce projection guide](docs/commerce-projections.md) covers persisted source
+observations, explicit reconciliation mappings, canonical snapshots and replay.
+
 ## Exception taxonomy
 
 The [V0 exception taxonomy](docs/exception-taxonomy.md) defines four detection classes, evidence requirements, safe recovery and verification. Its versioned synthetic golden cases cover positive, negative and uncertain outcomes for the detection pipeline. The [detection guide](docs/exception-detection.md) covers ingestion, immutable evidence, tenant-scoped persistence, deduplication and resolution.

@@ -61,8 +61,9 @@ and telemetry configuration, still use the existing app environment mechanism.
 Use `pnpm dev:manual` when you want to control the database and auth settings.
 
 The migration administrator connection is used only during initialization.
-`luma_api` inherits `luma_identity`. `luma_worker` inherits `luma_exceptions`,
-`luma_policies`, `luma_execution` and `luma_audit`. Neither runtime login has
+`luma_api` inherits `luma_identity`, `luma_connectors` and `luma_case_reader`.
+`luma_worker` inherits `luma_exceptions`, `luma_policies`, `luma_execution`,
+`luma_audit`, `luma_connectors`, `luma_orders` and `luma_inventory`. Neither runtime login has
 superuser, database creation, role creation or RLS bypass privileges.
 
 Temporal runs only when requested. Its development server persists workflow

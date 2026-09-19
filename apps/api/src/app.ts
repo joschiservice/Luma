@@ -1,3 +1,7 @@
+import { createSourceRecords } from '#modules/connectors/composition';
+import { createCommerceProjections as createOrderProjections } from '#modules/orders/composition';
+import { createCommerceProjections as createInventoryProjections } from '#modules/inventory/composition';
+import { createCommerceIngestion } from '#modules/workflows/index';
 import {
   createExceptionActivities,
   createExceptionClient,
@@ -512,4 +516,28 @@ export async function createDefaultExceptionWorker(
     await closeServices();
     throw error;
   }
+}
+
+/** Persist connector observations and replay canonical projections in owner transactions. */
+export function createCommerceServices(databaseUrl: string) {
+  const pool = new Pool({ connectionString: databaseUrl });
+  const db = createTenantDatabase(pool);
+  const inventory = createInventoryProjections(db);
+  const orders = createOrderProjections(db, (context, id) =>
+    inventory.has(context, 'sku', id),
+  );
+  const sources = createSourceRecords(db, (context, kind, id) =>
+    kind === 'order' || kind === 'order_line' || kind === 'fulfillment'
+      ? orders.has(context, kind, id)
+      : inventory.has(context, kind, id),
+  );
+  return {
+    sources,
+    orders,
+    inventory,
+    ingestion: createCommerceIngestion(sources, orders, inventory, (value) =>
+      createHash('sha256').update(value).digest('hex'),
+    ),
+    close: () => pool.end(),
+  };
 }
