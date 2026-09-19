@@ -42,7 +42,8 @@
     "ts-pattern": "5.9.0",
     "vite": "8.3.0",
     "vitest": "4.1.11",
-    "zod": "4.6.5"
+    "zod": "4.6.5",
+    "@luma/api-contract": "workspace:*"
   },
   "dependencies": {
     "@base-ui/react": "1.8.0",

@@ -86,10 +86,10 @@ it('registers, creates EU workspaces, restores links, switches tabs and revokes 
   await page.goto(`/app/${first}/exceptions`);
   await heading(page, 'Sign in to Luma');
   expect(new URL(page.url()).searchParams.get('returnTo')).toBe(
-    `/app/${first}/exceptions`,
+    `/app/${first}/exceptions?view=needs_you`,
   );
   await signIn(page);
-  await heading(page, 'Exceptions');
+  await heading(page, 'A clearer next step.');
   await page.goto('/app/workspaces/new');
   const second = await createWorkspace(page, 'South Studio');
   await page.goto('/app');

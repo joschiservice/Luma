@@ -33,3 +33,4 @@ export type {
   Diagnosis,
   DiagnosisInput,
 } from '#modules/exceptions/domain/diagnosis';
+export type { CaseService } from '#modules/exceptions/application/cases';

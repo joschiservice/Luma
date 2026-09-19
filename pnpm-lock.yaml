@@ -390,6 +390,9 @@ importers:
         specifier: 1.46.0
         version: 1.46.0(react@19.3.0)
     devDependencies:
+      '@luma/api-contract':
+        specifier: workspace:*
+        version: link:../api-contract
       '@luma/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config

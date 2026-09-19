@@ -109,6 +109,10 @@ Link the Linear issue, describe behavior and validation, and keep PRs scoped. Ru
 
 Implementation ADRs live in [docs/architecture](docs/architecture/README.md), the authoritative source reviewed and versioned with code. The [Linear decision register](https://linear.app/auren-labs/document/architecture-decision-register-305db9bed1de) contains summaries, issue links and repository references only; do not maintain full ADR copies there. Strategic product and business decisions remain in Notion. The web bootstrap follows [TanStack Start's setup guide](https://tanstack.com/start/latest/docs/framework/react/build-from-scratch). The [HTTP API guide](docs/api.md) covers contracts, clients, errors and OpenAPI. The [identity guide](docs/identity.md) covers authentication, tenant guards, database roles and migrations. The [observability guide](docs/observability.md) covers Sentry, Langfuse, PostHog, correlation and data redaction.
 
+## Case inbox
+
+The [case inbox guide](docs/case-inbox.md) covers attention views, filters, persisted investigations, evidence freshness and the read-only API.
+
 ## Model gateway
 
 The [model gateway guide](docs/model-gateway.md) covers provider-independent generation, configured routes, structured output, tool proposals, data policy and Langfuse metadata. Model calls are disabled by default. Vercel routes support public/synthetic input; tenant input requires an approved EU adapter.

@@ -10,6 +10,8 @@ import type {
   VerificationEvaluator,
 } from '#modules/exceptions/index';
 import {
+  createCases,
+  caseRoutes,
   createDiagnoses,
   createExceptions,
 } from '#modules/exceptions/composition';
@@ -55,6 +57,7 @@ import type { IdentityService } from '#modules/identity/index';
 
 export interface AppDependencies {
   shopify?: import('#modules/connectors/composition').ShopifyOAuth;
+  cases?: import('#modules/exceptions/index').CaseService;
   connections?: import('#modules/connectors/index').ConnectionManagement;
   modelGateway?: ModelGateway;
   identity?: IdentityService;
@@ -193,6 +196,7 @@ export function buildApp(
     s.registerRouter(
       apiContract,
       {
+        exceptions: caseRoutes(dependencies.cases),
         identity: identityRoutes(dependencies.identity),
         connections: connectionRoutes(
           dependencies.connections,
@@ -299,7 +303,13 @@ export function buildRuntimeApp(
     typeof connections === 'function'
       ? connections(identity.service)
       : installedConnections;
+  const casePool = new Pool({
+    connectionString: settings.databaseUrl,
+    max: 5,
+    statement_timeout: 5000,
+  });
   const app = buildApp(options, {
+    cases: createCases(createTenantDatabase(casePool)),
     ...(observability ? { observability } : {}),
     ...(modelGateway ? { modelGateway } : {}),
     ...(connectionService ? { connections: connectionService } : {}),
@@ -338,6 +348,8 @@ export function buildRuntimeApp(
     );
     app.addHook('onClose', () => connectionPool.end());
   }
+  casePool.on('error', () => app.log.error('Case database connection failed'));
+  app.addHook('onClose', () => casePool.end());
   identity.register(app);
   app.addHook('onClose', identity.close);
   return app;
@@ -425,6 +437,7 @@ export function createDetectionServices(
   );
   return {
     exceptions,
+    cases: createCases(createTenantDatabase(pool), now),
     diagnoses: createDiagnoses(
       createTenantDatabase(pool),
       now,

@@ -1,6 +1,1542 @@
 {
   "openapi": "3.0.2",
   "paths": {
+    "/v1/organizations/{organizationId}/exceptions": {
+      "get": {
+        "description": "Filter attention, active work or history by class, severity and state. Results sort by severity, oldest attention request or detection, then ID. Use the returned cursor with the same filters. Refresh from the first page as cases change.",
+        "summary": "List cases in your organization",
+        "tags": ["exceptions"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "schema": {
+              "default": "needs_you",
+              "type": "string",
+              "enum": ["needs_you", "active", "history"]
+            }
+          },
+          {
+            "name": "class",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "sync_failure",
+                "stuck_fulfillment",
+                "inventory_mismatch",
+                "workflow_failure"
+              ]
+            }
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["high", "medium"]
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "detected",
+                "diagnosed",
+                "proposed",
+                "awaiting_approval",
+                "allowed",
+                "executing",
+                "verifying",
+                "resolved",
+                "failed",
+                "escalated"
+              ]
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "default": 25,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ],
+        "operationId": "exceptions.list",
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "schemaVersion": {
+                            "type": "number",
+                            "enum": [1]
+                          },
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "revision": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": 0
+                          },
+                          "class": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "detected",
+                              "diagnosed",
+                              "proposed",
+                              "awaiting_approval",
+                              "allowed",
+                              "executing",
+                              "verifying",
+                              "resolved",
+                              "failed",
+                              "escalated"
+                            ]
+                          },
+                          "severity": {
+                            "type": "string",
+                            "enum": ["high", "medium"]
+                          },
+                          "summary": {
+                            "type": "string",
+                            "maxLength": 2000
+                          },
+                          "subject": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string"
+                              },
+                              "id": {
+                                "type": "string"
+                              },
+                              "scope": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                },
+                                "maxItems": 100
+                              }
+                            },
+                            "required": ["kind", "id", "scope"]
+                          },
+                          "sources": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "maxItems": 100
+                          },
+                          "detectedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "lastActivityAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "attention": {
+                            "type": "object",
+                            "properties": {
+                              "required": {
+                                "type": "boolean"
+                              },
+                              "reason": {
+                                "type": "string",
+                                "enum": [
+                                  "approval",
+                                  "manual_intervention",
+                                  "uncertainty"
+                                ],
+                                "nullable": true
+                              },
+                              "explanation": {
+                                "type": "string"
+                              },
+                              "requestedAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "required",
+                              "reason",
+                              "explanation",
+                              "requestedAt"
+                            ]
+                          },
+                          "freshness": {
+                            "type": "string",
+                            "enum": ["fresh", "stale", "unknown"]
+                          },
+                          "diagnosisStatus": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "ready",
+                              "insufficient_evidence",
+                              "failed"
+                            ]
+                          },
+                          "resolution": {
+                            "type": "string",
+                            "enum": ["verified", "human_disposition"],
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "schemaVersion",
+                          "id",
+                          "revision",
+                          "class",
+                          "state",
+                          "severity",
+                          "summary",
+                          "subject",
+                          "sources",
+                          "detectedAt",
+                          "lastActivityAt",
+                          "attention",
+                          "freshness",
+                          "diagnosisStatus",
+                          "resolution"
+                        ]
+                      },
+                      "maxItems": 100
+                    },
+                    "nextCursor": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "coverage": {
+                      "type": "string",
+                      "enum": ["observed", "unobserved"]
+                    }
+                  },
+                  "required": ["items", "nextCursor", "coverage"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/exceptions/{exceptionId}": {
+      "get": {
+        "description": "Returns the current persisted investigation and up to 100 evidence references. Recommendations require review; they do not authorize execution. Unavailable cases return not found.",
+        "summary": "Read a case investigation",
+        "tags": ["exceptions"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "exceptionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "operationId": "exceptions.get",
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemaVersion": {
+                      "type": "number",
+                      "enum": [1]
+                    },
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "revision": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "exclusiveMinimum": 0
+                    },
+                    "class": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "detected",
+                        "diagnosed",
+                        "proposed",
+                        "awaiting_approval",
+                        "allowed",
+                        "executing",
+                        "verifying",
+                        "resolved",
+                        "failed",
+                        "escalated"
+                      ]
+                    },
+                    "severity": {
+                      "type": "string",
+                      "enum": ["high", "medium"]
+                    },
+                    "summary": {
+                      "type": "string",
+                      "maxLength": 2000
+                    },
+                    "subject": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string"
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "scope": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "maxItems": 100
+                        }
+                      },
+                      "required": ["kind", "id", "scope"]
+                    },
+                    "sources": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 100
+                    },
+                    "detectedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "lastActivityAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "attention": {
+                      "type": "object",
+                      "properties": {
+                        "required": {
+                          "type": "boolean"
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "approval",
+                            "manual_intervention",
+                            "uncertainty"
+                          ],
+                          "nullable": true
+                        },
+                        "explanation": {
+                          "type": "string"
+                        },
+                        "requestedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "required",
+                        "reason",
+                        "explanation",
+                        "requestedAt"
+                      ]
+                    },
+                    "freshness": {
+                      "type": "string",
+                      "enum": ["fresh", "stale", "unknown"]
+                    },
+                    "diagnosisStatus": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "ready",
+                        "insufficient_evidence",
+                        "failed"
+                      ]
+                    },
+                    "resolution": {
+                      "type": "string",
+                      "enum": ["verified", "human_disposition"],
+                      "nullable": true
+                    },
+                    "diagnosis": {
+                      "type": "object",
+                      "properties": {
+                        "schemaVersion": {
+                          "type": "number",
+                          "enum": [1]
+                        },
+                        "exceptionId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "revision": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": 0
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "pending",
+                            "ready",
+                            "insufficient_evidence",
+                            "failed"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 512
+                        },
+                        "superseded": {
+                          "type": "boolean"
+                        },
+                        "summary": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 2000
+                        },
+                        "detectorDecision": {
+                          "discriminator": {
+                            "propertyName": "decision"
+                          },
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "decision": {
+                                  "type": "string",
+                                  "enum": ["detect"]
+                                },
+                                "severity": {
+                                  "type": "string",
+                                  "enum": ["medium", "high"]
+                                },
+                                "reason": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 512
+                                }
+                              },
+                              "required": ["decision", "severity", "reason"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "decision": {
+                                  "type": "string",
+                                  "enum": ["clear", "defer", "reject"]
+                                },
+                                "severity": {
+                                  "type": "string",
+                                  "format": "null",
+                                  "nullable": true
+                                },
+                                "reason": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 512
+                                }
+                              },
+                              "required": ["decision", "severity", "reason"],
+                              "additionalProperties": false
+                            }
+                          ]
+                        },
+                        "affected": {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 512
+                            },
+                            "id": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 512
+                            },
+                            "scope": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 512
+                              },
+                              "maxItems": 100
+                            }
+                          },
+                          "required": ["kind", "id", "scope"],
+                          "additionalProperties": false
+                        },
+                        "facts": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "code": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 512
+                              },
+                              "text": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 2000
+                              },
+                              "evidenceRefs": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 512
+                                },
+                                "maxItems": 100
+                              }
+                            },
+                            "required": ["code", "text", "evidenceRefs"],
+                            "additionalProperties": false
+                          },
+                          "maxItems": 100
+                        },
+                        "hypotheses": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "code": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 512
+                              },
+                              "text": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 2000
+                              },
+                              "evidenceRefs": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 512
+                                },
+                                "maxItems": 100
+                              },
+                              "contradictingEvidenceRefs": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 512
+                                },
+                                "maxItems": 100
+                              },
+                              "uncertainty": {
+                                "type": "string",
+                                "enum": ["unsubstantiated"]
+                              },
+                              "missingChecks": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 2000
+                                },
+                                "minItems": 1,
+                                "maxItems": 20
+                              },
+                              "origin": {
+                                "type": "string",
+                                "enum": ["rule", "model"]
+                              }
+                            },
+                            "required": [
+                              "code",
+                              "text",
+                              "evidenceRefs",
+                              "contradictingEvidenceRefs",
+                              "uncertainty",
+                              "missingChecks",
+                              "origin"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "maxItems": 20
+                        },
+                        "constraints": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 2000
+                          },
+                          "maxItems": 100
+                        },
+                        "impact": {
+                          "type": "object",
+                          "properties": {
+                            "observed": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "code": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 512
+                                  },
+                                  "text": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 2000
+                                  },
+                                  "evidenceRefs": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 512
+                                    },
+                                    "maxItems": 100
+                                  }
+                                },
+                                "required": ["code", "text", "evidenceRefs"],
+                                "additionalProperties": false
+                              }
+                            },
+                            "potential": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "code": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 512
+                                  },
+                                  "text": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 2000
+                                  },
+                                  "evidenceRefs": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 512
+                                    },
+                                    "maxItems": 100
+                                  }
+                                },
+                                "required": ["code", "text", "evidenceRefs"],
+                                "additionalProperties": false
+                              }
+                            },
+                            "exposedQuantity": {
+                              "type": "string",
+                              "pattern": "^-?\\d{1,15}(?:\\.\\d{1,6})?$",
+                              "nullable": true
+                            },
+                            "unit": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 512,
+                              "nullable": true
+                            },
+                            "cost": {
+                              "type": "string",
+                              "format": "null",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "observed",
+                            "potential",
+                            "exposedQuantity",
+                            "unit",
+                            "cost"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "nextSteps": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "code": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 512
+                              },
+                              "text": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 2000
+                              },
+                              "evidenceRefs": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 512
+                                },
+                                "maxItems": 100
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "read_investigate",
+                                  "manual_intervention"
+                                ]
+                              },
+                              "preconditions": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 2000
+                                }
+                              },
+                              "verificationCriteria": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 2000
+                                },
+                                "minItems": 1
+                              },
+                              "capabilityLimitations": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 2000
+                                }
+                              }
+                            },
+                            "required": [
+                              "code",
+                              "text",
+                              "evidenceRefs",
+                              "kind",
+                              "preconditions",
+                              "verificationCriteria",
+                              "capabilityLimitations"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "maxItems": 20
+                        },
+                        "attention": {
+                          "type": "object",
+                          "properties": {
+                            "suggested": {
+                              "type": "boolean"
+                            },
+                            "reason": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 512
+                            },
+                            "evidenceRefs": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 512
+                              },
+                              "maxItems": 100
+                            },
+                            "dueAt": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "suggested",
+                            "reason",
+                            "evidenceRefs",
+                            "dueAt"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "provenance": {
+                          "type": "object",
+                          "properties": {
+                            "generatedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "engineVersion": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 512
+                            },
+                            "ruleVersion": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 512
+                            },
+                            "configVersion": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 512
+                            },
+                            "mappingVersions": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 512
+                              },
+                              "maxItems": 100
+                            },
+                            "evidence": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 512
+                                  },
+                                  "observedAt": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "sourceUpdatedAt": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "nullable": true
+                                  },
+                                  "adapterVersion": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 512
+                                  },
+                                  "schemaVersion": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "exclusiveMinimum": 0
+                                  },
+                                  "source": {
+                                    "type": "object",
+                                    "properties": {
+                                      "provider": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 512
+                                      },
+                                      "resource": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 512
+                                      },
+                                      "externalId": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 512
+                                      },
+                                      "scopeKey": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "provider",
+                                      "resource",
+                                      "externalId",
+                                      "scopeKey"
+                                    ],
+                                    "additionalProperties": false,
+                                    "nullable": true
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "observedAt",
+                                  "sourceUpdatedAt",
+                                  "adapterVersion",
+                                  "schemaVersion",
+                                  "source"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "maxItems": 100
+                            },
+                            "validUntil": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            },
+                            "model": {
+                              "type": "object",
+                              "properties": {
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "disabled",
+                                    "used",
+                                    "unavailable",
+                                    "rejected"
+                                  ]
+                                },
+                                "model": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 512,
+                                  "nullable": true
+                                },
+                                "promptVersion": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 512,
+                                  "nullable": true
+                                }
+                              },
+                              "required": ["status", "model", "promptVersion"],
+                              "additionalProperties": false
+                            },
+                            "reread": {
+                              "type": "object",
+                              "properties": {
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "not_requested",
+                                    "unavailable",
+                                    "completed",
+                                    "rate_limited",
+                                    "failed"
+                                  ]
+                                },
+                                "retryAfter": {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "nullable": true
+                                }
+                              },
+                              "required": ["status", "retryAfter"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "generatedAt",
+                            "engineVersion",
+                            "ruleVersion",
+                            "configVersion",
+                            "mappingVersions",
+                            "evidence",
+                            "validUntil",
+                            "model",
+                            "reread"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "schemaVersion",
+                        "exceptionId",
+                        "revision",
+                        "status",
+                        "reason",
+                        "superseded",
+                        "summary",
+                        "detectorDecision",
+                        "affected",
+                        "facts",
+                        "hypotheses",
+                        "constraints",
+                        "impact",
+                        "nextSteps",
+                        "attention",
+                        "provenance"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "schemaVersion",
+                    "id",
+                    "revision",
+                    "class",
+                    "state",
+                    "severity",
+                    "summary",
+                    "subject",
+                    "sources",
+                    "detectedAt",
+                    "lastActivityAt",
+                    "attention",
+                    "freshness",
+                    "diagnosisStatus",
+                    "resolution",
+                    "diagnosis"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/organizations": {
       "get": {
         "summary": "List your organizations",
