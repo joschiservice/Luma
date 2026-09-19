@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { Link, useLocation, useNavigate } from '@tanstack/react-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { Button } from '@luma/ui/button';
+import { Button, buttonVariants } from '@luma/ui/button';
 import { clearPrivate, IdentityError, returnPath } from './data';
 
 export function Brand() {
@@ -62,7 +62,9 @@ export function Failure({
       {status !== 403 && status !== 404 ? (
         <Button onClick={retry}>Try again</Button>
       ) : null}
-      <Link to="/app/workspaces">Choose a workspace</Link>
+      <Link to="/app/workspaces" className={buttonVariants()}>
+        Choose a workspace
+      </Link>
     </main>
   );
 }

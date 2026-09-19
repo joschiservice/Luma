@@ -107,12 +107,13 @@ export async function environment(saved, workflows = false) {
     if (error.code !== 'ENOENT') throw error;
   }
   const localOrigin = `http://127.0.0.1:${saved.webPort}`;
-  const webOrigin = apiEnv.SHOPIFY_WEB_ORIGIN || localOrigin;
+  const webOrigin =
+    apiEnv.SHOPIFY_WEB_ORIGIN || apiEnv.BETTER_AUTH_URL || localOrigin;
   if (
     new URL(webOrigin).origin !== webOrigin ||
     !['http:', 'https:'].includes(new URL(webOrigin).protocol)
   )
-    throw new Error('SHOPIFY_WEB_ORIGIN must be an exact HTTP origin');
+    throw new Error('The configured web URL must be an exact HTTP origin');
   const generated = {
     CONNECTIONS_ACTIVE_KEY_ID: 'local',
     CONNECTIONS_KEYS: JSON.stringify({ local: await connectionKey() }),

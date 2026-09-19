@@ -9,6 +9,7 @@ export default defineConfig(({ mode }) => {
     plugins: [tailwindcss(), tanstackStart(), react()],
     server: {
       host: '127.0.0.1',
+      allowedHosts: ['luma-dev.tail2dda1b.ts.net'],
       port: Number(process.env.WEB_PORT ?? env.WEB_PORT ?? 3000),
       strictPort: true,
       proxy: {
