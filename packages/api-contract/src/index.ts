@@ -1,6 +1,20 @@
+import {
+  caseDecisionSchema,
+  decisionReceiptSchema,
+  caseReviewSchema,
+  caseProgressSchema,
+  caseTimelineSchema,
+} from './desk.js';
+export * from './desk.js';
 import { overviewQuerySchema, operationsOverviewSchema } from './overview.js';
 export * from './overview.js';
-import { caseQuerySchema, caseListSchema, caseDetailSchema } from './cases.js';
+import {
+  caseQuerySchema,
+  caseListSchema,
+  caseDetailSchema,
+  caseEvidenceQuerySchema,
+  caseEvidencePageSchema,
+} from './cases.js';
 export * from './cases.js';
 import {
   installedConnectionSchema,
@@ -29,6 +43,7 @@ export const apiErrorSchema = z.object({
     'NOT_READY',
     'INTERNAL_ERROR',
     'PAYLOAD_TOO_LARGE',
+    'TOO_MANY_REQUESTS',
     'UNSUPPORTED_MEDIA_TYPE',
   ]),
   message: z.string(),
@@ -239,8 +254,94 @@ const connectionsContract = c.router(
   },
 );
 
+const caseParams = organizationParamsSchema.extend({
+  exceptionId: z.string().uuid(),
+});
+export const caseEventsContract = c.router({
+  events: {
+    method: 'GET',
+    path: '/v1/organizations/:organizationId/exceptions/:exceptionId/events',
+    pathParams: caseParams,
+    responses: {
+      200: c.otherResponse({
+        contentType: 'text/event-stream',
+        body: z.string(),
+      }),
+      400: apiErrorSchema,
+      401: apiErrorSchema,
+      403: apiErrorSchema,
+      404: apiErrorSchema,
+      429: apiErrorSchema,
+      500: apiErrorSchema,
+      503: apiErrorSchema,
+    },
+    summary: 'Follow case progress',
+    description:
+      'Authenticated SSE emits resync events with a current progress snapshot every five seconds. Refetch case, review and timeline on each event and reconnect. Last-Event-ID always resynchronizes current state; events are not an audit replay. Sessions and membership are checked before each snapshot. Streams reconnect after one minute. Slow consumers are disconnected. Use the timeline endpoint for persisted history.',
+  },
+});
 export const apiContract = c.router(
   {
+    caseDesk: c.router(
+      {
+        review: {
+          method: 'GET',
+          path: '/v1/organizations/:organizationId/exceptions/:exceptionId/review',
+          pathParams: caseParams,
+          responses: { 200: caseReviewSchema },
+          summary: 'Review a case proposal',
+          description:
+            'Returns an immutable proposal, its current policy result and permitted decisions. Unavailable capabilities cannot be approved. Manual recommendations remain in the case investigation.',
+        },
+        decide: {
+          method: 'POST',
+          path: '/v1/organizations/:organizationId/exceptions/:exceptionId/decisions',
+          pathParams: caseParams,
+          body: caseDecisionSchema,
+          responses: { 200: decisionReceiptSchema },
+          summary: 'Approve, reject or escalate a case',
+          description:
+            'Use a unique commandId and the current case, diagnosis, proposal and policy versions from review. Exact retries return the committed receipt. Conflicts return 409. Approval records a decision; it does not mean execution or verification succeeded.',
+        },
+        receipt: {
+          method: 'GET',
+          path: '/v1/organizations/:organizationId/exceptions/:exceptionId/decisions/:commandId',
+          pathParams: caseParams.extend({ commandId: z.string().uuid() }),
+          responses: { 200: decisionReceiptSchema },
+          summary: 'Recover a decision result',
+          description:
+            'After a timeout, read the receipt using the original command ID or retry the identical request. Receipts are visible to their submitting actor.',
+        },
+        progress: {
+          method: 'GET',
+          path: '/v1/organizations/:organizationId/exceptions/:exceptionId/progress',
+          pathParams: caseParams,
+          responses: { 200: caseProgressSchema },
+          summary: 'Read execution and verification progress',
+          description:
+            'Returns persisted execution and canonical resolution separately from workflow phase. An unavailable workflow service does not imply success or no activity.',
+        },
+        timeline: {
+          method: 'GET',
+          path: '/v1/organizations/:organizationId/exceptions/:exceptionId/timeline',
+          pathParams: caseParams,
+          query: caseEvidenceQuerySchema,
+          responses: { 200: caseTimelineSchema },
+          summary: 'Read case audit history',
+          description:
+            'Returns up to 100 persisted events, ordered by timestamp and ID. Reuse cursors with the same organization, case and page size. Refresh from the first page and deduplicate by ID as events arrive.',
+        },
+      },
+      {
+        commonResponses: {
+          401: apiErrorSchema,
+          403: apiErrorSchema,
+          404: apiErrorSchema,
+          409: apiErrorSchema,
+          503: apiErrorSchema,
+        },
+      },
+    ),
     operations: c.router({
       overview: {
         method: 'GET',
@@ -270,6 +371,18 @@ export const apiContract = c.router(
           description:
             'Filter attention, active work or history by class, severity and state. Results sort by severity, oldest attention request or detection, then ID. Use the returned cursor with the same filters. Refresh from the first page as cases change.',
         },
+        evidence: {
+          method: 'GET',
+          path: '/v1/organizations/:organizationId/exceptions/:exceptionId/evidence',
+          pathParams: organizationParamsSchema.extend({
+            exceptionId: z.string().uuid(),
+          }),
+          query: caseEvidenceQuerySchema,
+          responses: { 200: caseEvidencePageSchema },
+          summary: 'Read case evidence references',
+          description:
+            'Returns persisted observation and verification references ordered by immutable ID, including evidence outside the current diagnosis. Pages default to 25 references and allow at most 100. Reuse cursors only for the same organization, case and page size. As evidence arrives, refresh from the first page and deduplicate by ID. Completeness is unknown unless explicitly recorded for the observation. A null source update time means unknown, regardless of observation freshness.',
+        },
         get: {
           method: 'GET',
           path: '/v1/organizations/:organizationId/exceptions/:exceptionId',
@@ -279,7 +392,7 @@ export const apiContract = c.router(
           responses: { 200: caseDetailSchema },
           summary: 'Read a case investigation',
           description:
-            'Returns the current persisted investigation and up to 100 evidence references. Recommendations require review; they do not authorize execution. Unavailable cases return not found.',
+            'Returns the current persisted investigation and up to 100 evidence references. Use the evidence endpoint to read further historical references. Recommendations require review; they do not authorize execution. Unavailable cases return not found.',
         },
       },
       {

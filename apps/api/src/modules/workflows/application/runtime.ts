@@ -71,6 +71,11 @@ export interface ExceptionActivities {
   verify(input: ExceptionWorkflowInput, exceptionId: string): Promise<boolean>;
 }
 export interface WorkflowBindings {
+  recordWorkflow?(
+    context: TenantContext,
+    exceptionId: string,
+    source: WorkflowSource,
+  ): Promise<void>;
   /** Load an immutable, tenant-owned ingestion request. Never fetch live provider payloads here. */
   loadDetection(
     context: TenantContext,
@@ -134,11 +139,18 @@ export function createExceptionActivities(deps: {
       if (input.source.kind === 'incident') {
         const incident = await deps.exceptions.get(fresh, input.source.id);
         if (!incident) throw new WorkflowInputError('Exception not found');
+        await deps.bindings.recordWorkflow?.(fresh, incident.id, input.source);
         return incident.id;
       }
       const request = await deps.bindings.loadDetection(fresh, input.source.id);
       if (!request) throw new WorkflowInputError('Detection request not found');
       const result = await deps.exceptions.ingest(fresh, request);
+      if (result.incident)
+        await deps.bindings.recordWorkflow?.(
+          fresh,
+          result.incident.id,
+          input.source,
+        );
       return result.incident?.id ?? null;
     },
     async diagnose(input, exceptionId) {

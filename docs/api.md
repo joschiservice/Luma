@@ -62,3 +62,12 @@ The stable ts-rest packages are pinned to 3.52.1 with Zod 3.25.76 isolated to th
 ## Request tracing
 
 Responses include a server-generated `x-request-id`. When observability is wired, `x-trace-id` identifies the trace in Sentry and Langfuse. Send a UUIDv4 `x-luma-action-id` to correlate related requests from one user action. Invalid action IDs are ignored. These IDs provide diagnostics, not authentication or tenant access. See the [observability guide](observability.md).
+
+## Exception Desk
+
+Tenant-scoped [case reads](case-inbox.md) include bounded evidence pagination.
+[Decision and progress APIs](case-decisions.md) provide immutable proposal review,
+approve/reject/escalate commands, retry receipts, execution and verification reads,
+audit history and authenticated SSE. All contracts and the stream client are
+exported by `@luma/api-contract`; overview and installed-connection endpoints retain
+their existing module ownership.

@@ -5,6 +5,7 @@ import {
   Client,
   Connection,
   WorkflowExecutionAlreadyStartedError,
+  WorkflowNotFoundError,
 } from '@temporalio/client';
 import {
   ApplicationFailure,
@@ -123,10 +124,14 @@ export function createWorkflowCommands(
   taskQueue: string,
   identity: Pick<IdentityService, 'refreshContext'>,
 ) {
-  async function scope(context: TenantContext, source: WorkflowSource) {
-    requireRole(context, ['owner', 'admin']);
+  async function scope(
+    context: TenantContext,
+    source: WorkflowSource,
+    write = true,
+  ) {
+    if (write) requireRole(context, ['owner', 'admin']);
     const fresh = await identity.refreshContext(context);
-    requireRole(fresh, ['owner', 'admin']);
+    if (write) requireRole(fresh, ['owner', 'admin']);
     if (
       fresh.tenantId !== context.tenantId ||
       fresh.actor.id !== context.actor.id
@@ -163,7 +168,7 @@ export function createWorkflowCommands(
       return { workflowId: scoped.id };
     },
     async progress(context: TenantContext, source: WorkflowSource) {
-      const { id } = await scope(context, source);
+      const { id } = await scope(context, source, false);
       const handle = client.workflow.getHandle(id);
       const description = await handle.describe();
       if (description.status.name === 'COMPLETED')
@@ -191,13 +196,56 @@ export async function createExceptionClient(
 ) {
   validateSettings(settings);
   const connection = await Connection.connect({
+    connectTimeout: '2 seconds',
     address: settings.address,
     ...(settings.tls === undefined ? {} : { tls: settings.tls }),
     ...(settings.apiKey ? { apiKey: settings.apiKey } : {}),
   });
   const client = new Client({ connection, namespace: settings.namespace });
+  const commands = createWorkflowCommands(client, settings.taskQueue, identity);
   return {
-    ...createWorkflowCommands(client, settings.taskQueue, identity),
+    ...commands,
+    progress: (context: TenantContext, source: WorkflowSource) =>
+      connection.withDeadline(Date.now() + 2000, () =>
+        commands.progress(context, source),
+      ),
     close: () => connection.close(),
+  };
+}
+
+/** Connect lazily so persisted reads remain available while Temporal is offline. */
+export function createDeskWorkflowReader(
+  settings: TemporalSettings,
+  identity: Pick<IdentityService, 'refreshContext'>,
+) {
+  let pending: ReturnType<typeof createExceptionClient> | undefined;
+  let closed = false;
+  return {
+    async get(
+      context: TenantContext,
+      exceptionId: string,
+      source: WorkflowSource | null = null,
+    ) {
+      if (closed) throw new Error('Workflow reader closed');
+      pending ??= createExceptionClient(settings, identity).catch((error) => {
+        pending = undefined;
+        throw error;
+      });
+      const client = await pending;
+      try {
+        return await client.progress(
+          context,
+          source ?? { kind: 'incident', id: exceptionId },
+        );
+      } catch (error) {
+        if (error instanceof WorkflowNotFoundError) return null;
+        throw error;
+      }
+    },
+    async close() {
+      closed = true;
+      const client = await pending?.catch(() => undefined);
+      await client?.close();
+    },
   };
 }

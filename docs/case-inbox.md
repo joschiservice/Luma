@@ -23,6 +23,21 @@ write controls are exposed. A selected case stays open when it leaves its filter
 - `GET /v1/organizations/:organizationId/exceptions/:exceptionId` returns the
   current persisted diagnosis with at most 100 evidence references, including
   observations that preceded diagnosis completion.
+- `GET /v1/organizations/:organizationId/exceptions/:exceptionId/evidence`
+  returns historical observation and verification references. It accepts `cursor`
+  and `limit` (25 by default, at most 100), ordered by immutable evidence ID.
+  Cursors bind the tenant, case, page size and sort version. Each page authenticates
+  membership and checks case ownership. Unknown or inaccessible cases return 404.
+  Refresh from the first page and deduplicate by ID as new observations arrive.
+
+Evidence pages expose source identity, adapter/schema versions, observation time,
+source update time and completeness. A null source update time means unknown.
+Completeness is `complete` or `incomplete` only when the observation explicitly
+records a boolean `complete` fact; otherwise it is `unknown`. It does not describe
+connection coverage. Arbitrary provider facts and payloads are not returned.
+Evidence can precede the current diagnosis or establish its verified resolution;
+reading it does not start an investigation. Shared clients use
+`client.exceptions.evidence({ params: { organizationId, exceptionId }, query })`.
 
 Reads reuse identity guards and PostgreSQL RLS. They do not run investigations or
 call models. List responses omit diagnosis evidence. Keyset pagination orders
@@ -34,12 +49,13 @@ Coverage reports whether any observations exist, not whether they are complete o
 healthy. Connection availability is read independently through the existing
 connection API. An empty attention queue never implies healthy operations.
 
-This implements the read slice needed from LUMA-32. Decision commands, executable
-proposal projections, paginated historical evidence and streaming history remain
-in their owning follow-up slices. Case reads display at most 100 evidence
-references. Oversized investigations explicitly report the omitted count and
-withhold findings, impact and recommendations; pending investigations remain
-pending. Reads preserve the complete persisted evidence. The canonical exception
+Case detail reads display at most 100 evidence references. Oversized investigations
+explicitly report the omitted count and withhold findings, impact and recommendations;
+pending investigations remain pending. Evidence pagination preserves access to the
+complete persisted references. Proposal review, decisions, execution and audit reads,
+and authenticated SSE are described in [case decisions and progress](case-decisions.md).
+The inbox UI's decision controls and live timeline remain separate frontend work.
+The canonical exception
 and diagnosis tables remain the only source of case data.
 
 ## Database access
@@ -52,7 +68,9 @@ GRANT luma_case_reader TO luma_api;
 ```
 
 Managed local setup includes this grant. The API uses `IDENTITY_DATABASE_URL` for
-case reads. The worker retains its separate write permissions.
+case reads. Migration `0010_case_evidence_reads.sql` adds SELECT access and tenant
+policies for evidence links and normalized inputs. The worker retains its separate
+write permissions.
 
 ## Validation
 
@@ -66,3 +84,7 @@ filter/tenant cursor isolation and denied case reads. Browser acceptance covers
 real authentication and persistence, empty coverage, pagination, direct links,
 reloads, mobile selection, keyboard focus restoration, refreshed diagnosis,
 filter departure, unavailable cases and API failure.
+
+Evidence API tests cover more than 100 historical references, stable ordering,
+current-diagnosis independence, verification evidence, cursor validation and
+isolation, denied reads, restricted database privileges and typed client responses.

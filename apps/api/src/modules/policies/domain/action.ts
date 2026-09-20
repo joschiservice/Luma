@@ -1,3 +1,5 @@
+export const currentPolicyVersion = 'v0.1';
+
 export interface Provenance {
   kind: 'user' | 'service' | 'agent' | 'connector';
   id: string;

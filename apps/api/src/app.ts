@@ -1,3 +1,11 @@
+import {
+  createDeskStore,
+  createDeskService,
+  createDeskWorkflowReader,
+  deskRoutes,
+  registerDeskEvents,
+} from '#modules/workflows/composition';
+import { parseAction } from '#modules/execution/composition';
 import { createConnectionCoverage } from '#modules/connectors/composition';
 import {
   createOperationsOverview,
@@ -20,6 +28,7 @@ import type {
 } from '#modules/exceptions/index';
 import {
   createCases,
+  createCaseEscalation,
   caseRoutes,
   createDiagnoses,
   createExceptions,
@@ -65,6 +74,8 @@ import { IdentityError } from '#modules/identity/index';
 import type { IdentityService } from '#modules/identity/index';
 
 export interface AppDependencies {
+  desk?: import('#modules/workflows/index').DeskService;
+  eventSettings?: { intervalMs: number; lifetimeMs: number };
   operations?: import('#modules/workflows/index').OperationsOverviewService;
   shopify?: import('#modules/connectors/composition').ShopifyOAuth;
   cases?: import('#modules/exceptions/index').CaseService;
@@ -162,7 +173,13 @@ export function buildApp(
     if (error instanceof IdentityError) {
       return reply.status(error.statusCode).send({
         code: error.code,
-        message: error.message,
+        message:
+          error.statusCode === 404 &&
+          request.routeOptions.url?.startsWith(
+            '/v1/organizations/:organizationId/exceptions',
+          )
+            ? 'Case not found'
+            : error.message,
         requestId: request.id,
       });
     }
@@ -207,6 +224,7 @@ export function buildApp(
       apiContract,
       {
         exceptions: caseRoutes(dependencies.cases),
+        caseDesk: deskRoutes(dependencies.desk),
         operations: operationsRoutes(dependencies.operations),
         identity: identityRoutes(dependencies.identity),
         connections: connectionRoutes(
@@ -268,6 +286,12 @@ export function buildApp(
     );
   });
   registerShopifyRoutes(app, dependencies.shopify, dependencies.identity);
+  registerDeskEvents(
+    app,
+    dependencies.desk,
+    dependencies.identity,
+    dependencies.eventSettings,
+  );
   app.get('/openapi.json', async () => openApiDocument);
   return app;
 }
@@ -282,6 +306,7 @@ export function buildRuntimeApp(
     | ((
         identity: IdentityService,
       ) => import('#modules/connectors/index').ConnectionManagement),
+  workflowSettings?: import('@luma/config').WorkflowConfig,
 ) {
   if (modelSettings && !observability)
     throw new Error('Model gateway requires observability');
@@ -320,8 +345,18 @@ export function buildRuntimeApp(
     statement_timeout: 5000,
   });
   const cases = createCases(createTenantDatabase(casePool));
+  const workflowReader = workflowSettings
+    ? createDeskWorkflowReader(workflowSettings.temporal, identity.service)
+    : undefined;
+  const desk = createDeskServices(
+    createTenantDatabase(casePool),
+    identity.service,
+    undefined,
+    workflowReader ? { workflow: workflowReader.get } : {},
+  );
   const app = buildApp(options, {
     cases,
+    desk,
     operations: createOperationsOverview(
       cases,
       createConnectionCoverage(createTenantDatabase(casePool)),
@@ -366,6 +401,7 @@ export function buildRuntimeApp(
   }
   casePool.on('error', () => app.log.error('Case database connection failed'));
   app.addHook('onClose', () => casePool.end());
+  if (workflowReader) app.addHook('onClose', workflowReader.close);
   identity.register(app);
   app.addHook('onClose', identity.close);
   return app;
@@ -397,33 +433,7 @@ export function createSafetyServices(
   const policies = createPolicies(
     db,
     identity.refreshContext,
-    async (evidence) => {
-      const item = evidence.document;
-      await audit.append({
-        id: item.id,
-        tenantId: item.tenantId,
-        eventKey: item.id,
-        eventType: evidence.type,
-        schemaVersion: 1,
-        occurredAt: 'evaluatedAt' in item ? item.evaluatedAt : item.createdAt,
-        actor: {
-          kind: 'user',
-          id: 'actorId' in item ? item.actorId : item.approverId,
-        },
-        correlationId: item.correlationId,
-        proposalId: item.proposalId,
-        actionHash: item.actionHash,
-        policyDecisionId: 'actorId' in item ? item.id : item.decisionId,
-        evidenceRefs: [],
-        details: {
-          outcome: item.outcome,
-          policyVersion: item.policyVersion,
-          ...('reason' in item
-            ? { reason: item.reason }
-            : { requesterId: item.requesterId, expiresAt: item.expiresAt }),
-        },
-      });
-    },
+    policyAudit(audit),
   );
   return {
     policies,
@@ -476,7 +486,29 @@ export function createExceptionWorkflowRuntime(
   >,
   safety: Pick<ReturnType<typeof createSafetyServices>, 'execution'>,
   bindings: WorkflowBindings,
+  desk?: import('#modules/workflows/index').DeskService,
 ) {
+  if (desk) bindings = { ...bindings, recordWorkflow: desk.bindWorkflow };
+  if (desk && bindings.proposals) {
+    const proposals = bindings.proposals;
+    bindings = {
+      ...bindings,
+      proposals: {
+        prepare: async (context, diagnosis) => {
+          const action = await proposals.prepare(context, diagnosis);
+          if (action)
+            await desk.publish(
+              context,
+              diagnosis.exceptionId,
+              diagnosis.revision,
+              action,
+            );
+          return action;
+        },
+        get: desk.proposal,
+      },
+    };
+  }
   const activities = createExceptionActivities({
     identity,
     ...detection,
@@ -499,8 +531,18 @@ export async function createDefaultExceptionWorker(
   const safety = createSafetyServices(settings.databaseUrl, identity.service, {
     resolve: async () => null,
   });
+  const deskPool = new Pool({ connectionString: settings.databaseUrl, max: 5 });
+  const desk = createDeskServices(
+    createTenantDatabase(deskPool),
+    identity.service,
+  );
   const closeServices = async () => {
-    await Promise.all([identity.close(), detection.close(), safety.close()]);
+    await Promise.all([
+      identity.close(),
+      detection.close(),
+      safety.close(),
+      deskPool.end(),
+    ]);
   };
   try {
     const runtime = createExceptionWorkflowRuntime(
@@ -510,7 +552,19 @@ export async function createDefaultExceptionWorker(
       safety,
       {
         loadDetection: async () => null,
+        proposals: {
+          prepare: async (context, diagnosis) => {
+            const review = await desk.review(context, diagnosis.exceptionId);
+            if (review.proposal?.diagnosisRevision !== diagnosis.revision)
+              return null;
+            return (
+              (await desk.proposal(context, review.proposal.id))?.action ?? null
+            );
+          },
+          get: desk.proposal,
+        },
       },
+      desk,
     );
     const worker = await runtime.createWorker();
     return {
@@ -551,5 +605,77 @@ export function createCommerceServices(databaseUrl: string) {
       createHash('sha256').update(value).digest('hex'),
     ),
     close: () => pool.end(),
+  };
+}
+
+/** Connect the operator boundary to persisted proposals and the existing policy authority. */
+export function createDeskServices(
+  db: import('#modules/platform/index').TenantDatabase,
+  identity: Pick<IdentityService, 'refreshContext'>,
+  effects: EffectRegistry = { resolve: async () => null },
+  options: {
+    capability?: (
+      action: import('#modules/policies/index').ProposedAction,
+    ) => boolean;
+    workflow?: import('#modules/workflows/index').DeskDependencies['workflow'];
+    now?: () => Date;
+  } = {},
+) {
+  const store = createDeskStore(db, {
+    parseAction,
+    escalate: (scoped, context, id, revision) =>
+      createCaseEscalation(scoped)(context, id, revision),
+    policies: (scoped) =>
+      createPolicies(
+        scoped,
+        identity.refreshContext,
+        policyAudit(createAuditLog(scoped)),
+      ),
+  });
+  return createDeskService({
+    store,
+    refreshContext: identity.refreshContext,
+    capability: options.capability ?? (() => false),
+    checkCapability: async (context, action) => {
+      const adapter = await effects.resolve(context, action);
+      return (
+        !!adapter &&
+        adapter.capability === action.capability &&
+        adapter.version === action.capabilityVersion &&
+        (await adapter.checkPreconditions(action))
+      );
+    },
+    now: options.now ?? (() => new Date()),
+    ...(options.workflow ? { workflow: options.workflow } : {}),
+  });
+}
+
+function policyAudit(audit: import('#modules/audit/index').AuditLog) {
+  return async (evidence: import('#modules/policies/index').PolicyEvidence) => {
+    const item = evidence.document;
+    await audit.append({
+      id: item.id,
+      tenantId: item.tenantId,
+      eventKey: item.id,
+      eventType: evidence.type,
+      schemaVersion: 1,
+      occurredAt: 'evaluatedAt' in item ? item.evaluatedAt : item.createdAt,
+      actor: {
+        kind: 'user',
+        id: 'actorId' in item ? item.actorId : item.approverId,
+      },
+      correlationId: item.correlationId,
+      proposalId: item.proposalId,
+      actionHash: item.actionHash,
+      policyDecisionId: 'actorId' in item ? item.id : item.decisionId,
+      evidenceRefs: [],
+      details: {
+        outcome: item.outcome,
+        policyVersion: item.policyVersion,
+        ...('reason' in item
+          ? { reason: item.reason }
+          : { requesterId: item.requesterId, expiresAt: item.expiresAt }),
+      },
+    });
   };
 }

@@ -1,3 +1,4 @@
+import { currentPolicyVersion } from '#modules/policies/domain/action';
 import { requireRole, requireTenant } from '#modules/identity/index';
 import type { TenantContext } from '#modules/identity/index';
 import type {
@@ -29,7 +30,7 @@ export interface PolicyDependencies {
   id(): string;
 }
 export function createPolicyService(deps: PolicyDependencies) {
-  const policyVersion = 'v0.1';
+  const policyVersion = currentPolicyVersion;
   async function flush(tenantId: string) {
     for (const evidence of await deps.repository.pending(tenantId)) {
       await deps.appendEvidence(evidence);

@@ -1,3 +1,4 @@
+export { currentPolicyVersion } from '#modules/policies/domain/action';
 export type {
   PolicyEvidence,
   Approval,
