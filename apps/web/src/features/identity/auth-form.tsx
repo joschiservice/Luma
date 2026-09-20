@@ -93,7 +93,6 @@ export function AuthForm({
     <main className="auth-page">
       <section className="auth-story">
         <Brand />
-        <p className="eyebrow">The Exception Desk</p>
         <h1>
           Clarity for
           <br />

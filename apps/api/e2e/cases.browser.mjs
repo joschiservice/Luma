@@ -49,7 +49,7 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
   await page
     .getByRole('button', { name: 'Create workspace', exact: true })
     .click();
-  await page.getByRole('heading', { name: 'Room to focus.' }).waitFor();
+  await page.getByRole('heading', { name: 'Operations overview' }).waitFor();
   const organizationId = new URL(page.url()).pathname.split('/')[2];
   await page
     .getByRole('heading', { name: 'Connect your first system.' })
@@ -74,9 +74,26 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
   await anonymous.close();
   const inbox = `/app/${organizationId}/exceptions`;
   await page.goto(inbox);
-  await page.getByText('Nothing needs you.', { exact: true }).waitFor();
-  await page.getByText('No observations yet', { exact: true }).waitFor();
+  await page.getByText('Nothing needs review', { exact: true }).waitFor();
+  await page.getByText('No data received yet', { exact: true }).waitFor();
   await page.getByText('No active connections', { exact: true }).waitFor();
+  await page.keyboard.press('Control+k');
+  await page.getByRole('dialog', { name: 'Go to a page' }).waitFor();
+  await page.getByRole('textbox', { name: 'Search pages' }).fill('issue');
+  await page
+    .getByRole('navigation', { name: 'Search results' })
+    .getByRole('link', { name: 'Issues' })
+    .click();
+  await page.getByRole('dialog').waitFor({ state: 'hidden' });
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await expect
+    .poll(() => page.locator('html').getAttribute('class'))
+    .toContain('dark');
+  await page.emulateMedia({ colorScheme: 'light' });
+  await expect
+    .poll(() => page.locator('html').getAttribute('class'))
+    .not.toContain('dark');
+
   const services = createDetectionServices(db.runtimeUrl);
   t.onTestFinished(() => services.close());
   const actorId = randomUUID();
@@ -138,16 +155,28 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
     });
     ids.push(result.incident.id);
   }
-  await page.getByRole('link', { name: 'Active', exact: true }).click();
+  await page.getByRole('link', { name: 'All open', exact: true }).click();
   await page.locator('.inbox-rows li').first().waitFor();
   expect(await page.locator('.inbox-rows li').count()).toBe(25);
-  await page.getByRole('link', { name: 'Next page →' }).click();
+  await page.getByText('Page 1 of 2', { exact: true }).waitFor();
+  await page.getByText('1–25 of 27 issues', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
   await expect.poll(() => page.locator('.inbox-rows li').count()).toBe(2);
-  await page.getByRole('link', { name: 'First page' }).click();
+  await page.getByText('Page 2 of 2', { exact: true }).waitFor();
+  await page.getByText('26–27 of 27 issues', { exact: true }).waitFor();
+  await page.reload();
+  await page.getByText('Page 2 of 2', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Return to first page' }).click();
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
+  await page.getByRole('button', { name: 'Previous', exact: true }).click();
+  await page.getByText('Filter issues', { exact: true }).click();
   await page.getByLabel('Class', { exact: true }).selectOption('sync_failure');
   const row = page.locator(`#case-${ids[0]}`);
   await row.click();
-  await page.getByText('Investigation pending', { exact: true }).waitFor();
+  await page
+    .locator('.inbox-detail')
+    .getByText('Investigation pending', { exact: true })
+    .waitFor();
   await expect
     .poll(() =>
       page
@@ -156,7 +185,10 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
     )
     .toBe(true);
   await page.reload();
-  await page.getByText('Investigation pending', { exact: true }).waitFor();
+  await page
+    .locator('.inbox-detail')
+    .getByText('Investigation pending', { exact: true })
+    .waitFor();
   expect(await page.getByLabel('Class', { exact: true }).inputValue()).toBe(
     'sync_failure',
   );
@@ -166,7 +198,7 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
   // The credentialed stream refreshes the completed investigation without a click.
   await page
     .getByRole('heading', {
-      name: 'The connection read needs investigation.',
+      name: 'The connection read needs investigation',
       exact: true,
     })
     .waitFor();
@@ -343,11 +375,15 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
   ]);
   expect(await auditDetails.getAttribute('open')).not.toBeNull();
   expect(await auditDetails.getAttribute('data-retained')).toBe('true');
-  expect(await page.getByLabel('Loading cases').count()).toBe(0);
+  expect(await page.getByLabel('Loading issues').count()).toBe(0);
   releasePage();
   await page.getByText('Review history page loaded', { exact: true }).waitFor();
   expect(await auditDetails.getAttribute('data-retained')).toBe('true');
   await page.unroute(`**${caseApi}/timeline?**`);
+  await page
+    .locator('.failed-disclosure > summary')
+    .filter({ hasText: 'Findings & evidence' })
+    .click();
   const evidence = page.locator('.case-evidence summary').first();
   await evidence.focus();
   await page.keyboard.press('Enter');
@@ -356,6 +392,53 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
       evidence.evaluate((el) => el.parentElement.hasAttribute('open')),
     )
     .toBe(true);
+  await page.locator('.inbox-detail').evaluate((el) => {
+    el.scrollTop = 0;
+  });
+  expect(
+    await page.evaluate(() => ({
+      height: document.documentElement.scrollHeight,
+      viewport: window.innerHeight,
+    })),
+  ).toEqual({ height: 1000, viewport: 1000 });
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'], {
+    origin,
+  });
+  await page.getByText('Issue details', { exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Copy issue ID', exact: true })
+    .click();
+  await page.getByText('Issue ID copied', { exact: true }).waitFor();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+    ids[0],
+  );
+  expect(await page.locator('.issue-id code').textContent()).toBe(ids[0]);
+  await page.getByText('Issue details', { exact: true }).click();
+  await page.locator('.inbox-detail').evaluate((el) => {
+    el.scrollTop = 0;
+  });
+  const inspectorHeader = page.locator('.inbox-case-nav');
+  const headerTop = await inspectorHeader.evaluate(
+    (el) => el.getBoundingClientRect().top,
+  );
+  await page.locator('.inbox-detail').evaluate((el) => {
+    el.scrollTop = 500;
+  });
+  expect(
+    await inspectorHeader.evaluate((el) => el.getBoundingClientRect().top),
+  ).toBe(headerTop);
+  expect(await inspectorHeader.getByRole('heading').isVisible()).toBe(true);
+  expect(
+    await inspectorHeader
+      .getByText('Connection issue', { exact: true })
+      .isVisible(),
+  ).toBe(true);
+  expect(
+    await inspectorHeader.locator('.issue-context-subject strong').isVisible(),
+  ).toBe(true);
+  expect(await inspectorHeader.getByText('High severity').isVisible()).toBe(
+    true,
+  );
   await page.locator('.inbox-detail').evaluate((el) => {
     el.scrollTop = 0;
   });
@@ -368,8 +451,10 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await page.getByRole('button', { name: 'Refresh case', exact: true }).click();
-  await page.getByRole('link', { name: '← Back to inbox' }).click();
+  await page
+    .getByRole('button', { name: 'Refresh issue', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'Close panel' }).click();
   // The completed diagnosis moved this row beyond page one; focus falls back to the inbox.
   await expect
     .poll(() =>
@@ -384,6 +469,11 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
     .locator('.inbox-list')
     .evaluate((el) => el.scrollTop);
   await stableRow.click();
+  await page.keyboard.press('Escape');
+  await expect
+    .poll(() => stableRow.evaluate((el) => el === document.activeElement))
+    .toBe(true);
+  await stableRow.click();
   await page.goBack();
   await expect
     .poll(() => stableRow.evaluate((el) => el === document.activeElement))
@@ -395,14 +485,14 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
   await page.goto(`${inbox}/${ids[0]}?view=active&class=sync_failure`);
   await page
     .getByRole('heading', {
-      name: 'The connection read needs investigation.',
+      name: 'The connection read needs investigation',
       exact: true,
     })
     .waitFor();
-  await page.getByRole('link', { name: 'Needs you', exact: true }).click();
+  await page.getByRole('link', { name: 'Needs review', exact: true }).click();
   await page
     .getByRole('heading', {
-      name: 'The connection read needs investigation.',
+      name: 'The connection read needs investigation',
       exact: true,
     })
     .waitFor();
@@ -433,7 +523,7 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
   });
   await page.getByRole('button', { name: 'Refresh', exact: true }).click();
   await page
-    .getByText('This case has left the current view', { exact: true })
+    .getByText('This issue has left the current view', { exact: true })
     .waitFor();
   await page
     .getByRole('heading', { name: 'Closed by human disposition' })
@@ -454,9 +544,12 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
   expect(denied.status()).toBe(404);
   expect(await denied.text()).not.toContain('scan-0');
   await page.goto(`${inbox}/${randomUUID()}?view=active`);
-  await page.getByText('Case unavailable', { exact: true }).waitFor();
+  await page
+    .getByRole('alert')
+    .getByText('Issue unavailable', { exact: true })
+    .waitFor();
   expect(
-    await page.getByRole('article', { name: 'Case investigation' }).count(),
+    await page.getByRole('article', { name: 'Issue investigation' }).count(),
   ).toBe(0);
   await page.route('**/api/v1/organizations/*/exceptions?**', (route) =>
     route.fulfill({
@@ -489,7 +582,7 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
   ).toContain(summary.prioritizedDecisions[0].id);
   await page.unroute('**/api/v1/organizations/*/exceptions?**');
   await page.locator('.operations-decisions a').first().click();
-  await page.getByRole('article', { name: 'Case investigation' }).waitFor();
+  await page.getByRole('article', { name: 'Issue investigation' }).waitFor();
   expect(new URL(page.url()).searchParams.get('view')).toBe('needs_you');
   await page.goto(`/app/${organizationId}/overview`);
   await page.locator('.operations-decisions a').first().waitFor();

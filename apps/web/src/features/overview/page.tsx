@@ -51,7 +51,7 @@ export function OverviewPage() {
           params={{ organizationId, exceptionId: item.id }}
           search={{ view: 'needs_you' }}
         >
-          {item.summary}
+          {item.summary.replace(/\.+$/, '')}
         </Link>
       )}
     />

@@ -5,6 +5,7 @@ import {
   Outlet,
   Scripts,
 } from '@tanstack/react-router';
+import { useEffect } from 'react';
 
 import stylesheet from '../styles.css?url';
 
@@ -23,10 +24,26 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 );
 
 function Root() {
+  useEffect(() => {
+    const preference = window.matchMedia('(prefers-color-scheme: dark)');
+    const apply = () =>
+      document.documentElement.classList.toggle('dark', preference.matches);
+    apply();
+    preference.addEventListener('change', apply);
+
+    return () => preference.removeEventListener('change', apply);
+  }, []);
+
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "document.documentElement.classList.toggle('dark',window.matchMedia('(prefers-color-scheme: dark)').matches)",
+          }}
+        />
       </head>
       <body>
         <Outlet />

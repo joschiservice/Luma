@@ -1,3 +1,4 @@
+import { figmaDesign } from '@luma/ui/lib/figma';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, within } from 'storybook/test';
 
@@ -6,6 +7,7 @@ import { Input } from './input';
 const meta = {
   title: 'UI/Input',
   component: Input,
+  parameters: { design: figmaDesign('input') },
   args: { 'aria-label': 'Workspace name', placeholder: 'Workspace name' },
 } satisfies Meta<typeof Input>;
 

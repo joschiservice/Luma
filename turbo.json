@@ -65,6 +65,12 @@
     },
     "build:storybook": {
       "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/apps/web/src/**",
+        "$TURBO_ROOT$/apps/web/package.json",
+        "$TURBO_ROOT$/apps/web/tsconfig.json"
+      ],
       "outputs": ["storybook-static/**"]
     },
     "dev:worker": {

@@ -2,6 +2,19 @@ import type {
   CaseSummary,
   OperationsOverview as Summary,
 } from '@luma/api-contract';
+import {
+  Activity,
+  ChevronRight,
+  CircleAlert,
+  CircleCheck,
+  Clock3,
+  Gauge,
+  ListChecks,
+  Network,
+  Plug,
+  RefreshCw,
+  Zap,
+} from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { Button } from './button';
@@ -30,6 +43,7 @@ export function overviewState(data: Summary) {
   if (!data.connections.length)
     return {
       title: 'Connect your first system.',
+      tone: 'info',
       description:
         'Start with Shopify or JTL-Wawi. Observations will bring your operations into view.',
     };
@@ -37,44 +51,51 @@ export function overviewState(data: Summary) {
   if (!monitored.length)
     return {
       title: 'No connected systems.',
+      tone: 'warning',
       description:
         'Your previous connections are disconnected. Connect a system to monitor operations again.',
     };
   if (monitored.some((c) => c.status !== 'active'))
     return {
       title: 'Check your connections.',
+      tone: 'warning',
       description:
         'Some systems are not active. Review their connection status before relying on operational health.',
     };
   if (monitored.some((c) => c.freshness === 'unobserved'))
     return {
       title: 'Waiting for observations.',
+      tone: 'info',
       description:
         'Health is unknown. At least one system has no observations for a permitted read capability.',
     };
   if (monitored.some((c) => c.freshness === 'stale'))
     return {
       title: 'Your data needs a refresh.',
+      tone: 'warning',
       description:
         'Some observations are older than 24 hours. Current operational health is unknown.',
     };
   if (data.attentionCount)
     return {
       title: 'A few decisions need you.',
+      tone: 'warning',
       description:
-        'Review the highest-severity cases first. Each investigation includes evidence and a next step.',
+        'Review the highest-severity issues first. Each investigation includes evidence and a next step.',
     };
   if (data.activeCount)
     return {
       title: 'Work is still in progress.',
+      tone: 'info',
       description:
-        'No decisions currently need you. Active cases are still being investigated or resolved.',
+        'No decisions currently need you. Active issues are still being investigated or resolved.',
     };
 
   return {
     title: 'Observed operations look healthy.',
+    tone: 'success',
     description:
-      'Monitored connections have recent observations and no active cases are recorded. Source coverage may still be incomplete.',
+      'Monitored connections have recent observations and no active issues are recorded. Source coverage may still be incomplete.',
   };
 }
 
@@ -96,14 +117,19 @@ export function OperationsOverview({
   decisionLink,
 }: OperationsOverviewProps) {
   const state = data ? overviewState(data) : undefined;
+  const StatusIcon =
+    state?.tone === 'success'
+      ? CircleCheck
+      : state?.tone === 'warning'
+        ? CircleAlert
+        : Activity;
 
   return (
     <div className="operations-overview">
       <header className="operations-heading">
         <div>
-          <p className="operations-eyebrow">Exception Desk / Overview</p>
-          <h1>Room to focus.</h1>
-          <p>The state of your operations. The decisions that need you.</p>
+          <h1>Operations overview</h1>
+          <p>Monitor connected systems and review what needs attention.</p>
         </div>
         <div className="operations-controls">
           <label>
@@ -121,6 +147,7 @@ export function OperationsOverview({
             onClick={onRefresh}
             disabled={refreshing || paused}
           >
+            <RefreshCw size={14} aria-hidden="true" />{' '}
             {error ? 'Retry' : 'Refresh'}
           </Button>
         </div>
@@ -141,10 +168,11 @@ export function OperationsOverview({
         <>
           <section
             className="operations-status"
+            data-tone={state.tone}
             aria-label="Operational health"
           >
             <span className="operations-status-mark" aria-hidden="true">
-              ◉
+              <StatusIcon size={22} />
             </span>
             <div>
               <h2>{state.title}</h2>
@@ -153,7 +181,7 @@ export function OperationsOverview({
             </div>
           </section>
           <p className="operations-asof">
-            As of{' '}
+            <Clock3 size={12} aria-hidden="true" /> As of{' '}
             <time dateTime={data.generatedAt}>
               {timestamp(data.generatedAt)}
             </time>
@@ -164,12 +192,22 @@ export function OperationsOverview({
             className="operations-metrics"
           >
             <div>
-              <p className="operations-eyebrow">Needs you · now</p>
+              <ListChecks
+                className="operations-metric-icon"
+                size={28}
+                aria-hidden="true"
+              />
+              <p className="operations-eyebrow">Needs your attention</p>
               <strong>{data.attentionCount}</strong>
               <p>Decisions requiring attention</p>
               {inboxLink}
             </div>
             <div>
+              <Zap
+                className="operations-metric-icon"
+                size={28}
+                aria-hidden="true"
+              />
               <p className="operations-eyebrow">Resolved automatically</p>
               <strong>{data.automaticallyResolved ?? 'Unavailable'}</strong>
               <p>
@@ -179,10 +217,15 @@ export function OperationsOverview({
               </p>
               <small>
                 {data.verifiedResolutions} verified resolutions in this window,
-                including cases with human work.
+                including issues with human work.
               </small>
             </div>
             <div>
+              <Gauge
+                className="operations-metric-icon"
+                size={28}
+                aria-hidden="true"
+              />
               <p className="operations-eyebrow">Eligible automation rate</p>
               <strong>
                 {data.automation && data.automation.denominator > 0
@@ -193,11 +236,11 @@ export function OperationsOverview({
               </strong>
               <p>
                 {data.automation
-                  ? `${data.automation.numerator} / ${data.automation.denominator} eligible exceptions resolved correctly without human work.`
+                  ? `${data.automation.numerator} / ${data.automation.denominator} eligible issues resolved correctly without human work.`
                   : 'Eligibility and human-work data are not available.'}
               </p>
               {data.automation?.denominator === 0 ? (
-                <small>No eligible exceptions in this window.</small>
+                <small>No eligible issues in this window.</small>
               ) : null}
             </div>
           </section>
@@ -213,16 +256,25 @@ export function OperationsOverview({
           <div className="operations-details">
             <section aria-labelledby="overview-decisions">
               <div className="operations-section-heading">
-                <h2 id="overview-decisions">Your next decisions</h2>
+                <h2 id="overview-decisions">
+                  <ListChecks size={17} aria-hidden="true" /> Your next
+                  decisions
+                </h2>
                 <span>Severity, then oldest request</span>
               </div>
               {data.prioritizedDecisions.length ? (
                 <ol className="operations-decisions">
                   {data.prioritizedDecisions.map((item) => (
                     <li key={item.id}>
-                      {decisionLink(item)}
+                      <div className="operations-decision-title">
+                        {decisionLink(item)}
+                        <ChevronRight size={15} aria-hidden="true" />
+                      </div>
                       <p>
-                        <span className="operations-severity">
+                        <span
+                          className="operations-severity"
+                          data-severity={item.severity}
+                        >
                           {item.severity} severity
                         </span>{' '}
                         · {item.attention.explanation}
@@ -231,23 +283,40 @@ export function OperationsOverview({
                   ))}
                 </ol>
               ) : (
-                <p>
-                  No decisions currently require attention. {data.activeCount}{' '}
-                  active cases remain.
+                <p className="operations-empty">
+                  <CircleCheck size={18} aria-hidden="true" />
+                  No decisions currently require attention. {
+                    data.activeCount
+                  }{' '}
+                  active issues remain.
                 </p>
               )}
               {inboxLink}
             </section>
             <section aria-labelledby="overview-connections">
               <div className="operations-section-heading">
-                <h2 id="overview-connections">Connection health</h2>
+                <h2 id="overview-connections">
+                  <Network size={17} aria-hidden="true" /> Connection health
+                </h2>
               </div>
               {data.connections.length ? (
                 <ul className="operations-connections">
                   {data.connections.map((c) => (
-                    <li key={c.id}>
+                    <li
+                      key={c.id}
+                      data-health={
+                        c.status === 'disconnected'
+                          ? 'inactive'
+                          : c.status === 'active' && c.freshness === 'fresh'
+                            ? 'fresh'
+                            : 'attention'
+                      }
+                    >
                       <div>
-                        <strong>{c.label}</strong>
+                        <strong>
+                          <Plug size={15} aria-hidden="true" />
+                          {c.label}
+                        </strong>
                         <span>
                           {c.status} ·{' '}
                           {c.status === 'disconnected'

@@ -192,7 +192,7 @@ export const VerifiedResolution: Story = {
     ).toBeVisible();
     await userEvent.click(canvas.getByText('Attempt 1 · Succeeded'));
     await expect(canvas.getByText('Observed result: Passed')).toBeVisible();
-    const summary = canvas.getByText('Shopify · Inventory · stock-after');
+    const summary = canvas.getByText('Shopify · Inventory', { exact: false });
     summary.focus();
     await expect(summary).toHaveFocus();
     await userEvent.click(summary);

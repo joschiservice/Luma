@@ -128,7 +128,10 @@ export function LiveCaseDetail({
   return (
     <CaseInvestigation
       item={data.detail}
+      embedded
       unconfirmed={unconfirmed}
+      onRefresh={refresh}
+      refreshing={snapshot.isFetching}
       progress={
         <CaseTimeline
           {...data}

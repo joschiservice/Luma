@@ -70,6 +70,8 @@ export const caseSummarySchema = z.object({
 });
 
 export const caseListSchema = z.object({
+  totalCount: z.number().int().nonnegative(),
+  offset: z.number().int().nonnegative(),
   items: z.array(caseSummarySchema).max(100),
   nextCursor: z.string().nullable(),
   coverage: z.enum(['observed', 'unobserved']),

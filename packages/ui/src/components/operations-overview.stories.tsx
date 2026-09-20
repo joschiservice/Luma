@@ -32,6 +32,7 @@ const data: Summary = {
 const meta = {
   title: 'Operations/Overview',
   component: OperationsOverview,
+  parameters: { layout: 'fullscreen' },
   args: {
     data,
     window: '24h',
@@ -39,7 +40,9 @@ const meta = {
     onRefresh: fn(),
     connectionsLink: <a href="#connections">Manage connections →</a>,
     inboxLink: <a href="#inbox">Open attention inbox →</a>,
-    decisionLink: (item) => <a href={`#${item.id}`}>{item.summary}</a>,
+    decisionLink: (item) => (
+      <a href={`#${item.id}`}>{item.summary.replace(/\.+$/, '')}</a>
+    ),
   },
   decorators: [
     (Story) => (
@@ -63,7 +66,7 @@ export const Healthy: Story = {
     await expect(canvas.getByText('75%')).toBeVisible();
     await expect(
       canvas.getByText(
-        '9 / 12 eligible exceptions resolved correctly without human work.',
+        '9 / 12 eligible issues resolved correctly without human work.',
       ),
     ).toBeVisible();
     const select = canvas.getByRole('combobox', { name: 'Resolution window' });
@@ -96,7 +99,9 @@ export const AttentionNeeded: Story = {
     await expect(
       canvas.getByRole('heading', { name: 'A few decisions need you.' }),
     ).toBeVisible();
-    const link = canvas.getByRole('link', { name: inventoryCase.summary });
+    const link = canvas.getByRole('link', {
+      name: inventoryCase.summary.replace(/\.+$/, ''),
+    });
     link.focus();
     await expect(link).toHaveFocus();
     await expect(link).toHaveAttribute('href', `#${inventoryCase.id}`);

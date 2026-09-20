@@ -60,7 +60,6 @@ export function Connections({
 
   return (
     <div className="connections-page">
-      <p className="eyebrow">Exception Desk / Your systems</p>
       <h1>Connections</h1>
       {shopifyResult ? (
         <p role="status">

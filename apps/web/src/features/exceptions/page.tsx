@@ -6,6 +6,9 @@ import {
   CaseNotice,
   CaseRow,
 } from '@luma/ui/components/case-investigation';
+import { IssueInspectorHeader } from '@luma/ui/components/issue-inspector-header';
+import { IssueSummary } from '@luma/ui/components/issue-summary';
+import { Pagination } from '@luma/ui/components/pagination';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Link,
@@ -14,10 +17,12 @@ import {
   useParams,
   useSearch,
 } from '@tanstack/react-router';
-import { useEffect, useRef } from 'react';
+import { ChevronRight } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
 import { connectionsOptions } from '../connections/data';
 import { IdentityError } from '../identity/data';
+import { overviewOptions } from '../overview/data';
 import {
   caseOptions,
   casesKey,
@@ -52,6 +57,42 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
   const list = useQuery(casesOptions(organizationId, search));
   const detail = useQuery(caseOptions(organizationId, exceptionId ?? ''));
   const connections = useQuery(connectionsOptions(organizationId));
+  const overview = useQuery(overviewOptions(organizationId, '24h'));
+  const [pageCursors, setPageCursors] = useState<
+    Record<string, (string | undefined)[]>
+  >({});
+  const filterKey = JSON.stringify([
+    search.view,
+    search.class,
+    search.state,
+    search.severity,
+  ]);
+  const cursors = pageCursors[filterKey] ?? [undefined];
+  const pageIndex = cursors.indexOf(search.cursor);
+  const goNext = () => {
+    if (!list.data?.nextCursor) return;
+    const nextCursor = list.data.nextCursor;
+    if (pageIndex >= 0)
+      setPageCursors((previous) => ({
+        ...previous,
+        [filterKey]: [...cursors.slice(0, pageIndex + 1), nextCursor],
+      }));
+    void navigate({
+      ...destination,
+      search: { ...search, cursor: nextCursor },
+      resetScroll: false,
+    });
+  };
+  const goPrevious =
+    pageIndex > 0
+      ? () => {
+          void navigate({
+            ...destination,
+            search: { ...search, cursor: cursors[pageIndex - 1] },
+            resetScroll: false,
+          });
+        }
+      : undefined;
   const pane = useRef<HTMLElement>(null);
   const listPane = useRef<HTMLDivElement>(null);
   const previous = useRef<string | undefined>(undefined);
@@ -101,32 +142,44 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
       });
     void client.invalidateQueries({ queryKey: casesKey(organizationId) });
     void connections.refetch();
+    void overview.refetch();
   };
 
   return (
     <div className={`inbox ${exceptionId ? 'inbox-selected' : ''}`}>
-      <header className="inbox-heading">
-        <div>
-          <p className="eyebrow">Exception Desk / Investigations</p>
-          <h1>A clearer next step.</h1>
-          <p>Investigated cases. Evidence before action.</p>
-        </div>
-        <Button
-          variant="outline"
-          onClick={refresh}
-          disabled={list.isFetching || detail.isFetching}
-        >
-          Refresh
-        </Button>
-      </header>
+      <h1 className="sr-only">Issues</h1>
+      <IssueSummary
+        review={
+          overview.isError || overview.isPaused
+            ? undefined
+            : overview.data?.attentionCount
+        }
+        open={
+          overview.isError || overview.isPaused
+            ? undefined
+            : overview.data?.activeCount
+        }
+        verified={
+          overview.isError || overview.isPaused
+            ? undefined
+            : overview.data?.verifiedResolutions
+        }
+        loading={overview.isPending}
+      />
+      {overview.isError && (
+        <CaseNotice title="Summary unavailable">
+          Refresh to check the latest totals. Your issue list is still
+          available.
+        </CaseNotice>
+      )}
       <div className="inbox-workspace">
         <div
           className="inbox-list"
           ref={listPane}
           tabIndex={-1}
-          aria-label="Case inbox"
+          aria-label="Issue inbox"
         >
-          <nav className="inbox-views" aria-label="Case views">
+          <nav className="inbox-views" aria-label="Issue views">
             {(['needs_you', 'active', 'history'] as const).map((view) => (
               <Link
                 key={view}
@@ -135,51 +188,71 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
                 resetScroll={false}
                 aria-current={search.view === view ? 'page' : undefined}
               >
-                {view === 'needs_you' ? 'Needs you' : caseLabel(view)}
+                {view === 'needs_you'
+                  ? 'Needs review'
+                  : view === 'active'
+                    ? 'All open'
+                    : 'History'}
               </Link>
             ))}
+            <Button
+              variant="ghost"
+              onClick={refresh}
+              disabled={list.isFetching || detail.isFetching}
+            >
+              Refresh
+            </Button>
           </nav>
-          <div className="inbox-filters">
-            {(['state', 'class', 'severity'] as const).map((field) => (
-              <label key={field}>
-                {caseLabel(field)}
-                <select
-                  aria-label={caseLabel(field)}
-                  value={search[field] ?? ''}
-                  onChange={(event) =>
-                    update({ [field]: event.target.value || undefined })
-                  }
-                >
-                  <option value="">
-                    All{' '}
-                    {field === 'class'
-                      ? 'classes'
-                      : field === 'state'
-                        ? 'states'
-                        : 'severities'}
-                  </option>
-                  {(field === 'state'
-                    ? caseStates
-                    : field === 'class'
-                      ? caseClasses
-                      : ['high', 'medium']
-                  ).map((value) => (
-                    <option key={value} value={value}>
-                      {caseLabel(value)}
+          <details className="inbox-filter-disclosure">
+            <summary>
+              Filter issues
+              {[search.class, search.state, search.severity].filter(Boolean)
+                .length > 0
+                ? ` · ${[search.class, search.state, search.severity].filter(Boolean).length} active`
+                : ''}
+            </summary>
+            <div className="inbox-filters">
+              {(['state', 'class', 'severity'] as const).map((field) => (
+                <label key={field}>
+                  {caseLabel(field)}
+                  <select
+                    aria-label={caseLabel(field)}
+                    value={search[field] ?? ''}
+                    onChange={(event) =>
+                      update({ [field]: event.target.value || undefined })
+                    }
+                  >
+                    <option value="">
+                      All{' '}
+                      {field === 'class'
+                        ? 'classes'
+                        : field === 'state'
+                          ? 'states'
+                          : 'severities'}
                     </option>
-                  ))}
-                </select>
-              </label>
-            ))}
-          </div>
+                    {(field === 'state'
+                      ? caseStates
+                      : field === 'class'
+                        ? caseClasses
+                        : ['high', 'medium']
+                    ).map((value) => (
+                      <option key={value} value={value}>
+                        {caseLabel(value)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+            </div>
+          </details>
           {connections.isError ? (
             <CaseNotice title="Connection coverage unavailable">
-              Case reads may still be available. Refresh to check connections.
+              Your issues may still be available. Refresh to check connections.
             </CaseNotice>
           ) : connections.data &&
             !connections.data.some((c) => c.status === 'active') ? (
             <CaseNotice title="No active connections">
-              Connect a commerce system to receive observations.{' '}
+              Connect a commerce system to start monitoring operations.{' '}
               <Link
                 to="/app/$organizationId/connections"
                 params={{ organizationId }}
@@ -204,8 +277,8 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
           ) : listData ? (
             <>
               {listData.coverage === 'unobserved' ? (
-                <CaseNotice title="No observations yet">
-                  Operational health is unknown until observations arrive.
+                <CaseNotice title="No data received yet">
+                  Connect a system to start monitoring your operations.
                 </CaseNotice>
               ) : null}
               {!listData.items.length ? (
@@ -213,14 +286,14 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
                   <span aria-hidden="true">○</span>
                   <h2>
                     {search.view === 'needs_you'
-                      ? 'Nothing needs you.'
+                      ? 'Nothing needs review'
                       : search.view === 'history'
-                        ? 'No history in this view.'
-                        : 'No active cases in this view.'}
+                        ? 'No issue history yet'
+                        : 'No open issues in this view'}
                   </h2>
                   <p>
                     {search.view === 'needs_you'
-                      ? 'No cases match this attention queue. Active work and observation coverage are separate.'
+                      ? 'No issues currently need your review. Check All open for ongoing work.'
                       : 'Try another view or adjust the filters.'}
                   </p>
                 </div>
@@ -252,28 +325,21 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
                   ))}
                 </ul>
               )}
-              <div className="inbox-pagination">
-                {search.cursor ? (
-                  <Link
-                    {...destination}
-                    search={{ ...search, cursor: undefined }}
-                    resetScroll={false}
-                  >
-                    First page
-                  </Link>
-                ) : (
-                  <span>{listData.items.length} cases</span>
-                )}
-                {listData.nextCursor ? (
-                  <Link
-                    {...destination}
-                    search={{ ...search, cursor: listData.nextCursor }}
-                    resetScroll={false}
-                  >
-                    Next page →
-                  </Link>
-                ) : null}
-              </div>
+              <Pagination
+                count={listData.items.length}
+                totalCount={listData.totalCount}
+                offset={listData.offset}
+                page={pageIndex >= 0 ? pageIndex + 1 : undefined}
+                hasNext={Boolean(listData.nextCursor)}
+                onPrevious={goPrevious}
+                onNext={goNext}
+                disabled={list.isFetching}
+              />
+              {search.cursor && pageIndex < 0 && (
+                <Button variant="ghost" onClick={() => update({})}>
+                  Return to first page
+                </Button>
+              )}
             </>
           ) : null}
         </div>
@@ -281,53 +347,88 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
           className="inbox-detail"
           ref={pane}
           tabIndex={-1}
-          aria-label="Selected case"
+          aria-label="Selected issue"
+          onKeyDown={(event) => {
+            if (
+              event.key !== 'Escape' ||
+              event.defaultPrevented ||
+              !exceptionId
+            )
+              return;
+            // Nested controls retain Escape for their own dismissal or editing behavior.
+            if (
+              event.target instanceof Element &&
+              event.target.closest(
+                'input, textarea, select, [contenteditable="true"], [role="dialog"], [role="menu"]',
+              )
+            )
+              return;
+            event.preventDefault();
+            void navigate({
+              to: '/app/$organizationId/exceptions',
+              params: { organizationId },
+              search,
+              resetScroll: false,
+            });
+          }}
         >
           {exceptionId ? (
             <>
-              <div className="inbox-case-nav">
-                <Link
-                  to="/app/$organizationId/exceptions"
-                  params={{ organizationId }}
-                  search={search}
-                  resetScroll={false}
-                >
-                  ← Back to inbox
-                </Link>
-                {next ? (
-                  <Link
-                    to="/app/$organizationId/exceptions/$exceptionId"
-                    params={{ organizationId, exceptionId: next.id }}
-                    search={search}
-                    resetScroll={false}
-                  >
-                    Next case →
-                  </Link>
-                ) : null}
-              </div>
+              <IssueInspectorHeader
+                className="inbox-case-nav"
+                item={item}
+                fallback={
+                  detail.isError ? 'Issue unavailable' : 'Loading issue…'
+                }
+                onClose={() =>
+                  void navigate({
+                    to: '/app/$organizationId/exceptions',
+                    params: { organizationId },
+                    search,
+                    resetScroll: false,
+                  })
+                }
+                next={
+                  next ? (
+                    <Link
+                      to="/app/$organizationId/exceptions/$exceptionId"
+                      params={{ organizationId, exceptionId: next.id }}
+                      className="issue-panel-next"
+                      aria-label="Next issue"
+                      title="Next issue"
+                      search={search}
+                      resetScroll={false}
+                    >
+                      <ChevronRight size={18} aria-hidden="true" />
+                    </Link>
+                  ) : null
+                }
+              />
               <Button
                 className="inbox-mobile-refresh"
                 variant="outline"
                 onClick={refresh}
                 disabled={detail.isFetching}
               >
-                Refresh case
+                Refresh issue
               </Button>
               {detail.isPending ? <CaseLoading /> : null}
               {detail.isError ? (
                 <CaseNotice
                   error
                   title={
-                    denied ? 'Case unavailable' : 'Case could not be refreshed'
+                    denied
+                      ? 'Issue unavailable'
+                      : 'Issue could not be refreshed'
                   }
                 >
                   {denied
-                    ? 'This case is missing or you no longer have access.'
+                    ? 'This issue is missing or you no longer have access.'
                     : 'The current investigation could not be confirmed. Refresh before relying on these findings.'}
                 </CaseNotice>
               ) : null}
               {moved ? (
-                <CaseNotice title="This case has left the current view">
+                <CaseNotice title="This issue has left the current view">
                   Its state or attention requirement changed. It stays open here
                   while you finish reading.
                 </CaseNotice>
@@ -356,18 +457,8 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
             </>
           ) : (
             <div className="inbox-placeholder">
-              <p className="eyebrow">From signal to understanding</p>
-              <h2>
-                Make room
-                <br />
-                for the whole story.
-              </h2>
-              <p>
-                Select a case to see what happened,
-                <br />
-                what it means and the next step.
-              </p>
-              <span aria-hidden="true">↖</span>
+              <h2>Select an issue</h2>
+              <p>Review the details and choose your next step.</p>
             </div>
           )}
         </section>

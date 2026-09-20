@@ -331,6 +331,9 @@ importers:
       better-auth:
         specifier: 1.7.5
         version: 1.7.5(@opentelemetry/api@1.9.1)(@tanstack/react-start@1.168.54(esbuild@0.28.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)))(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(kysely@0.29.6)(pg@8.23.0))(pg@8.23.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@4.1.11)
+      lucide-react:
+        specifier: 1.46.0
+        version: 1.46.0(react@19.3.0)
       react:
         specifier: ^19.2.0
         version: 19.3.0
@@ -347,6 +350,9 @@ importers:
       '@luma/typescript-config':
         specifier: workspace:*
         version: link:../../packages/typescript-config
+      '@storybook/react-vite':
+        specifier: 10.6.0
+        version: 10.6.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(storybook@10.6.0(@types/react@19.3.0)(prettier@3.9.7)(react@19.3.0))(supports-color@8.1.1)(typescript@5.9.3)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))
       '@tailwindcss/vite':
         specifier: 4.3.3
         version: 4.3.3(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))
@@ -362,6 +368,9 @@ importers:
       '@vitejs/plugin-react':
         specifier: ^6.0.0
         version: 6.1.1(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))
+      storybook:
+        specifier: 10.6.0
+        version: 10.6.0(@types/react@19.3.0)(prettier@3.9.7)(react@19.3.0)
       vite:
         specifier: 8.3.0
         version: 8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1)
@@ -434,6 +443,12 @@ importers:
       '@base-ui/react':
         specifier: 1.8.0
         version: 1.8.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@fontsource-variable/inter':
+        specifier: 5.3.0
+        version: 5.3.0
+      '@fontsource/ibm-plex-mono':
+        specifier: 5.3.0
+        version: 5.3.0
       class-variance-authority:
         specifier: 0.7.1
         version: 0.7.1
@@ -453,6 +468,9 @@ importers:
       '@storybook/addon-a11y':
         specifier: 10.6.0
         version: 10.6.0(storybook@10.6.0(@types/react@19.3.0)(prettier@3.9.7)(react@19.3.0))
+      '@storybook/addon-designs':
+        specifier: ^11.1.4
+        version: 11.1.4(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(storybook@10.6.0(@types/react@19.3.0)(prettier@3.9.7)(react@19.3.0))
       '@storybook/addon-vitest':
         specifier: 10.6.0
         version: 10.6.0(@vitest/browser-playwright@4.1.11)(@vitest/browser@4.1.11(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(vitest@4.1.11))(@vitest/runner@4.1.11)(react@19.3.0)(storybook@10.6.0(@types/react@19.3.0)(prettier@3.9.7)(react@19.3.0))(vitest@4.1.11)
@@ -944,6 +962,14 @@ packages:
   '@fastify/proxy-addr@5.1.1':
     resolution: {integrity: sha512-zv07Y9GEuDsJPegZoDFd4SDWaZOW8N2pa0GSrYmKpId/tjt1Hgo3BjZBVjdVpfVrHaA+Qv5jawtS2O50J5xM9g==}
 
+  '@figspec/components@2.1.0':
+    resolution: {integrity: sha512-PFKBX2oFz+vhThKTNsu7Mh4ZT3X7YCiM694UkAMT36j/p0tdmXs9Je0Sf88stTEcMgwYvNv9TZtvniYmgaE+bw==}
+
+  '@figspec/react@2.0.1':
+    resolution: {integrity: sha512-xflqJ3XQZVzm8+7dsm8OFxVAmBNNA3Mg65sqwNHiq7VRSMSD7qwH4BPsBy07ZaX+9nHeaacBpFZd3Q0aIsISqw==}
+    peerDependencies:
+      react: ^16.14.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
   '@floating-ui/core@1.8.0':
     resolution: {integrity: sha512-0CIZ5itps/8x7BG8dEIhs53BvCUH2PCoogtakwRTut+Arm58sJooJ0AuZhLw2HJYIR5cMLNPBSS728sPho2khQ==}
 
@@ -958,6 +984,12 @@ packages:
 
   '@floating-ui/utils@0.2.12':
     resolution: {integrity: sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww==}
+
+  '@fontsource-variable/inter@5.3.0':
+    resolution: {integrity: sha512-OupL48va4JNofb97w6NYeF9S7W/kHNKM0Er8Dem5nqi4jeOLrVJDoE8tZEpnMJmtkvNbB1EIPPwHcdkF6b1oUA==}
+
+  '@fontsource/ibm-plex-mono@5.3.0':
+    resolution: {integrity: sha512-eTgnZjZEGk1QtD3ZstF+Vclo2HLAni8YMy34/DxllwZvyz1lR/1RF/xTiAquOBO7MvqBx8D2Ig2WCPMVfdZu7Q==}
 
   '@grpc/grpc-js@1.14.5':
     resolution: {integrity: sha512-7VZM+SVdEcUUqSQeNI3zM8Qs/BhQKZndPo2h5VkYkAM8Iz0wJIa8mKV5ekQGqG8UUsnkQ0NMxIxwkIHYvj0qOw==}
@@ -1173,6 +1205,14 @@ packages:
       '@opentelemetry/core': ^2.0.1
       '@opentelemetry/exporter-trace-otlp-http': '>=0.202.0 <1.0.0'
       '@opentelemetry/sdk-trace-base': ^2.0.1
+
+  '@lit-labs/react@2.1.3':
+    resolution: {integrity: sha512-OD9h2JynerBQUMNzb563jiVpxfvPF0HjQkKY2mx0lpVYvD7F+rtJpOGz6ek+6ufMidV3i+MPT9SX62OKWHFrQg==}
+
+  '@lit/react@1.0.8':
+    resolution: {integrity: sha512-p2+YcF+JE67SRX3mMlJ1TKCSTsgyOVdAwd/nxp3NuV1+Cb6MWALbN6nT7Ld4tpmYofcE5kcaSY1YBB9erY+6fw==}
+    peerDependencies:
+      '@types/react': 17 || 18 || 19
 
   '@napi-rs/wasm-runtime@1.2.4':
     resolution: {integrity: sha512-AJxoUD2/15ESHbvpcyjU274nsAPLuOtPHCk0vKJM5pj//Fg/B1FXNWjPnXTT9PymCYYiHo4zPj0ZomXBKhoy7g==}
@@ -1742,6 +1782,21 @@ packages:
     resolution: {integrity: sha512-Z/CZor/F8H74/+IoeLroEQXQoVxvmjVtUgATJ95KPBolHxMaHLXLsYU0wosIiiORxmfRCnpen5pQl1n4+pBWQw==}
     peerDependencies:
       storybook: ^10.6.0
+
+  '@storybook/addon-designs@11.1.4':
+    resolution: {integrity: sha512-4NWq8iiCbAODyfbMXKlOmMcz+xLcfIKzxC0UMdWq2M4W9SkTwzX7qr/m+2+a0dqddAaZvOZ9zfIrZa5suHC1ow==}
+    peerDependencies:
+      '@storybook/addon-docs': ^0.0.0-0 || ^10.0.0 || ^10.0.0-0 || ^10.1.0-0 || ^10.2.0-0 || ^10.5.0-0 || ^10.6.0-0
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+      react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+      storybook: ^0.0.0-0 || ^10.0.0 || ^10.0.0-0 || ^10.1.0-0 || ^10.2.0-0 || ^10.5.0-0 || ^10.6.0-0
+    peerDependenciesMeta:
+      '@storybook/addon-docs':
+        optional: true
+      react:
+        optional: true
+      react-dom:
+        optional: true
 
   '@storybook/addon-vitest@10.6.0':
     resolution: {integrity: sha512-GY2SwSXLNgyMqjQ59J7YTkEQTHdEbBMggOvbbuhuPUBhWo97OGSDCmn1UW3nXDZvkoWyWhF9T9628m1uei7FbA==}
@@ -5255,6 +5310,16 @@ snapshots:
       '@fastify/forwarded': 3.0.2
       ipaddr.js: 2.5.0
 
+  '@figspec/components@2.1.0': {}
+
+  '@figspec/react@2.0.1(@types/react@19.3.0)(react@19.3.0)':
+    dependencies:
+      '@figspec/components': 2.1.0
+      '@lit-labs/react': 2.1.3(@types/react@19.3.0)
+      react: 19.3.0
+    transitivePeerDependencies:
+      - '@types/react'
+
   '@floating-ui/core@1.8.0':
     dependencies:
       '@floating-ui/utils': 0.2.12
@@ -5271,6 +5336,10 @@ snapshots:
       react-dom: 19.3.0(react@19.3.0)
 
   '@floating-ui/utils@0.2.12': {}
+
+  '@fontsource-variable/inter@5.3.0': {}
+
+  '@fontsource/ibm-plex-mono@5.3.0': {}
 
   '@grpc/grpc-js@1.14.5':
     dependencies:
@@ -5503,6 +5572,16 @@ snapshots:
       '@opentelemetry/core': 2.11.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/exporter-trace-otlp-http': 0.222.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/sdk-trace-base': 2.11.0(@opentelemetry/api@1.9.1)
+
+  '@lit-labs/react@2.1.3(@types/react@19.3.0)':
+    dependencies:
+      '@lit/react': 1.0.8(@types/react@19.3.0)
+    transitivePeerDependencies:
+      - '@types/react'
+
+  '@lit/react@1.0.8(@types/react@19.3.0)':
+    dependencies:
+      '@types/react': 19.3.0
 
   '@napi-rs/wasm-runtime@1.2.4(@emnapi/core@1.11.0)(@emnapi/runtime@1.11.0)':
     dependencies:
@@ -5912,6 +5991,16 @@ snapshots:
       '@storybook/global': 5.0.0
       axe-core: 4.13.0
       storybook: 10.6.0(@types/react@19.3.0)(prettier@3.9.7)(react@19.3.0)
+
+  '@storybook/addon-designs@11.1.4(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(storybook@10.6.0(@types/react@19.3.0)(prettier@3.9.7)(react@19.3.0))':
+    dependencies:
+      '@figspec/react': 2.0.1(@types/react@19.3.0)(react@19.3.0)
+      storybook: 10.6.0(@types/react@19.3.0)(prettier@3.9.7)(react@19.3.0)
+    optionalDependencies:
+      react: 19.3.0
+      react-dom: 19.3.0(react@19.3.0)
+    transitivePeerDependencies:
+      - '@types/react'
 
   '@storybook/addon-vitest@10.6.0(@vitest/browser-playwright@4.1.11)(@vitest/browser@4.1.11(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(vitest@4.1.11))(@vitest/runner@4.1.11)(react@19.3.0)(storybook@10.6.0(@types/react@19.3.0)(prettier@3.9.7)(react@19.3.0))(vitest@4.1.11)':
     dependencies:

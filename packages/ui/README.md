@@ -1,5 +1,14 @@
 # Luma UI
 
+The [design workflow](../../docs/design-workflow.md) describes the Figma library,
+token checks, story links, and AI-assisted iteration. `Foundations/Theme`
+shows the current tokens in Storybook; the Designs addon displays linked Figma
+frames alongside their stories.
+
+`App/Workspace shell` shows the production sidebar, header, workspace switcher,
+account menu, and mobile drawer. These stories live in `apps/web` and use local
+navigation fixtures. Their app stylesheet is mounted only for the app stories.
+
 Owned React source, initialized with shadcn's Base UI registry. `components.json` retains `base-nova` to select upstream source; Luma's tokens and variants define the appearance. No router, server, auth or desktop bridge belongs here.
 
 ## Starter surface

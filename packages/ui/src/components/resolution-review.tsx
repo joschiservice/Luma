@@ -3,6 +3,19 @@ import type {
   CaseProgress,
   CaseReview,
 } from '@luma/api-contract';
+import {
+  Activity,
+  ArrowRightLeft,
+  ArrowUpRight,
+  Check,
+  ClipboardCheck,
+  Clock3,
+  ListChecks,
+  MessageSquare,
+  ShieldQuestion,
+  Target,
+  X,
+} from 'lucide-react';
 import { useId, useState } from 'react';
 
 import { Button } from './button';
@@ -41,52 +54,91 @@ export function ResolutionReview({
 
   return (
     <article
-      className="case-investigation resolution-review"
+      className="case-investigation recorded-findings resolution-review"
       aria-label="Resolution review"
     >
       <section>
         <h3>
-          <span>06</span> Review the resolution
+          <ClipboardCheck size={16} aria-hidden="true" /> Review the resolution
         </h3>
         {proposal ? (
           <>
-            <h4>{fieldLabel(proposal.capability)}</h4>
-            <p className="case-caption">
-              Proposal version {proposal.version} · Investigation revision{' '}
-              {proposal.diagnosisRevision}
-            </p>
-            <dl className="resolution-facts">
-              <dt>Target system</dt>
-              <dd>{connectionLabel ?? proposal.connectionId}</dd>
-              <dt>Target object</dt>
-              <dd>
-                {caseLabel(proposal.target.kind)} · {proposal.target.id}
-              </dd>
-              <dt>Risk</dt>
-              <dd>{caseLabel(proposal.risk)}</dd>
-              <dt>Available recovery</dt>
-              <dd>
-                No recovery action is specified for this proposal. Do not assume
-                the change can be undone.
-              </dd>
-            </dl>
-            <h4>Proposed changes</h4>
-            <Fields values={proposal.parameters} />
-            <h4>Expected result</h4>
-            <Fields values={proposal.expectedPostcondition} />
-            <h4>Preconditions</h4>
-            <p>
-              Evidence must remain current through{' '}
-              <CaseTime value={proposal.preconditions.validUntil} />.
-            </p>
-            <ul>
-              {proposal.preconditions.evidenceRefs.map((ref) => (
-                <li key={ref}>{ref}</li>
-              ))}
-            </ul>
-            <p className="case-caption">
-              Proposal expires <CaseTime value={proposal.expiresAt} />.
-            </p>
+            <div className="resolution-proposal">
+              <div className="resolution-proposal-heading">
+                <h4>
+                  <ArrowRightLeft size={16} aria-hidden="true" />
+                  {fieldLabel(proposal.capability)}
+                </h4>
+                <span className="resolution-risk" data-risk={proposal.risk}>
+                  {caseLabel(proposal.risk)} risk
+                </span>
+              </div>
+              <p className="case-caption">
+                Proposal version {proposal.version} · Investigation revision{' '}
+                {proposal.diagnosisRevision}
+              </p>
+              <dl className="resolution-facts">
+                <dt>Target system</dt>
+                <dd>{connectionLabel ?? proposal.connectionId}</dd>
+                <dt>Target object</dt>
+                <dd>
+                  {caseLabel(proposal.target.kind)} · {proposal.target.id}
+                </dd>
+              </dl>
+            </div>
+            <div className="resolution-change-group">
+              <div className="resolution-change-card">
+                <h4>
+                  <ArrowRightLeft size={14} aria-hidden="true" /> Proposed
+                  changes
+                </h4>
+                <Fields values={proposal.parameters} />
+              </div>
+              <div className="resolution-change-card">
+                <h4>
+                  <Target size={14} aria-hidden="true" /> Expected result
+                </h4>
+                <Fields values={proposal.expectedPostcondition} />
+              </div>
+            </div>
+            <div className="resolution-recovery">
+              <ShieldQuestion size={16} aria-hidden="true" />
+              <div>
+                <strong>Recovery not specified</strong>
+                <p>
+                  No recovery action is specified for this proposal. Do not
+                  assume the change can be undone.
+                </p>
+              </div>
+            </div>
+            <div className="resolution-preconditions">
+              <h4>
+                <ListChecks size={14} aria-hidden="true" /> Preconditions
+              </h4>
+              <p>
+                Evidence must remain current through{' '}
+                <CaseTime value={proposal.preconditions.validUntil} />.
+              </p>
+              {proposal.preconditions.evidenceRefs.length > 0 && (
+                <details className="finding-sources">
+                  <summary>
+                    Evidence references (
+                    {proposal.preconditions.evidenceRefs.length})
+                  </summary>
+                  <ul>
+                    {proposal.preconditions.evidenceRefs.map((ref) => (
+                      <li key={ref}>
+                        <code>{ref}</code>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+              <p className="case-caption">
+                <Clock3 size={12} aria-hidden="true" /> Proposal expires{' '}
+                <CaseTime value={proposal.expiresAt} />.
+              </p>
+            </div>
             <CaseNotice
               title={
                 proposal.policy?.outcome === 'allowed'
@@ -155,23 +207,25 @@ export function ResolutionReview({
       </section>
       <section aria-label="Execution and verification">
         <h3>
-          <span>07</span> Execution and verification
+          <Activity size={16} aria-hidden="true" /> Execution and verification
         </h3>
         {progress ? (
           <>
-            <p>Case: {caseLabel(progress.state)}</p>
-            <p>
-              Execution:{' '}
-              {progress.execution
-                ? caseLabel(progress.execution.state)
-                : 'Not recorded'}
-            </p>
-            <p>
-              Verification:{' '}
-              {progress.execution?.verification
-                ? caseLabel(progress.execution.verification.outcome)
-                : 'Not recorded'}
-            </p>
+            <p className="case-caption">Issue: {caseLabel(progress.state)}</p>
+            <div className="resolution-outcomes">
+              <p>
+                Execution:{' '}
+                {progress.execution
+                  ? caseLabel(progress.execution.state)
+                  : 'Not recorded'}
+              </p>
+              <p>
+                Verification:{' '}
+                {progress.execution?.verification
+                  ? caseLabel(progress.execution.verification.outcome)
+                  : 'Not recorded'}
+              </p>
+            </div>
             {progress.execution?.verification ? (
               <p className="case-caption">
                 Observed{' '}
@@ -254,6 +308,9 @@ function DecisionControls({
 
   return (
     <div className="resolution-controls" aria-busy={pending}>
+      <h4>
+        <MessageSquare size={15} aria-hidden="true" /> Your decision
+      </h4>
       <label htmlFor={id}>Decision reason (required)</label>
       <textarea
         id={id}
@@ -273,6 +330,13 @@ function DecisionControls({
             disabled={disabled || pending || refreshing || !reason.trim()}
             onClick={() => onDecision(kind, reason.trim())}
           >
+            {kind === 'approve' ? (
+              <Check size={15} aria-hidden="true" />
+            ) : kind === 'reject' ? (
+              <X size={15} aria-hidden="true" />
+            ) : (
+              <ArrowUpRight size={15} aria-hidden="true" />
+            )}
             {caseLabel(kind)}
           </Button>
         ))}

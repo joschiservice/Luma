@@ -55,7 +55,7 @@ it('reviews decisions, recovers ambiguous commands and escalates through the con
   await page
     .getByRole('button', { name: 'Create workspace', exact: true })
     .click();
-  await page.getByRole('heading', { name: 'Room to focus.' }).waitFor();
+  await page.getByRole('heading', { name: 'Operations overview' }).waitFor();
   const organizationId = new URL(page.url()).pathname.split('/')[2];
   const inbox = `/app/${organizationId}/exceptions`;
   const services = createDetectionServices(db.runtimeUrl);
@@ -372,6 +372,6 @@ it('reviews decisions, recovers ambiguous commands and escalates through the con
   );
   expect(await recovered.json()).toEqual(committed);
   await page.getByText('Escalation recorded', { exact: true }).waitFor();
-  await page.getByText('Case: Escalated', { exact: true }).waitFor();
+  await page.getByText('Issue: Escalated', { exact: true }).waitFor();
   expect(errors).toEqual([]);
 });

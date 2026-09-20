@@ -39,7 +39,6 @@ export function WorkspaceList({ entry = false }: { entry?: boolean }) {
         <Brand />
         <a href="/sign-out">Sign out</a>
       </header>
-      <p className="eyebrow">Your Exception Desk</p>
       <h1>Choose your workspace.</h1>
       <p>Open a workspace to pick up where you left off.</p>
       <ul className="workspace-list">

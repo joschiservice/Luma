@@ -4,6 +4,20 @@ import type {
   CaseReview,
   CaseTimelinePage,
 } from '@luma/api-contract';
+import {
+  Activity,
+  CircleAlert,
+  CircleCheck,
+  ClipboardCheck,
+  Clock3,
+  Database,
+  Flag,
+  History,
+  Play,
+  RefreshCw,
+  Search,
+  ShieldCheck,
+} from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { Button } from './button';
@@ -68,14 +82,14 @@ export function CaseTimeline({
 
   return (
     <section
-      className="case-progress"
+      className="case-progress recorded-findings"
       aria-label="Execution and audit timeline"
     >
       <header className="case-progress-heading">
         <h3>
-          <span>05</span> Execution & verification
+          <Activity size={16} aria-hidden="true" /> Execution & verification
         </h3>
-        <span className="case-live-status" role="status">
+        <span className="case-live-status" data-live={current} role="status">
           {current
             ? 'Live'
             : connection === 'syncing'
@@ -95,46 +109,97 @@ export function CaseTimeline({
       ) : null}
       <ol className="case-lifecycle" aria-label="Case lifecycle">
         {[
-          ['detected'],
-          ['diagnosed'],
-          ['proposed'],
-          ['awaiting_approval', 'allowed'],
-          ['executing'],
-          ['verifying'],
-          ['resolved', 'escalated', 'failed'],
-        ].map((states) => (
+          {
+            states: ['detected', 'diagnosed'],
+            label: 'Investigation',
+            icon: Search,
+            tone: 'investigation',
+          },
+          {
+            states: ['proposed', 'awaiting_approval', 'allowed'],
+            label: 'Review',
+            icon: ClipboardCheck,
+            tone: 'review',
+          },
+          {
+            states: ['executing'],
+            label: 'Execution',
+            icon: Play,
+            tone: 'execution',
+          },
+          {
+            states: ['verifying'],
+            label: 'Verification',
+            icon: ShieldCheck,
+            tone: 'verification',
+          },
+          {
+            states: ['resolved', 'escalated', 'failed'],
+            label: 'Outcome',
+            icon:
+              progress.state === 'failed' || progress.state === 'escalated'
+                ? CircleAlert
+                : progress.resolution?.kind === 'verification'
+                  ? CircleCheck
+                  : Flag,
+            tone:
+              progress.state === 'failed'
+                ? 'failed'
+                : progress.state === 'escalated'
+                  ? 'review'
+                  : progress.resolution?.kind === 'verification'
+                    ? 'resolved'
+                    : 'outcome',
+          },
+        ].map(({ states, label, icon: Icon, tone }) => (
           <li
-            key={states[0]}
+            key={label}
+            data-stage={tone}
             aria-current={states.includes(progress.state) ? 'step' : undefined}
           >
-            {states.map(caseLabel).join(' / ')}
+            <span className="lifecycle-node">
+              <Icon size={16} aria-hidden="true" />
+            </span>
+            <span>{label}</span>
           </li>
         ))}
       </ol>
-      <p className="case-progress-state">
-        {current ? 'Case state' : 'Last confirmed case state'}:{' '}
-        <strong>{caseLabel(progress.state)}</strong>
-      </p>
-      <p className="case-caption">
-        Case revision {progress.caseRevision} · Investigation revision{' '}
-        {progress.diagnosisRevision}
-      </p>
-      <p>
-        Workflow:{' '}
-        {workflow.availability === 'unavailable'
-          ? 'Unavailable. Current activity is unknown.'
-          : workflow.availability === 'not_started'
-            ? 'Not started'
-            : workflow.progress
-              ? caseLabel(workflow.progress.phase)
-              : 'Current phase unknown'}
-      </p>
-      {workflow.progress?.reason ? (
-        <p>{caseLabel(workflow.progress.reason)}</p>
-      ) : null}
+      <div className="execution-state-card">
+        <p className="case-progress-state">
+          {current ? 'Case state' : 'Last confirmed case state'}:{' '}
+          <strong>{caseLabel(progress.state)}</strong>
+        </p>
+        <p className="case-caption">
+          Case revision {progress.caseRevision} · Investigation revision{' '}
+          {progress.diagnosisRevision}
+        </p>
+        <p>
+          Workflow:{' '}
+          {workflow.availability === 'unavailable'
+            ? 'Unavailable. Current activity is unknown.'
+            : workflow.availability === 'not_started'
+              ? 'Not started'
+              : workflow.progress
+                ? caseLabel(workflow.progress.phase)
+                : 'Current phase unknown'}
+        </p>
+        {workflow.progress?.reason ? (
+          <p>{caseLabel(workflow.progress.reason)}</p>
+        ) : null}
+      </div>
       <div className="case-outcomes">
-        <div>
-          <h4>Execution result</h4>
+        <div
+          data-tone={
+            execution?.state === 'succeeded'
+              ? 'success'
+              : execution?.state === 'failed'
+                ? 'error'
+                : 'neutral'
+          }
+        >
+          <h4>
+            <Play size={15} aria-hidden="true" /> Execution result
+          </h4>
           <strong>
             {execution
               ? {
@@ -147,8 +212,18 @@ export function CaseTimeline({
           </strong>
           <p>A successful action alone does not establish resolution.</p>
         </div>
-        <div>
-          <h4>Verification result</h4>
+        <div
+          data-tone={
+            verification?.outcome === 'passed'
+              ? 'success'
+              : verification?.outcome === 'failed'
+                ? 'error'
+                : 'neutral'
+          }
+        >
+          <h4>
+            <ShieldCheck size={15} aria-hidden="true" /> Verification result
+          </h4>
           <strong>
             {verification ? caseLabel(verification.outcome) : 'Not recorded'}
           </strong>
@@ -182,9 +257,9 @@ export function CaseTimeline({
             <dt>Requested by</dt>
             <dd>{boundProposal.requestedBy}</dd>
           </dl>
-          <h4>Expected postcondition</h4>
+          <h4>Expected outcome</h4>
           {Object.keys(boundProposal.expectedPostcondition).length ? (
-            <dl>
+            <dl className="execution-criteria">
               {Object.entries(boundProposal.expectedPostcondition).map(
                 ([key, value]) => (
                   <div key={key}>
@@ -286,7 +361,9 @@ export function CaseTimeline({
           <References refs={progress.resolution.evidenceRefs} />
         </div>
       ) : (
-        <p>No canonical resolution recorded. The case remains unresolved.</p>
+        <p className="case-caption">
+          This issue is still open. No resolution has been recorded.
+        </p>
       )}
       {['failed', 'escalated'].includes(progress.state) ? (
         <CaseNotice title="Next steps">
@@ -301,10 +378,12 @@ export function CaseTimeline({
         </CaseNotice>
       ) : null}
       <div className="case-progress-heading">
-        <h4>Audit history</h4>
+        <h4>
+          <History size={16} aria-hidden="true" /> Audit history
+        </h4>
         {onRefresh ? (
           <Button variant="outline" onClick={onRefresh}>
-            Refresh progress
+            <RefreshCw size={14} aria-hidden="true" /> Refresh progress
           </Button>
         ) : null}
       </div>
@@ -312,7 +391,18 @@ export function CaseTimeline({
         <ol className="case-audit">
           {timeline.map((event) => (
             <li key={event.id}>
-              <div>
+              <span className="audit-event-icon" aria-hidden="true">
+                {event.outcome === 'failed' ||
+                event.type === 'execution.withheld' ? (
+                  <CircleAlert size={14} />
+                ) : event.outcome === 'succeeded' ||
+                  event.type === 'execution.reconciled' ? (
+                  <CircleCheck size={14} />
+                ) : (
+                  <Clock3 size={14} />
+                )}
+              </span>
+              <div className="audit-event-heading">
                 <strong>
                   {eventNames[event.type] ??
                     caseLabel(event.type.replaceAll('.', ' '))}
@@ -320,12 +410,23 @@ export function CaseTimeline({
                 <CaseTime value={event.occurredAt} />
               </div>
               {event.outcome ? (
-                <p>Outcome: {caseLabel(event.outcome)}</p>
+                <p
+                  className="audit-outcome"
+                  data-tone={
+                    event.outcome === 'succeeded'
+                      ? 'success'
+                      : event.outcome === 'failed'
+                        ? 'error'
+                        : 'neutral'
+                  }
+                >
+                  {caseLabel(event.outcome)}
+                </p>
               ) : null}
               <p className="case-caption">
                 Actor: {event.actorId ?? 'Not recorded'}
               </p>
-              <details>
+              <details className="audit-event-details">
                 <summary>Audit evidence</summary>
                 <dl>
                   <dt>Event</dt>
@@ -347,7 +448,9 @@ export function CaseTimeline({
       ) : (
         <p>No audit events recorded yet.</p>
       )}
-      <h4>Evidence provenance</h4>
+      <h4 className="execution-evidence-heading">
+        <Database size={16} aria-hidden="true" /> Evidence provenance
+      </h4>
       {evidence.length ? (
         evidence.map((entry) => (
           <details className="case-evidence" key={entry.id}>
@@ -355,9 +458,13 @@ export function CaseTimeline({
               {entry.source
                 ? `${entry.source.provider} · ${entry.source.resource}`
                 : 'Canonical evidence'}{' '}
-              · {entry.id}
+              <span>
+                Observed <CaseTime value={entry.observedAt} />
+              </span>
             </summary>
             <dl>
+              <dt>Evidence ID</dt>
+              <dd>{entry.id}</dd>
               <dt>Observed</dt>
               <dd>
                 <CaseTime value={entry.observedAt} />

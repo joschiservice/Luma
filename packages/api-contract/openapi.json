@@ -6563,6 +6563,14 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "totalCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "offset": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
                     "items": {
                       "type": "array",
                       "items": {
@@ -6722,7 +6730,13 @@
                       "enum": ["observed", "unobserved"]
                     }
                   },
-                  "required": ["items", "nextCursor", "coverage"]
+                  "required": [
+                    "totalCount",
+                    "offset",
+                    "items",
+                    "nextCursor",
+                    "coverage"
+                  ]
                 }
               }
             }

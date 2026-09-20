@@ -334,15 +334,23 @@ export function createCaseReader(
             });
           }
         }
-        const result = await tx.query<Row & { sort_at: string }>(
+        const result = await tx.query<{
+          items: (Row & { sort_at: string })[];
+          total_count: number;
+          offset: number;
+        }>(
           `${projection}
-        SELECT * FROM ordered WHERE
+        , filtered AS (SELECT * FROM ordered WHERE
         ($3='needs_you' AND attention_reason IS NOT NULL OR $3='active' AND document->>'state'<>'resolved' OR $3='history' AND document->>'state'='resolved')
         AND ($4::text IS NULL OR document->>'exceptionClass'=$4)
         AND ($5::text IS NULL OR document->>'severity'=$5)
-        AND ($6::text IS NULL OR document->>'state'=$6)
-        AND ($7::integer IS NULL OR (rank,sort_at::timestamptz,document->>'id') > ($7,$8::timestamptz,$9))
-        ORDER BY rank,sort_at::timestamptz,document->>'id' LIMIT $10`,
+        AND ($6::text IS NULL OR document->>'state'=$6)),
+        page AS (SELECT * FROM filtered WHERE ($7::integer IS NULL OR (rank,sort_at::timestamptz,document->>'id') > ($7,$8::timestamptz,$9))
+        ORDER BY rank,sort_at::timestamptz,document->>'id' LIMIT $10)
+        SELECT (SELECT count(*)::integer FROM filtered) AS total_count,
+        (SELECT count(*)::integer FROM filtered WHERE $7::integer IS NOT NULL AND
+          (rank,sort_at::timestamptz,document->>'id') <= ($7,$8::timestamptz,$9)) AS offset,
+        COALESCE((SELECT jsonb_agg(page ORDER BY rank,sort_at::timestamptz,document->>'id') FROM page), '[]'::jsonb) AS items`,
           [
             tenantId,
             clock.toISOString(),
@@ -356,7 +364,8 @@ export function createCaseReader(
             query.limit + 1,
           ],
         );
-        const rows = result.rows.slice(0, query.limit);
+        const page = result.rows[0]!;
+        const rows = page.items.slice(0, query.limit);
         const last = rows.at(-1);
         const coverage = await tx.query<{ observed: boolean }>(
           'SELECT EXISTS(SELECT 1 FROM exception_sources WHERE tenant_id=$1) AS observed',
@@ -364,6 +373,8 @@ export function createCaseReader(
         );
 
         return {
+          totalCount: page.total_count,
+          offset: page.offset,
           items: rows.map((row) => {
             const { diagnosis, ...summary } = project(row, clock);
             void diagnosis;
@@ -371,7 +382,7 @@ export function createCaseReader(
             return summary;
           }),
           nextCursor:
-            result.rows.length > query.limit && last
+            page.items.length > query.limit && last
               ? Buffer.from(
                   JSON.stringify({
                     context: key,

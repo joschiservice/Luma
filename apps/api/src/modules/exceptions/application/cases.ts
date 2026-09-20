@@ -70,6 +70,8 @@ export interface CaseReader {
     tenantId: string,
     query: CaseQuery,
   ): Promise<{
+    totalCount: number;
+    offset: number;
     items: CaseSummary[];
     nextCursor: string | null;
     coverage: 'observed' | 'unobserved';
