@@ -217,11 +217,11 @@ export function CaseResolution({
           disabled={
             disabled ||
             query.isError ||
-            query.isFetching ||
             Boolean(uncertain) ||
             Boolean(mismatched)
           }
           pending={pending}
+          refreshing={query.isFetching}
           onDecision={(kind, reason) => void decide(kind, reason)}
         />
       ) : null}

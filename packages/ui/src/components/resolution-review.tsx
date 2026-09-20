@@ -19,6 +19,7 @@ export function ResolutionReview({
   connectionLabel,
   disabled = false,
   pending = false,
+  refreshing = false,
   onDecision,
 }: {
   review: CaseReview;
@@ -26,6 +27,7 @@ export function ResolutionReview({
   connectionLabel?: string | undefined;
   disabled?: boolean;
   pending?: boolean;
+  refreshing?: boolean;
   onDecision: (kind: DecisionKind, reason: string) => void;
 }) {
   const proposal = review.proposal;
@@ -124,18 +126,22 @@ export function ResolutionReview({
             manual next steps.
           </p>
         )}
+        {/* Routine policy reevaluations change IDs, not the decision being drafted. */}
         <DecisionControls
           key={JSON.stringify([
-            review.caseRevision,
             review.diagnosisRevision,
             proposal?.id,
             proposal?.version,
-            proposal?.policy?.id,
-            review.permittedDecisions,
+            proposal?.available,
+            proposal?.policy?.policyVersion,
+            proposal?.policy?.outcome,
+            proposal?.policy?.reason,
+            [...review.permittedDecisions].sort(),
           ])}
           decisions={review.permittedDecisions}
           disabled={disabled}
           pending={pending}
+          refreshing={refreshing}
           onDecision={onDecision}
         />
       </section>
@@ -222,11 +228,13 @@ function DecisionControls({
   decisions,
   disabled,
   pending,
+  refreshing,
   onDecision,
 }: {
   decisions: DecisionKind[];
   disabled: boolean;
   pending: boolean;
+  refreshing: boolean;
   onDecision: (kind: DecisionKind, reason: string) => void;
 }) {
   const [reason, setReason] = useState('');
@@ -251,7 +259,7 @@ function DecisionControls({
           <Button
             key={kind}
             variant={kind === 'approve' ? 'default' : 'outline'}
-            disabled={disabled || pending || !reason.trim()}
+            disabled={disabled || pending || refreshing || !reason.trim()}
             onClick={() => onDecision(kind, reason.trim())}
           >
             {caseLabel(kind)}

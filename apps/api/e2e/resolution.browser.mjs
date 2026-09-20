@@ -127,13 +127,21 @@ it('reviews decisions, recovers ambiguous commands and escalates through the con
   let release;
   let receipt;
   let receiptReady = false;
+  let holdReview = false;
+  let releaseReview;
   const json = (route, body, status = 200) =>
     route.fulfill({
       status,
       contentType: 'application/json',
       body: JSON.stringify(body),
     });
-  await page.route(`**${path}/review`, (route) => json(route, review));
+  await page.route(`**${path}/review`, async (route) => {
+    if (holdReview)
+      await new Promise((resolve) => {
+        releaseReview = resolve;
+      });
+    return json(route, review);
+  });
   await page.route(`**${path}/progress`, (route) => json(route, progress));
   await page.route(`**${path}/decisions/*`, (route) =>
     receiptReady
@@ -189,8 +197,44 @@ it('reviews decisions, recovers ambiguous commands and escalates through the con
   await page
     .getByLabel('Decision reason (required)')
     .fill('Reviewed source order');
+  // Exercise real background polling while the operator continues typing.
+  const reason = page.getByLabel('Decision reason (required)');
+  const reevaluatedDecisionId = randomUUID();
+  review = {
+    ...review,
+    caseRevision: 5,
+    proposal: {
+      ...review.proposal,
+      policy: {
+        ...review.proposal.policy,
+        id: reevaluatedDecisionId,
+        evaluatedAt: new Date().toISOString(),
+      },
+    },
+  };
+  progress = { ...progress, caseRevision: 5 };
+  holdReview = true;
+  await expect
+    .poll(() => Boolean(releaseReview), { timeout: 15_000 })
+    .toBe(true);
+  expect(await reason.isEnabled()).toBe(true);
+  expect(await reason.evaluate((el) => el === document.activeElement)).toBe(
+    true,
+  );
+  expect(await approve.isDisabled()).toBe(true);
+  await page.keyboard.type(' and risk');
+  holdReview = false;
+  releaseReview();
+  await expect.poll(() => approve.isEnabled()).toBe(true);
+  expect(await reason.inputValue()).toBe('Reviewed source order and risk');
+  expect(await reason.evaluate((el) => el === document.activeElement)).toBe(
+    true,
+  );
   await approve.click();
   await expect.poll(() => posts.length).toBe(1);
+  expect(posts[0].decisionId).toBe(reevaluatedDecisionId);
+  expect(posts[0].caseRevision).toBe(5);
+  expect(posts[0].reason).toBe('Reviewed source order and risk');
   expect(await approve.isDisabled()).toBe(true);
   expect(
     await page
@@ -208,6 +252,7 @@ it('reviews decisions, recovers ambiguous commands and escalates through the con
     await page.getByText('Resolution verified', { exact: true }).count(),
   ).toBe(0);
   review = structuredClone(resolutionReview);
+  progress = structuredClone(resolutionProgress);
   await page.reload();
   await page
     .getByLabel('Decision reason (required)')
@@ -223,6 +268,19 @@ it('reviews decisions, recovers ambiguous commands and escalates through the con
     .poll(() => page.getByLabel('Decision reason (required)').inputValue())
     .toBe('');
   expect(await approve.isDisabled()).toBe(true);
+  await reason.fill('Reason before policy change');
+  review = {
+    ...review,
+    proposal: {
+      ...review.proposal,
+      policy: {
+        ...review.proposal.policy,
+        reason: 'An additional risk needs operator review.',
+      },
+    },
+  };
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect.poll(() => reason.inputValue()).toBe('');
   for (const [scenario, kind, message] of [
     ['success', 'Reject', 'Rejection recorded'],
     [
@@ -254,6 +312,7 @@ it('reviews decisions, recovers ambiguous commands and escalates through the con
   }
   mode = 'ambiguous';
   review = structuredClone(resolutionReview);
+  progress = structuredClone(resolutionProgress);
   await page.reload();
   await page.getByLabel('Decision reason (required)').fill('Checked again');
   await approve.click();
