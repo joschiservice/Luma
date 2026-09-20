@@ -26,7 +26,8 @@ No new execution authority is granted by a learning record.
    ```
 
 3. Use that same run ID when binding automated steps. Existing admitted runs can
-   also be annotated. Incident, diagnosis and artifact bindings must agree.
+   also be annotated after artifact revocation. Incident, diagnosis and artifact
+   bindings must agree. New runs require an active artifact.
 4. POST operator records to `.../resolution-runs/:runId/events`. Each request has
    a unique UUID `id`, `occurredAt` and a discriminated `fact` (see OpenAPI).
 5. GET `.../resolution-runs` to find runs. Pages contain up to 50 records; pass
@@ -58,7 +59,8 @@ attribution and the corresponding evidence; a model hypothesis cannot confirm a
 cause.
 
 Ingest supporting evidence before referencing it. References must belong to the
-incident or its persisted verification evidence. Store human input bindings and
+incident, including retained diagnosis revisions, or its persisted verification
+evidence. Store human input bindings and
 edit content as protected evidence, then reference them by ID and hash. Do not
 put customer payloads, credentials or provider error messages into codes. Effort
 is in seconds; intervention effort is additional to repair effort, not a second
@@ -74,9 +76,11 @@ codes, retry/effect metadata and provider request IDs when available. Provider
 messages are not retained.
 
 Incident verification records its own pending/completed attempts, including
-validation failures. Its evaluator result is separate from whether the incident
-accepted that result under its freshness and concurrency checks. The export
-includes the canonical incident resolution for that distinction.
+validation failures. Completed evaluations preserve the evaluator result and
+`accepted`, indicating whether persistence resolved the incident. Persistence
+errors also record `resolution_rejected`, without retaining error messages. A crash
+before completion leaves a pending attempt; consult the exported canonical
+incident resolution to determine whether resolution committed.
 
 API acceptance and a passed action check do not prove the incident is resolved.
 An operator's `verified` outcome must match the incident's persisted, complete,

@@ -126,7 +126,8 @@ export interface IncidentVerificationAttempt {
   evidenceRefs?: string[];
   authoritative?: boolean;
   complete?: boolean;
-  failureCode?: 'evaluation_failed';
+  accepted?: boolean;
+  failureCode?: 'evaluation_failed' | 'resolution_rejected';
 }
 export interface DetectionRepository {
   verification(
@@ -292,23 +293,39 @@ export function createDetectionService(
         });
         throw error;
       }
-      await repository.verification(context.tenantId, id, {
+      const completed = {
         ...started,
         attemptId,
-        phase: 'completed',
-        occurredAt: now().toISOString(),
+        phase: 'completed' as const,
         outcome: proof.outcome,
         evidenceRefs: proof.evidenceRefs,
         authoritative: proof.authoritative,
         complete: proof.complete,
+      };
+      let accepted: boolean;
+      try {
+        accepted = await repository.resolve(
+          context.tenantId,
+          id,
+          proof,
+          context.actor.id,
+          now().toISOString(),
+        );
+      } catch (error) {
+        await repository.verification(context.tenantId, id, {
+          ...completed,
+          occurredAt: now().toISOString(),
+          accepted: false,
+          failureCode: 'resolution_rejected',
+        });
+        throw error;
+      }
+      await repository.verification(context.tenantId, id, {
+        ...completed,
+        occurredAt: now().toISOString(),
+        accepted,
       });
-      return repository.resolve(
-        context.tenantId,
-        id,
-        proof,
-        context.actor.id,
-        now().toISOString(),
-      );
+      return accepted;
     },
     resolve(
       context: TenantContext,

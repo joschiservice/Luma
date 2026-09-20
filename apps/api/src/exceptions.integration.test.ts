@@ -429,6 +429,13 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
           .map((v) => v.result?.outcome),
       ).toEqual(['inconclusive', 'failed', 'passed']);
       expect(history.incidentVerifications).toHaveLength(6);
+      expect(
+        history.incidentVerifications.filter((v) => v.phase === 'completed'),
+      ).toEqual([
+        expect.objectContaining({ failureCode: 'evaluation_failed' }),
+        expect.objectContaining({ outcome: 'inconclusive', accepted: false }),
+        expect.objectContaining({ outcome: 'passed', accepted: true }),
+      ]);
       expect(JSON.stringify(history)).not.toContain('private-customer-payload');
       expect(history.events.map((e) => e.sequence)).toEqual(
         history.events.map((_, i) => i + 1),
@@ -461,6 +468,51 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
           ]),
         ),
       ).rejects.toThrow('permission denied');
+      const historicalRunId = randomUUID();
+      const historicalBinding = {
+        runId: historicalRunId,
+        stepId: 'execute',
+        tenantId,
+        principalId: context().actor.id,
+        artifactId: artifact.id,
+        artifactVersion: artifact.version,
+        artifactDigest: artifact.digest,
+        incidentId: incident.id,
+        diagnosisRevision: 1,
+        action: { ...action, id: randomUUID() },
+      };
+      await safety.provisioning.bind(context(), historicalBinding);
+      await safety.provisioning.revoke(
+        context(),
+        artifact.id,
+        artifact.version,
+      );
+      await services.diagnoses.run(context(), recurrence.id);
+      await expect(
+        learning.start(context(), recurrence.id, {
+          ...selection,
+          id: historicalRunId,
+        }),
+      ).rejects.toThrow('binding conflicts');
+      await expect(
+        learning.start(context(), incident.id, {
+          ...selection,
+          id: historicalRunId,
+        }),
+      ).resolves.toMatchObject({ id: historicalRunId });
+      await expect(
+        learning.start(context(), incident.id, {
+          ...selection,
+          id: randomUUID(),
+        }),
+      ).rejects.toThrow('revoked');
+      await expect(
+        safety.provisioning.bind(context(), {
+          ...historicalBinding,
+          stepId: 'another',
+          action: { ...action, id: randomUUID() },
+        }),
+      ).rejects.toThrow('not activated');
       const app = buildApp(
         { logger: false },
         {
@@ -1009,6 +1061,79 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
         incident.id,
       ))!.provenance.evidence.map((e) => e.id),
     ).toEqual(['cleared']);
+    const refreshContext = async (ctx: ReturnType<typeof context>) => ctx;
+    const safety = createAdmittedSafety(
+      runtimeUrl,
+      { refreshContext },
+      { resolve: async () => null },
+      { eligible: async () => true },
+    );
+    try {
+      const artifact = await safety.provisioning.activate(context(), {
+        id: 'diagnosis-evidence',
+        version: '1',
+        generation: { kind: 'generated', reference: 'fixture' },
+        steps: {
+          execute: {
+            capability: 'stock.correct',
+            capabilityVersion: '1',
+            targetKind: 'sku',
+            minimumRisk: 'low',
+          },
+        },
+      });
+      const learning = createResolutionLearning(
+        createTenantDatabase(runtime),
+        refreshContext,
+        () => now,
+      );
+      const diagnosis = (await services.diagnoses.get(context(), incident.id))!;
+      const run = await learning.start(context(), incident.id, {
+        id: randomUUID(),
+        diagnosisRevision: diagnosis.revision,
+        resolution: {
+          id: artifact.id,
+          version: artifact.version,
+          use: 'created',
+          reasonCode: 'investigate',
+        },
+      });
+      expect(run.context.evidenceRefs).toEqual(['cleared']);
+      const appendCause = (refs: string[]) =>
+        learning.append(context(), incident.id, run.id, {
+          id: randomUUID(),
+          occurredAt: now.toISOString(),
+          fact: {
+            kind: 'cause',
+            code: 'provider_outage',
+            status: 'rejected',
+            basis: 'operator_investigation',
+            supportingEvidenceRefs: [],
+            contradictingEvidenceRefs: refs,
+          },
+        });
+      await expect(appendCause(['cleared', 'deferred'])).resolves.toMatchObject(
+        { fact: { contradictingEvidenceRefs: ['cleared', 'deferred'] } },
+      );
+      await services.exceptions.ingest(
+        context(otherTenant),
+        request('foreign-tenant', otherTenant),
+      );
+      const foreign = request('foreign-incident');
+      if (foreign.input.exceptionClass !== 'sync_failure')
+        throw new Error('Fixture');
+      foreign.input.facts.connectionId = randomUUID();
+      foreign.input.facts.subjectId = foreign.input.facts.connectionId;
+      foreign.evidence[0]!.connectionId = foreign.input.facts.connectionId;
+      await services.exceptions.ingest(context(), foreign);
+      for (const key of ['foreign-tenant', 'foreign-incident']) {
+        await expect(appendCause([key])).rejects.toThrow(
+          'belong to this incident',
+        );
+      }
+    } finally {
+      await safety.close();
+    }
     const client = await owner.connect();
     try {
       await client.query('BEGIN');
@@ -2084,6 +2209,21 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
       await expect(
         services.exceptions.verify(context(), incident.id),
       ).rejects.toThrow();
+      const attempts = await owner.query(
+        "SELECT document FROM exception_outbox WHERE exception_id=$1 AND document->>'type'='exception.verification_attempt' AND document->>'phase'='completed'",
+        [incident.id],
+      );
+      expect(attempts.rows.map((row) => row.document)).toEqual([
+        expect.objectContaining(
+          field === 'tenant'
+            ? { failureCode: 'evaluation_failed' }
+            : {
+                outcome: 'passed',
+                accepted: false,
+                failureCode: 'resolution_rejected',
+              },
+        ),
+      ]);
       expect((await services.exceptions.list(context()))[0]?.state).toBe(
         'detected',
       );
@@ -2106,6 +2246,17 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
     await expect(
       services.exceptions.verify(context(), incident.id),
     ).rejects.toThrow('changed during verification');
+    const attempts = await owner.query(
+      "SELECT document FROM exception_outbox WHERE exception_id=$1 AND document->>'type'='exception.verification_attempt' AND document->>'phase'='completed'",
+      [incident.id],
+    );
+    expect(attempts.rows.map((row) => row.document)).toEqual([
+      expect.objectContaining({
+        outcome: 'passed',
+        accepted: false,
+        failureCode: 'resolution_rejected',
+      }),
+    ]);
     expect(
       (await services.exceptions.list(context()))[0]?.occurrenceCount,
     ).toBe(2);

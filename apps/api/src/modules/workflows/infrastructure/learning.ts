@@ -97,7 +97,6 @@ export function createLearningStore(
           )
         ).rows[0];
         if (!diagnosis || !artifact) throw missing();
-        if (!artifact.active) conflict('Selected resolution is revoked');
         const binding = (
           await tx.query<{
             document: {
@@ -119,6 +118,8 @@ export function createLearningStore(
             binding.artifactVersion !== input.resolution.version)
         )
           conflict('Resolution run binding conflicts');
+        if (!artifact.active && !binding)
+          conflict('Selected resolution is revoked');
         if (input.resolution.previousVersion) {
           const base = await tx.query(
             'SELECT 1 FROM action_artifacts WHERE tenant_id=$1 AND id=$2 AND version=$3',
@@ -189,6 +190,7 @@ export function createLearningStore(
         const owned = await tx.query(
           `WITH refs AS (
           SELECT jsonb_array_elements_text(i.document->'facts'->'evidenceRefs') AS id FROM exception_evidence e JOIN exception_inputs i ON i.tenant_id=e.tenant_id AND i.evidence_key=e.evidence_key WHERE e.tenant_id=$1 AND e.exception_id=$2
+          UNION SELECT evidence->>'id' FROM exception_diagnoses d CROSS JOIN LATERAL jsonb_array_elements(d.document->'provenance'->'evidence') AS evidence WHERE d.tenant_id=$1 AND d.exception_id=$2
           UNION SELECT jsonb_array_elements_text(document->'resolution'->'evidenceRefs') FROM exceptions WHERE tenant_id=$1 AND id=$2
           UNION SELECT jsonb_array_elements_text(document->'verification'->'evidenceRefs') FROM exception_outbox WHERE tenant_id=$1 AND exception_id=$2
         ) SELECT DISTINCT s.evidence_key FROM refs JOIN exception_sources s ON s.tenant_id=$1 AND s.evidence_key=refs.id WHERE s.evidence_key=ANY($3::text[])`,
