@@ -10,10 +10,32 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  quality:
-    name: Quality gates
+  checks:
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Static checks and builds
+            cache: builds
+            command: pnpm format:check && pnpm lint && pnpm typecheck && pnpm build
+          - name: Main tests
+            cache: tests
+            browser: '@luma/ui'
+            command: pnpm test
+          - name: Backend E2E
+            cache: e2e
+            command: pnpm test:e2e
+          - name: Browser E2E (1/2)
+            cache: browser-1
+            browser: '@luma/api'
+            command: pnpm test:browser --shard=1/2
+          - name: Browser E2E (2/2)
+            cache: browser-2
+            browser: '@luma/api'
+            command: pnpm test:browser --shard=2/2
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -22,6 +44,22 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @luma/ui exec playwright install --with-deps chromium
-      - run: pnpm --filter @luma/api exec playwright install --with-deps chromium
-      - run: pnpm test:full
+      - uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-node24-${{ matrix.cache }}-${{ github.sha }}
+          restore-keys: turbo-${{ runner.os }}-node24-${{ matrix.cache }}-
+      - if: matrix.browser
+        run: pnpm --filter '${{ matrix.browser }}' exec playwright install --with-deps chromium
+      - run: ${{ matrix.command }}
+  quality:
+    name: Quality gates
+    if: always()
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Require all checks to pass
+        env:
+          CHECKS_RESULT: ${{ needs.checks.result }}
+        run: test "$CHECKS_RESULT" = success

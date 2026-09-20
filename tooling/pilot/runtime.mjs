@@ -28,7 +28,13 @@ import {
 import { identitySettings } from './seed.mjs';
 import { readJson } from './fixtures.mjs';
 
-export async function createPilot(env, directory, manifest, temporal) {
+export async function createPilot(
+  env,
+  directory,
+  manifest,
+  temporal,
+  { pause = () => delay(20_000) } = {},
+) {
   if (process.env.NODE_ENV === 'production' || !manifest.synthetic)
     throw new Error('The synthetic pilot is for local development only');
   const settings = identitySettings(env);
@@ -141,7 +147,7 @@ export async function createPilot(env, directory, manifest, temporal) {
         return Response.json((await readJson(path)).order);
       if (manifest.scenario === 'failed')
         return new Response(null, { status: 409 });
-      if (manifest.scenario === 'executing') await delay(20_000);
+      if (manifest.scenario === 'executing') await pause('executing');
       const key = new Headers(init.headers).get('Idempotency-Key');
       const body = JSON.parse(String(init.body));
       await mutate((state) => {
@@ -202,7 +208,7 @@ export async function createPilot(env, directory, manifest, temporal) {
   const verifier = {
     version: 'synthetic-shipping-correction-v1',
     async evaluate(actor, incident) {
-      if (manifest.scenario === 'verifying') await delay(20_000);
+      if (manifest.scenario === 'verifying') await pause('verifying');
       // A fresh adapter read verifies this workflow's shipping correction, not shipment completion.
       const result = await capabilities.read(actor, {
         connectionId: manifest.connections.jtl,

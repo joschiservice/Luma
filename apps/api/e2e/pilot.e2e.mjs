@@ -22,7 +22,7 @@ afterAll(async () => {
   await temporal?.teardown();
 });
 
-async function setup(t, scenario) {
+async function setup(t, scenario, options) {
   const db = await database(t);
   await db.migrate();
   await db.grantRuntime();
@@ -48,7 +48,7 @@ async function setup(t, scenario) {
     taskQueue: `luma-pilot-${manifest.runId}`,
     dataRegion: 'EU',
   };
-  const pilot = await createPilot(env, directory, manifest, settings);
+  const pilot = await createPilot(env, directory, manifest, settings, options);
   const client = await pilot.runtime.createClient();
   t.onTestFinished(async () => {
     await client.close();
@@ -175,10 +175,12 @@ test.each(['executing', 'verifying'])(
   'exposes %s before verified resolution',
   async (scenario) => {
     const t = { onTestFinished };
-    const f = await setup(t, scenario);
+    const { promise: paused, resolve: release } = Promise.withResolvers();
+    const f = await setup(t, scenario, { pause: () => paused });
     const worker = await f.pilot.runtime.createWorker();
     const running = worker.run();
     t.onTestFinished(async () => {
+      release();
       worker.shutdown();
       await running;
       await worker.close();
@@ -195,6 +197,7 @@ test.each(['executing', 'verifying'])(
     expect(
       (await f.pilot.detection.exceptions.get(actor, source.id)).state,
     ).not.toBe('resolved');
+    release();
     await waitFor(
       async () =>
         (await f.client.progress(actor, source))?.phase === 'resolved',

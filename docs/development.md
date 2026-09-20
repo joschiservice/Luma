@@ -96,6 +96,12 @@ administrator connection with database and role creation permissions. Do not use
 a development or production database. CI uses the same Testcontainers path as
 local full checks. No fixed database or browser test ports are required.
 
+CI runs static checks and builds, main tests, backend E2E, and two browser shards
+in parallel. Each test job provisions its own PostgreSQL container. Turbo build
+results are cached between runs; tests always execute. To reproduce one browser
+shard, run `pnpm test:browser --shard=1/2` or `pnpm test:browser --shard=2/2`.
+Both E2E commands accept Vitest arguments, including file filters and `--shard`.
+
 For a fast check without containers, use `pnpm test:local`. Database integration
 suites skip if no test connection is supplied; backend and browser E2E require a
 database. `pnpm test:ui` and Storybook do not need PostgreSQL.

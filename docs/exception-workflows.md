@@ -72,4 +72,9 @@ Process progress is a Temporal projection, not a second incident lifecycle table
 
 `pnpm check` includes a local Temporal server integration suite. The SDK downloads/caches the development server binary on first use; CI needs access to Temporal's download service. Tests cover history replay, worker replacement during approval, lost notifications, expiry, diagnosis retry, cancellation, ambiguous effect recovery, verification failure and manual intervention. Activity tests cover tenant scope, revoked access, stale revisions, immutable proposal bindings and verification replay. PostgreSQL execution tests cover durable reservation and single dispatch; `pnpm test:e2e` kills a worker after a provider commit and verifies restart reconciliation.
 
+The lost-notification polling test uses a separate Temporal time-skipping server
+to exercise the polling timer without waiting 30 seconds. Its binary is also
+downloaded on first use. Apple silicon requires Rosetta 2 for that test server.
+The worker-recovery E2E test continues to use the full local Temporal server.
+
 Implementation references: [Temporal TypeScript SDK](https://typescript.temporal.io/), [workflow testing](https://docs.temporal.io/develop/typescript/testing-suite), [execution guarantees](execution.md), [diagnosis revisions](exception-diagnosis.md).

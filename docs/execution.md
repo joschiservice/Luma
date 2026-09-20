@@ -47,7 +47,7 @@ TEST_DATABASE_URL=postgresql://... pnpm --filter @luma/api test
 pnpm check
 ```
 
-Integration tests create isolated databases and restricted runtime logins on PostgreSQL 17. They cover authorization, approval/rejection/expiry, current membership, capability risk, tenant isolation, canonical hashes, concurrent delivery, restart recovery, stale verification, audit outages, lost completion persistence and immutable evidence. CI supplies PostgreSQL through the existing quality-gates job. Without `TEST_DATABASE_URL`, database integration tests are skipped.
+Integration tests create isolated databases and restricted runtime logins on PostgreSQL 17. They cover authorization, approval/rejection/expiry, current membership, capability risk, tenant isolation, canonical hashes, concurrent delivery, restart recovery, stale verification, audit outages, lost completion persistence and immutable evidence. CI supplies PostgreSQL separately in each test job. Without `TEST_DATABASE_URL`, database integration tests are skipped.
 
 ## Action admission
 
