@@ -23,3 +23,8 @@ export type {
   DeskDependencies,
   DeskStore,
 } from '#modules/workflows/application/desk';
+
+export type {
+  LearningService,
+  ResolutionHistory,
+} from '#modules/workflows/application/learning';

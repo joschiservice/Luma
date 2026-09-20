@@ -602,6 +602,7 @@ describe.skipIf(!databaseUrl)(
           '0002_policy_execution_audit.sql',
           '0012_action_admission.sql',
           '0013_preserve_prepared_reconciliation.sql',
+          '0014_execution_observations.sql',
         ]) {
           await owner.query(
             await readFile(
@@ -1152,6 +1153,116 @@ describe.skipIf(!databaseUrl)(
           parameters: { quantity: 5 },
         }),
       ).rejects.toThrow('conflicts');
+    });
+    it('persists pending, failed and concurrent verification attempts without leaking errors', async () => {
+      const proposal = action();
+      execute.mockRejectedValue(
+        new ConnectorError({
+          code: 'timeout',
+          effect: 'unknown',
+          retry: 'reconcile',
+          providerRequestId: 'request-timeout-43',
+        }),
+      );
+      await safety.execution.execute(alice, proposal);
+      let started!: () => void;
+      let release!: () => void;
+      const waiting = new Promise<void>((resolve) => {
+        started = resolve;
+      });
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      verify.mockImplementationOnce(async () => {
+        started();
+        await gate;
+        throw new Error('secret-provider-response');
+      });
+      const failed = safety.execution.reconcile(alice, proposal.id);
+      const failureAssertion = expect(failed).rejects.toThrow(
+        'secret-provider-response',
+      );
+      await waiting;
+      const entries = async () =>
+        (
+          await owner.query(
+            'SELECT document FROM execution_verifications WHERE tenant_id=$1 AND proposal_id=$2 ORDER BY created_at,id,phase DESC',
+            [tenantId, proposal.id],
+          )
+        ).rows.map((row) => row.document);
+      try {
+        expect(await entries()).toMatchObject([
+          { phase: 'pending', actorId: alice.actor.id },
+        ]);
+      } finally {
+        release();
+      }
+      await failureAssertion;
+      expect(await entries()).toMatchObject([
+        { phase: 'pending' },
+        {
+          phase: 'completed',
+          failure: { code: 'internal', phase: 'verification' },
+        },
+      ]);
+      const failures = (
+        await owner.query(
+          'SELECT document FROM execution_failures WHERE tenant_id=$1 AND proposal_id=$2',
+          [tenantId, proposal.id],
+        )
+      ).rows.map((row) => row.document);
+      expect(failures).toMatchObject([
+        {
+          code: 'timeout',
+          retry: 'reconcile',
+          providerRequestId: 'request-timeout-43',
+        },
+      ]);
+      expect(JSON.stringify(await entries())).not.toContain(
+        'secret-provider-response',
+      );
+      await safety.close();
+      safety = startSafety();
+      let observed = 0;
+      let bothStarted!: () => void;
+      const together = new Promise<void>((resolve) => {
+        bothStarted = resolve;
+      });
+      verify.mockImplementation(async () => {
+        if (++observed === 2) bothStarted();
+        await together;
+        return {
+          outcome: 'passed',
+          observationRefs: [observationId],
+          observedAt: new Date().toISOString(),
+          evaluatorVersion: 'fixture',
+        };
+      });
+      await Promise.all([
+        safety.execution.reconcile(alice, proposal.id),
+        safety.execution.reconcile(alice, proposal.id),
+      ]);
+      expect(
+        (await entries()).filter((row) => row.phase === 'completed'),
+      ).toHaveLength(3);
+      expect(execute).toHaveBeenCalledTimes(1);
+      await expect(
+        runtime.query('UPDATE execution_verifications SET document=document'),
+      ).rejects.toThrow('permission denied');
+      const isolated = await runtime.connect();
+      try {
+        await isolated.query('BEGIN');
+        await isolated.query("SELECT set_config('app.tenant_id',$1,true)", [
+          outsider.tenantId,
+        ]);
+        expect(
+          (await isolated.query('SELECT * FROM execution_verifications'))
+            .rowCount,
+        ).toBe(0);
+        await isolated.query('ROLLBACK');
+      } finally {
+        isolated.release();
+      }
     });
     it('does not retry ambiguous effects; reconciliation only reads authoritative state', async () => {
       const proposal = action();

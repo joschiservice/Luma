@@ -11,3 +11,8 @@ export type {
   ActivatedArtifact,
   AdmissionReader,
 } from '#modules/execution/application/admission';
+
+export type {
+  VerificationAttempt,
+  ExecutionFailure,
+} from '#modules/execution/application/history';
