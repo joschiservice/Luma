@@ -25,6 +25,30 @@ pilot run. `pnpm dev:workflows` starts the ordinary worker; use `pilot:worker` f
 these fixture bindings. Stop an ordinary development server before starting the
 pilot because they share this checkout's web/API ports.
 
+## Hostname and Tailscale
+
+Set the browser-facing origin in `apps/api/.env`:
+
+```dotenv
+BETTER_AUTH_URL=https://luma-dev.tail2dda1b.ts.net
+```
+
+Use your machine's Tailscale hostname. The value must include `http://` or
+`https://`, with no path or trailing slash. If `SHOPIFY_WEB_ORIGIN` is set, it
+takes precedence; set it to the same origin or remove it. Without either setting,
+the pilot uses its local loopback URL.
+
+Restart `pnpm pilot` and `pnpm pilot:worker` after changing the origin. The pilot
+uses it for authentication and allows its hostname in the web development server.
+Forward Tailscale HTTPS traffic to the printed **Local web target**:
+
+```sh
+tailscale serve --bg http://127.0.0.1:<web-port>
+```
+
+Replace `<web-port>` with the printed port, then open the printed **Web** URL from
+a device on your tailnet. The web server proxies API requests to the local API.
+
 ## Repeat and reset
 
 `pnpm pilot:seed` preserves the current manifest, organization, evidence and

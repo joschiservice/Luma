@@ -29,13 +29,7 @@ try {
     'postgres',
     'temporal',
   ]);
-  const { generated, migrationUrl } = await environment(saved, true);
-  const webOrigin = `http://127.0.0.1:${saved.webPort}`;
-  Object.assign(generated, {
-    BETTER_AUTH_URL: webOrigin,
-    AUTH_TRUSTED_ORIGINS: webOrigin,
-    __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS: '127.0.0.1',
-  });
+  const { generated, migrationUrl, webOrigin } = await environment(saved, true);
   await provision(saved, migrationUrl);
   await saveEnvironment(generated);
   await run('pnpm', ['exec', 'turbo', 'run', 'build', '--filter=@luma/api...']);
@@ -48,7 +42,7 @@ try {
     command === 'reset',
   );
   console.log(
-    `SIMULATED EXTERNAL SYSTEMS · ${manifest.scenario}\nOrganization: ${manifest.organizationId}\nWeb: ${webOrigin}\nManifest: .luma/pilot.json`,
+    `SIMULATED EXTERNAL SYSTEMS · ${manifest.scenario}\nOrganization: ${manifest.organizationId}\nWeb: ${webOrigin}\nLocal web target: http://127.0.0.1:${saved.webPort}\nManifest: .luma/pilot.json`,
   );
   // Start the API without inherited provider/model/telemetry credentials or API .env files.
   const env = {
