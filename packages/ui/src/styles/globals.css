@@ -546,3 +546,41 @@
   font-weight: 700;
   border-bottom: 2px solid var(--brand);
 }
+
+.resolution-facts {
+  display: grid;
+  grid-template-columns: minmax(100px, 1fr) minmax(0, 2fr);
+  gap: 8px 20px;
+}
+.resolution-facts > div {
+  display: contents;
+}
+.resolution-facts dt {
+  color: var(--muted-foreground);
+}
+.resolution-controls {
+  margin-top: 24px;
+}
+.resolution-controls label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.resolution-controls textarea {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--background);
+  padding: 10px;
+}
+.resolution-controls textarea:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.resolution-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}

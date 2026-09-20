@@ -55,8 +55,8 @@ explicitly report the omitted count and withhold findings, impact and recommenda
 pending investigations remain pending. Evidence pagination preserves access to the
 complete persisted references. Proposal review, decisions, execution and audit reads,
 and authenticated SSE are described in [case decisions and progress](case-decisions.md).
-The live timeline refreshes through authenticated SSE; proposal decision controls
-remain separate frontend work.
+The live timeline refreshes through authenticated SSE. Resolution review shows
+current policy and the decisions permitted for the operator.
 The canonical exception
 and diagnosis tables remain the only source of case data.
 

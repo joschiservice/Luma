@@ -110,7 +110,9 @@ Case detail shows canonical state alongside workflow activity, execution outcome
 and independent verification. A passed check does not imply canonical resolution;
 human disposition is labeled separately. Expand attempts, action criteria, audit
 events and historical evidence to inspect actors, timestamps and provenance.
-Proposal parameters and raw provider payloads are not rendered.
+The timeline omits proposal parameters and raw provider payloads. Resolution
+review presents the proposed action and permitted approval, rejection or
+escalation decisions.
 
 The authenticated stream refreshes detail, review, progress and loaded history
 from the first page. Reads with conflicting case or diagnosis revisions are

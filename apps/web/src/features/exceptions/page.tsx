@@ -25,6 +25,7 @@ import {
 import { connectionsOptions } from '../connections/data';
 import { IdentityError } from '../identity/data';
 import { LiveCaseDetail } from './progress';
+import { CaseResolution } from './resolution';
 
 export function Inbox() {
   const { organizationId } = useParams({
@@ -324,11 +325,25 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
                 </CaseNotice>
               ) : null}
               {item ? (
-                <LiveCaseDetail
-                  key={`${organizationId}:${exceptionId}`}
-                  organizationId={organizationId}
-                  exceptionId={exceptionId}
-                />
+                <>
+                  <LiveCaseDetail
+                    key={`${organizationId}:${exceptionId}`}
+                    organizationId={organizationId}
+                    exceptionId={exceptionId}
+                  />
+                  <CaseResolution
+                    key={exceptionId}
+                    organizationId={organizationId}
+                    exceptionId={item.id}
+                    disabled={detail.isError}
+                    connectionLabels={Object.fromEntries(
+                      (connections.data ?? []).map((connection) => [
+                        connection.id,
+                        `${connection.label} · ${caseLabel(connection.target.kind)}`,
+                      ]),
+                    )}
+                  />
+                </>
               ) : null}
             </>
           ) : (
