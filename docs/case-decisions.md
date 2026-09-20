@@ -103,3 +103,21 @@ Responses include bounded provenance, actors and outcomes, not raw provider payl
 The operations overview continues to use its explicit windows, denominators and
 observation-coverage contract. Persisted pending approvals feed the shared attention
 projection, including the inbox and overview; empty attention never proves health.
+
+## Live case detail
+
+Case detail shows canonical state alongside workflow activity, execution outcome
+and independent verification. A passed check does not imply canonical resolution;
+human disposition is labeled separately. Expand attempts, action criteria, audit
+events and historical evidence to inspect actors, timestamps and provenance.
+Proposal parameters and raw provider payloads are not rendered.
+
+The authenticated stream refreshes detail, review, progress and loaded history
+from the first page. Reads with conflicting case or diagnosis revisions are
+rejected until the next refresh. Timeline entries are deduplicated by immutable ID.
+History and evidence load in batches of 100; Load more reads another batch.
+Connection loss marks displayed records as last confirmed, and automatic reconnect
+resynchronizes them. Refresh progress also restarts the stream. Navigation closes
+the old stream and isolates caches by organization and case; reload reconstructs
+state from persisted reads. Failed and escalated cases show available decision
+names and direct operators to the current investigation without exposing retries.

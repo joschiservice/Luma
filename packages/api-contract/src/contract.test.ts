@@ -114,12 +114,12 @@ it('validates SSE snapshots and closes malformed streams while allowing transpor
     const stop = subscribeToCaseProgress({
       baseUrl: 'https://luma.example/api/',
       organizationId: 'org',
-      exceptionId: 'case',
+      exceptionId: '11111111-1111-4111-8111-111111111111',
       onResync,
       onError,
     });
     expect(create).toHaveBeenCalledWith(
-      'https://luma.example/api/v1/organizations/org/exceptions/case/events',
+      'https://luma.example/api/v1/organizations/org/exceptions/11111111-1111-4111-8111-111111111111/events',
       { withCredentials: true },
     );
     listeners.get('error')!({});
@@ -143,9 +143,21 @@ it('validates SSE snapshots and closes malformed streams while allowing transpor
       }),
     });
     expect(onResync).toHaveBeenCalledWith(progress);
+    listeners.get('resync')!({
+      data: JSON.stringify({
+        schemaVersion: 1,
+        exceptionId: '22222222-2222-4222-8222-222222222222',
+        refetch: true,
+        progress,
+      }),
+    });
+    expect(onResync).toHaveBeenCalledTimes(1);
+    expect(close).toHaveBeenCalledTimes(1);
+    close.mockClear();
+    onError.mockClear();
     listeners.get('resync')!({ data: 'invalid' });
     expect(close).toHaveBeenCalledTimes(1);
-    expect(onError).toHaveBeenCalledTimes(2);
+    expect(onError).toHaveBeenCalledTimes(1);
     stop();
     expect(close).toHaveBeenCalledTimes(2);
   } finally {

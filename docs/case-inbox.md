@@ -13,8 +13,9 @@ resolutions and human dispositions; these are labeled separately.
 
 The investigation presents impact, manual next steps, facts, hypotheses,
 constraints and expandable provenance. Unknown impact stays unknown. Expired or
-resolved investigations hide their old recommendations. No decision or connector
-write controls are exposed. A selected case stays open when it leaves its filter.
+resolved investigations hide their old recommendations. Execution progress and
+audit history appear below the investigation. A selected case stays open when it
+leaves its filter.
 
 ## Read API
 
@@ -54,7 +55,8 @@ explicitly report the omitted count and withhold findings, impact and recommenda
 pending investigations remain pending. Evidence pagination preserves access to the
 complete persisted references. Proposal review, decisions, execution and audit reads,
 and authenticated SSE are described in [case decisions and progress](case-decisions.md).
-The inbox UI's decision controls and live timeline remain separate frontend work.
+The live timeline refreshes through authenticated SSE; proposal decision controls
+remain separate frontend work.
 The canonical exception
 and diagnosis tables remain the only source of case data.
 

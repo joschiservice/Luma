@@ -185,3 +185,4 @@ export type CaseDecision = z.infer<typeof caseDecisionSchema>;
 export type DecisionReceipt = z.infer<typeof decisionReceiptSchema>;
 export type CaseReview = z.infer<typeof caseReviewSchema>;
 export type CaseProgress = z.infer<typeof caseProgressSchema>;
+export type CaseTimelinePage = z.infer<typeof caseTimelineSchema>;

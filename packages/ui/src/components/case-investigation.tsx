@@ -82,7 +82,13 @@ function Findings({ items }: { items: Diagnosis['facts'] }) {
     </ul>
   );
 }
-export function CaseInvestigation({ item }: { item: CaseDetail }) {
+export function CaseInvestigation({
+  item,
+  progress,
+}: {
+  item: CaseDetail;
+  progress?: ReactNode;
+}) {
   const diagnosis = item.diagnosis;
   const historical =
     diagnosis?.superseded ||
@@ -332,21 +338,23 @@ export function CaseInvestigation({ item }: { item: CaseDetail }) {
           </p>
         ) : null}
       </section>
-      <section>
-        <h3>
-          <span>05</span> Case progress
-        </h3>
-        <p>
-          {item.resolution === 'verified'
-            ? 'Resolved with fresh verification evidence.'
-            : item.resolution === 'human_disposition'
-              ? 'Closed by human disposition. This does not establish a verified correction.'
-              : `${caseLabel(item.state)}. The case remains active until a terminal disposition is recorded.`}
-        </p>
-        <p className="case-caption">
-          Last activity <CaseTime value={item.lastActivityAt} />
-        </p>
-      </section>
+      {progress ?? (
+        <section>
+          <h3>
+            <span>05</span> Case progress
+          </h3>
+          <p>
+            {item.resolution === 'verified'
+              ? 'Resolved with fresh verification evidence.'
+              : item.resolution === 'human_disposition'
+                ? 'Closed by human disposition. This does not establish a verified correction.'
+                : `${caseLabel(item.state)}. The case remains active until a terminal disposition is recorded.`}
+          </p>
+          <p className="case-caption">
+            Last activity <CaseTime value={item.lastActivityAt} />
+          </p>
+        </section>
+      )}
     </article>
   );
 }
