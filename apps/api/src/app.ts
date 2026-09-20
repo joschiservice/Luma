@@ -1,8 +1,7 @@
 import {
+  createPlaybooks,
   createResolutionLearning,
   learningRoutes,
-} from '#modules/workflows/composition';
-import {
   createDeskStore,
   createDeskService,
   createDeskWorkflowReader,
@@ -519,6 +518,15 @@ export function createExceptionWorkflowRuntime(
   bindings: WorkflowBindings,
   desk?: import('#modules/workflows/index').DeskService,
   artifactReference = { id: 'exception-resolution', version: '1' },
+  playbook?: {
+    service: import('#modules/workflows/index').PlaybookService;
+    activationId: string;
+    snapshot(
+      context: import('#modules/identity/index').TenantContext,
+      diagnosis: import('#modules/exceptions/index').Diagnosis,
+      action: import('#modules/policies/index').ProposedAction,
+    ): Promise<import('#modules/workflows/index').PlaybookSnapshot>;
+  },
 ) {
   if (desk) bindings = { ...bindings, recordWorkflow: desk.bindWorkflow };
   if (desk && bindings.proposals) {
@@ -550,6 +558,16 @@ export function createExceptionWorkflowRuntime(
         prepare: async (context, diagnosis) => {
           const action = await proposals.prepare(context, diagnosis);
           if (!action) return null;
+          if (playbook) {
+            await playbook.service.bind(context, {
+              activationId: playbook.activationId,
+              incidentId: diagnosis.exceptionId,
+              diagnosisRevision: diagnosis.revision,
+              action,
+              snapshot: await playbook.snapshot(context, diagnosis, action),
+            });
+            return action;
+          }
           const artifact = await safety.provisioning.artifact(
             context,
             artifactReference.id,
@@ -577,6 +595,7 @@ export function createExceptionWorkflowRuntime(
     identity,
     ...detection,
     execution: safety.execution,
+    ...(playbook ? { playbook: playbook.service } : {}),
     bindings,
   });
   return {
@@ -780,4 +799,26 @@ export function policyAudit(audit: import('#modules/audit/index').AuditLog) {
       },
     });
   };
+}
+
+/** Trusted composition publishes and activates playbooks; activities receive only the service. */
+export function createResolutionPlaybooks(
+  db: import('#modules/platform/index').TenantDatabase,
+  identity: Pick<IdentityService, 'refreshContext'>,
+  safety: Pick<
+    ReturnType<typeof createSafetyServices>,
+    'execution' | 'provisioning'
+  >,
+  now: () => Date = () => new Date(),
+) {
+  return createPlaybooks(
+    db,
+    {
+      admission: safety.execution,
+      provisioning: safety.provisioning,
+      refreshContext: identity.refreshContext,
+      parseAction,
+    },
+    now,
+  );
 }

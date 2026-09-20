@@ -7,6 +7,10 @@ import type {
   DiagnosisService,
 } from '#modules/exceptions/index';
 import type { ActionAdmission } from '#modules/execution/index';
+import type {
+  PlaybookService,
+  PlaybookOutcome,
+} from '#modules/workflows/application/playbook';
 import type { ProposedAction } from '#modules/policies/index';
 
 export type WorkflowSource = { kind: 'detection' | 'incident'; id: string };
@@ -105,6 +109,7 @@ export function createExceptionActivities(deps: {
   diagnoses: DiagnosisService;
   execution: ActionAdmission;
   bindings: WorkflowBindings;
+  playbook?: PlaybookService;
 }): ExceptionActivities {
   async function context(input: ExceptionWorkflowInput) {
     const fresh = await deps.identity.resolveWorkflowContext(
@@ -132,6 +137,18 @@ export function createExceptionActivities(deps: {
     )
       return null;
     return diagnosis;
+  }
+  function playbookResult(outcome: PlaybookOutcome): WorkflowExecutionResult {
+    if (outcome.state === 'awaiting_approval' && outcome.decisionId)
+      return { state: 'approval_required', decisionId: outcome.decisionId };
+    if (outcome.state === 'verified') return { state: 'succeeded' };
+    if (outcome.state === 'denied') return { state: 'denied' };
+    return {
+      state:
+        outcome.reason === 'reconciliation_required'
+          ? 'reconciliation_required'
+          : 'failed',
+    };
   }
   return {
     async detect(input) {
@@ -198,6 +215,15 @@ export function createExceptionActivities(deps: {
     },
     async execute(input, exceptionId, proposal) {
       const fresh = await context(input);
+      if (deps.playbook) {
+        const { run } = await deps.playbook.get(fresh, proposal.id);
+        if (
+          run.incidentId !== exceptionId ||
+          run.diagnosisRevision !== proposal.revision
+        )
+          throw new WorkflowInputError('Playbook run binding does not match');
+        return playbookResult(await deps.playbook.execute(fresh, proposal.id));
+      }
       const previous = await deps.execution.get(fresh, proposal.id);
       if (previous && 'record' in previous) return { state: previous.state };
       const stored = await deps.bindings.proposals?.get(fresh, proposal.id);
@@ -219,6 +245,10 @@ export function createExceptionActivities(deps: {
         : { state: result.state };
     },
     async reconcile(input, proposalId) {
+      if (deps.playbook)
+        return playbookResult(
+          await deps.playbook.reconcile(await context(input), proposalId),
+        );
       const result = await deps.execution.reconcile(
         await context(input),
         proposalId,

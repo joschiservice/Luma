@@ -25,6 +25,20 @@ export type {
 } from '#modules/workflows/application/desk';
 
 export type {
+  PlaybookDefinition,
+  PlaybookVersion,
+  PlaybookActivation,
+  PlaybookIR,
+  PlaybookSnapshot,
+} from '#modules/workflows/domain/playbook';
+export type {
+  PlaybookRun,
+  PlaybookOutcome,
+  PlaybookService,
+} from '#modules/workflows/application/playbook';
+export { shippingMethodPlaybook } from '#modules/workflows/domain/shipping-method-playbook';
+
+export type {
   LearningService,
   ResolutionHistory,
 } from '#modules/workflows/application/learning';

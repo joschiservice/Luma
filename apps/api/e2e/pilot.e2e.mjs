@@ -145,7 +145,16 @@ test.each(['approval-required', 'rejected', 'resolved', 'failed'])(
     );
     const incident = await f.pilot.detection.exceptions.get(actor, source.id);
     expect(incident.state === 'resolved').toBe(scenario === 'resolved');
+    const playbook = await f.pilot.playbooks.get(actor, f.manifest.proposalId);
+    expect(playbook.version.provenance.kind).toBe('pilot');
+    expect(playbook.run.versionDigest).toBe(playbook.version.digest);
+    expect(playbook.run.snapshot.inputs).toEqual({ shippingMethodId: '8' });
+    expect(playbook.outcomes.length).toBeGreaterThan(0);
     if (scenario === 'resolved') {
+      expect(playbook.outcomes.at(-1)).toMatchObject({
+        state: 'verified',
+        stepId: 'verify-correction',
+      });
       expect(incident.resolution).toMatchObject({
         kind: 'verification',
         outcome: 'passed',
@@ -313,7 +322,7 @@ test.each(['before', 'after'])(
     expect(
       await f.pilot.safety.execution.execute(actor, {
         runId: proposal.action.id,
-        stepId: 'execute',
+        stepId: 'correct-shipping-method',
       }),
     ).toMatchObject({
       state: 'denied',

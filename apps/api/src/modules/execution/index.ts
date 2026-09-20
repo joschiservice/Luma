@@ -12,6 +12,8 @@ export type {
   AdmissionReader,
 } from '#modules/execution/application/admission';
 
+export { AdmissionRejected } from '#modules/execution/application/admission';
+
 export type {
   VerificationAttempt,
   ExecutionFailure,

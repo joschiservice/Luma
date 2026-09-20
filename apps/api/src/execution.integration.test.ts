@@ -1,7 +1,13 @@
+import { shippingMethodPlaybook } from '#modules/workflows/index';
+import {
+  definePlaybook,
+  printPlaybookCode,
+  parsePlaybookCode,
+} from '#modules/workflows/composition';
 import { ConnectorError } from '#modules/connectors/index';
 import { createSafetyFixture as createSafetyServices } from '#test-support/safety-fixtures';
 import { randomUUID } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { Pool } from 'pg';
 import {
   afterAll,
@@ -16,6 +22,7 @@ import {
   buildRuntimeApp,
   createSafetyServices as createAdmissionServices,
   createExceptionWorkflowRuntime,
+  createResolutionPlaybooks,
 } from '#app';
 import { createAuditLog } from '#modules/audit/composition';
 import type { AuditEntry } from '#modules/audit/index';
@@ -597,13 +604,11 @@ describe.skipIf(!databaseUrl)(
         await roleSetup.query(
           "SELECT pg_advisory_lock(hashtext('luma_test_role_setup'))",
         );
-        for (const name of [
-          '0001_identity.sql',
-          '0002_policy_execution_audit.sql',
-          '0012_action_admission.sql',
-          '0013_preserve_prepared_reconciliation.sql',
-          '0014_execution_observations.sql',
-        ]) {
+        for (const name of (
+          await readdir(new URL('../migrations/', import.meta.url))
+        )
+          .filter((name) => name.endsWith('.sql'))
+          .sort()) {
           await owner.query(
             await readFile(
               new URL(`../migrations/${name}`, import.meta.url),
@@ -621,7 +626,7 @@ describe.skipIf(!databaseUrl)(
         `CREATE ROLE "${login}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`,
       );
       await admin.query(
-        `GRANT luma_identity,luma_policies,luma_execution,luma_audit TO "${login}"`,
+        `GRANT luma_identity,luma_policies,luma_execution,luma_audit,luma_desk TO "${login}"`,
       );
       url.username = login;
       url.password = password;
@@ -691,6 +696,552 @@ describe.skipIf(!databaseUrl)(
       await admin.query(`DROP DATABASE IF EXISTS "${database}"`);
       await admin.query(`DROP ROLE IF EXISTS "${login}"`);
       await admin.end();
+    });
+    async function playbookFixture(
+      facts = { diagnosisReady: true, methodMapped: true },
+      age = 0,
+      source = shippingMethodPlaybook,
+    ) {
+      const service = createAdmissionServices(
+        runtimeUrl,
+        { refreshContext },
+        { resolve },
+        { eligible: async () => true },
+      );
+      const playbooks = createResolutionPlaybooks(
+        createTenantDatabase(runtime),
+        { refreshContext },
+        service,
+      );
+      const proposal = action({
+        capability: 'orders.shipping-method.write',
+        capabilityVersion: '0',
+        target: { kind: 'order', id: randomUUID() },
+        parameters: {},
+        expectedPostcondition: { shippingMethodId: '8' },
+        risk: 'high',
+      });
+      resolve.mockResolvedValue({
+        ...adapter,
+        capability: proposal.capability,
+        version: '0',
+        minimumRisk: 'high',
+      });
+      verify.mockImplementation(async () => ({
+        outcome: 'passed',
+        observationRefs: [observationId],
+        observedAt: new Date().toISOString(),
+        evaluatorVersion: 'shipping-method/1',
+      }));
+      const version = await playbooks.publish(alice, source);
+      const activation = await playbooks.activate(alice, {
+        id: randomUUID(),
+        definitionId: version.definition.id,
+        version: version.version,
+        grants: {
+          principalIds: [alice.actor.id],
+          connectionIds: [connectionId],
+          targetIds: [proposal.target.id],
+        },
+        policyVersion: 'v0.1',
+      });
+      const command = {
+        activationId: activation.id,
+        incidentId: randomUUID(),
+        diagnosisRevision: 1,
+        action: proposal,
+        snapshot: {
+          inputs: { shippingMethodId: '8' },
+          evidence: {
+            kind: 'workflow_failure',
+            facts,
+            observations: [
+              {
+                id: observationId,
+                observedAt: new Date(Date.now() - age).toISOString(),
+                source: 'pilot/1',
+              },
+            ],
+          },
+          provenance: {
+            reference: 'LUMA-41 pilot evaluation',
+            capturedAt: new Date().toISOString(),
+          },
+        },
+      };
+      const run = await playbooks.bind(alice, command);
+      return { service, playbooks, version, activation, command, run };
+    }
+    async function approvePlaybook(
+      f: Awaited<ReturnType<typeof playbookFixture>>,
+    ) {
+      const waiting = await f.playbooks.execute(alice, f.run.id);
+      expect(waiting.state).toBe('awaiting_approval');
+      expect(execute).not.toHaveBeenCalled();
+      await f.service.policies.respond(
+        bob,
+        waiting.decisionId!,
+        'approved',
+        new Date(Date.now() + 60_000).toISOString(),
+      );
+    }
+    it('persists the exact playbook, snapshot, grants and action; concurrent replay dispatches once', async () => {
+      const f = await playbookFixture();
+      try {
+        await approvePlaybook(f);
+        const results = await Promise.all([
+          f.playbooks.execute(alice, f.run.id),
+          f.playbooks.execute(alice, f.run.id),
+        ]);
+        expect(results.some((r) => r.state === 'verified')).toBe(true);
+        expect(execute).toHaveBeenCalledTimes(1);
+        expect(execute).toHaveBeenCalledWith(f.run.action, `v0:${f.run.id}`);
+        const restarted = createResolutionPlaybooks(
+          createTenantDatabase(runtime),
+          { refreshContext },
+          f.service,
+        );
+        expect((await restarted.execute(alice, f.run.id)).state).toBe(
+          'verified',
+        );
+        expect(await restarted.bind(alice, f.command)).toEqual(f.run);
+        const history = await restarted.get(alice, f.run.id);
+        expect(history.run.snapshot).toEqual(f.command.snapshot);
+        expect(history.run.versionDigest).toBe(f.version.digest);
+        expect(history.run.artifactDigest).toBe(f.activation.artifactDigest);
+        expect(history.outcomes).toContainEqual(
+          expect.objectContaining({
+            state: 'verified',
+            stepId: 'verify-correction',
+            execution: expect.objectContaining({
+              record: expect.objectContaining({
+                attempt: expect.objectContaining({
+                  verification: expect.objectContaining({
+                    observationRefs: [observationId],
+                  }),
+                }),
+              }),
+            }),
+          }),
+        );
+        expect(execute).toHaveBeenCalledTimes(1);
+        const altered = structuredClone(shippingMethodPlaybook);
+        altered.ir.verification.maxDurationSeconds = 1;
+        await expect(restarted.publish(alice, altered)).rejects.toThrow(
+          'immutable',
+        );
+        await expect(
+          restarted.bind(alice, {
+            ...f.command,
+            snapshot: {
+              ...f.command.snapshot,
+              provenance: {
+                ...f.command.snapshot.provenance,
+                reference: 'changed',
+              },
+            },
+          }),
+        ).rejects.toThrow('immutable');
+        await expect(restarted.get(outsider, f.run.id)).rejects.toThrow(
+          'not found',
+        );
+        await expect(restarted.get(member, f.run.id)).rejects.toThrow();
+        for (const table of [
+          'playbook_definitions',
+          'playbook_versions',
+          'playbook_activations',
+          'playbook_runs',
+          'playbook_outcomes',
+        ]) {
+          await expect(
+            createTenantDatabase(runtime).transaction(tenantId, (tx) =>
+              tx.query(
+                `UPDATE ${table} SET document=document WHERE tenant_id=$1`,
+                [tenantId],
+              ),
+            ),
+          ).rejects.toThrow('permission denied');
+          await expect(
+            createTenantDatabase(runtime).transaction(tenantId, (tx) =>
+              tx.query(`DELETE FROM ${table} WHERE tenant_id=$1`, [tenantId]),
+            ),
+          ).rejects.toThrow('permission denied');
+          const foreign = await createTenantDatabase(runtime).transaction(
+            outsider.tenantId,
+            (tx) =>
+              tx.query(`SELECT * FROM ${table} WHERE tenant_id=$1`, [tenantId]),
+          );
+          expect(foreign.rows).toEqual([]);
+        }
+      } finally {
+        await f.service.close();
+      }
+    });
+    it.each([
+      ['ineligible', { diagnosisReady: false, methodMapped: true }, 0],
+      ['stale_evidence', { diagnosisReady: true, methodMapped: true }, 301_000],
+    ] as const)(
+      'escalates %s evidence without binding dispatch authority',
+      async (reason, facts, age) => {
+        const f = await playbookFixture(facts, age);
+        try {
+          expect(await f.playbooks.execute(alice, f.run.id)).toMatchObject({
+            state: 'escalated',
+            reason,
+            stepId: 'eligible',
+          });
+          await expect(
+            f.service.execution.execute(alice, {
+              runId: f.run.id,
+              stepId: 'correct-shipping-method',
+            }),
+          ).rejects.toThrow('not found');
+          expect(execute).not.toHaveBeenCalled();
+        } finally {
+          await f.service.close();
+        }
+      },
+    );
+    it('records policy denial and rejects activation changes or revoked grants', async () => {
+      const f = await playbookFixture();
+      try {
+        checkPreconditions.mockResolvedValue(false);
+        expect(await f.playbooks.execute(alice, f.run.id)).toMatchObject({
+          state: 'denied',
+          reason: 'policy_denied',
+        });
+        await expect(
+          f.playbooks.bind(alice, {
+            ...f.command,
+            action: {
+              ...f.command.action,
+              id: randomUUID(),
+              target: { kind: 'order', id: randomUUID() },
+            },
+          }),
+        ).rejects.toThrow('grants');
+        await f.playbooks.revoke(alice, f.activation.id);
+        await expect(
+          f.service.execution.execute(alice, {
+            runId: f.run.id,
+            stepId: 'correct-shipping-method',
+          }),
+        ).rejects.toThrow('activated artifact');
+        expect(execute).not.toHaveBeenCalled();
+      } finally {
+        await f.service.close();
+      }
+    });
+    it.each(['failed', 'inconclusive'] as const)(
+      'escalates %s verification and never redispatches on recovery',
+      async (outcome) => {
+        const f = await playbookFixture();
+        try {
+          await approvePlaybook(f);
+          verify.mockImplementation(async () => ({
+            outcome,
+            observationRefs: [observationId],
+            observedAt: new Date().toISOString(),
+            evaluatorVersion: 'shipping-method/1',
+          }));
+          expect((await f.playbooks.execute(alice, f.run.id)).state).toBe(
+            'escalated',
+          );
+          expect((await f.playbooks.reconcile(alice, f.run.id)).state).toBe(
+            'escalated',
+          );
+          expect(execute).toHaveBeenCalledTimes(1);
+          expect(
+            (await f.playbooks.get(alice, f.run.id)).outcomes.some(
+              (o) =>
+                o.execution?.record.attempt.verification?.outcome === outcome,
+            ),
+          ).toBe(true);
+        } finally {
+          await f.service.close();
+        }
+      },
+    );
+    it('enforces playbook grants even when admission is called directly', async () => {
+      const f = await playbookFixture();
+      try {
+        const foreignAction = {
+          ...f.run.action,
+          id: randomUUID(),
+          target: { kind: 'order', id: randomUUID() },
+        };
+        await f.service.provisioning.bind(alice, {
+          runId: foreignAction.id,
+          stepId: 'correct-shipping-method',
+          tenantId,
+          principalId: alice.actor.id,
+          artifactId: `playbook:${f.activation.id}`,
+          artifactVersion: f.version.version,
+          artifactDigest: f.activation.artifactDigest,
+          incidentId: f.run.incidentId,
+          diagnosisRevision: 1,
+          eligibilityValidUntil: f.run.action.preconditions.validUntil,
+          action: foreignAction,
+        });
+        await expect(
+          f.service.execution.execute(alice, {
+            runId: foreignAction.id,
+            stepId: 'correct-shipping-method',
+          }),
+        ).rejects.toThrow('activation grants');
+        expect(execute).not.toHaveBeenCalled();
+      } finally {
+        await f.service.close();
+      }
+    });
+    it('rejects a successful receipt from a different verification evaluator', async () => {
+      const f = await playbookFixture();
+      try {
+        await approvePlaybook(f);
+        verify.mockImplementation(async () => ({
+          outcome: 'passed',
+          observationRefs: [observationId],
+          observedAt: new Date().toISOString(),
+          evaluatorVersion: 'other/1',
+        }));
+        expect(await f.playbooks.execute(alice, f.run.id)).toMatchObject({
+          state: 'escalated',
+          reason: 'verification_inconclusive',
+        });
+        expect(execute).toHaveBeenCalledTimes(1);
+      } finally {
+        await f.service.close();
+      }
+    });
+    it('publishes authored and round-tripped versions while rejecting changed digests', async () => {
+      const f = await playbookFixture();
+      try {
+        const authored = definePlaybook(shippingMethodPlaybook);
+        expect(await f.playbooks.publish(alice, authored)).toEqual(f.version);
+        expect(
+          await f.playbooks.publish(
+            alice,
+            parsePlaybookCode(printPlaybookCode(authored)),
+          ),
+        ).toEqual(f.version);
+        const changed = structuredClone(authored);
+        changed.ir.evidence.maxAgeSeconds = 10;
+        await expect(f.playbooks.publish(alice, changed)).rejects.toThrow(
+          'digest mismatch',
+        );
+      } finally {
+        await f.service.close();
+      }
+    });
+    it('does not grant admission when an ineligible run is rebound with changed evidence', async () => {
+      const f = await playbookFixture({
+        diagnosisReady: true,
+        methodMapped: false,
+      });
+      try {
+        const changed = structuredClone(f.command);
+        changed.snapshot.evidence.facts.methodMapped = true;
+        const results = await Promise.allSettled([
+          f.playbooks.bind(alice, changed),
+          f.playbooks.bind(alice, f.command),
+        ]);
+        expect(results[0]).toMatchObject({
+          status: 'rejected',
+          reason: expect.objectContaining({
+            message: 'Playbook run is immutable',
+          }),
+        });
+        expect(results[1].status).toBe('fulfilled');
+        expect(
+          await f.service.provisioning.step(
+            alice,
+            f.run.id,
+            'correct-shipping-method',
+          ),
+        ).toBeNull();
+        await expect(
+          f.service.execution.execute(alice, {
+            runId: f.run.id,
+            stepId: 'correct-shipping-method',
+          }),
+        ).rejects.toThrow('not found');
+        expect(
+          (await f.playbooks.get(alice, f.run.id)).run.snapshot.evidence.facts
+            .methodMapped,
+        ).toBe(false);
+        expect(execute).not.toHaveBeenCalled();
+      } finally {
+        await f.service.close();
+      }
+    });
+    it('completes admission on replay after run persistence succeeds but admission binding fails', async () => {
+      const f = await playbookFixture();
+      try {
+        const command = {
+          ...f.command,
+          action: { ...f.command.action, id: randomUUID() },
+        };
+        const binding = vi
+          .spyOn(f.service.provisioning, 'bind')
+          .mockRejectedValueOnce(new Error('temporary admission store outage'));
+        await expect(f.playbooks.bind(alice, command)).rejects.toThrow(
+          'temporary',
+        );
+        expect(
+          (await f.playbooks.get(alice, command.action.id)).run.action,
+        ).toEqual(command.action);
+        expect(
+          await f.service.provisioning.step(
+            alice,
+            command.action.id,
+            'correct-shipping-method',
+          ),
+        ).toBeNull();
+        await f.playbooks.bind(alice, command);
+        expect(binding).toHaveBeenCalledTimes(2);
+        expect(
+          await f.service.provisioning.step(
+            alice,
+            command.action.id,
+            'correct-shipping-method',
+          ),
+        ).not.toBeNull();
+        binding.mockRestore();
+      } finally {
+        await f.service.close();
+      }
+    });
+    it('rejects malformed incident references before persisting a run', async () => {
+      const f = await playbookFixture();
+      try {
+        for (const invalid of [
+          { incidentId: 'invalid' },
+          { diagnosisRevision: 0 },
+        ]) {
+          const command = {
+            ...f.command,
+            ...invalid,
+            action: { ...f.command.action, id: randomUUID() },
+          };
+          await expect(f.playbooks.bind(alice, command)).rejects.toThrow();
+          await expect(
+            f.playbooks.get(alice, command.action.id),
+          ).rejects.toThrow('not found');
+          expect(
+            await f.service.provisioning.step(
+              alice,
+              command.action.id,
+              'correct-shipping-method',
+            ),
+          ).toBeNull();
+        }
+      } finally {
+        await f.service.close();
+      }
+    });
+    it('retries a transient pre-dispatch failure without persisting terminal escalation', async () => {
+      const f = await playbookFixture();
+      try {
+        resolve.mockRejectedValueOnce(
+          new Error('temporary connector lookup outage'),
+        );
+        await expect(f.playbooks.execute(alice, f.run.id)).rejects.toThrow(
+          'temporary',
+        );
+        expect((await f.playbooks.get(alice, f.run.id)).outcomes).toEqual([]);
+        await approvePlaybook(f);
+        expect((await f.playbooks.execute(alice, f.run.id)).state).toBe(
+          'verified',
+        );
+        expect(execute).toHaveBeenCalledTimes(1);
+      } finally {
+        await f.service.close();
+      }
+    });
+    it.each(['during_preflight', 'direct_admission'] as const)(
+      'enforces the pinned evidence deadline for %s',
+      async (mode) => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        const source = structuredClone(shippingMethodPlaybook);
+        source.definition.id = 'shipping-method-short-evidence';
+        source.ir.evidence.maxAgeSeconds = 1;
+        const f = await playbookFixture(undefined, 0, source);
+        try {
+          await approvePlaybook(f);
+          const deadline =
+            Date.parse(f.run.snapshot.evidence.observations[0]!.observedAt) +
+            1000;
+          const step = await f.service.provisioning.step(
+            alice,
+            f.run.id,
+            'correct-shipping-method',
+          );
+          expect(step?.eligibilityValidUntil).toBe(
+            new Date(deadline).toISOString(),
+          );
+          if (mode === 'during_preflight') {
+            checkPreconditions.mockImplementationOnce(async () => {
+              vi.setSystemTime(deadline + 1);
+              return true;
+            });
+            expect(await f.playbooks.execute(alice, f.run.id)).toMatchObject({
+              state: 'escalated',
+              execution: {
+                record: { attempt: { dispatch: 'not_dispatched' } },
+              },
+            });
+          } else {
+            vi.setSystemTime(deadline);
+            await expect(
+              f.service.execution.execute(alice, {
+                runId: f.run.id,
+                stepId: 'correct-shipping-method',
+              }),
+            ).rejects.toThrow('no longer eligible');
+          }
+          expect(execute).not.toHaveBeenCalled();
+          await expect(
+            f.service.provisioning.bind(alice, {
+              ...step!,
+              eligibilityValidUntil: new Date(deadline + 60_000).toISOString(),
+            }),
+          ).rejects.toThrow('already bound');
+        } finally {
+          vi.useRealTimers();
+          await f.service.close();
+        }
+      },
+    );
+    it('recovers a lost provider response with fresh verification after evidence expiry', async () => {
+      const f = await playbookFixture();
+      try {
+        await approvePlaybook(f);
+        execute.mockRejectedValue(new Error('lost response'));
+        verify.mockRejectedValue(new Error('read unavailable'));
+        expect(await f.playbooks.execute(alice, f.run.id)).toMatchObject({
+          state: 'escalated',
+          reason: 'reconciliation_required',
+        });
+        const future = new Date(Date.now() + 301_000);
+        verify.mockResolvedValue({
+          outcome: 'passed',
+          observationRefs: [observationId],
+          observedAt: new Date().toISOString(),
+          evaluatorVersion: 'shipping-method/1',
+        });
+        const recovered = createResolutionPlaybooks(
+          createTenantDatabase(runtime),
+          { refreshContext },
+          f.service,
+          () => future,
+        );
+        expect((await recovered.reconcile(alice, f.run.id)).state).toBe(
+          'verified',
+        );
+        expect(execute).toHaveBeenCalledTimes(1);
+      } finally {
+        await f.service.close();
+      }
     });
     it('persists intent, policy and preparation before the effect; success requires verification', async () => {
       const proposal = action({
