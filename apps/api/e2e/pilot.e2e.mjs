@@ -248,3 +248,130 @@ test('worker death after provider commit reconciles without a second PATCH', asy
     await f.pilot.detection.exceptions.get(actor, source.id),
   ).toMatchObject({ state: 'resolved', resolution: { kind: 'verification' } });
 }, 120_000);
+
+async function operatorRequest(f) {
+  const origin = f.env.BETTER_AUTH_URL;
+  const login = await f.pilot.app.inject({
+    method: 'POST',
+    url: '/auth/sign-in/email',
+    headers: { origin },
+    payload: {
+      email: 'pilot-operator@example.test',
+      password: f.saved.seedPassword,
+    },
+  });
+  expect(login.statusCode).toBe(200);
+  const cookies = login.headers['set-cookie'];
+  const cookie = (Array.isArray(cookies) ? cookies : [cookies])
+    .map((value) => value.split(';')[0])
+    .join('; ');
+  return (url, payload) =>
+    f.pilot.app.inject({
+      method: payload ? 'POST' : 'GET',
+      url,
+      headers: { origin, cookie },
+      ...(payload ? { payload } : {}),
+    });
+}
+
+test.each(['before', 'after'])(
+  'disconnect %s approval prevents fixture dispatch',
+  async (timing) => {
+    const f = await setup({ onTestFinished }, 'approval-required');
+    const worker = await f.pilot.runtime.createWorker();
+    const running = worker.run();
+    try {
+      await startJourney(f.pilot, f.manifest, f.client);
+    } finally {
+      worker.shutdown();
+      await running;
+      await worker.close();
+    }
+    const actor = await f.pilot.context();
+    const id = f.manifest.incidents.workflow_failure;
+    const proposal = await f.pilot.desk.proposal(actor, f.manifest.proposalId);
+    if (timing === 'after')
+      await respond(f.pilot, f.manifest, f.client, 'approve');
+    const request = await operatorRequest(f);
+    const base = `/v1/organizations/${f.manifest.organizationId}`;
+    const disconnected = await request(
+      `${base}/connections/${f.manifest.connections.jtl}/disconnect`,
+      { version: 1 },
+    );
+    expect(disconnected.statusCode).toBe(200);
+    const review = await request(`${base}/exceptions/${id}/review`);
+    expect(review.statusCode).toBe(200);
+    expect(review.json().proposal.available).toBe(false);
+    expect(review.json().permittedDecisions).not.toContain('approve');
+    if (timing === 'before')
+      await expect(
+        respond(f.pilot, f.manifest, f.client, 'approve'),
+      ).rejects.toMatchObject({ statusCode: 409 });
+    expect(
+      await f.pilot.safety.execution.execute(actor, proposal.action),
+    ).toMatchObject({
+      state: 'denied',
+      decision: { reason: 'capability_unavailable' },
+    });
+    expect((await f.pilot.provider()).effects).toHaveLength(0);
+    expect((await f.pilot.provider()).patchRequests ?? 0).toBe(0);
+  },
+);
+
+test('health checks reject non-pilot connections without changing their health or history', async (t) => {
+  const f = await setup(t, 'healthy');
+  const other = await seedPilot(f.saved, f.env, f.directory, 'healthy', true);
+  const request = await operatorRequest(f);
+  const installed = await request(
+    `/v1/organizations/${f.manifest.organizationId}/connections`,
+    {
+      label: 'Existing connected store',
+      target: { kind: 'shopify', shop: 'existing.myshopify.com' },
+      permissions: ['orders.read'],
+      credentials: { token: 'synthetic-test-token' },
+    },
+  );
+  expect(installed.statusCode).toBe(201);
+  const targets = [
+    {
+      organizationId: other.organizationId,
+      connectionId: other.connections.jtl,
+    },
+    {
+      organizationId: f.manifest.organizationId,
+      connectionId: installed.json().id,
+    },
+  ];
+  for (const target of targets) {
+    await f.db.owner.query(
+      `UPDATE connector_installations SET document = document || '{"status":"active","granted":["orders.read"]}'::jsonb WHERE id=$1`,
+      [target.connectionId],
+    );
+    const snapshot = async () => ({
+      connection: (
+        await f.db.owner.query(
+          'SELECT * FROM connector_installations WHERE id=$1',
+          [target.connectionId],
+        )
+      ).rows,
+      events: (
+        await f.db.owner.query(
+          'SELECT * FROM connector_lifecycle_events ORDER BY tenant_id,connection_id,version',
+        )
+      ).rows,
+    });
+    const before = await snapshot();
+    const checked = await request(
+      `/v1/organizations/${target.organizationId}/connections/${target.connectionId}/check`,
+      { version: 1 },
+    );
+    expect(checked.statusCode).toBe(404);
+    expect(await snapshot()).toEqual(before);
+  }
+  const checked = await request(
+    `/v1/organizations/${f.manifest.organizationId}/connections/${f.manifest.connections.jtl}/check`,
+    { version: 1 },
+  );
+  expect(checked.statusCode).toBe(200);
+  expect(checked.json().status).toBe('degraded');
+});

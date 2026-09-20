@@ -17,7 +17,11 @@ import {
   createInstalledConnections,
   createConnectionCoverage,
 } from '../../apps/api/dist/modules/connectors/composition.js';
-import { createCapabilityRuntime } from '../../apps/api/dist/modules/connectors/index.js';
+import { IdentityError } from '../../apps/api/dist/modules/identity/index.js';
+import {
+  ConnectorError,
+  createCapabilityRuntime,
+} from '../../apps/api/dist/modules/connectors/index.js';
 import {
   createOperationsOverview,
   createDeskWorkflowReader,
@@ -60,6 +64,46 @@ export async function createPilot(env, directory, manifest, temporal) {
       manifest.organizationId,
       'synthetic-pilot-operator',
     );
+  const installations = createInstalledConnections(db, {
+    refreshContext: identity.service.refreshContext,
+    activeKeyId: env.CONNECTIONS_ACTIVE_KEY_ID,
+    keys: new Map(
+      Object.entries(JSON.parse(env.CONNECTIONS_KEYS)).map(([id, key]) => [
+        id,
+        Buffer.from(key, 'base64'),
+      ]),
+    ),
+    verify: async () => {
+      throw new Error(
+        'Synthetic pilot does not verify connected-system health',
+      );
+    },
+  });
+  const connections = {
+    ...installations,
+    async check(actor, connectionId, version) {
+      if (
+        actor.tenantId !== manifest.organizationId ||
+        !Object.values(manifest.connections).includes(connectionId)
+      )
+        throw new IdentityError(404, 'NOT_FOUND', 'Connection not found');
+      return installations.check(actor, connectionId, version);
+    },
+  };
+  async function connectionAvailable(actor, connectionId) {
+    if (
+      actor.tenantId !== manifest.organizationId ||
+      connectionId !== manifest.connections.jtl
+    )
+      return false;
+    const connection = (await installations.list(actor)).find(
+      (item) => item.id === connectionId,
+    );
+    // Pending fixture configuration is usable without claiming live provider health.
+    return (
+      !!connection && !['disconnected', 'revoked'].includes(connection.status)
+    );
+  }
   const id = manifest.incidents.workflow_failure;
   const connector = createJtlConnector({
     tenantId: manifest.organizationId,
@@ -70,7 +114,20 @@ export async function createPilot(env, directory, manifest, temporal) {
       appId: 'LumaSyntheticPilot',
       appVersion: '1',
       challengeCode: 'synthetic',
-      apiKey: async () => 'synthetic',
+      apiKey: async () => {
+        if (
+          !(await connectionAvailable(
+            await context(),
+            manifest.connections.jtl,
+          ))
+        )
+          throw new ConnectorError({
+            code: 'unavailable',
+            effect: 'none',
+            retry: 'never',
+          });
+        return 'synthetic';
+      },
     },
     shippingMethodActions: true,
     recordObservations: ({ observations }) =>
@@ -113,10 +170,7 @@ export async function createPilot(env, directory, manifest, temporal) {
   });
   const capabilities = createCapabilityRuntime({
     resolve: async (actor, connectionId) =>
-      actor.tenantId === manifest.organizationId &&
-      connectionId === connector.id
-        ? connector
-        : null,
+      (await connectionAvailable(actor, connectionId)) ? connector : null,
     record: async () => {},
   });
   const supported = (action) =>
@@ -137,6 +191,7 @@ export async function createPilot(env, directory, manifest, temporal) {
       const diagnosis = await detection.diagnoses.get(actor, id);
       return (
         supported(action) &&
+        (await connectionAvailable(actor, action.connectionId)) &&
         diagnosis?.status === 'ready' &&
         !diagnosis.superseded &&
         action.preconditions.evidenceRefs.every((ref) =>
@@ -213,25 +268,26 @@ export async function createPilot(env, directory, manifest, temporal) {
   const reader = temporal
     ? createDeskWorkflowReader(temporal, identity.service)
     : null;
-  const desk = createDeskServices(db, identity.service, effects, {
+  const deskService = createDeskServices(db, identity.service, effects, {
     capability: supported,
     ...(reader ? { workflow: reader.get } : {}),
   });
-  const connections = createInstalledConnections(db, {
-    refreshContext: identity.service.refreshContext,
-    activeKeyId: env.CONNECTIONS_ACTIVE_KEY_ID,
-    keys: new Map(
-      Object.entries(JSON.parse(env.CONNECTIONS_KEYS)).map(([id, key]) => [
-        id,
-        Buffer.from(key, 'base64'),
-      ]),
-    ),
-    verify: async () => {
-      throw new Error(
-        'Synthetic pilot does not verify connected-system health',
-      );
+  const desk = {
+    ...deskService,
+    async review(actor, exceptionId) {
+      const review = await deskService.review(actor, exceptionId);
+      if (
+        review.proposal &&
+        !(await connectionAvailable(actor, review.proposal.connectionId))
+      ) {
+        review.proposal.available = false;
+        review.permittedDecisions = review.permittedDecisions.filter(
+          (kind) => kind !== 'approve',
+        );
+      }
+      return review;
     },
-  });
+  };
   const app = buildApp(
     { logger: false },
     {

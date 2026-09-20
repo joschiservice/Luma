@@ -101,7 +101,12 @@ Both connection labels begin with **SIMULATED**, and their configurations remain
 pending. The overview therefore reports unobserved connection coverage. A healthy
 synthetic workload does not imply healthy connected systems. Every seeded evidence
 document carries `synthetic: true`; the organization name also identifies the
-simulation. The pilot uses an injected fetch function that cannot send requests
+simulation. Disconnecting or revoking the seeded JTL connection disables approval
+and prevents dispatch, including for an already approved action. Simulated health
+checks accept only this run's seeded connections; other connections are rejected
+without changing their stored health or lifecycle history.
+
+The pilot uses an injected fetch function that cannot send requests
 to JTL or Shopify. Production entrypoints and configuration are unchanged.
 
 ## Worker failure and recovery
