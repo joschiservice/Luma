@@ -601,6 +601,7 @@ describe.skipIf(!databaseUrl)(
           '0001_identity.sql',
           '0002_policy_execution_audit.sql',
           '0012_action_admission.sql',
+          '0013_preserve_prepared_reconciliation.sql',
         ]) {
           await owner.query(
             await readFile(
@@ -1174,6 +1175,123 @@ describe.skipIf(!databaseUrl)(
       );
       expect(execute).toHaveBeenCalledTimes(1);
     });
+    it.each(['prepared', 'unknown'] as const)(
+      'reconciles legacy %s attempts using their stored executor binding',
+      async (state) => {
+        const proposal = action();
+        execute.mockRejectedValue(new Error('lost response'));
+        await safety.execution.execute(alice, proposal);
+        // Recreate the document shape persisted before dispatch identity was introduced.
+        await owner.query('ALTER TABLE executed_actions DISABLE TRIGGER USER');
+        try {
+          await owner.query(
+            `UPDATE executed_actions SET state=$2, document=jsonb_set(
+              document #- '{attempt,dispatch}' #- '{attempt,businessOutcome}',
+              '{state}', to_jsonb($2::text)) WHERE proposal_id=$1`,
+            [proposal.id, state],
+          );
+        } finally {
+          await owner.query('ALTER TABLE executed_actions ENABLE TRIGGER USER');
+        }
+        const current = { ...adapter, dispatchIdentity: 'provider/1' };
+        resolve.mockResolvedValue({
+          ...current,
+          mechanism: 'deterministic_browser',
+        });
+        await expect(
+          safety.execution.reconcile(alice, proposal.id),
+        ).rejects.toThrow('Capability unavailable');
+        resolve.mockResolvedValue({
+          ...current,
+          executor: { kind: 'connector', id: 'different' },
+        });
+        await expect(
+          safety.execution.reconcile(alice, proposal.id),
+        ).rejects.toThrow('Capability unavailable');
+        expect(verify).not.toHaveBeenCalled();
+        resolve.mockResolvedValue(current);
+        expect(
+          (await safety.execution.reconcile(alice, proposal.id)).state,
+        ).toBe('succeeded');
+        expect(execute).toHaveBeenCalledTimes(1);
+        expect(verify).toHaveBeenCalledTimes(1);
+      },
+    );
+    it.each(['failed', 'inconclusive'] as const)(
+      'preserves an in-flight completion after %s reconciliation',
+      async (outcome) => {
+        const proposal = action();
+        let notifyStarted!: () => void;
+        const started = new Promise<void>((resolve) => {
+          notifyStarted = resolve;
+        });
+        let release!: (
+          value: Awaited<ReturnType<EffectAdapter['execute']>>,
+        ) => void;
+        const response = new Promise<
+          Awaited<ReturnType<EffectAdapter['execute']>>
+        >((resolve) => {
+          release = resolve;
+        });
+        execute.mockImplementation(async () => {
+          notifyStarted();
+          return response;
+        });
+        verify.mockImplementationOnce(async () => ({
+          outcome,
+          observationRefs: [observationId],
+          observedAt: new Date().toISOString(),
+          evaluatorVersion: 'fixture-1',
+        }));
+        const pending = safety.execution.execute(alice, proposal);
+        await started;
+        try {
+          expect(
+            await safety.execution.reconcile(alice, proposal.id),
+          ).toMatchObject({
+            state: 'reconciliation_required',
+            record: {
+              state: 'prepared',
+              attempt: { verification: { outcome } },
+            },
+          });
+          expect((await safety.execution.execute(alice, proposal)).state).toBe(
+            'reconciliation_required',
+          );
+        } finally {
+          release({
+            evidenceRefs: [observationId],
+            providerRequestId: 'live-request',
+          });
+        }
+        expect(await pending).toMatchObject({
+          state: 'succeeded',
+          record: {
+            attempt: {
+              dispatch: 'dispatched',
+              providerRequestId: 'live-request',
+              verification: { outcome: 'passed' },
+            },
+          },
+        });
+        expect(execute).toHaveBeenCalledTimes(1);
+        const events = await audit(proposal.id);
+        expect(events).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              eventType: 'execution.reconciled',
+              details: expect.objectContaining({ verification: outcome }),
+            }),
+            expect.objectContaining({
+              eventType: 'execution.completed',
+              details: expect.objectContaining({
+                providerRequestId: 'live-request',
+              }),
+            }),
+          ]),
+        );
+      },
+    );
     it('does not equate an accepted request with verified success', async () => {
       verify.mockImplementation(async () => ({
         outcome: 'failed',

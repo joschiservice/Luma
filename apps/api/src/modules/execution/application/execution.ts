@@ -13,6 +13,18 @@ import type {
 import { ConnectorError } from '#modules/connectors/index';
 import type { AuditEntry, AuditLog } from '#modules/audit/index';
 
+function sameExecutor(current: Provenance, reserved: Provenance): boolean {
+  return (
+    current.kind === reserved.kind &&
+    current.id === reserved.id &&
+    current.initiatingUserId === reserved.initiatingUserId &&
+    (current.model === undefined) === (reserved.model === undefined) &&
+    (['provider', 'name', 'version', 'promptVersion', 'runId'] as const).every(
+      (key) => current.model?.[key] === reserved.model?.[key],
+    )
+  );
+}
+
 export interface ExecutionAdmission {
   runId: string;
   stepId: string;
@@ -390,7 +402,11 @@ export function createExecutionService(deps: ExecutionDependencies) {
         !adapter ||
         adapter.capability !== record.intent.capability ||
         adapter.version !== record.intent.capabilityVersion ||
-        adapter.dispatchIdentity !== record.attempt.dispatchIdentity
+        // Legacy attempts predate dispatch identities; retain their recorded executor binding.
+        (record.attempt.dispatchIdentity === undefined
+          ? adapter.mechanism !== record.attempt.mechanism ||
+            !sameExecutor(adapter.executor, record.attempt.executor)
+          : adapter.dispatchIdentity !== record.attempt.dispatchIdentity)
       )
         throw new Error('Capability unavailable');
       const verification = verified(
@@ -400,7 +416,7 @@ export function createExecutionService(deps: ExecutionDependencies) {
       // A negative read while an old request is in flight cannot establish a safe retry.
       const expectedState = record.state;
       record.state =
-        verification.outcome === 'passed' ? 'succeeded' : 'unknown';
+        verification.outcome === 'passed' ? 'succeeded' : expectedState;
       record.attempt.businessOutcome =
         verification.outcome === 'passed'
           ? 'satisfied'

@@ -37,8 +37,9 @@ export function createExecutionRepository(
       }),
     prepare: (record, entry) =>
       db.transaction(record.tenantId, async (tx) => {
+        // Concurrent reservations can conflict on either proposal or idempotency identity.
         const result = await tx.query(
-          'INSERT INTO executed_actions(id, tenant_id, proposal_id, idempotency_key, action_hash, state, document) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (tenant_id, proposal_id) DO NOTHING RETURNING id',
+          'INSERT INTO executed_actions(id, tenant_id, proposal_id, idempotency_key, action_hash, state, document) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT DO NOTHING RETURNING id',
           [
             record.id,
             record.tenantId,
