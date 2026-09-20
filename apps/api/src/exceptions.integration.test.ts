@@ -662,6 +662,62 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
       await app.close();
     }
   });
+  it('paginates evidence from current and superseded non-detection investigations', async () => {
+    const incident = (
+      await services.exceptions.ingest(context(), request('detected'))
+    ).incident!;
+    for (const [key, complete] of [
+      ['deferred', false],
+      ['cleared', true],
+    ] as const) {
+      const next = request(key);
+      if (next.input.exceptionClass !== 'sync_failure')
+        throw new Error('Fixture');
+      next.input.facts.status = 'success';
+      next.input.facts.errorCode = null;
+      next.input.facts.scanComplete = complete;
+      expect(
+        (await services.exceptions.ingest(context(), next)).decision.decision,
+      ).toBe(complete ? 'clear' : 'defer');
+      await services.diagnoses.run(context(), incident.id);
+    }
+    expect(
+      (await services.diagnoses.get(
+        context(),
+        incident.id,
+      ))!.provenance.evidence.map((e) => e.id),
+    ).toEqual(['cleared']);
+    const client = await owner.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('SET LOCAL ROLE luma_case_reader');
+      const reader = createCases({
+        transaction: async (tenant, operation) => {
+          await client.query("SELECT set_config('app.tenant_id',$1,true)", [
+            tenant,
+          ]);
+          return operation(client);
+        },
+      });
+      const ids: string[] = [];
+      let cursor: string | undefined;
+      do {
+        const page = (await reader.evidence(context(), incident.id, {
+          limit: 1,
+          ...(cursor ? { cursor } : {}),
+        }))!;
+        ids.push(...page.items.map((e) => e.id));
+        cursor = page.nextCursor ?? undefined;
+      } while (cursor);
+      expect(ids).toEqual(['cleared', 'deferred', 'detected']);
+      expect(
+        await reader.evidence(context(otherTenant), incident.id, { limit: 1 }),
+      ).toBeNull();
+    } finally {
+      await client.query('ROLLBACK');
+      client.release();
+    }
+  });
   it('includes verification evidence and grants only scoped SELECT access for evidence reads', async () => {
     const incident = (await services.exceptions.ingest(context(), request()))
       .incident!;
@@ -809,6 +865,44 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
       refreshContext,
     };
   }
+  it('preserves approval request age when the workflow reevaluates the same proposal', async () => {
+    const f = await decisionFixture();
+    try {
+      const before = (await services.cases.get(context(), f.incident.id))!;
+      const firstPolicy = (await f.desk.review(decisionActor(), f.incident.id))
+        .proposal!.policy!;
+      expect(before.attention.reason).toBe('approval');
+      // Separate clock ticks make an accidental reset observable without delaying the test.
+      await owner.query(
+        "UPDATE policy_decisions SET document=jsonb_set(document,'{evaluatedAt}',to_jsonb($2::text)) WHERE id=$1",
+        [
+          firstPolicy.id,
+          new Date(Date.parse(firstPolicy.evaluatedAt) - 30_000).toISOString(),
+        ],
+      );
+      const original = (await services.cases.get(context(), f.incident.id))!
+        .attention.requestedAt;
+      expect(
+        (await f.safety.execution.execute(context(), f.action)).state,
+      ).toBe('approval_required');
+      const current = (await f.desk.review(decisionActor(), f.incident.id))
+        .proposal!.policy!;
+      expect(current.id).not.toBe(firstPolicy.id);
+      const detail = (await services.cases.get(context(), f.incident.id))!;
+      expect(detail.attention.requestedAt).toBe(original);
+      expect(detail.lastActivityAt).toBe(current.evaluatedAt);
+      const list = await services.cases.list(
+        context(),
+        caseQuerySchema.parse({ view: 'needs_you' }),
+      );
+      expect(
+        list.items.find((item) => item.id === f.incident.id)!.attention
+          .requestedAt,
+      ).toBe(original);
+    } finally {
+      await f.safety.close();
+    }
+  });
   it('commits one decision receipt under retries and separates approval, execution and verified resolution', async () => {
     const f = await decisionFixture();
     try {

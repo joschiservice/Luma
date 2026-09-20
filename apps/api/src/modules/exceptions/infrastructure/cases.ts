@@ -30,7 +30,7 @@ const projection = `WITH cases AS (
    AND (d.document->'provenance'->>'validUntil' IS NULL OR (d.document->'provenance'->>'validUntil')::timestamptz >= $2::timestamptz)
    AND d.document->'nextSteps' @> '[{"kind":"manual_intervention"}]'::jsonb THEN 'manual_intervention'
  ELSE NULL END AS attention_reason,
- COALESCE(CASE WHEN e.state='escalated' THEN command.at ELSE pa.document->>'evaluatedAt' END,u.first_deferred_at::text,d.document->'provenance'->>'generatedAt',e.document->>'firstDetectedAt') AS attention_at,
+ COALESCE(CASE WHEN e.state='escalated' THEN command.at ELSE pa.requested_at END,u.first_deferred_at::text,d.document->'provenance'->>'generatedAt',e.document->>'firstDetectedAt') AS attention_at,
  GREATEST(e.document->>'lastDetectedAt',d.document->'provenance'->>'generatedAt',e.document->'resolution'->>'at',command.at,pa.document->>'evaluatedAt') AS activity,
  CASE WHEN e.document->>'severity'='high' THEN 0 ELSE 1 END AS rank
  FROM exceptions e
@@ -39,7 +39,13 @@ const projection = `WITH cases AS (
  LEFT JOIN exception_uncertainty u ON u.tenant_id=e.tenant_id AND u.fingerprint=e.fingerprint
  LEFT JOIN LATERAL (SELECT document->>'createdAt' AS at FROM case_commands WHERE tenant_id=e.tenant_id AND exception_id=e.id ORDER BY created_at DESC,id DESC LIMIT 1) command ON true
  LEFT JOIN LATERAL (
-   SELECT pd.document FROM case_proposals p
+   SELECT pd.document,
+     (SELECT min(first.document->>'evaluatedAt') FROM policy_decisions first
+      WHERE first.tenant_id=p.tenant_id AND first.proposal_id=p.id AND first.action_hash=p.action_hash
+      AND first.document->>'outcome'='approval_required'
+      AND first.document->>'policyVersion'=pd.document->>'policyVersion'
+      AND first.document->>'actorId'=pd.document->>'actorId') AS requested_at
+   FROM case_proposals p
    JOIN LATERAL (SELECT * FROM policy_decisions WHERE tenant_id=p.tenant_id AND proposal_id=p.id AND action_hash=p.action_hash ORDER BY created_at DESC,id DESC LIMIT 1) pd ON true
    WHERE p.tenant_id=e.tenant_id AND p.exception_id=e.id AND p.diagnosis_revision=h.revision
    AND d.document->>'status'='ready'
@@ -228,6 +234,10 @@ export function createCaseReader(
             JOIN exception_inputs i ON i.tenant_id=e.tenant_id AND i.evidence_key=e.evidence_key
             CROSS JOIN LATERAL jsonb_array_elements_text(i.document->'facts'->'evidenceRefs') AS ref(id)
             WHERE e.tenant_id=$1 AND e.exception_id=$2
+            UNION
+            SELECT evidence->>'id' FROM exception_diagnoses d
+            CROSS JOIN LATERAL jsonb_array_elements(d.document->'provenance'->'evidence') AS evidence
+            WHERE d.tenant_id=$1 AND d.exception_id=$2
             UNION
             SELECT jsonb_array_elements_text(document->'resolution'->'evidenceRefs')
             FROM exceptions WHERE tenant_id=$1 AND id=$2
