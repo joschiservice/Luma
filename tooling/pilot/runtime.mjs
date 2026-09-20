@@ -7,6 +7,7 @@ import { Pool } from 'pg';
 import {
   buildApp,
   createDeskServices,
+  createResolutionPlaybooks,
   createDetectionServices,
   createSafetyServices,
   createAdmissionEligibility,
@@ -25,6 +26,7 @@ import {
   createOperationsOverview,
   createDeskWorkflowReader,
 } from '../../apps/api/dist/modules/workflows/composition.js';
+import { shippingMethodPlaybook } from '../../apps/api/dist/modules/workflows/index.js';
 import { identitySettings } from './seed.mjs';
 import { readJson } from './fixtures.mjs';
 
@@ -271,18 +273,18 @@ export async function createPilot(
     effects,
     { eligible: createAdmissionEligibility(detection.diagnoses) },
   );
-  await safety.provisioning.activate(await context(), {
-    id: 'exception-resolution',
-    version: '1',
-    generation: { kind: 'manual', reference: 'synthetic-pilot/1' },
-    steps: {
-      execute: {
-        capability: 'orders.shipping-method.write',
-        capabilityVersion: '0',
-        targetKind: 'order',
-        minimumRisk: 'high',
-      },
+  const playbooks = createResolutionPlaybooks(db, identity.service, safety);
+  await playbooks.publish(await context(), shippingMethodPlaybook);
+  const activation = await playbooks.activate(await context(), {
+    id: manifest.proposalId,
+    definitionId: shippingMethodPlaybook.definition.id,
+    version: shippingMethodPlaybook.version,
+    grants: {
+      principalIds: [manifest.requesterId],
+      connectionIds: [manifest.connections.jtl],
+      targetIds: [manifest.subjects.workflow_failure],
     },
+    policyVersion: 'v0.1',
   });
   const reader = temporal
     ? createDeskWorkflowReader(temporal, identity.service)
@@ -370,6 +372,32 @@ export async function createPilot(
           },
         },
         desk,
+        undefined,
+        {
+          service: playbooks,
+          activationId: activation.id,
+          async snapshot(_actor, diagnosis) {
+            return {
+              inputs: { shippingMethodId: '8' },
+              evidence: {
+                kind: 'workflow_failure',
+                facts: {
+                  diagnosisReady: diagnosis.status === 'ready',
+                  methodMapped: true,
+                },
+                observations: diagnosis.provenance.evidence.map((item) => ({
+                  id: item.id,
+                  observedAt: item.observedAt,
+                  source: `pilot:${item.adapterVersion}`,
+                })),
+              },
+              provenance: {
+                reference: `pilot:${manifest.runId}`,
+                capturedAt: diagnosis.provenance.generatedAt,
+              },
+            };
+          },
+        },
       )
     : null;
   return {
@@ -380,6 +408,7 @@ export async function createPilot(
     detection,
     desk,
     safety,
+    playbooks,
     provider: () => readJson(path),
     async close() {
       await app.close();

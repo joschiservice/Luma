@@ -169,3 +169,7 @@ fixture and environment behavior; they do not establish usability of every
 operator screen. For a real pilot deployment, provision approved EU PostgreSQL
 and Temporal services and configure real connectors using their integration
 guides. This local synthetic command is not a production deployment command.
+
+The shipping-method correction runs through [Resolution Playbook V0](resolution-playbooks.md).
+Its version, tenant activation, input/evidence snapshot and step outcomes are persisted
+with pilot provenance. Merchant method IDs remain inputs to the playbook.

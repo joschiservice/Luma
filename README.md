@@ -143,6 +143,9 @@ The [connector SDK guide](docs/connectors.md) defines typed capability inputs/ou
 
 The [execution guide](docs/execution.md) covers policy checks, approval, tenant-scoped idempotency, durable attempts, verification and append-only audit evidence. Workflow activities use the execution service for connector writes. The [Temporal runtime guide](docs/exception-workflows.md) covers worker startup, durable approvals, progress and recovery.
 
+The [Resolution Playbook guide](docs/resolution-playbooks.md) covers typed authoring,
+immutable versions, scoped activation, evidence snapshots and the pilot correction.
+
 ## UI workshop
 
 ```sh

@@ -1,5 +1,6 @@
 import { requireRole, requireTenant } from '#modules/identity/index';
 import type { TenantContext } from '#modules/identity/index';
+import { currentPolicyVersion } from '#modules/policies/index';
 import type { ProposedAction } from '#modules/policies/index';
 import type { ExecutionService } from '#modules/execution/application/execution';
 
@@ -8,6 +9,15 @@ export interface ActivatedArtifact {
   version: string;
   digest: string;
   active: boolean;
+  playbook?:
+    | {
+        versionDigest: string;
+        policyVersion: string;
+        principalIds: string[];
+        connectionIds: string[];
+        targetIds: string[];
+      }
+    | undefined;
   /** Describes authorship only. Activation and the run's principal grant authority. */
   generation: { kind: 'manual' | 'generated'; reference: string };
   steps: Record<
@@ -104,6 +114,14 @@ export function createActionAdmission(deps: AdmissionDependencies) {
         risk[action.risk] < risk[permission.minimumRisk]
       )
         throw new Error('Action does not match activated artifact');
+      if (
+        artifact.playbook &&
+        (artifact.playbook.policyVersion !== currentPolicyVersion ||
+          !artifact.playbook.principalIds.includes(fresh.actor.id) ||
+          !artifact.playbook.connectionIds.includes(action.connectionId) ||
+          !artifact.playbook.targetIds.includes(action.target.id))
+      )
+        throw new Error('Action exceeds playbook activation grants');
       const admission = {
         runId: step.runId,
         stepId: step.stepId,

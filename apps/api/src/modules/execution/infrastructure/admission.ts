@@ -22,6 +22,16 @@ const artifactSchema = z
   .object({
     id: text,
     version: text,
+    playbook: z
+      .object({
+        versionDigest: z.string().regex(/^[a-f0-9]{64}$/),
+        policyVersion: text,
+        principalIds: z.array(text).min(1).max(100),
+        connectionIds: z.array(z.string().uuid()).min(1).max(100),
+        targetIds: z.array(z.string().uuid()).min(1).max(100),
+      })
+      .strict()
+      .optional(),
     generation: z
       .object({ kind: z.enum(['manual', 'generated']), reference: text })
       .strict(),
