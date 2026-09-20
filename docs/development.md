@@ -79,8 +79,9 @@ Setup creates `demo@example.test` with a generated password recorded in
 authentication failure and an exhausted workflow failure. Seeding uses the real
 authentication, organization and exception services. Repeating it preserves the
 same user, workspace and evidence. The exception timestamps match the versioned
-golden corpus; no external connector calls occur. The current web overview does
-not yet display those persisted exceptions.
+golden corpus; no external connector calls occur. The case inbox displays those
+persisted exceptions. For all four exception classes, operator states and
+fixture-backed safe execution, use the [synthetic pilot](pilot-environment.md).
 
 ## Tests
 

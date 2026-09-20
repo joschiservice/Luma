@@ -25,6 +25,13 @@ services and preserves database data. Each worktree has its own ports, credentia
 Compose project and volumes. See [local development](docs/development.md) for
 workflow workers, configuration, diagnostics, and manually managed services.
 
+## Synthetic pilot
+
+Run `pnpm pilot:seed`, then `pnpm pilot` and `pnpm pilot:worker` in separate terminals
+for fixture-backed external systems with the real database and workflow stack.
+See the [pilot guide](docs/pilot-environment.md) for scenario reset, credentials,
+approval, verification and worker crash recovery.
+
 ## Quality gates
 
 ```sh

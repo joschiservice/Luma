@@ -29,7 +29,11 @@
     "db:seed": "node tooling/dev/cli.mjs seed",
     "test:local": "pnpm test:tooling && pnpm test:architecture && turbo run test",
     "test:full": "node tooling/dev/test.mjs full",
-    "test:tooling": "node --test tooling/dev/*.test.mjs"
+    "test:tooling": "node --test tooling/dev/*.test.mjs",
+    "pilot": "node tooling/pilot/cli.mjs serve",
+    "pilot:seed": "node tooling/pilot/cli.mjs seed",
+    "pilot:reset": "node tooling/pilot/cli.mjs reset",
+    "pilot:worker": "node tooling/pilot/cli.mjs worker"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
