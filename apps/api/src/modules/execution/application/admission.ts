@@ -40,6 +40,8 @@ export interface BoundActionStep {
   artifactDigest: string;
   incidentId: string;
   diagnosisRevision: number;
+  /** Immutable deadline derived from the playbook snapshot and evidence-age limit. */
+  eligibilityValidUntil?: string;
   actionHash: string;
   action: ProposedAction;
 }
@@ -59,11 +61,14 @@ export interface AdmissionDependencies {
   repository: AdmissionReader;
   execution: ExecutionService;
   refreshContext(context: TenantContext): Promise<TenantContext>;
+  now(): Date;
   parseReference(input: unknown): { runId: string; stepId: string };
   parseAction(input: unknown): { action: ProposedAction; hash: string };
   /** Independently load current incident, diagnosis and tenant-owned evidence. */
   eligible(context: TenantContext, step: BoundActionStep): Promise<boolean>;
 }
+export class AdmissionRejected extends Error {}
+
 const risk = { low: 0, medium: 1, high: 2 };
 
 /** The interpreter receives this port, with a server-bound context, and serializable references only. */
@@ -77,7 +82,7 @@ export function createActionAdmission(deps: AdmissionDependencies) {
       requireTenant(fresh, context.tenantId);
       requireRole(fresh, ['owner', 'admin']);
       if (fresh.actor.id !== context.actor.id)
-        throw new Error('Admission principal changed');
+        throw new AdmissionRejected('Admission principal changed');
       const step = await deps.repository.step(
         fresh,
         reference.runId,
@@ -90,7 +95,7 @@ export function createActionAdmission(deps: AdmissionDependencies) {
         step.tenantId !== fresh.tenantId ||
         step.principalId !== fresh.actor.id
       )
-        throw new Error('Action step not found');
+        throw new AdmissionRejected('Action step not found');
       const artifact = await deps.repository.artifact(
         fresh,
         step.artifactId,
@@ -113,7 +118,7 @@ export function createActionAdmission(deps: AdmissionDependencies) {
         action.target.kind !== permission.targetKind ||
         risk[action.risk] < risk[permission.minimumRisk]
       )
-        throw new Error('Action does not match activated artifact');
+        throw new AdmissionRejected('Action does not match activated artifact');
       if (
         artifact.playbook &&
         (artifact.playbook.policyVersion !== currentPolicyVersion ||
@@ -121,7 +126,9 @@ export function createActionAdmission(deps: AdmissionDependencies) {
           !artifact.playbook.connectionIds.includes(action.connectionId) ||
           !artifact.playbook.targetIds.includes(action.target.id))
       )
-        throw new Error('Action exceeds playbook activation grants');
+        throw new AdmissionRejected(
+          'Action exceeds playbook activation grants',
+        );
       const admission = {
         runId: step.runId,
         stepId: step.stepId,
@@ -143,7 +150,7 @@ export function createActionAdmission(deps: AdmissionDependencies) {
           binding.stepId !== step.stepId ||
           binding.artifactDigest !== artifact.digest
         )
-          throw new Error('Execution admission binding conflicts');
+          throw new AdmissionRejected('Execution admission binding conflicts');
         return previous;
       }
       const stillEligible = async () => {
@@ -159,11 +166,14 @@ export function createActionAdmission(deps: AdmissionDependencies) {
         return (
           !!active?.active &&
           active.digest === artifact.digest &&
-          (await deps.eligible(current, step))
+          (await deps.eligible(current, step)) &&
+          (!artifact.playbook ||
+            (Number.isFinite(Date.parse(step.eligibilityValidUntil ?? '')) &&
+              deps.now().getTime() < Date.parse(step.eligibilityValidUntil!)))
         );
       };
       if (!(await stillEligible()))
-        throw new Error('Action is no longer eligible');
+        throw new AdmissionRejected('Action is no longer eligible');
       return deps.execution.execute(fresh, action, admission, stillEligible);
     },
   };

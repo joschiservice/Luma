@@ -17,14 +17,17 @@ activity retries. It does not define the playbook.
 | `PlaybookOutcome`    | Stable step ID, proposal/decision references, finite outcome and reason; execution receipt with dispatch, verification observations and evaluator provenance when available    |
 
 Definitions, versions, activations, run inputs and outcome records are immutable.
-Publishing the same definition/version with different content fails. A content
-change needs a new semantic version; changing operational intent needs a new
+Publication accepts source data or a compiled version and verifies any supplied
+digest. Publishing the same definition/version with different content fails.
+A content change needs a new semantic version; changing operational intent needs a new
 stable definition ID. The version digest covers definition, semantic version,
 compatibility, provenance and IR using SHA-256 over canonical JSON with sorted
 object keys. Array order is significant. Publication does not activate a version.
 
 Activations are explicit and tenant-scoped. Their admission artifacts include the
-version digest, grants and policy version in their own digest. Revocation disables
+version digest, grants and policy version in their own digest. The action binding
+retains the snapshot’s evidence deadline; admission checks it
+again after policy and audit work, immediately before dispatch. Revocation disables
 that artifact permanently; a later grant needs a new activation ID. Admission
 independently checks grants, current membership, diagnosis eligibility, policy,
 approval, idempotency and audit before effects. Playbook code receives no connector
@@ -110,11 +113,14 @@ workflow runtime login already has `luma_desk` and the safety roles. No new
 configuration or database role is needed.
 
 Publication, activation and binding span owner transactions. Replaying them is
-idempotent. A crash can leave a published version or unused admission binding;
-execution requires both the stored run and its bound action. The effect reservation
-and audit path remain in execution, so replay after a lost completion cannot issue
+idempotent. Run persistence precedes admission binding. A failed snapshot rebind
+cannot grant authority. A crash can leave a stored run without an admission binding; retrying
+the same inputs completes the binding. Execution requires both records.
+The effect reservation and audit path remain in execution, so replay after a lost completion cannot issue
 a second write. Outcomes deduplicate identical evidence by content hash and retain
-later recovery observations separately.
+later recovery observations separately. Definitive admission rejections escalate;
+transient failures without an execution receipt propagate to Temporal for bounded
+retry. A reserved effect remains subject to read-only recovery.
 
 ## Validation
 

@@ -11,3 +11,5 @@ export type {
   ActivatedArtifact,
   AdmissionReader,
 } from '#modules/execution/application/admission';
+
+export { AdmissionRejected } from '#modules/execution/application/admission';

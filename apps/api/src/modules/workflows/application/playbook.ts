@@ -2,6 +2,7 @@ import type { TenantContext } from '#modules/identity/index';
 import { requireRole, requireTenant } from '#modules/identity/index';
 import { currentPolicyVersion } from '#modules/policies/index';
 import type { ProposedAction } from '#modules/policies/index';
+import { AdmissionRejected } from '#modules/execution/index';
 import type {
   ActivatedArtifact,
   BoundActionStep,
@@ -196,15 +197,17 @@ export function createPlaybookService(deps: PlaybookDependencies) {
           runId: id,
           stepId: ir.action.id,
         });
-      } catch {
+      } catch (error) {
         // An interrupted dispatch may already have reserved the action. Recovery reads only.
         result = await deps.admission.get(context, run.action.id);
-        if (!result || !('record' in result))
+        if (!result || !('record' in result)) {
+          if (!(error instanceof AdmissionRejected)) throw error;
           return record({
             state: 'escalated',
             reason: 'admission_rejected',
             stepId: ir.action.id,
           });
+        }
       }
     }
     if (result.state === 'approval_required')
@@ -396,9 +399,10 @@ export function createPlaybookService(deps: PlaybookDependencies) {
         actionHash: hash,
         createdAt: deps.now().toISOString(),
       };
-      // Bind admission first: a crash can leave an unused reservation, never an unadmitted effect.
+      // Only persisted immutable inputs may grant authority. Retrying a partial bind completes it.
+      const stored = await deps.store.bind(context, run);
       if (
-        playbookEligible(version.ir, snapshot, deps.now().getTime()) ===
+        playbookEligible(version.ir, stored.snapshot, deps.now().getTime()) ===
         'eligible'
       )
         await deps.provisioning.bind(context, {
@@ -411,9 +415,18 @@ export function createPlaybookService(deps: PlaybookDependencies) {
           artifactDigest: activation.artifactDigest,
           incidentId: run.incidentId,
           diagnosisRevision: run.diagnosisRevision,
-          action,
+          action: stored.action,
+          eligibilityValidUntil: new Date(
+            Math.min(
+              ...stored.snapshot.evidence.observations.map(
+                (observation) =>
+                  Date.parse(observation.observedAt) +
+                  version.ir.evidence.maxAgeSeconds * 1000,
+              ),
+            ),
+          ).toISOString(),
         });
-      return deps.store.bind(context, run);
+      return stored;
     },
     execute: (context: TenantContext, id: string) =>
       perform(context, id, false),

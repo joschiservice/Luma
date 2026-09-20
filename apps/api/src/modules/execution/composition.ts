@@ -39,12 +39,13 @@ import { createActionAdmission } from '#modules/execution/application/admission'
 import type { AdmissionDependencies } from '#modules/execution/application/admission';
 import { parseAdmissionReference } from '#modules/execution/infrastructure/admission';
 export function createAdmission(
-  deps: Omit<AdmissionDependencies, 'parseAction' | 'parseReference'>,
+  deps: Omit<AdmissionDependencies, 'parseAction' | 'parseReference' | 'now'>,
 ) {
   return createActionAdmission({
     ...deps,
     parseAction,
     parseReference: parseAdmissionReference,
+    now: () => new Date(),
   });
 }
 

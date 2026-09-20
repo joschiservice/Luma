@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { shippingMethodPlaybook } from '#modules/workflows/domain/shipping-method-playbook';
 import {
   compilePlaybook,
+  definePlaybook,
   parsePlaybookCode,
   printPlaybookCode,
   parsePlaybookSnapshot,
@@ -27,6 +28,15 @@ describe('Resolution Playbook V0 authoring', () => {
   it('round-trips the TypeScript code view through the same serializable IR', () => {
     const version = compilePlaybook(shippingMethodPlaybook);
     expect(parsePlaybookCode(printPlaybookCode(version))).toEqual(version);
+    expect(compilePlaybook(definePlaybook(shippingMethodPlaybook))).toEqual(
+      version,
+    );
+    expect(
+      compilePlaybook(parsePlaybookCode(printPlaybookCode(version))),
+    ).toEqual(version);
+    expect(() =>
+      compilePlaybook({ ...version, digest: '0'.repeat(64) }),
+    ).toThrow('digest mismatch');
     expect(JSON.parse(JSON.stringify(version))).toEqual(version);
     expect(
       compilePlaybook(
@@ -82,7 +92,7 @@ describe('Resolution Playbook V0 authoring', () => {
     ).toThrow();
     const now = Date.parse(snapshot.provenance.capturedAt);
     expect(playbookEligible(version.ir, snapshot, now)).toBe('eligible');
-    expect(playbookEligible(version.ir, snapshot, now + 300_001)).toBe(
+    expect(playbookEligible(version.ir, snapshot, now + 300_000)).toBe(
       'stale_evidence',
     );
     expect(playbookEligible(version.ir, snapshot, now - 1)).toBe(

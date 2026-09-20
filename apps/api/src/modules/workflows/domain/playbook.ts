@@ -107,7 +107,7 @@ export function playbookEligible(
       return (
         !Number.isFinite(time) ||
         time > captured ||
-        now - time > ir.evidence.maxAgeSeconds * 1000
+        now - time >= ir.evidence.maxAgeSeconds * 1000
       );
     })
   )

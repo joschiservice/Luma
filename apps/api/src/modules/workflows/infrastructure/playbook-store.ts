@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type { TenantDatabase, SqlTransaction } from '#modules/platform/index';
 import type { TenantContext } from '#modules/identity/index';
 import { requireRole } from '#modules/identity/index';
@@ -111,6 +112,10 @@ export function createPlaybookStore(db: TenantDatabase): PlaybookStore {
       ),
     bind: (context, run) =>
       scoped(context, async (tx) => {
+        z.object({
+          incidentId: z.string().uuid(),
+          diagnosisRevision: z.number().int().positive(),
+        }).parse(run);
         await tx.query(
           'INSERT INTO playbook_runs(tenant_id,id,activation_id,definition_id,version,version_digest,document) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT DO NOTHING',
           [

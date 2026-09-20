@@ -168,13 +168,22 @@ export function definePlaybook(
   return compilePlaybook(input);
 }
 export function compilePlaybook(input: unknown): PlaybookVersion {
-  const parsed = sourceSchema.safeParse(input);
+  const envelope = sourceSchema.extend({
+    digest: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .optional(),
+  });
+  const parsed = envelope.safeParse(input);
   if (!parsed.success)
     throw new Error('Unsupported playbook; escalate for author review', {
       cause: parsed.error,
     });
-  const source = parsed.data;
-  return { ...source, digest: playbookHash(source) };
+  const { digest: suppliedDigest, ...source } = parsed.data;
+  const digest = playbookHash(source);
+  if (suppliedDigest !== undefined && suppliedDigest !== digest)
+    throw new Error('Playbook digest mismatch');
+  return { ...source, digest };
 }
 /** Parse only the generated JSON literal. Never evaluate TypeScript or imports. */
 export function parsePlaybookCode(code: string): PlaybookVersion {

@@ -158,6 +158,8 @@ export function createAdmissionStore(db: TenantDatabase) {
       );
       if (!artifact?.active || artifact.digest !== input.artifactDigest)
         throw new Error('Artifact is not activated');
+      if (artifact.playbook || input.eligibilityValidUntil !== undefined)
+        z.string().datetime().parse(input.eligibilityValidUntil);
       const document: BoundActionStep = {
         ...input,
         ...reference,
