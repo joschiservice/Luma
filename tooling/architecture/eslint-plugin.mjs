@@ -56,6 +56,16 @@ export function violation(from, to) {
   ) {
     return 'Apps must communicate through public API contracts, not source imports.';
   }
+  // Synthetic observation fixtures are excluded from the production build.
+  if (
+    from === 'apps/api/src/test-support/detection-fixtures.ts' &&
+    [
+      'apps/api/src/modules/connectors/application/capabilities.ts',
+      'apps/api/src/modules/connectors/infrastructure/jtl/adapter.ts',
+      'apps/api/src/modules/connectors/infrastructure/shopify/adapter.ts',
+    ].includes(to)
+  )
+    return null;
   if (!source && target) {
     if (
       ![
@@ -70,6 +80,7 @@ export function violation(from, to) {
         'apps/api/src/shopify-oauth.integration.test.ts',
         'apps/api/src/connections.test.ts',
         'apps/api/src/test-support/detection-fixtures.ts',
+        'apps/api/src/test-support/safety-fixtures.ts',
         'apps/api/src/index.ts',
       ].includes(from)
     ) {

@@ -156,6 +156,8 @@ export type ConnectorErrorCode =
   | 'transient'
   | 'internal';
 export interface ConnectorFailure {
+  dispatch?: 'not_dispatched' | 'dispatched' | 'uncertain';
+  providerRequestId?: string;
   code: ConnectorErrorCode;
   effect: 'none' | 'unknown';
   retry: 'never' | 'after_delay' | 'reconcile';

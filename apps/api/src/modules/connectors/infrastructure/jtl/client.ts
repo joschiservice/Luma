@@ -86,7 +86,11 @@ export function createClient(options: JtlTransportOptions) {
     async request(
       path: string,
       query: Record<string, string> = {},
-      write?: { body: unknown; idempotencyKey: string },
+      write?: {
+        body: unknown;
+        idempotencyKey: string;
+        receipt?(requestId: string | null): void;
+      },
     ): Promise<unknown> {
       const url = new URL(path, base);
       for (const [key, value] of Object.entries(query))
@@ -118,6 +122,7 @@ export function createClient(options: JtlTransportOptions) {
         headers['Idempotency-Key'] = write.idempotencyKey;
       }
       const signal = AbortSignal.timeout(timeoutMs);
+      let providerRequestId: string | null = null;
       try {
         const response = await (options.fetch ?? globalThis.fetch)(url, {
           method: write ? 'PATCH' : 'GET',
@@ -126,6 +131,11 @@ export function createClient(options: JtlTransportOptions) {
           redirect: 'error',
           signal,
         });
+        const requestId = response.headers.get('x-request-id');
+        providerRequestId =
+          requestId && /^[\x21-\x7e]{1,200}$/.test(requestId)
+            ? requestId
+            : null;
         if (response.status === 401) fail('authentication');
         if ([402, 403].includes(response.status)) fail('permission_denied');
         if (response.status === 404) fail('not_found');
@@ -144,6 +154,7 @@ export function createClient(options: JtlTransportOptions) {
         }
         if (response.status >= 500) fail('transient', 1000);
         if (!response.ok) fail('invalid_response');
+        write?.receipt?.(providerRequestId);
         try {
           // Node's JSON source context preserves decimal tokens before IEEE-754 rounding.
           return JSON.parse(
@@ -185,11 +196,16 @@ export function createClient(options: JtlTransportOptions) {
           )
             throw new ConnectorError({
               code,
+              ...(providerRequestId ? { providerRequestId } : {}),
               effect: 'unknown',
               retry: 'reconcile',
             });
         }
-        if (error instanceof ConnectorError) throw error;
+        if (error instanceof ConnectorError) {
+          if (write && providerRequestId)
+            throw new ConnectorError({ ...error.failure, providerRequestId });
+          throw error;
+        }
         if (
           signal.aborted ||
           (error instanceof Error &&

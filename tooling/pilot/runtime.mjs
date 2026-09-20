@@ -1,3 +1,5 @@
+import { createJtlConnector } from '../../apps/api/dist/modules/connectors/infrastructure/jtl/adapter.js';
+import { createCapabilityRuntime } from '../../apps/api/dist/modules/connectors/application/capabilities.js';
 import { writeFile, rename } from 'node:fs/promises';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -7,21 +9,18 @@ import {
   createDeskServices,
   createDetectionServices,
   createSafetyServices,
+  createAdmissionEligibility,
   createExceptionWorkflowRuntime,
 } from '../../apps/api/dist/app.js';
 import { createIdentity } from '../../apps/api/dist/modules/identity/composition.js';
 import { createTenantDatabase } from '../../apps/api/dist/modules/platform/composition.js';
 import {
-  createJtlConnector,
   createShippingMethodEffects,
   createInstalledConnections,
   createConnectionCoverage,
 } from '../../apps/api/dist/modules/connectors/composition.js';
 import { IdentityError } from '../../apps/api/dist/modules/identity/index.js';
-import {
-  ConnectorError,
-  createCapabilityRuntime,
-} from '../../apps/api/dist/modules/connectors/index.js';
+import { ConnectorError } from '../../apps/api/dist/modules/connectors/index.js';
 import {
   createOperationsOverview,
   createDeskWorkflowReader,
@@ -264,7 +263,21 @@ export async function createPilot(env, directory, manifest, temporal) {
     env.WORKFLOW_DATABASE_URL,
     identity.service,
     effects,
+    { eligible: createAdmissionEligibility(detection.diagnoses) },
   );
+  await safety.provisioning.activate(await context(), {
+    id: 'exception-resolution',
+    version: '1',
+    generation: { kind: 'manual', reference: 'synthetic-pilot/1' },
+    steps: {
+      execute: {
+        capability: 'orders.shipping-method.write',
+        capabilityVersion: '0',
+        targetKind: 'order',
+        minimumRisk: 'high',
+      },
+    },
+  });
   const reader = temporal
     ? createDeskWorkflowReader(temporal, identity.service)
     : null;

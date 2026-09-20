@@ -6,7 +6,7 @@ import type {
   Diagnosis,
   DiagnosisService,
 } from '#modules/exceptions/index';
-import type { ExecutionService } from '#modules/execution/index';
+import type { ActionAdmission } from '#modules/execution/index';
 import type { ProposedAction } from '#modules/policies/index';
 
 export type WorkflowSource = { kind: 'detection' | 'incident'; id: string };
@@ -103,7 +103,7 @@ export function createExceptionActivities(deps: {
   identity: Pick<IdentityService, 'resolveWorkflowContext'>;
   exceptions: DetectionService;
   diagnoses: DiagnosisService;
-  execution: ExecutionService;
+  execution: ActionAdmission;
   bindings: WorkflowBindings;
 }): ExceptionActivities {
   async function context(input: ExceptionWorkflowInput) {
@@ -210,7 +210,10 @@ export function createExceptionActivities(deps: {
         throw new WorkflowInputError('Proposal binding does not match');
       if (!(await current(fresh, exceptionId, proposal.revision)))
         return { state: 'denied' };
-      const result = await deps.execution.execute(fresh, stored.action);
+      const result = await deps.execution.execute(fresh, {
+        runId: stored.action.id,
+        stepId: 'execute',
+      });
       return result.state === 'approval_required'
         ? { state: result.state, decisionId: result.decision.id }
         : { state: result.state };

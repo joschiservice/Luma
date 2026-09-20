@@ -26,7 +26,7 @@ export interface InstalledRuntimeOptions {
   /** Transport override for Shopify and JTL Cloud only. */
   fetch?: typeof globalThis.fetch;
 }
-export function createInstalledRuntime(options: InstalledRuntimeOptions) {
+function installedRuntime(options: InstalledRuntimeOptions) {
   const { installations } = options;
   return createCapabilityRuntime({
     record: options.record,
@@ -200,4 +200,20 @@ export function createInstalledRuntime(options: InstalledRuntimeOptions) {
       };
     },
   });
+}
+
+export function createInstalledRuntime(options: InstalledRuntimeOptions) {
+  const runtime = installedRuntime(options);
+  return Object.freeze({ read: runtime.read, discover: runtime.discover });
+}
+
+import { createShippingMethodEffects } from '#modules/connectors/application/shipping-method-effects';
+import type { ShippingMethodEffectBinding } from '#modules/connectors/application/shipping-method-effects';
+/** Only the composition root supplies the registry to action admission. */
+export function createInstalledShippingMethodEffects(
+  options: InstalledRuntimeOptions,
+  binding: ShippingMethodEffectBinding,
+) {
+  const runtime = installedRuntime(options);
+  return createShippingMethodEffects(runtime, binding);
 }

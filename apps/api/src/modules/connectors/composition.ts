@@ -18,14 +18,12 @@ export function createConnectors(
   return createProviderRoutes(catalog);
 }
 
-export { createShopifyConnector } from '#modules/connectors/infrastructure/shopify/adapter';
 export type {
   ShopifyConnectorOptions,
   ShopifyEvidence,
 } from '#modules/connectors/infrastructure/shopify/adapter';
 export { mapShopifyWebhook } from '#modules/connectors/infrastructure/shopify/webhooks';
 
-export { createJtlConnector } from '#modules/connectors/infrastructure/jtl/adapter';
 export type {
   JtlConnectorOptions,
   JtlEvidence,
@@ -59,7 +57,10 @@ export function createInstalledConnections(
   });
   return { ...service, shopify };
 }
-export { createInstalledRuntime } from '#modules/connectors/infrastructure/installed-runtime';
+export {
+  createInstalledRuntime,
+  createInstalledShippingMethodEffects,
+} from '#modules/connectors/infrastructure/installed-runtime';
 export type { InstalledRuntimeOptions } from '#modules/connectors/infrastructure/installed-runtime';
 export { createSecretCipher };
 export function createInstallationService(

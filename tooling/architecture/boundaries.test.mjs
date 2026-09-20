@@ -63,7 +63,7 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
       ),
       sample(
         filename('apps/api/src/test-support/detection-fixtures.ts'),
-        "import { createJtlConnector } from '../modules/connectors/composition.js';",
+        "import { createInstalledRuntime } from '../modules/connectors/composition.js';",
       ),
       sample(
         filename('apps/api/src/app.test.ts'),
@@ -133,8 +133,8 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
         "import { createDetectionRepository } from './modules/exceptions/infrastructure/repository.js';",
       ),
       invalid(
-        filename('apps/api/src/test-support/detection-fixtures.ts'),
-        "import { createJtlConnector } from '../modules/connectors/infrastructure/jtl/adapter.js';",
+        filename('apps/api/src/app.ts'),
+        "import { createJtlConnector } from './modules/connectors/infrastructure/jtl/adapter.js';",
       ),
       invalid(
         filename('apps/api/src/app.test.ts'),

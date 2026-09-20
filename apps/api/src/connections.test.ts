@@ -1,3 +1,5 @@
+import * as connectorPublic from '#modules/connectors/index';
+import * as connectorComposition from '#modules/connectors/composition';
 import { request } from 'node:https';
 import { EventEmitter } from 'node:events';
 import { Readable } from 'node:stream';
@@ -8,10 +10,19 @@ import {
   createInstallationService,
   createSecretCipher,
   createInstalledRuntime,
+  createInstalledShippingMethodEffects,
 } from '#modules/connectors/composition';
+import { ConnectorError } from '#modules/connectors/index';
 import type { StoredInstallation } from '#modules/connectors/composition';
 import type { InstallationCapability } from '#modules/connectors/index';
 
+it('keeps raw runtime and handler factories out of application entry points', () => {
+  for (const exports of [connectorPublic, connectorComposition]) {
+    expect(exports).not.toHaveProperty('createCapabilityRuntime');
+    expect(exports).not.toHaveProperty('createJtlConnector');
+    expect(exports).not.toHaveProperty('createShopifyConnector');
+  }
+});
 vi.mock('node:https', () => ({ request: vi.fn() }));
 function pinnedProvider(fetch: typeof globalThis.fetch) {
   vi.mocked(request).mockImplementation((url, options, callback) => {
@@ -481,14 +492,15 @@ describe('installed shipping-method permissions', () => {
         isCancelled: false,
       });
     });
-    const runtime = createInstalledRuntime({
+    const options = {
       installations: f.service,
       fetch,
       record: vi.fn(),
       recordObservations: vi.fn(),
       approveJtlEndpoint: vi.fn(),
       jtlEndpoints: [],
-    });
+    };
+    const runtime = createInstalledRuntime(options);
     expect(await runtime.discover(f.ctx, connection.id)).toEqual([]);
     await f.service.check(f.ctx, connection.id, 1);
     expect(
@@ -496,7 +508,7 @@ describe('installed shipping-method permissions', () => {
     ).toEqual(actionInput.permissions);
     const ref = (externalId: string) => ({ externalId, scopeKey: '' });
     expect(
-      await runtime.write(f.ctx, {
+      await installedWrite(options, f.ctx, {
         connectionId: connection.id,
         capability: 'orders.shipping-method.write',
         version: '0',
@@ -635,7 +647,7 @@ describe('installed JTL address pins', () => {
     });
     pinnedProvider(provider);
     const genericFetch = vi.fn();
-    const runtime = createInstalledRuntime({
+    const options = {
       installations: f.service,
       record: vi.fn(),
       recordObservations: vi.fn(),
@@ -648,10 +660,21 @@ describe('installed JTL address pins', () => {
         },
       ],
       fetch: genericFetch,
-    });
+    };
+    const runtime = createInstalledRuntime(options);
+    expect(Object.keys(runtime).sort()).toEqual(['discover', 'read']);
+    expect(
+      await runtime.read(f.ctx, {
+        connectionId: installed.id,
+        capability: 'orders.shipping-method.write',
+        version: '0',
+        input: {},
+      } as never),
+    ).toMatchObject({ ok: false, error: { code: 'invalid_input' } });
+    expect(provider).not.toHaveBeenCalled();
     const ref = (externalId: string) => ({ externalId, scopeKey: '' });
     expect(
-      await runtime.write(f.ctx, {
+      await installedWrite(options, f.ctx, {
         connectionId: installed.id,
         capability: 'orders.shipping-method.write',
         version: '0',
@@ -695,3 +718,47 @@ it('records Shopify authorization failures without overwriting newer credentials
     f.service.credential(f.ctx, installed.id, 'products.read'),
   ).rejects.toThrow();
 });
+
+async function installedWrite(
+  options: Parameters<typeof createInstalledRuntime>[0],
+  context: Parameters<ReturnType<typeof createInstalledRuntime>['read']>[0],
+  request: {
+    connectionId: string;
+    capability: 'orders.shipping-method.write';
+    version: '0';
+    idempotencyKey: string;
+    input: import('#modules/connectors/index').CapabilityInput<'orders.shipping-method.write'>;
+  },
+) {
+  const registry = createInstalledShippingMethodEffects(options, {
+    map: async () => request.input,
+    checkPreconditions: async () => true,
+  });
+  const intent = {
+    tenantId: context.tenantId,
+    connectionId: request.connectionId,
+    capability: request.capability,
+    capabilityVersion: request.version,
+    target: { kind: 'order', id: randomUUID() },
+    parameters: {},
+    preconditions: {
+      evidenceRefs: [randomUUID()],
+      validUntil: new Date(Date.now() + 60000).toISOString(),
+    },
+    expectedPostcondition: {
+      shippingMethodId: request.input.shippingMethod.externalId,
+    },
+  };
+  const adapter = await registry.resolve(context, intent);
+  if (!adapter) throw new Error('Test effect unavailable');
+  try {
+    return {
+      ok: true,
+      value: await adapter.execute(intent, request.idempotencyKey),
+    };
+  } catch (error) {
+    if (error instanceof ConnectorError)
+      return { ok: false, error: error.failure };
+    throw error;
+  }
+}

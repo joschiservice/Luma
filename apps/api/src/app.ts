@@ -42,7 +42,11 @@ import {
 } from '#modules/platform/composition';
 import { createPolicies } from '#modules/policies/composition';
 import { createAuditLog } from '#modules/audit/composition';
-import { createExecution } from '#modules/execution/composition';
+import {
+  createExecution,
+  createAdmission,
+  createAdmissionStore,
+} from '#modules/execution/composition';
 import type { EffectRegistry } from '#modules/connectors/index';
 import { randomUUID, createHash } from 'node:crypto';
 import type {
@@ -421,6 +425,12 @@ export function createSafetyServices(
   databaseUrl: string,
   identity: Pick<IdentityService, 'refreshContext'>,
   registry: EffectRegistry,
+  admissionOptions: {
+    eligible(
+      context: import('#modules/identity/index').TenantContext,
+      step: import('#modules/execution/index').BoundActionStep,
+    ): Promise<boolean>;
+  } = { eligible: async () => false },
 ) {
   const pool = new Pool({
     connectionString: databaseUrl,
@@ -435,15 +445,23 @@ export function createSafetyServices(
     identity.refreshContext,
     policyAudit(audit),
   );
+  const provisioning = createAdmissionStore(db);
+  const engine = createExecution(
+    db,
+    policies,
+    audit,
+    registry,
+    identity.refreshContext,
+  );
   return {
     policies,
-    execution: createExecution(
-      db,
-      policies,
-      audit,
-      registry,
-      identity.refreshContext,
-    ),
+    provisioning,
+    execution: createAdmission({
+      repository: provisioning,
+      execution: engine,
+      refreshContext: identity.refreshContext,
+      eligible: admissionOptions.eligible,
+    }),
     close: () => pool.end(),
   };
 }
@@ -484,9 +502,13 @@ export function createExceptionWorkflowRuntime(
     ReturnType<typeof createDetectionServices>,
     'exceptions' | 'diagnoses'
   >,
-  safety: Pick<ReturnType<typeof createSafetyServices>, 'execution'>,
+  safety: Pick<
+    ReturnType<typeof createSafetyServices>,
+    'execution' | 'provisioning'
+  >,
   bindings: WorkflowBindings,
   desk?: import('#modules/workflows/index').DeskService,
+  artifactReference = { id: 'exception-resolution', version: '1' },
 ) {
   if (desk) bindings = { ...bindings, recordWorkflow: desk.bindWorkflow };
   if (desk && bindings.proposals) {
@@ -509,15 +531,80 @@ export function createExceptionWorkflowRuntime(
       },
     };
   }
+  if (bindings.proposals) {
+    const proposals = bindings.proposals;
+    bindings = {
+      ...bindings,
+      proposals: {
+        ...proposals,
+        prepare: async (context, diagnosis) => {
+          const action = await proposals.prepare(context, diagnosis);
+          if (!action) return null;
+          const artifact = await safety.provisioning.artifact(
+            context,
+            artifactReference.id,
+            artifactReference.version,
+          );
+          if (!artifact?.active) return null;
+          await safety.provisioning.bind(context, {
+            runId: action.id,
+            stepId: 'execute',
+            tenantId: context.tenantId,
+            principalId: context.actor.id,
+            artifactId: artifact.id,
+            artifactVersion: artifact.version,
+            artifactDigest: artifact.digest,
+            incidentId: diagnosis.exceptionId,
+            diagnosisRevision: diagnosis.revision,
+            action,
+          });
+          return action;
+        },
+      },
+    };
+  }
   const activities = createExceptionActivities({
     identity,
     ...detection,
-    ...safety,
+    execution: safety.execution,
     bindings,
   });
   return {
     createClient: () => createExceptionClient(settings, identity),
     createWorker: () => createExceptionWorker(settings, activities),
+  };
+}
+
+/** Recheck the bound diagnosis and its evidence independently of workflow decisions. */
+export function createAdmissionEligibility(
+  diagnoses: Pick<import('#modules/exceptions/index').DiagnosisService, 'get'>,
+  maxEvidenceAgeMs = 5 * 60_000,
+) {
+  if (!Number.isFinite(maxEvidenceAgeMs) || maxEvidenceAgeMs <= 0)
+    throw new Error('Evidence freshness window must be positive');
+  return async (
+    context: import('#modules/identity/index').TenantContext,
+    step: import('#modules/execution/index').BoundActionStep,
+  ) => {
+    const diagnosis = await diagnoses.get(context, step.incidentId);
+    const now = Date.now();
+    return (
+      !!diagnosis &&
+      diagnosis.exceptionId === step.incidentId &&
+      !diagnosis.superseded &&
+      diagnosis.status === 'ready' &&
+      diagnosis.revision === step.diagnosisRevision &&
+      (diagnosis.provenance.validUntil === null ||
+        Date.parse(diagnosis.provenance.validUntil) > now) &&
+      Date.parse(step.action.preconditions.validUntil) > now &&
+      step.action.preconditions.evidenceRefs.every((id) => {
+        const evidence = diagnosis.provenance.evidence.find(
+          (evidence) => evidence.id === id,
+        );
+        const observedAt = Date.parse(evidence?.observedAt ?? '');
+        return observedAt <= now && observedAt + maxEvidenceAgeMs > now;
+      })
+    );
   };
 }
 
@@ -528,9 +615,14 @@ export async function createDefaultExceptionWorker(
 ) {
   const identity = createIdentity(identitySettings);
   const detection = createDetectionServices(settings.databaseUrl);
-  const safety = createSafetyServices(settings.databaseUrl, identity.service, {
-    resolve: async () => null,
-  });
+  const safety = createSafetyServices(
+    settings.databaseUrl,
+    identity.service,
+    {
+      resolve: async () => null,
+    },
+    { eligible: createAdmissionEligibility(detection.diagnoses) },
+  );
   const deskPool = new Pool({ connectionString: settings.databaseUrl, max: 5 });
   const desk = createDeskServices(
     createTenantDatabase(deskPool),
@@ -650,7 +742,7 @@ export function createDeskServices(
   });
 }
 
-function policyAudit(audit: import('#modules/audit/index').AuditLog) {
+export function policyAudit(audit: import('#modules/audit/index').AuditLog) {
   return async (evidence: import('#modules/policies/index').PolicyEvidence) => {
     const item = evidence.document;
     await audit.append({

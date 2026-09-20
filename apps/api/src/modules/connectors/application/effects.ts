@@ -18,10 +18,17 @@ export interface VerificationResult {
 }
 /** Resolved by trusted composition for an active, tenant-owned connection. */
 export interface EffectAdapter {
+  /** Stable provider and adapter identity, pinned across dispatch and reconciliation. */
+  dispatchIdentity?: string;
   capability: string;
   version: string;
   minimumRisk: 'low' | 'medium' | 'high';
-  mechanism: 'api' | 'deterministic_browser' | 'agentic_browser' | 'human';
+  mechanism:
+    | 'api'
+    | 'deterministic_browser'
+    | 'agentic_browser'
+    | 'human'
+    | 'sandboxed_code';
   executor: {
     kind: 'service' | 'agent' | 'connector';
     id: string;
@@ -37,7 +44,7 @@ export interface EffectAdapter {
   execute(
     intent: EffectIntent,
     idempotencyKey: string,
-  ): Promise<{ evidenceRefs: string[] }>;
+  ): Promise<{ evidenceRefs: string[]; providerRequestId?: string | null }>;
   /** Read authoritative state; never perform a write during verification. */
   verify(intent: EffectIntent): Promise<VerificationResult>;
 }

@@ -189,6 +189,7 @@ export function createJtlShippingMethodCapabilities(
           ]),
         )
         .digest('hex');
+      let providerRequestId: string | null = null;
       const response = await client.request(
         `sales-orders/${input.order.externalId}`,
         {},
@@ -198,6 +199,9 @@ export function createJtlShippingMethodCapabilities(
             disableAutomaticWorkflows: true,
           },
           idempotencyKey: key,
+          receipt: (id) => {
+            providerRequestId = id;
+          },
         },
       );
       const parsed = shippingMethodResponse.safeParse(response);
@@ -207,13 +211,14 @@ export function createJtlShippingMethodCapabilities(
       )
         throw new ConnectorError({
           code: 'invalid_response',
+          ...(providerRequestId ? { providerRequestId } : {}),
           effect: 'unknown',
           retry: 'reconcile',
         });
       return {
         status: 'accepted',
         evidenceRefs: [before.id],
-        providerRequestId: null,
+        providerRequestId,
       };
     },
   };

@@ -1,3 +1,4 @@
+import { createAdmissionEligibility } from '#app';
 import { describe, expect, it, vi } from 'vitest';
 import { makeTenantContext } from '#modules/identity/composition';
 import { IdentityError } from '#modules/identity/index';
@@ -160,7 +161,10 @@ describe('durable activity boundaries', () => {
       'tenant',
       'request',
     );
-    expect(deps.execution.execute).toHaveBeenCalledWith(context, action);
+    expect(deps.execution.execute).toHaveBeenCalledWith(context, {
+      runId: action.id,
+      stepId: 'execute',
+    });
   });
   it('uses the persisted detection request and preserves detection deduplication', async () => {
     const { deps, activities } = fixture();
@@ -353,3 +357,65 @@ it('deduplicates starts and scopes commands to the current tenant', async () => 
     await env.teardown();
   }
 }, 30_000);
+
+it('requires current, owned evidence even when a diagnosis has no expiry', async () => {
+  const now = Date.now();
+  const current = structuredClone(diagnosis);
+  current.provenance.validUntil = null;
+  current.provenance.evidence = [
+    {
+      id: 'observation',
+      observedAt: new Date(now).toISOString(),
+      sourceUpdatedAt: null,
+      adapterVersion: 'fixture/1',
+      schemaVersion: 1,
+      source: null,
+    },
+  ];
+  const get = vi.fn().mockResolvedValue(current);
+  const eligible = createAdmissionEligibility({ get });
+  const step = {
+    runId: action.id,
+    stepId: 'execute',
+    tenantId: context.tenantId,
+    principalId: context.actor.id,
+    artifactId: 'fixture',
+    artifactVersion: '1',
+    artifactDigest: 'digest',
+    incidentId: current.exceptionId,
+    diagnosisRevision: current.revision,
+    actionHash: 'hash',
+    action: {
+      ...action,
+      preconditions: {
+        evidenceRefs: ['observation'],
+        validUntil: new Date(now + 60000).toISOString(),
+      },
+    },
+  };
+  expect(await eligible(context, step)).toBe(true);
+  current.provenance.evidence[0]!.observedAt = new Date(
+    now - 600000,
+  ).toISOString();
+  expect(await eligible(context, step)).toBe(false);
+  current.provenance.evidence[0]!.observedAt = new Date(
+    now + 60000,
+  ).toISOString();
+  expect(await eligible(context, step)).toBe(false);
+  current.provenance.evidence[0]!.observedAt = new Date(now).toISOString();
+  expect(await eligible(context, { ...step, diagnosisRevision: 999 })).toBe(
+    false,
+  );
+  expect(
+    await eligible(context, {
+      ...step,
+      action: {
+        ...step.action,
+        preconditions: {
+          ...step.action.preconditions,
+          evidenceRefs: ['foreign'],
+        },
+      },
+    }),
+  ).toBe(false);
+});
