@@ -46,7 +46,9 @@ pnpm test:browser
 
 `pnpm check` runs formatting, lint, typechecking, tests and builds. `pnpm test:full`
 runs all gates including backend and browser E2E with one disposable PostgreSQL 17
-container. CI runs the same command. Install Chromium first with `pnpm run setup`
+container. CI runs the same gates in parallel jobs, with browser E2E split across
+two shards. The required `Quality gates` check passes only when every job succeeds.
+Install Chromium first with `pnpm run setup`
 (on Linux CI, use Playwright's `--with-deps` option).
 
 `pnpm test`, `pnpm test:e2e` and `pnpm test:browser` automatically start PostgreSQL

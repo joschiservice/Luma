@@ -55,17 +55,17 @@ function fixture() {
     verify: vi.fn<ExceptionActivities['verify']>().mockResolvedValue(true),
   };
 }
-async function run(activities: ExceptionActivities) {
+async function run(activities: ExceptionActivities, environment = env) {
   const taskQueue = randomUUID();
   const worker = await Worker.create({
-    connection: env.nativeConnection,
+    connection: environment.nativeConnection,
     taskQueue,
     workflowBundle: bundle,
     activities,
   });
   return worker.runUntil(
     () =>
-      env.client.workflow.execute('exceptionWorkflow', {
+      environment.client.workflow.execute('exceptionWorkflow', {
         workflowId: randomUUID(),
         taskQueue,
         args: [input],
@@ -241,13 +241,20 @@ it('honors diagnosis backoff and evaluates the next revision', async () => {
   expect(await run(activities)).toMatchObject({ phase: 'resolved' });
   expect(activities.diagnose).toHaveBeenCalledTimes(2);
 }, 15_000);
-it('recovers committed approval without a notification', async () => {
+it('recovers committed approval without a notification', async (t) => {
+  const clock = await TestWorkflowEnvironment.createTimeSkipping();
+  t.onTestFinished(() => clock.teardown());
   const activities = fixture();
+  activities.propose.mockResolvedValue({
+    id: 'proposal',
+    revision: 1,
+    expiresAt: new Date((await clock.currentTimeMs()) + 60_000).toISOString(),
+  });
   activities.execute.mockResolvedValueOnce({
     state: 'approval_required',
     decisionId: 'decision',
   });
-  expect(await run(activities)).toMatchObject({ phase: 'resolved' });
+  expect(await run(activities, clock)).toMatchObject({ phase: 'resolved' });
   expect(activities.execute).toHaveBeenCalledTimes(2);
 }, 40_000);
 it.each(['succeeded', 'reconciliation_required', 'lost_completion'] as const)(
