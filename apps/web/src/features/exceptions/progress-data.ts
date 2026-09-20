@@ -20,7 +20,7 @@ export function progressOptions(
   exceptionId: string,
   pages = 1,
 ) {
-  return queryOptions({
+  const options = queryOptions({
     queryKey: [...casesKey(organizationId), 'progress', exceptionId, pages],
     staleTime: 0,
     gcTime: 0,
@@ -53,7 +53,8 @@ export function progressOptions(
       if (
         detail.revision !== progress.caseRevision ||
         review.caseRevision !== progress.caseRevision ||
-        review.diagnosisRevision !== progress.diagnosisRevision
+        review.diagnosisRevision !== progress.diagnosisRevision ||
+        (detail.diagnosis?.revision ?? 0) !== progress.diagnosisRevision
       )
         throw new Error('Case changed during refresh');
       const timeline: import('@luma/api-contract').CaseTimelinePage['items'] =
@@ -106,5 +107,13 @@ export function progressOptions(
         hasMore: Boolean(timelineCursor || evidenceCursor),
       };
     },
+  });
+  return queryOptions({
+    ...options,
+    placeholderData: (previous, previousQuery) =>
+      previousQuery?.queryKey[2] === organizationId &&
+      previousQuery.queryKey[5] === exceptionId
+        ? previous
+        : undefined,
   });
 }

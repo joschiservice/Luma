@@ -115,7 +115,10 @@ Proposal parameters and raw provider payloads are not rendered.
 The authenticated stream refreshes detail, review, progress and loaded history
 from the first page. Reads with conflicting case or diagnosis revisions are
 rejected until the next refresh. Timeline entries are deduplicated by immutable ID.
-History and evidence load in batches of 100; Load more reads another batch.
+History and evidence load in batches of 100; Load more reads another batch while
+retaining the current case and expanded evidence. Repeated stream events reuse
+in-flight refreshes. Routine refreshes preserve recorded evidence freshness;
+connection uncertainty is shown separately.
 Connection loss marks displayed records as last confirmed, and automatic reconnect
 resynchronizes them. Refresh progress also restarts the stream. Navigation closes
 the old stream and isolates caches by organization and case; reload reconstructs

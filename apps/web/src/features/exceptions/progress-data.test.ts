@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { QueryClient } from '@tanstack/react-query';
+import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import { progressOptions } from './progress-data';
 import { caseDetailSchema } from '@luma/api-contract';
 
@@ -122,5 +122,42 @@ it('rejects malformed progress instead of retaining a success result', async () 
   await expect(
     client.fetchQuery(progressOptions('tenant-a', id)),
   ).rejects.toThrow();
+  client.clear();
+});
+
+it('rejects a diagnosis-only transition even when review and progress agree', async () => {
+  mockReads({
+    review: {
+      schemaVersion: 1,
+      caseRevision: 1,
+      diagnosisRevision: 1,
+      permittedDecisions: [],
+      proposal: null,
+    },
+    progress: { ...progress, diagnosisRevision: 1 },
+  });
+  const client = new QueryClient();
+  await expect(
+    client.fetchQuery(progressOptions('tenant-a', id)),
+  ).rejects.toThrow('Case changed during refresh');
+  expect(
+    client.getQueryData(progressOptions('tenant-a', id).queryKey),
+  ).toBeUndefined();
+  client.clear();
+});
+it('retains loaded pages only within the same tenant and case', async () => {
+  mockReads();
+  const client = new QueryClient();
+  const first = await client.fetchQuery(progressOptions('tenant-a', id));
+  const observer = new QueryObserver(client, progressOptions('tenant-a', id));
+  const unsubscribe = observer.subscribe(() => {});
+  observer.setOptions(progressOptions('tenant-a', id, 2));
+  expect(observer.getCurrentResult().data).toEqual(first);
+  expect(observer.getCurrentResult().isPlaceholderData).toBe(true);
+  observer.setOptions(progressOptions('tenant-b', id, 2));
+  expect(observer.getCurrentResult().data).toBeUndefined();
+  observer.setOptions(progressOptions('tenant-a', 'other-case', 2));
+  expect(observer.getCurrentResult().data).toBeUndefined();
+  unsubscribe();
   client.clear();
 });

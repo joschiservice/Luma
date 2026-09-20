@@ -39,11 +39,13 @@ export function LiveCaseDetail({
       onResync: () => {
         if (!active) return;
         const current = ++generation;
-        setConnection('syncing');
+        setConnection((previous) =>
+          previous === 'live' ? 'syncing' : previous,
+        );
         void client
           .invalidateQueries(
             { queryKey: casesKey(organizationId) },
-            { throwOnError: true },
+            { throwOnError: true, cancelRefetch: false },
           )
           .then(() => {
             if (active && generation === current) setConnection('live');
@@ -57,7 +59,10 @@ export function LiveCaseDetail({
         if (active) {
           setConnection('disconnected');
           // A closed stream can mean revoked access. Recheck reads to clear protected content.
-          void client.invalidateQueries({ queryKey: casesKey(organizationId) });
+          void client.invalidateQueries(
+            { queryKey: casesKey(organizationId) },
+            { cancelRefetch: false },
+          );
         }
       },
     });
@@ -93,10 +98,14 @@ export function LiveCaseDetail({
         </Button>
       </CaseNotice>
     );
-  const confirmed = connection === 'live' && !snapshot.isError;
+  const unconfirmed =
+    snapshot.isError ||
+    connection === 'disconnected' ||
+    connection === 'connecting';
   return (
     <CaseInvestigation
-      item={confirmed ? data.detail : { ...data.detail, freshness: 'stale' }}
+      item={data.detail}
+      unconfirmed={unconfirmed}
       progress={
         <CaseTimeline
           {...data}

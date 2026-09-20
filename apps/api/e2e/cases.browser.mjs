@@ -272,6 +272,80 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
         .replaceAll('_', ' ')
         .replace(/^./, (c) => c.toUpperCase()),
     );
+  await page.getByText('Live', { exact: true }).waitFor();
+  const recordedTimeline = await (
+    await context.request.get(`${caseApi}/timeline?limit=100`)
+  ).json();
+  const slowEvent = {
+    id: randomUUID(),
+    type: 'review.slow_refresh_completed',
+    occurredAt: baseline.detectedAt,
+    actorId: null,
+    proposalId: null,
+    outcome: null,
+    evidenceRefs: [],
+  };
+  let slowRefresh = true;
+  let releasePage;
+  const pageGate = new Promise((resolve) => {
+    releasePage = resolve;
+  });
+  await page.route(`**${caseApi}/timeline?**`, async (route) => {
+    const laterPage = new URL(route.request().url()).searchParams.has('cursor');
+    if (slowRefresh) await new Promise((resolve) => setTimeout(resolve, 6500));
+    if (laterPage) await pageGate;
+    await route.fulfill({
+      json: {
+        items: laterPage
+          ? [
+              {
+                ...slowEvent,
+                id: randomUUID(),
+                type: 'review.history_page_loaded',
+              },
+            ]
+          : [...recordedTimeline.items, slowEvent],
+        nextCursor: laterPage ? null : 'review-page-2',
+      },
+    });
+  });
+  const recommendations = await page.locator('.case-step').allTextContents();
+  expect(recommendations.length).toBeGreaterThan(0);
+  // The request spans a second SSE heartbeat. It must finish without being cancelled.
+  await page.waitForRequest((request) =>
+    request.url().includes(`${caseApi}/timeline?`),
+  );
+  await page.getByText('Refreshing', { exact: true }).waitFor();
+  expect(await page.locator('.case-step').allTextContents()).toEqual(
+    recommendations,
+  );
+  expect(
+    await page.getByText('Evidence is stale', { exact: true }).count(),
+  ).toBe(0);
+  await page
+    .getByText('Review slow refresh completed', { exact: true })
+    .waitFor();
+  slowRefresh = false;
+  const auditDetails = page.locator('.case-audit details').first();
+  await auditDetails.locator('summary').click();
+  await auditDetails.evaluate((element) => {
+    element.dataset.retained = 'true';
+  });
+  await Promise.all([
+    page.waitForRequest((request) =>
+      request.url().includes('cursor=review-page-2'),
+    ),
+    page
+      .getByRole('button', { name: 'Load more history and evidence' })
+      .click(),
+  ]);
+  expect(await auditDetails.getAttribute('open')).not.toBeNull();
+  expect(await auditDetails.getAttribute('data-retained')).toBe('true');
+  expect(await page.getByLabel('Loading cases').count()).toBe(0);
+  releasePage();
+  await page.getByText('Review history page loaded', { exact: true }).waitFor();
+  expect(await auditDetails.getAttribute('data-retained')).toBe('true');
+  await page.unroute(`**${caseApi}/timeline?**`);
   const evidence = page.locator('.case-evidence summary').first();
   await evidence.focus();
   await page.keyboard.press('Enter');
