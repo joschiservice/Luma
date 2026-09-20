@@ -1,3 +1,7 @@
+import type {
+  ExecutionFailure,
+  VerificationAttempt,
+} from '#modules/execution/application/history';
 import { requireRole, requireTenant } from '#modules/identity/index';
 import type { TenantContext } from '#modules/identity/index';
 import type {
@@ -64,6 +68,8 @@ export interface ExecutionRecord {
   };
 }
 export interface ExecutionRepository {
+  verification(tenantId: string, entry: VerificationAttempt): Promise<void>;
+  failure(tenantId: string, entry: ExecutionFailure): Promise<void>;
   bindIntent(action: ProposedAction, hash: string): Promise<void>;
   get(tenantId: string, proposalId: string): Promise<ExecutionRecord | null>;
   /** Atomically insert the attempt and audit outbox entry. Returns false on a competing reservation. */
@@ -151,6 +157,77 @@ export function createExecutionService(deps: ExecutionDependencies) {
     const observedAt = Date.parse(observation.observedAt);
     if (observedAt < Date.parse(startedAt) || observedAt > deps.now().getTime())
       throw new Error('Verification observation is not fresh');
+    return observation;
+  }
+  function failure(
+    error: unknown,
+    proposalId: string,
+    phase: ExecutionFailure['phase'],
+  ): ExecutionFailure {
+    const value = error instanceof ConnectorError ? error.failure : null;
+    const codes = [
+      'unavailable',
+      'unsupported_capability',
+      'unsupported_version',
+      'invalid_input',
+      'invalid_response',
+      'authentication',
+      'permission_denied',
+      'not_found',
+      'conflict',
+      'rate_limited',
+      'timeout',
+      'transient',
+      'internal',
+    ];
+    return {
+      id: deps.id(),
+      proposalId,
+      phase,
+      occurredAt: deps.now().toISOString(),
+      code: value && codes.includes(value.code) ? value.code : 'internal',
+      retry:
+        value && ['never', 'after_delay', 'reconcile'].includes(value.retry)
+          ? value.retry
+          : 'reconcile',
+      effect: value?.effect === 'none' ? 'none' : 'unknown',
+      ...(value?.providerRequestId &&
+      /^[\x21-\x7e]{1,200}$/.test(value.providerRequestId)
+        ? { providerRequestId: value.providerRequestId }
+        : {}),
+    };
+  }
+  async function observe(
+    context: TenantContext,
+    record: ExecutionRecord,
+    read: () => Promise<VerificationResult>,
+  ) {
+    const entry: VerificationAttempt = {
+      id: deps.id(),
+      proposalId: record.proposalId,
+      phase: 'pending',
+      actorId: context.actor.id,
+      startedAt: deps.now().toISOString(),
+    };
+    await deps.repository.verification(context.tenantId, entry);
+    let observation: VerificationResult;
+    try {
+      observation = verified(await read(), record.attempt.startedAt);
+    } catch (error) {
+      await deps.repository.verification(context.tenantId, {
+        ...entry,
+        phase: 'completed',
+        finishedAt: deps.now().toISOString(),
+        failure: failure(error, record.proposalId, 'verification'),
+      });
+      throw error;
+    }
+    await deps.repository.verification(context.tenantId, {
+      ...entry,
+      phase: 'completed',
+      finishedAt: deps.now().toISOString(),
+      result: observation,
+    });
     return observation;
   }
   return {
@@ -302,6 +379,7 @@ export function createExecutionService(deps: ExecutionDependencies) {
         await flush(context.tenantId, action.id);
         return result(record);
       }
+      let phase: ExecutionFailure['phase'] = 'dispatch';
       try {
         const effect = await adapter.execute(action, record.idempotencyKey);
         record.attempt.dispatch = 'dispatched';
@@ -316,9 +394,9 @@ export function createExecutionService(deps: ExecutionDependencies) {
         record.attempt.effectEvidenceRefs = deps.parseEvidence(
           effect.evidenceRefs,
         );
-        record.attempt.verification = verified(
-          await adapter.verify(action),
-          record.attempt.startedAt,
+        phase = 'verification';
+        record.attempt.verification = await observe(context, record, () =>
+          adapter.verify(action),
         );
         record.state =
           record.attempt.verification.outcome === 'passed'
@@ -327,6 +405,10 @@ export function createExecutionService(deps: ExecutionDependencies) {
               ? 'failed'
               : 'unknown';
       } catch (error) {
+        await deps.repository.failure(
+          context.tenantId,
+          failure(error, action.id, phase),
+        );
         if (
           error instanceof ConnectorError &&
           typeof error.failure.providerRequestId === 'string' &&
@@ -409,9 +491,8 @@ export function createExecutionService(deps: ExecutionDependencies) {
           : adapter.dispatchIdentity !== record.attempt.dispatchIdentity)
       )
         throw new Error('Capability unavailable');
-      const verification = verified(
-        await adapter.verify(record.intent),
-        record.attempt.startedAt,
+      const verification = await observe(context, record, () =>
+        adapter.verify(record.intent),
       );
       // A negative read while an old request is in flight cannot establish a safe retry.
       const expectedState = record.state;

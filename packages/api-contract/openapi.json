@@ -1,6 +1,3293 @@
 {
   "openapi": "3.0.2",
   "paths": {
+    "/v1/organizations/{organizationId}/exceptions/{exceptionId}/resolution-runs": {
+      "get": {
+        "description": "Owners and admins can find up to 50 runs for a case. Pass nextCursor as after to continue; IDs provide stable page ordering. Refresh from the first page to discover newly recorded runs.",
+        "summary": "List resolution runs",
+        "tags": ["resolutionLearning"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "exceptionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "operationId": "resolutionLearning.list",
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "diagnosisRevision": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": 0
+                          },
+                          "resolution": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                              },
+                              "version": {
+                                "type": "string",
+                                "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                              },
+                              "use": {
+                                "type": "string",
+                                "enum": [
+                                  "created",
+                                  "improved",
+                                  "reused",
+                                  "partner_specific"
+                                ]
+                              },
+                              "reasonCode": {
+                                "type": "string",
+                                "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                              },
+                              "previousVersion": {
+                                "type": "string",
+                                "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                              },
+                              "partnerCodeRef": {
+                                "type": "string",
+                                "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                              }
+                            },
+                            "required": ["id", "version", "use", "reasonCode"],
+                            "additionalProperties": false
+                          },
+                          "schemaVersion": {
+                            "type": "number",
+                            "enum": [1]
+                          },
+                          "incidentId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "actorId": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "context": {
+                            "type": "object",
+                            "properties": {
+                              "evidenceRefs": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "mappingVersions": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "configVersion": {
+                                "type": "string"
+                              },
+                              "ruleVersion": {
+                                "type": "string"
+                              },
+                              "diagnosisVersion": {
+                                "type": "string"
+                              },
+                              "hypotheses": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "code": {
+                                      "type": "string"
+                                    },
+                                    "text": {
+                                      "type": "string"
+                                    },
+                                    "evidenceRefs": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "contradictingEvidenceRefs": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "uncertainty": {
+                                      "type": "string",
+                                      "enum": ["unsubstantiated"]
+                                    },
+                                    "missingChecks": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "origin": {
+                                      "type": "string",
+                                      "enum": ["rule", "model"]
+                                    }
+                                  },
+                                  "required": [
+                                    "code",
+                                    "text",
+                                    "evidenceRefs",
+                                    "contradictingEvidenceRefs",
+                                    "uncertainty",
+                                    "missingChecks",
+                                    "origin"
+                                  ]
+                                }
+                              },
+                              "model": {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "enum": [
+                                      "disabled",
+                                      "used",
+                                      "unavailable",
+                                      "rejected"
+                                    ]
+                                  },
+                                  "model": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "promptVersion": {
+                                    "type": "string",
+                                    "nullable": true
+                                  }
+                                },
+                                "required": ["status", "model", "promptVersion"]
+                              }
+                            },
+                            "required": [
+                              "evidenceRefs",
+                              "mappingVersions",
+                              "configVersion",
+                              "ruleVersion",
+                              "diagnosisVersion",
+                              "hypotheses",
+                              "model"
+                            ]
+                          },
+                          "generation": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": ["manual", "generated"]
+                              },
+                              "reference": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["kind", "reference"]
+                          },
+                          "artifactDigest": {
+                            "type": "string",
+                            "pattern": "^[a-f0-9]{64}$"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "diagnosisRevision",
+                          "resolution",
+                          "schemaVersion",
+                          "incidentId",
+                          "actorId",
+                          "createdAt",
+                          "context",
+                          "generation",
+                          "artifactDigest"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "nextCursor": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    }
+                  },
+                  "required": ["items", "nextCursor"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "Owners and admins record a run ID, diagnosis revision, resolution version and reason. Reuse the run ID for automated steps. Exact retries return the original record; conflicting IDs return 409.",
+        "summary": "Record a resolution selection",
+        "tags": ["resolutionLearning"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "exceptionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "operationId": "resolutionLearning.start",
+        "requestBody": {
+          "description": "Body",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "diagnosisRevision": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": 0
+                  },
+                  "resolution": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                      },
+                      "version": {
+                        "type": "string",
+                        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                      },
+                      "use": {
+                        "type": "string",
+                        "enum": [
+                          "created",
+                          "improved",
+                          "reused",
+                          "partner_specific"
+                        ]
+                      },
+                      "reasonCode": {
+                        "type": "string",
+                        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                      },
+                      "previousVersion": {
+                        "type": "string",
+                        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                      },
+                      "partnerCodeRef": {
+                        "type": "string",
+                        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                      }
+                    },
+                    "required": ["id", "version", "use", "reasonCode"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": ["id", "diagnosisRevision", "resolution"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "diagnosisRevision": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "exclusiveMinimum": 0
+                    },
+                    "resolution": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                        },
+                        "version": {
+                          "type": "string",
+                          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                        },
+                        "use": {
+                          "type": "string",
+                          "enum": [
+                            "created",
+                            "improved",
+                            "reused",
+                            "partner_specific"
+                          ]
+                        },
+                        "reasonCode": {
+                          "type": "string",
+                          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                        },
+                        "previousVersion": {
+                          "type": "string",
+                          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                        },
+                        "partnerCodeRef": {
+                          "type": "string",
+                          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                        }
+                      },
+                      "required": ["id", "version", "use", "reasonCode"],
+                      "additionalProperties": false
+                    },
+                    "schemaVersion": {
+                      "type": "number",
+                      "enum": [1]
+                    },
+                    "incidentId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "actorId": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "context": {
+                      "type": "object",
+                      "properties": {
+                        "evidenceRefs": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "mappingVersions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "configVersion": {
+                          "type": "string"
+                        },
+                        "ruleVersion": {
+                          "type": "string"
+                        },
+                        "diagnosisVersion": {
+                          "type": "string"
+                        },
+                        "hypotheses": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "code": {
+                                "type": "string"
+                              },
+                              "text": {
+                                "type": "string"
+                              },
+                              "evidenceRefs": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "contradictingEvidenceRefs": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "uncertainty": {
+                                "type": "string",
+                                "enum": ["unsubstantiated"]
+                              },
+                              "missingChecks": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "origin": {
+                                "type": "string",
+                                "enum": ["rule", "model"]
+                              }
+                            },
+                            "required": [
+                              "code",
+                              "text",
+                              "evidenceRefs",
+                              "contradictingEvidenceRefs",
+                              "uncertainty",
+                              "missingChecks",
+                              "origin"
+                            ]
+                          }
+                        },
+                        "model": {
+                          "type": "object",
+                          "properties": {
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "disabled",
+                                "used",
+                                "unavailable",
+                                "rejected"
+                              ]
+                            },
+                            "model": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "promptVersion": {
+                              "type": "string",
+                              "nullable": true
+                            }
+                          },
+                          "required": ["status", "model", "promptVersion"]
+                        }
+                      },
+                      "required": [
+                        "evidenceRefs",
+                        "mappingVersions",
+                        "configVersion",
+                        "ruleVersion",
+                        "diagnosisVersion",
+                        "hypotheses",
+                        "model"
+                      ]
+                    },
+                    "generation": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["manual", "generated"]
+                        },
+                        "reference": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["kind", "reference"]
+                    },
+                    "artifactDigest": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "diagnosisRevision",
+                    "resolution",
+                    "schemaVersion",
+                    "incidentId",
+                    "actorId",
+                    "createdAt",
+                    "context",
+                    "generation",
+                    "artifactDigest"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/exceptions/{exceptionId}/resolution-runs/{runId}/events": {
+      "post": {
+        "description": "Append cause assessments, repairs, interventions, edits, outcomes or recurrence links. Use codes and incident evidence references. Model hypotheses remain suspected. Verified outcomes require the incident’s authoritative verification. Exact retries return the original event.",
+        "summary": "Record a resolution observation",
+        "tags": ["resolutionLearning"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "exceptionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "operationId": "resolutionLearning.append",
+        "requestBody": {
+          "description": "Body",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "occurredAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "fact": {
+                    "discriminator": {
+                      "propertyName": "kind"
+                    },
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["cause"]
+                          },
+                          "code": {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": ["suspected", "confirmed", "rejected"]
+                          },
+                          "supportingEvidenceRefs": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                            },
+                            "maxItems": 100
+                          },
+                          "contradictingEvidenceRefs": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                            },
+                            "maxItems": 100
+                          },
+                          "basis": {
+                            "type": "string",
+                            "enum": [
+                              "model_hypothesis",
+                              "operator_investigation"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "code",
+                          "status",
+                          "supportingEvidenceRefs",
+                          "contradictingEvidenceRefs",
+                          "basis"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["repair_step"]
+                          },
+                          "stepId": {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                          },
+                          "actionCode": {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                          },
+                          "inputEvidenceRefs": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                            },
+                            "minItems": 1,
+                            "maxItems": 100
+                          },
+                          "actionHash": {
+                            "type": "string",
+                            "pattern": "^[a-f0-9]{64}$"
+                          },
+                          "startedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "finishedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "effortSeconds": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 31536000
+                          },
+                          "result": {
+                            "type": "string",
+                            "enum": ["accepted", "failed", "unknown"]
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "stepId",
+                          "actionCode",
+                          "inputEvidenceRefs",
+                          "actionHash",
+                          "startedAt",
+                          "finishedAt",
+                          "effortSeconds",
+                          "result"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["intervention"]
+                          },
+                          "stepId": {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                          },
+                          "reasonCode": {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                          },
+                          "effortSeconds": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 31536000
+                          },
+                          "evidenceRefs": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                            },
+                            "minItems": 1,
+                            "maxItems": 100
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "stepId",
+                          "reasonCode",
+                          "effortSeconds",
+                          "evidenceRefs"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["observation"]
+                          },
+                          "stepId": {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                          },
+                          "code": {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                          },
+                          "evidenceRefs": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                            },
+                            "minItems": 1,
+                            "maxItems": 100
+                          }
+                        },
+                        "required": ["kind", "stepId", "code", "evidenceRefs"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["human_edit"]
+                          },
+                          "stepId": {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                          },
+                          "beforeHash": {
+                            "type": "string",
+                            "pattern": "^[a-f0-9]{64}$"
+                          },
+                          "afterHash": {
+                            "type": "string",
+                            "pattern": "^[a-f0-9]{64}$"
+                          },
+                          "reasonCode": {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                          },
+                          "evidenceRefs": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                            },
+                            "minItems": 1,
+                            "maxItems": 100
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "stepId",
+                          "beforeHash",
+                          "afterHash",
+                          "reasonCode",
+                          "evidenceRefs"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["outcome"]
+                          },
+                          "result": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "failed",
+                              "inconclusive",
+                              "verified"
+                            ]
+                          },
+                          "evaluatorVersion": {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                          },
+                          "authoritative": {
+                            "type": "boolean"
+                          },
+                          "complete": {
+                            "type": "boolean"
+                          },
+                          "evidenceRefs": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                            },
+                            "maxItems": 100
+                          },
+                          "businessResult": {
+                            "type": "object",
+                            "properties": {
+                              "code": {
+                                "type": "string",
+                                "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                              },
+                              "value": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "unit": {
+                                "type": "string",
+                                "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$",
+                                "nullable": true
+                              }
+                            },
+                            "required": ["code", "value", "unit"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "result",
+                          "evaluatorVersion",
+                          "authoritative",
+                          "complete",
+                          "evidenceRefs",
+                          "businessResult"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["recurrence"]
+                          },
+                          "incidentId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "evidenceRefs": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                            },
+                            "minItems": 1,
+                            "maxItems": 100
+                          }
+                        },
+                        "required": ["kind", "incidentId", "evidenceRefs"],
+                        "additionalProperties": false
+                      }
+                    ]
+                  }
+                },
+                "required": ["id", "occurredAt", "fact"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "occurredAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "fact": {
+                      "discriminator": {
+                        "propertyName": "kind"
+                      },
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["cause"]
+                            },
+                            "code": {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": ["suspected", "confirmed", "rejected"]
+                            },
+                            "supportingEvidenceRefs": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                              },
+                              "maxItems": 100
+                            },
+                            "contradictingEvidenceRefs": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                              },
+                              "maxItems": 100
+                            },
+                            "basis": {
+                              "type": "string",
+                              "enum": [
+                                "model_hypothesis",
+                                "operator_investigation"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "code",
+                            "status",
+                            "supportingEvidenceRefs",
+                            "contradictingEvidenceRefs",
+                            "basis"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["repair_step"]
+                            },
+                            "stepId": {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                            },
+                            "actionCode": {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                            },
+                            "inputEvidenceRefs": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                              },
+                              "minItems": 1,
+                              "maxItems": 100
+                            },
+                            "actionHash": {
+                              "type": "string",
+                              "pattern": "^[a-f0-9]{64}$"
+                            },
+                            "startedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "finishedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "effortSeconds": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 31536000
+                            },
+                            "result": {
+                              "type": "string",
+                              "enum": ["accepted", "failed", "unknown"]
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "stepId",
+                            "actionCode",
+                            "inputEvidenceRefs",
+                            "actionHash",
+                            "startedAt",
+                            "finishedAt",
+                            "effortSeconds",
+                            "result"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["intervention"]
+                            },
+                            "stepId": {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                            },
+                            "reasonCode": {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                            },
+                            "effortSeconds": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 31536000
+                            },
+                            "evidenceRefs": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                              },
+                              "minItems": 1,
+                              "maxItems": 100
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "stepId",
+                            "reasonCode",
+                            "effortSeconds",
+                            "evidenceRefs"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["observation"]
+                            },
+                            "stepId": {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                            },
+                            "code": {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                            },
+                            "evidenceRefs": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                              },
+                              "minItems": 1,
+                              "maxItems": 100
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "stepId",
+                            "code",
+                            "evidenceRefs"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["human_edit"]
+                            },
+                            "stepId": {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                            },
+                            "beforeHash": {
+                              "type": "string",
+                              "pattern": "^[a-f0-9]{64}$"
+                            },
+                            "afterHash": {
+                              "type": "string",
+                              "pattern": "^[a-f0-9]{64}$"
+                            },
+                            "reasonCode": {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                            },
+                            "evidenceRefs": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                              },
+                              "minItems": 1,
+                              "maxItems": 100
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "stepId",
+                            "beforeHash",
+                            "afterHash",
+                            "reasonCode",
+                            "evidenceRefs"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["outcome"]
+                            },
+                            "result": {
+                              "type": "string",
+                              "enum": [
+                                "pending",
+                                "failed",
+                                "inconclusive",
+                                "verified"
+                              ]
+                            },
+                            "evaluatorVersion": {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                            },
+                            "authoritative": {
+                              "type": "boolean"
+                            },
+                            "complete": {
+                              "type": "boolean"
+                            },
+                            "evidenceRefs": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                              },
+                              "maxItems": 100
+                            },
+                            "businessResult": {
+                              "type": "object",
+                              "properties": {
+                                "code": {
+                                  "type": "string",
+                                  "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                                },
+                                "value": {
+                                  "type": "number",
+                                  "nullable": true
+                                },
+                                "unit": {
+                                  "type": "string",
+                                  "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$",
+                                  "nullable": true
+                                }
+                              },
+                              "required": ["code", "value", "unit"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "result",
+                            "evaluatorVersion",
+                            "authoritative",
+                            "complete",
+                            "evidenceRefs",
+                            "businessResult"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["recurrence"]
+                            },
+                            "incidentId": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "evidenceRefs": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                              },
+                              "minItems": 1,
+                              "maxItems": 100
+                            }
+                          },
+                          "required": ["kind", "incidentId", "evidenceRefs"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "sequence": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "exclusiveMinimum": 0
+                    },
+                    "actorId": {
+                      "type": "string"
+                    },
+                    "recordedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "occurredAt",
+                    "fact",
+                    "sequence",
+                    "actorId",
+                    "recordedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/exceptions/{exceptionId}/resolution-runs/{runId}": {
+      "get": {
+        "description": "Owners and admins can export the original context, ordered operator records, bound steps, execution and all verification attempts. A pending attempt without completion has no known result. Execution acceptance does not establish business success.",
+        "summary": "Read resolution learning history",
+        "tags": ["resolutionLearning"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "exceptionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "operationId": "resolutionLearning.read",
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "run": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "diagnosisRevision": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": 0
+                        },
+                        "resolution": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                            },
+                            "version": {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                            },
+                            "use": {
+                              "type": "string",
+                              "enum": [
+                                "created",
+                                "improved",
+                                "reused",
+                                "partner_specific"
+                              ]
+                            },
+                            "reasonCode": {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                            },
+                            "previousVersion": {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                            },
+                            "partnerCodeRef": {
+                              "type": "string",
+                              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                            }
+                          },
+                          "required": ["id", "version", "use", "reasonCode"],
+                          "additionalProperties": false
+                        },
+                        "schemaVersion": {
+                          "type": "number",
+                          "enum": [1]
+                        },
+                        "incidentId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "actorId": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "context": {
+                          "type": "object",
+                          "properties": {
+                            "evidenceRefs": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "mappingVersions": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "configVersion": {
+                              "type": "string"
+                            },
+                            "ruleVersion": {
+                              "type": "string"
+                            },
+                            "diagnosisVersion": {
+                              "type": "string"
+                            },
+                            "hypotheses": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "code": {
+                                    "type": "string"
+                                  },
+                                  "text": {
+                                    "type": "string"
+                                  },
+                                  "evidenceRefs": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "contradictingEvidenceRefs": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "uncertainty": {
+                                    "type": "string",
+                                    "enum": ["unsubstantiated"]
+                                  },
+                                  "missingChecks": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "origin": {
+                                    "type": "string",
+                                    "enum": ["rule", "model"]
+                                  }
+                                },
+                                "required": [
+                                  "code",
+                                  "text",
+                                  "evidenceRefs",
+                                  "contradictingEvidenceRefs",
+                                  "uncertainty",
+                                  "missingChecks",
+                                  "origin"
+                                ]
+                              }
+                            },
+                            "model": {
+                              "type": "object",
+                              "properties": {
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "disabled",
+                                    "used",
+                                    "unavailable",
+                                    "rejected"
+                                  ]
+                                },
+                                "model": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "promptVersion": {
+                                  "type": "string",
+                                  "nullable": true
+                                }
+                              },
+                              "required": ["status", "model", "promptVersion"]
+                            }
+                          },
+                          "required": [
+                            "evidenceRefs",
+                            "mappingVersions",
+                            "configVersion",
+                            "ruleVersion",
+                            "diagnosisVersion",
+                            "hypotheses",
+                            "model"
+                          ]
+                        },
+                        "generation": {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["manual", "generated"]
+                            },
+                            "reference": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["kind", "reference"]
+                        },
+                        "artifactDigest": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "diagnosisRevision",
+                        "resolution",
+                        "schemaVersion",
+                        "incidentId",
+                        "actorId",
+                        "createdAt",
+                        "context",
+                        "generation",
+                        "artifactDigest"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "events": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "occurredAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "fact": {
+                            "discriminator": {
+                              "propertyName": "kind"
+                            },
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": ["cause"]
+                                  },
+                                  "code": {
+                                    "type": "string",
+                                    "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                                  },
+                                  "status": {
+                                    "type": "string",
+                                    "enum": [
+                                      "suspected",
+                                      "confirmed",
+                                      "rejected"
+                                    ]
+                                  },
+                                  "supportingEvidenceRefs": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                                    },
+                                    "maxItems": 100
+                                  },
+                                  "contradictingEvidenceRefs": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                                    },
+                                    "maxItems": 100
+                                  },
+                                  "basis": {
+                                    "type": "string",
+                                    "enum": [
+                                      "model_hypothesis",
+                                      "operator_investigation"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "code",
+                                  "status",
+                                  "supportingEvidenceRefs",
+                                  "contradictingEvidenceRefs",
+                                  "basis"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": ["repair_step"]
+                                  },
+                                  "stepId": {
+                                    "type": "string",
+                                    "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                                  },
+                                  "actionCode": {
+                                    "type": "string",
+                                    "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                                  },
+                                  "inputEvidenceRefs": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                                    },
+                                    "minItems": 1,
+                                    "maxItems": 100
+                                  },
+                                  "actionHash": {
+                                    "type": "string",
+                                    "pattern": "^[a-f0-9]{64}$"
+                                  },
+                                  "startedAt": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "finishedAt": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "effortSeconds": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 31536000
+                                  },
+                                  "result": {
+                                    "type": "string",
+                                    "enum": ["accepted", "failed", "unknown"]
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "stepId",
+                                  "actionCode",
+                                  "inputEvidenceRefs",
+                                  "actionHash",
+                                  "startedAt",
+                                  "finishedAt",
+                                  "effortSeconds",
+                                  "result"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": ["intervention"]
+                                  },
+                                  "stepId": {
+                                    "type": "string",
+                                    "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                                  },
+                                  "reasonCode": {
+                                    "type": "string",
+                                    "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                                  },
+                                  "effortSeconds": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 31536000
+                                  },
+                                  "evidenceRefs": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                                    },
+                                    "minItems": 1,
+                                    "maxItems": 100
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "stepId",
+                                  "reasonCode",
+                                  "effortSeconds",
+                                  "evidenceRefs"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": ["observation"]
+                                  },
+                                  "stepId": {
+                                    "type": "string",
+                                    "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                                  },
+                                  "code": {
+                                    "type": "string",
+                                    "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                                  },
+                                  "evidenceRefs": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                                    },
+                                    "minItems": 1,
+                                    "maxItems": 100
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "stepId",
+                                  "code",
+                                  "evidenceRefs"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": ["human_edit"]
+                                  },
+                                  "stepId": {
+                                    "type": "string",
+                                    "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                                  },
+                                  "beforeHash": {
+                                    "type": "string",
+                                    "pattern": "^[a-f0-9]{64}$"
+                                  },
+                                  "afterHash": {
+                                    "type": "string",
+                                    "pattern": "^[a-f0-9]{64}$"
+                                  },
+                                  "reasonCode": {
+                                    "type": "string",
+                                    "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                                  },
+                                  "evidenceRefs": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                                    },
+                                    "minItems": 1,
+                                    "maxItems": 100
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "stepId",
+                                  "beforeHash",
+                                  "afterHash",
+                                  "reasonCode",
+                                  "evidenceRefs"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": ["outcome"]
+                                  },
+                                  "result": {
+                                    "type": "string",
+                                    "enum": [
+                                      "pending",
+                                      "failed",
+                                      "inconclusive",
+                                      "verified"
+                                    ]
+                                  },
+                                  "evaluatorVersion": {
+                                    "type": "string",
+                                    "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                                  },
+                                  "authoritative": {
+                                    "type": "boolean"
+                                  },
+                                  "complete": {
+                                    "type": "boolean"
+                                  },
+                                  "evidenceRefs": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                                    },
+                                    "maxItems": 100
+                                  },
+                                  "businessResult": {
+                                    "type": "object",
+                                    "properties": {
+                                      "code": {
+                                        "type": "string",
+                                        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                                      },
+                                      "value": {
+                                        "type": "number",
+                                        "nullable": true
+                                      },
+                                      "unit": {
+                                        "type": "string",
+                                        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$",
+                                        "nullable": true
+                                      }
+                                    },
+                                    "required": ["code", "value", "unit"],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "result",
+                                  "evaluatorVersion",
+                                  "authoritative",
+                                  "complete",
+                                  "evidenceRefs",
+                                  "businessResult"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": ["recurrence"]
+                                  },
+                                  "incidentId": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  "evidenceRefs": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$"
+                                    },
+                                    "minItems": 1,
+                                    "maxItems": 100
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "incidentId",
+                                  "evidenceRefs"
+                                ],
+                                "additionalProperties": false
+                              }
+                            ]
+                          },
+                          "sequence": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": 0
+                          },
+                          "actorId": {
+                            "type": "string"
+                          },
+                          "recordedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "occurredAt",
+                          "fact",
+                          "sequence",
+                          "actorId",
+                          "recordedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "steps": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "nullable": true
+                        }
+                      }
+                    },
+                    "executions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "nullable": true
+                        }
+                      }
+                    },
+                    "verifications": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "nullable": true
+                        }
+                      }
+                    },
+                    "failures": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "nullable": true
+                        }
+                      }
+                    },
+                    "incident": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "nullable": true
+                      }
+                    },
+                    "incidentVerifications": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "nullable": true
+                        }
+                      }
+                    },
+                    "recurrences": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "detectedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": ["id", "detectedAt"]
+                      }
+                    }
+                  },
+                  "required": [
+                    "run",
+                    "events",
+                    "steps",
+                    "executions",
+                    "verifications",
+                    "failures",
+                    "incident",
+                    "incidentVerifications",
+                    "recurrences"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/organizations/{organizationId}/exceptions/{exceptionId}/review": {
       "get": {
         "description": "Returns an immutable proposal, its current policy result and permitted decisions. Unavailable capabilities cannot be approved. Manual recommendations remain in the case investigation.",

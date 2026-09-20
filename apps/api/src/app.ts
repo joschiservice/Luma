@@ -1,4 +1,8 @@
 import {
+  createResolutionLearning,
+  learningRoutes,
+} from '#modules/workflows/composition';
+import {
   createDeskStore,
   createDeskService,
   createDeskWorkflowReader,
@@ -78,6 +82,7 @@ import { IdentityError } from '#modules/identity/index';
 import type { IdentityService } from '#modules/identity/index';
 
 export interface AppDependencies {
+  learning?: import('#modules/workflows/index').LearningService;
   desk?: import('#modules/workflows/index').DeskService;
   eventSettings?: { intervalMs: number; lifetimeMs: number };
   operations?: import('#modules/workflows/index').OperationsOverviewService;
@@ -229,6 +234,7 @@ export function buildApp(
       {
         exceptions: caseRoutes(dependencies.cases),
         caseDesk: deskRoutes(dependencies.desk),
+        resolutionLearning: learningRoutes(dependencies.learning),
         operations: operationsRoutes(dependencies.operations),
         identity: identityRoutes(dependencies.identity),
         connections: connectionRoutes(
@@ -361,6 +367,10 @@ export function buildRuntimeApp(
   const app = buildApp(options, {
     cases,
     desk,
+    learning: createResolutionLearning(
+      createTenantDatabase(casePool),
+      identity.service.refreshContext,
+    ),
     operations: createOperationsOverview(
       cases,
       createConnectionCoverage(createTenantDatabase(casePool)),

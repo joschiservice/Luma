@@ -57,6 +57,16 @@ export function createDetectionRepository(
   db: TenantDatabase,
 ): DetectionRepository {
   return {
+    verification: (tenantId, incidentId, entry) =>
+      db.transaction(tenantId, async (tx) => {
+        const attemptId = entry.attemptId ?? randomUUID();
+        await audit(tx, tenantId, incidentId, {
+          ...entry,
+          attemptId,
+          type: 'exception.verification_attempt',
+        });
+        return attemptId;
+      }),
     record: (value) =>
       db.transaction(value.request.input.facts.tenantId, async (tx) => {
         const { request, decision, fingerprint, now } = value;

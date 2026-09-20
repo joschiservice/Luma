@@ -14,6 +14,20 @@ export function createExecutionRepository(
   db: TenantDatabase,
 ): ExecutionRepository {
   return {
+    verification: (tenantId, entry) =>
+      db.transaction(tenantId, async (tx) => {
+        await tx.query(
+          'INSERT INTO execution_verifications(tenant_id,id,proposal_id,phase,document) VALUES($1,$2,$3,$4,$5)',
+          [tenantId, entry.id, entry.proposalId, entry.phase, entry],
+        );
+      }),
+    failure: (tenantId, entry) =>
+      db.transaction(tenantId, async (tx) => {
+        await tx.query(
+          'INSERT INTO execution_failures(tenant_id,id,proposal_id,document) VALUES($1,$2,$3,$4)',
+          [tenantId, entry.id, entry.proposalId, entry],
+        );
+      }),
     bindIntent: (action, hash) =>
       db.transaction(action.tenantId, async (tx) => {
         await tx.query(

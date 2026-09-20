@@ -66,10 +66,26 @@ export function LiveCaseDetail({
         }
       },
     });
+    const offline = () => {
+      // Stop queued stream updates from confirming state after connectivity is lost.
+      active = false;
+      generation++;
+      close();
+      setConnection('disconnected');
+    };
+    const online = () => {
+      setConnection('connecting');
+      setStreamAttempt((attempt) => attempt + 1);
+    };
+    window.addEventListener('offline', offline);
+    window.addEventListener('online', online);
+    if (!navigator.onLine) offline();
     return () => {
       active = false;
       generation++;
       close();
+      window.removeEventListener('offline', offline);
+      window.removeEventListener('online', online);
     };
   }, [client, organizationId, exceptionId, streamAttempt]);
   const refresh = () => {

@@ -1,3 +1,5 @@
+import { createResolutionLearning } from '#modules/workflows/composition';
+import { createSafetyServices as createAdmittedSafety } from '#app';
 import { createSafetyFixture as createSafetyServices } from '#test-support/safety-fixtures';
 import { createConnectionCoverage } from '#modules/connectors/composition';
 import { createTenantDatabase } from '#modules/platform/composition';
@@ -156,6 +158,382 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
     await admin.query(`DROP DATABASE IF EXISTS "${name}"`);
     await admin.query(`DROP ROLE IF EXISTS "${name}"`);
     await admin.end();
+  });
+  it('reconstructs a resolution run with repairs, delayed verification and recurrence', async () => {
+    now = new Date();
+    const evidenceId = randomUUID();
+    const source = request(evidenceId);
+    source.evidence[0]!.observedAt = now.toISOString();
+    const incident = (await services.exceptions.ingest(context(), source))
+      .incident!;
+    await services.diagnoses.run(context(), incident.id);
+    const db = createTenantDatabase(runtime);
+    const refreshContext = async (ctx: ReturnType<typeof context>) => ctx;
+    let outcome: 'passed' | 'failed' | 'inconclusive' = 'inconclusive';
+    const perform = vi.fn(async () => ({
+      evidenceRefs: [evidenceId],
+      providerRequestId: 'provider-43',
+    }));
+    const safety = createAdmittedSafety(
+      runtimeUrl,
+      { refreshContext },
+      {
+        resolve: async () => ({
+          capability: 'stock.correct',
+          version: '1',
+          minimumRisk: 'low',
+          mechanism: 'api',
+          executor: { kind: 'connector', id: 'fixture' },
+          checkPreconditions: async () => true,
+          execute: perform,
+          verify: async () => ({
+            outcome,
+            observationRefs: [evidenceId],
+            observedAt: new Date().toISOString(),
+            evaluatorVersion: 'stock-v1',
+          }),
+        }),
+      },
+      { eligible: async () => true },
+    );
+    const learning = createResolutionLearning(db, refreshContext, () => now);
+    const artifact = await safety.provisioning.activate(context(), {
+      id: 'stock-repair',
+      version: randomUUID(),
+      generation: { kind: 'generated', reference: 'generation-43' },
+      steps: {
+        execute: {
+          capability: 'stock.correct',
+          capabilityVersion: '1',
+          targetKind: 'sku',
+          minimumRisk: 'low',
+        },
+      },
+    });
+    const selection = {
+      id: randomUUID(),
+      diagnosisRevision: 1,
+      resolution: {
+        id: artifact.id,
+        version: artifact.version,
+        use: 'created',
+        reasonCode: 'restore_stock',
+      },
+    };
+    const run = await learning.start(context(), incident.id, selection);
+    const action = {
+      schemaVersion: 1 as const,
+      id: randomUUID(),
+      tenantId,
+      connectionId,
+      capability: 'stock.correct',
+      capabilityVersion: '1',
+      target: { kind: 'sku', id: randomUUID() },
+      parameters: { quantity: 3 },
+      expectedPostcondition: { quantity: 3 },
+      preconditions: {
+        evidenceRefs: [evidenceId],
+        validUntil: new Date(Date.now() + 60_000).toISOString(),
+      },
+      risk: 'low' as const,
+      proposedBy: { kind: 'user' as const, id: context().actor.id },
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    };
+    const append = (fact: unknown, id = randomUUID()) =>
+      learning.append(context(), incident.id, run.id, {
+        id,
+        occurredAt: now.toISOString(),
+        fact,
+      });
+    try {
+      expect(await learning.start(context(), incident.id, selection)).toEqual(
+        run,
+      );
+      await expect(
+        learning.start(context(), incident.id, {
+          ...selection,
+          resolution: { ...selection.resolution, reasonCode: 'different' },
+        }),
+      ).rejects.toThrow('already belongs');
+      await safety.provisioning.bind(context(), {
+        runId: run.id,
+        stepId: 'execute',
+        tenantId,
+        principalId: context().actor.id,
+        artifactId: artifact.id,
+        artifactVersion: artifact.version,
+        artifactDigest: artifact.digest,
+        incidentId: incident.id,
+        diagnosisRevision: 1,
+        action,
+      });
+      const cause = {
+        kind: 'cause',
+        code: 'mapping_error',
+        status: 'suspected',
+        basis: 'model_hypothesis',
+        supportingEvidenceRefs: [evidenceId],
+        contradictingEvidenceRefs: [],
+      };
+      await append(cause);
+      await expect(append({ ...cause, status: 'confirmed' })).rejects.toThrow(
+        'Model hypotheses',
+      );
+      await append({
+        ...cause,
+        status: 'confirmed',
+        basis: 'operator_investigation',
+      });
+      await append({
+        ...cause,
+        code: 'provider_outage',
+        status: 'rejected',
+        basis: 'operator_investigation',
+        contradictingEvidenceRefs: [evidenceId],
+      });
+      await append({
+        kind: 'repair_step',
+        stepId: 'repair-mapping',
+        actionCode: 'correct_mapping',
+        inputEvidenceRefs: [evidenceId],
+        actionHash: 'a'.repeat(64),
+        startedAt: new Date(now.getTime() - 60_000).toISOString(),
+        finishedAt: now.toISOString(),
+        effortSeconds: 45,
+        result: 'accepted',
+      });
+      await append({
+        kind: 'intervention',
+        stepId: 'execute',
+        reasonCode: 'operator_review',
+        effortSeconds: 20,
+        evidenceRefs: [evidenceId],
+      });
+      await append({
+        kind: 'human_edit',
+        stepId: 'execute',
+        beforeHash: 'a'.repeat(64),
+        afterHash: 'b'.repeat(64),
+        reasonCode: 'correct_quantity',
+        evidenceRefs: [evidenceId],
+      });
+      const observationId = randomUUID();
+      const observation = {
+        kind: 'observation',
+        stepId: 'execute',
+        code: 'provider_accepted',
+        evidenceRefs: [evidenceId],
+      };
+      const receipts = await Promise.all(
+        Array.from({ length: 4 }, () => append(observation, observationId)),
+      );
+      expect(new Set(receipts.map((r) => r.sequence)).size).toBe(1);
+      await expect(
+        append({ ...observation, code: 'changed' }, observationId),
+      ).rejects.toThrow('already belongs');
+      const business = {
+        kind: 'outcome',
+        result: 'pending',
+        evaluatorVersion: 'fixture-postcondition-v1',
+        authoritative: false,
+        complete: false,
+        evidenceRefs: [evidenceId],
+        businessResult: { code: 'stock_corrected', value: 3, unit: 'piece' },
+      };
+      await append(business);
+      await expect(
+        append({
+          ...business,
+          result: 'verified',
+          authoritative: true,
+          complete: true,
+        }),
+      ).rejects.toThrow('authoritative verification');
+      const reference = { runId: run.id, stepId: 'execute' };
+      expect((await safety.execution.execute(context(), reference)).state).toBe(
+        'reconciliation_required',
+      );
+      outcome = 'failed';
+      expect(
+        (await safety.execution.reconcile(context(), action.id)).state,
+      ).toBe('reconciliation_required');
+      outcome = 'passed';
+      expect(
+        (await safety.execution.reconcile(context(), action.id)).state,
+      ).toBe('succeeded');
+      expect(perform).toHaveBeenCalledTimes(1);
+      // Canonical verification is independent from the connector's successful action.
+      now = new Date();
+      const proof = verification(incident);
+      proof.evidence[0]!.observedAt = now.toISOString();
+      evaluate.mockRejectedValueOnce(new Error('private-customer-payload'));
+      await expect(
+        services.exceptions.verify(context(), incident.id),
+      ).rejects.toThrow();
+      evaluate.mockResolvedValueOnce({ ...proof, outcome: 'inconclusive' });
+      expect(await services.exceptions.verify(context(), incident.id)).toBe(
+        false,
+      );
+      evaluate.mockResolvedValueOnce(proof);
+      expect(await services.exceptions.verify(context(), incident.id)).toBe(
+        true,
+      );
+      await append({
+        ...business,
+        result: 'verified',
+        authoritative: true,
+        complete: true,
+        evidenceRefs: ['verification-1'],
+      });
+      const recurrenceSource = request(randomUUID());
+      recurrenceSource.evidence[0]!.observedAt = now.toISOString();
+      const recurrence = (
+        await services.exceptions.ingest(context(), recurrenceSource)
+      ).incident!;
+      await append({
+        kind: 'recurrence',
+        incidentId: recurrence.id,
+        evidenceRefs: [evidenceId],
+      });
+      const reopened = createResolutionLearning(db, refreshContext, () => now);
+      const history = await reopened.read(context(), incident.id, run.id);
+      expect(
+        (await reopened.list(context(), incident.id)).items.map(
+          (item) => item.id,
+        ),
+      ).toEqual([run.id]);
+      expect(
+        (await reopened.list(context(), incident.id, run.id)).items,
+      ).toEqual([]);
+      expect(history.run.context.evidenceRefs).toEqual([evidenceId]);
+      expect(history.run.context.configVersion).toBe(
+        defaultConfiguration.version,
+      );
+      expect(history.run.generation).toEqual({
+        kind: 'generated',
+        reference: 'generation-43',
+      });
+      expect(history.steps[0]!.action.parameters).toEqual({ quantity: 3 });
+      expect(history.executions[0]!.actionHash).toBe(
+        history.steps[0]!.actionHash,
+      );
+      expect(history.executions[0]!.attempt.providerRequestId).toBe(
+        'provider-43',
+      );
+      expect(
+        history.verifications.filter((v) => v.phase === 'pending'),
+      ).toHaveLength(3);
+      expect(
+        history.verifications
+          .filter((v) => v.phase === 'completed')
+          .map((v) => v.result?.outcome),
+      ).toEqual(['inconclusive', 'failed', 'passed']);
+      expect(history.incidentVerifications).toHaveLength(6);
+      expect(
+        history.incidentVerifications.filter((v) => v.phase === 'completed'),
+      ).toEqual([
+        expect.objectContaining({ failureCode: 'evaluation_failed' }),
+        expect.objectContaining({ outcome: 'inconclusive', accepted: false }),
+        expect.objectContaining({ outcome: 'passed', accepted: true }),
+      ]);
+      expect(JSON.stringify(history)).not.toContain('private-customer-payload');
+      expect(history.events.map((e) => e.sequence)).toEqual(
+        history.events.map((_, i) => i + 1),
+      );
+      expect(
+        history.events.every((e) => e.actorId === context().actor.id),
+      ).toBe(true);
+      expect(history.recurrences.map((r) => r.id)).toEqual([recurrence.id]);
+      expect(history.incident.resolution?.kind).toBe('verification');
+      await expect(
+        reopened.read(context(otherTenant), incident.id, run.id),
+      ).rejects.toThrow('not found');
+      await expect(
+        reopened.read(decisionActor('member', 'member'), incident.id, run.id),
+      ).rejects.toThrow('role');
+      await expect(
+        append({ ...observation, evidenceRefs: ['foreign-evidence'] }),
+      ).rejects.toThrow('belong to this incident');
+      await expect(
+        db.transaction(tenantId, (tx) =>
+          tx.query('UPDATE resolution_runs SET document=document WHERE id=$1', [
+            run.id,
+          ]),
+        ),
+      ).rejects.toThrow('permission denied');
+      await expect(
+        db.transaction(tenantId, (tx) =>
+          tx.query('DELETE FROM resolution_learning_events WHERE run_id=$1', [
+            run.id,
+          ]),
+        ),
+      ).rejects.toThrow('permission denied');
+      const historicalRunId = randomUUID();
+      const historicalBinding = {
+        runId: historicalRunId,
+        stepId: 'execute',
+        tenantId,
+        principalId: context().actor.id,
+        artifactId: artifact.id,
+        artifactVersion: artifact.version,
+        artifactDigest: artifact.digest,
+        incidentId: incident.id,
+        diagnosisRevision: 1,
+        action: { ...action, id: randomUUID() },
+      };
+      await safety.provisioning.bind(context(), historicalBinding);
+      await safety.provisioning.revoke(
+        context(),
+        artifact.id,
+        artifact.version,
+      );
+      await services.diagnoses.run(context(), recurrence.id);
+      await expect(
+        learning.start(context(), recurrence.id, {
+          ...selection,
+          id: historicalRunId,
+        }),
+      ).rejects.toThrow('binding conflicts');
+      await expect(
+        learning.start(context(), incident.id, {
+          ...selection,
+          id: historicalRunId,
+        }),
+      ).resolves.toMatchObject({ id: historicalRunId });
+      await expect(
+        learning.start(context(), incident.id, {
+          ...selection,
+          id: randomUUID(),
+        }),
+      ).rejects.toThrow('revoked');
+      await expect(
+        safety.provisioning.bind(context(), {
+          ...historicalBinding,
+          stepId: 'another',
+          action: { ...action, id: randomUUID() },
+        }),
+      ).rejects.toThrow('not activated');
+      const app = buildApp(
+        { logger: false },
+        {
+          learning: reopened,
+          identity: {
+            resolveTenant: async () => context(),
+          } as unknown as IdentityService,
+        },
+      );
+      try {
+        const response = await app.inject(
+          `/v1/organizations/${tenantId}/exceptions/${incident.id}/resolution-runs/${run.id}`,
+        );
+        expect(response.statusCode, response.body).toBe(200);
+        expect(response.json().verifications).toHaveLength(6);
+      } finally {
+        await app.close();
+      }
+    } finally {
+      await safety.close();
+    }
   });
   it('serves scoped overview counts, bounded priority and explicit metric availability', async () => {
     for (let i = 0; i < 7; i++) {
@@ -683,6 +1061,79 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
         incident.id,
       ))!.provenance.evidence.map((e) => e.id),
     ).toEqual(['cleared']);
+    const refreshContext = async (ctx: ReturnType<typeof context>) => ctx;
+    const safety = createAdmittedSafety(
+      runtimeUrl,
+      { refreshContext },
+      { resolve: async () => null },
+      { eligible: async () => true },
+    );
+    try {
+      const artifact = await safety.provisioning.activate(context(), {
+        id: 'diagnosis-evidence',
+        version: '1',
+        generation: { kind: 'generated', reference: 'fixture' },
+        steps: {
+          execute: {
+            capability: 'stock.correct',
+            capabilityVersion: '1',
+            targetKind: 'sku',
+            minimumRisk: 'low',
+          },
+        },
+      });
+      const learning = createResolutionLearning(
+        createTenantDatabase(runtime),
+        refreshContext,
+        () => now,
+      );
+      const diagnosis = (await services.diagnoses.get(context(), incident.id))!;
+      const run = await learning.start(context(), incident.id, {
+        id: randomUUID(),
+        diagnosisRevision: diagnosis.revision,
+        resolution: {
+          id: artifact.id,
+          version: artifact.version,
+          use: 'created',
+          reasonCode: 'investigate',
+        },
+      });
+      expect(run.context.evidenceRefs).toEqual(['cleared']);
+      const appendCause = (refs: string[]) =>
+        learning.append(context(), incident.id, run.id, {
+          id: randomUUID(),
+          occurredAt: now.toISOString(),
+          fact: {
+            kind: 'cause',
+            code: 'provider_outage',
+            status: 'rejected',
+            basis: 'operator_investigation',
+            supportingEvidenceRefs: [],
+            contradictingEvidenceRefs: refs,
+          },
+        });
+      await expect(appendCause(['cleared', 'deferred'])).resolves.toMatchObject(
+        { fact: { contradictingEvidenceRefs: ['cleared', 'deferred'] } },
+      );
+      await services.exceptions.ingest(
+        context(otherTenant),
+        request('foreign-tenant', otherTenant),
+      );
+      const foreign = request('foreign-incident');
+      if (foreign.input.exceptionClass !== 'sync_failure')
+        throw new Error('Fixture');
+      foreign.input.facts.connectionId = randomUUID();
+      foreign.input.facts.subjectId = foreign.input.facts.connectionId;
+      foreign.evidence[0]!.connectionId = foreign.input.facts.connectionId;
+      await services.exceptions.ingest(context(), foreign);
+      for (const key of ['foreign-tenant', 'foreign-incident']) {
+        await expect(appendCause([key])).rejects.toThrow(
+          'belong to this incident',
+        );
+      }
+    } finally {
+      await safety.close();
+    }
     const client = await owner.connect();
     try {
       await client.query('BEGIN');
@@ -1758,6 +2209,21 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
       await expect(
         services.exceptions.verify(context(), incident.id),
       ).rejects.toThrow();
+      const attempts = await owner.query(
+        "SELECT document FROM exception_outbox WHERE exception_id=$1 AND document->>'type'='exception.verification_attempt' AND document->>'phase'='completed'",
+        [incident.id],
+      );
+      expect(attempts.rows.map((row) => row.document)).toEqual([
+        expect.objectContaining(
+          field === 'tenant'
+            ? { failureCode: 'evaluation_failed' }
+            : {
+                outcome: 'passed',
+                accepted: false,
+                failureCode: 'resolution_rejected',
+              },
+        ),
+      ]);
       expect((await services.exceptions.list(context()))[0]?.state).toBe(
         'detected',
       );
@@ -1780,6 +2246,17 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
     await expect(
       services.exceptions.verify(context(), incident.id),
     ).rejects.toThrow('changed during verification');
+    const attempts = await owner.query(
+      "SELECT document FROM exception_outbox WHERE exception_id=$1 AND document->>'type'='exception.verification_attempt' AND document->>'phase'='completed'",
+      [incident.id],
+    );
+    expect(attempts.rows.map((row) => row.document)).toEqual([
+      expect.objectContaining({
+        outcome: 'passed',
+        accepted: false,
+        failureCode: 'resolution_rejected',
+      }),
+    ]);
     expect(
       (await services.exceptions.list(context()))[0]?.occurrenceCount,
     ).toBe(2);

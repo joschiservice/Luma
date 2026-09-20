@@ -116,7 +116,25 @@ export interface Evaluation {
   fingerprint: string;
   now: string;
 }
+export interface IncidentVerificationAttempt {
+  attemptId?: string;
+  phase: 'pending' | 'completed';
+  actorId: string;
+  occurredAt: string;
+  evaluatorVersion: string;
+  outcome?: 'passed' | 'failed' | 'inconclusive';
+  evidenceRefs?: string[];
+  authoritative?: boolean;
+  complete?: boolean;
+  accepted?: boolean;
+  failureCode?: 'evaluation_failed' | 'resolution_rejected';
+}
 export interface DetectionRepository {
+  verification(
+    tenantId: string,
+    incidentId: string,
+    entry: IncidentVerificationAttempt,
+  ): Promise<string>;
   record(value: Evaluation): Promise<DetectionResult>;
   get(
     tenantId: string,
@@ -234,30 +252,80 @@ export function createDetectionService(
       if (!snapshot) throw new Error('Exception not found');
       if (snapshot.incident.state === 'resolved')
         throw new Error('Exception already resolved');
-      const result = await verifier.evaluate(
-        context,
-        structuredClone(snapshot.incident),
-      );
-      const proof = boundary.resolution({
-        ...result,
-        kind: 'verification',
-        fingerprint: snapshot.incident.fingerprint,
-        configVersion: snapshot.incident.configVersion,
+      const started = {
+        phase: 'pending' as const,
+        actorId: context.actor.id,
+        occurredAt: now().toISOString(),
         evaluatorVersion: verifier.version,
-        incidentVersion: snapshot.version,
-        evidenceRefs: result.evidence.map((e) => e.key),
-      });
-      if (proof.kind !== 'verification')
-        throw new Error('Invalid verification result');
-      for (const evidence of proof.evidence)
-        requireTenant(context, evidence.tenantId);
-      return repository.resolve(
+      };
+      const attemptId = await repository.verification(
         context.tenantId,
         id,
-        proof,
-        context.actor.id,
-        now().toISOString(),
+        started,
       );
+      let proof: VerifiedDisposition;
+      try {
+        const result = await verifier.evaluate(
+          context,
+          structuredClone(snapshot.incident),
+        );
+        const parsed = boundary.resolution({
+          ...result,
+          kind: 'verification',
+          fingerprint: snapshot.incident.fingerprint,
+          configVersion: snapshot.incident.configVersion,
+          evaluatorVersion: verifier.version,
+          incidentVersion: snapshot.version,
+          evidenceRefs: result.evidence.map((e) => e.key),
+        });
+        if (parsed.kind !== 'verification')
+          throw new Error('Invalid verification result');
+        for (const evidence of parsed.evidence)
+          requireTenant(context, evidence.tenantId);
+        proof = parsed;
+      } catch (error) {
+        await repository.verification(context.tenantId, id, {
+          ...started,
+          attemptId,
+          phase: 'completed',
+          occurredAt: now().toISOString(),
+          failureCode: 'evaluation_failed',
+        });
+        throw error;
+      }
+      const completed = {
+        ...started,
+        attemptId,
+        phase: 'completed' as const,
+        outcome: proof.outcome,
+        evidenceRefs: proof.evidenceRefs,
+        authoritative: proof.authoritative,
+        complete: proof.complete,
+      };
+      let accepted: boolean;
+      try {
+        accepted = await repository.resolve(
+          context.tenantId,
+          id,
+          proof,
+          context.actor.id,
+          now().toISOString(),
+        );
+      } catch (error) {
+        await repository.verification(context.tenantId, id, {
+          ...completed,
+          occurredAt: now().toISOString(),
+          accepted: false,
+          failureCode: 'resolution_rejected',
+        });
+        throw error;
+      }
+      await repository.verification(context.tenantId, id, {
+        ...completed,
+        occurredAt: now().toISOString(),
+        accepted,
+      });
+      return accepted;
     },
     resolve(
       context: TenantContext,
