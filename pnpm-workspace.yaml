@@ -1,6 +1,7 @@
 packages:
   - apps/*
   - packages/*
+  - packages/connectors/*
 
 minimumReleaseAge: 0
 saveExact: true

@@ -1,12 +1,16 @@
 import { createFileRoute } from '@tanstack/react-router';
+
 import { AuthForm } from '../features/identity/auth-form';
 import { authSearch } from '../features/identity/data';
+
 export const Route = createFileRoute('/sign-up')({
   ssr: false,
   validateSearch: authSearch,
   component: Page,
 });
+
 function Page() {
   const { returnTo } = Route.useSearch();
+
   return <AuthForm signup={true} returnTo={returnTo} />;
 }

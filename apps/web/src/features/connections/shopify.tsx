@@ -1,12 +1,15 @@
-import { useRef, useState } from 'react';
-import { useForm } from '@tanstack/react-form';
 import { Button } from '@luma/ui/button';
 import { Input } from '@luma/ui/components/input';
+import { useForm } from '@tanstack/react-form';
+import { useRef, useState } from 'react';
+
 import { createWebApiClient } from '../../lib/api-client';
 import { IdentityError } from '../identity/data';
 import { connectionError } from './data';
 
 const api = createWebApiClient();
+
+/** Starts Shopify authorization for a workspace, optionally reconnecting a specified shop. */
 export function ShopifyForm({
   organizationId,
   shop = '',
@@ -55,6 +58,7 @@ export function ShopifyForm({
       }
     },
   });
+
   return (
     <form
       onSubmit={(event) => {

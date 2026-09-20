@@ -1,5 +1,6 @@
 import { QueryObserver } from '@tanstack/react-query';
 import { describe, expect, it } from 'vitest';
+
 import { createQueryClient } from './query-client';
 
 describe('request-scoped Query clients', () => {

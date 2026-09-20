@@ -1,11 +1,12 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, within } from 'storybook/test';
+
+import { caseFixture, inventoryCase } from './case-fixtures';
 import {
   CaseInvestigation,
   CaseLoading,
   CaseNotice,
 } from './case-investigation';
-import { inventoryCase, caseFixture } from './case-fixtures';
 
 const meta = {
   title: 'Cases/Investigation',
@@ -19,8 +20,11 @@ const meta = {
     ),
   ],
 } satisfies Meta<typeof CaseInvestigation>;
+
 export default meta;
+
 type Story = StoryObj<typeof meta>;
+
 export const Inventory: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -42,7 +46,9 @@ export const Inventory: Story = {
     await expect(canvas.getAllByText('Unknown')[0]).toBeVisible();
   },
 };
+
 export const Pending: Story = { args: { item: caseFixture('pending') } };
+
 export const MissingAuthority: Story = {
   args: { item: caseFixture('uncertain') },
   play: async ({ canvasElement }) => {
@@ -53,6 +59,7 @@ export const MissingAuthority: Story = {
     ).not.toBeInTheDocument();
   },
 };
+
 export const StaleEvidence: Story = {
   args: { item: caseFixture('stale') },
   play: async ({ canvasElement }) => {
@@ -65,21 +72,29 @@ export const StaleEvidence: Story = {
     ).not.toBeInTheDocument();
   },
 };
+
 export const InvestigationFailed: Story = {
   args: { item: caseFixture('failed') },
 };
+
 export const Verified: Story = { args: { item: caseFixture('resolved') } };
+
 export const SyncFailure: Story = {
   args: { item: caseFixture('sync_failure') },
 };
+
 export const StuckFulfillment: Story = {
   args: { item: caseFixture('stuck_fulfillment') },
 };
+
 export const WorkflowFailure: Story = {
   args: { item: caseFixture('workflow_failure') },
 };
+
 export const UnknownClass: Story = { args: { item: caseFixture('unknown') } };
+
 export const Loading: Story = { render: () => <CaseLoading /> };
+
 export const ReadFailure: Story = {
   render: () => (
     <CaseNotice error title="Case could not be refreshed">
@@ -87,6 +102,7 @@ export const ReadFailure: Story = {
     </CaseNotice>
   ),
 };
+
 export const EmptyAttention: Story = {
   render: () => (
     <CaseNotice title="Nothing needs you">
@@ -95,6 +111,7 @@ export const EmptyAttention: Story = {
     </CaseNotice>
   ),
 };
+
 export const Unobserved: Story = {
   render: () => (
     <CaseNotice title="No observations yet">

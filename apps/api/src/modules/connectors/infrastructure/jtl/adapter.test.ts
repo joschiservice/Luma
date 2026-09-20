@@ -1,28 +1,33 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { TenantContext } from '#modules/identity/index';
+
 import { createCapabilityRuntime } from '#modules/connectors/application/capabilities';
 import type {
   CapabilityInput,
   ReadCapability,
 } from '#modules/connectors/domain/capabilities';
-import { createJtlConnector } from '#modules/connectors/infrastructure/jtl/adapter';
 import type { JtlConnectorOptions } from '#modules/connectors/infrastructure/jtl/adapter';
-import commerce from './fixtures/commerce.json' with { type: 'json' };
+import { createJtlConnector } from '#modules/connectors/infrastructure/jtl/adapter';
 import {
   cloudId,
   cloudPayload,
 } from '#modules/connectors/infrastructure/jtl/fixtures/cloud';
+import type { TenantContext } from '#modules/identity/index';
+
+import commerce from './fixtures/commerce.json' with { type: 'json' };
 
 vi.mock('#modules/identity/index', () => ({
   requireTenant(context: TenantContext, tenantId: string) {
     if (context.tenantId !== tenantId) throw new Error('Tenant mismatch');
   },
 }));
+
 const context = {
   tenantId: 'tenant-a',
   requestId: 'request-a',
 } as TenantContext;
+
 const ref = (externalId: string) => ({ externalId, scopeKey: '' });
+
 function fixture(overrides: Partial<JtlConnectorOptions> = {}) {
   const data = structuredClone(commerce);
   const cloud = overrides.connection?.kind === 'cloud';
@@ -35,9 +40,11 @@ function fixture(overrides: Partial<JtlConnectorOptions> = {}) {
         String(Number(id)),
       )
       .replace(/^\/erp\/v2\/|^\/api\/eazybusiness\//, '');
+
     function page(items: unknown[]) {
       const pageNumber = Number(url.searchParams.get('pageNumber'));
       const pageSize = Number(url.searchParams.get('pageSize'));
+
       return json({
         items: items.slice((pageNumber - 1) * pageSize, pageNumber * pageSize),
         totalItems: items.length,
@@ -45,6 +52,7 @@ function fixture(overrides: Partial<JtlConnectorOptions> = {}) {
         pageSize,
       });
     }
+
     if (path === 'items') return page(data.items);
     if (path === 'sales-orders') return page(data.orders);
     if (path === 'sales-orders/10/line-items') return json(data.orderLines);
@@ -54,6 +62,7 @@ function fixture(overrides: Partial<JtlConnectorOptions> = {}) {
     const match = /^delivery-notes\/(30|31)(\/line-items)?$/.exec(path);
     if (match) {
       const index = Number(match[1]) - 30;
+
       return match[2]
         ? page(data.noteLines[index] ?? [])
         : json(data.details[index]);
@@ -93,6 +102,7 @@ function fixture(overrides: Partial<JtlConnectorOptions> = {}) {
       version: '0',
       input,
     });
+
   return { data, fetch, apiKey, recordObservations, connection, runtime, read };
 }
 

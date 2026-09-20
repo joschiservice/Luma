@@ -1,11 +1,12 @@
-import type { TenantContext } from '#modules/identity/index';
 import type {
+  FulfillmentSnapshot,
+  InventorySnapshot,
   Observation,
   OrderSnapshot,
-  InventorySnapshot,
-  FulfillmentSnapshot,
   SourceIdentity,
 } from '#modules/connectors/domain/capabilities';
+import type { TenantContext } from '#modules/identity/index';
+
 export type CommerceObservation =
   | { capability: 'orders.read'; observation: Observation<OrderSnapshot> }
   | {
@@ -16,17 +17,21 @@ export type CommerceObservation =
       capability: 'fulfillment.read';
       observation: Observation<FulfillmentSnapshot>;
     };
+
 export interface SourceRecords {
+  /** Stores an observation idempotently; an ingest key reused for different content is rejected. */
   record(
     context: TenantContext,
     ingestKey: string,
     input: CommerceObservation,
   ): Promise<CommerceObservation>;
+  /** Reads a previously stored observation from this tenant, or null when absent. */
   get(
     context: TenantContext,
     connectionId: string,
     ingestKey: string,
   ): Promise<CommerceObservation | null>;
+  /** Records an evidence-backed mapping to an existing canonical entity; requires an owner or admin. */
   bind(
     context: TenantContext,
     source: SourceIdentity,
@@ -34,6 +39,7 @@ export interface SourceRecords {
     observationId: string,
     method: string,
   ): Promise<void>;
+  /** Returns the current canonical mapping for this source, or null when none exists. */
   resolve(
     context: TenantContext,
     source: SourceIdentity,

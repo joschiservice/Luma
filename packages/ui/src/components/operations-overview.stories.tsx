@@ -1,8 +1,10 @@
+import type { OperationsOverview as Summary } from '@luma/api-contract';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, within } from 'storybook/test';
-import type { OperationsOverview as Summary } from '@luma/api-contract';
-import { OperationsOverview } from './operations-overview';
+
 import { inventoryCase } from './case-fixtures';
+import { OperationsOverview } from './operations-overview';
+
 const data: Summary = {
   generatedAt: '2026-09-19T09:00:00.000Z',
   window: {
@@ -26,6 +28,7 @@ const data: Summary = {
   automation: { numerator: 9, denominator: 12 },
   prioritizedDecisions: [],
 };
+
 const meta = {
   title: 'Operations/Overview',
   component: OperationsOverview,
@@ -46,8 +49,11 @@ const meta = {
     ),
   ],
 } satisfies Meta<typeof OperationsOverview>;
+
 export default meta;
+
 type Story = StoryObj<typeof meta>;
+
 export const Healthy: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
@@ -75,6 +81,7 @@ export const Healthy: Story = {
     ).toHaveFocus();
   },
 };
+
 export const AttentionNeeded: Story = {
   args: {
     data: {
@@ -95,6 +102,7 @@ export const AttentionNeeded: Story = {
     await expect(link).toHaveAttribute('href', `#${inventoryCase.id}`);
   },
 };
+
 export const Onboarding: Story = {
   args: {
     data: {
@@ -106,6 +114,7 @@ export const Onboarding: Story = {
     },
   },
 };
+
 export const NoObservations: Story = {
   args: {
     data: {
@@ -118,6 +127,7 @@ export const NoObservations: Story = {
     },
   },
 };
+
 export const Stale: Story = {
   args: {
     data: {
@@ -130,6 +140,7 @@ export const Stale: Story = {
     },
   },
 };
+
 export const Degraded: Story = {
   args: {
     data: {
@@ -138,9 +149,11 @@ export const Degraded: Story = {
     },
   },
 };
+
 export const AttributionUnavailable: Story = {
   args: { data: { ...data, automaticallyResolved: null, automation: null } },
 };
+
 export const NoEligibleExceptions: Story = {
   args: {
     data: {
@@ -150,9 +163,11 @@ export const NoEligibleExceptions: Story = {
     },
   },
 };
+
 export const Loading: Story = {
   args: { data: undefined, loading: true, refreshing: true },
 };
+
 export const ServiceFailure: Story = {
   args: { error: true },
   play: async ({ canvasElement, args }) => {
@@ -174,6 +189,7 @@ const retired: Summary['connections'][number] = {
   freshness: 'unobserved',
   lastObservedAt: null,
 };
+
 export const HealthyWithRetiredConnection: Story = {
   args: { data: { ...data, connections: [...data.connections, retired] } },
   play: async ({ canvasElement }) => {
@@ -189,6 +205,7 @@ export const HealthyWithRetiredConnection: Story = {
     ).not.toBeInTheDocument();
   },
 };
+
 export const AllConnectionsRetired: Story = {
   args: { data: { ...data, connections: [retired] } },
   play: async ({ canvasElement }) => {
@@ -201,6 +218,7 @@ export const AllConnectionsRetired: Story = {
     ).not.toBeInTheDocument();
   },
 };
+
 export const RevokedConnection: Story = {
   args: {
     data: {
@@ -214,6 +232,7 @@ export const RevokedConnection: Story = {
     ).toBeVisible();
   },
 };
+
 export const OfflineAfterSuccess: Story = {
   args: { paused: true },
   play: async ({ canvasElement }) => {
@@ -230,6 +249,7 @@ export const OfflineAfterSuccess: Story = {
     ).toBeDisabled();
   },
 };
+
 export const OfflineBeforeFirstLoad: Story = {
   args: { paused: true, loading: true, data: undefined },
   play: async ({ canvasElement }) => {

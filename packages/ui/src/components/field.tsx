@@ -1,7 +1,7 @@
-import type { ComponentProps } from 'react';
 import { cn } from '@luma/ui/lib/utils';
+import type { ComponentProps } from 'react';
 
-// The small subset of shadcn Field used by Luma's initial forms.
+/** Groups related form fields with consistent vertical spacing. */
 function FieldGroup({ className, ...props }: ComponentProps<'div'>) {
   return (
     <div
@@ -12,6 +12,10 @@ function FieldGroup({ className, ...props }: ComponentProps<'div'>) {
   );
 }
 
+/**
+ * Groups a field's label, input, and feedback; accepts disabled and invalid state data
+ * attributes.
+ */
 function Field({ className, ...props }: ComponentProps<'div'>) {
   return (
     <div
@@ -23,6 +27,7 @@ function Field({ className, ...props }: ComponentProps<'div'>) {
   );
 }
 
+/** Renders a field label; pass htmlFor to associate it with the input. */
 function FieldLabel({ className, ...props }: ComponentProps<'label'>) {
   return (
     <label
@@ -36,6 +41,7 @@ function FieldLabel({ className, ...props }: ComponentProps<'label'>) {
   );
 }
 
+/** Renders field help text; link its ID from the input's aria-describedby when applicable. */
 function FieldDescription({ className, ...props }: ComponentProps<'p'>) {
   return (
     <p
@@ -46,13 +52,17 @@ function FieldDescription({ className, ...props }: ComponentProps<'p'>) {
   );
 }
 
+/**
+ * Announces validation feedback, deduplicating supplied error messages unless explicit
+ * children are provided.
+ */
 function FieldError({
   className,
   children,
   errors,
   ...props
 }: ComponentProps<'div'> & {
-  errors?: ReadonlyArray<{ message?: string } | undefined>;
+  errors?: readonly ({ message?: string } | undefined)[];
 }) {
   const messages = [
     ...new Set(
@@ -71,6 +81,7 @@ function FieldError({
       </ul>
     ) : null);
   if (!content) return null;
+
   return (
     <div
       role="alert"
@@ -83,4 +94,4 @@ function FieldError({
   );
 }
 
-export { Field, FieldLabel, FieldDescription, FieldError, FieldGroup };
+export { Field, FieldDescription, FieldError, FieldGroup, FieldLabel };

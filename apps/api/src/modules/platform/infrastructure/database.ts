@@ -1,5 +1,11 @@
 import type { Pool } from 'pg';
+
 import type { TenantDatabase } from '#modules/platform/application/database';
+
+/**
+ * Runs operations in transactions with a transaction-local tenant setting; commits on
+ * success and rolls back on failure.
+ */
 export function createTenantDatabase(pool: Pool): TenantDatabase {
   return {
     async transaction(tenantId, operation) {
@@ -11,6 +17,7 @@ export function createTenantDatabase(pool: Pool): TenantDatabase {
         ]);
         const result = await operation(client);
         await client.query('COMMIT');
+
         return result;
       } catch (error) {
         await client.query('ROLLBACK');

@@ -15,6 +15,7 @@ export const contactSchema = z.object({
 });
 
 export type ContactInput = z.input<typeof contactSchema>;
+
 export type Contact = z.output<typeof contactSchema>;
 
 export const saveContactResultSchema = z.discriminatedUnion('kind', [

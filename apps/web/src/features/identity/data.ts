@@ -1,19 +1,29 @@
+import { type QueryClient, queryOptions } from '@tanstack/react-query';
 import { createAuthClient } from 'better-auth/client';
-import { queryOptions, type QueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
+
 import { createWebApiClient } from '../../lib/api-client';
+import { privateQueryDefaults } from '../../lib/private-query';
 
 export const auth = createAuthClient({
   basePath: '/api/auth',
   fetchOptions: { retry: 0 },
 });
+
 const api = createWebApiClient();
+
 export const sessionKey = ['private', 'session'] as const;
+
 export class IdentityError extends Error {
   constructor(public status: number) {
     super('Identity request failed');
   }
 }
+
+/**
+ * Returns a local application path, falling back to /app for external, malformed, or
+ * unsupported destinations.
+ */
 export function returnPath(value: unknown): string {
   if (typeof value !== 'string' || /[\\\s%]/.test(value)) return '/app';
   try {
@@ -24,19 +34,24 @@ export function returnPath(value: unknown): string {
       !(url.pathname === '/app' || url.pathname.startsWith('/app/'))
     )
       return '/app';
+
     return url.pathname + url.search + url.hash;
   } catch {
     return '/app';
   }
 }
+
 export const authSearch = z.object({
   returnTo: z.unknown().optional().transform(returnPath),
 });
+
 export const workspaceName = z
   .string()
   .trim()
   .min(1, 'Enter a workspace name.')
   .max(200, 'Use 200 characters or fewer.');
+
+/** Builds a normalized workspace slug with a random suffix to reduce naming collisions. */
 export function organizationSlug(name: string) {
   const stem =
     name
@@ -46,8 +61,11 @@ export function organizationSlug(name: string) {
       .replace(/^-|-$/g, '')
       .slice(0, 70)
       .replace(/-$/, '') || 'workspace';
+
   return `${stem}-${crypto.randomUUID().slice(0, 8)}`;
 }
+
+/** Cancels and removes private queries, optionally limited to one organization. */
 export async function clearPrivate(
   client: QueryClient,
   organizationId?: string,
@@ -58,13 +76,17 @@ export async function clearPrivate(
   await client.cancelQueries({ queryKey });
   client.removeQueries({ queryKey });
 }
+
 const privateOptions = {
-  staleTime: 0,
-  gcTime: 0,
-  retry: false,
+  ...privateQueryDefaults,
   refetchOnMount: 'always',
   refetchOnWindowFocus: 'always',
 } as const;
+
+/**
+ * Reads the current session without retaining unused private data; returns null when signed
+ * out.
+ */
 export const sessionOptions = () =>
   queryOptions({
     ...privateOptions,
@@ -74,11 +96,14 @@ export const sessionOptions = () =>
         fetchOptions: { signal, cache: 'no-store' },
       });
       if (result.error) throw new IdentityError(result.error.status);
+
       return result.data
         ? { user: { id: result.data.user.id, name: result.data.user.name } }
         : null;
     },
   });
+
+/** Loads the current user's organizations with immediate staleness and no automatic retries. */
 export const organizationsOptions = () =>
   queryOptions({
     ...privateOptions,
@@ -88,9 +113,15 @@ export const organizationsOptions = () =>
         fetchOptions: { signal, cache: 'no-store' },
       });
       if (result.status !== 200) throw new IdentityError(result.status);
+
       return result.body.items;
     },
   });
+
+/**
+ * Loads the current tenant context for an organization; invalid IDs are reported as not
+ * found.
+ */
 export const contextOptions = (organizationId: string) =>
   queryOptions({
     ...privateOptions,
@@ -103,9 +134,15 @@ export const contextOptions = (organizationId: string) =>
         fetchOptions: { signal, cache: 'no-store' },
       });
       if (result.status !== 200) throw new IdentityError(result.status);
+
       return result.body;
     },
   });
+
+/**
+ * Creates an EU workspace with a validated name and generated slug; rejects unsuccessful API
+ * responses.
+ */
 export async function createOrganization(name: string) {
   const result = await api.identity.createOrganization({
     body: {
@@ -115,5 +152,6 @@ export async function createOrganization(name: string) {
     },
   });
   if (result.status !== 201) throw new IdentityError(result.status);
+
   return result.body;
 }

@@ -1,10 +1,14 @@
 export { createDetectionPipeline } from '#modules/workflows/application/detection';
+
 export type {
-  InventoryMapping,
   FulfillmentMapping,
+  InventoryMapping,
 } from '#modules/workflows/application/detection';
+
 export { createDiagnosisRereader } from '#modules/workflows/application/diagnosis';
+
 export type { DiagnosisReadPlan } from '#modules/workflows/application/diagnosis';
+
 export type {
   ExceptionActivities,
   ExceptionWorkflowInput,
@@ -15,27 +19,31 @@ export type {
 } from '#modules/workflows/application/runtime';
 
 export { createCommerceIngestion } from '#modules/workflows/application/commerce';
+
 export type { ProjectionOutcome } from '#modules/workflows/application/commerce';
 
 export type { OperationsOverviewService } from '#modules/workflows/application/overview';
+
 export type {
-  DeskService,
   DeskDependencies,
+  DeskService,
   DeskStore,
 } from '#modules/workflows/application/desk';
 
 export type {
-  PlaybookDefinition,
-  PlaybookVersion,
   PlaybookActivation,
+  PlaybookDefinition,
   PlaybookIR,
   PlaybookSnapshot,
+  PlaybookVersion,
 } from '#modules/workflows/domain/playbook';
+
 export type {
-  PlaybookRun,
   PlaybookOutcome,
+  PlaybookRun,
   PlaybookService,
 } from '#modules/workflows/application/playbook';
+
 export { shippingMethodPlaybook } from '#modules/workflows/domain/shipping-method-playbook';
 
 export type {

@@ -7,6 +7,7 @@ const levels = [
   'trace',
   'silent',
 ] as const;
+
 type LogLevel = (typeof levels)[number];
 
 export interface ApiConfig {
@@ -28,6 +29,7 @@ export function readApiConfig(
   const logLevel = env.LOG_LEVEL ?? 'info';
   if (!levels.includes(logLevel as LogLevel))
     throw new Error('LOG_LEVEL is invalid');
+
   return { host, port: Number(port), logLevel: logLevel as LogLevel };
 }
 
@@ -38,6 +40,11 @@ export interface IdentityConfig {
   trustedOrigins: string[];
   cookiePrefix?: string;
 }
+
+/**
+ * Reads and validates server-only identity settings; production trusted origins must use
+ * HTTPS.
+ */
 export function readIdentityConfig(
   env: Readonly<Record<string, string | undefined>>,
 ): IdentityConfig {
@@ -86,6 +93,7 @@ export function readIdentityConfig(
     throw new Error(
       'BETTER_AUTH_COOKIE_PREFIX must contain 1–64 letters, numbers, underscores or hyphens',
     );
+
   return {
     databaseUrl,
     secret,
@@ -96,12 +104,19 @@ export function readIdentityConfig(
 }
 
 export { readObservabilityConfig } from './observability.js';
+
 export type { ObservabilityConfig } from './observability.js';
+
 export { readModelGatewayConfig } from './model-gateway.js';
+
 export type { ModelGatewayConfig } from './model-gateway.js';
+
 export { readWorkflowConfig } from './workflows.js';
+
 export type { WorkflowConfig } from './workflows.js';
+
 export { readConnectionsConfig } from './connections.js';
+
 export type { ConnectionsConfig } from './connections.js';
 
 export type { ShopifyConfig } from './shopify.js';

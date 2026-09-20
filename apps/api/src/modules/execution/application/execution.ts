@@ -1,21 +1,21 @@
-import type {
-  ExecutionFailure,
-  VerificationAttempt,
-} from '#modules/execution/application/history';
-import { requireRole, requireTenant } from '#modules/identity/index';
-import type { TenantContext } from '#modules/identity/index';
-import type {
-  PolicyService,
-  ProposedAction,
-  Provenance,
-  PolicyDecision,
-} from '#modules/policies/index';
+import type { AuditEntry, AuditLog } from '#modules/audit/index';
 import type {
   EffectRegistry,
   VerificationResult,
 } from '#modules/connectors/index';
 import { ConnectorError } from '#modules/connectors/index';
-import type { AuditEntry, AuditLog } from '#modules/audit/index';
+import type {
+  ExecutionFailure,
+  VerificationAttempt,
+} from '#modules/execution/application/history';
+import type { TenantContext } from '#modules/identity/index';
+import { requireRole, requireTenant } from '#modules/identity/index';
+import type {
+  PolicyDecision,
+  PolicyService,
+  ProposedAction,
+  Provenance,
+} from '#modules/policies/index';
 
 function sameExecutor(current: Provenance, reserved: Provenance): boolean {
   return (
@@ -67,6 +67,7 @@ export interface ExecutionRecord {
     verification?: VerificationResult;
   };
 }
+
 export interface ExecutionRepository {
   verification(tenantId: string, entry: VerificationAttempt): Promise<void>;
   failure(tenantId: string, entry: ExecutionFailure): Promise<void>;
@@ -83,6 +84,7 @@ export interface ExecutionRepository {
   pending(tenantId: string, proposalId: string): Promise<AuditEntry[]>;
   delivered(tenantId: string, eventId: string): Promise<void>;
 }
+
 export interface ExecutionDependencies {
   repository: ExecutionRepository;
   policies: PolicyService;
@@ -95,6 +97,7 @@ export interface ExecutionDependencies {
   now(): Date;
   id(): string;
 }
+
 export type ExecutionResult =
   | { state: 'denied' | 'approval_required'; decision: PolicyDecision }
   | {
@@ -102,6 +105,10 @@ export type ExecutionResult =
       record: ExecutionRecord;
     };
 
+/**
+ * Creates guarded action execution and reconciliation with policy checks, durable attempts,
+ * and audit evidence.
+ */
 export function createExecutionService(deps: ExecutionDependencies) {
   async function flush(tenantId: string, proposalId: string) {
     for (const entry of await deps.repository.pending(tenantId, proposalId)) {
@@ -109,6 +116,7 @@ export function createExecutionService(deps: ExecutionDependencies) {
       await deps.repository.delivered(tenantId, entry.id);
     }
   }
+
   function event(
     context: TenantContext,
     action: ProposedAction,
@@ -137,6 +145,7 @@ export function createExecutionService(deps: ExecutionDependencies) {
       details,
     };
   }
+
   function result(record: ExecutionRecord): ExecutionResult {
     return {
       state:
@@ -146,19 +155,24 @@ export function createExecutionService(deps: ExecutionDependencies) {
       record,
     };
   }
+
   async function existing(tenantId: string, proposalId: string, hash: string) {
     const record = await deps.repository.get(tenantId, proposalId);
     if (record && record.actionHash !== hash)
       throw new Error('Idempotency key conflicts with existing intent');
+
     return record;
   }
+
   function verified(input: unknown, startedAt: string) {
     const observation = deps.parseVerification(input);
     const observedAt = Date.parse(observation.observedAt);
     if (observedAt < Date.parse(startedAt) || observedAt > deps.now().getTime())
       throw new Error('Verification observation is not fresh');
+
     return observation;
   }
+
   function failure(
     error: unknown,
     proposalId: string,
@@ -180,6 +194,7 @@ export function createExecutionService(deps: ExecutionDependencies) {
       'transient',
       'internal',
     ];
+
     return {
       id: deps.id(),
       proposalId,
@@ -197,6 +212,7 @@ export function createExecutionService(deps: ExecutionDependencies) {
         : {}),
     };
   }
+
   async function observe(
     context: TenantContext,
     record: ExecutionRecord,
@@ -228,8 +244,10 @@ export function createExecutionService(deps: ExecutionDependencies) {
       finishedAt: deps.now().toISOString(),
       result: observation,
     });
+
     return observation;
   }
+
   return {
     async get(
       context: TenantContext,
@@ -242,6 +260,7 @@ export function createExecutionService(deps: ExecutionDependencies) {
       const record = await deps.repository.get(fresh.tenantId, proposalId);
       if (!record) return null;
       await flush(fresh.tenantId, proposalId);
+
       return result(record);
     },
     async execute(
@@ -268,6 +287,7 @@ export function createExecutionService(deps: ExecutionDependencies) {
       const previous = await existing(context.tenantId, action.id, hash);
       if (previous) {
         await flush(context.tenantId, action.id);
+
         return result(previous);
       }
       const adapter = await deps.registry.resolve(context, action);
@@ -340,6 +360,7 @@ export function createExecutionService(deps: ExecutionDependencies) {
       if (!(await deps.repository.prepare(record, prepared))) {
         const winner = await existing(context.tenantId, action.id, hash);
         if (!winner) throw new Error('Execution reservation missing');
+
         return result(winner);
       }
       // A durable reservation is never automatically redelivered after a crash.
@@ -377,6 +398,7 @@ export function createExecutionService(deps: ExecutionDependencies) {
           ),
         );
         await flush(context.tenantId, action.id);
+
         return result(record);
       }
       let phase: ExecutionFailure['phase'] = 'dispatch';
@@ -465,6 +487,7 @@ export function createExecutionService(deps: ExecutionDependencies) {
       ];
       await deps.repository.finish(record, 'prepared', completion);
       await flush(context.tenantId, action.id);
+
       return result((await existing(context.tenantId, action.id, hash))!);
     },
     async reconcile(
@@ -526,10 +549,12 @@ export function createExecutionService(deps: ExecutionDependencies) {
       reconciled.evidenceRefs = verification.observationRefs;
       await deps.repository.finish(record, expectedState, reconciled);
       await flush(context.tenantId, proposalId);
+
       return result(
         (await existing(context.tenantId, proposalId, record.actionHash))!,
       );
     },
   };
 }
+
 export type ExecutionService = ReturnType<typeof createExecutionService>;

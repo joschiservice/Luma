@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
+
 import { learningCommandSchema, startResolutionRunSchema } from './learning.js';
+
 const id = 'a2336206-b73a-48f3-8dc0-912ebae80f50';
+
 const command = (fact: unknown) => ({
   id,
   occurredAt: '2026-09-20T08:00:00.000Z',
   fact,
 });
+
 describe('resolution learning contracts', () => {
   it('requires a prior version or code reference for the corresponding reuse classification', () => {
     const input = {

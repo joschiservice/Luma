@@ -13,6 +13,7 @@ export function equalJson(left: unknown, right: unknown): boolean {
   const leftFields = left as Record<string, unknown>;
   const rightFields = right as Record<string, unknown>;
   const keys = Object.keys(leftFields);
+
   return (
     keys.length === Object.keys(rightFields).length &&
     keys.every(

@@ -1,7 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, within } from 'storybook/test';
+
+import { resolutionProgress, resolutionReview } from './resolution-fixtures';
 import { ResolutionReview } from './resolution-review';
-import { resolutionReview, resolutionProgress } from './resolution-fixtures';
+
 const meta = {
   title: 'Cases/Resolution review',
   component: ResolutionReview,
@@ -19,8 +21,11 @@ const meta = {
     ),
   ],
 } satisfies Meta<typeof ResolutionReview>;
+
 export default meta;
+
 type Story = StoryObj<typeof meta>;
+
 export const ApprovalRequired: Story = {
   play: async ({ canvasElement, args }) => {
     const c = within(canvasElement);
@@ -38,6 +43,7 @@ export const ApprovalRequired: Story = {
     await expect(c.getByText('Verification: Not recorded')).toBeVisible();
   },
 };
+
 export const Automatic: Story = {
   args: {
     review: {
@@ -61,6 +67,7 @@ export const Automatic: Story = {
     ).not.toBeInTheDocument();
   },
 };
+
 export const Denied: Story = {
   args: {
     review: {
@@ -84,6 +91,7 @@ export const Denied: Story = {
     ).not.toBeInTheDocument();
   },
 };
+
 export const Rejected: Story = {
   args: {
     review: {
@@ -101,6 +109,7 @@ export const Rejected: Story = {
     },
   },
 };
+
 export const Approved: Story = {
   args: {
     review: {
@@ -118,6 +127,7 @@ export const Approved: Story = {
     },
   },
 };
+
 export const Escalated: Story = {
   args: {
     review: { ...resolutionReview, permittedDecisions: [] },
@@ -128,6 +138,7 @@ export const Escalated: Story = {
     },
   },
 };
+
 export const Pending: Story = {
   args: { pending: true },
   play: async ({ canvasElement }) => {
@@ -135,9 +146,11 @@ export const Pending: Story = {
       await expect(button).toBeDisabled();
   },
 };
+
 export const PermissionLost: Story = {
   args: { review: { ...resolutionReview, permittedDecisions: [] } },
 };
+
 export const Unavailable: Story = {
   args: {
     review: {

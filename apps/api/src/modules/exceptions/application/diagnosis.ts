@@ -1,15 +1,15 @@
-import { requireTenant } from '#modules/identity/index';
+import type {
+  Diagnosis,
+  DiagnosisInput,
+} from '#modules/exceptions/domain/diagnosis';
+import { diagnose } from '#modules/exceptions/domain/diagnosis';
 import type { TenantContext } from '#modules/identity/index';
+import { requireTenant } from '#modules/identity/index';
 import type {
   ModelGateway,
   ModelSchema,
   TraceContext,
 } from '#modules/platform/index';
-import { diagnose } from '#modules/exceptions/domain/diagnosis';
-import type {
-  Diagnosis,
-  DiagnosisInput,
-} from '#modules/exceptions/domain/diagnosis';
 
 export interface DiagnosisRepository {
   current(
@@ -23,9 +23,11 @@ export interface DiagnosisRepository {
   history(tenantId: string, exceptionId: string): Promise<Diagnosis[]>;
   complete(tenantId: string, document: Diagnosis): Promise<boolean>;
 }
+
 export interface ReasoningSelection {
   hypotheses: { code: string; evidenceRefs: string[] }[];
 }
+
 /** Installed by workflows. Only scoped read capabilities and detection ingestion may run here. */
 export interface DiagnosisRereader {
   read(
@@ -37,10 +39,16 @@ export interface DiagnosisRereader {
     retryAfter: string | null;
   }>;
 }
+
 export interface DiagnosisOptions {
   model?: { gateway: ModelGateway; profile: string };
   rereader?: DiagnosisRereader;
 }
+
+/**
+ * Creates persisted investigations with optional bounded rereads and model-assisted
+ * hypothesis selection; expired evidence cannot support a ready diagnosis.
+ */
 export function createDiagnosisService(
   repository: DiagnosisRepository,
   now: () => Date,
@@ -56,6 +64,7 @@ export function createDiagnosisService(
   const expired = (value: Diagnosis) =>
     value.provenance.validUntil !== null &&
     Date.parse(now().toISOString()) > Date.parse(value.provenance.validUntil);
+
   return {
     async get(context: TenantContext, exceptionId: string) {
       requireTenant(context, context.tenantId);
@@ -81,10 +90,12 @@ export function createDiagnosisService(
         value.attention.suggested = true;
         value.attention.reason = 'review_window_elapsed';
       }
+
       return boundary.parse(value);
     },
     async history(context: TenantContext, exceptionId: string) {
       requireTenant(context, context.tenantId);
+
       return (
         await repository.history(context.tenantId, boundary.id(exceptionId))
       ).map((value) =>
@@ -212,8 +223,10 @@ export function createDiagnosisService(
         }
       }
       await repository.complete(context.tenantId, boundary.parse(value));
+
       return this.get(context, id);
     },
   };
 }
+
 export type DiagnosisService = ReturnType<typeof createDiagnosisService>;

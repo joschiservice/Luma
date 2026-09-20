@@ -1,16 +1,26 @@
+import { apiContract } from '@luma/api-contract';
 import { initServer } from '@ts-rest/fastify';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { apiContract } from '@luma/api-contract';
+
 import type { IdentityService } from '#modules/identity/application/identity';
 import { IdentityError } from '#modules/identity/domain/context';
+
+/** Extracts the cookie and authorization headers used to resolve a request's session. */
 export function credentials(request: FastifyRequest) {
   return request.headers.cookie ? { cookie: request.headers.cookie } : {};
 }
+
 function tenantContext(request: FastifyRequest) {
   if (!request.tenantContext)
     throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+
   return request.tenantContext;
 }
+
+/**
+ * Creates organization and membership handlers; returns service unavailable when identity is
+ * not configured.
+ */
 export function identityRoutes(service?: IdentityService) {
   const use = () => {
     if (!service)
@@ -19,8 +29,10 @@ export function identityRoutes(service?: IdentityService) {
         'REGION_UNAVAILABLE',
         'Identity service is unavailable',
       );
+
     return service;
   };
+
   return initServer().router(apiContract.identity, {
     listOrganizations: async ({ request }) => ({
       status: 200,
@@ -45,6 +57,7 @@ export function identityRoutes(service?: IdentityService) {
         action: 'add',
         ...body,
       });
+
       return { status: 201, body: member! };
     },
     updateMember: async ({ request, params, body }) => {
@@ -53,6 +66,7 @@ export function identityRoutes(service?: IdentityService) {
         memberId: params.memberId,
         role: body.role,
       });
+
       return { status: 200, body: member! };
     },
     removeMember: async ({ request, params }) => {
@@ -60,10 +74,12 @@ export function identityRoutes(service?: IdentityService) {
         action: 'remove',
         memberId: params.memberId,
       });
+
       return { status: 204, body: undefined };
     },
   });
 }
+
 // Deliberate public surface: newly registered routes require tenant authorization.
 const publicRoutes = new Set([
   'GET /v1/shopify/callback',
@@ -76,6 +92,8 @@ const publicRoutes = new Set([
   'GET /auth/*',
   'POST /auth/*',
 ]);
+
+/** Registers session, organization, and origin guards before protected route handlers run. */
 export function registerIdentityGuards(
   app: FastifyInstance,
   service?: IdentityService,
@@ -109,6 +127,7 @@ export function registerIdentityGuards(
       );
     if (route === '/v1/organizations') {
       await service.authenticate(credentials(request));
+
       return;
     }
     const params = request.params as { organizationId?: string };
@@ -126,6 +145,7 @@ export function registerIdentityGuards(
     );
   });
 }
+
 declare module 'fastify' {
   interface FastifyRequest {
     tenantContext:

@@ -1,14 +1,20 @@
+import { apiContract, installedConnectionSchema } from '@luma/api-contract';
 import { initServer } from '@ts-rest/fastify';
 import type { FastifyRequest } from 'fastify';
-import { apiContract, installedConnectionSchema } from '@luma/api-contract';
-import { IdentityError } from '#modules/identity/index';
+
 import type { InstallationService } from '#modules/connectors/application/installations';
 import type { ShopifyOAuth } from '#modules/connectors/application/shopify';
+import { IdentityError } from '#modules/identity/index';
+
 type ConnectionManagement = Omit<
   InstallationService,
   'credential' | 'recordFailure'
 >;
 
+/**
+ * Creates authenticated connection-management handlers; returns service unavailable when
+ * management is not configured.
+ */
 export function connectionRoutes(
   service?: ConnectionManagement,
   shopify?: ShopifyOAuth,
@@ -22,10 +28,13 @@ export function connectionRoutes(
         'SERVICE_UNAVAILABLE',
         'Connection service is unavailable',
       );
+
     return { service, context: request.tenantContext };
   }
+
   // Parse summaries before serialization so credentials can never become response fields.
   const summary = (value: unknown) => installedConnectionSchema.parse(value);
+
   return initServer().router(apiContract.connections, {
     shopifyStart: async ({ request, body }) => {
       const { context } = use(request);
@@ -35,10 +44,12 @@ export function connectionRoutes(
           'SERVICE_UNAVAILABLE',
           'Shopify is not configured',
         );
+
       return { status: 200, body: await shopify.start(context, body) };
     },
     list: async ({ request }) => {
       const { service, context } = use(request);
+
       return {
         status: 200,
         body: { items: (await service.list(context)).map(summary) },
@@ -52,6 +63,7 @@ export function connectionRoutes(
           'CONFLICT',
           'Use Connect Shopify to authorize this store',
         );
+
       return {
         status: 201,
         body: summary(await service.install(context, body)),
@@ -70,6 +82,7 @@ export function connectionRoutes(
           'CONFLICT',
           'Use Reconnect Shopify to validate access',
         );
+
       return {
         status: 200,
         body: summary(
@@ -90,6 +103,7 @@ export function connectionRoutes(
           'CONFLICT',
           'Use Reconnect Shopify to renew access',
         );
+
       return {
         status: 200,
         body: summary(
@@ -104,6 +118,7 @@ export function connectionRoutes(
     },
     disconnect: async ({ request, params, body }) => {
       const { service, context } = use(request);
+
       return {
         status: 200,
         body: summary(

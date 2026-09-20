@@ -1,7 +1,9 @@
-import { equalJson } from '#modules/connectors/domain/equal-json';
-import { requireTenant } from '#modules/identity/index';
-import type { TenantContext } from '#modules/identity/index';
-import { ConnectorError } from '#modules/connectors/domain/capabilities';
+import type {
+  EffectAdapter,
+  EffectIntent,
+  EffectRegistry,
+  VerificationResult,
+} from '#modules/connectors/application/effects';
 import type {
   Capability,
   CapabilityInput,
@@ -11,12 +13,10 @@ import type {
   ReadCapability,
   WriteCapability,
 } from '#modules/connectors/domain/capabilities';
-import type {
-  EffectAdapter,
-  EffectIntent,
-  EffectRegistry,
-  VerificationResult,
-} from '#modules/connectors/application/effects';
+import { ConnectorError } from '#modules/connectors/domain/capabilities';
+import { equalJson } from '#modules/connectors/domain/equal-json';
+import type { TenantContext } from '#modules/identity/index';
+import { requireTenant } from '#modules/identity/index';
 
 export interface CapabilityDescriptor {
   version: '0';
@@ -25,6 +25,7 @@ export interface CapabilityDescriptor {
   /** Retry advice never authorizes replay of an uncertain write. */
   retry: { maxAttempts: number; initialDelayMs: number };
 }
+
 export interface InvocationContext {
   tenant: TenantContext;
   connectionId: string;
@@ -32,6 +33,7 @@ export interface InvocationContext {
   /** Present for writes; adapters namespace the key by tenant and connection. */
   idempotencyKey?: string;
 }
+
 export interface CapabilityHandler<K extends Capability> {
   descriptor: CapabilityDescriptor;
   /** Validate inputs and normalized outputs at the I/O boundary. Throw on invalid data. */
@@ -42,6 +44,7 @@ export interface CapabilityHandler<K extends Capability> {
     input: CapabilityInput<K>,
   ): Promise<CapabilityOutput<K>>;
 }
+
 export interface ConnectorConnection {
   tenantId: string;
   id: string;
@@ -52,6 +55,7 @@ export interface ConnectorConnection {
   executor: EffectAdapter['executor'];
   capabilities: { [K in Capability]?: CapabilityHandler<K> };
 }
+
 export interface CapabilityEvent {
   tenantId: string;
   connectionId: string;
@@ -65,6 +69,7 @@ export interface CapabilityEvent {
   phase: 'started' | 'succeeded' | 'failed';
   error?: ConnectorFailure;
 }
+
 export interface CapabilityDependencies {
   /** Resolve current connection state with tenant scope; do not return credentials. */
   resolve(
@@ -74,12 +79,14 @@ export interface CapabilityDependencies {
   /** Awaited evidence hook. No input, output, provider payload or exception text is included. */
   record(event: CapabilityEvent): Promise<void>;
 }
+
 export interface CapabilityRequest<K extends Capability> {
   connectionId: string;
   capability: K;
   version: '0';
   input: CapabilityInput<K>;
 }
+
 export type WriteRequest<K extends WriteCapability> = CapabilityRequest<K> & {
   idempotencyKey: string;
 };
@@ -113,8 +120,10 @@ export function createCapabilityRuntime(deps: CapabilityDependencies) {
       connection.status !== 'active'
     )
       return null;
+
     return connection;
   }
+
   async function invoke<K extends Capability>(
     context: TenantContext,
     request: CapabilityRequest<K>,
@@ -220,12 +229,15 @@ export function createCapabilityRuntime(deps: CapabilityDependencies) {
       phase: result.ok ? 'succeeded' : 'failed',
       ...(result.ok ? {} : { error: result.error }),
     });
+
     return result;
   }
+
   return {
     async discover(context: TenantContext, connectionId: string) {
       const connection = await resolve(context, connectionId);
       if (!connection) return [];
+
       return Object.entries(connection.capabilities).map(
         ([capability, handler]) => ({
           capability: capability as Capability,
@@ -287,6 +299,7 @@ export function createCapabilityRuntime(deps: CapabilityDependencies) {
           );
           const boundIntent = structuredClone(intent);
           const boundInput = structuredClone(input);
+
           return {
             dispatchIdentity: expectedIdentity,
             capability: binding.capability,
@@ -312,6 +325,7 @@ export function createCapabilityRuntime(deps: CapabilityDependencies) {
                 expectedIdentity,
               );
               if (!result.ok) throw new ConnectorError(result.error);
+
               return {
                 evidenceRefs: result.value.evidenceRefs,
                 providerRequestId: result.value.providerRequestId,
@@ -324,5 +338,7 @@ export function createCapabilityRuntime(deps: CapabilityDependencies) {
     },
   };
 }
+
 export type CapabilityRuntime = ReturnType<typeof createCapabilityRuntime>;
+
 export type CapabilityReader = Pick<CapabilityRuntime, 'discover' | 'read'>;

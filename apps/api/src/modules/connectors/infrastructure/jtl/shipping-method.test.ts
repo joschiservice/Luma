@@ -1,23 +1,28 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { TenantContext } from '#modules/identity/index';
+
 import { createCapabilityRuntime } from '#modules/connectors/application/capabilities';
-import { createShippingMethodEffects } from '#modules/connectors/application/shipping-method-effects';
 import type { EffectIntent } from '#modules/connectors/application/effects';
-import { createJtlConnector } from '#modules/connectors/infrastructure/jtl/adapter';
+import { createShippingMethodEffects } from '#modules/connectors/application/shipping-method-effects';
 import type { JtlConnectorOptions } from '#modules/connectors/infrastructure/jtl/adapter';
+import { createJtlConnector } from '#modules/connectors/infrastructure/jtl/adapter';
 import { cloudId } from '#modules/connectors/infrastructure/jtl/fixtures/cloud';
+import type { TenantContext } from '#modules/identity/index';
 
 vi.mock('#modules/identity/index', () => ({
   requireTenant(context: TenantContext, tenantId: string) {
     if (context.tenantId !== tenantId) throw new Error('Tenant mismatch');
   },
 }));
+
 const context = {
   tenantId: 'tenant-a',
   requestId: 'request-a',
 } as TenantContext;
+
 const ref = (externalId: string) => ({ externalId, scopeKey: '' });
+
 const date = new Date('2026-09-18T01:00:00Z');
+
 function fixture(cloud = false) {
   const ids = {
     order: cloud ? cloudId(10) : '10',
@@ -40,8 +45,10 @@ function fixture(cloud = false) {
       const response = { salesOrderId: ids.order };
       ledger.set(key, response);
       effects++;
+
       return Response.json(response);
     }
+
     return Response.json({
       ...state,
       shipmentAddress: { private: 'excluded' },
@@ -107,6 +114,7 @@ function fixture(cloud = false) {
     now: () => date,
   };
   const effectsRegistry = () => createShippingMethodEffects(runtime(), binding);
+
   return {
     ids,
     state,
@@ -256,6 +264,7 @@ describe('JTL shipping-method correction', () => {
       const result = await original(...args);
       if (args[1]?.method === 'PATCH')
         throw new Error('lost response with secret');
+
       return result;
     });
     expect(await f.write()).toEqual({

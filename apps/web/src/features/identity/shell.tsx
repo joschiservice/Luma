@@ -1,16 +1,17 @@
-import { useState } from 'react';
-import { Link, Outlet, useParams } from '@tanstack/react-router';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@luma/ui/button';
 import {
   Dialog,
-  DialogTrigger,
   DialogContent,
-  DialogTitle,
   DialogDescription,
+  DialogTitle,
+  DialogTrigger,
 } from '@luma/ui/components/dialog';
-import { contextOptions, organizationsOptions, sessionOptions } from './data';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link, Outlet, useParams } from '@tanstack/react-router';
+import { useState } from 'react';
+
 import { AccountMenu, Brand, Failure, Pending } from './common';
+import { contextOptions, organizationsOptions, sessionOptions } from './data';
 
 function Navigation({
   organizationId,
@@ -35,10 +36,14 @@ function Navigation({
     </nav>
   );
 }
+
+/** Provides workspace navigation and tenant context for nested application routes. */
 export function WorkspaceShell() {
   const { organizationId } = useParams({ from: '/app/$organizationId' });
+
   return <TenantShell key={organizationId} organizationId={organizationId} />;
 }
+
 function TenantShell({ organizationId }: { organizationId: string }) {
   const client = useQueryClient();
   const access = useQuery(contextOptions(organizationId));
@@ -58,6 +63,7 @@ function TenantShell({ organizationId }: { organizationId: string }) {
   const organization = organizations.data.find(
     (org) => org.id === organizationId,
   );
+
   return (
     <div className="desk">
       <a className="skip-link" href="#workspace-content">
@@ -114,56 +120,5 @@ function TenantShell({ organizationId }: { organizationId: string }) {
         </main>
       </div>
     </div>
-  );
-}
-export function Welcome() {
-  const { organizationId } = useParams({ from: '/app/$organizationId' });
-  return (
-    <>
-      <p className="eyebrow">Overview / A fresh start</p>
-      <h1>
-        Welcome to your
-        <br />
-        <em>Exception Desk.</em>
-      </h1>
-      <p className="desk-intro">
-        A little more clarity. A little more room to act.
-        <br />
-        This is where your team’s operations come together.
-      </p>
-      <section className="next-step">
-        <span className="step-number">01</span>
-        <div>
-          <p className="eyebrow">Your next step</p>
-          <h2>Start with your connections.</h2>
-          <p>Connections bring your commerce systems into your workspace.</p>
-          <Link
-            className="action-link"
-            to="/app/$organizationId/connections"
-            params={{ organizationId }}
-          >
-            Explore connections <span aria-hidden="true">↗</span>
-          </Link>
-        </div>
-      </section>
-    </>
-  );
-}
-export function Unavailable({ feature }: { feature: string }) {
-  return (
-    <>
-      <p className="eyebrow">Exception Desk / {feature}</p>
-      <h1>{feature}</h1>
-      <section className="next-step">
-        <div>
-          <h2>Not available yet.</h2>
-          <p>
-            {feature === 'Connections'
-              ? 'Connection setup is coming soon. You’ll be able to connect your commerce systems here.'
-              : 'Exception review is coming soon. You’ll be able to investigate and review cases here.'}
-          </p>
-        </div>
-      </section>
-    </>
   );
 }

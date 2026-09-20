@@ -1,25 +1,30 @@
-import type { IdentityService, TenantContext } from '#modules/identity/index';
-import { IdentityError } from '#modules/identity/index';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { randomUUID } from 'node:crypto';
+import { Writable } from 'node:stream';
+
 import { apiErrorSchema } from '@luma/api-contract';
 import { createApiClient } from '@luma/api-contract/client';
 import { openApiDocument } from '@luma/api-contract/openapi';
-import { buildApp } from '#app';
-import { randomUUID } from 'node:crypto';
-import { Writable } from 'node:stream';
 import {
   InMemorySpanExporter,
   SimpleSpanProcessor,
 } from '@opentelemetry/sdk-trace-node';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import { buildApp } from '#app';
+import type { IdentityService, TenantContext } from '#modules/identity/index';
+import { IdentityError } from '#modules/identity/index';
 import { createObservability } from '#modules/platform/composition';
 
 describe('HTTP foundation', () => {
   const apps: ReturnType<typeof buildApp>[] = [];
+
   function createApp(...args: Parameters<typeof buildApp>) {
     const app = buildApp(...args);
     apps.push(app);
+
     return app;
   }
+
   afterEach(async () => {
     await Promise.all(apps.splice(0).map((app) => app.close()));
   });
@@ -217,6 +222,7 @@ function fixture() {
     resolveTenant: vi.fn(async (credentials, tenantId, requestId) => {
       if (!credentials.cookie)
         throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+
       return {
         tenantId,
         dataRegion: 'EU',
@@ -232,6 +238,7 @@ function fixture() {
       } as TenantContext;
     }),
   };
+
   return { spans, posthog, observability, identity };
 }
 
@@ -259,6 +266,7 @@ describe('observability baseline', () => {
                   inputTokens: 12,
                   outputTokens: 4,
                 });
+
                 return { output: 'private model output' };
               },
             );
@@ -271,6 +279,7 @@ describe('observability baseline', () => {
           true,
         );
         observability.capture(parent, 'observability_test_completed');
+
         return { ok: true };
       },
     );
@@ -365,6 +374,7 @@ describe('observability baseline', () => {
       await observability.run(context, 'workflow.run', async () => {
         await new Promise((resolve) => setTimeout(resolve, 5));
       });
+
       return {};
     });
     try {
@@ -526,6 +536,7 @@ it('composes model-backed work with routes selected by startup configuration', a
     const gateway = createModelGateway(settings, observability, {
       transport: async (_url, init) => {
         models.push(JSON.parse(String(init?.body)).model);
+
         return Response.json({
           choices: [{ finish_reason: 'stop', message: { content: 'summary' } }],
           usage: { prompt_tokens: 2, completion_tokens: 1 },

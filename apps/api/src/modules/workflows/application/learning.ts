@@ -1,16 +1,16 @@
-import type { TenantContext } from '#modules/identity/index';
-import {
-  requireRole,
-  requireTenant,
-  IdentityError,
-} from '#modules/identity/index';
 import type { Diagnosis, Incident } from '#modules/exceptions/index';
 import type {
+  BoundActionStep,
+  ExecutionFailure,
   ExecutionRecord,
   VerificationAttempt,
-  ExecutionFailure,
-  BoundActionStep,
 } from '#modules/execution/index';
+import type { TenantContext } from '#modules/identity/index';
+import {
+  IdentityError,
+  requireRole,
+  requireTenant,
+} from '#modules/identity/index';
 
 export interface ResolutionSelection {
   id: string;
@@ -20,11 +20,13 @@ export interface ResolutionSelection {
   previousVersion?: string | undefined;
   partnerCodeRef?: string | undefined;
 }
+
 export interface StartResolutionRun {
   id: string;
   diagnosisRevision: number;
   resolution: ResolutionSelection;
 }
+
 export type LearningFact =
   | {
       kind: 'cause';
@@ -80,16 +82,19 @@ export type LearningFact =
       };
     }
   | { kind: 'recurrence'; incidentId: string; evidenceRefs: string[] };
+
 export interface LearningCommand {
   id: string;
   occurredAt: string;
   fact: LearningFact;
 }
+
 export interface LearningEvent extends LearningCommand {
   sequence: number;
   actorId: string;
   recordedAt: string;
 }
+
 export interface ResolutionRun extends StartResolutionRun {
   schemaVersion: 1;
   incidentId: string;
@@ -107,6 +112,7 @@ export interface ResolutionRun extends StartResolutionRun {
   generation: { kind: 'manual' | 'generated'; reference: string };
   artifactDigest: string;
 }
+
 export interface ResolutionHistory {
   run: ResolutionRun;
   events: LearningEvent[];
@@ -118,6 +124,7 @@ export interface ResolutionHistory {
   incidentVerifications: Record<string, unknown>[];
   recurrences: { id: string; detectedAt: string }[];
 }
+
 export interface LearningStore {
   list(
     context: TenantContext,
@@ -141,13 +148,47 @@ export interface LearningStore {
     runId: string,
   ): Promise<ResolutionHistory>;
 }
+
+/** Resolution history commands that require a current owner or admin role. */
+export interface LearningService {
+  /** Lists resolution runs for an incident, optionally after a pagination cursor. */
+  list(
+    context: TenantContext,
+    incidentId: string,
+    after?: string,
+  ): Promise<{ items: ResolutionRun[]; nextCursor: string | null }>;
+  /** Validates and starts a resolution run bound to the supplied diagnosis revision. */
+  start(
+    context: TenantContext,
+    incidentId: string,
+    input: unknown,
+  ): Promise<ResolutionRun>;
+  /** Validates and appends a learning event to an existing resolution run. */
+  append(
+    context: TenantContext,
+    incidentId: string,
+    runId: string,
+    input: unknown,
+  ): Promise<LearningEvent>;
+  /** Reads a resolution run with its evidence, execution attempts, and outcomes. */
+  read(
+    context: TenantContext,
+    incidentId: string,
+    runId: string,
+  ): Promise<ResolutionHistory>;
+}
+
+/**
+ * Creates authorized resolution-run and learning-event commands using the supplied
+ * validators and persistent store.
+ */
 export function createLearningService(deps: {
   store: LearningStore;
   refreshContext(context: TenantContext): Promise<TenantContext>;
   parseStart(input: unknown): StartResolutionRun;
   parseEvent(input: unknown): LearningCommand;
   parseId(input: string): string;
-}) {
+}): LearningService {
   async function authorized(context: TenantContext) {
     requireTenant(context, context.tenantId);
     const fresh = await deps.refreshContext(context);
@@ -155,8 +196,10 @@ export function createLearningService(deps: {
     requireRole(fresh, ['owner', 'admin']);
     if (fresh.actor.id !== context.actor.id)
       throw new IdentityError(403, 'FORBIDDEN', 'Actor changed');
+
     return fresh;
   }
+
   return {
     async list(context: TenantContext, incidentId: string, after?: string) {
       return deps.store.list(
@@ -194,4 +237,3 @@ export function createLearningService(deps: {
     },
   };
 }
-export type LearningService = ReturnType<typeof createLearningService>;

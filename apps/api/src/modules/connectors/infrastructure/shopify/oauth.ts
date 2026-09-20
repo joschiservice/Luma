@@ -1,33 +1,31 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
+
+import {
+  callbackParams,
+  createClient,
+  createOAuthClient,
+  parse,
+  shopHostname,
+  shopifyScopes,
+  validMac,
+} from '@luma/connector-shopify';
 import { z } from 'zod';
-import type { ShopifyAppConfig as ShopifyConfig } from '#modules/connectors/application/shopify';
-import type { TenantDatabase, SqlTransaction } from '#modules/platform/index';
-import { IdentityError, requireRole } from '#modules/identity/index';
-import type { TenantContext } from '#modules/identity/index';
-import { secretBinding } from '#modules/connectors/application/installations';
+
 import type {
   InstallationDependencies,
   StoredInstallation,
 } from '#modules/connectors/application/installations';
+import { secretBinding } from '#modules/connectors/application/installations';
+import type { ShopifyAppConfig as ShopifyConfig } from '#modules/connectors/application/shopify';
+import { ConnectorError } from '#modules/connectors/domain/capabilities';
 import type {
   InstallationCredentials,
   InstalledConnection,
 } from '#modules/connectors/domain/installation';
-import { createInstallationRepository } from '#modules/connectors/infrastructure/installation-repository';
-import { ConnectorError } from '#modules/connectors/domain/capabilities';
-import {
-  createClient,
-  parse,
-} from '#modules/connectors/infrastructure/shopify/client';
-import {
-  appBinding,
-  callbackParams,
-  createOAuthClient,
-  shopHostname,
-  shopifyReads,
-  shopifyScopes,
-  validMac,
-} from '#modules/connectors/infrastructure/shopify/oauth-client';
+import { createInstallationRepository } from '#modules/connectors/infrastructure/installations/repository';
+import type { TenantContext } from '#modules/identity/index';
+import { IdentityError, requireRole } from '#modules/identity/index';
+import type { SqlTransaction, TenantDatabase } from '#modules/platform/index';
 
 const invalid = () =>
   new IdentityError(
@@ -35,17 +33,36 @@ const invalid = () =>
     'CONFLICT',
     'Shopify authorization expired or is invalid. Connect again.',
   );
+
 const unavailable = () =>
   new ConnectorError({
     code: 'authentication',
     effect: 'none',
     retry: 'never',
   });
+
 const digest = (state: string) =>
   createHash('sha256').update(state).digest('hex');
+
 export const oauthStartInput = z
   .object({ shop: shopHostname, label: z.string().trim().min(1).max(120) })
   .strict();
+
+const shopifyReads = [
+  'orders.read',
+  'products.read',
+  'inventory.read',
+  'fulfillment.read',
+] as const;
+
+/** Identifies an OAuth application within its configured environment. */
+const appBinding = (config: ShopifyConfig) =>
+  `${config.environment}:${config.clientId}`;
+
+/**
+ * Creates tenant-bound Shopify authorization, credential refresh, and uninstall handling
+ * backed by persistent OAuth state.
+ */
 export function createShopifyOAuth(
   db: TenantDatabase,
   config: ShopifyConfig,
@@ -56,16 +73,28 @@ export function createShopifyOAuth(
 ) {
   const now = deps.now ?? (() => new Date());
   const app = appBinding(config);
-  const client = createOAuthClient(config, deps.fetch, now);
+  const oauthClient = createOAuthClient(config, deps.fetch, now);
+  const client = {
+    async token(
+      ...args: Parameters<typeof oauthClient.token>
+    ): Promise<InstallationCredentials> {
+      const { token, ...shopify } = await oauthClient.token(...args);
+
+      return { token, shopify: { ...shopify, app: appBinding(config) } };
+    },
+  };
   const repository = createInstallationRepository(db);
+
   function scoped(tx: SqlTransaction, tenantId: string) {
     return createInstallationRepository({
       transaction: async (tenant, operation) => {
         if (tenant !== tenantId) throw invalid();
+
         return operation(tx);
       },
     });
   }
+
   async function locked<T>(
     tenantId: string,
     shop: string,
@@ -83,9 +112,11 @@ export function createShopifyOAuth(
         "SELECT id FROM connector_installations WHERE tenant_id=$1 AND document->'target'->>'kind'='shopify' AND document->'target'->>'shop'=$2 FOR UPDATE",
         [tenantId, shop],
       );
+
       return operation(tx);
     });
   }
+
   async function persist(
     tx: SqlTransaction,
     record: StoredInstallation | null,
@@ -111,6 +142,7 @@ export function createShopifyOAuth(
         'Connection changed. Connect again.',
       );
   }
+
   function next(
     record: StoredInstallation,
     status: InstalledConnection['status'],
@@ -122,6 +154,7 @@ export function createShopifyOAuth(
       updatedAt: now().toISOString(),
     };
   }
+
   async function registerUninstall(
     connection: InstalledConnection,
     credentials: InstallationCredentials,
@@ -168,6 +201,7 @@ export function createShopifyOAuth(
     )
       throw unavailable();
   }
+
   return {
     config: { webOrigin: config.webOrigin },
     async start(context: TenantContext, input: unknown) {
@@ -203,6 +237,7 @@ export function createShopifyOAuth(
         redirect_uri: config.callbackUrl,
         state,
       }).toString();
+
       return { authorizationUrl: url.href };
     },
     callbackTenant(query: string) {
@@ -214,6 +249,7 @@ export function createShopifyOAuth(
       }
       const state = params.get('state') ?? '';
       if (!/^[0-9a-f-]{36}\.[0-9a-f]{64}$/.test(state)) throw invalid();
+
       return z.string().uuid().parse(state.split('.')[0]);
     },
     async callback(context: TenantContext, query: string) {
@@ -241,12 +277,14 @@ export function createShopifyOAuth(
             now(),
           ],
         );
+
         return result.rows[0];
       });
       if (!attempt) throw invalid();
       if (params.has('error')) return 'denied' as const;
       const code = params.get('code');
       if (!code || code.length > 4096) throw invalid();
+
       return locked(fresh.tenantId, shop, async (tx) => {
         const repo = scoped(tx, fresh.tenantId);
         const existing = (await repo.list(fresh.tenantId)).filter(
@@ -314,6 +352,7 @@ export function createShopifyOAuth(
           fresh.actor.id,
           'shopify_authorized',
         );
+
         return connection.status === 'active'
           ? ('connected' as const)
           : ('permissions' as const);
@@ -371,6 +410,7 @@ export function createShopifyOAuth(
               context.actor.id,
               'shopify_authorization_revoked',
             );
+
             return null;
           }
           await persist(
@@ -384,10 +424,12 @@ export function createShopifyOAuth(
             context.actor.id,
             'shopify_token_refreshed',
           );
+
           return credentials;
         },
       );
       if (!outcome) throw unavailable();
+
       return outcome;
     },
     async uninstall(
@@ -451,6 +493,7 @@ export function createShopifyOAuth(
               'shopify',
               'shopify_token_refreshed',
             );
+
           return;
         } catch (error) {
           if (
@@ -471,4 +514,5 @@ export function createShopifyOAuth(
     },
   };
 }
+
 export type ShopifyOAuth = ReturnType<typeof createShopifyOAuth>;

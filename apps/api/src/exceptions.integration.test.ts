@@ -1,14 +1,12 @@
-import { createResolutionLearning } from '#modules/workflows/composition';
-import { createSafetyServices as createAdmittedSafety } from '#app';
-import { createSafetyFixture as createSafetyServices } from '#test-support/safety-fixtures';
-import { createConnectionCoverage } from '#modules/connectors/composition';
-import { createTenantDatabase } from '#modules/platform/composition';
-import { createOperationsOverview } from '#modules/workflows/composition';
-import type { ModelGateway } from '#modules/platform/index';
-import { parseInput } from '#modules/exceptions/composition';
-import { detectionFixtures } from '#test-support/detection-fixtures';
 import { randomUUID } from 'node:crypto';
-import { readFile, readdir } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
+
+import {
+  caseDetailSchema,
+  caseEvidencePageSchema,
+  caseQuerySchema,
+} from '@luma/api-contract';
+import { createApiClient } from '@luma/api-contract/client';
 import { Pool } from 'pg';
 import {
   afterAll,
@@ -19,28 +17,39 @@ import {
   it,
   vi,
 } from 'vitest';
-import { buildApp, createDetectionServices, createDeskServices } from '#app';
+
 import {
-  caseQuerySchema,
-  caseDetailSchema,
-  caseEvidencePageSchema,
-} from '@luma/api-contract';
-import { IdentityError } from '#modules/identity/index';
-import { createApiClient } from '@luma/api-contract/client';
-import { createCases } from '#modules/exceptions/composition';
-import type { IdentityService } from '#modules/identity/index';
-import { makeTenantContext } from '#modules/identity/composition';
-import { defaultConfiguration } from '#modules/exceptions/index';
+  buildApp,
+  createDeskServices,
+  createDetectionServices,
+  createSafetyServices as createAdmittedSafety,
+} from '#app';
+import { createConnectionCoverage } from '#modules/connectors/composition';
+import { createCases, parseInput } from '#modules/exceptions/composition';
 import type {
   DetectionRequest,
   Evidence,
+  Incident,
   VerificationEvaluator,
   VerificationResult,
-  Incident,
 } from '#modules/exceptions/index';
+import { defaultConfiguration } from '#modules/exceptions/index';
+import { makeTenantContext } from '#modules/identity/composition';
+import type { IdentityService } from '#modules/identity/index';
+import { IdentityError } from '#modules/identity/index';
+import { createTenantDatabase } from '#modules/platform/composition';
+import type { ModelGateway } from '#modules/platform/index';
+import {
+  createOperationsOverview,
+  createResolutionLearning,
+} from '#modules/workflows/composition';
+import { detectionFixtures } from '#test-support/detection-fixtures';
+import { createSafetyFixture as createSafetyServices } from '#test-support/safety-fixtures';
+
 import corpus from '../../../docs/fixtures/exceptions-v0.json' with { type: 'json' };
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
+
 describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
   const name = `exceptions_${randomUUID().replaceAll('-', '')}`;
   const admin = new Pool({ connectionString: databaseUrl });
@@ -53,6 +62,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
   const tenantId = randomUUID(),
     otherTenant = randomUUID(),
     connectionId = randomUUID();
+
   function context(id: string = tenantId) {
     return makeTenantContext(
       { userId: 'operator', sessionId: 'session' },
@@ -72,6 +82,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
       randomUUID(),
     );
   }
+
   function request(event = 'event-1', tenant = tenantId): DetectionRequest {
     const evidence: Evidence = {
       key: event,
@@ -84,6 +95,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
       source: null,
       facts: { errorCode: 'authentication' },
     };
+
     return {
       key: event,
       input: parseInput('sync_failure', {
@@ -98,6 +110,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
       evidence: [evidence],
     };
   }
+
   beforeAll(async () => {
     await admin.query(`CREATE DATABASE "${name}"`);
     const url = new URL(databaseUrl!);
@@ -1143,6 +1156,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
           await client.query("SELECT set_config('app.tenant_id',$1,true)", [
             tenant,
           ]);
+
           return operation(client);
         },
       });
@@ -1179,6 +1193,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
           await client.query("SELECT set_config('app.tenant_id',$1,true)", [
             tenant,
           ]);
+
           return operation(client);
         },
       });
@@ -1204,6 +1219,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
       client.release();
     }
   });
+
   function decisionActor(
     role: 'owner' | 'admin' | 'member' = 'admin',
     user = 'approver',
@@ -1222,6 +1238,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
       randomUUID(),
     );
   }
+
   async function decisionFixture(capability = 'stock.correct') {
     now = new Date();
     const evidenceId = randomUUID();
@@ -1301,6 +1318,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
       decisionId: review.proposal!.policy!.id,
       reason: 'Reviewed current evidence',
     };
+
     return {
       desk,
       safety,
@@ -1312,6 +1330,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
       refreshContext,
     };
   }
+
   it('preserves approval request age when the workflow reevaluates the same proposal', async () => {
     const f = await decisionFixture();
     try {
@@ -1660,6 +1679,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
           );
         if (tenant !== tenantId)
           throw new IdentityError(404, 'NOT_FOUND', 'Organization not found');
+
         return decisionActor();
       });
     const app = buildApp(
@@ -2128,6 +2148,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
       ).toBe(true);
     }
   });
+
   function verification(incident: Incident): VerificationResult {
     return {
       reason: 'Complete authoritative reread proves the postcondition',
@@ -2150,6 +2171,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
       ],
     };
   }
+
   it('rejects caller-authored verified dispositions and fails closed without an evaluator', async () => {
     const incident = (await services.exceptions.ingest(context(), request()))
       .incident!;
@@ -2241,6 +2263,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
       .incident!;
     evaluate.mockImplementation(async () => {
       await services.exceptions.ingest(context(), request('event-2'));
+
       return verification(incident);
     });
     await expect(
@@ -2410,6 +2433,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
       async generate<T>() {
         started();
         await gate;
+
         return {
           output: { hypotheses: [] } as T,
           toolCalls: [],
@@ -2486,6 +2510,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
                     },
                   ],
                 };
+
           return {
             output: output as T,
             toolCalls:

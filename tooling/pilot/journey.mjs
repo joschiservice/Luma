@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 
+/**
+ * Polls until the check returns a truthy value, tolerating transient Temporal outages;
+ * rejects when the deadline expires.
+ */
 export async function waitFor(check, timeout = 30_000) {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
@@ -16,6 +20,10 @@ export async function waitFor(check, timeout = 30_000) {
   throw new Error('Timed out waiting for pilot state');
 }
 
+/**
+ * Records an operator decision using current case versions and notifies its waiting
+ * workflow.
+ */
 export async function respond(pilot, manifest, client, kind) {
   const actor = await pilot.operator();
   const id = manifest.incidents.workflow_failure;
@@ -31,9 +39,14 @@ export async function respond(pilot, manifest, client, kind) {
     reason: `Synthetic pilot ${kind}`,
   });
   await client.notifyApproval(actor, { kind: 'incident', id });
+
   return receipt;
 }
 
+/**
+ * Starts the scenario's workflow and supplies its scripted decision when required,
+ * preserving existing approvals after restarts.
+ */
 export async function startJourney(pilot, manifest, client) {
   if (
     ['healthy', 'diagnosis-pending', 'decisions-needed', 'uncertain'].includes(
@@ -53,6 +66,7 @@ export async function startJourney(pilot, manifest, client) {
     )
       return progress;
     const review = await pilot.desk.review(await pilot.operator(), source.id);
+
     return review.proposal?.approval ? progress : null;
   });
   if (manifest.scenario === 'approval-required') return;

@@ -1,4 +1,5 @@
 import { appendFile, readFile } from 'node:fs/promises';
+
 import { buildRuntimeApp, createSafetyServices } from '../dist/app.js';
 
 process.once(
@@ -16,9 +17,11 @@ process.once(
       '/v1/organizations/:organizationId/e2e-context',
       async (request) => {
         context = request.tenantContext;
+
         return {};
       },
     );
+
     async function resolveContext() {
       const response = await app.inject({
         url: `/v1/organizations/${action.tenantId}/e2e-context`,
@@ -26,8 +29,10 @@ process.once(
       });
       if (response.statusCode !== 200 || !context)
         throw new Error('Unable to resolve worker identity');
+
       return context;
     }
+
     const adapter = {
       capability: 'stock.correct',
       version: '1',
@@ -45,6 +50,7 @@ process.once(
         );
         process.send({ type: 'effect-committed' });
         if (mode === 'interrupt') await new Promise(() => {});
+
         return { evidenceRefs: intent.preconditions.evidenceRefs };
       },
       async verify(intent) {
@@ -52,6 +58,7 @@ process.once(
           .trim()
           .split('\n')
           .map((line) => JSON.parse(line));
+
         return {
           outcome: records.some(
             (record) =>

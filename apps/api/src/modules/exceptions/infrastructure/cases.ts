@@ -1,14 +1,16 @@
 import { createHash } from 'node:crypto';
+
 import { z } from 'zod';
+
 import type {
   CaseDetail,
-  CaseQuery,
   CaseEvidencePage,
+  CaseQuery,
+  CaseReader,
 } from '#modules/exceptions/application/cases';
-import type { TenantDatabase } from '#modules/platform/index';
-import type { CaseReader } from '#modules/exceptions/application/cases';
 import type { Incident } from '#modules/exceptions/application/detection';
 import type { Diagnosis } from '#modules/exceptions/domain/diagnosis';
+import type { TenantDatabase } from '#modules/platform/index';
 
 type Row = {
   document: Incident;
@@ -19,6 +21,7 @@ type Row = {
   activity: string;
   rank: number;
 };
+
 // Attention comes from persisted lifecycle, uncertainty escalation or deterministic manual steps.
 // Model-selected hypotheses and severity never create an attention request.
 const projection = `WITH cases AS (
@@ -56,6 +59,7 @@ const projection = `WITH cases AS (
  ) pa ON true
  WHERE e.tenant_id=$1
 ), ordered AS (SELECT *, CASE WHEN attention_reason IS NULL THEN document->>'firstDetectedAt' ELSE attention_at END AS sort_at FROM cases)`;
+
 const cursorSchema = z
   .object({
     context: z.string(),
@@ -64,6 +68,7 @@ const cursorSchema = z
     id: z.string().uuid(),
   })
   .strict();
+
 function contextKey(tenantId: string, query: CaseQuery) {
   return createHash('sha256')
     .update(
@@ -78,6 +83,7 @@ function contextKey(tenantId: string, query: CaseQuery) {
     )
     .digest('hex');
 }
+
 function project(row: Row, now: Date): CaseDetail {
   const incident = row.document;
   const diagnosis = row.diagnosis ? structuredClone(row.diagnosis) : null;
@@ -131,6 +137,7 @@ function project(row: Row, now: Date): CaseDetail {
     stuck_fulfillment: 'Fulfillment progress needs investigation.',
     workflow_failure: 'A workflow did not reach its expected outcome.',
   };
+
   return {
     schemaVersion: 1,
     id: incident.id,
@@ -182,6 +189,11 @@ function project(row: Row, now: Date): CaseDetail {
     diagnosis,
   };
 }
+
+/**
+ * Creates persisted case, overview, and evidence reads with tenant-scoped pagination and
+ * current freshness assessment.
+ */
 export function createCaseReader(
   db: TenantDatabase,
   now: () => Date,
@@ -257,6 +269,7 @@ export function createCaseReader(
         );
         const items = result.rows.slice(0, query.limit).map((row) => row.item);
         const last = items.at(-1);
+
         return {
           schemaVersion: 1,
           items,
@@ -290,6 +303,7 @@ export function createCaseReader(
           [tenantId, end, start],
         );
         const row = result.rows[0]!;
+
         return {
           attentionCount: row.attention_count,
           activeCount: row.active_count,
@@ -297,6 +311,7 @@ export function createCaseReader(
           prioritizedDecisions: row.decisions.map((value) => {
             const { diagnosis, ...summary } = project(value, new Date(end));
             void diagnosis;
+
             return summary;
           }),
         };
@@ -347,10 +362,12 @@ export function createCaseReader(
           'SELECT EXISTS(SELECT 1 FROM exception_sources WHERE tenant_id=$1) AS observed',
           [tenantId],
         );
+
         return {
           items: rows.map((row) => {
             const { diagnosis, ...summary } = project(row, clock);
             void diagnosis;
+
             return summary;
           }),
           nextCursor:
@@ -374,6 +391,7 @@ export function createCaseReader(
           `${projection} SELECT * FROM ordered WHERE document->>'id'=$3`,
           [tenantId, clock.toISOString(), id],
         );
+
         return result.rows[0] ? project(result.rows[0], clock) : null;
       }),
   };

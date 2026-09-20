@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { IdentityError } from '#modules/identity/index';
+
 import type { TenantContext } from '#modules/identity/index';
+import { IdentityError } from '#modules/identity/index';
 import type { TenantDatabase } from '#modules/platform/index';
+
 /** Escalation retains the incident and its evidence; it never claims resolution. */
 export function createEscalationRepository(db: TenantDatabase) {
   return (context: TenantContext, id: string, revision: number) =>
@@ -32,6 +34,7 @@ export function createEscalationRepository(db: TenantDatabase) {
           },
         ],
       );
+
       return result.rows[0].version;
     });
 }

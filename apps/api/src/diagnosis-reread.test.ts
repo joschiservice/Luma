@@ -1,13 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
-import { makeTenantContext } from '#modules/identity/composition';
-import { createDiagnosisRereader } from '#modules/workflows/index';
-import type { DiagnosisInput } from '#modules/exceptions/index';
-import { defaultConfiguration } from '#modules/exceptions/index';
+
 import type {
   CapabilityReader,
   CapabilityRequest,
   ReadCapability,
 } from '#modules/connectors/index';
+import type { DiagnosisInput } from '#modules/exceptions/index';
+import { defaultConfiguration } from '#modules/exceptions/index';
+import { makeTenantContext } from '#modules/identity/composition';
+import { createDiagnosisRereader } from '#modules/workflows/index';
+
 const context = makeTenantContext(
   { userId: 'operator', sessionId: 'session' },
   {
@@ -20,7 +22,9 @@ const context = makeTenantContext(
   { id: 'member', organizationId: 'tenant', userId: 'operator', role: 'owner' },
   'request',
 );
+
 const now = new Date('2026-09-17T12:00:00Z');
+
 const snapshot: DiagnosisInput = {
   exceptionId: 'incident',
   revision: 1,
@@ -59,12 +63,14 @@ const snapshot: DiagnosisInput = {
     },
   ],
 };
+
 const request: CapabilityRequest<ReadCapability> = {
   connectionId: 'connection',
   capability: 'inventory.read',
   version: '0',
   input: { limit: 1 },
 };
+
 function setup(requests = [request], notBefore: string | null = null) {
   const read = vi.fn(async () => ({
     ok: true as const,
@@ -76,8 +82,10 @@ function setup(requests = [request], notBefore: string | null = null) {
     { plan: async () => ({ requests, notBefore }), publish },
     () => now,
   );
+
   return { reader, read, publish };
 }
+
 describe('bounded diagnosis rereads', () => {
   it('uses the scoped read port and preserves partial-page provenance', async () => {
     const { reader, read, publish } = setup();
@@ -124,6 +132,7 @@ describe('bounded diagnosis rereads', () => {
     const { reader, read, publish } = setup();
     read.mockImplementation(async () => {
       controller.abort();
+
       return {
         ok: true,
         value: { items: [], nextCursor: 'next', completeness: 'partial' },

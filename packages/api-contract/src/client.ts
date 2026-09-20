@@ -1,6 +1,7 @@
-import { caseStreamEventSchema } from './desk.js';
-import { initClient } from '@ts-rest/core';
 import type { ClientArgs, InitClientReturn } from '@ts-rest/core';
+import { initClient } from '@ts-rest/core';
+
+import { caseStreamEventSchema } from './desk.js';
 import { apiContract } from './index.js';
 
 export type ApiClient = InitClientReturn<typeof apiContract, ClientArgs>;
@@ -43,5 +44,6 @@ export function subscribeToCaseProgress(options: {
     }
   });
   source.addEventListener('error', options.onError);
+
   return () => source.close();
 }

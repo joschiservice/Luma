@@ -1,15 +1,16 @@
-import { queueDiagnosis } from '#modules/exceptions/infrastructure/diagnosis-repository';
-import { verificationPostconditions } from '#modules/exceptions/application/detection';
 import { randomUUID } from 'node:crypto';
-import type { SqlTransaction, TenantDatabase } from '#modules/platform/index';
-import { decimalString, decimalUnits } from '#modules/exceptions/domain/facts';
-import type { Configuration } from '#modules/exceptions/domain/facts';
-import { identity } from '#modules/exceptions/domain/evaluate';
+
 import type {
   DetectionRepository,
   Evidence,
   Incident,
 } from '#modules/exceptions/application/detection';
+import { verificationPostconditions } from '#modules/exceptions/application/detection';
+import { identity } from '#modules/exceptions/domain/evaluate';
+import type { Configuration } from '#modules/exceptions/domain/facts';
+import { decimalString, decimalUnits } from '#modules/exceptions/domain/facts';
+import { queueDiagnosis } from '#modules/exceptions/infrastructure/diagnosis-repository';
+import type { SqlTransaction, TenantDatabase } from '#modules/platform/index';
 
 async function lock(tx: SqlTransaction, tenantId: string) {
   // One tenant lock serializes fingerprint, source-key and resolution races together.
@@ -17,6 +18,7 @@ async function lock(tx: SqlTransaction, tenantId: string) {
     `exceptions:${tenantId}`,
   ]);
 }
+
 async function immutable(
   tx: SqlTransaction,
   table: 'exception_configurations' | 'exception_sources' | 'exception_inputs',
@@ -36,12 +38,14 @@ async function immutable(
   if (!result.rows[0]?.matches)
     throw new Error('Immutable evidence or configuration key conflict');
 }
+
 async function save(tx: SqlTransaction, incident: Incident) {
   await tx.query(
     'UPDATE exceptions SET state=$3,document=$4,version=version+1,updated_at=now() WHERE tenant_id=$1 AND id=$2',
     [incident.tenantId, incident.id, incident.state, incident],
   );
 }
+
 async function audit(
   tx: SqlTransaction,
   tenantId: string,
@@ -53,6 +57,11 @@ async function audit(
     [randomUUID(), tenantId, incidentId, document],
   );
 }
+
+/**
+ * Creates transactional incident and evidence storage with deduplication and revision
+ * checks.
+ */
 export function createDetectionRepository(
   db: TenantDatabase,
 ): DetectionRepository {
@@ -65,6 +74,7 @@ export function createDetectionRepository(
           attemptId,
           type: 'exception.verification_attempt',
         });
+
         return attemptId;
       }),
     record: (value) =>
@@ -262,6 +272,7 @@ export function createDetectionRepository(
             now,
           );
         }
+
         return { decision, incident, reviewRequired };
       }),
     get: (tenantId, incidentId) =>
@@ -271,6 +282,7 @@ export function createDetectionRepository(
           [tenantId, incidentId],
         );
         const row = result.rows[0];
+
         return row ? { incident: row.document, version: row.version } : null;
       }),
     list: (tenantId) =>
@@ -329,6 +341,7 @@ export function createDetectionRepository(
                       ? e.connectionId !== null &&
                         subject.scope.slice(1).includes(e.connectionId)
                       : e.connectionId === null;
+
               return (
                 !binding ||
                 binding.exceptionClass !== incident.exceptionClass ||
@@ -402,6 +415,7 @@ export function createDetectionRepository(
               actorId,
               at: now,
             });
+
             return false;
           }
         }
@@ -427,6 +441,7 @@ export function createDetectionRepository(
             { type: 'exception.resolved', resolution },
           ],
         );
+
         return true;
       }),
   };

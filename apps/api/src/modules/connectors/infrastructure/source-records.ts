@@ -1,17 +1,24 @@
 import { randomUUID } from 'node:crypto';
+
 import { z } from 'zod';
-import type { TenantContext } from '#modules/identity/index';
-import type { SourceIdentity } from '#modules/connectors/domain/capabilities';
-import { requireTenant, requireRole } from '#modules/identity/index';
-import type { TenantDatabase } from '#modules/platform/index';
+
 import type {
-  SourceRecords,
   CommerceObservation,
+  SourceRecords,
 } from '#modules/connectors/application/source-records';
+import type { SourceIdentity } from '#modules/connectors/domain/capabilities';
 import {
   commerceSchema,
   sourceSchema,
 } from '#modules/connectors/infrastructure/source-validation';
+import type { TenantContext } from '#modules/identity/index';
+import { requireRole, requireTenant } from '#modules/identity/index';
+import type { TenantDatabase } from '#modules/platform/index';
+
+/**
+ * Creates tenant-scoped observation storage and canonical mappings. Reusing an ingest key
+ * with different content is rejected.
+ */
 export function createSourceRecords(
   db: TenantDatabase,
   canonicalExists: (
@@ -26,6 +33,7 @@ export function createSourceRecords(
       z.string().min(1).max(1024).parse(ingestKey);
       const value = commerceSchema.parse(input);
       requireTenant(context, value.observation.source.tenantId);
+
       return db.transaction(context.tenantId, async (tx) => {
         const source = value.observation.source;
         const installed = await tx.query<{
@@ -61,11 +69,13 @@ export function createSourceRecords(
           )
         ).rows[0]!;
         if (!stored.matches) throw new Error('Ingest key conflict');
+
         return stored.document;
       });
     },
     async get(context, connectionId, ingestKey) {
       requireTenant(context, context.tenantId);
+
       return db.transaction(
         context.tenantId,
         async (tx) =>
@@ -138,6 +148,7 @@ export function createSourceRecords(
     async resolve(context, input) {
       const source = sourceSchema.parse(input);
       requireTenant(context, source.tenantId);
+
       return db.transaction(
         context.tenantId,
         async (tx) =>
@@ -183,5 +194,6 @@ function evidenceIdentities(input: CommerceObservation) {
     for (const line of input.observation.data.lines)
       refs.push({ ...source, ...line.orderLine, resource: 'order_line' });
   }
+
   return refs;
 }

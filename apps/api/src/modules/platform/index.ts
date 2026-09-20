@@ -1,30 +1,35 @@
+export { canonicalJson } from '#modules/platform/domain/canonical-json';
+
 export type {
+  FeatureFlag,
   Observability,
   Observation,
-  TraceContext,
   Operation,
   ProductEvent,
-  FeatureFlag,
+  TraceContext,
 } from '#modules/platform/application/observability';
+
 export type {
-  TenantDatabase,
   SqlTransaction,
+  TenantDatabase,
 } from '#modules/platform/application/database';
+
 export { ModelGatewayError } from '#modules/platform/application/model-gateway';
+
 export type {
   JsonValue,
+  ModelAdapter,
+  ModelAdapterId,
+  ModelDataPolicy,
+  ModelErrorCode,
+  ModelGateway,
+  ModelMessage,
+  ModelRequest,
+  ModelResult,
+  ModelRoute,
+  ModelRoutingPolicy,
   ModelSchema,
   ModelTool,
   ModelToolCall,
-  ModelMessage,
-  ModelDataPolicy,
-  ModelRequest,
   ModelUsage,
-  ModelResult,
-  ModelGateway,
-  ModelAdapterId,
-  ModelRoute,
-  ModelRoutingPolicy,
-  ModelAdapter,
-  ModelErrorCode,
 } from '#modules/platform/application/model-gateway';

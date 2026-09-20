@@ -1,5 +1,6 @@
-import type { TenantContext } from '#modules/identity/index';
 import type { InstallationCredentials } from '#modules/connectors/domain/installation';
+import type { TenantContext } from '#modules/identity/index';
+
 export interface ShopifyOAuth {
   config: { webOrigin: string };
   start(

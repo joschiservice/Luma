@@ -1,11 +1,14 @@
 import { z } from 'zod';
+
 import type { ConnectorConnection } from '#modules/connectors/application/capabilities';
 import { ConnectorError } from '#modules/connectors/domain/capabilities';
 
 const externalId = z
   .object({ externalId: z.string().min(1), scopeKey: z.string() })
   .strict();
+
 const decimal = z.string().regex(/^-?\d{1,14}(\.\d{1,6})?$/);
+
 const readInput = z
   .object({
     limit: z.number().int().min(1).max(100),
@@ -14,6 +17,7 @@ const readInput = z
     location: externalId.optional(),
   })
   .strict();
+
 const writeInput = z
   .object({
     sku: externalId,
@@ -22,6 +26,7 @@ const writeInput = z
     expectedRevision: z.string().min(1),
   })
   .strict();
+
 const inventoryPage = z.object({
   items: z.array(
     z.object({
@@ -52,6 +57,7 @@ const inventoryPage = z.object({
   nextCursor: z.null(),
   completeness: z.literal('complete'),
 });
+
 const receipt = z.object({
   status: z.literal('accepted'),
   evidenceRefs: z.array(z.string().uuid()).min(1),
@@ -78,6 +84,7 @@ export function createSampleConnector(options: {
     a: z.infer<typeof externalId>,
     b: z.infer<typeof externalId>,
   ) => a.externalId === b.externalId && a.scopeKey === b.scopeKey;
+
   return {
     tenantId: options.tenantId,
     id: options.connectionId,
@@ -96,6 +103,7 @@ export function createSampleConnector(options: {
         },
         parseInput(input) {
           const parsed = readInput.parse(input);
+
           return {
             limit: parsed.limit,
             ...(parsed.cursor === undefined ? {} : { cursor: parsed.cursor }),
@@ -116,6 +124,7 @@ export function createSampleConnector(options: {
           const included =
             (!input.sku || matches(input.sku, sku)) &&
             (!input.location || matches(input.location, location));
+
           return {
             items: included
               ? [
@@ -181,6 +190,7 @@ export function createSampleConnector(options: {
                 effect: 'none',
                 retry: 'never',
               });
+
             return structuredClone(previous.receipt);
           }
           if (!matches(input.sku, sku) || !matches(input.location, location))
@@ -203,6 +213,7 @@ export function createSampleConnector(options: {
             providerRequestId: null,
           };
           receipts.set(key, { intent, receipt: result });
+
           return structuredClone(result);
         },
       },

@@ -1,11 +1,13 @@
-import { createServer } from 'node:net';
-import { assert, vi } from 'vitest';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
+
 import { Pool } from 'pg';
+import { assert, vi } from 'vitest';
 
 export const apiDirectory = fileURLToPath(new URL('../', import.meta.url));
+
 export const secret = 'backend-e2e-secret-at-least-32-characters';
 
 export async function until(check, description, timeout = 15_000) {
@@ -47,6 +49,7 @@ export function startProcess(t, script, env = {}, ipc = false) {
     if (!result) child.kill('SIGKILL');
     await wait();
   });
+
   return {
     child,
     get output() {
@@ -94,6 +97,7 @@ export async function database(t) {
   );
   url.username = id;
   url.password = password;
+
   return {
     owner,
     ownerUrl,
@@ -113,6 +117,7 @@ export async function database(t) {
           expectedCode,
           migration.output,
         );
+
         return migration.output;
       } finally {
         await lock.query(
@@ -159,11 +164,13 @@ export async function startApi(
       const response = await fetch(`${origin}/ready`, {
         signal: AbortSignal.timeout(500),
       });
+
       return response.status === 200;
     } catch {
       return false;
     }
   }, 'API readiness');
+
   return {
     origin,
     process,
@@ -180,6 +187,7 @@ export async function startApi(
       });
       const text = await response.text();
       assert.strictEqual(response.status, status, `${method} ${path}: ${text}`);
+
       return {
         body: text ? JSON.parse(text) : null,
         headers: response.headers,
@@ -202,6 +210,7 @@ export async function signup(api, name) {
     .map((value) => value.split(';')[0])
     .join('; ');
   assert.ok(cookie, 'Signup must issue a session cookie');
+
   return { cookie, userId: response.body.user.id };
 }
 
@@ -213,5 +222,6 @@ export async function availablePort() {
   });
   const port = listener.address().port;
   await new Promise((resolve) => listener.close(resolve));
+
   return port;
 }

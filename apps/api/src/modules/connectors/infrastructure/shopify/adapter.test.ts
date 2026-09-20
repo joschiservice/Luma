@@ -1,15 +1,18 @@
 import { createHmac } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+
+import { API_VERSION } from '@luma/connector-shopify';
 import { buildSchema, parse, validate } from 'graphql';
 import { describe, expect, it, vi } from 'vitest';
-import type { TenantContext } from '#modules/identity/index';
+
 import { createCapabilityRuntime } from '#modules/connectors/application/capabilities';
-import { ConnectorError } from '#modules/connectors/domain/capabilities';
-import { API_VERSION } from '#modules/connectors/infrastructure/shopify/client';
 import type { ReadCapability } from '#modules/connectors/domain/capabilities';
-import { createShopifyConnector } from '#modules/connectors/infrastructure/shopify/adapter';
+import { ConnectorError } from '#modules/connectors/domain/capabilities';
 import type { ShopifyConnectorOptions } from '#modules/connectors/infrastructure/shopify/adapter';
+import { createShopifyConnector } from '#modules/connectors/infrastructure/shopify/adapter';
 import { mapShopifyWebhook } from '#modules/connectors/infrastructure/shopify/webhooks';
+import type { TenantContext } from '#modules/identity/index';
+
 import commerce from './fixtures/commerce.json' with { type: 'json' };
 
 vi.mock('#modules/identity/index', () => ({
@@ -17,16 +20,21 @@ vi.mock('#modules/identity/index', () => ({
     if (context.tenantId !== tenantId) throw new Error('Tenant mismatch');
   },
 }));
+
 const context = {
   tenantId: 'tenant-a',
   requestId: 'request-a',
 } as TenantContext;
+
 const ref = (externalId: string) => ({ externalId, scopeKey: '' });
+
 const page = (nodes: unknown[], cursor: string | null = null) => ({
   nodes,
   pageInfo: { hasNextPage: cursor !== null, endCursor: cursor },
 });
+
 const response = (data: unknown) => Response.json({ data });
+
 function fixture(overrides: Partial<ShopifyConnectorOptions> = {}) {
   const data = structuredClone(commerce);
   const fetch = vi.fn<typeof globalThis.fetch>(async (_url, init) => {
@@ -58,8 +66,10 @@ function fixture(overrides: Partial<ShopifyConnectorOptions> = {}) {
               : variables.id?.includes('/FulfillmentOrder/')
                 ? data.workLines
                 : data.orderLines;
+
       return response({ node: { children: page(nodes) } });
     }
+
     return response({
       node: query.includes('... on InventoryItem')
         ? data.inventoryItem
@@ -98,6 +108,7 @@ function fixture(overrides: Partial<ShopifyConnectorOptions> = {}) {
       version: '0',
       input,
     });
+
   return {
     data,
     fetch,
@@ -242,6 +253,7 @@ describe('Shopify read capabilities', () => {
               : page([commerce.orderLines[0]], 'line-page-2'),
           },
         });
+
       return fallback(url, init);
     });
     const result = await f.read('orders.read');

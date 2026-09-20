@@ -76,6 +76,7 @@ route tree automatically.
 | `apps/web`                   | TanStack Start + React; minimal server-rendered landing page |
 | `apps/api`                   | Fastify + ts-rest HTTP server and public sample catalog      |
 | `packages/api-contract`      | Shared schemas, typed client and generated OpenAPI           |
+| `packages/connectors/*`      | Shopify/JTL protocols and shared transport failure handling  |
 | `packages/ui`                | Reusable React components and Storybook component tests      |
 | `packages/config`            | Validated server environment configuration                   |
 | `packages/typescript-config` | Strict shared TypeScript settings for Node and React         |
@@ -114,6 +115,34 @@ API defaults: `HOST=127.0.0.1`, `PORT=3001`, `LOG_LEVEL=info`. Containers must e
 Turborepo runs in strict environment mode. Add new runtime variable names to task `env` in `turbo.json`, especially variables used during builds so their values affect cache keys. Environment files already invalidate task caches. Builds and tests must not depend on production secrets.
 
 ## Contribution conventions
+
+Run `pnpm lint:fix` followed by `pnpm format` to apply style fixes. ESLint uses the
+official [typescript-eslint recommended and stylistic presets](https://typescript-eslint.io/users/configs/),
+with React Hooks and module-boundary checks. Empty test and Storybook stubs are
+allowed; intentional empty production callbacks need an explanatory comment.
+Both interfaces and type aliases are allowed because database row types rely on
+the implicit index signatures of type aliases.
+Prettier handles formatting. ESLint sorts and checks imports, requires spacing
+after imports, around declarations, and before returns, and requires descriptions
+on exported functions in application, package, and tooling source. Documentation
+is written by the author; autofix never inserts empty doc comments. Tests,
+stories, fixtures, and generated route declarations are exempt from documentation
+requirements. The existing CI lint gate enforces these rules; `pnpm test:style`
+checks the configuration and its compatibility with Prettier.
+
+Give exported functions and callable contracts short doc comments describing what
+callers need to know: behavior, input requirements, side effects, and relevant
+failure modes. Keep business rules in domain files, use cases and ports in
+application files, and database or provider access in infrastructure files.
+Colocate focused unit tests with the behavior they verify.
+
+The API composition root is organized under `apps/api/src/composition`: HTTP
+setup, configured runtime setup, service factories, and workflow setup have
+separate files. `app.ts` keeps their public imports stable. API routes live in
+`packages/api-contract/src/contracts`, grouped by feature; schemas remain next to
+their owning feature. Frontend feature folders separate page orchestration,
+interactive components, forms, and data access. Shared connector transport
+helpers and private-query defaults live with their respective consumers.
 
 Branch from `main`: `feat/LUMA-<id>-<short-description>`. Use Conventional Commits, for example `chore(repo): bootstrap workspace`. PR titles should be concise and include the issue, for example `LUMA-3: Bootstrap monorepo`.
 

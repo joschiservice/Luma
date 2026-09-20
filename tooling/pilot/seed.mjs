@@ -1,15 +1,18 @@
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+
 import { Pool } from 'pg';
+
 import {
   buildRuntimeApp,
   createDetectionServices,
 } from '../../apps/api/dist/app.js';
+import { createInstalledConnections } from '../../apps/api/dist/modules/connectors/composition.js';
 import { createIdentity } from '../../apps/api/dist/modules/identity/composition.js';
 import { createTenantDatabase } from '../../apps/api/dist/modules/platform/composition.js';
-import { createInstalledConnections } from '../../apps/api/dist/modules/connectors/composition.js';
-import { detectionRequest, newManifest, readJson, jtl } from './fixtures.mjs';
+import { detectionRequest, jtl, newManifest, readJson } from './fixtures.mjs';
 
+/** Builds identity-service settings from the pilot's environment. */
 export const identitySettings = (env) => ({
   databaseUrl: env.IDENTITY_DATABASE_URL,
   secret: env.BETTER_AUTH_SECRET,
@@ -17,6 +20,11 @@ export const identitySettings = (env) => ({
   baseURL: env.BETTER_AUTH_URL,
   trustedOrigins: [env.BETTER_AUTH_URL],
 });
+
+/**
+ * Seeds an isolated synthetic scenario and writes its manifest and fixtures to the pilot
+ * directory.
+ */
 export async function seedPilot(
   saved,
   env,
@@ -53,6 +61,7 @@ export async function seedPilot(
     },
   });
   let cookie;
+
   async function request(url, payload) {
     const response = await app.inject({
       method: payload ? 'POST' : 'GET',
@@ -62,8 +71,10 @@ export async function seedPilot(
     });
     if (response.statusCode >= 300)
       throw new Error(`Pilot request failed: ${url} (${response.statusCode})`);
+
     return response;
   }
+
   async function login(email) {
     const payload = { email, password: saved.seedPassword };
     let response = await app.inject({
@@ -83,8 +94,10 @@ export async function seedPilot(
       .filter(Boolean)
       .map((value) => value.split(';')[0])
       .join('; ');
+
     return response.json().user.id;
   }
+
   try {
     manifest.operatorId = await login('pilot-operator@example.test');
     await request('/auth/sign-out', {});
@@ -183,6 +196,7 @@ export async function seedPilot(
     console.log(
       `Synthetic pilot: ${scenario}. Login: pilot-operator@example.test. Password: .luma/demo.json.`,
     );
+
     return manifest;
   } finally {
     await Promise.all([

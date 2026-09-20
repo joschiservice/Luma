@@ -1,7 +1,11 @@
 import { z } from 'zod';
+
 const code = z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$/);
+
 const refs = z.array(code).max(100);
+
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
+
 export const startResolutionRunSchema = z
   .object({
     id: z.string().uuid(),
@@ -33,6 +37,7 @@ export const startResolutionRunSchema = z
       }),
   })
   .strict();
+
 const learningCommandBase = z
   .object({
     id: z.string().uuid(),
@@ -115,6 +120,7 @@ const learningCommandBase = z
     ]),
   })
   .strict();
+
 export const learningCommandSchema = learningCommandBase.superRefine(
   ({ fact, occurredAt }, ctx) => {
     const reject = (message: string) =>
@@ -143,11 +149,13 @@ export const learningCommandSchema = learningCommandBase.superRefine(
       reject('Repair times or effort are inconsistent');
   },
 );
+
 export const learningEventSchema = learningCommandBase.extend({
   sequence: z.number().int().positive(),
   actorId: z.string(),
   recordedAt: z.string().datetime(),
 });
+
 export const resolutionRunSchema = startResolutionRunSchema.extend({
   schemaVersion: z.literal(1),
   incidentId: z.string().uuid(),
@@ -182,6 +190,7 @@ export const resolutionRunSchema = startResolutionRunSchema.extend({
   }),
   artifactDigest: hash,
 });
+
 export const resolutionHistorySchema = z.object({
   run: resolutionRunSchema,
   events: z.array(learningEventSchema),

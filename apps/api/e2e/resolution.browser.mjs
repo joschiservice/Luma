@@ -1,16 +1,18 @@
 /* global document, innerWidth */
-import { it, expect } from 'vitest';
 import { randomUUID } from 'node:crypto';
-import { chromium } from 'playwright';
-import { database, startApi, startProcess, availablePort } from './helpers.mjs';
-import { createDetectionServices } from '../dist/app.js';
-import { makeTenantContext } from '../dist/modules/identity/composition.js';
-import { defaultConfiguration } from '../dist/modules/exceptions/index.js';
 import { readFile } from 'node:fs/promises';
+
+import { chromium } from 'playwright';
+import { expect, it } from 'vitest';
+
 import {
-  resolutionReview,
   resolutionProgress,
+  resolutionReview,
 } from '../../../packages/ui/src/components/resolution-fixtures.ts';
+import { createDetectionServices } from '../dist/app.js';
+import { defaultConfiguration } from '../dist/modules/exceptions/index.js';
+import { makeTenantContext } from '../dist/modules/identity/composition.js';
+import { availablePort, database, startApi, startProcess } from './helpers.mjs';
 
 it('reviews decisions, recovers ambiguous commands and escalates through the connected API', async (t) => {
   const port = await availablePort();
@@ -140,6 +142,7 @@ it('reviews decisions, recovers ambiguous commands and escalates through the con
       await new Promise((resolve) => {
         reviewReleases.push(resolve);
       });
+
     return json(route, review);
   });
   await page.route(`**${path}/progress`, (route) => json(route, progress));
@@ -173,6 +176,7 @@ it('reviews decisions, recovers ambiguous commands and escalates through the con
     if (mode === 'conflict') {
       review = { ...review, caseRevision: 5, permittedDecisions: ['escalate'] };
       progress = { ...progress, caseRevision: 5 };
+
       return json(
         route,
         { code: 'CONFLICT', message: 'Replaced', requestId: 'test' },
@@ -181,6 +185,7 @@ it('reviews decisions, recovers ambiguous commands and escalates through the con
     }
     if (mode === 'forbidden' || mode === 'expired') {
       review = { ...review, permittedDecisions: [] };
+
       return json(
         route,
         { code: 'FORBIDDEN', message: 'Access changed', requestId: 'test' },
@@ -188,6 +193,7 @@ it('reviews decisions, recovers ambiguous commands and escalates through the con
       );
     }
     review = { ...review, permittedDecisions: [] };
+
     return json(route, receipt);
   });
   await page.goto(detailUrl);

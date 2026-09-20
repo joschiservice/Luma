@@ -1,5 +1,7 @@
-import { pgTable, text, timestamp, boolean, uuid } from 'drizzle-orm/pg-core';
+import { boolean, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+
 const time = (name: string) => timestamp(name, { withTimezone: true });
+
 export const user = pgTable('users', {
   id: uuid('id').primaryKey(),
   name: text('name').notNull(),
@@ -9,6 +11,7 @@ export const user = pgTable('users', {
   createdAt: time('created_at').notNull(),
   updatedAt: time('updated_at').notNull(),
 });
+
 export const session = pgTable('sessions', {
   id: uuid('id').primaryKey(),
   token: text('token').notNull().unique(),
@@ -22,6 +25,7 @@ export const session = pgTable('sessions', {
   userAgent: text('user_agent'),
   activeOrganizationId: uuid('active_organization_id'),
 });
+
 export const account = pgTable('accounts', {
   id: uuid('id').primaryKey(),
   accountId: text('account_id').notNull(),
@@ -39,6 +43,7 @@ export const account = pgTable('accounts', {
   createdAt: time('created_at').notNull(),
   updatedAt: time('updated_at').notNull(),
 });
+
 export const verification = pgTable('verifications', {
   id: uuid('id').primaryKey(),
   identifier: text('identifier').notNull(),
@@ -47,6 +52,7 @@ export const verification = pgTable('verifications', {
   createdAt: time('created_at').notNull(),
   updatedAt: time('updated_at').notNull(),
 });
+
 export const organization = pgTable('organizations', {
   id: uuid('id').primaryKey(),
   name: text('name').notNull(),
@@ -57,6 +63,7 @@ export const organization = pgTable('organizations', {
   dataRegion: text('data_region').notNull().default('EU'),
   status: text('status').notNull().default('active'),
 });
+
 export const member = pgTable('memberships', {
   id: uuid('id').primaryKey(),
   organizationId: uuid('tenant_id')
@@ -68,6 +75,7 @@ export const member = pgTable('memberships', {
   role: text('role').notNull(),
   createdAt: time('created_at').notNull(),
 });
+
 export const invitation = pgTable('invitations', {
   id: uuid('id').primaryKey(),
   organizationId: uuid('tenant_id')

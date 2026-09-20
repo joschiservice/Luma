@@ -1,7 +1,10 @@
-import { expect, it, vi, afterEach } from 'vitest';
 import { QueryClient } from '@tanstack/react-query';
+import { afterEach, expect, it, vi } from 'vitest';
+
 import { overviewOptions, overviewSearch } from './data';
+
 afterEach(() => vi.unstubAllGlobals());
+
 it('separates organization and window caches and refreshes on reconnect', () => {
   expect(overviewOptions('a', '24h').queryKey).not.toEqual(
     overviewOptions('b', '24h').queryKey,
@@ -16,6 +19,7 @@ it('separates organization and window caches and refreshes on reconnect', () => 
   });
   expect(overviewSearch.parse({ window: 'bad' })).toEqual({ window: '24h' });
 });
+
 it('rejects unauthorized and malformed summaries without caching totals', async () => {
   const fetch = vi
     .fn()

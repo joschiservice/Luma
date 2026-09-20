@@ -4,8 +4,10 @@ export type Operation =
   | 'agent.run'
   | 'model.generate'
   | 'tool.execute';
+
 export type ProductEvent =
   'connector_provider_viewed' | 'observability_test_completed';
+
 export type FeatureFlag = 'observability-test';
 
 /** Correlation is diagnostic metadata, never proof of tenant access. */

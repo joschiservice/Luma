@@ -1,4 +1,5 @@
-import type { CaseReview, CaseProgress } from '@luma/api-contract';
+import type { CaseProgress, CaseReview } from '@luma/api-contract';
+
 export const resolutionReview: CaseReview = {
   schemaVersion: 1,
   caseRevision: 4,
@@ -34,6 +35,7 @@ export const resolutionReview: CaseReview = {
     approval: null,
   },
 };
+
 export const resolutionProgress: CaseProgress = {
   schemaVersion: 1,
   caseRevision: 4,

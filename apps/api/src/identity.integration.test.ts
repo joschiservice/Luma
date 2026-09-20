@@ -1,10 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
+
 import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
 import { buildRuntimeApp } from '#app';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
+
 describe.skipIf(!databaseUrl)(
   'identity on PostgreSQL with restricted runtime credentials',
   () => {
@@ -24,6 +27,7 @@ describe.skipIf(!databaseUrl)(
     let orgA: string;
     let orgB: string;
     const headers = (cookie: string) => ({ cookie, origin });
+
     async function signup(name: string) {
       const response = await app.inject({
         method: 'POST',
@@ -37,6 +41,7 @@ describe.skipIf(!databaseUrl)(
       });
       expect(response.statusCode, response.body).toBe(200);
       const cookies = response.headers['set-cookie'];
+
       return {
         id: response.json().user.id as string,
         cookie: (Array.isArray(cookies) ? cookies : [cookies!])
@@ -44,6 +49,7 @@ describe.skipIf(!databaseUrl)(
           .join('; '),
       };
     }
+
     async function createOrg(cookie: string, slug: string) {
       const response = await app.inject({
         method: 'POST',
@@ -56,8 +62,10 @@ describe.skipIf(!databaseUrl)(
         dataRegion: 'EU',
         status: 'active',
       });
+
       return response.json().id as string;
     }
+
     beforeAll(async () => {
       await admin.query(`CREATE DATABASE "${database}"`);
       const url = new URL(databaseUrl!);

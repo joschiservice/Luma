@@ -1,7 +1,11 @@
 import { z } from 'zod';
+
 const uuid = z.string().uuid();
+
 const decimal = z.string().regex(/^-?\d{1,14}(\.\d{1,6})?$/);
+
 const timestamp = z.string().datetime({ offset: true });
+
 const base = z.object({
   schemaVersion: z.literal(1),
   entityId: uuid,

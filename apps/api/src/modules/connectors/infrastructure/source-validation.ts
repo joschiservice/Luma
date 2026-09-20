@@ -1,12 +1,19 @@
 import { z } from 'zod';
+
 const uuid = z.string().uuid();
+
 const decimal = z.string().regex(/^-?\d{1,14}(\.\d{1,6})?$/);
+
 const units = (s: string) => {
   const [whole, fraction = ''] = s.replace('-', '').split('.');
+
   return BigInt(whole!) * 1000000n + BigInt(fraction.padEnd(6, '0'));
 };
+
 const positive = decimal.refine((s) => !s.startsWith('-') && units(s) > 0n);
+
 const timestamp = z.string().datetime({ offset: true });
+
 const unit = z.string().min(1).max(64);
 
 const external = z
@@ -15,6 +22,7 @@ const external = z
     scopeKey: z.string().max(1024),
   })
   .strict();
+
 export const sourceSchema = external
   .extend({
     tenantId: uuid,
@@ -30,7 +38,9 @@ export const sourceSchema = external
     ]),
   })
   .strict();
+
 const quantity = z.object({ amount: positive, unit }).strict();
+
 const observation = <T extends z.ZodTypeAny>(
   resource: 'order' | 'sku' | 'fulfillment',
   data: T,
@@ -48,6 +58,7 @@ const observation = <T extends z.ZodTypeAny>(
       data,
     })
     .strict();
+
 export const commerceSchema = z.discriminatedUnion('capability', [
   z
     .object({

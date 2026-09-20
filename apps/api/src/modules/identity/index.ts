@@ -1,16 +1,18 @@
 export {
   IdentityError,
-  requireTenant,
   requireRole,
+  requireTenant,
 } from '#modules/identity/domain/context';
+
 export type {
-  TenantContext,
-  SessionIdentity,
-  Role,
   Membership,
   Organization,
+  Role,
+  SessionIdentity,
+  TenantContext,
 } from '#modules/identity/domain/context';
+
 export type {
-  IdentityService,
   Credentials,
+  IdentityService,
 } from '#modules/identity/application/identity';

@@ -1,4 +1,10 @@
 // Consumer -> permitted providers. Keep ADR-001's table in sync.
+export const connectorPackages = {
+  'connector-core': [''],
+  'connector-jtl': ['', 'schemas'],
+  'connector-shopify': ['', 'schemas'],
+};
+
 export const dependencies = {
   platform: [],
   identity: ['platform'],

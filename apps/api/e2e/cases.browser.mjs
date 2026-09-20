@@ -1,12 +1,14 @@
 /* global document, innerWidth, window */
-import { it, expect } from 'vitest';
 import { randomUUID } from 'node:crypto';
-import { chromium } from 'playwright';
-import { database, startApi, startProcess, availablePort } from './helpers.mjs';
-import { createDetectionServices } from '../dist/app.js';
-import { makeTenantContext } from '../dist/modules/identity/composition.js';
-import { defaultConfiguration } from '../dist/modules/exceptions/index.js';
 import { readFile } from 'node:fs/promises';
+
+import { chromium } from 'playwright';
+import { expect, it } from 'vitest';
+
+import { createDetectionServices } from '../dist/app.js';
+import { defaultConfiguration } from '../dist/modules/exceptions/index.js';
+import { makeTenantContext } from '../dist/modules/identity/composition.js';
+import { availablePort, database, startApi, startProcess } from './helpers.mjs';
 
 it('reads persisted cases, restores desktop/mobile routes and focus, and denies other tenants', async (t) => {
   const port = await availablePort();

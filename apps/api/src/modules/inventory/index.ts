@@ -1,7 +1,7 @@
 export type {
-  EntityKind,
-  CommerceData,
   CanonicalSnapshot,
-  Projection,
+  CommerceData,
   CommerceProjections,
+  EntityKind,
+  Projection,
 } from '#modules/inventory/application/projections';

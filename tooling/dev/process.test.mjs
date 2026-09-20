@@ -1,7 +1,8 @@
-import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { run } from './process.mjs';
+import { test } from 'node:test';
+
 import { freePort, project } from './environment.mjs';
+import { run } from './process.mjs';
 
 test('commands preserve arguments without shell expansion', async () => {
   const value = 'literal $(echo secret) `whoami` with spaces';

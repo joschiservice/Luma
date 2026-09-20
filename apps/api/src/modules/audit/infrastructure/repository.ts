@@ -1,5 +1,7 @@
+import type { AuditEntry, AuditLog } from '#modules/audit/application/audit';
 import type { TenantDatabase } from '#modules/platform/index';
-import type { AuditLog, AuditEntry } from '#modules/audit/application/audit';
+
+/** Creates a tenant-scoped, append-only audit log with idempotent event keys. */
 export function createAuditLog(db: TenantDatabase): AuditLog {
   return {
     append: (entry) =>
@@ -23,6 +25,7 @@ export function createAuditLog(db: TenantDatabase): AuditLog {
           'SELECT document FROM audit_entries WHERE tenant_id=$1 AND proposal_id=$2 ORDER BY created_at, id',
           [tenantId, proposalId],
         );
+
         return result.rows.map((row) => row.document);
       }),
   };

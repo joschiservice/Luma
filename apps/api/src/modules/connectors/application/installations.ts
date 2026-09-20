@@ -1,24 +1,28 @@
+import { ConnectorError } from '#modules/connectors/domain/capabilities';
+import type {
+  InstallationCapability,
+  InstallationCredentials,
+  InstallationInput,
+  InstalledConnection,
+} from '#modules/connectors/domain/installation';
+import type { TenantContext } from '#modules/identity/index';
 import {
   IdentityError,
   requireRole,
   requireTenant,
 } from '#modules/identity/index';
-import type { TenantContext } from '#modules/identity/index';
-import { ConnectorError } from '#modules/connectors/domain/capabilities';
-import type { InstallationCapability } from '#modules/connectors/domain/installation';
-import type {
-  InstallationInput,
-  InstalledConnection,
-  InstallationCredentials,
-} from '#modules/connectors/domain/installation';
 
 export interface StoredInstallation {
   connection: InstalledConnection;
   secret: string | null;
 }
+
 export interface InstallationRepository {
+  /** Lists public connection state without decrypted credentials. */
   list(tenantId: string): Promise<InstalledConnection[]>;
+  /** Returns the stored encrypted credentials, or null when this tenant has no matching connection. */
   get(tenantId: string, id: string): Promise<StoredInstallation | null>;
+  /** Saves and records a lifecycle event if the version matches; null expects a new installation. */
   save(
     record: StoredInstallation,
     expectedVersion: number | null,
@@ -26,10 +30,62 @@ export interface InstallationRepository {
     event: string,
   ): Promise<boolean>;
 }
+
 export interface SecretCipher {
+  /** Encrypts credentials and binds them to the supplied connection identity. */
   seal(value: InstallationCredentials, binding: string): string;
+  /** Decrypts credentials; rejects tampered ciphertext, unavailable keys, or a mismatched binding. */
   open(value: string, binding: string): InstallationCredentials;
 }
+
+/** Tenant-scoped connection commands. Mutations require a current owner or admin role. */
+export interface ConnectionManagement {
+  /** Lists connections visible to the current tenant without credentials. */
+  list(context: TenantContext): Promise<InstalledConnection[]>;
+  /** Validates settings and stores encrypted credentials in a pending connection. */
+  install(context: TenantContext, input: unknown): Promise<InstalledConnection>;
+  /** Replaces credentials and clears grants; rejects stale versions or terminal connections. */
+  rotate(
+    context: TenantContext,
+    id: string,
+    version: number,
+    input: unknown,
+  ): Promise<InstalledConnection>;
+  /** Refreshes provider grants and health; rejects stale versions or unavailable credentials. */
+  check(
+    context: TenantContext,
+    id: string,
+    version: number,
+  ): Promise<InstalledConnection>;
+  /** Removes credentials and grants; rejects stale versions. Defaults to disconnected. */
+  disconnect(
+    context: TenantContext,
+    id: string,
+    version: number,
+    status?: 'disconnected' | 'revoked',
+  ): Promise<InstalledConnection>;
+}
+
+/** Adds trusted adapter operations to the public connection management contract. */
+export interface InstallationService extends ConnectionManagement {
+  /** Records Shopify access failures only when the active credential version still matches. */
+  recordFailure(
+    context: TenantContext,
+    id: string,
+    credentialVersion: number,
+    code: 'authentication' | 'permission_denied',
+  ): Promise<void>;
+  /** Returns credentials for an active, permitted capability. Keep this port out of HTTP and workflow interfaces. */
+  credential(
+    context: TenantContext,
+    id: string,
+    capability: InstallationCapability,
+  ): Promise<{
+    connection: InstalledConnection;
+    credentials: InstallationCredentials;
+  }>;
+}
+
 export interface InstallationDependencies {
   boundary: {
     input(value: unknown): InstallationInput;
@@ -51,6 +107,11 @@ export interface InstallationDependencies {
   id(): string;
   now(): Date;
 }
+
+/**
+ * Identifies the tenant, connection, and credential version that encrypted credentials
+ * belong to.
+ */
 export const secretBinding = (c: InstalledConnection) =>
   JSON.stringify([
     c.tenantId,
@@ -58,19 +119,44 @@ export const secretBinding = (c: InstalledConnection) =>
     Object.entries(c.target).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
     c.credentialVersion,
   ]);
+
+function requireCapability(
+  connection: InstalledConnection,
+  capability: InstallationCapability,
+): void {
+  if (
+    !connection.permissions.includes(capability) ||
+    !connection.granted.includes(capability)
+  )
+    throw new ConnectorError({
+      code: 'permission_denied',
+      effect: 'none',
+      retry: 'never',
+    });
+}
+
 const unavailable = () =>
   new IdentityError(404, 'NOT_FOUND', 'Connection not found');
+
 const conflict = () =>
   new IdentityError(409, 'CONFLICT', 'Connection changed; reload and retry');
 
-export function createInstallationService(deps: InstallationDependencies) {
+/**
+ * Creates connection lifecycle commands that refresh authorization, validate input, and
+ * encrypt stored credentials.
+ */
+export function createInstallationService(
+  deps: InstallationDependencies,
+): InstallationService {
   async function authorize(context: TenantContext, admin = false) {
     requireTenant(context, context.tenantId);
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
     if (admin) requireRole(fresh, ['owner', 'admin']);
+
     return fresh;
   }
+
   async function get(context: TenantContext, id: string) {
     const record = await deps.repository.get(context.tenantId, id);
     if (
@@ -79,8 +165,10 @@ export function createInstallationService(deps: InstallationDependencies) {
       record.connection.id !== id
     )
       throw unavailable();
+
     return record;
   }
+
   async function save(
     record: StoredInstallation,
     version: number | null,
@@ -89,11 +177,14 @@ export function createInstallationService(deps: InstallationDependencies) {
   ) {
     if (!(await deps.repository.save(record, version, actor, event)))
       throw conflict();
+
     return record.connection;
   }
+
   return {
     async list(context: TenantContext) {
       const fresh = await authorize(context);
+
       return deps.repository.list(fresh.tenantId);
     },
     async install(context: TenantContext, input: unknown) {
@@ -117,6 +208,7 @@ export function createInstallationService(deps: InstallationDependencies) {
         createdAt: timestamp,
         updatedAt: timestamp,
       };
+
       return save(
         {
           connection,
@@ -159,6 +251,7 @@ export function createInstallationService(deps: InstallationDependencies) {
         granted: [],
         updatedAt: deps.now().toISOString(),
       };
+
       return save(
         {
           connection,
@@ -197,6 +290,7 @@ export function createInstallationService(deps: InstallationDependencies) {
         // Provider errors can contain credentials; retain only a controlled health state.
       }
       const current = await authorize(context, true);
+
       return save(
         {
           secret: record.secret,
@@ -226,6 +320,7 @@ export function createInstallationService(deps: InstallationDependencies) {
         !['disconnected', 'revoked'].includes(status)
       )
         throw conflict();
+
       return save(
         {
           secret: null,
@@ -287,15 +382,7 @@ export function createInstallationService(deps: InstallationDependencies) {
           effect: 'none',
           retry: 'never',
         });
-      if (
-        !record.connection.permissions.includes(capability) ||
-        !record.connection.granted.includes(capability)
-      )
-        throw new ConnectorError({
-          code: 'permission_denied',
-          effect: 'none',
-          retry: 'never',
-        });
+      requireCapability(record.connection, capability);
       if (
         record.connection.target.kind === 'shopify' &&
         deps.shopifyCredential
@@ -304,15 +391,8 @@ export function createInstallationService(deps: InstallationDependencies) {
         const latest = await get(fresh, id);
         if (latest.connection.status !== 'active' || !latest.secret)
           throw unavailable();
-        if (
-          !latest.connection.permissions.includes(capability) ||
-          !latest.connection.granted.includes(capability)
-        )
-          throw new ConnectorError({
-            code: 'permission_denied',
-            effect: 'none',
-            retry: 'never',
-          });
+        requireCapability(latest.connection, capability);
+
         return {
           connection: latest.connection,
           credentials: deps.cipher.open(
@@ -321,6 +401,7 @@ export function createInstallationService(deps: InstallationDependencies) {
           ),
         };
       }
+
       return {
         connection: record.connection,
         credentials: deps.cipher.open(
@@ -331,4 +412,3 @@ export function createInstallationService(deps: InstallationDependencies) {
     },
   };
 }
-export type InstallationService = ReturnType<typeof createInstallationService>;

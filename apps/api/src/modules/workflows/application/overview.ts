@@ -1,7 +1,12 @@
-import { requireTenant } from '#modules/identity/index';
-import type { TenantContext } from '#modules/identity/index';
-import type { CaseService } from '#modules/exceptions/index';
 import type { CoverageReader } from '#modules/connectors/index';
+import type { CaseService } from '#modules/exceptions/index';
+import type { TenantContext } from '#modules/identity/index';
+import { requireTenant } from '#modules/identity/index';
+
+/**
+ * Combines persisted case counts and connection coverage for a rolling 24-hour or seven-day
+ * window.
+ */
 export function createOperationsOverview(
   cases: CaseService,
   coverage: CoverageReader,
@@ -17,6 +22,7 @@ export function createOperationsOverview(
       cases.overview(context, start, end),
       coverage(context, end),
     ]);
+
     return {
       ...summary,
       connections,
@@ -29,6 +35,7 @@ export function createOperationsOverview(
     };
   };
 }
+
 export type OperationsOverviewService = ReturnType<
   typeof createOperationsOverview
 >;

@@ -1,15 +1,17 @@
+import { API_VERSION } from '@luma/connector-jtl';
 import { describe, expect, it, vi } from 'vitest';
-import type { TenantContext } from '#modules/identity/index';
+
 import { createJtlConnector } from '#modules/connectors/infrastructure/jtl/adapter';
 import { cloudPayload } from '#modules/connectors/infrastructure/jtl/fixtures/cloud';
-import {
-  shippingMethodState,
-  shippingMethodResponse,
-} from '#modules/connectors/infrastructure/jtl/shipping-method';
-import { API_VERSION } from '#modules/connectors/infrastructure/jtl/client';
 import * as s from '#modules/connectors/infrastructure/jtl/schemas';
-import api from './fixtures/erp-2.2.json' with { type: 'json' };
+import {
+  shippingMethodResponse,
+  shippingMethodState,
+} from '#modules/connectors/infrastructure/jtl/shipping-method';
+import type { TenantContext } from '#modules/identity/index';
+
 import commerce from './fixtures/commerce.json' with { type: 'json' };
+import api from './fixtures/erp-2.2.json' with { type: 'json' };
 
 type Schema = {
   $ref?: string;
@@ -19,14 +21,19 @@ type Schema = {
   required?: string[];
   items?: Schema;
 };
+
 const cloudIdForContract = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000010';
+
 const schemas: Record<string, Schema> = api.schemas;
+
 function resolve(schema: Schema): Schema {
   if (!schema.$ref) return schema;
   const found = schemas[schema.$ref.split('/').at(-1)!];
   if (!found) throw new Error(`Unknown reference ${schema.$ref}`);
+
   return found;
 }
+
 // Compare the allowlisted projections to the provider's field names and types.
 function validate(value: unknown, schema: Schema): void {
   schema = resolve(schema);
@@ -56,8 +63,10 @@ function validate(value: unknown, schema: Schema): void {
       );
   }
 }
+
 function response(path: keyof typeof api.paths, list = false): Schema {
   const schema = resolve(api.paths[path].response);
+
   return list ? resolve(schema.properties?.items ?? schema).items! : schema;
 }
 
@@ -72,8 +81,10 @@ describe('JTL 2.2 published contract', () => {
             JSON.parse(String(init.body)),
             api.shippingMethodWrite.request,
           );
+
           return Response.json({ salesOrderId: cloudIdForContract });
         }
+
         return Response.json({
           id: cloudIdForContract,
           shippingMethodId: cloudIdForContract,

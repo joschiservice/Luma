@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { clearPrivate, organizationSlug, returnPath } from './data';
+
 import { createQueryClient } from '../../lib/query-client';
+import { clearPrivate, organizationSlug, returnPath } from './data';
 
 describe('identity navigation', () => {
   it.each([
@@ -41,6 +42,7 @@ describe('identity navigation', () => {
           signal.addEventListener('abort', () => {
             aborted = true;
           });
+
           return new Promise<string>((done) => {
             resolve = done;
           });

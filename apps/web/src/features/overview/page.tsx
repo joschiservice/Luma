@@ -1,12 +1,18 @@
+import { OperationsOverview } from '@luma/ui/components/operations-overview';
+import { useQuery } from '@tanstack/react-query';
 import {
   Link,
   useNavigate,
   useParams,
   useSearch,
 } from '@tanstack/react-router';
-import { useQuery } from '@tanstack/react-query';
-import { OperationsOverview } from '@luma/ui/components/operations-overview';
+
 import { overviewOptions } from './data';
+
+/**
+ * Displays the current workspace's operations summary with loading, error, and refresh
+ * states.
+ */
 export function OverviewPage() {
   const { organizationId } = useParams({
     from: '/app/$organizationId/overview',
@@ -14,6 +20,7 @@ export function OverviewPage() {
   const { window } = useSearch({ from: '/app/$organizationId/overview' });
   const navigate = useNavigate({ from: '/app/$organizationId/overview' });
   const result = useQuery(overviewOptions(organizationId, window));
+
   return (
     <OperationsOverview
       data={result.isError || result.isPaused ? undefined : result.data}

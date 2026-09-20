@@ -1,10 +1,13 @@
-import { afterEach, expect, it, vi } from 'vitest';
-import { QueryClient, QueryObserver } from '@tanstack/react-query';
-import { progressOptions } from './progress-data';
 import { caseDetailSchema } from '@luma/api-contract';
+import { QueryClient, QueryObserver } from '@tanstack/react-query';
+import { afterEach, expect, it, vi } from 'vitest';
+
+import { progressOptions } from './progress-data';
 
 const id = '11111111-1111-4111-8111-111111111111';
+
 const at = '2026-09-20T04:00:00Z';
+
 const detail = caseDetailSchema.parse({
   schemaVersion: 1,
   id,
@@ -28,6 +31,7 @@ const detail = caseDetailSchema.parse({
   resolution: null,
   diagnosis: null,
 });
+
 const progress = {
   schemaVersion: 1,
   caseRevision: 1,
@@ -37,6 +41,7 @@ const progress = {
   resolution: null,
   workflow: { availability: 'unavailable', progress: null },
 };
+
 const event = {
   id,
   type: 'execution.prepared',
@@ -46,7 +51,9 @@ const event = {
   outcome: null,
   evidenceRefs: [],
 };
+
 const requests: string[] = [];
+
 function mockReads(overrides: Record<string, unknown> = {}) {
   requests.length = 0;
   vi.stubGlobal(
@@ -76,6 +83,7 @@ function mockReads(overrides: Record<string, unknown> = {}) {
           },
           evidence: { schemaVersion: 1, items: [], nextCursor: null },
         }[resource];
+
       return new Response(JSON.stringify(body), {
         status: 200,
         headers: { 'content-type': 'application/json' },
@@ -83,7 +91,9 @@ function mockReads(overrides: Record<string, unknown> = {}) {
     }),
   );
 }
+
 afterEach(() => vi.unstubAllGlobals());
+
 it('refetches history from page one, deduplicates overlapping events and isolates tenants', async () => {
   mockReads();
   const client = new QueryClient();
@@ -105,6 +115,7 @@ it('refetches history from page one, deduplicates overlapping events and isolate
   );
   client.clear();
 });
+
 it('rejects snapshots that straddle a case transition', async () => {
   mockReads({ progress: { ...progress, caseRevision: 2, state: 'resolved' } });
   const client = new QueryClient();
@@ -116,6 +127,7 @@ it('rejects snapshots that straddle a case transition', async () => {
   ).toBeUndefined();
   client.clear();
 });
+
 it('rejects malformed progress instead of retaining a success result', async () => {
   mockReads({ progress: { ...progress, state: 'success' } });
   const client = new QueryClient();
@@ -145,6 +157,7 @@ it('rejects a diagnosis-only transition even when review and progress agree', as
   ).toBeUndefined();
   client.clear();
 });
+
 it('retains loaded pages only within the same tenant and case', async () => {
   mockReads();
   const client = new QueryClient();

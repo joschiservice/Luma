@@ -1,5 +1,6 @@
 import { access, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+
 import {
   compose,
   environment,
@@ -10,6 +11,7 @@ import {
 import { fail, root, run } from './process.mjs';
 
 const command = process.argv[2];
+
 try {
   if (Number(process.versions.node.split('.')[0]) !== 24)
     throw new Error(

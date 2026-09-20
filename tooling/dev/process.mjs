@@ -3,6 +3,10 @@ import { fileURLToPath } from 'node:url';
 
 export const root = fileURLToPath(new URL('../../', import.meta.url));
 
+/**
+ * Runs a command without a shell and forwards termination signals; resolves trimmed captured
+ * output or rejects with the child exit code.
+ */
 export function run(
   command,
   args,
@@ -73,6 +77,10 @@ export function run(
   });
 }
 
+/**
+ * Reports a command failure and sets the process exit code, suppressing expected
+ * interruption messages.
+ */
 export function fail(error) {
   if (![130, 143].includes(error.exitCode)) console.error(error.message);
   process.exitCode = error.exitCode ?? 1;

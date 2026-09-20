@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import { expect, it } from 'vitest';
+
 import { InMemorySpanExporter } from '@opentelemetry/sdk-trace-node';
+import { expect, it } from 'vitest';
+
 import { createObservability } from '#modules/platform/infrastructure/observability';
 
 it('exports the same trace to real Sentry and Langfuse SDKs with safe error metadata', async () => {
@@ -24,6 +26,7 @@ it('exports the same trace to real Sentry and Langfuse SDKs with safe error meta
       sentryTransport: () => ({
         send: async (envelope) => {
           envelopes.push(envelope);
+
           return { statusCode: 200 };
         },
         flush: async () => true,
@@ -67,6 +70,7 @@ it('resumes serialized workflow context without losing its trace', async () => {
       sentryTransport: () => ({
         send: async (envelope) => {
           envelopes.push(envelope);
+
           return { statusCode: 200 };
         },
         flush: async () => true,

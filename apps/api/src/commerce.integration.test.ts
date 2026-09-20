@@ -1,15 +1,18 @@
 import { randomUUID } from 'node:crypto';
-import { readFile, readdir } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
+
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+
 import { createCommerceServices } from '#app';
-import { makeTenantContext } from '#modules/identity/composition';
 import type {
   CommerceObservation,
   SourceIdentity,
 } from '#modules/connectors/index';
+import { makeTenantContext } from '#modules/identity/composition';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
+
 describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
   const name = `commerce_${randomUUID().replaceAll('-', '')}`;
   const admin = new Pool({ connectionString: databaseUrl });
@@ -20,6 +23,7 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
     otherTenant = randomUUID(),
     connection = randomUUID(),
     secondConnection = randomUUID();
+
   function context(tenantId = tenant) {
     return makeTenantContext(
       { userId: 'operator', sessionId: 'session' },
@@ -39,6 +43,7 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
       randomUUID(),
     );
   }
+
   function stock(
     options: {
       connectionId?: string;
@@ -78,6 +83,7 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
       },
     };
   }
+
   async function mapStock(input: ReturnType<typeof stock>, key: string) {
     const o = input.observation;
     await services.ingestion.ingest(context(), key, input);
@@ -95,8 +101,10 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
       o.id,
       'operator-confirmed',
     );
+
     return services.ingestion.replay(context(), o.source.connectionId, key);
   }
+
   beforeAll(async () => {
     await admin.query(`CREATE DATABASE "${name}"`);
     const url = new URL(databaseUrl!);

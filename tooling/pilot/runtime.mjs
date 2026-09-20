@@ -1,35 +1,41 @@
-import { createJtlConnector } from '../../apps/api/dist/modules/connectors/infrastructure/jtl/adapter.js';
-import { createCapabilityRuntime } from '../../apps/api/dist/modules/connectors/application/capabilities.js';
-import { writeFile, rename } from 'node:fs/promises';
+import { rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
+
 import { Pool } from 'pg';
+
 import {
   buildApp,
-  createDeskServices,
-  createResolutionPlaybooks,
-  createDetectionServices,
-  createSafetyServices,
   createAdmissionEligibility,
+  createDeskServices,
+  createDetectionServices,
   createExceptionWorkflowRuntime,
+  createResolutionPlaybooks,
+  createSafetyServices,
 } from '../../apps/api/dist/app.js';
+import { createCapabilityRuntime } from '../../apps/api/dist/modules/connectors/application/capabilities.js';
+import {
+  createConnectionCoverage,
+  createInstalledConnections,
+  createShippingMethodEffects,
+} from '../../apps/api/dist/modules/connectors/composition.js';
+import { ConnectorError } from '../../apps/api/dist/modules/connectors/index.js';
+import { createJtlConnector } from '../../apps/api/dist/modules/connectors/infrastructure/jtl/adapter.js';
 import { createIdentity } from '../../apps/api/dist/modules/identity/composition.js';
+import { IdentityError } from '../../apps/api/dist/modules/identity/index.js';
 import { createTenantDatabase } from '../../apps/api/dist/modules/platform/composition.js';
 import {
-  createShippingMethodEffects,
-  createInstalledConnections,
-  createConnectionCoverage,
-} from '../../apps/api/dist/modules/connectors/composition.js';
-import { IdentityError } from '../../apps/api/dist/modules/identity/index.js';
-import { ConnectorError } from '../../apps/api/dist/modules/connectors/index.js';
-import {
-  createOperationsOverview,
   createDeskWorkflowReader,
+  createOperationsOverview,
 } from '../../apps/api/dist/modules/workflows/composition.js';
 import { shippingMethodPlaybook } from '../../apps/api/dist/modules/workflows/index.js';
-import { identitySettings } from './seed.mjs';
 import { readJson } from './fixtures.mjs';
+import { identitySettings } from './seed.mjs';
 
+/**
+ * Creates the synthetic pilot's services and provider fixtures; rejects production use and
+ * exposes close for cleanup.
+ */
 export async function createPilot(
   env,
   directory,
@@ -54,9 +60,13 @@ export async function createPilot(
         flush: true,
       });
       await rename(`${path}.tmp`, path);
+
       return result;
     });
-    writes = work.catch(() => {});
+    writes = work.catch(() => {
+      // Let later mutations proceed; the caller still receives the rejected work.
+    });
+
     return work;
   };
   const context = () =>
@@ -94,9 +104,11 @@ export async function createPilot(
         !Object.values(manifest.connections).includes(connectionId)
       )
         throw new IdentityError(404, 'NOT_FOUND', 'Connection not found');
+
       return installations.check(actor, connectionId, version);
     },
   };
+
   async function connectionAvailable(actor, connectionId) {
     if (
       actor.tenantId !== manifest.organizationId ||
@@ -106,11 +118,13 @@ export async function createPilot(
     const connection = (await installations.list(actor)).find(
       (item) => item.id === connectionId,
     );
+
     // Pending fixture configuration is usable without claiming live provider health.
     return (
       !!connection && !['disconnected', 'revoked'].includes(connection.status)
     );
   }
+
   const id = manifest.incidents.workflow_failure;
   const connector = createJtlConnector({
     tenantId: manifest.organizationId,
@@ -133,6 +147,7 @@ export async function createPilot(
             effect: 'none',
             retry: 'never',
           });
+
         return 'synthetic';
       },
     },
@@ -172,13 +187,16 @@ export async function createPilot(
         await delay(40_000);
         throw new Error('Simulated lost provider response');
       }
+
       return Response.json({ salesOrderId: '10' });
     },
   });
   const capabilities = createCapabilityRuntime({
     resolve: async (actor, connectionId) =>
       (await connectionAvailable(actor, connectionId)) ? connector : null,
-    record: async () => {},
+    record: async () => {
+      // The synthetic pilot does not export capability telemetry.
+    },
   });
   const supported = (action) =>
     action.tenantId === manifest.organizationId &&
@@ -196,6 +214,7 @@ export async function createPilot(
         : null,
     checkPreconditions: async (actor, action) => {
       const diagnosis = await detection.diagnoses.get(actor, id);
+
       return (
         supported(action) &&
         (await connectionAvailable(actor, action.connectionId)) &&
@@ -224,6 +243,7 @@ export async function createPilot(
         observation?.data?.shippingMethod?.externalId === '8' &&
         !observation.data.isCancelled;
       const key = `pilot-verification:${manifest.runId}:${Date.now()}`;
+
       return {
         reason: 'Synthetic JTL order shipping method independently reread',
         outcome: passed ? 'passed' : 'inconclusive',
@@ -306,6 +326,7 @@ export async function createPilot(
           (kind) => kind !== 'approve',
         );
       }
+
       return review;
     },
   };
@@ -344,6 +365,7 @@ export async function createPilot(
               const expiresAt =
                 diagnosis.provenance.validUntil ??
                 new Date(Date.parse(manifest.epoch) + 300_000).toISOString();
+
               return {
                 schemaVersion: 1,
                 id: manifest.proposalId,
@@ -400,6 +422,7 @@ export async function createPilot(
         },
       )
     : null;
+
   return {
     app,
     runtime,

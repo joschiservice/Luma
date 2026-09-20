@@ -5,18 +5,21 @@ export interface Thresholds {
   stuckSeconds: number;
   uncertaintySeconds: number;
 }
+
 export interface Configuration {
   version: string;
   ruleVersion: 'v0.1';
   inventoryTolerance: string;
   thresholds: Thresholds;
 }
+
 interface Common {
   tenantId: string;
   evidenceTenantId: string;
   subjectId: string;
   evidenceRefs: string[];
 }
+
 interface FactMap {
   sync_failure: Common & {
     connectionId: string;
@@ -100,14 +103,19 @@ interface FactMap {
     errorCode: string;
   };
 }
+
 export type ExceptionClass = keyof FactMap;
+
 export type Facts<K extends ExceptionClass = ExceptionClass> = FactMap[K];
+
 export type EvaluationInput = {
   [K in ExceptionClass]: { exceptionClass: K; facts: Facts<K> };
 }[ExceptionClass];
+
 export type Decision =
   | { decision: 'detect'; severity: 'medium' | 'high'; reason: string }
   | { decision: 'clear' | 'defer' | 'reject'; severity: null; reason: string };
+
 export const defaultConfiguration: Configuration = {
   version: 'v0.1',
   ruleVersion: 'v0.1',
@@ -120,6 +128,7 @@ export const defaultConfiguration: Configuration = {
     uncertaintySeconds: 1800,
   },
 };
+
 /** Scale decimals to millionths without rounding through floating point. */
 export function decimalUnits(value: string): bigint {
   if (!/^-?\d{1,14}(?:\.\d{1,6})?$/.test(value))
@@ -127,9 +136,13 @@ export function decimalUnits(value: string): bigint {
   const negative = value.startsWith('-');
   const [whole, fraction = ''] = value.replace(/^-/, '').split('.');
   const units = BigInt(whole!) * 1_000_000n + BigInt(fraction.padEnd(6, '0'));
+
   return negative ? -units : units;
 }
+
+/** Formats millionth-unit integers as decimal strings without floating-point rounding. */
 export function decimalString(value: bigint): string {
   const magnitude = value < 0n ? -value : value;
+
   return `${value < 0n ? '-' : ''}${magnitude / 1_000_000n}.${String(magnitude % 1_000_000n).padStart(6, '0')}`;
 }

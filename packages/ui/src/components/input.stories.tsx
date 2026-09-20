@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, within } from 'storybook/test';
+
 import { Input } from './input';
 
 const meta = {
@@ -7,7 +8,9 @@ const meta = {
   component: Input,
   args: { 'aria-label': 'Workspace name', placeholder: 'Workspace name' },
 } satisfies Meta<typeof Input>;
+
 export default meta;
+
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
@@ -19,12 +22,14 @@ export const Default: Story = {
     await expect(input).toHaveValue('Luma');
   },
 };
+
 export const Disabled: Story = {
   args: { disabled: true, defaultValue: 'Luma' },
   play: async ({ canvasElement }) => {
     await expect(within(canvasElement).getByRole('textbox')).toBeDisabled();
   },
 };
+
 export const Invalid: Story = {
   args: { 'aria-invalid': true, 'aria-describedby': 'workspace-error' },
   render: (args) => (
@@ -41,4 +46,5 @@ export const Invalid: Story = {
     await expect(input).toHaveAccessibleDescription('Enter a workspace name.');
   },
 };
+
 export const Dark: Story = { globals: { theme: 'dark' } };

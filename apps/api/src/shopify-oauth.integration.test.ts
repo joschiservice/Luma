@@ -1,17 +1,20 @@
-import { readFileSync } from 'node:fs';
-import { buildSchema, parse, validate } from 'graphql';
 import { createHmac, randomBytes, randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
+
+import { buildSchema, parse, validate } from 'graphql';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+
 import {
-  createShopifyOAuth,
-  createSecretCipher,
   createInstalledConnections,
+  createSecretCipher,
+  createShopifyOAuth,
 } from '#modules/connectors/composition';
-import { createTenantDatabase } from '#modules/platform/composition';
-import { makeTenantContext } from '#modules/identity/composition';
 import { ConnectorError } from '#modules/connectors/index';
+import { makeTenantContext } from '#modules/identity/composition';
+import { createTenantDatabase } from '#modules/platform/composition';
+
 const schema = buildSchema(
   readFileSync(
     new URL(
@@ -21,15 +24,19 @@ const schema = buildSchema(
     'utf8',
   ),
 );
+
 const databaseUrl = process.env.TEST_DATABASE_URL;
+
 const scopes =
   'read_orders,read_products,read_inventory,read_merchant_managed_fulfillment_orders,read_third_party_fulfillment_orders';
+
 const reads = [
   'orders.read',
   'products.read',
   'inventory.read',
   'fulfillment.read',
 ] as const;
+
 const config = {
   clientId: 'client',
   clientSecret: 'test-client-secret',
@@ -37,6 +44,7 @@ const config = {
   callbackUrl: 'https://luma.test/api/v1/shopify/callback',
   webOrigin: 'https://luma.test',
 };
+
 const context = (
   id: string = randomUUID(),
   userId = 'admin',
@@ -49,6 +57,7 @@ const context = (
     { id: 'membership', organizationId: id, userId, role },
     randomUUID(),
   );
+
 describe.skipIf(!databaseUrl)('Shopify OAuth on PostgreSQL', () => {
   const name = `oauth_${randomUUID().replaceAll('-', '')}`;
   const admin = new Pool({ connectionString: databaseUrl });
@@ -114,6 +123,7 @@ describe.skipIf(!databaseUrl)('Shopify OAuth on PostgreSQL', () => {
         if (transient) return new Response(null, { status: 503 });
         if (revoked) return new Response(null, { status: 400 });
         counter++;
+
         return Response.json({
           access_token: `private-access-${counter}`,
           refresh_token: `private-refresh-${counter}`,
@@ -128,6 +138,7 @@ describe.skipIf(!databaseUrl)('Shopify OAuth on PostgreSQL', () => {
       ).toEqual([]);
       if (query.includes('LumaUninstallSubscriptions'))
         return Response.json({ data: { webhookSubscriptions: { nodes: [] } } });
+
       return Response.json({
         data: {
           webhookSubscriptionCreate: {
@@ -144,6 +155,7 @@ describe.skipIf(!databaseUrl)('Shopify OAuth on PostgreSQL', () => {
           effect: 'none',
           retry: 'never',
         });
+
       return [...reads];
     });
     const db = createTenantDatabase(runtime);
@@ -158,6 +170,7 @@ describe.skipIf(!databaseUrl)('Shopify OAuth on PostgreSQL', () => {
     const oauth = createShopifyOAuth(db, config, deps);
     const ctx = context();
     const shop = `shop-${randomUUID()}.myshopify.com`;
+
     async function query(
       overrides: Record<string, string> = {},
       authorizer = oauth,
@@ -179,8 +192,10 @@ describe.skipIf(!databaseUrl)('Shopify OAuth on PostgreSQL', () => {
         'hmac',
         createHmac('sha256', config.clientSecret).update(message).digest('hex'),
       );
+
       return params.toString();
     }
+
     async function connection() {
       return (
         await createInstalledConnections(db, {
@@ -191,6 +206,7 @@ describe.skipIf(!databaseUrl)('Shopify OAuth on PostgreSQL', () => {
         }).list(ctx)
       )[0]!;
     }
+
     return {
       ctx,
       shop,
@@ -219,6 +235,7 @@ describe.skipIf(!databaseUrl)('Shopify OAuth on PostgreSQL', () => {
       },
     };
   }
+
   it('authorizes, stores encrypted credentials and blocks replay and foreign tenants', async () => {
     const f = fixture();
     const q = await f.query();

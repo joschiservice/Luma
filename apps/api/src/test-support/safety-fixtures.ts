@@ -1,11 +1,12 @@
 import { Pool } from 'pg';
-import { createTenantDatabase } from '#modules/platform/composition';
-import { createAuditLog } from '#modules/audit/composition';
+
 import { policyAudit } from '#app';
-import { createPolicies } from '#modules/policies/composition';
+import { createAuditLog } from '#modules/audit/composition';
+import type { EffectRegistry } from '#modules/connectors/index';
 import { createExecution } from '#modules/execution/composition';
 import type { IdentityService } from '#modules/identity/index';
-import type { EffectRegistry } from '#modules/connectors/index';
+import { createTenantDatabase } from '#modules/platform/composition';
+import { createPolicies } from '#modules/policies/composition';
 
 /** Exercise engine persistence and failure recovery without provisioning a playbook. */
 export function createSafetyFixture(
@@ -21,6 +22,7 @@ export function createSafetyFixture(
     identity.refreshContext,
     policyAudit(audit),
   );
+
   return {
     policies,
     execution: createExecution(

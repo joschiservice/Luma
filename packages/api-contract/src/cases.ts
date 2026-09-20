@@ -1,4 +1,5 @@
 import { z } from 'zod';
+
 import { diagnosisSchema, evidenceReferenceSchema } from './diagnosis.js';
 
 export const caseClasses = [
@@ -7,6 +8,7 @@ export const caseClasses = [
   'inventory_mismatch',
   'workflow_failure',
 ] as const;
+
 export const caseStates = [
   'detected',
   'diagnosed',
@@ -19,6 +21,7 @@ export const caseStates = [
   'failed',
   'escalated',
 ] as const;
+
 export const caseQuerySchema = z
   .object({
     view: z.enum(['needs_you', 'active', 'history']).default('needs_you'),
@@ -29,7 +32,9 @@ export const caseQuerySchema = z
     limit: z.coerce.number().int().min(1).max(100).default(25),
   })
   .strict();
+
 export type CaseQuery = z.infer<typeof caseQuerySchema>;
+
 export const caseSummarySchema = z.object({
   schemaVersion: z.literal(1),
   id: z.string().uuid(),
@@ -63,15 +68,19 @@ export const caseSummarySchema = z.object({
   ]),
   resolution: z.enum(['verified', 'human_disposition']).nullable(),
 });
+
 export const caseListSchema = z.object({
   items: z.array(caseSummarySchema).max(100),
   nextCursor: z.string().nullable(),
   coverage: z.enum(['observed', 'unobserved']),
 });
+
 export const caseDetailSchema = caseSummarySchema.extend({
   diagnosis: diagnosisSchema.nullable(),
 });
+
 export type CaseSummary = z.infer<typeof caseSummarySchema>;
+
 export type CaseDetail = z.infer<typeof caseDetailSchema>;
 
 /** Historical evidence references, including observations outside the current diagnosis. */
@@ -81,13 +90,17 @@ export const caseEvidenceQuerySchema = z
     limit: z.coerce.number().int().min(1).max(100).default(25),
   })
   .strict();
+
 export const caseEvidenceSchema = evidenceReferenceSchema.extend({
   completeness: z.enum(['complete', 'incomplete', 'unknown']),
 });
+
 export const caseEvidencePageSchema = z.object({
   schemaVersion: z.literal(1),
   items: z.array(caseEvidenceSchema).max(100),
   nextCursor: z.string().nullable(),
 });
+
 export type CaseEvidenceQuery = z.infer<typeof caseEvidenceQuerySchema>;
+
 export type CaseEvidencePage = z.infer<typeof caseEvidencePageSchema>;

@@ -23,5 +23,6 @@ export function createQueryClient() {
     }),
     defaultOptions: { queries: { staleTime: 30_000 } },
   });
+
   return client;
 }

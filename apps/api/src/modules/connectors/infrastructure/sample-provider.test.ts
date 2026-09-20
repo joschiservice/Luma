@@ -1,18 +1,20 @@
 import { randomUUID } from 'node:crypto';
+
 import { describe, expect, expectTypeOf, it, vi } from 'vitest';
-import type { TenantContext } from '#modules/identity/index';
-import { createCapabilityRuntime } from '#modules/connectors/application/capabilities';
+
 import type {
   CapabilityEvent,
   CapabilityReader,
 } from '#modules/connectors/application/capabilities';
-import { ConnectorError } from '#modules/connectors/domain/capabilities';
+import { createCapabilityRuntime } from '#modules/connectors/application/capabilities';
+import type { EffectIntent } from '#modules/connectors/application/effects';
 import type {
   CapabilityInput,
   CapabilityOutput,
 } from '#modules/connectors/domain/capabilities';
-import type { EffectIntent } from '#modules/connectors/application/effects';
+import { ConnectorError } from '#modules/connectors/domain/capabilities';
 import { createSampleConnector } from '#modules/connectors/infrastructure/sample-provider';
+import type { TenantContext } from '#modules/identity/index';
 
 // Identity's brand and membership checks have their own tests; these fixtures isolate connector scoping.
 vi.mock('#modules/identity/index', () => ({
@@ -20,22 +22,26 @@ vi.mock('#modules/identity/index', () => ({
     if (context.tenantId !== tenantId) throw new Error('Tenant mismatch');
   },
 }));
+
 const context = {
   tenantId: 'tenant-a',
   requestId: 'request-a',
 } as TenantContext;
+
 const input: CapabilityInput<'inventory.write'> = {
   sku: { externalId: 'SKU/001', scopeKey: '' },
   location: { externalId: 'Warehouse-A', scopeKey: '' },
   available: { amount: '-2.250000', unit: 'each' },
   expectedRevision: '1',
 };
+
 const read = {
   connectionId: 'connection-a',
   capability: 'inventory.read',
   version: '0',
   input: { limit: 10 },
 } as const;
+
 const write = {
   connectionId: 'connection-a',
   capability: 'inventory.write',
@@ -43,6 +49,7 @@ const write = {
   input,
   idempotencyKey: 'v0:proposal-a',
 } as const;
+
 function fixture(mechanism: 'api' | 'deterministic_browser' = 'api') {
   const connection = createSampleConnector({
     tenantId: context.tenantId,
@@ -56,6 +63,7 @@ function fixture(mechanism: 'api' | 'deterministic_browser' = 'api') {
     .mockResolvedValue();
   const resolve = vi.fn().mockResolvedValue(connection);
   const runtime = createCapabilityRuntime({ resolve, record });
+
   return { connection, runtime, record, resolve };
 }
 
@@ -109,6 +117,7 @@ describe.each(['api', 'deterministic_browser'] as const)(
           if (!result.ok || !result.value.items[0])
             throw new Error('Observation unavailable');
           const observed = result.value.items[0];
+
           return {
             outcome:
               observed.data.available === input.available.amount
@@ -162,6 +171,7 @@ it('replays the same intent, rejects changed intent and stale revisions', async 
   const result = await runtime.read(context, read);
   expect(result.ok && result.value.items[0]?.sourceRevision).toBe('2');
 });
+
 it.each(['revoked', 'disconnected', 'pending', 'degraded'] as const)(
   'refuses %s connections',
   async (status) => {
@@ -175,6 +185,7 @@ it.each(['revoked', 'disconnected', 'pending', 'degraded'] as const)(
     expect(record).not.toHaveBeenCalled();
   },
 );
+
 it('rejects mismatched tenant and connection identities before dispatch', async () => {
   const { connection, runtime, record } = fixture();
   connection.tenantId = 'tenant-b';
@@ -190,6 +201,7 @@ it('rejects mismatched tenant and connection identities before dispatch', async 
   });
   expect(record).not.toHaveBeenCalled();
 });
+
 it('rejects unsupported capabilities, versions and invalid input', async () => {
   const { runtime } = fixture();
   expect(
@@ -218,6 +230,7 @@ it('rejects unsupported capabilities, versions and invalid input', async () => {
     error: { code: 'invalid_input' },
   });
 });
+
 it('normalizes ambiguous writes, does not retry, and excludes payloads from hooks', async () => {
   const { connection, runtime, record } = fixture();
   const run = vi.fn().mockRejectedValue(new Error('secret provider payload'));
@@ -245,6 +258,7 @@ it('normalizes ambiguous writes, does not retry, and excludes payloads from hook
     error: { code: 'timeout', retry: 'reconcile', retryAfterMs: 500 },
   });
 });
+
 it('preserves rate-limit advice on reads and rejects malformed responses', async () => {
   const { connection, runtime } = fixture();
   connection.capabilities['inventory.read']!.run = vi.fn().mockRejectedValue(
@@ -267,6 +281,7 @@ it('preserves rate-limit advice on reads and rejects malformed responses', async
     error: { code: 'invalid_response', effect: 'unknown', retry: 'reconcile' },
   });
 });
+
 it('fails closed on a pre-dispatch hook failure and propagates post-dispatch evidence failure', async () => {
   const { connection, runtime, record } = fixture();
   const run = vi.spyOn(connection.capabilities['inventory.write']!, 'run');
@@ -296,6 +311,7 @@ it('rejects observations from another source and returns independent discovery m
   handler.run = async (context, input) => {
     const page = await run(context, input);
     page.items[0]!.source.tenantId = 'foreign-tenant';
+
     return page;
   };
   expect(await runtime.read(context, read)).toMatchObject({

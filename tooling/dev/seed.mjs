@@ -1,14 +1,19 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+
 import {
   buildRuntimeApp,
   createDetectionServices,
 } from '../../apps/api/dist/app.js';
-import { createIdentity } from '../../apps/api/dist/modules/identity/composition.js';
-import { defaultConfiguration } from '../../apps/api/dist/modules/exceptions/index.js';
 import { parseInput } from '../../apps/api/dist/modules/exceptions/composition.js';
+import { defaultConfiguration } from '../../apps/api/dist/modules/exceptions/index.js';
+import { createIdentity } from '../../apps/api/dist/modules/identity/composition.js';
 import { stateDirectory } from './environment.mjs';
 
+/**
+ * Seeds the local demo workspace and writes its sign-in details to the selected output
+ * directory.
+ */
 export async function seed(saved, env, outputDirectory = stateDirectory) {
   const settings = {
     databaseUrl: env.IDENTITY_DATABASE_URL,
@@ -43,6 +48,7 @@ export async function seed(saved, env, outputDirectory = stateDirectory) {
       throw new Error(
         `Demo setup failed (${response.statusCode}): ${response.body}`,
       );
+
     return response.json();
   };
   try {

@@ -1,17 +1,17 @@
-import { currentPolicyVersion } from '#modules/policies/index';
+import type { Diagnosis, Incident } from '#modules/exceptions/index';
+import type { ExecutionRecord } from '#modules/execution/index';
+import type { TenantContext } from '#modules/identity/index';
 import {
   IdentityError,
   requireRole,
   requireTenant,
 } from '#modules/identity/index';
-import type { TenantContext } from '#modules/identity/index';
 import type {
-  ProposedAction,
-  PolicyDecision,
   Approval,
+  PolicyDecision,
+  ProposedAction,
 } from '#modules/policies/index';
-import type { Diagnosis, Incident } from '#modules/exceptions/index';
-import type { ExecutionRecord } from '#modules/execution/index';
+import { currentPolicyVersion } from '#modules/policies/index';
 import type {
   WorkflowProgress,
   WorkflowSource,
@@ -23,6 +23,7 @@ export interface BoundProposal {
   version: number;
   diagnosisRevision: number;
 }
+
 export interface DeskSnapshot {
   incident: Incident;
   revision: number;
@@ -32,6 +33,7 @@ export interface DeskSnapshot {
   approval: Approval | null;
   execution: ExecutionRecord | null;
 }
+
 export interface CaseDecision {
   commandId: string;
   kind: 'approve' | 'reject' | 'escalate';
@@ -42,6 +44,7 @@ export interface CaseDecision {
   decisionId?: string | undefined;
   reason: string;
 }
+
 export interface DecisionReceipt {
   id: string;
   exceptionId: string;
@@ -52,6 +55,7 @@ export interface DecisionReceipt {
   reason: string;
   createdAt: string;
 }
+
 export interface TimelineEvent {
   id: string;
   type: string;
@@ -61,6 +65,7 @@ export interface TimelineEvent {
   outcome: string | null;
   evidenceRefs: string[];
 }
+
 export interface DeskSession {
   snapshot: DeskSnapshot;
   receipt(
@@ -75,6 +80,7 @@ export interface DeskSession {
   save(request: CaseDecision, receipt: DecisionReceipt): Promise<void>;
   escalate(): Promise<number>;
 }
+
 export interface DeskStore {
   bindWorkflow(
     context: TenantContext,
@@ -111,6 +117,7 @@ export interface DeskStore {
     query: { limit: number; cursor?: string | undefined },
   ): Promise<{ items: TimelineEvent[]; nextCursor: string | null }>;
 }
+
 export interface DeskDependencies {
   store: DeskStore;
   refreshContext(context: TenantContext): Promise<TenantContext>;
@@ -126,19 +133,27 @@ export interface DeskDependencies {
   ): Promise<WorkflowProgress | null>;
   now(): Date;
 }
+
 function conflict(
   message = 'The case changed. Refresh before deciding.',
 ): never {
   throw new IdentityError(409, 'CONFLICT', message);
 }
+
+/**
+ * Creates proposal review and version-bound operator decisions with refreshed authorization
+ * and capability checks.
+ */
 export function createDeskService(deps: DeskDependencies) {
   async function fresh(context: TenantContext) {
     const next = await deps.refreshContext(context);
     requireTenant(next, context.tenantId);
     if (next.actor.id !== context.actor.id)
       throw new IdentityError(403, 'FORBIDDEN', 'Actor changed');
+
     return next;
   }
+
   function permitted(context: TenantContext, s: DeskSnapshot) {
     const decisions: CaseDecision['kind'][] = [];
     if (
@@ -170,8 +185,10 @@ export function createDeskService(deps: DeskDependencies) {
       decisions.push('reject');
       if (deps.capability(p.action)) decisions.push('approve');
     }
+
     return decisions;
   }
+
   return {
     async bindWorkflow(
       context: TenantContext,
@@ -193,6 +210,7 @@ export function createDeskService(deps: DeskDependencies) {
     },
     async review(context: TenantContext, id: string) {
       context = await fresh(context);
+
       return deps.store.withCase(
         context,
         id,
@@ -244,6 +262,7 @@ export function createDeskService(deps: DeskDependencies) {
     async decide(context: TenantContext, id: string, request: CaseDecision) {
       context = await fresh(context);
       requireRole(context, ['owner', 'admin']);
+
       return deps.store.withCase(context, id, true, async (session) => {
         context = await fresh(context);
         requireRole(context, ['owner', 'admin']);
@@ -262,6 +281,7 @@ export function createDeskService(deps: DeskDependencies) {
             conflict(
               'This command ID was already used for a different decision.',
             );
+
           return previous.receipt;
         }
         const s = session.snapshot;
@@ -322,11 +342,13 @@ export function createDeskService(deps: DeskDependencies) {
           createdAt: deps.now().toISOString(),
         };
         await session.save(request, receipt);
+
         return receipt;
       });
     },
     async receipt(context: TenantContext, id: string, commandId: string) {
       context = await fresh(context);
+
       return deps.store.withCase(context, id, false, async (session) => {
         const value = await session.receipt(commandId);
         if (
@@ -335,6 +357,7 @@ export function createDeskService(deps: DeskDependencies) {
           value.receipt.actorId !== context.actor.id
         )
           throw new IdentityError(404, 'NOT_FOUND', 'Decision not found');
+
         return value.receipt;
       });
     },
@@ -346,6 +369,7 @@ export function createDeskService(deps: DeskDependencies) {
         false,
         async ({ snapshot: s }) => {
           const e = s.execution;
+
           return {
             schemaVersion: 1 as const,
             caseRevision: s.revision,
@@ -401,6 +425,7 @@ export function createDeskService(deps: DeskDependencies) {
           /* Persisted state remains readable when the workflow service is unavailable. */
         }
       }
+
       return { ...snapshot, workflow: { availability, progress: workflow } };
     },
     async timeline(
@@ -409,8 +434,10 @@ export function createDeskService(deps: DeskDependencies) {
       query: { limit: number; cursor?: string | undefined },
     ) {
       context = await fresh(context);
+
       return deps.store.timeline(context, id, query);
     },
   };
 }
+
 export type DeskService = ReturnType<typeof createDeskService>;

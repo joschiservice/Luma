@@ -1,10 +1,9 @@
-import { useId, useRef } from 'react';
 import { useForm } from '@tanstack/react-form';
 import { useMutation } from '@tanstack/react-query';
+import { useId, useRef } from 'react';
 import { match } from 'ts-pattern';
+
 import { Button } from '../components/button';
-import { Input } from '../components/input';
-import { Spinner } from '../components/spinner';
 import {
   Field,
   FieldDescription,
@@ -12,11 +11,13 @@ import {
   FieldGroup,
   FieldLabel,
 } from '../components/field';
+import { Input } from '../components/input';
+import { Spinner } from '../components/spinner';
 import {
-  contactSchema,
-  saveContactResultSchema,
   type Contact,
   type ContactInput,
+  contactSchema,
+  saveContactResultSchema,
 } from './contact-schema';
 
 export interface ContactFormExampleProps {
@@ -87,6 +88,7 @@ export function ContactFormExample({ saveContact }: ContactFormExampleProps) {
           {(field) => {
             const invalid =
               field.state.meta.isTouched && !field.state.meta.isValid;
+
             return (
               <Field data-invalid={invalid} data-disabled={save.isPending}>
                 <FieldLabel htmlFor={`${id}-name`}>Name</FieldLabel>
@@ -117,6 +119,7 @@ export function ContactFormExample({ saveContact }: ContactFormExampleProps) {
           {(field) => {
             const invalid =
               field.state.meta.isTouched && !field.state.meta.isValid;
+
             return (
               <Field data-invalid={invalid} data-disabled={save.isPending}>
                 <FieldLabel htmlFor={`${id}-email`}>Email</FieldLabel>

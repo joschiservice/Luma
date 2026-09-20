@@ -1,14 +1,15 @@
 import { createHash } from 'node:crypto';
-import type { SqlTransaction, TenantDatabase } from '#modules/platform/index';
-import {
-  diagnose,
-  diagnosisVersion,
-} from '#modules/exceptions/domain/diagnosis';
+
+import type { DiagnosisRepository } from '#modules/exceptions/application/diagnosis';
 import type {
   Diagnosis,
   DiagnosisInput,
 } from '#modules/exceptions/domain/diagnosis';
-import type { DiagnosisRepository } from '#modules/exceptions/application/diagnosis';
+import {
+  diagnose,
+  diagnosisVersion,
+} from '#modules/exceptions/domain/diagnosis';
+import type { SqlTransaction, TenantDatabase } from '#modules/platform/index';
 
 /** Called under the detection tenant lock, so pending state commits with its evidence. */
 export async function queueDiagnosis(
@@ -101,6 +102,11 @@ export async function queueDiagnosis(
     ],
   );
 }
+
+/**
+ * Creates tenant-scoped access to current and historical diagnoses and revision-checked
+ * completion.
+ */
 export function createDiagnosisRepository(
   db: TenantDatabase,
 ): DiagnosisRepository {
@@ -117,6 +123,7 @@ export function createDiagnosisRepository(
       WHERE h.tenant_id=$1 AND h.exception_id=$2`,
           [tenantId, exceptionId],
         );
+
         return result.rows[0] ?? null;
       }),
     history: (tenantId, exceptionId) =>
@@ -141,6 +148,7 @@ export function createDiagnosisRepository(
       AND e.tenant_id=d.tenant_id AND e.id=d.exception_id AND e.state<>'resolved' AND d.document->>'status' IN ('pending','failed')`,
           [tenantId, document.exceptionId, document.revision, document],
         );
+
         return result.rowCount === 1;
       }),
   };

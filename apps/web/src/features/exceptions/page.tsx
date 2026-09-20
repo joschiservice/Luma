@@ -1,38 +1,45 @@
-import { useEffect, useRef } from 'react';
-import {
-  Link,
-  useParams,
-  useMatch,
-  useSearch,
-  useNavigate,
-} from '@tanstack/react-router';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { caseClasses, caseStates } from '@luma/api-contract';
 import { Button } from '@luma/ui/button';
 import {
-  CaseRow,
-  CaseNotice,
-  CaseLoading,
   caseLabel,
+  CaseLoading,
+  CaseNotice,
+  CaseRow,
 } from '@luma/ui/components/case-investigation';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  casesOptions,
-  caseOptions,
-  casesKey,
-  matchesView,
-  type InboxSearch,
-} from './data';
+  Link,
+  useMatch,
+  useNavigate,
+  useParams,
+  useSearch,
+} from '@tanstack/react-router';
+import { useEffect, useRef } from 'react';
+
 import { connectionsOptions } from '../connections/data';
 import { IdentityError } from '../identity/data';
+import {
+  caseOptions,
+  casesKey,
+  casesOptions,
+  type InboxSearch,
+  matchesView,
+} from './data';
 import { LiveCaseDetail } from './progress';
 import { CaseResolution } from './resolution';
 
+/**
+ * Displays the filtered case inbox and selected investigation using URL-backed navigation
+ * state.
+ */
 export function Inbox() {
   const { organizationId } = useParams({
     from: '/app/$organizationId/exceptions',
   });
+
   return <TenantInbox key={organizationId} organizationId={organizationId} />;
 }
+
 function TenantInbox({ organizationId }: { organizationId: string }) {
   const selected = useMatch({
     from: '/app/$organizationId/exceptions/$exceptionId',
@@ -95,6 +102,7 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
     void client.invalidateQueries({ queryKey: casesKey(organizationId) });
     void connections.refetch();
   };
+
   return (
     <div className={`inbox ${exceptionId ? 'inbox-selected' : ''}`}>
       <header className="inbox-heading">

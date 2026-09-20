@@ -1,13 +1,18 @@
-import path from 'node:path';
 import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { dependencies, layers } from './policy.mjs';
+
+import { connectorPackages, dependencies, layers } from './policy.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
+
 const modulePrefix = 'apps/api/src/modules/';
+
 const codeExtension = /\.(?:[cm]?[jt]sx?)$/;
+
 const normalize = (file) =>
   file.replaceAll(path.sep, '/').replace(codeExtension, '.ts');
+
 const apiImports = JSON.parse(
   readFileSync(new URL('../../apps/api/package.json', import.meta.url), 'utf8'),
 ).imports;
@@ -27,6 +32,7 @@ function apiImportTarget(specifier) {
           .some((part) => ['', '.', '..', 'node_modules'].includes(part)))
     )
       return null;
+
     return normalize(
       path.posix.join(
         'apps/api',
@@ -34,15 +40,21 @@ function apiImportTarget(specifier) {
       ),
     );
   }
+
   return null;
 }
 
 function moduleInfo(file) {
   if (!file.startsWith(modulePrefix)) return null;
   const [name, layer, ...rest] = file.slice(modulePrefix.length).split('/');
+
   return { name, layer, entry: rest.length === 0 };
 }
 
+/**
+ * Returns the reason an import crosses a forbidden ownership or layer boundary, or null when
+ * permitted.
+ */
 export function violation(from, to) {
   const source = moduleInfo(from);
   const target = moduleInfo(to);
@@ -82,7 +94,8 @@ export function violation(from, to) {
         'apps/api/src/test-support/detection-fixtures.ts',
         'apps/api/src/test-support/safety-fixtures.ts',
         'apps/api/src/index.ts',
-      ].includes(from)
+      ].includes(from) &&
+      !/^apps\/api\/src\/composition\/[^/]+\.ts$/.test(from)
     ) {
       return 'Only the API composition root may wire backend modules.';
     }
@@ -102,10 +115,26 @@ export function violation(from, to) {
   }
   if (!target) {
     if (source.layer === 'api' && to === 'packages/api-contract/') return null;
+    if (source.name === 'connectors') {
+      if (to === 'packages/connectors/core/') return null;
+      if (['infrastructure', 'composition.ts'].includes(source.layer)) {
+        if (to === 'packages/connectors/core/transport') return null;
+        for (const [name, exports] of Object.entries(connectorPackages)) {
+          if (
+            exports.some(
+              (entry) =>
+                to === `packages/connectors/${name.slice(10)}/${entry}`,
+            )
+          )
+            return null;
+        }
+      }
+    }
     // No paths back into the bootstrap, web app, or shared workspace runtime code.
     if (to.startsWith('apps/') || to.startsWith('packages/')) {
       return 'Backend modules may share runtime code only through registered module interfaces.';
     }
+
     return null;
   }
   if (!Object.hasOwn(dependencies, target.name))
@@ -113,6 +142,7 @@ export function violation(from, to) {
   if (source.name === target.name) {
     if (!layers[source.layer].includes(target.layer))
       return 'Import violates the module layer direction.';
+
     return null;
   }
   if (!target.entry || target.layer !== 'index.ts')
@@ -122,6 +152,7 @@ export function violation(from, to) {
   if (source.layer === 'domain' && target.name !== 'platform') {
     return 'Domain code may only import its own domain and platform primitives.';
   }
+
   return null;
 }
 
@@ -130,13 +161,16 @@ const rule = {
   create(context) {
     const from = normalize(path.relative(root, context.filename));
     const source = moduleInfo(from);
+
     function report(node, reason) {
       context.report({ node, messageId: 'boundary', data: { reason } });
     }
+
     function check(node, value) {
       if (typeof value !== 'string') {
         if (source)
           report(node, 'Module imports must use static string specifiers.');
+
         return;
       }
       // Reject the loader provider itself so aliases, namespace imports and
@@ -146,16 +180,22 @@ const rule = {
           node,
           'Backend modules must not use alternate Node loaders; use standard imports or literal require calls.',
         );
+
         return;
       }
       let to;
-      if (value.startsWith('#') && from.startsWith('apps/api/')) {
+      if (
+        value.startsWith('#') &&
+        (from.startsWith('apps/api/') ||
+          from.startsWith('packages/connectors/'))
+      ) {
         to = apiImportTarget(value);
         if (!to) {
           report(
             node,
             'Use a declared API package import with a canonical path.',
           );
+
           return;
         }
       } else if (value.startsWith('.')) {
@@ -166,7 +206,9 @@ const rule = {
         );
       } else if (value.startsWith('@luma/')) {
         const [name, ...subpath] = value.slice(6).split('/');
-        to = `packages/${name}/${subpath.join('/')}`;
+        to = Object.hasOwn(connectorPackages, name)
+          ? `packages/connectors/${name.slice(10)}/${subpath.join('/')}`
+          : `packages/${name}/${subpath.join('/')}`;
       } else {
         // Only package imports with known source targets can be checked for ownership.
         if (
@@ -190,11 +232,13 @@ const rule = {
             'Domain, application and public interfaces must be framework independent; inject an adapter.',
           );
         }
+
         return;
       }
       const reason = violation(from, to);
       if (reason) report(node, reason);
     }
+
     return {
       Program(node) {
         if (

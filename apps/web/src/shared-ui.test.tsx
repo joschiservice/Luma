@@ -1,13 +1,13 @@
-import { renderToStaticMarkup } from 'react-dom/server';
-import { expect, it } from 'vitest';
 import { Button } from '@luma/ui/button';
-import { Input } from '@luma/ui/components/input';
 import {
   Dialog,
-  DialogTrigger,
   DialogContent,
   DialogTitle,
+  DialogTrigger,
 } from '@luma/ui/components/dialog';
+import { Input } from '@luma/ui/components/input';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { expect, it } from 'vitest';
 
 it('renders shared Base UI primitives on the server without a router or desktop bridge', () => {
   const html = renderToStaticMarkup(

@@ -1,7 +1,12 @@
 import { apiContract } from '@luma/api-contract';
 import { initServer } from '@ts-rest/fastify';
+
 import type { ProviderCatalog } from '#modules/connectors/application/providers';
 
+/**
+ * Creates provider-catalog handlers with category filtering and not-found responses for
+ * unknown IDs.
+ */
 export function createProviderRoutes(catalog: ProviderCatalog) {
   return initServer().router(apiContract.connectorProviders, {
     list: async ({ query }) => ({
@@ -10,6 +15,7 @@ export function createProviderRoutes(catalog: ProviderCatalog) {
     }),
     get: async ({ params, request }) => {
       const provider = catalog.get(params.providerId);
+
       return provider
         ? { status: 200, body: provider }
         : {

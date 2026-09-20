@@ -1,17 +1,20 @@
 import { randomUUID } from 'node:crypto';
+
 import { APIError } from 'better-auth/api';
 import { and, eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import type { Pool } from 'pg';
-import { IdentityError } from '#modules/identity/domain/context';
-import type {
-  Organization,
-  Membership,
-} from '#modules/identity/domain/context';
+
 import type { IdentityRepository } from '#modules/identity/application/identity';
-import { createAuth } from '#modules/identity/infrastructure/auth';
+import type {
+  Membership,
+  Organization,
+} from '#modules/identity/domain/context';
+import { IdentityError } from '#modules/identity/domain/context';
 import type { AuthSettings } from '#modules/identity/infrastructure/auth';
+import { createAuth } from '#modules/identity/infrastructure/auth';
 import * as schema from '#modules/identity/infrastructure/schema';
+
 const organizationDto = (
   row: typeof schema.organization.$inferSelect,
 ): Organization => {
@@ -24,6 +27,7 @@ const organizationDto = (
       'REGION_UNAVAILABLE',
       'Organization placement is unavailable',
     );
+
   return {
     id: row.id,
     name: row.name,
@@ -32,9 +36,11 @@ const organizationDto = (
     status: row.status as Organization['status'],
   };
 };
+
 const memberDto = (row: typeof schema.member.$inferSelect): Membership => {
   if (!['owner', 'admin', 'member'].includes(row.role))
     throw new IdentityError(403, 'FORBIDDEN', 'Unknown organization role');
+
   return {
     id: row.id,
     organizationId: row.organizationId,
@@ -42,6 +48,7 @@ const memberDto = (row: typeof schema.member.$inferSelect): Membership => {
     role: row.role as Membership['role'],
   };
 };
+
 function normalizeDatabaseError(error: unknown): never {
   if (
     error instanceof APIError &&
@@ -68,6 +75,11 @@ function normalizeDatabaseError(error: unknown): never {
     throw new IdentityError(404, 'NOT_FOUND', 'User or member not found');
   throw error;
 }
+
+/**
+ * Creates authentication and persistent session, organization, and membership operations
+ * using the supplied pool.
+ */
 export function createRepository(pool: Pool, settings: AuthSettings) {
   const db = drizzle(pool, { schema });
   const auth = createAuth(db, settings);
@@ -77,6 +89,7 @@ export function createRepository(pool: Pool, settings: AuthSettings) {
         headers: new Headers(credentials),
         query: { disableCookieCache: true },
       });
+
       return session
         ? { userId: session.user.id, sessionId: session.session.id }
         : null;
@@ -87,6 +100,7 @@ export function createRepository(pool: Pool, settings: AuthSettings) {
           await tx.execute(
             sql`select set_config('app.user_id', ${userId}, true)`,
           );
+
           return operation({
             async findMembership(organizationId) {
               const [row] = await tx
@@ -98,6 +112,7 @@ export function createRepository(pool: Pool, settings: AuthSettings) {
                     eq(schema.member.userId, userId),
                   ),
                 );
+
               return row ? memberDto(row) : null;
             },
             async findOrganization(organizationId) {
@@ -105,6 +120,7 @@ export function createRepository(pool: Pool, settings: AuthSettings) {
                 .select()
                 .from(schema.organization)
                 .where(eq(schema.organization.id, organizationId));
+
               return row ? organizationDto(row) : null;
             },
             async listOrganizations() {
@@ -116,6 +132,7 @@ export function createRepository(pool: Pool, settings: AuthSettings) {
                   eq(schema.member.organizationId, schema.organization.id),
                 )
                 .where(eq(schema.member.userId, userId));
+
               return rows.map((row) => organizationDto(row.organization));
             },
             async createOrganization(input) {
@@ -133,6 +150,7 @@ export function createRepository(pool: Pool, settings: AuthSettings) {
                 .from(schema.organization)
                 .where(eq(schema.organization.id, created.id));
               if (!row) throw new Error('Created organization is unavailable');
+
               return organizationDto(row);
             },
             async selectTenant(organizationId) {
@@ -166,6 +184,7 @@ export function createRepository(pool: Pool, settings: AuthSettings) {
                   createdAt: new Date(),
                 })
                 .returning();
+
               return memberDto(row!);
             },
             async updateMember(organizationId, memberId, role) {
@@ -181,6 +200,7 @@ export function createRepository(pool: Pool, settings: AuthSettings) {
                 .returning();
               if (!row)
                 throw new IdentityError(404, 'NOT_FOUND', 'Member not found');
+
               return memberDto(row);
             },
             async removeMember(organizationId, memberId) {
@@ -200,5 +220,6 @@ export function createRepository(pool: Pool, settings: AuthSettings) {
       }
     },
   };
+
   return { repository, auth };
 }

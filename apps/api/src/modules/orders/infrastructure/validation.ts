@@ -1,13 +1,21 @@
 import { z } from 'zod';
+
 const uuid = z.string().uuid();
+
 const decimal = z.string().regex(/^-?\d{1,14}(\.\d{1,6})?$/);
+
 const units = (s: string) => {
   const [whole, fraction = ''] = s.replace('-', '').split('.');
+
   return BigInt(whole!) * 1000000n + BigInt(fraction.padEnd(6, '0'));
 };
+
 const positive = decimal.refine((s) => !s.startsWith('-') && units(s) > 0n);
+
 const timestamp = z.string().datetime({ offset: true });
+
 const unit = z.string().min(1).max(64);
+
 const base = z.object({
   schemaVersion: z.literal(1),
   entityId: uuid,
@@ -36,6 +44,7 @@ const line = z
       (!v.cancelledQuantity.startsWith('-') &&
         units(v.cancelledQuantity) <= units(v.quantity)),
   );
+
 const order = z
   .object({
     type: z.literal('order'),
@@ -55,6 +64,7 @@ const order = z
       .refine((v) => new Set(v.map((l) => l.id)).size === v.length),
   })
   .strict();
+
 const fulfillment = z
   .object({
     type: z.literal('fulfillment'),
@@ -75,6 +85,7 @@ const fulfillment = z
       .refine((v) => new Set(v.map((l) => l.orderLineId)).size === v.length),
   })
   .strict();
+
 export const snapshotSchema = z.union([
   base.extend({ kind: z.literal('order'), data: order }).strict(),
   base.extend({ kind: z.literal('fulfillment'), data: fulfillment }).strict(),

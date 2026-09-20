@@ -1,3 +1,4 @@
+/** Renders the public landing page with account creation and sign-in links. */
 export function Home() {
   return (
     <main>

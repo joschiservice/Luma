@@ -7,13 +7,13 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "dev": "tsx watch --conditions=luma-source --include '../../packages/config/dist/**/*.js' --include '../../packages/api-contract/dist/**/*.js' --env-file-if-exists=.env src/index.ts",
+    "dev": "tsx watch --conditions=luma-source --include '../../packages/config/dist/**/*.js' --include '../../packages/connectors/*/dist/**/*.js' --include '../../packages/api-contract/dist/**/*.js' --env-file-if-exists=.env src/index.ts",
     "start": "node --env-file-if-exists=.env dist/index.js",
     "db:migrate": "node --env-file-if-exists=.env scripts/migrate.mjs",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "test:browser": "vitest run --config vitest.browser.config.ts",
     "worker": "node --env-file-if-exists=.env dist/index.js --workflow-worker",
-    "dev:worker": "tsx watch --conditions=luma-source --include '../../packages/config/dist/**/*.js' --include 'src/modules/workflows/infrastructure/exception-workflow.ts' --env-file-if-exists=.env src/index.ts --workflow-worker"
+    "dev:worker": "tsx watch --conditions=luma-source --include '../../packages/config/dist/**/*.js' --include '../../packages/connectors/*/dist/**/*.js' --include 'src/modules/workflows/infrastructure/temporal/exception-workflow.ts' --env-file-if-exists=.env src/index.ts --workflow-worker"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",
@@ -31,7 +31,6 @@
     "@opentelemetry/sdk-trace-node": "2.11.0",
     "@sentry/node": "10.75.0",
     "@sentry/opentelemetry": "10.75.0",
-    "@shopify/admin-api-client": "2.0.0",
     "@temporalio/client": "1.24.0",
     "@temporalio/common": "1.24.0",
     "@temporalio/worker": "1.24.0",
@@ -43,7 +42,10 @@
     "fastify": "5.12.5",
     "pg": "8.20.0",
     "posthog-node": "5.52.4",
-    "zod": "3.25.76"
+    "zod": "3.25.76",
+    "@luma/connector-core": "workspace:*",
+    "@luma/connector-shopify": "workspace:*",
+    "@luma/connector-jtl": "workspace:*"
   },
   "imports": {
     "#modules/*": {

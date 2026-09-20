@@ -1,26 +1,28 @@
 import { createHmac } from 'node:crypto';
-import { ROOT_CONTEXT, trace, SpanStatusCode } from '@opentelemetry/api';
+
+import { LangfuseSpanProcessor } from '@langfuse/otel';
 import type { Attributes, Span } from '@opentelemetry/api';
+import { ROOT_CONTEXT, SpanStatusCode, trace } from '@opentelemetry/api';
+import type {
+  SpanExporter,
+  SpanProcessor,
+} from '@opentelemetry/sdk-trace-node';
 import {
   NodeTracerProvider,
   TraceIdRatioBasedSampler,
-} from '@opentelemetry/sdk-trace-node';
-import type {
-  SpanProcessor,
-  SpanExporter,
 } from '@opentelemetry/sdk-trace-node';
 import * as Sentry from '@sentry/node';
 import {
   SentrySpanProcessor,
   wrapSamplingDecision,
 } from '@sentry/opentelemetry';
-import { LangfuseSpanProcessor } from '@langfuse/otel';
 import { PostHog } from 'posthog-node';
+
 import type {
   Observability,
   Observation,
-  TraceContext,
   Operation,
+  TraceContext,
 } from '#modules/platform/application/observability';
 
 // This adapter accepts only deployment settings; it does not read ambient environment.
@@ -37,6 +39,7 @@ export interface TelemetrySettings {
 
 const uuid =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
 const operations: Record<Operation, string> = {
   'api.request': 'span',
   'workflow.run': 'chain',
@@ -87,6 +90,7 @@ export function createObservability(
           event.contexts = event.contexts?.trace
             ? { trace: event.contexts.trace }
             : {};
+
           return event;
         },
         beforeSend(event) {
@@ -131,6 +135,7 @@ export function createObservability(
     sampler: {
       shouldSample(context, traceId, _name, _kind, attributes) {
         const result = sampler.shouldSample(context, traceId);
+
         return sentry
           ? wrapSamplingDecision({
               decision: result.decision,
@@ -155,8 +160,10 @@ export function createObservability(
           enableExceptionAutocapture: false,
         })
       : undefined);
-  // Vendor failures must not serialize request data or interrupt business operations.
-  if (posthog instanceof PostHog) posthog.on('error', () => {});
+  if (posthog instanceof PostHog)
+    posthog.on('error', () => {
+      // Vendor failures must not serialize request data or interrupt business operations.
+    });
 
   function metadata(context: TraceContext): Attributes {
     return {
@@ -169,6 +176,7 @@ export function createObservability(
       ...(context.tenantRef ? { tenant_ref: context.tenantRef } : {}),
     };
   }
+
   function start(
     parent: TraceContext | undefined,
     operation: Operation,
@@ -208,6 +216,7 @@ export function createObservability(
     activeSpans.set(context.spanId, span);
     span.setAttributes(metadata(context));
     let ended = false;
+
     return {
       context,
       end(status = 'ok') {
@@ -253,6 +262,7 @@ export function createObservability(
       },
     };
   }
+
   const api: Observability = {
     request: (requestId, actionId) =>
       start(undefined, 'api.request', requestId, actionId),
@@ -264,6 +274,7 @@ export function createObservability(
       if (!settings.tenantHashKey) {
         if (settings.sentryDsn || settings.langfuse || settings.posthog)
           throw new Error('Tenant telemetry requires a hash key');
+
         return context;
       }
       const tenantRef = createHmac('sha256', settings.tenantHashKey)
@@ -271,6 +282,7 @@ export function createObservability(
         .digest('hex');
       const scoped = Object.freeze({ ...context, tenantRef });
       activeSpans.get(context.spanId)?.setAttributes(metadata(scoped));
+
       return scoped;
     },
     async run(parent, operation, work) {
@@ -278,6 +290,7 @@ export function createObservability(
       try {
         const result = await work(observation.context, observation);
         observation.end();
+
         return result;
       } catch (error) {
         observation.end('error');
@@ -337,6 +350,7 @@ export function createObservability(
       await Promise.allSettled([posthog?.shutdown(), sentry?.close(3000)]);
     },
   };
+
   return api;
 }
 
@@ -352,5 +366,6 @@ function safeTags(
     )
       safe[key] = value;
   }
+
   return safe;
 }

@@ -1,12 +1,12 @@
-import { currentPolicyVersion } from '#modules/policies/domain/action';
-import { requireRole, requireTenant } from '#modules/identity/index';
 import type { TenantContext } from '#modules/identity/index';
+import { requireRole, requireTenant } from '#modules/identity/index';
 import type {
   Approval,
   PolicyDecision,
-  ProposedAction,
   PolicyEvidence,
+  ProposedAction,
 } from '#modules/policies/domain/action';
+import { currentPolicyVersion } from '#modules/policies/domain/action';
 
 export interface PolicyRepository {
   pending(tenantId: string): Promise<PolicyEvidence[]>;
@@ -22,6 +22,7 @@ export interface PolicyRepository {
   /** First response wins for this intent, requester and policy version. */
   saveApproval(approval: Approval): Promise<Approval>;
 }
+
 export interface PolicyDependencies {
   repository: PolicyRepository;
   appendEvidence(event: PolicyEvidence): Promise<void>;
@@ -29,14 +30,21 @@ export interface PolicyDependencies {
   now(): Date;
   id(): string;
 }
+
+/**
+ * Creates policy evaluation and approval commands that refresh authorization and record
+ * decision evidence.
+ */
 export function createPolicyService(deps: PolicyDependencies) {
   const policyVersion = currentPolicyVersion;
+
   async function flush(tenantId: string) {
     for (const evidence of await deps.repository.pending(tenantId)) {
       await deps.appendEvidence(evidence);
       await deps.repository.delivered(tenantId, evidence.document.id);
     }
   }
+
   return {
     async evaluate(
       context: TenantContext,
@@ -109,6 +117,7 @@ export function createPolicyService(deps: PolicyDependencies) {
       };
       await deps.repository.saveDecision(decision);
       await flush(context.tenantId);
+
       return decision;
     },
     async respond(
@@ -157,8 +166,10 @@ export function createPolicyService(deps: PolicyDependencies) {
         createdAt: now.toISOString(),
       });
       await flush(context.tenantId);
+
       return approval;
     },
   };
 }
+
 export type PolicyService = ReturnType<typeof createPolicyService>;

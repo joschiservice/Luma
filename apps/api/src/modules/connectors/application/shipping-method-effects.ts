@@ -1,15 +1,16 @@
-import { equalJson } from '#modules/connectors/domain/equal-json';
-import { requireTenant } from '#modules/identity/index';
-import type { TenantContext } from '#modules/identity/index';
-import type { CapabilityInput } from '#modules/connectors/domain/capabilities';
 import type { CapabilityRuntime } from '#modules/connectors/application/capabilities';
 import type {
   EffectIntent,
   EffectRegistry,
   VerificationResult,
 } from '#modules/connectors/application/effects';
+import type { CapabilityInput } from '#modules/connectors/domain/capabilities';
+import { equalJson } from '#modules/connectors/domain/equal-json';
+import type { TenantContext } from '#modules/identity/index';
+import { requireTenant } from '#modules/identity/index';
 
 type Input = CapabilityInput<'orders.shipping-method.write'>;
+
 export interface ShippingMethodEffectBinding {
   /** Validate tenant-owned target, diagnosis evidence and approved method mapping. */
   map(context: TenantContext, intent: EffectIntent): Promise<Input | null>;
@@ -27,6 +28,7 @@ export function createShippingMethodEffects(
   binding: ShippingMethodEffectBinding,
 ): EffectRegistry {
   const now = binding.now ?? (() => new Date());
+
   async function map(context: TenantContext, intent: EffectIntent) {
     const input = await binding.map(context, intent);
     if (
@@ -37,8 +39,10 @@ export function createShippingMethodEffects(
         input.shippingMethod.externalId
     )
       return null;
+
     return input;
   }
+
   return {
     async resolve(context, intent) {
       requireTenant(context, intent.tenantId);
@@ -51,6 +55,7 @@ export function createShippingMethodEffects(
       if (!mapped) return null;
       const boundInput = structuredClone(mapped);
       const boundIntent = structuredClone(intent);
+
       return runtime
         .effects({
           capability: 'orders.shipping-method.write',
@@ -103,6 +108,7 @@ export function createShippingMethodEffects(
               time > now().getTime()
             )
               return inconclusive();
+
             return {
               outcome:
                 !observation.data.isCancelled &&

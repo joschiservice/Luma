@@ -1,9 +1,11 @@
-import { useEffect } from 'react';
-import { Link, useLocation, useNavigate } from '@tanstack/react-router';
-import { useQueryClient } from '@tanstack/react-query';
 import { Button, buttonVariants } from '@luma/ui/button';
+import { useQueryClient } from '@tanstack/react-query';
+import { Link, useLocation, useNavigate } from '@tanstack/react-router';
+import { useEffect } from 'react';
+
 import { clearPrivate, IdentityError, returnPath } from './data';
 
+/** Renders the shared Luma wordmark linked to the public home page. */
 export function Brand() {
   return (
     <a className="wordmark" href="/" aria-label="Luma home">
@@ -11,6 +13,8 @@ export function Brand() {
     </a>
   );
 }
+
+/** Announces that the workspace session or identity data is loading. */
 export function Pending() {
   return (
     <div className="status-page" role="status">
@@ -18,6 +22,8 @@ export function Pending() {
     </div>
   );
 }
+
+/** Redirects to sign-in with the current application location as the return path. */
 export function SignInRedirect() {
   const client = useQueryClient();
   const navigate = useNavigate();
@@ -31,8 +37,14 @@ export function SignInRedirect() {
       }),
     );
   }, [client, href, navigate]);
+
   return <Pending />;
 }
+
+/**
+ * Renders status-specific identity errors; authentication redirects to sign-in and
+ * inaccessible workspaces offer navigation instead of retry.
+ */
 export function Failure({
   error,
   retry,
@@ -42,6 +54,7 @@ export function Failure({
 }) {
   const status = error instanceof IdentityError ? error.status : 503;
   if (status === 401) return <SignInRedirect />;
+
   return (
     <main className="status-page">
       <Brand />
@@ -68,6 +81,8 @@ export function Failure({
     </main>
   );
 }
+
+/** Shows the signed-in user's name and sign-out action. */
 export function AccountMenu({ name }: { name: string }) {
   return (
     <details className="account-menu">

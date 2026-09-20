@@ -1,4 +1,5 @@
 import { writeFile } from 'node:fs/promises';
+
 import { openApiDocument } from './openapi.js';
 
 await writeFile(

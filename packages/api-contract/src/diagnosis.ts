@@ -1,9 +1,13 @@
 import { z } from 'zod';
 
 const ref = z.string().min(1).max(512);
+
 const text = z.string().min(1).max(2000);
+
 const refs = z.array(ref).max(100);
+
 const finding = z.object({ code: ref, text, evidenceRefs: refs }).strict();
+
 export const evidenceReferenceSchema = z
   .object({
     id: ref,
@@ -151,4 +155,5 @@ export const diagnosisSchema = z
           'Evidence references must belong to the diagnosis evidence set.',
       });
   });
+
 export type Diagnosis = z.infer<typeof diagnosisSchema>;

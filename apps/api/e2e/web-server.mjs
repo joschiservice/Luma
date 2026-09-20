@@ -1,8 +1,12 @@
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+
 const webRoot = fileURLToPath(new URL('../../web/', import.meta.url));
+
 const require = createRequire(`${webRoot}/package.json`);
+
 const { createServer } = await import(require.resolve('vite'));
+
 const server = await createServer({
   root: webRoot,
   server: {
@@ -17,5 +21,7 @@ const server = await createServer({
     },
   },
 });
+
 await server.listen();
+
 process.send?.({ type: 'listening' });

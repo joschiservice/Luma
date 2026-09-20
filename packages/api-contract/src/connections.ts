@@ -8,12 +8,14 @@ export const installationPermissions = z.enum([
   'orders.shipping-method.read',
   'orders.shipping-method.write',
 ]);
+
 const header = z
   .string()
   .min(1)
   .max(4096)
   .regex(/^[\x20-\x7e]+$/)
   .refine((s) => !!s.trim());
+
 export const installationTarget = z.discriminatedUnion('kind', [
   z
     .object({
@@ -32,6 +34,7 @@ export const installationTarget = z.discriminatedUnion('kind', [
         .url()
         .refine((value) => {
           const url = new URL(value);
+
           return (
             url.protocol === 'https:' &&
             !url.username &&
@@ -46,12 +49,14 @@ export const installationTarget = z.discriminatedUnion('kind', [
     })
     .strict(),
 ]);
+
 export const installationCredentials = z
   .object({
     token: header,
     challengeCode: header.refine((s) => s.length <= 30).optional(),
   })
   .strict();
+
 export const installationInput = z
   .object({
     label: z.string().trim().min(1).max(120),
@@ -91,7 +96,11 @@ export const installedConnectionSchema = z.object({
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
+
 export type InstalledConnection = z.infer<typeof installedConnectionSchema>;
+
 export type InstallationInput = z.infer<typeof installationInput>;
+
 export type InstallationCredentials = z.infer<typeof installationCredentials>;
+
 export type InstallationCapability = z.infer<typeof installationPermissions>;

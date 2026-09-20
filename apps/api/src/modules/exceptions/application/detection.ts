@@ -1,16 +1,16 @@
-import { requireRole, requireTenant } from '#modules/identity/index';
-import type { TenantContext } from '#modules/identity/index';
+import {
+  evaluate,
+  fingerprintMaterial,
+  identity,
+} from '#modules/exceptions/domain/evaluate';
 import type {
   Configuration,
   Decision,
   EvaluationInput,
   ExceptionClass,
 } from '#modules/exceptions/domain/facts';
-import {
-  evaluate,
-  fingerprintMaterial,
-  identity,
-} from '#modules/exceptions/domain/evaluate';
+import type { TenantContext } from '#modules/identity/index';
+import { requireRole, requireTenant } from '#modules/identity/index';
 
 export interface Evidence {
   key: string;
@@ -28,11 +28,13 @@ export interface Evidence {
   } | null;
   facts: Record<string, unknown>;
 }
+
 export interface HumanDisposition {
   kind: 'human_disposition';
   reason: string;
   evidenceRefs: string[];
 }
+
 export interface VerifiedDisposition {
   kind: 'verification';
   reason: string;
@@ -47,22 +49,26 @@ export interface VerifiedDisposition {
   bindings: VerificationBinding[];
   incidentVersion: number;
 }
+
 export const verificationPostconditions = {
   sync_failure: 'complete_scan_checkpoint_advanced',
   stuck_fulfillment: 'fulfillment_disposition_verified',
   inventory_mismatch: 'equivalent_inventory_agrees',
   workflow_failure: 'workflow_business_postcondition_verified',
 } as const;
+
 export interface VerificationBinding {
   evidenceKey: string;
   exceptionClass: ExceptionClass;
   subject: Incident['subject'];
   postcondition: (typeof verificationPostconditions)[ExceptionClass];
 }
+
 export type VerificationResult = Pick<
   VerifiedDisposition,
   'reason' | 'outcome' | 'complete' | 'authoritative' | 'evidence' | 'bindings'
 >;
+
 /** Installed by the composition root. Reads authoritative state and checks the business postcondition. */
 export interface VerificationEvaluator {
   version: string;
@@ -71,7 +77,9 @@ export interface VerificationEvaluator {
     incident: Readonly<Incident>,
   ): Promise<VerificationResult>;
 }
+
 export type Resolution = HumanDisposition | VerifiedDisposition;
+
 export interface DetectionRequest {
   /** Delivery correlation ID. Occurrences deduplicate by immutable evidence references. */
   key: string;
@@ -79,6 +87,7 @@ export interface DetectionRequest {
   evidence: Evidence[];
   configuration: Configuration;
 }
+
 export interface Incident {
   id: string;
   tenantId: string;
@@ -105,17 +114,20 @@ export interface Incident {
   configVersion: string;
   resolution?: Resolution & { actorId: string; at: string; auditId: string };
 }
+
 export interface DetectionResult {
   decision: Decision;
   incident: Incident | null;
   reviewRequired: boolean;
 }
+
 export interface Evaluation {
   request: DetectionRequest & { deliveryKey: string };
   decision: Decision;
   fingerprint: string;
   now: string;
 }
+
 export interface IncidentVerificationAttempt {
   attemptId?: string;
   phase: 'pending' | 'completed';
@@ -129,6 +141,7 @@ export interface IncidentVerificationAttempt {
   accepted?: boolean;
   failureCode?: 'evaluation_failed' | 'resolution_rejected';
 }
+
 export interface DetectionRepository {
   verification(
     tenantId: string,
@@ -150,6 +163,11 @@ export interface DetectionRepository {
     now: string,
   ): Promise<boolean>;
 }
+
+/**
+ * Creates incident detection, evidence ingestion, and resolution commands using the supplied
+ * persistence and verification boundaries.
+ */
 export function createDetectionService(
   repository: DetectionRepository,
   now: () => Date,
@@ -215,6 +233,7 @@ export function createDetectionService(
       )
         throw new Error('Inventory tolerance must match configuration');
       const clock = now().toISOString();
+
       return repository.record({
         request: {
           key,
@@ -230,6 +249,7 @@ export function createDetectionService(
     },
     async get(context: TenantContext, incidentId: string) {
       requireTenant(context, context.tenantId);
+
       return (
         (await repository.get(context.tenantId, boundary.id(incidentId)))
           ?.incident ?? null
@@ -237,10 +257,12 @@ export function createDetectionService(
     },
     list(context: TenantContext) {
       requireTenant(context, context.tenantId);
+
       return repository.list(context.tenantId);
     },
     evidence(context: TenantContext, incidentId: string) {
       requireTenant(context, context.tenantId);
+
       return repository.evidence(context.tenantId, boundary.id(incidentId));
     },
     async verify(context: TenantContext, incidentId: string) {
@@ -325,6 +347,7 @@ export function createDetectionService(
         occurredAt: now().toISOString(),
         accepted,
       });
+
       return accepted;
     },
     resolve(
@@ -334,6 +357,7 @@ export function createDetectionService(
     ) {
       requireRole(context, ['owner', 'admin']);
       const parsed = boundary.disposition(disposition);
+
       return repository.resolve(
         context.tenantId,
         boundary.id(incidentId),
@@ -344,4 +368,5 @@ export function createDetectionService(
     },
   };
 }
+
 export type DetectionService = ReturnType<typeof createDetectionService>;

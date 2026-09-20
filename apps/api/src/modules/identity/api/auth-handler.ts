@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+
 // Organization endpoints go through the typed API and scoped identity transactions.
 const endpoints = new Set([
   'POST /sign-up/email',
@@ -11,6 +12,11 @@ const endpoints = new Set([
   'GET /list-sessions',
   'POST /change-password',
 ]);
+
+/**
+ * Registers the authentication handler on Fastify, forwarding request bodies and response
+ * cookies.
+ */
 export function registerAuthHandler(
   app: FastifyInstance,
   handler: (request: Request) => Promise<Response>,
@@ -51,6 +57,7 @@ export function registerAuthHandler(
       });
       const cookies = response.headers.getSetCookie();
       if (cookies.length) reply.header('set-cookie', cookies);
+
       return reply.send(await response.text());
     },
   });

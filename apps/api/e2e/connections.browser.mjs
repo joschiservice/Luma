@@ -1,9 +1,11 @@
 /* global document, innerWidth, getComputedStyle */
-import { it, expect } from 'vitest';
 import { chromium } from 'playwright';
-import { database, startApi, startProcess, availablePort } from './helpers.mjs';
+import { expect, it } from 'vitest';
+
+import { availablePort, database, startApi, startProcess } from './helpers.mjs';
 
 let origin;
+
 async function fixture(t) {
   const port = await availablePort();
   origin = `http://127.0.0.1:${port}`;
@@ -47,22 +49,27 @@ async function fixture(t) {
   const organizationId = new URL(page.url()).pathname.split('/')[2];
   await page.getByRole('link', { name: 'Connections', exact: true }).click();
   await page.getByText('No connections yet', { exact: true }).waitFor();
+
   return { db, api, page, context, organizationId, errors };
 }
+
 async function setup(page, provider, label, token = 'valid-test-token') {
   await page
     .getByRole('button', { name: `Set up ${provider}`, exact: true })
     .click();
   await page.getByLabel('Connection name').fill(label);
   await page.getByLabel('Access token', { exact: true }).fill(token);
+
   return page.getByRole('dialog');
 }
+
 async function save(page, label) {
   await page
     .getByRole('button', { name: 'Save connection', exact: true })
     .click();
   const card = page.getByRole('article', { name: label, exact: true });
   await card.getByText('Awaiting validation', { exact: true }).waitFor();
+
   return card;
 }
 

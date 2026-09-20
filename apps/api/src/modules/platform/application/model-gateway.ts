@@ -12,16 +12,19 @@ export interface ModelSchema<T> {
   readonly jsonSchema: Readonly<Record<string, JsonValue>>;
   parse(value: unknown): T;
 }
+
 export interface ModelTool {
   readonly name: string;
   readonly description: string;
   readonly input: ModelSchema<unknown>;
 }
+
 export interface ModelToolCall {
   readonly id: string;
   readonly name: string;
   readonly arguments: JsonValue;
 }
+
 export type ModelMessage =
   | { readonly role: 'system' | 'user'; readonly content: string }
   | {
@@ -41,6 +44,7 @@ export interface ModelDataPolicy {
   readonly region: 'EU' | 'unrestricted';
   readonly zeroDataRetention: boolean;
 }
+
 export interface ModelRequest<T = string> {
   readonly profile: string;
   readonly dataPolicy: ModelDataPolicy;
@@ -50,12 +54,14 @@ export interface ModelRequest<T = string> {
   readonly maxOutputTokens: number;
   readonly signal?: AbortSignal;
 }
+
 export interface ModelUsage {
   readonly inputTokens: number;
   readonly outputTokens: number;
   /** USD reported by the provider; null means unavailable, not free. */
   readonly costUsd: number | null;
 }
+
 export interface ModelResult<T> {
   readonly output: T | null;
   /** Proposals only. The caller must authorize and execute them through execution. */
@@ -66,24 +72,29 @@ export interface ModelResult<T> {
     readonly latencyMs: number;
   };
 }
+
 export interface ModelGateway {
   generate<T = string>(
     context: TraceContext,
     request: ModelRequest<T>,
   ): Promise<ModelResult<T>>;
 }
+
 export type ModelAdapterId = 'vercel' | 'bedrock-eu';
+
 export interface ModelRoute {
   readonly adapter: ModelAdapterId;
   readonly model: string;
   readonly providers: readonly string[];
   readonly zeroDataRetention: boolean;
 }
+
 /** Policy may select an existing route or deny it; it cannot invent a destination. */
 export type ModelRoutingPolicy = (
   request: Pick<ModelRequest, 'profile' | 'dataPolicy'>,
   routes: Readonly<Record<string, ModelRoute>>,
 ) => string | null;
+
 export interface ModelAdapter {
   /** Covers gateway ingress, processing and provider inference. */
   readonly region: 'EU' | 'unrestricted';
@@ -97,6 +108,7 @@ export interface ModelAdapter {
     readonly usage: ModelUsage;
   }>;
 }
+
 export type ModelErrorCode =
   | 'route_denied'
   | 'adapter_unavailable'
@@ -106,6 +118,7 @@ export type ModelErrorCode =
   | 'rate_limited'
   | 'timeout'
   | 'aborted';
+
 export class ModelGatewayError extends Error {
   constructor(readonly code: ModelErrorCode) {
     super(`Model generation failed: ${code}`);
@@ -113,6 +126,10 @@ export class ModelGatewayError extends Error {
   }
 }
 
+/**
+ * Routes model requests through approved profiles, enforcing input policy, structured output
+ * validation, and telemetry boundaries.
+ */
 export function createRoutedModelGateway(
   routes: Readonly<Record<string, ModelRoute>>,
   adapters: Readonly<Partial<Record<ModelAdapterId, ModelAdapter>>>,
@@ -132,6 +149,7 @@ export function createRoutedModelGateway(
       ]),
     ),
   );
+
   return {
     async generate<T = string>(
       context: TraceContext,
@@ -222,6 +240,7 @@ export function createRoutedModelGateway(
             } catch {
               throw new ModelGatewayError('invalid_output');
             }
+
             return {
               output,
               toolCalls: result.toolCalls,

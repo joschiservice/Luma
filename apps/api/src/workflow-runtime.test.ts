@@ -1,15 +1,16 @@
-import { createAdmissionEligibility } from '#app';
 import { describe, expect, it, vi } from 'vitest';
+
+import { createAdmissionEligibility } from '#app';
+import type { Diagnosis, Incident } from '#modules/exceptions/index';
+import type { ExecutionRecord } from '#modules/execution/index';
 import { makeTenantContext } from '#modules/identity/composition';
 import { IdentityError } from '#modules/identity/index';
+import type { ProposedAction } from '#modules/policies/index';
 import { createExceptionActivities } from '#modules/workflows/composition';
 import type {
   ExceptionWorkflowInput,
   ProposalReference,
 } from '#modules/workflows/index';
-import type { Diagnosis, Incident } from '#modules/exceptions/index';
-import type { ProposedAction } from '#modules/policies/index';
-import type { ExecutionRecord } from '#modules/execution/index';
 
 const context = makeTenantContext(
   { userId: 'requester', sessionId: 'session' },
@@ -28,17 +29,20 @@ const context = makeTenantContext(
   },
   'request',
 );
+
 const input: ExceptionWorkflowInput = {
   tenantId: 'tenant',
   userId: 'requester',
   requestId: 'request',
   source: { kind: 'incident', id: 'incident' },
 };
+
 const proposal: ProposalReference = {
   id: 'proposal',
   revision: 1,
   expiresAt: '2026-09-20T00:00:00.000Z',
 };
+
 const diagnosis: Diagnosis = {
   schemaVersion: 1,
   exceptionId: 'incident',
@@ -78,6 +82,7 @@ const diagnosis: Diagnosis = {
     reread: { status: 'not_requested', retryAfter: null },
   },
 };
+
 const action: ProposedAction = {
   schemaVersion: 1,
   id: proposal.id,
@@ -96,6 +101,7 @@ const action: ProposedAction = {
   proposedBy: { kind: 'user', id: context.actor.id },
   expiresAt: proposal.expiresAt,
 };
+
 function fixture() {
   const deps = {
     identity: { resolveWorkflowContext: vi.fn().mockResolvedValue(context) },
@@ -133,8 +139,10 @@ function fixture() {
       },
     },
   };
+
   return { deps, activities: createExceptionActivities(deps) };
 }
+
 describe('durable activity boundaries', () => {
   it('reconstructs authorization for every step and returns only references', async () => {
     const { deps, activities } = fixture();

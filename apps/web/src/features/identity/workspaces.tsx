@@ -1,17 +1,22 @@
-import { useRef, useState } from 'react';
-import { useForm } from '@tanstack/react-form';
-import { Link, Navigate, useNavigate } from '@tanstack/react-router';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@luma/ui/button';
 import { Input } from '@luma/ui/components/input';
+import { useForm } from '@tanstack/react-form';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link, Navigate, useNavigate } from '@tanstack/react-router';
+import { useRef, useState } from 'react';
+
+import { Brand, Failure, Pending } from './common';
 import {
   createOrganization,
   IdentityError,
   organizationsOptions,
   workspaceName,
 } from './data';
-import { Brand, Failure, Pending } from './common';
 
+/**
+ * Lists accessible workspaces; entry mode opens the sole workspace or routes an empty list
+ * to creation.
+ */
 export function WorkspaceList({ entry = false }: { entry?: boolean }) {
   const query = useQuery(organizationsOptions());
   if (query.isError)
@@ -27,6 +32,7 @@ export function WorkspaceList({ entry = false }: { entry?: boolean }) {
         replace
       />
     );
+
   return (
     <main className="workspace-page">
       <header>
@@ -56,6 +62,11 @@ export function WorkspaceList({ entry = false }: { entry?: boolean }) {
     </main>
   );
 }
+
+/**
+ * Creates a workspace with validation and duplicate-submit protection, stopping retries when
+ * the outcome is uncertain.
+ */
 export function NewWorkspace() {
   const client = useQueryClient();
   const navigate = useNavigate();
@@ -96,6 +107,7 @@ export function NewWorkspace() {
           [401, 403, 404].includes(error.status)
         ) {
           setFailureStatus(error.status);
+
           return;
         }
         if (
@@ -125,8 +137,14 @@ export function NewWorkspace() {
   });
   if (failureStatus)
     return (
-      <Failure error={new IdentityError(failureStatus)} retry={() => {}} />
+      <Failure
+        error={new IdentityError(failureStatus)}
+        retry={() => {
+          // Authorization failures show navigation actions instead of a retry button.
+        }}
+      />
     );
+
   return (
     <main className="workspace-page">
       <header>

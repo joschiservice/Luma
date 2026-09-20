@@ -1,19 +1,25 @@
-import { decimalUnits } from '#modules/exceptions/domain/facts';
 import type {
   Configuration,
   Decision,
   EvaluationInput,
 } from '#modules/exceptions/domain/facts';
+import { decimalUnits } from '#modules/exceptions/domain/facts';
 
 const result = (
   decision: 'clear' | 'defer' | 'reject',
   reason: string,
 ): Decision => ({ decision, severity: null, reason });
+
 const detect = (severity: 'medium' | 'high', reason: string): Decision => ({
   decision: 'detect',
   severity,
   reason,
 });
+
+/**
+ * Evaluates one exception class against its configured thresholds, returning detect, clear,
+ * or defer with an evidence-based reason.
+ */
 export function evaluate(
   input: EvaluationInput,
   now: string,
@@ -54,10 +60,12 @@ export function evaluate(
       ) {
         if (age(f.firstFailureAt) < 0)
           return result('defer', 'future_evidence');
+
         return f.retryExhausted && age(f.firstFailureAt) >= t.syncFailureSeconds
           ? detect('medium', 'retry_window_exhausted')
           : result('clear', 'retry_window_open');
       }
+
       return result('defer', 'unclassified_error');
     }
     case 'stuck_fulfillment': {
@@ -82,6 +90,7 @@ export function evaluate(
         return result('defer', 'unknown_eligibility');
       if (f.lastProgressAt === null || age(f.lastProgressAt) < 0)
         return result('defer', 'unknown_progress');
+
       return age(f.lastProgressAt) >= t.stuckSeconds
         ? detect('medium', 'progress_timeout')
         : result('clear', 'progress_within_window');
@@ -126,6 +135,7 @@ export function evaluate(
         (f.sellingSource === 'left' ? difference > 0n : difference < 0n)
       )
         return detect('high', 'oversell_risk');
+
       return detect('medium', 'quantity_mismatch');
     }
     case 'workflow_failure': {
@@ -141,10 +151,16 @@ export function evaluate(
         return detect('high', 'terminal_failure');
       if (f.status === 'interrupted')
         return result('defer', 'missing_durable_decision');
+
       return result('clear', 'retry_pending');
     }
   }
 }
+
+/**
+ * Returns the rule, subject, and scope used to identify an exception independently of
+ * changing evidence.
+ */
 export function identity(input: EvaluationInput) {
   switch (input.exceptionClass) {
     case 'sync_failure':
@@ -180,8 +196,14 @@ export function identity(input: EvaluationInput) {
       };
   }
 }
+
+/**
+ * Returns stable fingerprint input for an exception; the caller supplies hashing and tenant
+ * scoping.
+ */
 export function fingerprintMaterial(input: EvaluationInput): string {
   const key = identity(input);
+
   return JSON.stringify([
     'v0',
     input.exceptionClass,

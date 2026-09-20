@@ -1,29 +1,32 @@
-import { requireTenant } from '#modules/identity/index';
-import type { TenantContext } from '#modules/identity/index';
 import type {
+  CapabilityOutput,
   CapabilityReader,
   CapabilityRequest,
-  CapabilityOutput,
   ReadCapability,
 } from '#modules/connectors/index';
 import type {
   DiagnosisInput,
   DiagnosisRereader,
 } from '#modules/exceptions/index';
+import type { TenantContext } from '#modules/identity/index';
+import { requireTenant } from '#modules/identity/index';
 
 export interface DiagnosisReadPlan {
   requests: CapabilityRequest<ReadCapability>[];
   /** Retained provider backoff from the preceding scan, resolved by the workflow owner. */
   notBefore: string | null;
 }
+
 function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
 }
+
 function sameExternalId(actual: unknown, expected: unknown): boolean {
   const a = record(actual),
     b = record(expected);
+
   return (
     a !== null &&
     b !== null &&
@@ -34,6 +37,7 @@ function sameExternalId(actual: unknown, expected: unknown): boolean {
     a.scopeKey === b.scopeKey
   );
 }
+
 /** Fail closed when the retained mapping cannot bind the canonical subject to a provider selector. */
 function inIncidentScope(
   snapshot: Readonly<DiagnosisInput>,
@@ -86,9 +90,11 @@ function inIncidentScope(
           e.facts.locationId === f.canonicalLocationId,
       );
       if (matched.length !== 1) return false;
+
       return ['left', 'right'].some((side, index) => {
         const mapping = record(matched[0]!.facts[side]);
         const source = record(mapping?.source);
+
         return (
           source?.tenantId === f.tenantId &&
           source.connectionId === f.connectionIds[index] &&
@@ -117,6 +123,7 @@ function inIncidentScope(
       if (matched.length !== 1) return false;
       const mapping = matched[0]!.facts,
         source = record(mapping.source);
+
       return (
         source?.tenantId === f.tenantId &&
         source.connectionId === f.connectionId &&
@@ -128,6 +135,7 @@ function inIncidentScope(
       return false;
   }
 }
+
 /** Canonical mapping and publication remain in workflows; the engine receives no connector write port. */
 export function createDiagnosisRereader(
   reader: CapabilityReader,
@@ -184,6 +192,7 @@ export function createDiagnosisRereader(
       // The publisher must preserve completeness; one page cannot stand in for a complete scan.
       await bindings.publish(context, snapshot, pages, signal);
       if (signal.aborted) throw new Error('Investigation cancelled');
+
       return { status: 'completed', retryAfter: null };
     },
   };

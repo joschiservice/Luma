@@ -1,4 +1,5 @@
 import { writeFile } from 'node:fs/promises';
+
 import {
   assertValidSchema,
   buildClientSchema,
@@ -11,10 +12,13 @@ import {
 } from 'graphql';
 
 const version = process.argv[2];
+
 if (!/^\d{4}-(01|04|07|10)$/.test(version ?? '')) {
   throw new Error('Usage: node scripts/update-shopify-schema.mjs YYYY-MM');
 }
+
 const source = `https://shopify.dev/admin-graphql-direct-proxy/${version}`;
+
 const response = await fetch(source, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
@@ -22,9 +26,13 @@ const response = await fetch(source, {
     query: getIntrospectionQuery({ descriptions: false }),
   }),
 });
+
 if (!response.ok) throw new Error(`Schema request failed: ${response.status}`);
+
 const body = await response.json();
+
 if (body.errors) throw new Error(JSON.stringify(body.errors));
+
 const schema = buildClientSchema(body.data);
 
 // Retain provider definitions for the adapter's surface, including every argument and its type.
@@ -78,6 +86,7 @@ const fields = {
   FulfillmentLineItem: ['id', 'quantity', 'lineItem'],
   PageInfo: ['hasNextPage', 'endCursor'],
 };
+
 for (const type of [
   'Order',
   'Product',
@@ -91,7 +100,9 @@ for (const type of [
 ]) {
   fields[`${type}Connection`] = ['nodes', 'pageInfo'];
 }
+
 const definitions = new Map();
+
 function include(name) {
   if (definitions.has(name)) return;
   const type = schema.getType(name);
@@ -134,12 +145,18 @@ function include(name) {
     },
   });
 }
+
 for (const name of Object.keys(fields)) include(name);
+
 const document = `# Generated from ${source}\n# Adapter surface only; regenerate with scripts/update-shopify-schema.mjs.\nschema { query: QueryRoot mutation: Mutation }\n\n${[...definitions.values()].map(print).join('\n\n')}\n`;
+
 assertValidSchema(buildSchema(document));
+
 const destination = new URL(
   `../src/modules/connectors/infrastructure/shopify/fixtures/admin-${version}.graphql`,
   import.meta.url,
 );
+
 await writeFile(destination, document);
+
 console.log(`Saved ${destination.pathname}`);

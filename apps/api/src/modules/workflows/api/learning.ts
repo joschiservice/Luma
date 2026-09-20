@@ -1,21 +1,28 @@
-import { initServer } from '@ts-rest/fastify';
 import {
   apiContract,
-  startResolutionRunSchema,
   learningCommandSchema,
-  resolutionRunSchema,
   learningEventSchema,
   resolutionHistorySchema,
+  resolutionRunSchema,
+  startResolutionRunSchema,
 } from '@luma/api-contract';
+import { initServer } from '@ts-rest/fastify';
+import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
+
 import { IdentityError } from '#modules/identity/index';
 import type { LearningService } from '#modules/workflows/application/learning';
-import type { FastifyRequest } from 'fastify';
+
 export const learningBoundary = {
   parseStart: (input: unknown) => startResolutionRunSchema.parse(input),
   parseEvent: (input: unknown) => learningCommandSchema.parse(input),
   parseId: (input: string) => z.string().uuid().parse(input),
 };
+
+/**
+ * Creates authenticated handlers for recording and reading resolution runs and learning
+ * events.
+ */
 export function learningRoutes(service?: LearningService) {
   function use(request: FastifyRequest) {
     if (!request.tenantContext)
@@ -26,8 +33,10 @@ export function learningRoutes(service?: LearningService) {
         'SERVICE_UNAVAILABLE',
         'Resolution history is unavailable',
       );
+
     return { context: request.tenantContext, service };
   }
+
   return initServer().router(apiContract.resolutionLearning, {
     list: async ({ request, params, query }) => {
       const s = use(request);
@@ -36,6 +45,7 @@ export function learningRoutes(service?: LearningService) {
         params.exceptionId,
         query.after,
       );
+
       return {
         status: 200,
         body: {
@@ -46,6 +56,7 @@ export function learningRoutes(service?: LearningService) {
     },
     start: async ({ request, params, body }) => {
       const s = use(request);
+
       return {
         status: 200,
         body: resolutionRunSchema.parse(
@@ -55,6 +66,7 @@ export function learningRoutes(service?: LearningService) {
     },
     append: async ({ request, params, body }) => {
       const s = use(request);
+
       return {
         status: 200,
         body: learningEventSchema.parse(
@@ -69,6 +81,7 @@ export function learningRoutes(service?: LearningService) {
     },
     read: async ({ request, params }) => {
       const s = use(request);
+
       return {
         status: 200,
         body: resolutionHistorySchema.parse(

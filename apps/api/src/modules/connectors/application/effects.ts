@@ -10,12 +10,14 @@ export interface EffectIntent {
   preconditions: { evidenceRefs: string[]; validUntil: string };
   expectedPostcondition: Record<string, string | number | boolean | null>;
 }
+
 export interface VerificationResult {
   outcome: 'passed' | 'failed' | 'inconclusive';
   observationRefs: string[];
   observedAt: string;
   evaluatorVersion: string;
 }
+
 /** Resolved by trusted composition for an active, tenant-owned connection. */
 export interface EffectAdapter {
   /** Stable provider and adapter identity, pinned across dispatch and reconciliation. */
@@ -48,6 +50,7 @@ export interface EffectAdapter {
   /** Read authoritative state; never perform a write during verification. */
   verify(intent: EffectIntent): Promise<VerificationResult>;
 }
+
 export interface EffectRegistry {
   resolve(
     context: TenantContext,

@@ -3,6 +3,10 @@ import { cn } from '@luma/ui/lib/utils';
 
 export type InputProps = InputPrimitive.Props;
 
+/**
+ * Renders the shared text-input styling and forwards native input props, including
+ * validation and disabled state.
+ */
 function Input({ className, ...props }: InputProps) {
   return (
     <InputPrimitive

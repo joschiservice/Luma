@@ -1,5 +1,6 @@
-import { afterEach, expect, it, vi } from 'vitest';
 import { QueryClient } from '@tanstack/react-query';
+import { afterEach, expect, it, vi } from 'vitest';
+
 import { createWebApiClient } from '../../lib/api-client';
 import { connectorProviderQueryOptions } from './queries';
 

@@ -1,7 +1,8 @@
-import { readFile } from 'node:fs/promises';
 import { createHash, randomUUID } from 'node:crypto';
-import { defaultConfiguration } from '../../apps/api/dist/modules/exceptions/index.js';
+import { readFile } from 'node:fs/promises';
+
 import { parseInput } from '../../apps/api/dist/modules/exceptions/composition.js';
+import { defaultConfiguration } from '../../apps/api/dist/modules/exceptions/index.js';
 
 export const scenarios = [
   'healthy',
@@ -16,17 +17,22 @@ export const scenarios = [
   'failed',
   'recovery',
 ];
+
+/** Reads and parses a UTF-8 JSON file, propagating file and syntax errors. */
 export const readJson = async (path) =>
   JSON.parse(await readFile(path, 'utf8'));
+
 export const corpus = await readJson(
   new URL('../../docs/fixtures/exceptions-v0.json', import.meta.url),
 );
+
 export const jtl = await readJson(
   new URL(
     '../../apps/api/src/modules/connectors/infrastructure/jtl/fixtures/commerce.json',
     import.meta.url,
   ),
 );
+
 export const shopify = await readJson(
   new URL(
     '../../apps/api/src/modules/connectors/infrastructure/shopify/fixtures/commerce.json',
@@ -45,9 +51,14 @@ function shift(value, epoch) {
     return Object.fromEntries(
       Object.entries(value).map(([key, item]) => [key, shift(item, epoch)]),
     );
+
   return value;
 }
 
+/**
+ * Builds a synthetic detector request for the manifest, exception class, and fixture
+ * variant.
+ */
 export function detectionRequest(manifest, kind, variant = 'default') {
   const key = `pilot:${manifest.runId}:${kind}:${variant}`;
   const base = shift(corpus.bases[kind], manifest.epoch);
@@ -60,6 +71,7 @@ export function detectionRequest(manifest, kind, variant = 'default') {
         : [manifest.connections.jtl];
   const refs = connections.map((_, i) => {
     const hex = createHash('sha256').update(`${key}:${i}`).digest('hex');
+
     return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
   });
   const facts = {
@@ -86,6 +98,7 @@ export function detectionRequest(manifest, kind, variant = 'default') {
       ? { durable: false, status: 'interrupted' }
       : {}),
   };
+
   return {
     key,
     input: parseInput(kind, facts),
@@ -119,9 +132,11 @@ export function detectionRequest(manifest, kind, variant = 'default') {
   };
 }
 
+/** Creates fresh identifiers and initial metadata for a synthetic pilot scenario. */
 export function newManifest(scenario) {
   if (!scenarios.includes(scenario))
     throw new Error(`Choose a scenario: ${scenarios.join(', ')}`);
+
   return {
     schemaVersion: 1,
     synthetic: true,

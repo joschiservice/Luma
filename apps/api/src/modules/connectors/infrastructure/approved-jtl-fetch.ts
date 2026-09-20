@@ -13,6 +13,7 @@ export function approvedJtlFetch(
   options: { allowWrites?: boolean } = {},
 ): typeof globalThis.fetch {
   const base = new URL(endpoint.baseUrl);
+
   return async (input, init) => {
     const url = new URL(
       input instanceof Request ? input.url : input.toString(),
@@ -31,6 +32,7 @@ export function approvedJtlFetch(
         ))
     )
       throw new Error('JTL destination is not approved');
+
     return new Promise<Response>((resolve, reject) => {
       const req = request(
         url,

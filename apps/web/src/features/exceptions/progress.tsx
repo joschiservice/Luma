@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { subscribeToCaseProgress } from '@luma/api-contract/client';
+import { Button } from '@luma/ui/button';
 import {
   CaseInvestigation,
   CaseLoading,
@@ -10,11 +9,17 @@ import {
   CaseTimeline,
   type LiveConnection,
 } from '@luma/ui/components/case-timeline';
-import { Button } from '@luma/ui/button';
-import { progressOptions } from './progress-data';
-import { casesKey } from './data';
-import { IdentityError } from '../identity/data';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 
+import { IdentityError } from '../identity/data';
+import { casesKey } from './data';
+import { progressOptions } from './progress-data';
+
+/**
+ * Keeps a selected case investigation and history current through progress events and query
+ * refreshes.
+ */
 export function LiveCaseDetail({
   organizationId,
   exceptionId,
@@ -80,6 +85,7 @@ export function LiveCaseDetail({
     window.addEventListener('offline', offline);
     window.addEventListener('online', online);
     if (!navigator.onLine) offline();
+
     return () => {
       active = false;
       generation++;
@@ -118,6 +124,7 @@ export function LiveCaseDetail({
     snapshot.isError ||
     connection === 'disconnected' ||
     connection === 'connecting';
+
   return (
     <CaseInvestigation
       item={data.detail}

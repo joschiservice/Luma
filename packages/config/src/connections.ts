@@ -1,12 +1,14 @@
-import { readShopifyConfig } from './shopify.js';
-import type { ShopifyConfig } from './shopify.js';
 import { isIP } from 'node:net';
+
+import type { ShopifyConfig } from './shopify.js';
+import { readShopifyConfig } from './shopify.js';
 
 export interface JtlEndpoint {
   tenantId: string;
   baseUrl: string;
   addresses: string[];
 }
+
 export interface ConnectionsConfig {
   shopify?: ShopifyConfig;
   activeKeyId: string;
@@ -103,5 +105,6 @@ export function readConnectionsConfig(
       addresses: [...entry.addresses],
     });
   }
+
   return { activeKeyId, keys, jtlEndpoints, ...(shopify ? { shopify } : {}) };
 }

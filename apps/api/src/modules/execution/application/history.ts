@@ -10,6 +10,7 @@ export interface ExecutionFailure {
   effect: 'none' | 'unknown';
   providerRequestId?: string;
 }
+
 export interface VerificationAttempt {
   id: string;
   proposalId: string;

@@ -1,9 +1,12 @@
 import Fastify from 'fastify';
 import { expect, it, vi } from 'vitest';
-import { IdentityError } from '#modules/identity/index';
+
 import { registerShopifyRoutes } from '#modules/connectors/api/shopify';
 import type { ShopifyOAuth } from '#modules/connectors/application/shopify';
+import { IdentityError } from '#modules/identity/index';
+
 const tenant = '11111111-1111-4111-8111-111111111111';
+
 function oauth(): ShopifyOAuth {
   return {
     config: { webOrigin: 'https://luma.test' },
@@ -14,6 +17,7 @@ function oauth(): ShopifyOAuth {
     callback: vi.fn(),
   };
 }
+
 it.each([401, 403, 404] as const)(
   'redirects to recovery when callback identity fails with %s',
   async (status) => {
@@ -43,6 +47,7 @@ it.each([401, 403, 404] as const)(
     }
   },
 );
+
 it('passes the original webhook bytes to signature verification', async () => {
   const app = Fastify();
   const service = oauth();

@@ -1,10 +1,13 @@
+import type { CaseProgress, CaseReview } from '@luma/api-contract';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, within } from 'storybook/test';
-import type { CaseProgress, CaseReview } from '@luma/api-contract';
+
 import { CaseTimeline } from './case-timeline';
 
 const id = '11111111-1111-4111-8111-111111111111';
+
 const at = '2026-09-20T04:00:00Z';
+
 const progress: CaseProgress = {
   schemaVersion: 1,
   caseRevision: 3,
@@ -17,6 +20,7 @@ const progress: CaseProgress = {
     progress: { phase: 'awaiting_approval' },
   },
 };
+
 const review: CaseReview = {
   schemaVersion: 1,
   caseRevision: 3,
@@ -48,6 +52,7 @@ const review: CaseReview = {
     approval: null,
   },
 };
+
 const execution: NonNullable<CaseProgress['execution']> = {
   id,
   proposalId: id,
@@ -61,6 +66,7 @@ const execution: NonNullable<CaseProgress['execution']> = {
   effectEvidenceRefs: ['effect-1'],
   verification: null,
 };
+
 const meta = {
   title: 'Cases/Execution timeline',
   component: CaseTimeline,
@@ -107,8 +113,11 @@ const meta = {
     ),
   ],
 } satisfies Meta<typeof CaseTimeline>;
+
 export default meta;
+
 type Story = StoryObj<typeof meta>;
+
 export const ApprovalWait: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -120,6 +129,7 @@ export const ApprovalWait: Story = {
     ).not.toBeInTheDocument();
   },
 };
+
 export const Executing: Story = {
   args: {
     progress: {
@@ -130,6 +140,7 @@ export const Executing: Story = {
     },
   },
 };
+
 export const Verifying: Story = {
   args: {
     progress: {
@@ -150,6 +161,7 @@ export const Verifying: Story = {
     ).not.toBeInTheDocument();
   },
 };
+
 const resolved: CaseProgress = {
   ...progress,
   state: 'resolved',
@@ -170,6 +182,7 @@ const resolved: CaseProgress = {
   },
   workflow: { availability: 'available', progress: { phase: 'resolved' } },
 };
+
 export const VerifiedResolution: Story = {
   args: { progress: resolved },
   play: async ({ canvasElement }) => {
@@ -186,6 +199,7 @@ export const VerifiedResolution: Story = {
     await expect(canvas.getByText('sku-104')).toBeVisible();
   },
 };
+
 export const Failed: Story = {
   args: {
     progress: {
@@ -215,6 +229,7 @@ export const Failed: Story = {
     ).not.toBeInTheDocument();
   },
 };
+
 export const Escalated: Story = {
   args: {
     progress: {
@@ -238,6 +253,7 @@ export const Escalated: Story = {
     review: { ...review, permittedDecisions: [] },
   },
 };
+
 export const Recovery: Story = {
   args: {
     progress: resolved,
@@ -254,6 +270,7 @@ export const Recovery: Story = {
     ],
   },
 };
+
 export const ConnectionLost: Story = {
   args: { progress: resolved, connection: 'disconnected' },
   play: async ({ canvasElement }) => {
@@ -264,9 +281,11 @@ export const ConnectionLost: Story = {
     await expect(canvas.getByText(/Last confirmed case state/)).toBeVisible();
   },
 };
+
 export const Resync: Story = {
   args: { progress: resolved, connection: 'syncing' },
 };
+
 export const HumanDisposition: Story = {
   args: {
     progress: {

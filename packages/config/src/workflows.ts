@@ -9,6 +9,11 @@ export interface WorkflowConfig {
     apiKey?: string;
   };
 }
+
+/**
+ * Validates the workflow database and EU Temporal settings; production connections and API
+ * keys require TLS.
+ */
 export function readWorkflowConfig(
   env: Readonly<Record<string, string | undefined>>,
 ): WorkflowConfig {
@@ -34,6 +39,7 @@ export function readWorkflowConfig(
     throw new Error('TEMPORAL_TLS must be true or false');
   if ((env.NODE_ENV === 'production' || env.TEMPORAL_API_KEY) && tls !== 'true')
     throw new Error('Temporal production connections and API keys require TLS');
+
   return {
     databaseUrl,
     temporal: {

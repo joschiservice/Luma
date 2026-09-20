@@ -1,5 +1,14 @@
 import { createHash, randomUUID } from 'node:crypto';
+
+import type { ShopifyTransportOptions } from '@luma/connector-shopify';
+import {
+  API_VERSION,
+  createClient,
+  fail,
+  parse,
+} from '@luma/connector-shopify';
 import { z } from 'zod';
+
 import type {
   CapabilityHandler,
   ConnectorConnection,
@@ -15,27 +24,25 @@ import type {
   ReadCapability,
   SourceIdentity,
 } from '#modules/connectors/domain/capabilities';
-import {
-  API_VERSION,
-  createClient,
-  fail,
-  parse,
-} from '#modules/connectors/infrastructure/shopify/client';
-import type { ShopifyTransportOptions } from '#modules/connectors/infrastructure/shopify/client';
 import * as s from '#modules/connectors/infrastructure/shopify/schemas';
 
 const pageFields = 'pageInfo { hasNextPage endCursor }';
+
 const ref = (externalId: string, scopeKey = ''): ExternalId => ({
   externalId,
   scopeKey,
 });
+
 const quantity = (value: number) => ({ amount: String(value), unit: 'each' });
+
 const record = z.record(z.unknown());
+
 const statusFrom = <T extends string>(
   mapping: Record<string, T>,
   value: string,
 ): T | 'unknown' =>
   Object.hasOwn(mapping, value) ? (mapping[value] ?? 'unknown') : 'unknown';
+
 const paymentStatuses: Record<string, OrderSnapshot['paymentStatus']> = {
   PENDING: 'pending',
   AUTHORIZED: 'authorized',
@@ -43,6 +50,7 @@ const paymentStatuses: Record<string, OrderSnapshot['paymentStatus']> = {
   PARTIALLY_REFUNDED: 'partially_refunded',
   REFUNDED: 'refunded',
 };
+
 const workStatuses: Record<string, FulfillmentSnapshot['status']> = {
   OPEN: 'pending',
   SCHEDULED: 'pending',
@@ -51,6 +59,7 @@ const workStatuses: Record<string, FulfillmentSnapshot['status']> = {
   CANCELLED: 'cancelled',
   INCOMPLETE: 'failed',
 };
+
 const shipmentStatuses: Record<string, FulfillmentSnapshot['status']> = {
   PENDING: 'pending',
   OPEN: 'processing',
@@ -69,6 +78,7 @@ export interface ShopifyEvidence {
   /** Allowlisted provider fields only. Storage must encrypt bytes and enforce tenant access and expiry. */
   raw?: { payloads: unknown[]; expiresAt: string };
 }
+
 export interface ShopifyConnectorOptions extends ShopifyTransportOptions {
   tenantId: string;
   connectionId: string;
@@ -156,10 +166,12 @@ export function createShopifyConnector(
         ): T => {
           const parsed = parse(schema, value);
           if (options.rawRetentionMs !== undefined) payloads.push(parsed);
+
           return parsed;
         };
         const observedAt = now().toISOString();
         const items: Observation<unknown>[] = [];
+
         function emit(
           resource: SourceIdentity['resource'],
           external: ExternalId,
@@ -184,6 +196,7 @@ export function createShopifyConnector(
             data,
           });
         }
+
         async function node<T>(
           externalId: string,
           type: string,
@@ -195,8 +208,10 @@ export function createShopifyConnector(
             { id: externalId },
           );
           if (data.node === null) fail('not_found');
+
           return capture(schema, data.node);
         }
+
         async function children<T>(
           externalId: string,
           type: string,
@@ -222,8 +237,10 @@ export function createShopifyConnector(
             // Bound malformed or unexpectedly large scans; never return a truncated snapshot.
             if (seen.size > 1000) fail('invalid_response');
           } while (cursor);
+
           return result;
         }
+
         const root =
           capability === 'products.read'
             ? 'products'
@@ -451,10 +468,12 @@ export function createShopifyConnector(
                 },
               }),
         });
+
         return validated;
       },
     };
   }
+
   return {
     tenantId: options.tenantId,
     id: options.connectionId,
@@ -471,7 +490,9 @@ export function createShopifyConnector(
     },
   };
 }
+
 function next(page: z.infer<typeof s.pageInfo>): string | null {
   if (page.hasNextPage && !page.endCursor) fail('invalid_response');
+
   return page.hasNextPage ? page.endCursor : null;
 }

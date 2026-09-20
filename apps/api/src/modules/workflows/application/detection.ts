@@ -1,20 +1,20 @@
-import { requireTenant } from '#modules/identity/index';
-import type { TenantContext } from '#modules/identity/index';
 import type {
-  ExternalId,
-  SourceIdentity,
-  Observation,
-  InventorySnapshot,
-  FulfillmentSnapshot,
   ConnectorFailure,
+  ExternalId,
+  FulfillmentSnapshot,
+  InventorySnapshot,
+  Observation,
+  SourceIdentity,
 } from '#modules/connectors/index';
-import { decimalUnits, decimalString } from '#modules/exceptions/index';
 import type {
   Configuration,
   DetectionService,
   Evidence,
   Facts,
 } from '#modules/exceptions/index';
+import { decimalString, decimalUnits } from '#modules/exceptions/index';
+import type { TenantContext } from '#modules/identity/index';
+import { requireTenant } from '#modules/identity/index';
 
 export interface InventoryMapping {
   tenantId: string;
@@ -27,6 +27,7 @@ export interface InventoryMapping {
   authority: 'left' | 'right' | null;
   sellingSource: 'left' | 'right';
 }
+
 export interface FulfillmentMapping {
   tenantId: string;
   version: string;
@@ -36,19 +37,23 @@ export interface FulfillmentMapping {
   order: ExternalId;
   lines: ExternalId[];
 }
+
 const externalMatches = (a: ExternalId, b: ExternalId) =>
   a.externalId === b.externalId && a.scopeKey === b.scopeKey;
+
 const sourceMatches = (a: SourceIdentity, b: SourceIdentity) =>
   externalMatches(a, b) &&
   a.tenantId === b.tenantId &&
   a.connectionId === b.connectionId &&
   a.provider === b.provider &&
   a.resource === b.resource;
+
 function sourceEvidence<T>(
   observation: Observation<T>,
   facts: Record<string, unknown>,
 ): Evidence {
   const { tenantId, connectionId, ...source } = observation.source;
+
   return {
     key: observation.id,
     tenantId,
@@ -65,8 +70,10 @@ function sourceEvidence<T>(
     },
   };
 }
+
 function inventoryEvidence(observation: Observation<InventorySnapshot>) {
   const d = observation.data;
+
   return sourceEvidence(observation, {
     sku: d.sku,
     location: d.location,
@@ -77,12 +84,14 @@ function inventoryEvidence(observation: Observation<InventorySnapshot>) {
     reserved: d.reserved,
   });
 }
+
 /** Invoke with persisted scan/event IDs and mappings resolved inside the trusted tenant scope. */
 export function createDetectionPipeline(
   service: DetectionService,
   hash: (value: string) => string,
 ) {
   const key = (parts: unknown[]) => hash(JSON.stringify(parts));
+
   return {
     inventory(
       context: TenantContext,
@@ -147,6 +156,7 @@ export function createDetectionPipeline(
         schemaVersion: 1,
         facts: { ...mapping },
       };
+
       return service.ingest(context, {
         key: key([
           'inventory',
@@ -241,6 +251,7 @@ export function createDetectionPipeline(
         schemaVersion: 1,
         facts: { ...mapping },
       };
+
       return service.ingest(context, {
         key: key([
           'fulfillment',
@@ -295,6 +306,7 @@ export function createDetectionPipeline(
         retryExhausted: input.retryExhausted,
         scanComplete: input.scanComplete,
       };
+
       return service.ingest(context, {
         key: key(['scan', input.connectionId, event.key]),
         input: { exceptionClass: 'sync_failure', facts },

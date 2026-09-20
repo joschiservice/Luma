@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { readApiConfig, readIdentityConfig } from './index.js';
 
 describe('readApiConfig', () => {
@@ -35,6 +36,7 @@ const authEnvironment = {
   BETTER_AUTH_URL: 'http://localhost:3001',
   AUTH_TRUSTED_ORIGINS: 'http://localhost:3000',
 };
+
 it('accepts distinct cookie namespaces and rejects invalid cookie names', () => {
   expect(
     readIdentityConfig({
@@ -52,6 +54,7 @@ it('accepts distinct cookie namespaces and rejects invalid cookie names', () => 
     ).toThrow('BETTER_AUTH_COOKIE_PREFIX');
   }
 });
+
 it('requires explicit identity credentials and exact trusted origins', () => {
   expect(readIdentityConfig(authEnvironment).trustedOrigins).toEqual([
     'http://localhost:3001',

@@ -1,9 +1,3 @@
-import {
-  IdentityError,
-  makeTenantContext,
-  requireRole,
-  requireTenant,
-} from '#modules/identity/domain/context';
 import type {
   Membership,
   Organization,
@@ -11,7 +5,15 @@ import type {
   SessionIdentity,
   TenantContext,
 } from '#modules/identity/domain/context';
+import {
+  IdentityError,
+  makeTenantContext,
+  requireRole,
+  requireTenant,
+} from '#modules/identity/domain/context';
+
 export type Credentials = Readonly<Record<string, string>>;
+
 export interface IdentityTransaction {
   listOrganizations(): Promise<Organization[]>;
   findMembership(organizationId: string): Promise<Membership | null>;
@@ -35,6 +37,7 @@ export interface IdentityTransaction {
   ): Promise<Membership>;
   removeMember(organizationId: string, memberId: string): Promise<void>;
 }
+
 export interface IdentityRepository {
   getSession(credentials: Credentials): Promise<SessionIdentity | null>;
   withUser<T>(
@@ -42,6 +45,11 @@ export interface IdentityRepository {
     operation: (tx: IdentityTransaction) => Promise<T>,
   ): Promise<T>;
 }
+
+/**
+ * Creates session and tenant resolution plus organization and membership commands backed by
+ * the supplied repository.
+ */
 export function createIdentityService(repository: IdentityRepository) {
   async function authenticate(
     credentials: Credentials,
@@ -49,8 +57,10 @@ export function createIdentityService(repository: IdentityRepository) {
     const session = await repository.getSession(credentials);
     if (!session)
       throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+
     return session;
   }
+
   async function resolve(
     tx: IdentityTransaction,
     session: SessionIdentity,
@@ -61,18 +71,23 @@ export function createIdentityService(repository: IdentityRepository) {
     const organization = member && (await tx.findOrganization(organizationId));
     if (!member || !organization)
       throw new IdentityError(404, 'NOT_FOUND', 'Organization not found');
+
     return makeTenantContext(session, organization, member, requestId);
   }
+
   async function withTenant<T>(
     context: TenantContext,
     operation: (tx: IdentityTransaction) => Promise<T>,
   ) {
     requireTenant(context, context.tenantId);
+
     return repository.withUser(context.actor.id, async (tx) => {
       await tx.selectTenant(context.tenantId);
+
       return operation(tx);
     });
   }
+
   return {
     authenticate,
     /** Reauthorize the initiating user of a trusted durable workflow. */
@@ -92,6 +107,7 @@ export function createIdentityService(repository: IdentityRepository) {
     },
     async refreshContext(context: TenantContext) {
       requireTenant(context, context.tenantId);
+
       return repository.withUser(context.actor.id, (tx) =>
         resolve(
           tx,
@@ -103,6 +119,7 @@ export function createIdentityService(repository: IdentityRepository) {
     },
     async listOrganizations(credentials: Credentials) {
       const session = await authenticate(credentials);
+
       return repository.withUser(session.userId, (tx) =>
         tx.listOrganizations(),
       );
@@ -122,6 +139,7 @@ export function createIdentityService(repository: IdentityRepository) {
           'REGION_UNAVAILABLE',
           'Requested region is unavailable',
         );
+
       return repository.withUser(session.userId, (tx) =>
         tx.createOrganization({ name: input.name, slug: input.slug }),
       );
@@ -132,6 +150,7 @@ export function createIdentityService(repository: IdentityRepository) {
       requestId: string,
     ) {
       const session = await authenticate(credentials);
+
       return repository.withUser(session.userId, (tx) =>
         resolve(tx, session, organizationId, requestId),
       );
@@ -147,6 +166,7 @@ export function createIdentityService(repository: IdentityRepository) {
         | { action: 'remove'; memberId: string },
     ) {
       const { tenantId: organizationId, requestId } = initialContext;
+
       return withTenant(initialContext, async (tx) => {
         await tx.lockOrganization(organizationId);
         // Recheck membership after taking the lock so concurrent revocations win.
@@ -188,9 +208,11 @@ export function createIdentityService(repository: IdentityRepository) {
             command.role,
           );
         await tx.removeMember(organizationId, command.memberId);
+
         return null;
       });
     },
   };
 }
+
 export type IdentityService = ReturnType<typeof createIdentityService>;

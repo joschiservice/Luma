@@ -1,6 +1,8 @@
-import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import { createHash } from 'node:crypto';
+
+import { fail, verifyWebhook } from '@luma/connector-shopify';
+
 import type { ReadCapability } from '#modules/connectors/domain/capabilities';
-import { fail } from '#modules/connectors/infrastructure/shopify/client';
 
 const topics: Record<string, ReadCapability[]> = {
   'orders/create': ['orders.read', 'fulfillment.read'],
@@ -44,22 +46,12 @@ export function mapShopifyWebhook(options: {
     !options.connectionId
   )
     fail('authentication');
-  if (
-    options.body.byteLength > 1024 * 1024 ||
-    !options.eventId ||
-    options.eventId.length > 256
-  )
-    fail('invalid_input');
-  const expected = createHmac('sha256', options.secret)
-    .update(options.body)
-    .digest();
-  const actual = Buffer.from(options.hmac, 'base64');
-  if (actual.length !== expected.length || !timingSafeEqual(actual, expected))
-    fail('authentication');
+  verifyWebhook(options);
   const capabilities = Object.hasOwn(topics, options.topic)
     ? topics[options.topic]
     : undefined;
   if (!capabilities) return null;
+
   return {
     tenantId: options.tenantId,
     connectionId: options.connectionId,

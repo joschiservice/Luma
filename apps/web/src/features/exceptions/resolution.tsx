@@ -1,12 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { CaseDecision, DecisionReceipt } from '@luma/api-contract';
-import { ResolutionReview } from '@luma/ui/components/resolution-review';
+import { Button } from '@luma/ui/button';
 import {
   CaseLoading,
   CaseNotice,
 } from '@luma/ui/components/case-investigation';
-import { Button } from '@luma/ui/button';
+import { ResolutionReview } from '@luma/ui/components/resolution-review';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef, useState } from 'react';
+
 import { IdentityError } from '../identity/data';
 import { casesKey } from './data';
 import {
@@ -17,6 +18,10 @@ import {
   sendDecision,
 } from './resolution-data';
 
+/**
+ * Presents permitted case decisions and recovers uncertain submissions through their
+ * recorded receipts.
+ */
 export function CaseResolution({
   organizationId,
   exceptionId,
@@ -46,6 +51,7 @@ export function CaseResolution({
   const [receipt, setReceipt] = useState<DecisionReceipt>();
   const refresh = () =>
     client.invalidateQueries({ queryKey: casesKey(organizationId) });
+
   async function decide(kind: CaseDecision['kind'], reason: string) {
     if (
       lock.current ||
@@ -95,6 +101,7 @@ export function CaseResolution({
       lock.current = false;
     }
   }
+
   async function recover(retry = false) {
     if (!uncertain || lock.current) return;
     lock.current = true;
@@ -129,6 +136,7 @@ export function CaseResolution({
       lock.current = false;
     }
   }
+
   const denied =
     query.error instanceof IdentityError &&
     [401, 403, 404].includes(query.error.status);
@@ -142,6 +150,7 @@ export function CaseResolution({
     ) <= query.dataUpdatedAt;
   const mismatched =
     data && data.review.caseRevision !== data.progress.caseRevision;
+
   return (
     <>
       {query.isPending ? <CaseLoading /> : null}

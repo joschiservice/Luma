@@ -1,10 +1,11 @@
 import { z } from 'zod';
-import { ModelGatewayError } from '#modules/platform/application/model-gateway';
+
 import type {
   JsonValue,
   ModelAdapter,
   ModelMessage,
 } from '#modules/platform/application/model-gateway';
+import { ModelGatewayError } from '#modules/platform/application/model-gateway';
 
 const responseSchema = z.object({
   choices: z
@@ -53,6 +54,7 @@ function message(value: ModelMessage) {
           }
         : {}),
     };
+
   return { role: value.role, content: value.content };
 }
 
@@ -153,6 +155,7 @@ export function createVercelModelAdapter(
         } catch {
           throw new ModelGatewayError('invalid_output');
         }
+
         return {
           text: choice.message.content ?? '',
           toolCalls,

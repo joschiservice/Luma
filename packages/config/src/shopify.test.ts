@@ -1,5 +1,7 @@
 import { expect, it } from 'vitest';
+
 import { readShopifyConfig } from './shopify.js';
+
 const settings = {
   SHOPIFY_CLIENT_ID: 'client',
   SHOPIFY_CLIENT_SECRET: 'secret',
@@ -7,6 +9,7 @@ const settings = {
   SHOPIFY_CALLBACK_URL: 'https://luma.test/api/v1/shopify/callback',
   SHOPIFY_WEB_ORIGIN: 'https://luma.test',
 };
+
 it('requires a complete app configuration and exact HTTPS callback', () => {
   expect(readShopifyConfig({})).toBeUndefined();
   expect(readShopifyConfig(settings)?.environment).toBe('development');

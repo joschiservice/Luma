@@ -1,11 +1,16 @@
 import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
+
 import { Pool } from 'pg';
 
 const connectionString = process.env.MIGRATION_DATABASE_URL;
+
 if (!connectionString) throw new Error('MIGRATION_DATABASE_URL is required');
+
 const pool = new Pool({ connectionString, max: 1 });
+
 const client = await pool.connect();
+
 try {
   await client.query('BEGIN');
   await client.query(

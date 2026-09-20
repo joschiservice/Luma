@@ -1,12 +1,13 @@
+import type { ConnectionCoverage } from '#modules/connectors/domain/coverage';
 import type { TenantContext } from '#modules/identity/index';
-import type { InstalledConnection } from '#modules/connectors/domain/installation';
-export interface ConnectionCoverage {
-  id: string;
-  label: string;
-  status: InstalledConnection['status'];
-  lastObservedAt: string | null;
-  freshness: 'fresh' | 'stale' | 'unobserved';
-}
+
+export type { ConnectionCoverage } from '#modules/connectors/domain/coverage';
+
+/**
+ * Reads all current tenant connections, ordered by label then ID.
+ * Pass an ISO timestamp as `asOf`; observations after that instant are excluded.
+ * Connection status and permissions reflect their current state, not historical state.
+ */
 export type CoverageReader = (
   context: TenantContext,
   asOf: string,

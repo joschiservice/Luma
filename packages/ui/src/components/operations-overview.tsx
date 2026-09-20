@@ -1,8 +1,9 @@
-import type { ReactNode } from 'react';
 import type {
-  OperationsOverview as Summary,
   CaseSummary,
+  OperationsOverview as Summary,
 } from '@luma/api-contract';
+import type { ReactNode } from 'react';
+
 import { Button } from './button';
 import { CaseLoading, CaseNotice } from './case-investigation';
 
@@ -19,9 +20,12 @@ export interface OperationsOverviewProps {
   inboxLink: ReactNode;
   decisionLink: (item: CaseSummary) => ReactNode;
 }
+
 function timestamp(value: string) {
   return value.replace('T', ' ').slice(0, 16) + ' UTC';
 }
+
+/** Classifies an operations summary into the presentation state used by the overview. */
 export function overviewState(data: Summary) {
   if (!data.connections.length)
     return {
@@ -66,12 +70,18 @@ export function overviewState(data: Summary) {
       description:
         'No decisions currently need you. Active cases are still being investigated or resolved.',
     };
+
   return {
     title: 'Observed operations look healthy.',
     description:
       'Monitored connections have recent observations and no active cases are recorded. Source coverage may still be incomplete.',
   };
 }
+
+/**
+ * Presents operations counts, prioritized decisions, and connection freshness with caller-
+ * provided navigation and refresh actions.
+ */
 export function OperationsOverview({
   data,
   loading,
@@ -86,6 +96,7 @@ export function OperationsOverview({
   decisionLink,
 }: OperationsOverviewProps) {
   const state = data ? overviewState(data) : undefined;
+
   return (
     <div className="operations-overview">
       <header className="operations-heading">

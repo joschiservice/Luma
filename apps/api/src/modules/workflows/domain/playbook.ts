@@ -1,17 +1,21 @@
 /** V0 is a linear resolution: eligibility, one admitted action, verification and recovery. */
 export type PlaybookScalar = string | number | boolean | null;
+
 export type PlaybookFields = Record<
   string,
   'string' | 'number' | 'boolean' | 'null'
 >;
+
 export type PlaybookValue =
   | { source: 'input' | 'evidence'; field: string }
   | { source: 'literal'; value: PlaybookScalar };
+
 export interface PlaybookDefinition {
   id: string;
   name: string;
   intent: string;
 }
+
 export interface PlaybookIR {
   schemaVersion: 1;
   inputs: PlaybookFields;
@@ -45,6 +49,7 @@ export interface PlaybookIR {
     strategy: 'reconcile_then_escalate';
   };
 }
+
 export interface PlaybookVersion {
   definition: PlaybookDefinition;
   version: string;
@@ -58,6 +63,7 @@ export interface PlaybookVersion {
   ir: PlaybookIR;
   digest: string;
 }
+
 export interface PlaybookActivation {
   id: string;
   tenantId: string;
@@ -72,6 +78,7 @@ export interface PlaybookActivation {
   };
   policyVersion: string;
 }
+
 export interface PlaybookSnapshot {
   inputs: Record<string, PlaybookScalar>;
   evidence: {
@@ -81,6 +88,8 @@ export interface PlaybookSnapshot {
   };
   provenance: { reference: string; capturedAt: string };
 }
+
+/** Resolves a literal or named snapshot value; throws when a referenced field is missing. */
 export function playbookValue(
   value: PlaybookValue,
   snapshot: PlaybookSnapshot,
@@ -90,8 +99,14 @@ export function playbookValue(
     value.source === 'input' ? snapshot.inputs : snapshot.evidence.facts;
   if (!Object.hasOwn(fields, value.field))
     throw new Error('Missing playbook value');
+
   return fields[value.field]!;
 }
+
+/**
+ * Checks evidence freshness and eligibility predicates at the supplied time without
+ * executing actions.
+ */
 export function playbookEligible(
   ir: PlaybookIR,
   snapshot: PlaybookSnapshot,
@@ -104,6 +119,7 @@ export function playbookEligible(
     !snapshot.evidence.observations.length ||
     snapshot.evidence.observations.some((item) => {
       const time = Date.parse(item.observedAt);
+
       return (
         !Number.isFinite(time) ||
         time > captured ||
@@ -112,6 +128,7 @@ export function playbookEligible(
     })
   )
     return 'stale_evidence';
+
   return ir.eligibility.all.every(
     (check) =>
       Object.hasOwn(snapshot.evidence.facts, check.field) &&

@@ -1,15 +1,18 @@
 import { readFileSync } from 'node:fs';
+
 import { describe, expect, it } from 'vitest';
-import { diagnose } from '#modules/exceptions/domain/diagnosis';
+
 import type { DiagnosisInput } from '#modules/exceptions/domain/diagnosis';
-import { defaultConfiguration } from '#modules/exceptions/domain/facts';
-import type { ExceptionClass } from '#modules/exceptions/domain/facts';
+import { diagnose } from '#modules/exceptions/domain/diagnosis';
 import { identity } from '#modules/exceptions/domain/evaluate';
-import { parseInput } from '#modules/exceptions/infrastructure/validation';
+import type { ExceptionClass } from '#modules/exceptions/domain/facts';
+import { defaultConfiguration } from '#modules/exceptions/domain/facts';
 import {
   boundedInvestigation,
   selectionSchema,
 } from '#modules/exceptions/infrastructure/diagnosis-boundary';
+import { parseInput } from '#modules/exceptions/infrastructure/validation';
+
 const corpus = JSON.parse(
   readFileSync(
     new URL(
@@ -19,6 +22,7 @@ const corpus = JSON.parse(
     'utf8',
   ),
 );
+
 function snapshot(
   exceptionClass: ExceptionClass,
   changes: Record<string, unknown> = {},
@@ -28,6 +32,7 @@ function snapshot(
     ...changes,
   });
   const subject = identity(input);
+
   return {
     exceptionId: '11111111-1111-4111-8111-111111111111',
     revision: 1,
@@ -59,6 +64,7 @@ function snapshot(
     })),
   };
 }
+
 describe('deterministic evidence-grounded diagnoses', () => {
   for (const test of corpus.cases as {
     id: string;
@@ -70,6 +76,7 @@ describe('deterministic evidence-grounded diagnoses', () => {
       const value = snapshot(test.exceptionClass, test.input);
       if (test.expected.decision === 'reject') {
         expect(() => diagnose(value, corpus.now)).toThrow('scope');
+
         return;
       }
       const result = diagnose(value, corpus.now);
@@ -155,6 +162,7 @@ describe('deterministic evidence-grounded diagnoses', () => {
     await expect(
       boundedInvestigation((s) => {
         signal = s;
+
         return new Promise(() => {});
       }, 5),
     ).rejects.toThrow('timed out');

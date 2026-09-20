@@ -2,19 +2,25 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { describe, it, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+
 import { RuleTester } from 'eslint';
 import tseslint from 'typescript-eslint';
+
 import plugin from './eslint-plugin.mjs';
 import { dependencies } from './policy.mjs';
 
 RuleTester.describe = describe;
+
 RuleTester.it = it;
 
 const filename = (file) =>
   fileURLToPath(new URL(`../../${file}`, import.meta.url));
+
 const moduleFile = (module, layer = 'application/service.ts') =>
   filename(`apps/api/src/modules/${module}/${layer}`);
+
 const sample = (file, code) => ({ filename: file, code });
+
 const invalid = (file, code) => ({
   ...sample(file, code),
   errors: [{ messageId: 'boundary' }],
@@ -33,9 +39,11 @@ function withPackageImport(entry) {
         .relative(sourceRoot, target)
         .replaceAll(path.sep, '/')
         .slice(0, -3);
+
       return `${quote}#${relative}${quote}`;
     },
   );
+
   return code === entry.code ? [entry] : [entry, { ...entry, code }];
 }
 
@@ -44,6 +52,30 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
   plugin.rules.boundaries,
   {
     valid: [
+      sample(
+        moduleFile('connectors', 'infrastructure/shopify/adapter.ts'),
+        "import { createClient } from '@luma/connector-shopify';",
+      ),
+      sample(
+        moduleFile('connectors', 'infrastructure/jtl/adapter.ts'),
+        "import { order } from '@luma/connector-jtl/schemas';",
+      ),
+      sample(
+        moduleFile('connectors', 'domain/capabilities.ts'),
+        "export { ConnectorError } from '@luma/connector-core';",
+      ),
+      sample(
+        filename('packages/connectors/shopify/src/client.ts'),
+        "import { ConnectorError } from '@luma/connector-core';",
+      ),
+      sample(
+        moduleFile('connectors', 'infrastructure/installations/runtime.ts'),
+        "import type { InstallationService } from '#modules/connectors/application/installations';",
+      ),
+      sample(
+        filename('apps/api/src/composition/services.ts'),
+        "import { createCases } from '#modules/exceptions/composition';",
+      ),
       ...[
         'connections.test.ts',
         'connections.integration.test.ts',
@@ -115,6 +147,46 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
       ),
     ].flatMap(withPackageImport),
     invalid: [
+      invalid(
+        moduleFile('connectors', 'application/installations.ts'),
+        "import { createClient } from '@luma/connector-shopify';",
+      ),
+      invalid(
+        moduleFile('connectors', 'domain/capabilities.ts'),
+        "import { parse } from '@luma/connector-core/transport';",
+      ),
+      invalid(
+        moduleFile('orders', 'infrastructure/projections.ts'),
+        "import { createClient } from '@luma/connector-jtl';",
+      ),
+      invalid(
+        moduleFile('connectors', 'infrastructure/shopify/adapter.ts'),
+        "import { createClient } from '@luma/connector-shopify/src/client';",
+      ),
+      invalid(
+        filename('packages/connectors/shopify/src/client.ts'),
+        "import type { TenantContext } from '#modules/identity/index';",
+      ),
+      invalid(
+        filename('packages/connectors/jtl/src/client.ts'),
+        "import { buildApp } from '../../../../apps/api/src/app.js';",
+      ),
+      invalid(
+        moduleFile('connectors', 'application/installations.ts'),
+        "import { createSecretCipher } from '#modules/connectors/infrastructure/installations/secret-cipher';",
+      ),
+      invalid(
+        moduleFile('execution', 'infrastructure/adapter.ts'),
+        "import { createSecretCipher } from '#modules/connectors/infrastructure/installations/secret-cipher';",
+      ),
+      invalid(
+        filename('apps/api/src/composition/services.ts'),
+        "import { createCaseReader } from '#modules/exceptions/infrastructure/cases';",
+      ),
+      invalid(
+        moduleFile('exceptions'),
+        "import { createDetectionServices } from '../../../composition/services.js';",
+      ),
       ...[
         'connections.test.ts',
         'connections.integration.test.ts',
@@ -125,7 +197,7 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
       ].map((name) =>
         invalid(
           filename(`apps/api/src/${name}`),
-          "import { createSecretCipher } from './modules/connectors/infrastructure/secret-cipher.js';",
+          "import { createSecretCipher } from './modules/connectors/infrastructure/installations/secret-cipher.js';",
         ),
       ),
       invalid(
@@ -274,5 +346,6 @@ test('the declared module graph is acyclic and references registered modules', (
     for (const provider of dependencies[name])
       visit(provider, [...ancestors, name]);
   }
+
   for (const name of Object.keys(dependencies)) visit(name);
 });

@@ -2,7 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+
 import { expect, test } from 'vitest';
+
 import { seed } from '../../../tooling/dev/seed.mjs';
 import { database, secret } from './helpers.mjs';
 
@@ -21,6 +23,7 @@ test('repeated demo seeding preserves evaluations, diagnoses and evidence', asyn
     BETTER_AUTH_SECRET: secret,
     BETTER_AUTH_URL: 'http://127.0.0.1:3000',
   };
+
   async function snapshot() {
     const result = {};
     for (const table of [
@@ -43,8 +46,10 @@ test('repeated demo seeding preserves evaluations, diagnoses and evidence', asyn
         )
       ).rows.map((row) => row.value);
     }
+
     return result;
   }
+
   await seed(saved, env, directory);
   const initial = await snapshot();
   expect(initial.users).toHaveLength(1);

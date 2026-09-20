@@ -1,14 +1,16 @@
-import { randomBytes, randomUUID } from 'node:crypto';
-import { fork } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
+import { fork } from 'node:child_process';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { once } from 'node:events';
 import { readFile } from 'node:fs/promises';
+
 import {
   installedConnectionSchema,
   organizationSchema,
 } from '@luma/api-contract';
 import { Pool } from 'pg';
-import { afterAll, beforeAll, expect, it, describe } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
 const databaseUrl = process.env.TEST_DATABASE_URL;
 
 describe.skipIf(!databaseUrl)('connections through the API CLI', () => {
@@ -21,6 +23,7 @@ describe.skipIf(!databaseUrl)('connections through the API CLI', () => {
   let origin: string;
   let cookie: string;
   let organizationId: string;
+
   async function stop() {
     if (!child || child.exitCode !== null || child.signalCode !== null) return;
     const exited = once(child, 'exit');
@@ -28,6 +31,7 @@ describe.skipIf(!databaseUrl)('connections through the API CLI', () => {
     await exited;
     child = undefined;
   }
+
   async function start(configured = true) {
     child = fork(new URL('./index.ts', import.meta.url), [], {
       execArgv: [
@@ -84,6 +88,7 @@ describe.skipIf(!databaseUrl)('connections through the API CLI', () => {
       });
     });
   }
+
   async function call(path: string, body?: unknown) {
     return fetch(`${origin}${path}`, {
       method: body === undefined ? 'GET' : 'POST',
@@ -95,6 +100,7 @@ describe.skipIf(!databaseUrl)('connections through the API CLI', () => {
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
   }
+
   beforeAll(async () => {
     await admin.query(`CREATE DATABASE "${name}"`);
     const url = new URL(databaseUrl!);

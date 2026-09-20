@@ -1,5 +1,12 @@
 import { createHash, randomUUID } from 'node:crypto';
+
+import { API_VERSION, createClient, fail, parse } from '@luma/connector-jtl';
+import {
+  shippingMethodResponse,
+  shippingMethodState,
+} from '@luma/connector-jtl/schemas';
 import { z } from 'zod';
+
 import type {
   CapabilityHandler,
   ConnectorConnection,
@@ -8,21 +15,15 @@ import type {
 import type { CapabilityOutput } from '#modules/connectors/domain/capabilities';
 import { ConnectorError } from '#modules/connectors/domain/capabilities';
 import type { JtlConnectorOptions } from '#modules/connectors/infrastructure/jtl/adapter';
-import {
-  API_VERSION,
-  createClient,
-  fail,
-  parse,
-} from '#modules/connectors/infrastructure/jtl/client';
-import { externalId, id } from '#modules/connectors/infrastructure/jtl/schemas';
+import { externalId } from '#modules/connectors/infrastructure/jtl/schemas';
 
 const ref = z.object({ externalId, scopeKey: z.literal('') }).strict();
-export const shippingMethodState = z.object({
-  id,
-  shippingMethodId: id,
-  isCancelled: z.boolean(),
-});
-export const shippingMethodResponse = z.object({ salesOrderId: id });
+
+export {
+  shippingMethodState,
+  shippingMethodResponse,
+} from '@luma/connector-jtl/schemas';
+
 const writeInput = z
   .object({ order: ref, expectedShippingMethod: ref, shippingMethod: ref })
   .strict()
@@ -31,6 +32,7 @@ const writeInput = z
       value.expectedShippingMethod.externalId !==
       value.shippingMethod.externalId,
   );
+
 const receipt = z
   .object({
     status: z.literal('accepted'),
@@ -38,6 +40,7 @@ const receipt = z
     providerRequestId: z.string().nullable(),
   })
   .strict();
+
 const readOutput = z
   .object({
     items: z
@@ -79,6 +82,7 @@ export function createJtlShippingMethodCapabilities(
 ): ConnectorConnection['capabilities'] {
   const client = createClient(options);
   const now = options.now ?? (() => new Date());
+
   function check(context: InvocationContext) {
     if (
       context.tenant.tenantId !== options.tenantId ||
@@ -87,6 +91,7 @@ export function createJtlShippingMethodCapabilities(
     )
       fail('unavailable');
   }
+
   async function observe(
     order: z.infer<typeof ref>,
   ): Promise<CapabilityOutput<'orders.shipping-method.read'>> {
@@ -131,8 +136,10 @@ export function createJtlShippingMethodCapabilities(
       capability: 'orders.shipping-method.read',
       observations: result.items,
     });
+
     return result;
   }
+
   const read: CapabilityHandler<'orders.shipping-method.read'> = {
     descriptor: {
       version: '0',
@@ -148,6 +155,7 @@ export function createJtlShippingMethodCapabilities(
     parseOutput: (value) => readOutput.parse(value),
     async run(context, input) {
       check(context);
+
       return observe(ref.parse(input.order));
     },
   };
@@ -215,6 +223,7 @@ export function createJtlShippingMethodCapabilities(
           effect: 'unknown',
           retry: 'reconcile',
         });
+
       return {
         status: 'accepted',
         evidenceRefs: [before.id],
@@ -222,6 +231,7 @@ export function createJtlShippingMethodCapabilities(
       };
     },
   };
+
   return {
     'orders.shipping-method.read': read,
     'orders.shipping-method.write': write,

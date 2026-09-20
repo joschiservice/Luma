@@ -48,7 +48,7 @@ modules/<name>/
 - `infrastructure` imports its own infrastructure/application/domain and allowed providers' interfaces.
 - `api` imports its own api/application/domain and allowed providers' interfaces; inject use cases rather than constructing repositories.
 - `index.ts` exposes selected domain/application contracts with explicit named exports. No infrastructure, HTTP handlers, ORM tables, singleton instances or composition factories.
-- `composition.ts` may wire all its own layers and consume allowed providers through their public interfaces. Only `apps/api/src/app.ts` and `index.ts` wire module entry points; no other root-level backend helpers may reach into modules.
+- `composition.ts` may wire all its own layers and consume allowed providers through their public interfaces. The application composition root lives in `apps/api/src/composition/`, with separate HTTP setup, runtime setup, service factories, and workflow setup. `app.ts` exposes these factories and `index.ts` starts the selected runtime. Composition files may only consume module entry points; backend modules cannot import the composition root.
 
 Registered integration fixtures may wire module public/composition entry points: `app.test.ts`, `exceptions.integration.test.ts`, `commerce.integration.test.ts`, `diagnosis-reread.test.ts`, `workflow-runtime.test.ts`, the connection test files and `test-support/detection-fixtures.ts`. They cannot import another module’s internal layers. The diagnosis reread fixture verifies the workflow-to-connector read boundary with a trusted identity context. The workflow runtime fixture verifies activity authorization, proposal freshness and tenant-scoped Temporal commands through module entry points.
 
@@ -72,7 +72,24 @@ Example: connectors records an external observation; workflows invokes orders/in
 
 ## Shared primitives and enforcement
 
+Group infrastructure files by responsibility when several files implement one feature:
+
+- `connectors/infrastructure/installations` owns credential storage, input validation, verification, and installed adapter wiring. Provider protocol clients and schemas live in `packages/connectors/jtl` and `packages/connectors/shopify`; local provider folders adapt their results to Luma capabilities.
+- `workflows/infrastructure/playbooks` owns playbook validation and persistence.
+- `workflows/infrastructure/temporal` owns worker setup and durable workflow execution. Keep the worker entry point beside its runtime loader.
+- `workflows/infrastructure/persistence` owns operator desk and resolution learning storage.
+
+Nested folders retain their layer's dependency rules. Other modules use `index.ts`; application wiring uses `composition.ts`. File moves must update runtime paths and development watch paths as well as imports.
+
+Define consumed service contracts explicitly in the application layer and annotate their factories. Use interface extension for a larger contract, such as trusted installation operations extending connection management. Prefer injected functions and composed adapters for shared behavior; introduce a base class only when implementations share lifecycle invariants that it can enforce. Keep recurring helpers with their semantic owner.
+
+Extract a workspace package when it has a coherent public API and an independent consumer or build lifecycle. Shared HTTP contracts, configuration, and UI already meet that bar. Installation and workflow adapters remain owned by their modules; a folder split does not require a package or a new dependency edge.
+
 Keep a primitive with its semantic owner. Share only after a concrete second consumer exists. Platform owns technical interfaces; identity owns tenant context; audit owns evidence contracts; connectors owns capability descriptions; policies owns approval/decision semantics. Existing `packages/config` remains startup configuration, consumed by the composition root. Inject configuration into modules. `packages/ui` remains presentation-only. Packages must not import apps, and apps must not import another app's source.
+
+The provider packages expose compiled JavaScript and declarations through explicit exports. `@luma/connector-jtl` and `@luma/connector-shopify` own protocol clients and provider response schemas. Shopify also owns OAuth token exchange, callback signatures, and webhook signature verification. They accept credentials and transports from callers and never import API source or access tenant storage. The API owns authorization, OAuth state and app/environment binding, connection lifecycle, capability mappings, observation persistence, and webhook refresh scheduling.
+
+`@luma/connector-core` owns the shared failure contract and transport helpers used by both providers. Its root export has no runtime dependencies; schema parsing lives in the separate `/transport` export. The connectors module may use the core failure contract in its inner layers, while provider packages, provider `/schemas` exports, and core `/transport` are restricted to its infrastructure and composition layers. Other backend modules consume the connectors module's public interface. Package imports use `@luma/connector-*`; relative source imports are not a substitute for public package exports.
 
 `tooling/architecture/policy.mjs` is the executable dependency/layer map. The local ESLint rule runs in `pnpm lint` and CI. It checks module registration, public entry points, import directions, layer directions, external dependencies in inner layers, static imports/re-exports, type imports, literal dynamic imports and `require`. Nonliteral module imports are rejected. The `api` layer may import the root `@luma/api-contract` export for HTTP schemas; all other layers and contract subpath imports remain forbidden. This narrow exception keeps transport mapping out of inner layers. Backend modules cannot import or re-export `node:module` or `module`, including through dynamic imports or `require`; this prohibits alternate loaders such as `createRequire` regardless of local aliases. Use standard imports or literal `require` calls instead. `pnpm test:architecture` exercises allowed and forbidden imports and checks the graph for cycles; it is included in `pnpm test`.
 

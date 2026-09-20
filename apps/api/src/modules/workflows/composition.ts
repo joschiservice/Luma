@@ -1,27 +1,41 @@
-export { createExceptionActivities } from '#modules/workflows/application/runtime';
-export {
-  createExceptionWorker,
-  createExceptionClient,
-  createDeskWorkflowReader,
-} from '#modules/workflows/infrastructure/runtime';
-export type { TemporalSettings } from '#modules/workflows/infrastructure/runtime';
-
-export { createOperationsOverview } from '#modules/workflows/application/overview';
-export { operationsRoutes } from '#modules/workflows/api/overview';
-export { createDeskStore } from '#modules/workflows/infrastructure/desk';
-export { createDeskService } from '#modules/workflows/application/desk';
-export { deskRoutes, registerDeskEvents } from '#modules/workflows/api/desk';
-
-import { createPlaybookService } from '#modules/workflows/application/playbook';
-import type { PlaybookDependencies } from '#modules/workflows/application/playbook';
 import type { TenantDatabase } from '#modules/platform/index';
-import { createPlaybookStore } from '#modules/workflows/infrastructure/playbook-store';
+import { learningBoundary } from '#modules/workflows/api/learning';
+import { createLearningService } from '#modules/workflows/application/learning';
+import type { PlaybookDependencies } from '#modules/workflows/application/playbook';
+import { createPlaybookService } from '#modules/workflows/application/playbook';
+import { createLearningStore } from '#modules/workflows/infrastructure/persistence/learning';
 import {
+  activationRequestSchema,
   compilePlaybook,
   parsePlaybookSnapshot,
-  activationRequestSchema,
   playbookHash,
-} from '#modules/workflows/infrastructure/playbook-schema';
+} from '#modules/workflows/infrastructure/playbooks/schema';
+import { createPlaybookStore } from '#modules/workflows/infrastructure/playbooks/store';
+
+export { createExceptionActivities } from '#modules/workflows/application/runtime';
+
+export {
+  createDeskWorkflowReader,
+  createExceptionClient,
+  createExceptionWorker,
+} from '#modules/workflows/infrastructure/temporal/runtime';
+
+export type { TemporalSettings } from '#modules/workflows/infrastructure/temporal/runtime';
+
+export { createOperationsOverview } from '#modules/workflows/application/overview';
+
+export { operationsRoutes } from '#modules/workflows/api/overview';
+
+export { createDeskStore } from '#modules/workflows/infrastructure/persistence/desk';
+
+export { createDeskService } from '#modules/workflows/application/desk';
+
+export { deskRoutes, registerDeskEvents } from '#modules/workflows/api/desk';
+
+/**
+ * Creates persistent playbook services with compilation, snapshot validation, and action-
+ * admission boundaries.
+ */
 export function createPlaybooks(
   db: TenantDatabase,
   dependencies: Pick<
@@ -40,17 +54,20 @@ export function createPlaybooks(
     now,
   });
 }
-export {
-  definePlaybook,
-  compilePlaybook,
-  printPlaybookCode,
-  parsePlaybookCode,
-} from '#modules/workflows/infrastructure/playbook-schema';
 
-import { createLearningService } from '#modules/workflows/application/learning';
-import { createLearningStore } from '#modules/workflows/infrastructure/learning';
-import { learningBoundary } from '#modules/workflows/api/learning';
+export {
+  compilePlaybook,
+  definePlaybook,
+  parsePlaybookCode,
+  printPlaybookCode,
+} from '#modules/workflows/infrastructure/playbooks/schema';
+
 export { learningRoutes } from '#modules/workflows/api/learning';
+
+/**
+ * Creates persistent resolution learning with fresh authorization and validated commands and
+ * responses.
+ */
 export function createResolutionLearning(
   db: import('#modules/platform/index').TenantDatabase,
   refreshContext: (

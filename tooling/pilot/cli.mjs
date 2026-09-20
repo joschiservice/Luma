@@ -1,4 +1,6 @@
 import { join } from 'node:path';
+
+import { provision } from '../dev/database.mjs';
 import {
   compose,
   environment,
@@ -6,7 +8,6 @@ import {
   state,
   stateDirectory,
 } from '../dev/environment.mjs';
-import { provision } from '../dev/database.mjs';
 import { fail, run } from '../dev/process.mjs';
 
 try {

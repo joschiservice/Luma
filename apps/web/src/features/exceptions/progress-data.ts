@@ -1,20 +1,28 @@
-import { queryOptions } from '@tanstack/react-query';
 import {
   caseDetailSchema,
-  caseReviewSchema,
-  caseProgressSchema,
-  caseTimelineSchema,
   caseEvidencePageSchema,
+  caseProgressSchema,
+  caseReviewSchema,
+  caseTimelineSchema,
 } from '@luma/api-contract';
+import { queryOptions } from '@tanstack/react-query';
+
 import { createWebApiClient } from '../../lib/api-client';
+import { privateQueryDefaults } from '../../lib/private-query';
 import { IdentityError } from '../identity/data';
 import { casesKey } from './data';
 
 const api = createWebApiClient();
+
+/** Deduplicates entries by ID, retaining the last value at the first occurrence's position. */
 export function uniqueEntries<T extends { id: string }>(items: T[]): T[] {
   return [...new Map(items.map((item) => [item.id, item])).values()];
 }
 
+/**
+ * Loads consistent case, review, and progress revisions plus paginated history; rejects
+ * refreshes that span conflicting revisions.
+ */
 export function progressOptions(
   organizationId: string,
   exceptionId: string,
@@ -22,9 +30,7 @@ export function progressOptions(
 ) {
   const options = queryOptions({
     queryKey: [...casesKey(organizationId), 'progress', exceptionId, pages],
-    staleTime: 0,
-    gcTime: 0,
-    retry: false,
+    ...privateQueryDefaults,
     refetchOnWindowFocus: 'always',
     queryFn: async ({ signal }) => {
       const request = {
@@ -36,6 +42,7 @@ export function progressOptions(
       ) => {
         const response = await promise;
         if (response.status !== 200) throw new IdentityError(response.status);
+
         return response.body;
       };
       const [detail, review, progress] = await Promise.all([
@@ -98,6 +105,7 @@ export function progressOptions(
         ]);
         if (!timelineCursor && !evidenceCursor) break;
       }
+
       return {
         detail,
         review,
@@ -108,6 +116,7 @@ export function progressOptions(
       };
     },
   });
+
   return queryOptions({
     ...options,
     placeholderData: (previous, previousQuery) =>

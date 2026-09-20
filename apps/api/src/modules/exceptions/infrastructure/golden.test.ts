@@ -1,17 +1,23 @@
 import { readFileSync } from 'node:fs';
+
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
-import { factSchemas as schemas } from '#modules/exceptions/infrastructure/validation';
 import { evaluate } from '#modules/exceptions/domain/evaluate';
-import { parseInput } from '#modules/exceptions/infrastructure/validation';
+import {
+  factSchemas as schemas,
+  parseInput,
+} from '#modules/exceptions/infrastructure/validation';
+
 const timestamp = z.string().datetime();
+
 const className = z.enum([
   'sync_failure',
   'stuck_fulfillment',
   'inventory_mismatch',
   'workflow_failure',
 ]);
+
 const decision = z.discriminatedUnion('decision', [
   z
     .object({
@@ -30,6 +36,7 @@ const decision = z.discriminatedUnion('decision', [
       .strict(),
   ),
 ]);
+
 const corpusSchema = z
   .object({
     schemaVersion: z.literal(1),
@@ -60,6 +67,7 @@ const corpusSchema = z
       .min(1),
   })
   .strict();
+
 const corpus = corpusSchema.parse(
   JSON.parse(
     readFileSync(

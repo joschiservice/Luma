@@ -1,24 +1,29 @@
 import { createHash } from 'node:crypto';
+
+import { z } from 'zod';
+
 import type {
   DetectionRequest,
-  Resolution,
   HumanDisposition,
+  Resolution,
 } from '#modules/exceptions/application/detection';
-import { z } from 'zod';
 import { identity } from '#modules/exceptions/domain/evaluate';
 import type {
-  ExceptionClass,
   EvaluationInput,
+  ExceptionClass,
 } from '#modules/exceptions/domain/facts';
 
 const timestamp = z.string().datetime();
+
 const decimal = z.string().regex(/^-?\d{1,14}(?:\.\d{1,6})?$/);
+
 const common = {
   tenantId: z.string().min(1),
   evidenceTenantId: z.string().min(1),
   subjectId: z.string().min(1),
   evidenceRefs: z.array(z.string().min(1)).min(1),
 };
+
 export const factSchemas = {
   sync_failure: z
     .object({
@@ -135,6 +140,7 @@ export const thresholdsSchema = z
     uncertaintySeconds: z.number().int().positive(),
   })
   .strict();
+
 export const configurationSchema = z
   .object({
     version: z.string().min(1),
@@ -144,6 +150,10 @@ export const configurationSchema = z
   })
   .strict();
 
+/**
+ * Validates and normalizes detector input for the selected exception class; rejects facts
+ * that do not match that class.
+ */
 export function parseInput(
   exceptionClass: ExceptionClass,
   facts: unknown,
@@ -153,7 +163,9 @@ export function parseInput(
     facts: factSchemas[exceptionClass].parse(facts),
   } as EvaluationInput;
 }
+
 const ref = z.string().min(1).max(512);
+
 export const evidenceSchema = z
   .object({
     key: ref,
@@ -184,6 +196,7 @@ const humanDispositionSchema = z
     evidenceRefs: z.array(ref).min(1),
   })
   .strict();
+
 export const resolutionSchema = z.discriminatedUnion('kind', [
   z
     .object({
@@ -253,6 +266,7 @@ export const detectionBoundary = {
       input.facts.effect === 'unknown'
     )
       z.string().uuid().parse(input.facts.executionId);
+
     return {
       key: ref.parse(request.key),
       input,

@@ -1,10 +1,13 @@
 /* global document, window, innerWidth, requestAnimationFrame */
-import { it, expect } from 'vitest';
 import { chromium } from 'playwright';
-import { database, startApi, startProcess, availablePort } from './helpers.mjs';
+import { expect, it } from 'vitest';
+
+import { availablePort, database, startApi, startProcess } from './helpers.mjs';
 
 let origin;
+
 const password = 'browser-test-password-123';
+
 async function fixture(t) {
   const port = await availablePort();
   origin = `http://127.0.0.1:${port}`;
@@ -29,8 +32,10 @@ async function fixture(t) {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.setDefaultTimeout(15_000);
+
   return { db, api, browser, context, page, errors };
 }
+
 async function heading(page, name) {
   try {
     await page.getByRole('heading', { name, exact: true }).waitFor();
@@ -41,6 +46,7 @@ async function heading(page, name) {
     );
   }
 }
+
 async function register(page, email = 'ada@example.test') {
   await page.goto('/sign-up');
   await page.getByLabel('Name', { exact: true }).fill('Ada');
@@ -51,14 +57,17 @@ async function register(page, email = 'ada@example.test') {
     .click();
   await heading(page, 'Create a workspace.');
 }
+
 async function createWorkspace(page, name) {
   await page.getByLabel('Workspace name').fill(name);
   await page
     .getByRole('button', { name: 'Create workspace', exact: true })
     .click();
   await heading(page, 'Room to focus.');
+
   return new URL(page.url()).pathname.split('/')[2];
 }
+
 async function signIn(page, email = 'ada@example.test') {
   await heading(page, 'Sign in to Luma');
   await page.getByLabel('Email', { exact: true }).fill(email);

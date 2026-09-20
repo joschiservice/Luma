@@ -1,15 +1,20 @@
 import { createHash } from 'node:crypto';
+
 import { z } from 'zod';
-import type { TenantDatabase } from '#modules/platform/index';
-import { requireRole, requireTenant } from '#modules/identity/index';
-import type { TenantContext } from '#modules/identity/index';
+
 import type {
   ActivatedArtifact,
   BoundActionStep,
 } from '#modules/execution/application/admission';
 import { parseAction } from '#modules/execution/infrastructure/validation';
+import type { TenantContext } from '#modules/identity/index';
+import { requireRole, requireTenant } from '#modules/identity/index';
+import type { TenantDatabase } from '#modules/platform/index';
+import { canonicalJson as canonical } from '#modules/platform/index';
 
 const text = z.string().min(1).max(200);
+
+/** Validates the run and step references accepted by action admission. */
 export const parseAdmissionReference = (input: unknown) =>
   z
     .object({
@@ -18,6 +23,7 @@ export const parseAdmissionReference = (input: unknown) =>
     })
     .strict()
     .parse(input);
+
 const artifactSchema = z
   .object({
     id: text,
@@ -53,15 +59,7 @@ const artifactSchema = z
       ),
   })
   .strict();
-function canonical(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
-  if (value && typeof value === 'object')
-    return `{${Object.entries(value)
-      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-      .map(([key, v]) => `${JSON.stringify(key)}:${canonical(v)}`)
-      .join(',')}}`;
-  return JSON.stringify(value);
-}
+
 const digest = (value: unknown) =>
   createHash('sha256').update(canonical(value)).digest('hex');
 
@@ -76,6 +74,7 @@ export function createAdmissionStore(db: TenantDatabase) {
             [context.tenantId, runId, stepId],
           )
         ).rows[0];
+
         return row?.document ?? null;
       }),
     artifact: (context: TenantContext, id: string, version: string) =>
@@ -96,10 +95,12 @@ export function createAdmissionStore(db: TenantDatabase) {
           const document = artifactSchema.parse(row.document);
           if (digest(document) !== row.digest)
             throw new Error('Artifact digest mismatch');
+
           return { ...document, digest: row.digest, active: row.active };
         },
       ),
   };
+
   return {
     ...reader,
     async activate(context: TenantContext, input: unknown) {
@@ -120,6 +121,7 @@ export function createAdmissionStore(db: TenantDatabase) {
         if (row?.digest !== hash || !row.active)
           throw new Error('Artifact version is immutable or revoked');
       });
+
       return { ...document, digest: hash, active: true };
     },
     async revoke(context: TenantContext, id: string, version: string) {

@@ -1,11 +1,17 @@
 import { z } from 'zod';
+
 import { caseStates } from './cases.js';
+
 const id = z.string().uuid();
+
 const at = z.string().datetime();
+
 const ref = z.string().min(1).max(512);
+
 const fields = z.record(
   z.union([z.string().max(1000), z.number().finite(), z.boolean(), z.null()]),
 );
+
 export const caseDecisionSchema = z.discriminatedUnion('kind', [
   z
     .object({
@@ -41,6 +47,7 @@ export const caseDecisionSchema = z.discriminatedUnion('kind', [
     })
     .strict(),
 ]);
+
 export const decisionReceiptSchema = z.object({
   id,
   exceptionId: id,
@@ -51,6 +58,7 @@ export const decisionReceiptSchema = z.object({
   reason: z.string().min(1).max(1000),
   createdAt: at,
 });
+
 export const caseReviewSchema = z.object({
   schemaVersion: z.literal(1),
   caseRevision: z.number().int().positive(),
@@ -96,6 +104,7 @@ export const caseReviewSchema = z.object({
     })
     .nullable(),
 });
+
 export const caseProgressSchema = z.object({
   schemaVersion: z.literal(1),
   caseRevision: z.number().int().positive(),
@@ -159,6 +168,7 @@ export const caseProgressSchema = z.object({
       .nullable(),
   }),
 });
+
 export const caseTimelineSchema = z.object({
   items: z
     .array(
@@ -175,14 +185,20 @@ export const caseTimelineSchema = z.object({
     .max(100),
   nextCursor: z.string().nullable(),
 });
+
 export const caseStreamEventSchema = z.object({
   schemaVersion: z.literal(1),
   exceptionId: id,
   refetch: z.literal(true),
   progress: caseProgressSchema,
 });
+
 export type CaseDecision = z.infer<typeof caseDecisionSchema>;
+
 export type DecisionReceipt = z.infer<typeof decisionReceiptSchema>;
+
 export type CaseReview = z.infer<typeof caseReviewSchema>;
+
 export type CaseProgress = z.infer<typeof caseProgressSchema>;
+
 export type CaseTimelinePage = z.infer<typeof caseTimelineSchema>;

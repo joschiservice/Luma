@@ -1,23 +1,25 @@
-import { queryOptions } from '@tanstack/react-query';
 import {
-  caseDecisionSchema,
-  caseReviewSchema,
-  caseProgressSchema,
-  decisionReceiptSchema,
-  type CaseReview,
   type CaseDecision,
+  caseDecisionSchema,
+  caseProgressSchema,
+  type CaseReview,
+  caseReviewSchema,
+  decisionReceiptSchema,
 } from '@luma/api-contract';
+import { queryOptions } from '@tanstack/react-query';
+
 import { createWebApiClient } from '../../lib/api-client';
+import { privateQueryDefaults } from '../../lib/private-query';
 import { IdentityError } from '../identity/data';
 import { casesKey } from './data';
 
 const api = createWebApiClient();
+
+/** Loads proposal review and execution progress together, refreshing every five seconds. */
 export function resolutionOptions(organizationId: string, exceptionId: string) {
   return queryOptions({
     queryKey: [...casesKey(organizationId), 'resolution', exceptionId],
-    staleTime: 0,
-    gcTime: 0,
-    retry: false,
+    ...privateQueryDefaults,
     refetchOnWindowFocus: 'always',
     refetchInterval: 5000,
     queryFn: async ({ signal }) => {
@@ -31,6 +33,7 @@ export function resolutionOptions(organizationId: string, exceptionId: string) {
       ]);
       if (review.status !== 200) throw new IdentityError(review.status);
       if (progress.status !== 200) throw new IdentityError(progress.status);
+
       return {
         review: caseReviewSchema.parse(review.body),
         progress: caseProgressSchema.parse(progress.body),
@@ -38,6 +41,11 @@ export function resolutionOptions(organizationId: string, exceptionId: string) {
     },
   });
 }
+
+/**
+ * Builds a validated, revision-bound decision; rejects unavailable decisions or missing
+ * proposal policy data.
+ */
 export function decisionCommand(
   review: CaseReview,
   kind: CaseDecision['kind'],
@@ -57,6 +65,7 @@ export function decisionCommand(
   const proposal = review.proposal;
   if (!proposal?.policy)
     throw new Error('A current proposal and policy result are required.');
+
   return caseDecisionSchema.parse({
     ...common,
     proposalId: proposal.id,
@@ -64,6 +73,8 @@ export function decisionCommand(
     decisionId: proposal.policy.id,
   });
 }
+
+/** Submits a decision using its command ID for correlation and returns the validated receipt. */
 export async function sendDecision(
   organizationId: string,
   exceptionId: string,
@@ -75,8 +86,11 @@ export async function sendDecision(
     extraHeaders: { 'x-luma-action-id': body.commandId },
   });
   if (result.status !== 200) throw new IdentityError(result.status);
+
   return decisionReceiptSchema.parse(result.body);
 }
+
+/** Reads the receipt for an earlier command without resubmitting the decision. */
 export async function recoverDecision(
   organizationId: string,
   exceptionId: string,
@@ -87,8 +101,14 @@ export async function recoverDecision(
     fetchOptions: { cache: 'no-store' },
   });
   if (result.status !== 200) throw new IdentityError(result.status);
+
   return decisionReceiptSchema.parse(result.body);
 }
+
+/**
+ * Returns decision feedback that distinguishes rejected requests from uncertain outcomes
+ * requiring a refresh.
+ */
 export function decisionError(error: unknown) {
   if (error instanceof IdentityError) {
     if (error.status === 401)
@@ -102,5 +122,6 @@ export function decisionError(error: unknown) {
     if (error.status === 400)
       return 'The decision could not be accepted. Review the reason and current proposal.';
   }
+
   return 'The decision result is uncertain. Current state is being refreshed. Check the recorded decision before taking another action.';
 }

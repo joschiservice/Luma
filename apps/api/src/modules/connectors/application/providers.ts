@@ -15,6 +15,7 @@ export function createProviderCatalog(): ProviderCatalog {
     { id: 'shopify', name: 'Shopify', category: 'storefront' },
     { id: 'jtl', name: 'JTL', category: 'erp' },
   ];
+
   return {
     list: (category) =>
       providers
@@ -22,6 +23,7 @@ export function createProviderCatalog(): ProviderCatalog {
         .map((provider) => ({ ...provider })),
     get: (id) => {
       const provider = providers.find((item) => item.id === id);
+
       return provider ? { ...provider } : null;
     },
   };

@@ -1,9 +1,14 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+
+import type { ShopifyOAuth } from '#modules/connectors/application/shopify';
 import type { IdentityService } from '#modules/identity/index';
 import { IdentityError } from '#modules/identity/index';
-import type { ShopifyOAuth } from '#modules/connectors/application/shopify';
 
+/**
+ * Registers Shopify authorization callbacks and uninstall webhooks with signature and
+ * session validation.
+ */
 export function registerShopifyRoutes(
   app: FastifyInstance,
   oauth?: ShopifyOAuth,
@@ -30,6 +35,7 @@ export function registerShopifyRoutes(
       result = 'failed';
     }
     reply.header('referrer-policy', 'no-referrer');
+
     return reply.redirect(
       `${oauth.config.webOrigin}/app/${tenant}/connections?shopify=${result}`,
     );
@@ -68,6 +74,7 @@ export function registerShopifyRoutes(
           header('x-shopify-shop-domain'),
           header('x-shopify-topic'),
         );
+
         return reply.status(204).send();
       },
     );

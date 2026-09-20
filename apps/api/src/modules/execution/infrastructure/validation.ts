@@ -1,13 +1,20 @@
 import { createHash } from 'node:crypto';
+
 import { z } from 'zod';
+
+import { canonicalJson as canonical } from '#modules/platform/index';
 import type { ProposedAction } from '#modules/policies/index';
+
 const text = z.string().min(1).max(200);
+
 const refs = z.array(z.string().uuid()).min(1).max(100);
+
 const fields = z
   .record(
     z.union([z.string().max(1000), z.number().finite(), z.boolean(), z.null()]),
   )
   .refine((value) => Object.keys(value).length <= 50);
+
 const schema = z
   .object({
     schemaVersion: z.literal(1),
@@ -44,6 +51,7 @@ const schema = z
     expiresAt: z.string().datetime(),
   })
   .strict();
+
 const verification = z
   .object({
     outcome: z.enum(['passed', 'failed', 'inconclusive']),
@@ -52,28 +60,28 @@ const verification = z
     evaluatorVersion: text,
   })
   .strict();
-function canonical(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
-  if (value && typeof value === 'object')
-    return `{${Object.entries(value)
-      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-      .map(([key, entry]) => `${JSON.stringify(key)}:${canonical(entry)}`)
-      .join(',')}}`;
-  return JSON.stringify(value);
-}
+
 function freeze<T>(value: T): T {
   if (value && typeof value === 'object') {
     for (const child of Object.values(value)) freeze(child);
     Object.freeze(value);
   }
+
   return value;
 }
+
+/** Validates a proposed action and its capability-specific input before execution. */
 export function parseAction(input: unknown) {
   const action = schema.parse(input) as ProposedAction;
+
   return {
     action: freeze(action),
     hash: createHash('sha256').update(canonical(action)).digest('hex'),
   };
 }
+
+/** Validates an effect-verification result before it can influence execution state. */
 export const parseVerification = (input: unknown) => verification.parse(input);
+
+/** Validates the evidence references attached to an execution result. */
 export const parseEvidence = (input: unknown) => refs.parse(input);

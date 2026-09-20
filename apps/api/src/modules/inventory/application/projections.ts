@@ -1,5 +1,7 @@
 import type { TenantContext } from '#modules/identity/index';
+
 export type EntityKind = 'sku' | 'location' | 'product' | 'position';
+
 export type CommerceData = {
   type: 'position';
   skuId: string;
@@ -10,6 +12,7 @@ export type CommerceData = {
   available: string | null;
   availabilityBasis: 'provider_reported' | 'derived' | 'unknown';
 };
+
 export interface CanonicalSnapshot {
   schemaVersion: 1;
   entityId: string;
@@ -24,11 +27,13 @@ export interface CanonicalSnapshot {
   deleted: boolean;
   data: CommerceData;
 }
+
 export interface Projection {
   snapshotId: string;
   version: number;
   snapshot: CanonicalSnapshot;
 }
+
 export interface CommerceProjections {
   identify(
     context: TenantContext,

@@ -1,21 +1,22 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { z } from 'zod';
 import {
   InMemorySpanExporter,
   SimpleSpanProcessor,
 } from '@opentelemetry/sdk-trace-node';
-import { createRoutedModelGateway } from '#modules/platform/application/model-gateway';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
+
 import type {
   ModelAdapter,
   ModelDataPolicy,
   ModelGateway,
   ModelMessage,
-  ModelToolCall,
   ModelRequest,
-  ModelRoutingPolicy,
   ModelRoute,
+  ModelRoutingPolicy,
   ModelSchema,
+  ModelToolCall,
 } from '#modules/platform/application/model-gateway';
+import { createRoutedModelGateway } from '#modules/platform/application/model-gateway';
 import { createObservability } from '#modules/platform/infrastructure/observability';
 import { createVercelModelAdapter } from '#modules/platform/infrastructure/vercel-model-adapter';
 
@@ -29,6 +30,7 @@ const answer: ModelSchema<{ answer: string }> = {
   },
   parse: (value) => z.object({ answer: z.string() }).strict().parse(value),
 };
+
 const request: ModelRequest<{ answer: string }> = {
   profile: 'reasoning',
   dataPolicy: {
@@ -40,16 +42,20 @@ const request: ModelRequest<{ answer: string }> = {
   maxOutputTokens: 128,
   output: answer,
 };
+
 function completion(content = '{"answer":"synthetic-secret"}') {
   return {
     choices: [{ finish_reason: 'stop', message: { content } }],
     usage: { prompt_tokens: 10, completion_tokens: 5 },
   };
 }
-const shutdown: Array<() => Promise<void>> = [];
+
+const shutdown: (() => Promise<void>)[] = [];
+
 afterEach(async () => {
   await Promise.all(shutdown.splice(0).map((close) => close()));
 });
+
 function setup(
   options: {
     model?: string;
@@ -109,10 +115,12 @@ function setup(
     telemetry,
     () => {
       time += 7;
+
       return time;
     },
     options.policy,
   );
+
   return { gateway, root, telemetry, spans, langfuse, transport };
 }
 
@@ -125,6 +133,7 @@ describe('model gateway', () => {
     ) {
       return (await gateway.generate(context, request)).output?.answer;
     }
+
     for (const model of ['anthropic/claude-sonnet-4.5', 'openai/gpt-4.1']) {
       const { gateway, root, telemetry, spans, langfuse, transport } = setup({
         model,
@@ -537,7 +546,7 @@ describe('tool history', () => {
   const tools = [
     { name: 'lookup', description: 'Read a value', input: answer },
   ];
-  const invalid: Array<[string, ModelMessage[]]> = [
+  const invalid: [string, ModelMessage[]][] = [
     ['empty call ID', [assistant({ ...call, id: '' }), result('')]],
     ['blank call ID', [assistant({ ...call, id: ' ' }), result(' ')]],
     ['duplicate calls in a turn', [assistant(call, call), result(call.id)]],

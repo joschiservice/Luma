@@ -1,5 +1,7 @@
 import { readFile } from 'node:fs/promises';
+
 import { expect, it, vi } from 'vitest';
+
 import { createApiClient, subscribeToCaseProgress } from './client.js';
 import { dataRegionSchema, organizationParamsSchema } from './index.js';
 import { openApiDocument } from './openapi.js';
@@ -92,6 +94,7 @@ it('documents decision conflicts and authenticated resync streams', () => {
   expect(document.paths[`${base}/events`].get.responses).toHaveProperty('401');
   expect(document.paths[`${base}/events`].get.responses).toHaveProperty('429');
 });
+
 it('validates SSE snapshots and closes malformed streams while allowing transport reconnects', () => {
   const listeners = new Map<string, (event: unknown) => void>();
   const close = vi.fn();

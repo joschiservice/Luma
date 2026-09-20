@@ -1,6 +1,8 @@
 import { Pool } from 'pg';
+
 import { run } from './process.mjs';
 
+/** Applies database migrations and provisions restricted local API and worker roles. */
 export async function provision(saved, migrationUrl) {
   await run('pnpm', ['--filter', '@luma/api', 'db:migrate'], {
     env: { ...process.env, MIGRATION_DATABASE_URL: migrationUrl },

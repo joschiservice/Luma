@@ -68,5 +68,6 @@ export function readModelGatewayConfig(
     (!apiKey?.trim() || /\s/.test(apiKey))
   )
     throw new Error('AI_GATEWAY_API_KEY is required for Vercel routes');
+
   return { routes, timeoutMs: Number(timeout), ...(apiKey ? { apiKey } : {}) };
 }

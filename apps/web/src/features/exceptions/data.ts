@@ -1,13 +1,17 @@
-import { queryOptions } from '@tanstack/react-query';
 import {
+  caseClasses,
   caseDetailSchema,
   caseListSchema,
   type CaseQuery,
+  caseStates,
 } from '@luma/api-contract';
+import { queryOptions } from '@tanstack/react-query';
 import { z } from 'zod';
-import { caseClasses, caseStates } from '@luma/api-contract';
+
 import { createWebApiClient } from '../../lib/api-client';
+import { privateQueryDefaults } from '../../lib/private-query';
 import { IdentityError } from '../identity/data';
+
 export const inboxSearch = z.object({
   view: z
     .enum(['needs_you', 'active', 'history'])
@@ -18,18 +22,24 @@ export const inboxSearch = z.object({
   state: z.enum(caseStates).optional().catch(undefined),
   cursor: z.string().min(1).max(2048).optional().catch(undefined),
 });
+
 export type InboxSearch = z.infer<typeof inboxSearch>;
+
 const api = createWebApiClient();
+
+/** Returns the query-key prefix for all case data in one organization. */
 export const casesKey = (organizationId: string) =>
   ['private', 'organization', organizationId, 'cases'] as const;
+
 const options = {
-  staleTime: 0,
-  gcTime: 0,
-  retry: false,
+  ...privateQueryDefaults,
   refetchOnWindowFocus: 'always',
 } as const;
+
+/** Loads a validated inbox page using the requested view, filters, and cursor. */
 export function casesOptions(organizationId: string, search: InboxSearch) {
   const query: CaseQuery = { ...search, limit: 25 };
+
   return queryOptions({
     ...options,
     queryKey: [...casesKey(organizationId), 'list', query],
@@ -40,10 +50,16 @@ export function casesOptions(organizationId: string, search: InboxSearch) {
         fetchOptions: { signal, cache: 'no-store' },
       });
       if (result.status !== 200) throw new IdentityError(result.status);
+
       return caseListSchema.parse(result.body);
     },
   });
 }
+
+/**
+ * Loads a validated case detail; rejects invalid IDs and disables fetching for an empty
+ * selection.
+ */
 export function caseOptions(organizationId: string, exceptionId: string) {
   return queryOptions({
     ...options,
@@ -57,10 +73,13 @@ export function caseOptions(organizationId: string, exceptionId: string) {
         fetchOptions: { signal, cache: 'no-store' },
       });
       if (result.status !== 200) throw new IdentityError(result.status);
+
       return caseDetailSchema.parse(result.body);
     },
   });
 }
+
+/** Checks whether a case still belongs in the selected inbox view and filters. */
 export function matchesView(
   item: import('@luma/api-contract').CaseSummary,
   search: InboxSearch,

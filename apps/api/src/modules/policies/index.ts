@@ -1,13 +1,15 @@
 export { currentPolicyVersion } from '#modules/policies/domain/action';
+
 export type {
-  PolicyEvidence,
   Approval,
   PolicyDecision,
+  PolicyEvidence,
   ProposedAction,
   Provenance,
 } from '#modules/policies/domain/action';
+
 export type {
-  PolicyService,
-  PolicyRepository,
   PolicyDependencies,
+  PolicyRepository,
+  PolicyService,
 } from '#modules/policies/application/policies';

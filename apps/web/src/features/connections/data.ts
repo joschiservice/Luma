@@ -1,33 +1,46 @@
-import { queryOptions } from '@tanstack/react-query';
 import {
-  installedConnectionSchema,
-  type InstallationInput,
   type InstallationCredentials,
+  type InstallationInput,
   type InstalledConnection,
+  installedConnectionSchema,
 } from '@luma/api-contract';
+import { queryOptions } from '@tanstack/react-query';
+
 import { createWebApiClient } from '../../lib/api-client';
+import { privateQueryDefaults } from '../../lib/private-query';
 import { IdentityError } from '../identity/data';
 
 const api = createWebApiClient();
+
+/** Returns the query-key prefix for one organization's installed connections. */
 export const connectionsKey = (organizationId: string) =>
   ['private', 'organization', organizationId, 'connections'] as const;
+
+/**
+ * Loads validated connections without retaining unused data or automatically retrying failed
+ * reads.
+ */
 export const connectionsOptions = (organizationId: string) =>
   queryOptions({
     queryKey: connectionsKey(organizationId),
-    staleTime: 0,
-    gcTime: 0,
-    retry: false,
+    ...privateQueryDefaults,
     queryFn: async ({ signal }) => {
       const result = await api.connections.list({
         params: { organizationId },
         fetchOptions: { signal, cache: 'no-store' },
       });
       if (result.status !== 200) throw new IdentityError(result.status);
+
       return result.body.items.map((item) =>
         installedConnectionSchema.parse(item),
       );
     },
   });
+
+/**
+ * Installs a connection and returns its validated public state; rejects unsuccessful API
+ * responses.
+ */
 export async function installConnection(
   organizationId: string,
   body: InstallationInput,
@@ -37,8 +50,14 @@ export async function installConnection(
     body,
   });
   if (result.status !== 201) throw new IdentityError(result.status);
+
   return installedConnectionSchema.parse(result.body);
 }
+
+/**
+ * Checks, disconnects, or rotates a connection at its current version. Rotation requires
+ * replacement credentials.
+ */
 export async function changeConnection(
   organizationId: string,
   connection: InstalledConnection,
@@ -55,8 +74,11 @@ export async function changeConnection(
         })
       : await api.connections[action]({ params, body });
   if (result.status !== 200) throw new IdentityError(result.status);
+
   return installedConnectionSchema.parse(result.body);
 }
+
+/** Returns actionable connection feedback without exposing provider responses or credentials. */
 export function connectionError(error: unknown) {
   const status = error instanceof IdentityError ? error.status : 0;
   if (status === 401) return 'Your session expired. Sign in again.';
@@ -70,5 +92,6 @@ export function connectionError(error: unknown) {
     return 'Check the connection details and enter the credentials again.';
   if (status === 503)
     return 'Connection service unavailable. Ask your administrator to check the provider setup, then refresh.';
+
   return 'The result could not be confirmed. Refresh the list before trying again.';
 }

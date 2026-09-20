@@ -1,4 +1,5 @@
 import { PostgreSqlContainer } from '@testcontainers/postgresql';
+
 import { fail, run } from './process.mjs';
 
 const suites = {
@@ -13,7 +14,9 @@ const suites = {
   ],
   full: [['check'], ['test:e2e'], ['test:browser']],
 };
+
 let container;
+
 try {
   const suite = process.argv[2];
   const commands = suites[suite]?.map((args) => [...args]);

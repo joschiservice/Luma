@@ -1,5 +1,7 @@
 import type { TenantContext } from '#modules/identity/index';
+
 export type EntityKind = 'order' | 'order_line' | 'fulfillment';
+
 export type CommerceData =
   | {
       type: 'order';
@@ -22,6 +24,7 @@ export type CommerceData =
       failureCode: string | null;
       lines: { orderLineId: string; quantity: string; unit: string }[];
     };
+
 export interface CanonicalSnapshot {
   schemaVersion: 1;
   entityId: string;
@@ -36,11 +39,13 @@ export interface CanonicalSnapshot {
   deleted: boolean;
   data: CommerceData;
 }
+
 export interface Projection {
   snapshotId: string;
   version: number;
   snapshot: CanonicalSnapshot;
 }
+
 export interface CommerceProjections {
   identify(
     context: TenantContext,

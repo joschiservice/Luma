@@ -1,14 +1,21 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
-import { parseEnv } from 'node:util';
 import { join } from 'node:path';
+import { parseEnv } from 'node:util';
+
 import { root, run } from './process.mjs';
 
 export const stateDirectory = join(root, '.luma');
+
 const statePath = join(stateDirectory, 'state.json');
+
 const connectionKeyPath = join(stateDirectory, 'connection-key');
 
+/**
+ * Loads or creates the worktree's encryption key; rejects malformed existing keys instead of
+ * replacing them.
+ */
 export async function connectionKey(path = connectionKeyPath) {
   await mkdir(stateDirectory, { recursive: true, mode: 0o700 });
   try {
@@ -27,11 +34,16 @@ export async function connectionKey(path = connectionKeyPath) {
     throw new Error(
       'Local connection key is invalid. Restore .luma/connection-key from backup.',
     );
+
   return key;
 }
 
 export const project = `luma-${createHash('sha256').update(root).digest('hex').slice(0, 12)}`;
 
+/**
+ * Returns a currently available loopback port; the port is released before returning and is
+ * not reserved.
+ */
 export async function freePort() {
   const server = createServer();
   await new Promise((resolve, reject) => {
@@ -42,9 +54,14 @@ export async function freePort() {
   await new Promise((resolve, reject) =>
     server.close((error) => (error ? reject(error) : resolve())),
   );
+
   return port;
 }
 
+/**
+ * Loads this worktree's local state, creating it only when requested; rejects state from
+ * another checkout.
+ */
 export async function state(create = false) {
   try {
     const saved = JSON.parse(await readFile(statePath, 'utf8'));
@@ -52,6 +69,7 @@ export async function state(create = false) {
       throw new Error(
         'Local state belongs to a different checkout. Remove this checkout’s .luma directory and rerun pnpm run setup.',
       );
+
     return saved;
   } catch (error) {
     if (error.code !== 'ENOENT') throw error;
@@ -79,9 +97,14 @@ export async function state(create = false) {
     mode: 0o600,
     flag: 'wx',
   });
+
   return saved;
 }
 
+/**
+ * Runs Docker Compose for this worktree with its saved database credentials and optional
+ * captured output.
+ */
 export function compose(saved, args, capture = false) {
   return run(
     'docker',
@@ -93,6 +116,10 @@ export function compose(saved, args, capture = false) {
   );
 }
 
+/**
+ * Builds process settings from worktree state and published service ports, including
+ * optional Temporal access.
+ */
 export async function environment(saved, workflows = false) {
   const binding = await compose(saved, ['port', 'postgres', '5432'], true);
   const dbPort = Number(binding.split(':').at(-1));
@@ -141,6 +168,7 @@ export async function environment(saved, workflows = false) {
       true,
     );
   }
+
   return {
     generated,
     migrationUrl: database('postgres', saved.databasePassword),
@@ -149,6 +177,10 @@ export async function environment(saved, workflows = false) {
   };
 }
 
+/**
+ * Writes generated settings to the worktree's private environment file with owner-only
+ * permissions.
+ */
 export async function saveEnvironment(generated) {
   await writeFile(
     join(stateDirectory, 'env'),

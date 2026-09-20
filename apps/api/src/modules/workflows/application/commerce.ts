@@ -1,16 +1,18 @@
-import { requireTenant, requireRole } from '#modules/identity/index';
-import type { TenantContext } from '#modules/identity/index';
 import type {
-  SourceRecords,
   CommerceObservation,
-  SourceIdentity,
   ExternalId,
+  SourceIdentity,
+  SourceRecords,
 } from '#modules/connectors/index';
-import type { CommerceProjections as Orders } from '#modules/orders/index';
+import type { TenantContext } from '#modules/identity/index';
+import { requireRole, requireTenant } from '#modules/identity/index';
 import type { CommerceProjections as Inventory } from '#modules/inventory/index';
+import type { CommerceProjections as Orders } from '#modules/orders/index';
+
 export type ProjectionOutcome =
   | { status: 'pending'; missing: SourceIdentity[] }
   | { status: 'applied' | 'retained' | 'duplicate'; entityId: string };
+
 /** Coordinates idempotent owner transactions; replay resumes after a partial failure. */
 export function createCommerceIngestion(
   sources: SourceRecords,
@@ -24,6 +26,7 @@ export function createCommerceIngestion(
   ): Promise<ProjectionOutcome> {
     const o = input.observation;
     const missing: SourceIdentity[] = [];
+
     async function resolve(
       resource: SourceIdentity['resource'],
       external: ExternalId,
@@ -31,8 +34,10 @@ export function createCommerceIngestion(
       const source = { ...o.source, ...external, resource };
       const id = await sources.resolve(context, source);
       if (!id) missing.push(source);
+
       return id;
     }
+
     const provenance = {
       schemaVersion: 1 as const,
       connectionId: o.source.connectionId,
@@ -69,6 +74,7 @@ export function createCommerceIngestion(
           availabilityBasis: data.availabilityBasis,
         },
       });
+
       return { status, entityId };
     }
     if (input.capability === 'orders.read') {
@@ -110,6 +116,7 @@ export function createCommerceIngestion(
           lines,
         },
       });
+
       return { status, entityId };
     }
     const data = input.observation.data;
@@ -165,8 +172,10 @@ export function createCommerceIngestion(
         lines,
       },
     });
+
     return { status, entityId };
   }
+
   return {
     async ingest(
       context: TenantContext,
@@ -174,6 +183,7 @@ export function createCommerceIngestion(
       input: CommerceObservation,
     ) {
       requireTenant(context, context.tenantId);
+
       return project(context, await sources.record(context, ingestKey, input));
     },
     async replay(
@@ -183,6 +193,7 @@ export function createCommerceIngestion(
     ) {
       const stored = await sources.get(context, connectionId, ingestKey);
       if (!stored) throw new Error('Observation not found');
+
       return project(context, stored);
     },
     async bind(
@@ -212,6 +223,7 @@ export function createCommerceIngestion(
               reconciliationKey,
             );
       await sources.bind(context, source, id, observationId, method);
+
       return id;
     },
   };

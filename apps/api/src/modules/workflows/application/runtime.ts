@@ -1,5 +1,3 @@
-import type { TenantContext, IdentityService } from '#modules/identity/index';
-import { requireRole, requireTenant } from '#modules/identity/index';
 import type {
   DetectionRequest,
   DetectionService,
@@ -7,13 +5,19 @@ import type {
   DiagnosisService,
 } from '#modules/exceptions/index';
 import type { ActionAdmission } from '#modules/execution/index';
-import type {
-  PlaybookService,
-  PlaybookOutcome,
-} from '#modules/workflows/application/playbook';
+import type { IdentityService, TenantContext } from '#modules/identity/index';
+import { requireRole, requireTenant } from '#modules/identity/index';
 import type { ProposedAction } from '#modules/policies/index';
+import type {
+  PlaybookOutcome,
+  PlaybookService,
+} from '#modules/workflows/application/playbook';
 
-export type WorkflowSource = { kind: 'detection' | 'incident'; id: string };
+export type WorkflowSource = {
+  kind: 'detection' | 'incident';
+  id: string;
+};
+
 /** References only: payloads and authorization decisions are loaded inside activities. */
 export interface ExceptionWorkflowInput {
   tenantId: string;
@@ -21,11 +25,13 @@ export interface ExceptionWorkflowInput {
   requestId: string;
   source: WorkflowSource;
 }
+
 export interface ProposalReference {
   id: string;
   revision: number;
   expiresAt: string;
 }
+
 export interface WorkflowProgress {
   phase:
     | 'detecting'
@@ -44,9 +50,11 @@ export interface WorkflowProgress {
   decisionId?: string;
   reason?: string;
 }
+
 export type WorkflowExecutionResult =
   | { state: 'approval_required'; decisionId: string }
   | { state: 'denied' | 'succeeded' | 'failed' | 'reconciliation_required' };
+
 export interface ExceptionActivities {
   detect(input: ExceptionWorkflowInput): Promise<string | null>;
   diagnose(
@@ -74,6 +82,7 @@ export interface ExceptionActivities {
   ): Promise<WorkflowExecutionResult>;
   verify(input: ExceptionWorkflowInput, exceptionId: string): Promise<boolean>;
 }
+
 export interface WorkflowBindings {
   recordWorkflow?(
     context: TenantContext,
@@ -101,8 +110,13 @@ export interface WorkflowBindings {
     } | null>;
   };
 }
+
 export class WorkflowInputError extends Error {}
 
+/**
+ * Creates workflow activities that resolve fresh tenant authorization before detection,
+ * diagnosis, execution, and verification.
+ */
 export function createExceptionActivities(deps: {
   identity: Pick<IdentityService, 'resolveWorkflowContext'>;
   exceptions: DetectionService;
@@ -121,8 +135,10 @@ export function createExceptionActivities(deps: {
     requireRole(fresh, ['owner', 'admin']);
     if (fresh.actor.id !== input.userId)
       throw new WorkflowInputError('Actor changed');
+
     return fresh;
   }
+
   async function current(
     context: TenantContext,
     exceptionId: string,
@@ -136,13 +152,16 @@ export function createExceptionActivities(deps: {
       diagnosis.revision !== revision
     )
       return null;
+
     return diagnosis;
   }
+
   function playbookResult(outcome: PlaybookOutcome): WorkflowExecutionResult {
     if (outcome.state === 'awaiting_approval' && outcome.decisionId)
       return { state: 'approval_required', decisionId: outcome.decisionId };
     if (outcome.state === 'verified') return { state: 'succeeded' };
     if (outcome.state === 'denied') return { state: 'denied' };
+
     return {
       state:
         outcome.reason === 'reconciliation_required'
@@ -150,6 +169,7 @@ export function createExceptionActivities(deps: {
           : 'failed',
     };
   }
+
   return {
     async detect(input) {
       const fresh = await context(input);
@@ -157,6 +177,7 @@ export function createExceptionActivities(deps: {
         const incident = await deps.exceptions.get(fresh, input.source.id);
         if (!incident) throw new WorkflowInputError('Exception not found');
         await deps.bindings.recordWorkflow?.(fresh, incident.id, input.source);
+
         return incident.id;
       }
       const request = await deps.bindings.loadDetection(fresh, input.source.id);
@@ -168,6 +189,7 @@ export function createExceptionActivities(deps: {
           result.incident.id,
           input.source,
         );
+
       return result.incident?.id ?? null;
     },
     async diagnose(input, exceptionId) {
@@ -175,6 +197,7 @@ export function createExceptionActivities(deps: {
         await context(input),
         exceptionId,
       );
+
       return {
         status:
           !diagnosis || diagnosis.superseded ? 'unavailable' : diagnosis.status,
@@ -207,6 +230,7 @@ export function createExceptionActivities(deps: {
       );
       if (!Number.isFinite(expiry))
         throw new WorkflowInputError('Invalid proposal expiry');
+
       return {
         id: action.id,
         revision,
@@ -222,6 +246,7 @@ export function createExceptionActivities(deps: {
           run.diagnosisRevision !== proposal.revision
         )
           throw new WorkflowInputError('Playbook run binding does not match');
+
         return playbookResult(await deps.playbook.execute(fresh, proposal.id));
       }
       const previous = await deps.execution.get(fresh, proposal.id);
@@ -240,6 +265,7 @@ export function createExceptionActivities(deps: {
         runId: stored.action.id,
         stepId: 'execute',
       });
+
       return result.state === 'approval_required'
         ? { state: result.state, decisionId: result.decision.id }
         : { state: result.state };
@@ -255,6 +281,7 @@ export function createExceptionActivities(deps: {
       );
       if (result.state === 'approval_required')
         throw new WorkflowInputError('Unexpected reconciliation result');
+
       return { state: result.state };
     },
     async verify(input, exceptionId) {
@@ -264,6 +291,7 @@ export function createExceptionActivities(deps: {
       // A worker may have committed the resolution before its activity completion was recorded.
       if (incident.state === 'resolved')
         return incident.resolution?.kind === 'verification';
+
       return deps.exceptions.verify(fresh, exceptionId);
     },
   };

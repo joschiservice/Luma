@@ -1,13 +1,7 @@
-import { shippingMethodPlaybook } from '#modules/workflows/index';
-import {
-  definePlaybook,
-  printPlaybookCode,
-  parsePlaybookCode,
-} from '#modules/workflows/composition';
-import { ConnectorError } from '#modules/connectors/index';
-import { createSafetyFixture as createSafetyServices } from '#test-support/safety-fixtures';
 import { randomUUID } from 'node:crypto';
-import { readFile, readdir } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
+
+import { TestWorkflowEnvironment } from '@temporalio/testing';
 import { Pool } from 'pg';
 import {
   afterAll,
@@ -18,28 +12,42 @@ import {
   it,
   vi,
 } from 'vitest';
+
 import {
   buildRuntimeApp,
-  createSafetyServices as createAdmissionServices,
   createExceptionWorkflowRuntime,
   createResolutionPlaybooks,
+  createSafetyServices as createAdmissionServices,
 } from '#app';
 import { createAuditLog } from '#modules/audit/composition';
 import type { AuditEntry } from '#modules/audit/index';
+import { ConnectorError } from '#modules/connectors/index';
 import { createTenantDatabase } from '#modules/platform/composition';
-import { TestWorkflowEnvironment } from '@temporalio/testing';
+import {
+  definePlaybook,
+  parsePlaybookCode,
+  printPlaybookCode,
+} from '#modules/workflows/composition';
+import { shippingMethodPlaybook } from '#modules/workflows/index';
+import { createSafetyFixture as createSafetyServices } from '#test-support/safety-fixtures';
+
 type Safety = ReturnType<typeof createSafetyServices>;
+
 type TenantContext = Parameters<Safety['execution']['execute']>[0];
+
 type EffectRegistry = Parameters<typeof createSafetyServices>[2];
+
 type EffectAdapter = NonNullable<
   Awaited<ReturnType<EffectRegistry['resolve']>>
 >;
+
 type ProposedAction = Extract<
   Awaited<ReturnType<Safety['execution']['execute']>>,
   { record: unknown }
 >['record']['intent'];
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
+
 describe.skipIf(!databaseUrl)(
   'durable policy, execution and audit on PostgreSQL',
   () => {
@@ -77,6 +85,7 @@ describe.skipIf(!databaseUrl)(
       checkPreconditions,
     };
     const resolve = vi.fn<EffectRegistry['resolve']>();
+
     async function context(cookie: string, organizationId: string) {
       const response = await app.inject({
         url: `/v1/organizations/${organizationId}/capture`,
@@ -85,13 +94,16 @@ describe.skipIf(!databaseUrl)(
       const captured = contexts.get(response.json().requestId);
       if (response.statusCode !== 200 || !captured)
         throw new Error('Context unavailable');
+
       return captured;
     }
+
     const contexts = new Map<string, TenantContext>();
     const refreshContext = (value: TenantContext) =>
       context(cookies.get(value.actor.id)!, value.tenantId);
     const startSafety = () =>
       createSafetyServices(runtimeUrl, { refreshContext }, { resolve });
+
     function action(overrides: Partial<ProposedAction> = {}): ProposedAction {
       return {
         schemaVersion: 1,
@@ -113,6 +125,7 @@ describe.skipIf(!databaseUrl)(
         ...overrides,
       };
     }
+
     async function signup(name: string) {
       const response = await app.inject({
         method: 'POST',
@@ -131,8 +144,10 @@ describe.skipIf(!databaseUrl)(
         .join('; ');
       const id = response.json().user.id as string;
       cookies.set(id, cookie);
+
       return { id, cookie };
     }
+
     async function organization(cookie: string, slug: string) {
       const response = await app.inject({
         method: 'POST',
@@ -141,8 +156,10 @@ describe.skipIf(!databaseUrl)(
         payload: { name: slug, slug },
       });
       expect(response.statusCode, response.body).toBe(201);
+
       return response.json().id as string;
     }
+
     async function audit(proposalId: string) {
       return (
         await owner.query(
@@ -151,6 +168,7 @@ describe.skipIf(!databaseUrl)(
         )
       ).rows.map((row) => row.document);
     }
+
     async function admitted(
       proposal = action(),
       eligible = true,
@@ -193,6 +211,7 @@ describe.skipIf(!databaseUrl)(
         action: proposal,
       };
       await service.provisioning.bind(alice, step);
+
       return {
         service,
         artifact,
@@ -200,6 +219,7 @@ describe.skipIf(!databaseUrl)(
         reference: { runId: step.runId, stepId: step.stepId },
       };
     }
+
     it('admits concurrent logical requests once and retains provider, artifact and audit identity', async () => {
       const f = await admitted();
       execute.mockResolvedValue({
@@ -443,6 +463,7 @@ describe.skipIf(!databaseUrl)(
           f.artifact.id,
           f.artifact.version,
         );
+
         return true;
       });
       try {
@@ -640,6 +661,7 @@ describe.skipIf(!databaseUrl)(
       });
       app.get('/v1/organizations/:organizationId/capture', async (request) => {
         contexts.set(request.id, request.tenantContext!);
+
         return { requestId: request.id };
       });
       const a = await signup('alice');
@@ -697,6 +719,7 @@ describe.skipIf(!databaseUrl)(
       await admin.query(`DROP ROLE IF EXISTS "${login}"`);
       await admin.end();
     });
+
     async function playbookFixture(
       facts = { diagnosisReady: true, methodMapped: true },
       age = 0,
@@ -770,8 +793,10 @@ describe.skipIf(!databaseUrl)(
         },
       };
       const run = await playbooks.bind(alice, command);
+
       return { service, playbooks, version, activation, command, run };
     }
+
     async function approvePlaybook(
       f: Awaited<ReturnType<typeof playbookFixture>>,
     ) {
@@ -785,6 +810,7 @@ describe.skipIf(!databaseUrl)(
         new Date(Date.now() + 60_000).toISOString(),
       );
     }
+
     it('persists the exact playbook, snapshot, grants and action; concurrent replay dispatches once', async () => {
       const f = await playbookFixture();
       try {
@@ -1182,6 +1208,7 @@ describe.skipIf(!databaseUrl)(
           if (mode === 'during_preflight') {
             checkPreconditions.mockImplementationOnce(async () => {
               vi.setSystemTime(deadline + 1);
+
               return true;
             });
             expect(await f.playbooks.execute(alice, f.run.id)).toMatchObject({
@@ -1274,6 +1301,7 @@ describe.skipIf(!databaseUrl)(
         expect(
           (await audit(proposal.id)).map((entry) => entry.eventType),
         ).toEqual(['policy.evaluated', 'execution.prepared']);
+
         return { evidenceRefs: [observationId] };
       });
       const result = await safety.execution.execute(alice, proposal);
@@ -1782,6 +1810,7 @@ describe.skipIf(!databaseUrl)(
       verify.mockImplementation(async () => {
         if (++observed === 2) bothStarted();
         await together;
+
         return {
           outcome: 'passed',
           observationRefs: [observationId],
@@ -1897,6 +1926,7 @@ describe.skipIf(!databaseUrl)(
         });
         execute.mockImplementation(async () => {
           notifyStarted();
+
           return response;
         });
         verify.mockImplementationOnce(async () => ({
@@ -2004,6 +2034,7 @@ describe.skipIf(!databaseUrl)(
         await owner.query(
           'CREATE TRIGGER reject_audit BEFORE INSERT ON audit_entries FOR EACH ROW EXECUTE FUNCTION reject_audit()',
         );
+
         return { evidenceRefs: [observationId] };
       });
       try {

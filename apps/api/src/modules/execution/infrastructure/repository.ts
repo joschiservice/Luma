@@ -1,15 +1,21 @@
-import type { TenantDatabase, SqlTransaction } from '#modules/platform/index';
 import type { AuditEntry } from '#modules/audit/index';
 import type {
-  ExecutionRepository,
   ExecutionRecord,
+  ExecutionRepository,
 } from '#modules/execution/application/execution';
+import type { SqlTransaction, TenantDatabase } from '#modules/platform/index';
+
 async function outbox(tx: SqlTransaction, entry: AuditEntry) {
   await tx.query(
     'INSERT INTO execution_outbox(id, tenant_id, proposal_id, document) VALUES ($1,$2,$3,$4)',
     [entry.id, entry.tenantId, entry.proposalId, entry],
   );
 }
+
+/**
+ * Creates tenant-scoped action, attempt, and reconciliation storage with concurrency
+ * control.
+ */
 export function createExecutionRepository(
   db: TenantDatabase,
 ): ExecutionRepository {
@@ -47,6 +53,7 @@ export function createExecutionRepository(
           'SELECT document FROM executed_actions WHERE tenant_id=$1 AND proposal_id=$2',
           [tenantId, proposalId],
         );
+
         return result.rows[0]?.document ?? null;
       }),
     prepare: (record, entry) =>
@@ -66,6 +73,7 @@ export function createExecutionRepository(
         );
         if (!result.rowCount) return false;
         await outbox(tx, entry);
+
         return true;
       }),
     finish: (record, expectedState, entry) =>
@@ -82,6 +90,7 @@ export function createExecutionRepository(
         );
         if (!result.rowCount) return false;
         await outbox(tx, entry);
+
         return true;
       }),
     pending: (tenantId, proposalId) =>
@@ -90,6 +99,7 @@ export function createExecutionRepository(
           'SELECT document FROM execution_outbox WHERE tenant_id=$1 AND proposal_id=$2 AND delivered_at IS NULL ORDER BY created_at, id',
           [tenantId, proposalId],
         );
+
         return result.rows.map((row) => row.document);
       }),
     delivered: (tenantId, id) =>

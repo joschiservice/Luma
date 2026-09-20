@@ -10,6 +10,7 @@ export interface AuditActor {
     runId: string;
   };
 }
+
 export interface AuditEntry {
   id: string;
   tenantId: string;
@@ -29,6 +30,7 @@ export interface AuditEntry {
   evidenceRefs: string[];
   details: Record<string, string>;
 }
+
 export interface AuditLog {
   /** Exact replay is accepted; reuse of an event key with different content fails. */
   append(entry: AuditEntry): Promise<void>;

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { readObservabilityConfig } from './observability.js';
 
 describe('observability configuration', () => {

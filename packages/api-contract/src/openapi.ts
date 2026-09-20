@@ -1,4 +1,5 @@
 import { generateOpenApi } from '@ts-rest/open-api';
+
 import { apiContract, caseEventsContract } from './index.js';
 
 export const openApiDocument = generateOpenApi(

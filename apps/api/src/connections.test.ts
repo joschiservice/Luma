@@ -1,20 +1,22 @@
-import * as connectorPublic from '#modules/connectors/index';
-import * as connectorComposition from '#modules/connectors/composition';
-import { request } from 'node:https';
-import { EventEmitter } from 'node:events';
-import { Readable } from 'node:stream';
 import { randomBytes, randomUUID } from 'node:crypto';
+import { EventEmitter } from 'node:events';
+import { request } from 'node:https';
+import { Readable } from 'node:stream';
+
 import { describe, expect, it, vi } from 'vitest';
-import { makeTenantContext } from '#modules/identity/composition';
+
+import type { StoredInstallation } from '#modules/connectors/composition';
+import * as connectorComposition from '#modules/connectors/composition';
 import {
   createInstallationService,
-  createSecretCipher,
   createInstalledRuntime,
   createInstalledShippingMethodEffects,
+  createSecretCipher,
 } from '#modules/connectors/composition';
-import { ConnectorError } from '#modules/connectors/index';
-import type { StoredInstallation } from '#modules/connectors/composition';
 import type { InstallationCapability } from '#modules/connectors/index';
+import * as connectorPublic from '#modules/connectors/index';
+import { ConnectorError } from '#modules/connectors/index';
+import { makeTenantContext } from '#modules/identity/composition';
 
 it('keeps raw runtime and handler factories out of application entry points', () => {
   for (const exports of [connectorPublic, connectorComposition]) {
@@ -23,10 +25,13 @@ it('keeps raw runtime and handler factories out of application entry points', ()
     expect(exports).not.toHaveProperty('createShopifyConnector');
   }
 });
+
 vi.mock('node:https', () => ({ request: vi.fn() }));
+
 function pinnedProvider(fetch: typeof globalThis.fetch) {
   vi.mocked(request).mockImplementation((url, options, callback) => {
     const req = new EventEmitter();
+
     return Object.assign(req, {
       end: (body?: string) => {
         void fetch(String(url), {
@@ -50,6 +55,7 @@ function pinnedProvider(fetch: typeof globalThis.fetch) {
     }) as never;
   });
 }
+
 const context = (
   tenantId: string = randomUUID(),
   role: 'admin' | 'member' = 'admin',
@@ -66,12 +72,14 @@ const context = (
     { id: 'membership', organizationId: tenantId, userId: 'user', role },
     'request',
   );
+
 const input = {
   label: 'Shop',
   target: { kind: 'shopify', shop: 'example.myshopify.com' },
   permissions: ['products.read'],
   credentials: { token: 'secret-token' },
 };
+
 function fixture() {
   const records = new Map<string, StoredInstallation>();
   const events: unknown[] = [];
@@ -93,6 +101,7 @@ function fixture() {
           return false;
         records.set(key, structuredClone(record));
         events.push({ actor, event, version: record.connection.version });
+
         return true;
       },
     },
@@ -102,6 +111,7 @@ function fixture() {
     now: () => new Date('2026-09-18T00:00:00Z'),
     id: randomUUID,
   });
+
   return { records, events, refreshContext, verify, service, ctx: context() };
 }
 
@@ -178,6 +188,7 @@ describe('installed connection lifecycle', () => {
     const connection = await service.install(ctx, input);
     verify.mockImplementationOnce(async () => {
       await service.disconnect(ctx, connection.id, 1, 'revoked');
+
       return ['products.read'];
     });
     await expect(service.check(ctx, connection.id, 1)).rejects.toMatchObject({
@@ -334,6 +345,7 @@ describe('installed connection lifecycle', () => {
           } else {
             await service.disconnect(ctx, connection.id, 2, change);
           }
+
           return snapshot;
         });
         const fetch = vi.fn();
@@ -486,6 +498,7 @@ describe('installed shipping-method permissions', () => {
     const connection = await f.service.install(f.ctx, actionInput);
     const fetch = vi.fn<typeof globalThis.fetch>(async () => {
       await f.service.disconnect(f.ctx, connection.id, 2, 'revoked');
+
       return Response.json({
         id: 'aaaaaaaa-aaaa-4aaa-8aaa-000000000010',
         shippingMethodId: 'aaaaaaaa-aaaa-4aaa-8aaa-000000000007',
@@ -535,6 +548,7 @@ describe('installed JTL address pins', () => {
     appId: 'app',
     appVersion: '1',
   };
+
   function assertPin(address: string) {
     const options = vi.mocked(request).mock.calls.at(-1)![1];
     const callback = vi.fn();
@@ -547,6 +561,7 @@ describe('installed JTL address pins', () => {
     )('erp.example.test', { all: true }, callback);
     expect(callback).toHaveBeenCalledWith(null, [{ address, family: 4 }]);
   }
+
   it('pins every page, rechecks tenant approval and never uses the generic transport', async () => {
     const f = fixture();
     const installed = await f.service.install(f.ctx, {
@@ -559,6 +574,7 @@ describe('installed JTL address pins', () => {
       const pageNumber = Number(
         new URL(String(url)).searchParams.get('pageNumber'),
       );
+
       return Response.json({
         items: [
           {
@@ -639,6 +655,7 @@ describe('installed JTL address pins', () => {
     await f.service.check(f.ctx, installed.id, 1);
     const provider = vi.fn<typeof globalThis.fetch>(async (_url, init) => {
       assertPin('10.0.0.5');
+
       return Response.json(
         init?.method === 'PATCH'
           ? { salesOrderId: '10' }

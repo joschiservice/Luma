@@ -1,21 +1,27 @@
-import { afterEach, expect, it, vi } from 'vitest';
 import { QueryClient } from '@tanstack/react-query';
+import { afterEach, expect, it, vi } from 'vitest';
+
 import {
-  resolutionReview,
   resolutionProgress,
+  resolutionReview,
 } from '../../../../../packages/ui/src/components/resolution-fixtures';
+import { IdentityError } from '../identity/data';
 import {
   decisionCommand,
+  decisionError,
+  recoverDecision,
   resolutionOptions,
   sendDecision,
-  recoverDecision,
-  decisionError,
 } from './resolution-data';
-import { IdentityError } from '../identity/data';
+
 const organizationId = '66666666-6666-4666-8666-666666666666';
+
 const exceptionId = '77777777-7777-4777-8777-777777777777';
+
 const commandId = '88888888-8888-4888-8888-888888888888';
+
 afterEach(() => vi.unstubAllGlobals());
+
 it.each(['approve', 'reject', 'escalate'] as const)(
   'sends versioned %s commands and recovers the original receipt',
   async (kind) => {
@@ -65,6 +71,7 @@ it.each(['approve', 'reject', 'escalate'] as const)(
     expect(fetch.mock.calls[1]![0]).toContain(`/decisions/${commandId}`);
   },
 );
+
 it('does not invent permission or accept an empty reason', () => {
   expect(() =>
     decisionCommand(
@@ -75,6 +82,7 @@ it('does not invent permission or accept an empty reason', () => {
   ).toThrow();
   expect(() => decisionCommand(resolutionReview, 'reject', '  ')).toThrow();
 });
+
 it('refetches tenant-scoped review and progress without retrying commands', async () => {
   vi.stubGlobal(
     'fetch',
@@ -100,6 +108,7 @@ it('refetches tenant-scoped review and progress without retrying commands', asyn
     client.clear();
   }
 });
+
 it.each([401, 403, 404, 409])(
   'preserves command rejection status %s',
   async (status) => {

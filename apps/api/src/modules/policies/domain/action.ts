@@ -29,6 +29,7 @@ export interface ProposedAction {
   proposedBy: Provenance;
   expiresAt: string;
 }
+
 export interface PolicyDecision {
   correlationId: string;
   id: string;
@@ -50,6 +51,7 @@ export interface PolicyDecision {
   evaluatedAt: string;
   validUntil: string;
 }
+
 export interface Approval {
   decisionId: string;
   correlationId: string;

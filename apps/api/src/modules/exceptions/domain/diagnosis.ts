@@ -1,23 +1,26 @@
 import { evaluate } from '#modules/exceptions/domain/evaluate';
-import { decimalString, decimalUnits } from '#modules/exceptions/domain/facts';
 import type {
   Configuration,
   Decision,
   EvaluationInput,
 } from '#modules/exceptions/domain/facts';
+import { decimalString, decimalUnits } from '#modules/exceptions/domain/facts';
 
 export const diagnosisVersion = 'diagnosis-v1';
+
 export interface Finding {
   code: string;
   text: string;
   evidenceRefs: string[];
 }
+
 export interface Hypothesis extends Finding {
   contradictingEvidenceRefs: string[];
   uncertainty: 'unsubstantiated';
   missingChecks: string[];
   origin: 'rule' | 'model';
 }
+
 /** Recommendations carry no execution authority. Candidate proposals are owned by policies. */
 export interface NextStep extends Finding {
   kind: 'read_investigate' | 'manual_intervention';
@@ -25,6 +28,7 @@ export interface NextStep extends Finding {
   verificationCriteria: string[];
   capabilityLimitations: string[];
 }
+
 export interface Diagnosis {
   schemaVersion: 1;
   exceptionId: string;
@@ -88,6 +92,7 @@ export interface Diagnosis {
     };
   };
 }
+
 export interface DiagnosisInput {
   exceptionId: string;
   revision: number;
@@ -108,6 +113,11 @@ export interface DiagnosisInput {
     facts: Record<string, unknown>;
   }[];
 }
+
+/**
+ * Builds an evidence-backed diagnosis at the supplied timestamp without performing provider
+ * reads or authorizing actions.
+ */
 export function diagnose(snapshot: DiagnosisInput, now: string): Diagnosis {
   const { input, configuration, evidence } = snapshot;
   const refs = [...input.facts.evidenceRefs].sort();
@@ -488,5 +498,6 @@ export function diagnose(snapshot: DiagnosisInput, now: string): Diagnosis {
           : dueAt
         : null,
   };
+
   return result;
 }

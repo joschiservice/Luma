@@ -1,23 +1,30 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createRequire } from 'node:module';
-import { afterAll, beforeAll, expect, test, onTestFinished } from 'vitest';
-import { seedPilot } from '../../../tooling/pilot/seed.mjs';
-import { createPilot } from '../../../tooling/pilot/runtime.mjs';
+
+import { afterAll, beforeAll, expect, onTestFinished, test } from 'vitest';
+
 import {
-  startJourney,
   respond,
+  startJourney,
   waitFor,
 } from '../../../tooling/pilot/journey.mjs';
+import { createPilot } from '../../../tooling/pilot/runtime.mjs';
+import { seedPilot } from '../../../tooling/pilot/seed.mjs';
 import { database, secret, startProcess, until } from './helpers.mjs';
+
 const require = createRequire(import.meta.url);
+
 const { TestWorkflowEnvironment } = require('@temporalio/testing');
+
 let temporal;
+
 beforeAll(async () => {
   temporal = await TestWorkflowEnvironment.createLocal();
 }, 60_000);
+
 afterAll(async () => {
   await temporal?.teardown();
 });
@@ -54,6 +61,7 @@ async function setup(t, scenario, options) {
     await client.close();
     await pilot.close();
   });
+
   return { db, directory, env, saved, manifest, pilot, client };
 }
 
@@ -252,6 +260,7 @@ test('worker death after provider commit reconciles without a second PATCH', asy
   const actor = await f.pilot.context();
   await waitFor(async () => {
     if (second.result) throw new Error(second.output);
+
     return (await f.client.progress(actor, source))?.phase === 'resolved';
   }, 90_000);
   expect((await f.pilot.provider()).effects).toHaveLength(1);
@@ -277,6 +286,7 @@ async function operatorRequest(f) {
   const cookie = (Array.isArray(cookies) ? cookies : [cookies])
     .map((value) => value.split(';')[0])
     .join('; ');
+
   return (url, payload) =>
     f.pilot.app.inject({
       method: payload ? 'POST' : 'GET',

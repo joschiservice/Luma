@@ -1,5 +1,7 @@
 export type Role = 'owner' | 'admin' | 'member';
+
 export type DataRegion = 'EU' | 'US' | 'APAC';
+
 export interface Organization {
   id: string;
   name: string;
@@ -7,17 +9,20 @@ export interface Organization {
   dataRegion: DataRegion;
   status: 'active' | 'suspended' | 'closed';
 }
+
 export interface Membership {
   id: string;
   organizationId: string;
   userId: string;
   role: Role;
 }
+
 export interface SessionIdentity {
   userId: string;
   sessionId: string;
 }
 const resolvedContext: unique symbol = Symbol('resolvedTenantContext');
+
 export interface TenantContext {
   readonly [resolvedContext]: true;
   readonly tenantId: string;
@@ -32,6 +37,7 @@ export interface TenantContext {
   }>;
   readonly requestId: string;
 }
+
 export class IdentityError extends Error {
   constructor(
     readonly statusCode: 401 | 403 | 404 | 409 | 422 | 503,
@@ -47,6 +53,11 @@ export class IdentityError extends Error {
     super(message);
   }
 }
+
+/**
+ * Creates an immutable context for a matching membership in an active EU organization;
+ * rejects inaccessible or unsupported organizations.
+ */
 export function makeTenantContext(
   session: SessionIdentity,
   organization: Organization,
@@ -65,6 +76,7 @@ export function makeTenantContext(
       'REGION_UNAVAILABLE',
       'Organization region is unavailable',
     );
+
   return Object.freeze({
     [resolvedContext]: true as const,
     tenantId: organization.id,
@@ -80,10 +92,17 @@ export function makeTenantContext(
     requestId,
   });
 }
+
+/** Rejects unresolved contexts and tenant mismatches with a not-found error. */
 export function requireTenant(context: TenantContext, tenantId: string): void {
   if (context[resolvedContext] !== true || context.tenantId !== tenantId)
     throw new IdentityError(404, 'NOT_FOUND', 'Resource not found');
 }
+
+/**
+ * Requires a resolved tenant context and one of the supplied organization roles; otherwise
+ * throws an identity error.
+ */
 export function requireRole(
   context: TenantContext,
   roles: readonly Role[],

@@ -4,12 +4,14 @@ import {
   cp,
   mkdir,
   mkdtemp,
-  readFile,
   readdir,
+  readFile,
   rm,
 } from 'node:fs/promises';
 import { join } from 'node:path';
+
 import { assert, test } from 'vitest';
+
 import {
   apiDirectory,
   database,
@@ -23,6 +25,7 @@ async function temporaryDirectory(t) {
   // Keeping copies under the API package preserves the migration runner's pg resolution.
   const directory = await mkdtemp(join(apiDirectory, '.e2e-'));
   t.onTestFinished(() => rm(directory, { recursive: true, force: true }));
+
   return directory;
 }
 
@@ -30,6 +33,7 @@ async function provision(t) {
   const db = await database(t);
   await db.migrate();
   await db.grantRuntime();
+
   return db;
 }
 

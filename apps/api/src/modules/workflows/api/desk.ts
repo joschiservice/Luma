@@ -1,18 +1,21 @@
 import { randomUUID } from 'node:crypto';
-import { initServer } from '@ts-rest/fastify';
+
 import {
   apiContract,
   caseEventsContract,
   caseProgressSchema,
   caseReviewSchema,
-  decisionReceiptSchema,
-  caseTimelineSchema,
   caseStreamEventSchema,
+  caseTimelineSchema,
+  decisionReceiptSchema,
 } from '@luma/api-contract';
-import { IdentityError } from '#modules/identity/index';
-import type { IdentityService } from '#modules/identity/index';
-import type { DeskService } from '#modules/workflows/application/desk';
+import { initServer } from '@ts-rest/fastify';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
+
+import type { IdentityService } from '#modules/identity/index';
+import { IdentityError } from '#modules/identity/index';
+import type { DeskService } from '#modules/workflows/application/desk';
+
 function use(request: FastifyRequest, service?: DeskService) {
   if (!request.tenantContext)
     throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
@@ -22,12 +25,19 @@ function use(request: FastifyRequest, service?: DeskService) {
       'SERVICE_UNAVAILABLE',
       'Case decisions are unavailable',
     );
+
   return { context: request.tenantContext, service };
 }
+
+/**
+ * Creates authenticated review, decision, receipt, progress, and timeline handlers for the
+ * operator desk.
+ */
 export function deskRoutes(service?: DeskService) {
   return initServer().router(apiContract.caseDesk, {
     review: async ({ request, params }) => {
       const s = use(request, service);
+
       return {
         status: 200,
         body: caseReviewSchema.parse(
@@ -37,6 +47,7 @@ export function deskRoutes(service?: DeskService) {
     },
     decide: async ({ request, params, body }) => {
       const s = use(request, service);
+
       return {
         status: 200,
         body: decisionReceiptSchema.parse(
@@ -46,6 +57,7 @@ export function deskRoutes(service?: DeskService) {
     },
     receipt: async ({ request, params }) => {
       const s = use(request, service);
+
       return {
         status: 200,
         body: decisionReceiptSchema.parse(
@@ -59,6 +71,7 @@ export function deskRoutes(service?: DeskService) {
     },
     progress: async ({ request, params }) => {
       const s = use(request, service);
+
       return {
         status: 200,
         body: caseProgressSchema.parse(
@@ -68,6 +81,7 @@ export function deskRoutes(service?: DeskService) {
     },
     timeline: async ({ request, params, query }) => {
       const s = use(request, service);
+
       return {
         status: 200,
         body: caseTimelineSchema.parse(
@@ -77,6 +91,11 @@ export function deskRoutes(service?: DeskService) {
     },
   });
 }
+
+/**
+ * Registers bounded progress streams that recheck the session and tenant access before each
+ * snapshot.
+ */
 export function registerDeskEvents(
   app: FastifyInstance,
   service?: DeskService,
@@ -210,6 +229,7 @@ export function registerDeskEvents(
       if (!group.size) streams.delete(key);
       if (reply.sent) {
         close();
+
         return;
       }
       throw error;

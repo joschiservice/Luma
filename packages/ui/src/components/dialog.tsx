@@ -1,26 +1,30 @@
-import * as React from 'react';
 import { Dialog as DialogPrimitive } from '@base-ui/react/dialog';
-import { cn } from '@luma/ui/lib/utils';
-
 import { Button } from '@luma/ui/components/button';
+import { cn } from '@luma/ui/lib/utils';
 import { XIcon } from 'lucide-react';
+import * as React from 'react';
 
+/** Provides the shared dialog state and accessibility context for its trigger and content. */
 function Dialog({ ...props }: DialogPrimitive.Root.Props) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />;
 }
 
+/** Opens the enclosing dialog and supports a custom trigger through Base UI's render prop. */
 function DialogTrigger({ ...props }: DialogPrimitive.Trigger.Props) {
   return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />;
 }
 
+/** Mounts dialog elements in a portal outside the surrounding layout. */
 function DialogPortal({ ...props }: DialogPrimitive.Portal.Props) {
   return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />;
 }
 
+/** Closes the enclosing dialog and forwards Base UI close-button props. */
 function DialogClose({ ...props }: DialogPrimitive.Close.Props) {
   return <DialogPrimitive.Close data-slot="dialog-close" {...props} />;
 }
 
+/** Renders the shared modal backdrop with reduced-motion support. */
 function DialogOverlay({
   className,
   ...props
@@ -39,6 +43,10 @@ function DialogOverlay({
   );
 }
 
+/**
+ * Renders portalled dialog content with an overlay and optional close button; supply a
+ * DialogTitle for its accessible name.
+ */
 function DialogContent({
   className,
   children,
@@ -81,6 +89,7 @@ function DialogContent({
   );
 }
 
+/** Groups the dialog title and description with consistent spacing. */
 function DialogHeader({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
@@ -91,6 +100,7 @@ function DialogHeader({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
+/** Lays out dialog actions and optionally adds a close button. */
 function DialogFooter({
   className,
   showCloseButton = false,
@@ -118,6 +128,7 @@ function DialogFooter({
   );
 }
 
+/** Provides the enclosing dialog's accessible title with shared typography. */
 function DialogTitle({ className, ...props }: DialogPrimitive.Title.Props) {
   return (
     <DialogPrimitive.Title
@@ -133,6 +144,7 @@ function DialogTitle({ className, ...props }: DialogPrimitive.Title.Props) {
   );
 }
 
+/** Provides the enclosing dialog's accessible description with shared text styling. */
 function DialogDescription({
   className,
   ...props

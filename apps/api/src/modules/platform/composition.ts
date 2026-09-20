@@ -1,15 +1,16 @@
-export { createObservability } from '#modules/platform/infrastructure/observability';
-export { createTenantDatabase } from '#modules/platform/infrastructure/database';
-
-import type { Observability } from '#modules/platform/application/observability';
-import { createRoutedModelGateway } from '#modules/platform/application/model-gateway';
 import type {
   ModelAdapter,
   ModelAdapterId,
-  ModelRoutingPolicy,
   ModelRoute,
+  ModelRoutingPolicy,
 } from '#modules/platform/application/model-gateway';
+import { createRoutedModelGateway } from '#modules/platform/application/model-gateway';
+import type { Observability } from '#modules/platform/application/observability';
 import { createVercelModelAdapter } from '#modules/platform/infrastructure/vercel-model-adapter';
+
+export { createObservability } from '#modules/platform/infrastructure/observability';
+
+export { createTenantDatabase } from '#modules/platform/infrastructure/database';
 
 /** Bedrock requires an explicitly installed EU adapter; it never falls back to Vercel. */
 export function createModelGateway(
@@ -37,6 +38,7 @@ export function createModelGateway(
       throw new Error('Bedrock adapter must enforce EU processing');
     adapters['bedrock-eu'] = dependencies.bedrockEu;
   }
+
   return createRoutedModelGateway(
     settings.routes,
     adapters,

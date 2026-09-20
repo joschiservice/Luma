@@ -1,9 +1,11 @@
 import { expect, it } from 'vitest';
+
 import {
   makeTenantContext,
   requireRole,
   requireTenant,
 } from '#modules/identity/domain/context';
+
 it('freezes audit identity and rejects unauthorized tenant or role use', () => {
   const context = makeTenantContext(
     { userId: 'u', sessionId: 's' },

@@ -1,7 +1,8 @@
-import { useEffect, useState, type PropsWithChildren } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { type PropsWithChildren, useEffect, useState } from 'react';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
+
 import { ContactFormExample } from './contact-form';
 
 function QuerySandbox({ children }: PropsWithChildren) {
@@ -15,6 +16,7 @@ function QuerySandbox({ children }: PropsWithChildren) {
       }),
   );
   useEffect(() => () => client.clear(), [client]);
+
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 }
 
@@ -30,7 +32,9 @@ const meta = {
     ),
   ],
 } satisfies Meta<typeof ContactFormExample>;
+
 export default meta;
+
 type Story = StoryObj<typeof meta>;
 
 async function fillAndSubmit(canvasElement: HTMLElement) {

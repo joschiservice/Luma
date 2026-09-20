@@ -1,7 +1,10 @@
 import { randomBytes } from 'node:crypto';
+
 import { z } from 'zod';
-import type { ModelSchema } from '#modules/platform/index';
+
 import type { ReasoningSelection } from '#modules/exceptions/application/diagnosis';
+import type { ModelSchema } from '#modules/platform/index';
+
 const selection = z
   .object({
     hypotheses: z
@@ -16,6 +19,7 @@ const selection = z
       .max(10),
   })
   .strict();
+
 export const selectionSchema: ModelSchema<ReasoningSelection> = {
   name: 'diagnosis_hypothesis_selection',
   jsonSchema: {
@@ -44,6 +48,7 @@ export const selectionSchema: ModelSchema<ReasoningSelection> = {
   },
   parse: (value) => selection.parse(value),
 };
+
 /** Enforce the local deadline even when a provider ignores cancellation. */
 export async function boundedInvestigation<T>(
   work: (signal: AbortSignal) => Promise<T>,
@@ -66,6 +71,10 @@ export async function boundedInvestigation<T>(
   }
 }
 
+/**
+ * Creates trace metadata for a diagnosis request without including case evidence or
+ * credentials.
+ */
 export const diagnosisTrace = (requestId: string) => ({
   requestId,
   traceId: randomBytes(16).toString('hex'),

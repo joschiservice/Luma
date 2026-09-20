@@ -1,17 +1,26 @@
-import { createDiagnosisService } from '#modules/exceptions/application/diagnosis';
-import type { DiagnosisOptions } from '#modules/exceptions/application/diagnosis';
-import { createDiagnosisRepository } from '#modules/exceptions/infrastructure/diagnosis-repository';
-import {
-  boundedInvestigation,
-  selectionSchema,
-  diagnosisTrace,
-} from '#modules/exceptions/infrastructure/diagnosis-boundary';
 import { parseDiagnosis } from '#modules/exceptions/api/diagnosis';
-import { detectionBoundary } from '#modules/exceptions/infrastructure/validation';
-import type { TenantDatabase } from '#modules/platform/index';
+import { createCaseService } from '#modules/exceptions/application/cases';
 import type { VerificationEvaluator } from '#modules/exceptions/application/detection';
 import { createDetectionService } from '#modules/exceptions/application/detection';
+import type { DiagnosisOptions } from '#modules/exceptions/application/diagnosis';
+import { createDiagnosisService } from '#modules/exceptions/application/diagnosis';
+import { createEscalationService } from '#modules/exceptions/application/escalation';
+import { createCaseReader } from '#modules/exceptions/infrastructure/cases';
+import {
+  boundedInvestigation,
+  diagnosisTrace,
+  selectionSchema,
+} from '#modules/exceptions/infrastructure/diagnosis-boundary';
+import { createDiagnosisRepository } from '#modules/exceptions/infrastructure/diagnosis-repository';
+import { createEscalationRepository } from '#modules/exceptions/infrastructure/escalation';
 import { createDetectionRepository } from '#modules/exceptions/infrastructure/repository';
+import { detectionBoundary } from '#modules/exceptions/infrastructure/validation';
+import type { TenantDatabase } from '#modules/platform/index';
+
+/**
+ * Creates persistent incident detection and resolution services with the standard validation
+ * boundary.
+ */
 export function createExceptions(
   db: TenantDatabase,
   now: () => Date = () => new Date(),
@@ -27,6 +36,10 @@ export function createExceptions(
 
 export { parseInput } from '#modules/exceptions/infrastructure/validation';
 
+/**
+ * Creates persistent investigations with validated output and optional model reasoning or
+ * connector rereads.
+ */
 export function createDiagnoses(
   db: TenantDatabase,
   now: () => Date = () => new Date(),
@@ -46,18 +59,17 @@ export function createDiagnoses(
   );
 }
 
-import { createCaseService } from '#modules/exceptions/application/cases';
-import { createCaseReader } from '#modules/exceptions/infrastructure/cases';
+/** Creates tenant-scoped case reads using persisted incidents and diagnoses. */
 export function createCases(
   db: TenantDatabase,
   now: () => Date = () => new Date(),
 ) {
   return createCaseService(createCaseReader(db, now));
 }
+
 export { caseRoutes } from '#modules/exceptions/api/cases';
 
-import { createEscalationService } from '#modules/exceptions/application/escalation';
-import { createEscalationRepository } from '#modules/exceptions/infrastructure/escalation';
+/** Creates a persistent command for escalating a tenant's incident to manual attention. */
 export function createCaseEscalation(db: TenantDatabase) {
   return createEscalationService(createEscalationRepository(db));
 }

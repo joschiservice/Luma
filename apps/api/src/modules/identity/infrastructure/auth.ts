@@ -1,10 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import { betterAuth } from 'better-auth';
+
 import type { BetterAuthPlugin } from 'better-auth';
+import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { organization } from 'better-auth/plugins';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
+
 import * as schema from '#modules/identity/infrastructure/schema';
+
 export interface AuthSettings {
   secret: string;
   baseURL: string;
@@ -14,6 +17,11 @@ export interface AuthSettings {
   /** Reviewed server plugins, e.g. regional SSO/SCIM adapters. */
   plugins?: BetterAuthPlugin[];
 }
+
+/**
+ * Configures authentication and organization support using the supplied database and trusted
+ * origins.
+ */
 export function createAuth(
   db: NodePgDatabase<typeof schema>,
   settings: AuthSettings,

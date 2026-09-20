@@ -1,14 +1,18 @@
 import { expect, it } from 'vitest';
+
 import { readModelGatewayConfig } from './model-gateway.js';
+
 const route = {
   adapter: 'vercel',
   model: 'anthropic/claude-sonnet-4.5',
   providers: ['anthropic'],
   zeroDataRetention: true,
 };
+
 it('disables model calls by default', () => {
   expect(readModelGatewayConfig({})).toEqual({ routes: {}, timeoutMs: 30000 });
 });
+
 it('loads a provider-independent profile and an explicitly reserved Bedrock route', () => {
   const routes = {
     reasoning: route,
@@ -26,6 +30,7 @@ it('loads a provider-independent profile and an explicitly reserved Bedrock rout
     }).routes,
   ).toEqual(routes);
 });
+
 it.each([
   { MODEL_GATEWAY_ROUTES: 'invalid secret' },
   { MODEL_GATEWAY_ROUTES: '[]' },
@@ -37,6 +42,7 @@ it.each([
 ])('rejects invalid or partial configuration', (env) => {
   expect(() => readModelGatewayConfig(env)).toThrow();
 });
+
 it.each([
   { providers: [] },
   { providers: [''] },

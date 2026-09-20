@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
+
 import { Button } from './button';
 import {
   Dialog,
@@ -36,7 +37,9 @@ const meta = {
     </Dialog>
   ),
 } satisfies Meta<typeof Dialog>;
+
 export default meta;
+
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
@@ -84,6 +87,7 @@ export const Default: Story = {
 
 // Leave the popup open so its rendered state receives an accessibility scan.
 export const Open: Story = { args: { defaultOpen: true } };
+
 export const Dark: Story = {
   args: { defaultOpen: true },
   globals: { theme: 'dark' },

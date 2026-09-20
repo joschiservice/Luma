@@ -1,15 +1,18 @@
-import type { ReactNode } from 'react';
 import type {
+  CaseEvidencePage,
   CaseProgress,
   CaseReview,
-  CaseEvidencePage,
   CaseTimelinePage,
 } from '@luma/api-contract';
-import { caseLabel, CaseNotice, CaseTime } from './case-investigation';
+import type { ReactNode } from 'react';
+
 import { Button } from './button';
+import { caseLabel, CaseNotice, CaseTime } from './case-investigation';
 
 export type LiveConnection = 'connecting' | 'syncing' | 'live' | 'disconnected';
+
 type Event = CaseTimelinePage['items'][number];
+
 const eventNames: Record<string, string> = {
   'execution.prepared': 'Execution reserved',
   'execution.completed': 'Execution attempt finished',
@@ -19,6 +22,7 @@ const eventNames: Record<string, string> = {
   'case.reject': 'Operator rejected',
   'case.escalate': 'Operator escalated',
 };
+
 function References({ refs }: { refs: string[] }) {
   return refs.length ? (
     <ul className="case-reference-list">
@@ -30,6 +34,11 @@ function References({ refs }: { refs: string[] }) {
     <p>No evidence references recorded.</p>
   );
 }
+
+/**
+ * Displays execution progress, audit events, and evidence with optional controls for loading
+ * more history.
+ */
 export function CaseTimeline({
   progress,
   review,
@@ -56,6 +65,7 @@ export function CaseTimeline({
       : null;
   const current = connection === 'live';
   const workflow = progress.workflow;
+
   return (
     <section
       className="case-progress"

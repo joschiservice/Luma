@@ -1,9 +1,14 @@
-import { useEffect } from 'react';
-import { Outlet, useLocation } from '@tanstack/react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { sessionOptions } from './data';
-import { Failure, Pending, SignInRedirect } from './common';
+import { Outlet, useLocation } from '@tanstack/react-router';
+import { useEffect } from 'react';
 
+import { Failure, Pending, SignInRedirect } from './common';
+import { sessionOptions } from './data';
+
+/**
+ * Resolves the session before rendering protected routes and redirects signed-out users to
+ * sign-in.
+ */
 export function Protected() {
   const session = useQuery(sessionOptions());
   const client = useQueryClient();
@@ -17,6 +22,7 @@ export function Protected() {
     };
     window.addEventListener('focus', refresh);
     window.addEventListener('pageshow', restore);
+
     return () => {
       window.removeEventListener('focus', refresh);
       window.removeEventListener('pageshow', restore);
@@ -31,5 +37,6 @@ export function Protected() {
     );
   if (session.isPending) return <Pending />;
   if (!session.data) return <SignInRedirect />;
+
   return <Outlet />;
 }

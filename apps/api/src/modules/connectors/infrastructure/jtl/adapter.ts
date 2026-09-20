@@ -1,5 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto';
+
+import type { JtlTransportOptions } from '@luma/connector-jtl';
+import { API_VERSION, createClient, fail, parse } from '@luma/connector-jtl';
 import { z } from 'zod';
+
 import type {
   CapabilityHandler,
   ConnectorConnection,
@@ -12,21 +16,15 @@ import type {
   ReadCapability,
   SourceIdentity,
 } from '#modules/connectors/domain/capabilities';
-import {
-  API_VERSION,
-  createClient,
-  fail,
-  parse,
-} from '#modules/connectors/infrastructure/jtl/client';
-import type { JtlTransportOptions } from '#modules/connectors/infrastructure/jtl/client';
-import { createJtlShippingMethodCapabilities } from '#modules/connectors/infrastructure/jtl/shipping-method';
 import { outputs } from '#modules/connectors/infrastructure/jtl/outputs';
 import * as s from '#modules/connectors/infrastructure/jtl/schemas';
+import { createJtlShippingMethodCapabilities } from '#modules/connectors/infrastructure/jtl/shipping-method';
 
 const ref = (id: number | string, scopeKey = ''): ExternalId => ({
   externalId: String(id),
   scopeKey,
 });
+
 export interface JtlEvidence {
   tenantId: string;
   connectionId: string;
@@ -36,6 +34,7 @@ export interface JtlEvidence {
   /** Allowlisted fields only. Storage must enforce encryption, tenant access and expiry. */
   raw?: { payloads: unknown[]; expiresAt: string };
 }
+
 export interface JtlConnectorOptions extends JtlTransportOptions {
   tenantId: string;
   connectionId: string;
@@ -74,6 +73,7 @@ export function createJtlConnector(
   const client = createClient(options);
   const now = options.now ?? (() => new Date());
   const nextId = options.id ?? randomUUID;
+
   function handler<
     K extends Exclude<ReadCapability, 'orders.shipping-method.read'>,
   >(capability: K): CapabilityHandler<K> {
@@ -132,14 +132,17 @@ export function createJtlConnector(
           }
         }
         const payloads: unknown[] = [];
+
         function capture<T>(
           schema: z.ZodType<T, z.ZodTypeDef, unknown>,
           value: unknown,
         ): T {
           const result = parse(schema, value);
           if (options.rawRetentionMs !== undefined) payloads.push(result);
+
           return result;
         }
+
         async function page<T extends z.ZodTypeAny>(
           path: string,
           schema: T,
@@ -171,8 +174,10 @@ export function createJtlConnector(
               result.nextPageNumber !== number + 1)
           )
             fail('invalid_response');
+
           return { items: result.items as z.infer<T>[], hasNext };
         }
+
         async function children<T extends z.ZodTypeAny>(
           path: string,
           schema: T,
@@ -191,8 +196,10 @@ export function createJtlConnector(
           }
           fail('invalid_response');
         }
+
         const observedAt = now().toISOString();
         const observations: Observation<unknown>[] = [];
+
         function emit(
           resource: SourceIdentity['resource'],
           external: ExternalId,
@@ -217,6 +224,7 @@ export function createJtlConnector(
             data,
           });
         }
+
         async function orderLines(orderId: string) {
           const lines = capture(
             z.array(s.orderLine),
@@ -227,8 +235,10 @@ export function createJtlConnector(
             lines.some((line) => line.salesOrderId !== orderId)
           )
             fail('invalid_response');
+
           return lines;
         }
+
         let hasNext: boolean;
         if (capability === 'orders.read') {
           const result = await page(
@@ -349,6 +359,7 @@ export function createJtlConnector(
               );
               if (!source || line.deliveryNoteId !== note.id)
                 fail('invalid_response');
+
               return {
                 orderLine: ref(source.id, String(note.salesOrderId)),
                 quantity: {
@@ -415,10 +426,12 @@ export function createJtlConnector(
                 },
               }),
         });
+
         return result;
       },
     };
   }
+
   return {
     tenantId: options.tenantId,
     id: options.connectionId,

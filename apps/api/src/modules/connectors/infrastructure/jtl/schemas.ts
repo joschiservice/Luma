@@ -1,100 +1,22 @@
+import { externalId } from '@luma/connector-jtl/schemas';
 import { z } from 'zod';
-export const externalId = z.union([
-  z
-    .string()
-    .uuid()
-    .refine((value) => value !== '00000000-0000-0000-0000-000000000000'),
-  z
-    .string()
-    .regex(/^[1-9]\d*$/)
-    .refine((value) => Number(value) <= 2147483647),
-]);
-export const id = z
-  .union([externalId, z.number().int().positive().max(2147483647)])
-  .transform(String);
-export const timestamp = z
-  .string()
-  .datetime({ offset: true })
-  .refine((value) => !value.startsWith('0001-'));
-// Reject values outside the canonical precision instead of silently rounding them.
-export const decimal = z
-  .union([z.number().finite(), z.string()])
-  .transform(String)
-  .refine((value) => /^-?\d{1,14}(\.\d{1,6})?$/.test(value));
-export const order = z.object({
-  id,
-  salesOrderNumber: z.string(),
-  isCancelled: z.boolean(),
-  deliveryStatus: z.number().int(),
-  paymentStatus: z.number().int(),
-});
-export const orderLine = z.object({
-  id,
-  salesOrderId: id,
-  itemId: z.union([
-    id,
-    z.literal(0),
-    z.literal('00000000-0000-0000-0000-000000000000'),
-    z.null(),
-  ]),
-  quantity: decimal,
-  salesUnit: z.string().min(1),
-});
-export const item = z.object({
-  id,
-  sKU: z.string(),
-  name: z.string().nullable().optional(),
-  unit: z.string().optional(),
-  isActive: z.boolean(),
-  isInventoryManagementActive: z.boolean(),
-  modifiedTimestamp: timestamp.nullable().optional(),
-  stockTotal: decimal.nullable().optional(),
-  stockReservedTotal: decimal.nullable().optional(),
-  stockAvailable: decimal.nullable().optional(),
-});
-export const warehouseStock = z.object({
-  totalQuantity: decimal,
-  lockedQuantity: decimal,
-});
-export const note = z.object({
-  id,
-  salesOrderId: id,
-  deliveryNoteDate: timestamp,
-  packages: z.array(
-    z.object({
-      id,
-      deliveryNoteId: id,
-      shippingDate: timestamp.nullable().optional(),
-    }),
-  ),
-});
-export const noteLine = z.object({
-  id,
-  deliveryNoteId: id,
-  salesOrderLineItemId: id,
-  quantity: decimal.refine((value) => Number(value) > 0),
-});
-export const page = <T extends z.ZodTypeAny>(row: T) =>
-  z.object({
-    items: z.array(row),
-    pageNumber: z.number().int().positive(),
-    pageSize: z.number().int().positive(),
-    totalItems: z.number().int().nonnegative(),
-    hasNextPage: z.boolean().optional(),
-    nextPageNumber: z.number().int().optional(),
-  });
+
+export * from '@luma/connector-jtl/schemas';
+
 const ref = z
   .object({
     externalId,
     scopeKey: z.literal(''),
   })
   .strict();
+
 const query = z
   .object({
     limit: z.number().int().min(1).max(100),
     cursor: z.string().min(1).max(8192).optional(),
   })
   .strict();
+
 export const inputs = {
   'orders.read': query,
   'products.read': query,

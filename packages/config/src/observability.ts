@@ -8,6 +8,10 @@ export interface ObservabilityConfig {
   posthog?: { apiKey: string; host: string };
 }
 
+/**
+ * Reads telemetry settings and validates EU export destinations; enabled exports require a
+ * tenant hash key.
+ */
 export function readObservabilityConfig(
   env: Readonly<Record<string, string | undefined>>,
 ): ObservabilityConfig {
@@ -79,5 +83,6 @@ export function readObservabilityConfig(
     throw new Error(
       'OBSERVABILITY_TENANT_HASH_KEY is required when telemetry exports are enabled',
     );
+
   return config;
 }

@@ -1,13 +1,17 @@
-import { useEffect, useRef, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@luma/ui/button';
-import { auth, clearPrivate } from './data';
+import { useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef, useState } from 'react';
+
 import { Brand } from './common';
+import { auth, clearPrivate } from './data';
+
+/** Ends the session, clears private query data, and returns the user to sign-in. */
 export function SignOut() {
   const client = useQueryClient();
   const started = useRef(false);
   const [failed, setFailed] = useState(false);
   const [pending, setPending] = useState(false);
+
   async function signOut() {
     setPending(true);
     setFailed(false);
@@ -22,6 +26,7 @@ export function SignOut() {
       setPending(false);
     }
   }
+
   useEffect(() => {
     if (started.current) return;
     started.current = true;
@@ -29,6 +34,7 @@ export function SignOut() {
     // The initial revocation runs once; retries require a deliberate click.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
   return (
     <main className="status-page">
       <Brand />

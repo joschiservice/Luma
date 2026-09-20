@@ -1,13 +1,14 @@
 import {
   readApiConfig,
   readConnectionsConfig,
-  readWorkflowConfig,
-  readModelGatewayConfig,
   readIdentityConfig,
+  readModelGatewayConfig,
   readObservabilityConfig,
+  readWorkflowConfig,
 } from '@luma/config';
-import { createObservability } from '#modules/platform/composition';
+
 import { buildRuntimeApp, createDefaultExceptionWorker } from '#app';
+import { createObservability } from '#modules/platform/composition';
 
 if (process.argv.includes('--workflow-worker')) {
   const worker = await createDefaultExceptionWorker(

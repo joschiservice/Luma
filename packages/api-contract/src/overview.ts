@@ -1,11 +1,15 @@
 import { z } from 'zod';
+
 import { caseSummarySchema } from './cases.js';
+
 export const overviewQuerySchema = z
   .object({
     window: z.enum(['24h', '7d']).default('24h'),
   })
   .strict();
+
 const count = z.number().int().nonnegative();
+
 export const operationsOverviewSchema = z.object({
   generatedAt: z.string().datetime(),
   window: z.object({
@@ -38,4 +42,5 @@ export const operationsOverviewSchema = z.object({
     .nullable(),
   prioritizedDecisions: z.array(caseSummarySchema).max(5),
 });
+
 export type OperationsOverview = z.infer<typeof operationsOverviewSchema>;

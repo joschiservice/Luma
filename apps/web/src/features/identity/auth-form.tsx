@@ -1,13 +1,18 @@
-import { useRef, useState } from 'react';
-import { useForm } from '@tanstack/react-form';
-import { Link } from '@tanstack/react-router';
-import { useQueryClient } from '@tanstack/react-query';
-import { z } from 'zod';
 import { Button } from '@luma/ui/button';
 import { Input } from '@luma/ui/components/input';
-import { auth, clearPrivate, returnPath } from './data';
-import { Brand } from './common';
+import { useForm } from '@tanstack/react-form';
+import { useQueryClient } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
+import { useRef, useState } from 'react';
+import { z } from 'zod';
 
+import { Brand } from './common';
+import { auth, clearPrivate, returnPath } from './data';
+
+/**
+ * Renders sign-in or account creation and returns authenticated users to a validated
+ * application path.
+ */
 export function AuthForm({
   signup,
   returnTo,
@@ -50,6 +55,7 @@ export function AuthForm({
               ? 'Account creation was not confirmed. Try signing in if you may already have an account, or check your details and retry.'
               : 'Sign-in failed. Check your email and password, or try again when the service is available.',
           );
+
           return;
         }
         await clearPrivate(client);
@@ -60,6 +66,7 @@ export function AuthForm({
           setMessage(
             'Your account request succeeded, but we couldn’t confirm your session. Try signing in.',
           );
+
           return;
         }
         window.location.assign(
@@ -81,6 +88,7 @@ export function AuthForm({
       }
     },
   });
+
   return (
     <main className="auth-page">
       <section className="auth-story">
@@ -136,6 +144,7 @@ export function AuthForm({
             >
               {(field) => {
                 const errors = field.state.meta.errors;
+
                 return (
                   <div className="form-field">
                     <label htmlFor={name}>

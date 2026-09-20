@@ -1,18 +1,25 @@
-import { useId, useState } from 'react';
 import type {
   CaseDecision,
   CaseProgress,
   CaseReview,
 } from '@luma/api-contract';
+import { useId, useState } from 'react';
+
 import { Button } from './button';
-import { CaseNotice, CaseTime, caseLabel } from './case-investigation';
+import { caseLabel, CaseNotice, CaseTime } from './case-investigation';
 
 type DecisionKind = CaseDecision['kind'];
+
 function fieldLabel(value: string) {
   return caseLabel(
     value.replaceAll('.', ' ').replace(/([a-z])([A-Z])/g, '$1 $2'),
   );
 }
+
+/**
+ * Presents a proposal, policy result, and permitted decisions with caller-controlled
+ * submission state.
+ */
 export function ResolutionReview({
   review,
   progress,
@@ -31,6 +38,7 @@ export function ResolutionReview({
   onDecision: (kind: DecisionKind, reason: string) => void;
 }) {
   const proposal = review.proposal;
+
   return (
     <article
       className="case-investigation resolution-review"
@@ -206,6 +214,7 @@ export function ResolutionReview({
     </article>
   );
 }
+
 function Fields({
   values,
 }: {
@@ -224,6 +233,7 @@ function Fields({
     <p>No fields specified.</p>
   );
 }
+
 function DecisionControls({
   decisions,
   disabled,
@@ -241,6 +251,7 @@ function DecisionControls({
   const id = useId();
   if (!decisions.length)
     return <p>No decisions are currently available to you.</p>;
+
   return (
     <div className="resolution-controls" aria-busy={pending}>
       <label htmlFor={id}>Decision reason (required)</label>

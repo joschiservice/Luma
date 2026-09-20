@@ -1,18 +1,18 @@
-import type { TenantContext } from '#modules/identity/index';
-import { requireRole, requireTenant } from '#modules/identity/index';
-import { currentPolicyVersion } from '#modules/policies/index';
-import type { ProposedAction } from '#modules/policies/index';
-import { AdmissionRejected } from '#modules/execution/index';
 import type {
+  ActionAdmission,
   ActivatedArtifact,
   BoundActionStep,
-  ActionAdmission,
   ExecutionResult,
 } from '#modules/execution/index';
+import { AdmissionRejected } from '#modules/execution/index';
+import type { TenantContext } from '#modules/identity/index';
+import { requireRole, requireTenant } from '#modules/identity/index';
+import type { ProposedAction } from '#modules/policies/index';
+import { currentPolicyVersion } from '#modules/policies/index';
 import type {
   PlaybookActivation,
-  PlaybookVersion,
   PlaybookSnapshot,
+  PlaybookVersion,
 } from '#modules/workflows/domain/playbook';
 import {
   playbookEligible,
@@ -36,6 +36,7 @@ export interface PlaybookRun {
   actionHash: string;
   createdAt: string;
 }
+
 export interface PlaybookOutcome {
   state: 'awaiting_approval' | 'verified' | 'denied' | 'escalated';
   reason:
@@ -55,6 +56,7 @@ export interface PlaybookOutcome {
   decisionId?: string;
   execution?: Extract<ExecutionResult, { record: unknown }>;
 }
+
 export interface PlaybookStore {
   publish(context: TenantContext, version: PlaybookVersion): Promise<void>;
   version(
@@ -79,6 +81,7 @@ export interface PlaybookStore {
   ): Promise<void>;
   outcomes(context: TenantContext, runId: string): Promise<PlaybookOutcome[]>;
 }
+
 export interface PlaybookDependencies {
   store: PlaybookStore;
   admission: ActionAdmission;
@@ -108,8 +111,15 @@ export interface PlaybookDependencies {
   hash(input: unknown): string;
   now(): Date;
 }
+
 const artifactId = (id: string) => `playbook:${id}`;
+
 const rank = { low: 0, medium: 1, high: 2 };
+
+/**
+ * Creates playbook publication, activation, binding, and execution commands constrained by
+ * action admission.
+ */
 export function createPlaybookService(deps: PlaybookDependencies) {
   async function authorize(context: TenantContext) {
     const fresh = await deps.refreshContext(context);
@@ -117,8 +127,10 @@ export function createPlaybookService(deps: PlaybookDependencies) {
     requireRole(fresh, ['owner', 'admin']);
     if (fresh.actor.id !== context.actor.id)
       throw new Error('Playbook principal changed');
+
     return fresh;
   }
+
   async function load(context: TenantContext, id: string) {
     const run = await deps.store.run(context, id);
     if (!run || run.principalId !== context.actor.id)
@@ -134,8 +146,10 @@ export function createPlaybookService(deps: PlaybookDependencies) {
       deps.hash(run.snapshot) !== run.snapshotDigest
     )
       throw new Error('Playbook run integrity mismatch');
+
     return { run, version };
   }
+
   async function perform(
     context: TenantContext,
     id: string,
@@ -144,11 +158,14 @@ export function createPlaybookService(deps: PlaybookDependencies) {
     context = await authorize(context);
     const { run, version } = await load(context, id);
     const ir = version.ir;
+
     async function record(outcome: Omit<PlaybookOutcome, 'proposalId'>) {
       const result = { ...outcome, proposalId: run.action.id };
       await deps.store.record(context, id, result);
+
       return result;
     }
+
     // Recover reservations before checking evidence age; recovery never dispatches.
     let result = await deps.admission.get(context, run.action.id);
     if (!result || !('record' in result)) {
@@ -202,6 +219,7 @@ export function createPlaybookService(deps: PlaybookDependencies) {
         result = await deps.admission.get(context, run.action.id);
         if (!result || !('record' in result)) {
           if (!(error instanceof AdmissionRejected)) throw error;
+
           return record({
             state: 'escalated',
             reason: 'admission_rejected',
@@ -259,6 +277,7 @@ export function createPlaybookService(deps: PlaybookDependencies) {
       verification?.outcome === 'passed' &&
       valid &&
       inWindow;
+
     return record({
       state: verified ? 'verified' : 'escalated',
       reason: verified
@@ -272,11 +291,13 @@ export function createPlaybookService(deps: PlaybookDependencies) {
       execution: result,
     });
   }
+
   return {
     async publish(context: TenantContext, source: unknown) {
       context = await authorize(context);
       const version = deps.compile(source);
       await deps.store.publish(context, version);
+
       return version;
     },
     async activate(context: TenantContext, input: unknown) {
@@ -316,6 +337,7 @@ export function createPlaybookService(deps: PlaybookDependencies) {
         artifactDigest: artifact.digest,
       };
       await deps.store.activate(context, activation);
+
       return activation;
     },
     async revoke(context: TenantContext, id: string) {
@@ -426,6 +448,7 @@ export function createPlaybookService(deps: PlaybookDependencies) {
             ),
           ).toISOString(),
         });
+
       return stored;
     },
     execute: (context: TenantContext, id: string) =>
@@ -435,8 +458,10 @@ export function createPlaybookService(deps: PlaybookDependencies) {
     async get(context: TenantContext, id: string) {
       context = await authorize(context);
       const { run, version } = await load(context, id);
+
       return { run, version, outcomes: await deps.store.outcomes(context, id) };
     },
   };
 }
+
 export type PlaybookService = ReturnType<typeof createPlaybookService>;

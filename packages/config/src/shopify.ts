@@ -5,6 +5,11 @@ export interface ShopifyConfig {
   callbackUrl: string;
   webOrigin: string;
 }
+
+/**
+ * Returns undefined when Shopify is unconfigured; partial or invalid OAuth settings throw an
+ * error.
+ */
 export function readShopifyConfig(
   env: Readonly<Record<string, string | undefined>>,
 ): ShopifyConfig | undefined {
@@ -43,6 +48,7 @@ export function readShopifyConfig(
     );
   if (!/^[a-zA-Z0-9_-]{1,64}$/.test(env.SHOPIFY_APP_ENVIRONMENT!))
     throw new Error('SHOPIFY_APP_ENVIRONMENT is invalid');
+
   return {
     clientId: env.SHOPIFY_CLIENT_ID!,
     clientSecret: env.SHOPIFY_CLIENT_SECRET!,

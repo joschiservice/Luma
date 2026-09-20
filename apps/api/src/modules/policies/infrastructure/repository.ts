@@ -5,6 +5,11 @@ import type {
   PolicyDecision,
   PolicyEvidence,
 } from '#modules/policies/domain/action';
+
+/**
+ * Creates tenant-scoped storage for policy decisions and approvals with idempotency and
+ * version checks.
+ */
 export function createPolicyRepository(db: TenantDatabase): PolicyRepository {
   return {
     pending: (tenantId) =>
@@ -13,6 +18,7 @@ export function createPolicyRepository(db: TenantDatabase): PolicyRepository {
           'SELECT document FROM policy_outbox WHERE tenant_id=$1 AND delivered_at IS NULL ORDER BY created_at,id',
           [tenantId],
         );
+
         return result.rows.map((row) => row.document);
       }),
     delivered: (tenantId, id) =>
@@ -49,6 +55,7 @@ export function createPolicyRepository(db: TenantDatabase): PolicyRepository {
           'SELECT document FROM policy_decisions WHERE tenant_id=$1 AND id=$2',
           [tenantId, id],
         );
+
         return result.rows[0]?.document ?? null;
       }),
     findApproval: (tenantId, proposalId, hash, version) =>
@@ -57,6 +64,7 @@ export function createPolicyRepository(db: TenantDatabase): PolicyRepository {
           'SELECT document FROM policy_approvals WHERE tenant_id=$1 AND proposal_id=$2 AND action_hash=$3 AND policy_version=$4',
           [tenantId, proposalId, hash, version],
         );
+
         return result.rows[0]?.document ?? null;
       }),
     saveApproval: (approval) =>
@@ -90,6 +98,7 @@ export function createPolicyRepository(db: TenantDatabase): PolicyRepository {
             { type: 'approval.responded', document: saved },
           ],
         );
+
         return saved;
       }),
   };

@@ -1,9 +1,12 @@
 import type { CaseDetail, CaseSummary, Diagnosis } from '@luma/api-contract';
 import type { ReactNode } from 'react';
 
+/** Converts underscore-separated case codes to readable labels. */
 export function caseLabel(value: string) {
   return value.replaceAll('_', ' ').replace(/^./, (c) => c.toUpperCase());
 }
+
+/** Renders a case timestamp using a stable, locale-independent presentation. */
 export function CaseTime({ value }: { value: string }) {
   return (
     <time dateTime={value}>
@@ -11,6 +14,8 @@ export function CaseTime({ value }: { value: string }) {
     </time>
   );
 }
+
+/** Displays a case's current state and severity. */
 export function CaseStatus({ item }: { item: CaseSummary }) {
   return (
     <div className="case-badges">
@@ -21,6 +26,8 @@ export function CaseStatus({ item }: { item: CaseSummary }) {
     </div>
   );
 }
+
+/** Renders a compact case summary for an inbox entry. */
 export function CaseRow({ item }: { item: CaseSummary }) {
   return (
     <>
@@ -41,6 +48,8 @@ export function CaseRow({ item }: { item: CaseSummary }) {
     </>
   );
 }
+
+/** Renders a titled status message, or an alert when error is set. */
 export function CaseNotice({
   title,
   children,
@@ -57,6 +66,8 @@ export function CaseNotice({
     </div>
   );
 }
+
+/** Announces that a case investigation is loading. */
 export function CaseLoading() {
   return (
     <div className="case-loading" role="status" aria-label="Loading cases">
@@ -68,6 +79,7 @@ export function CaseLoading() {
     </div>
   );
 }
+
 function Findings({ items }: { items: Diagnosis['facts'] }) {
   return (
     <ul className="case-findings">
@@ -82,6 +94,11 @@ function Findings({ items }: { items: Diagnosis['facts'] }) {
     </ul>
   );
 }
+
+/**
+ * Presents a case diagnosis, supporting evidence, and recommended next steps without
+ * initiating execution.
+ */
 export function CaseInvestigation({
   item,
   progress,
@@ -96,6 +113,7 @@ export function CaseInvestigation({
     diagnosis?.superseded ||
     item.freshness === 'stale' ||
     item.state === 'resolved';
+
   return (
     <article className="case-investigation" aria-label="Case investigation">
       <header>

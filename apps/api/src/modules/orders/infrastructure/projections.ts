@@ -1,14 +1,20 @@
 import { randomUUID } from 'node:crypto';
+
 import { z } from 'zod';
+
 import type { TenantContext } from '#modules/identity/index';
-import { requireTenant, requireRole } from '#modules/identity/index';
-import type { TenantDatabase } from '#modules/platform/index';
+import { requireRole, requireTenant } from '#modules/identity/index';
 import type {
-  CommerceProjections,
   CanonicalSnapshot,
+  CommerceProjections,
 } from '#modules/orders/application/projections';
 import { snapshotSchema } from '#modules/orders/infrastructure/validation';
+import type { TenantDatabase } from '#modules/platform/index';
 
+/**
+ * Creates tenant-scoped order and fulfillment projections, checking referenced SKUs through
+ * the supplied lookup.
+ */
 export function createCommerceProjections(
   db: TenantDatabase,
   skuExists: (context: TenantContext, id: string) => Promise<boolean>,
@@ -17,12 +23,14 @@ export function createCommerceProjections(
     async identify(context, kind, reconciliationKey) {
       requireRole(context, ['owner', 'admin']);
       z.string().min(1).max(1024).parse(reconciliationKey);
+
       return db.transaction(context.tenantId, async (tx) => {
         const result = await tx.query<{ id: string }>(
           `INSERT INTO orders_entities(id,tenant_id,kind,reconciliation_key) VALUES($1,$2,$3,$4)
       ON CONFLICT(tenant_id,kind,reconciliation_key) DO NOTHING RETURNING id`,
           [randomUUID(), context.tenantId, kind, reconciliationKey],
         );
+
         return (
           result.rows[0]?.id ??
           (
@@ -36,6 +44,7 @@ export function createCommerceProjections(
     },
     async has(context, kind, id) {
       requireTenant(context, context.tenantId);
+
       return db.transaction(context.tenantId, async (tx) =>
         Boolean(
           (
@@ -55,6 +64,7 @@ export function createCommerceProjections(
           if (line.skuId && !(await skuExists(context, line.skuId)))
             throw new Error('Canonical SKU not found');
         }
+
       return db.transaction(context.tenantId, async (tx) => {
         const tenant = context.tenantId;
         await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
@@ -77,6 +87,7 @@ export function createCommerceProjections(
           );
           if (!same.rows[0]?.matches)
             throw new Error('Snapshot identity conflict');
+
           return 'duplicate';
         }
         for (const ref of references(value)) {
@@ -172,11 +183,13 @@ export function createCommerceProjections(
           'INSERT INTO orders_projection_events(id,tenant_id,snapshot_id,actor_id) VALUES($1,$2,$3,$4)',
           [randomUUID(), tenant, id, context.actor.id],
         );
+
         return 'applied';
       });
     },
     async current(context, entityId) {
       requireTenant(context, context.tenantId);
+
       return db.transaction(
         context.tenantId,
         async (tx) =>
@@ -196,6 +209,7 @@ export function createCommerceProjections(
     },
     async history(context, entityId) {
       requireTenant(context, context.tenantId);
+
       return db.transaction(context.tenantId, async (tx) =>
         (
           await tx.query<{ document: CanonicalSnapshot }>(
@@ -207,6 +221,7 @@ export function createCommerceProjections(
     },
   };
 }
+
 function references(value: CanonicalSnapshot): { kind: string; id: string }[] {
   return value.data.type === 'order'
     ? value.data.lines.map((line) => ({ kind: 'order_line', id: line.id }))

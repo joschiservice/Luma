@@ -1,8 +1,8 @@
-import { requireRole, requireTenant } from '#modules/identity/index';
-import type { TenantContext } from '#modules/identity/index';
-import { currentPolicyVersion } from '#modules/policies/index';
-import type { ProposedAction } from '#modules/policies/index';
 import type { ExecutionService } from '#modules/execution/application/execution';
+import type { TenantContext } from '#modules/identity/index';
+import { requireRole, requireTenant } from '#modules/identity/index';
+import type { ProposedAction } from '#modules/policies/index';
+import { currentPolicyVersion } from '#modules/policies/index';
 
 export interface ActivatedArtifact {
   id: string;
@@ -30,6 +30,7 @@ export interface ActivatedArtifact {
     }
   >;
 }
+
 export interface BoundActionStep {
   runId: string;
   stepId: string;
@@ -45,6 +46,7 @@ export interface BoundActionStep {
   actionHash: string;
   action: ProposedAction;
 }
+
 export interface AdmissionReader {
   step(
     context: TenantContext,
@@ -57,6 +59,7 @@ export interface AdmissionReader {
     version: string,
   ): Promise<ActivatedArtifact | null>;
 }
+
 export interface AdmissionDependencies {
   repository: AdmissionReader;
   execution: ExecutionService;
@@ -67,6 +70,7 @@ export interface AdmissionDependencies {
   /** Independently load current incident, diagnosis and tenant-owned evidence. */
   eligible(context: TenantContext, step: BoundActionStep): Promise<boolean>;
 }
+
 export class AdmissionRejected extends Error {}
 
 const risk = { low: 0, medium: 1, high: 2 };
@@ -151,6 +155,7 @@ export function createActionAdmission(deps: AdmissionDependencies) {
           binding.artifactDigest !== artifact.digest
         )
           throw new AdmissionRejected('Execution admission binding conflicts');
+
         return previous;
       }
       const stillEligible = async () => {
@@ -163,6 +168,7 @@ export function createActionAdmission(deps: AdmissionDependencies) {
           artifact.id,
           artifact.version,
         );
+
         return (
           !!active?.active &&
           active.digest === artifact.digest &&
@@ -174,8 +180,10 @@ export function createActionAdmission(deps: AdmissionDependencies) {
       };
       if (!(await stillEligible()))
         throw new AdmissionRejected('Action is no longer eligible');
+
       return deps.execution.execute(fresh, action, admission, stillEligible);
     },
   };
 }
+
 export type ActionAdmission = ReturnType<typeof createActionAdmission>;

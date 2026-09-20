@@ -1,12 +1,15 @@
 import type { CaseDetail, Diagnosis } from '@luma/api-contract';
 
 const observedAt = '2026-09-18T08:00:00.000Z';
+
 const refs = ['shopify-stock', 'jtl-stock', 'sku-mapping'];
+
 const finding = (code: string, text: string) => ({
   code,
   text,
   evidenceRefs: refs,
 });
+
 const diagnosis: Diagnosis = {
   schemaVersion: 1,
   exceptionId: '11111111-1111-4111-8111-111111111111',
@@ -115,6 +118,7 @@ const diagnosis: Diagnosis = {
     reread: { status: 'unavailable', retryAfter: null },
   },
 };
+
 export const inventoryCase: CaseDetail = {
   schemaVersion: 1,
   id: diagnosis.exceptionId,
@@ -138,6 +142,8 @@ export const inventoryCase: CaseDetail = {
   resolution: null,
   diagnosis,
 };
+
+/** Builds a synthetic case detail for the requested state or exception-class variant. */
 export function caseFixture(
   variant:
     | 'pending'
@@ -225,5 +231,6 @@ export function caseFixture(
     item.subject = { kind: 'operation', id: 'Operation 1042', scope: [] };
     item.sources = ['JTL'];
   }
+
   return item;
 }

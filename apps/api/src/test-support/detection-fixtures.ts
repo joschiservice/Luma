@@ -1,8 +1,10 @@
+import { readFileSync } from 'node:fs';
+
+import { createCapabilityRuntime } from '#modules/connectors/application/capabilities';
 import { createJtlConnector } from '#modules/connectors/infrastructure/jtl/adapter';
 import { createShopifyConnector } from '#modules/connectors/infrastructure/shopify/adapter';
-import { createCapabilityRuntime } from '#modules/connectors/application/capabilities';
 import type { TenantContext } from '#modules/identity/index';
-import { readFileSync } from 'node:fs';
+
 const jtl = JSON.parse(
   readFileSync(
     new URL(
@@ -12,6 +14,7 @@ const jtl = JSON.parse(
     'utf8',
   ),
 );
+
 const shopify = JSON.parse(
   readFileSync(
     new URL(
@@ -61,6 +64,7 @@ export async function detectionFixtures(context: TenantContext, now: Date) {
       const match = /^delivery-notes\/(30|31)(\/line-items)?$/.exec(path);
       if (match) {
         const i = Number(match[1]) - 30;
+
         return match[2]
           ? paged(jtlData.noteLines[i]!)
           : Response.json(jtlData.details[i]);
@@ -115,6 +119,7 @@ export async function detectionFixtures(context: TenantContext, now: Date) {
               ? { fulfillments: shopify.shipments }
               : shopify.order,
         };
+
       return Response.json({ data });
     },
   });
@@ -123,6 +128,7 @@ export async function detectionFixtures(context: TenantContext, now: Date) {
       id === jtlConnector.id ? jtlConnector : shopifyConnector,
     record: async () => {},
   });
+
   async function inventory(connectionId: string) {
     const result = await runtime.read(context, {
       connectionId,
@@ -132,8 +138,10 @@ export async function detectionFixtures(context: TenantContext, now: Date) {
     });
     if (!result.ok)
       throw new Error(`Inventory fixture failed: ${result.error.code}`);
+
     return result.value;
   }
+
   async function fulfillment(connectionId: string) {
     const result = await runtime.read(context, {
       connectionId,
@@ -143,8 +151,10 @@ export async function detectionFixtures(context: TenantContext, now: Date) {
     });
     if (!result.ok)
       throw new Error(`Fulfillment fixture failed: ${result.error.code}`);
+
     return result.value;
   }
+
   return {
     jtlInventory: await inventory(jtlConnector.id),
     shopifyInventory: await inventory(shopifyConnector.id),
