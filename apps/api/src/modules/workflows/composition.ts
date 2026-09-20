@@ -46,3 +46,21 @@ export {
   printPlaybookCode,
   parsePlaybookCode,
 } from '#modules/workflows/infrastructure/playbook-schema';
+
+import { createLearningService } from '#modules/workflows/application/learning';
+import { createLearningStore } from '#modules/workflows/infrastructure/learning';
+import { learningBoundary } from '#modules/workflows/api/learning';
+export { learningRoutes } from '#modules/workflows/api/learning';
+export function createResolutionLearning(
+  db: import('#modules/platform/index').TenantDatabase,
+  refreshContext: (
+    context: import('#modules/identity/index').TenantContext,
+  ) => Promise<import('#modules/identity/index').TenantContext>,
+  now: () => Date = () => new Date(),
+) {
+  return createLearningService({
+    store: createLearningStore(db, now),
+    refreshContext,
+    ...learningBoundary,
+  });
+}

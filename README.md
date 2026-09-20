@@ -146,6 +146,10 @@ The [execution guide](docs/execution.md) covers policy checks, approval, tenant-
 The [Resolution Playbook guide](docs/resolution-playbooks.md) covers typed authoring,
 immutable versions, scoped activation, evidence snapshots and the pilot correction.
 
+The [resolution learning guide](docs/resolution-learning.md) covers structured
+incident histories, human repairs, playbook reuse, verification attempts and
+exports for outcome evaluation.
+
 ## UI workshop
 
 ```sh

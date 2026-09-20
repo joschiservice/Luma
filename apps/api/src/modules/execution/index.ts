@@ -13,3 +13,8 @@ export type {
 } from '#modules/execution/application/admission';
 
 export { AdmissionRejected } from '#modules/execution/application/admission';
+
+export type {
+  VerificationAttempt,
+  ExecutionFailure,
+} from '#modules/execution/application/history';

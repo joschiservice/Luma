@@ -1,4 +1,4 @@
-/* global document, innerWidth */
+/* global document, innerWidth, window */
 import { it, expect } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { chromium } from 'playwright';
@@ -408,6 +408,15 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
   const eventCount = await audit.count();
   await page.getByRole('button', { name: 'Refresh progress' }).click();
   await expect.poll(() => audit.count()).toBe(eventCount);
+  await page.getByText('Live', { exact: true }).waitFor();
+  // An offline notification can precede the transport's error event.
+  await page.evaluate(() => window.dispatchEvent(new Event('offline')));
+  await page.getByText('Connection lost', { exact: true }).waitFor();
+  await page
+    .getByText('Current state is unconfirmed', { exact: true })
+    .waitFor();
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await page.getByText('Live', { exact: true }).waitFor();
   await context.setOffline(true);
   await page.getByText('Connection lost', { exact: true }).waitFor();
   await page
