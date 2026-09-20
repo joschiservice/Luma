@@ -1,3 +1,4 @@
+import { createSafetyFixture as createSafetyServices } from '#test-support/safety-fixtures';
 import { createConnectionCoverage } from '#modules/connectors/composition';
 import { createTenantDatabase } from '#modules/platform/composition';
 import { createOperationsOverview } from '#modules/workflows/composition';
@@ -16,12 +17,7 @@ import {
   it,
   vi,
 } from 'vitest';
-import {
-  buildApp,
-  createDetectionServices,
-  createDeskServices,
-  createSafetyServices,
-} from '#app';
+import { buildApp, createDetectionServices, createDeskServices } from '#app';
 import {
   caseQuerySchema,
   caseDetailSchema,

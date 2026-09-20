@@ -10,9 +10,34 @@ import type {
   EffectRegistry,
   VerificationResult,
 } from '#modules/connectors/index';
+import { ConnectorError } from '#modules/connectors/index';
 import type { AuditEntry, AuditLog } from '#modules/audit/index';
 
+function sameExecutor(current: Provenance, reserved: Provenance): boolean {
+  return (
+    current.kind === reserved.kind &&
+    current.id === reserved.id &&
+    current.initiatingUserId === reserved.initiatingUserId &&
+    (current.model === undefined) === (reserved.model === undefined) &&
+    (['provider', 'name', 'version', 'promptVersion', 'runId'] as const).every(
+      (key) => current.model?.[key] === reserved.model?.[key],
+    )
+  );
+}
+
+export interface ExecutionAdmission {
+  runId: string;
+  stepId: string;
+  artifactId: string;
+  artifactVersion: string;
+  artifactDigest: string;
+  incidentId: string;
+  diagnosisRevision: number;
+  generation: { kind: 'manual' | 'generated'; reference: string };
+}
+
 export interface ExecutionRecord {
+  admission?: ExecutionAdmission;
   id: string;
   tenantId: string;
   proposalId: string;
@@ -25,11 +50,15 @@ export interface ExecutionRecord {
     number: 1;
     policyDecisionId: string;
     approvalId?: string;
+    dispatchIdentity?: string;
     mechanism: string;
     executor: Provenance;
     requestedBy: string;
     startedAt: string;
     finishedAt?: string;
+    dispatch?: 'not_dispatched' | 'dispatched' | 'uncertain';
+    businessOutcome?: 'pending' | 'satisfied' | 'violated' | 'inconclusive';
+    providerRequestId?: string;
     effectEvidenceRefs?: string[];
     verification?: VerificationResult;
   };
@@ -141,6 +170,8 @@ export function createExecutionService(deps: ExecutionDependencies) {
     async execute(
       context: TenantContext,
       input: unknown,
+      admission?: ExecutionAdmission,
+      admissionGuard?: () => Promise<boolean>,
     ): Promise<ExecutionResult> {
       const { action, hash } = deps.parse(input);
       requireTenant(context, action.tenantId);
@@ -177,6 +208,7 @@ export function createExecutionService(deps: ExecutionDependencies) {
       if (!adapter || !available) throw new Error('Capability unavailable');
       const record: ExecutionRecord = {
         id: deps.id(),
+        ...(admission ? { admission: structuredClone(admission) } : {}),
         tenantId: context.tenantId,
         proposalId: action.id,
         actionHash: hash,
@@ -186,8 +218,13 @@ export function createExecutionService(deps: ExecutionDependencies) {
         attempt: {
           id: deps.id(),
           number: 1,
+          dispatch: 'uncertain',
+          businessOutcome: 'pending',
           policyDecisionId: decision.id,
           ...(decision.approvalId ? { approvalId: decision.approvalId } : {}),
+          ...(adapter.dispatchIdentity
+            ? { dispatchIdentity: adapter.dispatchIdentity }
+            : {}),
           mechanism: adapter.mechanism,
           executor: structuredClone(adapter.executor),
           requestedBy: context.actor.id,
@@ -202,6 +239,19 @@ export function createExecutionService(deps: ExecutionDependencies) {
         deps.id(),
         {
           idempotencyKey: record.idempotencyKey,
+          ...(admission
+            ? {
+                runId: admission.runId,
+                stepId: admission.stepId,
+                artifactId: admission.artifactId,
+                artifactVersion: admission.artifactVersion,
+                artifactDigest: admission.artifactDigest,
+                incidentId: admission.incidentId,
+                diagnosisRevision: String(admission.diagnosisRevision),
+                generationKind: admission.generation.kind,
+                generationReference: admission.generation.reference,
+              }
+            : {}),
           executorId: adapter.executor.id,
           mechanism: adapter.mechanism,
         },
@@ -218,8 +268,16 @@ export function createExecutionService(deps: ExecutionDependencies) {
       // A durable reservation is never automatically redelivered after a crash.
       await flush(context.tenantId, action.id);
       // Audit persistence can take time; expired decisions never authorize a call.
-      if (deps.now().getTime() >= Date.parse(decision.validUntil)) {
+      const admissionCurrent = admissionGuard
+        ? await admissionGuard().catch(() => false)
+        : true;
+      if (
+        !admissionCurrent ||
+        deps.now().getTime() >= Date.parse(decision.validUntil)
+      ) {
         record.state = 'failed';
+        record.attempt.dispatch = 'not_dispatched';
+        record.attempt.businessOutcome = 'inconclusive';
         record.attempt.finishedAt = deps.now().toISOString();
         await deps.repository.finish(
           record,
@@ -230,7 +288,13 @@ export function createExecutionService(deps: ExecutionDependencies) {
             hash,
             'execution.withheld',
             deps.id(),
-            { reason: 'decision_expired' },
+            {
+              reason: admissionCurrent
+                ? 'decision_expired'
+                : 'admission_changed',
+              dispatch: 'not_dispatched',
+              businessOutcome: 'inconclusive',
+            },
             decision.id,
             record.attempt.id,
           ),
@@ -240,6 +304,15 @@ export function createExecutionService(deps: ExecutionDependencies) {
       }
       try {
         const effect = await adapter.execute(action, record.idempotencyKey);
+        record.attempt.dispatch = 'dispatched';
+        if (effect.providerRequestId != null) {
+          if (
+            typeof effect.providerRequestId !== 'string' ||
+            !/^[\x21-\x7e]{1,200}$/.test(effect.providerRequestId)
+          )
+            throw new Error('Invalid provider request ID');
+          record.attempt.providerRequestId = effect.providerRequestId;
+        }
         record.attempt.effectEvidenceRefs = deps.parseEvidence(
           effect.evidenceRefs,
         );
@@ -253,10 +326,29 @@ export function createExecutionService(deps: ExecutionDependencies) {
             : record.attempt.verification.outcome === 'failed'
               ? 'failed'
               : 'unknown';
-      } catch {
+      } catch (error) {
+        if (
+          error instanceof ConnectorError &&
+          typeof error.failure.providerRequestId === 'string' &&
+          /^[\x21-\x7e]{1,200}$/.test(error.failure.providerRequestId) &&
+          !record.attempt.providerRequestId
+        )
+          record.attempt.providerRequestId = error.failure.providerRequestId;
+        if (
+          error instanceof ConnectorError &&
+          error.failure.dispatch !== undefined &&
+          record.attempt.dispatch !== 'dispatched'
+        )
+          record.attempt.dispatch = error.failure.dispatch;
         // A thrown request or invalid response cannot establish whether the effect committed.
         record.state = 'unknown';
       }
+      record.attempt.businessOutcome =
+        record.attempt.verification?.outcome === 'passed'
+          ? 'satisfied'
+          : record.attempt.verification?.outcome === 'failed'
+            ? 'violated'
+            : 'inconclusive';
       record.attempt.finishedAt = deps.now().toISOString();
       const completion = event(
         context,
@@ -266,6 +358,11 @@ export function createExecutionService(deps: ExecutionDependencies) {
         deps.id(),
         {
           state: record.state,
+          dispatch: record.attempt.dispatch ?? 'uncertain',
+          businessOutcome: record.attempt.businessOutcome,
+          ...(record.attempt.providerRequestId
+            ? { providerRequestId: record.attempt.providerRequestId }
+            : {}),
           verification: record.attempt.verification?.outcome ?? 'inconclusive',
           ...(record.attempt.verification
             ? {
@@ -304,7 +401,12 @@ export function createExecutionService(deps: ExecutionDependencies) {
       if (
         !adapter ||
         adapter.capability !== record.intent.capability ||
-        adapter.version !== record.intent.capabilityVersion
+        adapter.version !== record.intent.capabilityVersion ||
+        // Legacy attempts predate dispatch identities; retain their recorded executor binding.
+        (record.attempt.dispatchIdentity === undefined
+          ? adapter.mechanism !== record.attempt.mechanism ||
+            !sameExecutor(adapter.executor, record.attempt.executor)
+          : adapter.dispatchIdentity !== record.attempt.dispatchIdentity)
       )
         throw new Error('Capability unavailable');
       const verification = verified(
@@ -312,9 +414,15 @@ export function createExecutionService(deps: ExecutionDependencies) {
         record.attempt.startedAt,
       );
       // A negative read while an old request is in flight cannot establish a safe retry.
-      if (verification.outcome !== 'passed') return result(record);
       const expectedState = record.state;
-      record.state = 'succeeded';
+      record.state =
+        verification.outcome === 'passed' ? 'succeeded' : expectedState;
+      record.attempt.businessOutcome =
+        verification.outcome === 'passed'
+          ? 'satisfied'
+          : verification.outcome === 'failed'
+            ? 'violated'
+            : 'inconclusive';
       record.attempt.verification = verification;
       record.attempt.finishedAt = deps.now().toISOString();
       const reconciled = event(
@@ -324,8 +432,10 @@ export function createExecutionService(deps: ExecutionDependencies) {
         'execution.reconciled',
         deps.id(),
         {
-          state: 'succeeded',
-          verification: 'passed',
+          state: record.state,
+          dispatch: record.attempt.dispatch ?? 'uncertain',
+          businessOutcome: record.attempt.businessOutcome,
+          verification: verification.outcome,
           evaluatorVersion: verification.evaluatorVersion,
           observedAt: verification.observedAt,
         },

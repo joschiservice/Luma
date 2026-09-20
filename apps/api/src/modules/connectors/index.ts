@@ -32,17 +32,10 @@ export type {
   ConnectorFailure,
   CapabilityResult,
 } from '#modules/connectors/domain/capabilities';
-export { createCapabilityRuntime } from '#modules/connectors/application/capabilities';
 export type {
   CapabilityDescriptor,
-  InvocationContext,
-  CapabilityHandler,
-  ConnectorConnection,
   CapabilityEvent,
-  CapabilityDependencies,
   CapabilityRequest,
-  WriteRequest,
-  CapabilityRuntime,
   CapabilityReader,
 } from '#modules/connectors/application/capabilities';
 export type {

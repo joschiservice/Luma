@@ -1,6 +1,6 @@
-import { createJtlConnector } from '#modules/connectors/composition';
-import { createShopifyConnector } from '#modules/connectors/composition';
-import { createCapabilityRuntime } from '#modules/connectors/index';
+import { createJtlConnector } from '#modules/connectors/infrastructure/jtl/adapter';
+import { createShopifyConnector } from '#modules/connectors/infrastructure/shopify/adapter';
+import { createCapabilityRuntime } from '#modules/connectors/application/capabilities';
 import type { TenantContext } from '#modules/identity/index';
 import { readFileSync } from 'node:fs';
 const jtl = JSON.parse(

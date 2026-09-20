@@ -70,13 +70,40 @@ process.once(
       databaseUrl,
       { refreshContext: resolveContext },
       { resolve: async () => adapter },
+      { eligible: async () => true },
     );
     try {
       const actor = await resolveContext();
-      const replay = await safety.execution.execute(actor, action);
+      const artifact = await safety.provisioning.activate(actor, {
+        id: 'e2e-ledger',
+        version: '1',
+        generation: { kind: 'manual', reference: 'e2e-ledger/1' },
+        steps: {
+          execute: {
+            capability: 'stock.correct',
+            capabilityVersion: '1',
+            targetKind: action.target.kind,
+            minimumRisk: 'low',
+          },
+        },
+      });
+      await safety.provisioning.bind(actor, {
+        tenantId: actor.tenantId,
+        principalId: actor.actor.id,
+        runId: action.id,
+        stepId: 'execute',
+        artifactId: artifact.id,
+        artifactVersion: artifact.version,
+        artifactDigest: artifact.digest,
+        incidentId: action.target.id,
+        diagnosisRevision: 1,
+        action,
+      });
+      const reference = { runId: action.id, stepId: 'execute' };
+      const replay = await safety.execution.execute(actor, reference);
       if (mode === 'recover') {
         const reconciled = await safety.execution.reconcile(actor, action.id);
-        const repeated = await safety.execution.execute(actor, action);
+        const repeated = await safety.execution.execute(actor, reference);
         process.send({ type: 'recovered', replay, reconciled, repeated });
       } else {
         throw new Error(

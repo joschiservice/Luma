@@ -297,6 +297,34 @@ describe('JTL shipping-method correction', () => {
       new Headers(f.fetch.mock.calls[3]![1]?.headers).get('Idempotency-Key'),
     ).not.toBe(first);
   });
+  it('retains the provider request ID in the write receipt', async () => {
+    const f = fixture();
+    f.fetch
+      .mockResolvedValueOnce(Response.json(f.state))
+      .mockResolvedValueOnce(
+        Response.json(
+          { salesOrderId: '10' },
+          { headers: { 'x-request-id': 'provider-42' } },
+        ),
+      );
+    expect(await f.write()).toMatchObject({
+      ok: true,
+      value: { providerRequestId: 'provider-42' },
+    });
+  });
+  it('retains request identity when the provider response is inconclusive', async () => {
+    const f = fixture();
+    f.fetch.mockResolvedValueOnce(Response.json(f.state)).mockResolvedValueOnce(
+      new Response('invalid', {
+        status: 500,
+        headers: { 'x-request-id': 'uncertain-42' },
+      }),
+    );
+    expect(await f.write()).toMatchObject({
+      ok: false,
+      error: { effect: 'unknown', providerRequestId: 'uncertain-42' },
+    });
+  });
   it.each([429, 500, 503, 302, 200])(
     'requires reconciliation after an uncertain PATCH response %s',
     async (status) => {

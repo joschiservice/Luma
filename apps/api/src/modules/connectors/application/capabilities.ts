@@ -288,6 +288,7 @@ export function createCapabilityRuntime(deps: CapabilityDependencies) {
           const boundIntent = structuredClone(intent);
           const boundInput = structuredClone(input);
           return {
+            dispatchIdentity: expectedIdentity,
             capability: binding.capability,
             version: '0',
             minimumRisk: handler.descriptor.minimumRisk,
@@ -311,7 +312,10 @@ export function createCapabilityRuntime(deps: CapabilityDependencies) {
                 expectedIdentity,
               );
               if (!result.ok) throw new ConnectorError(result.error);
-              return { evidenceRefs: result.value.evidenceRefs };
+              return {
+                evidenceRefs: result.value.evidenceRefs,
+                providerRequestId: result.value.providerRequestId,
+              };
             },
             verify: (action) => binding.verify(context, action),
           };

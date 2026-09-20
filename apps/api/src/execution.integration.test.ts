@@ -1,3 +1,5 @@
+import { ConnectorError } from '#modules/connectors/index';
+import { createSafetyFixture as createSafetyServices } from '#test-support/safety-fixtures';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { Pool } from 'pg';
@@ -12,7 +14,7 @@ import {
 } from 'vitest';
 import {
   buildRuntimeApp,
-  createSafetyServices,
+  createSafetyServices as createAdmissionServices,
   createExceptionWorkflowRuntime,
 } from '#app';
 import { createAuditLog } from '#modules/audit/composition';
@@ -142,6 +144,449 @@ describe.skipIf(!databaseUrl)(
         )
       ).rows.map((row) => row.document);
     }
+    async function admitted(
+      proposal = action(),
+      eligible = true,
+      permission: Partial<{
+        capabilityVersion: string;
+        targetKind: string;
+        minimumRisk: 'low' | 'medium' | 'high';
+      }> = {},
+    ) {
+      const service = createAdmissionServices(
+        runtimeUrl,
+        { refreshContext },
+        { resolve },
+        { eligible: async () => eligible },
+      );
+      const artifact = await service.provisioning.activate(alice, {
+        id: 'admission-test',
+        version: randomUUID(),
+        generation: { kind: 'generated', reference: 'untrusted-author/1' },
+        steps: {
+          execute: {
+            capability: 'stock.correct',
+            capabilityVersion: '1',
+            targetKind: 'sku',
+            minimumRisk: 'low',
+            ...permission,
+          },
+        },
+      });
+      const step = {
+        runId: proposal.id,
+        stepId: 'execute',
+        tenantId,
+        principalId: alice.actor.id,
+        artifactId: artifact.id,
+        artifactVersion: artifact.version,
+        artifactDigest: artifact.digest,
+        incidentId: randomUUID(),
+        diagnosisRevision: 1,
+        action: proposal,
+      };
+      await service.provisioning.bind(alice, step);
+      return {
+        service,
+        artifact,
+        step,
+        reference: { runId: step.runId, stepId: step.stepId },
+      };
+    }
+    it('admits concurrent logical requests once and retains provider, artifact and audit identity', async () => {
+      const f = await admitted();
+      execute.mockResolvedValue({
+        evidenceRefs: [observationId],
+        providerRequestId: 'provider-request-42',
+      });
+      try {
+        await Promise.all(
+          Array.from({ length: 5 }, () =>
+            f.service.execution.execute(alice, f.reference),
+          ),
+        );
+        const result = await f.service.execution.execute(alice, f.reference);
+        expect(execute).toHaveBeenCalledTimes(1);
+        expect(result).toMatchObject({
+          state: 'succeeded',
+          record: {
+            idempotencyKey: `v0:${f.step.action.id}`,
+            admission: {
+              runId: f.step.runId,
+              artifactDigest: f.artifact.digest,
+              generation: { kind: 'generated' },
+            },
+            attempt: {
+              dispatch: 'dispatched',
+              businessOutcome: 'satisfied',
+              providerRequestId: 'provider-request-42',
+              requestedBy: alice.actor.id,
+            },
+          },
+        });
+        const entries = await audit(f.step.action.id);
+        expect(
+          entries.find((entry) => entry.eventType === 'execution.prepared')
+            ?.details,
+        ).toMatchObject({
+          runId: f.step.runId,
+          artifactDigest: f.artifact.digest,
+        });
+        expect(
+          entries.find((entry) => entry.eventType === 'execution.completed')
+            ?.details,
+        ).toMatchObject({
+          dispatch: 'dispatched',
+          businessOutcome: 'satisfied',
+          providerRequestId: 'provider-request-42',
+        });
+      } finally {
+        await f.service.close();
+      }
+    });
+    it('rejects raw actions, injected authority and foreign references with zero writes', async () => {
+      const f = await admitted();
+      try {
+        for (const input of [
+          f.step.action,
+          { ...f.reference, tenantId },
+          { ...f.reference, parameters: { quantity: 99 } },
+          { ...f.reference, capability: 'arbitrary.write' },
+          { ...f.reference, stepId: 'foreign' },
+          { ...f.reference, runId: randomUUID() },
+        ])
+          await expect(
+            f.service.execution.execute(alice, input),
+          ).rejects.toThrow();
+        await expect(
+          f.service.execution.execute(outsider, f.reference),
+        ).rejects.toThrow();
+        await expect(
+          f.service.execution.execute(bob, f.reference),
+        ).rejects.toThrow();
+        await expect(
+          f.service.execution.execute(member, f.reference),
+        ).rejects.toThrow();
+        expect(execute).not.toHaveBeenCalled();
+      } finally {
+        await f.service.close();
+      }
+    });
+    it('fails closed without an independent eligibility reader', async () => {
+      const f = await admitted();
+      const closed = createAdmissionServices(
+        runtimeUrl,
+        { refreshContext },
+        { resolve },
+      );
+      try {
+        await expect(
+          closed.execution.execute(alice, f.reference),
+        ).rejects.toThrow('eligible');
+        expect(execute).not.toHaveBeenCalled();
+      } finally {
+        await Promise.all([f.service.close(), closed.close()]);
+      }
+    });
+    it('rejects revoked artifacts, changed bindings and foreign target mappings', async () => {
+      const f = await admitted();
+      try {
+        await expect(
+          f.service.provisioning.bind(alice, {
+            ...f.step,
+            action: { ...f.step.action, id: randomUUID() },
+          }),
+        ).rejects.toThrow('already bound');
+        await expect(
+          f.service.provisioning.bind(alice, {
+            ...f.step,
+            runId: randomUUID(),
+          }),
+        ).rejects.toThrow('already bound');
+        await expect(
+          f.service.provisioning.bind(outsider, f.step),
+        ).rejects.toThrow();
+        resolve.mockResolvedValue(null);
+        expect(
+          await f.service.execution.execute(alice, f.reference),
+        ).toMatchObject({ state: 'denied' });
+        await f.service.provisioning.revoke(
+          alice,
+          f.artifact.id,
+          f.artifact.version,
+        );
+        await expect(
+          f.service.execution.execute(alice, f.reference),
+        ).rejects.toThrow('activated artifact');
+        expect(execute).not.toHaveBeenCalled();
+      } finally {
+        await f.service.close();
+      }
+    });
+    it('independently enforces policy denial, evidence freshness and approval risk', async () => {
+      const f = await admitted(action({ risk: 'high' }));
+      try {
+        checkPreconditions.mockResolvedValue(false);
+        expect(
+          await f.service.execution.execute(alice, f.reference),
+        ).toMatchObject({ state: 'denied' });
+        checkPreconditions.mockResolvedValue(true);
+        expect(
+          await f.service.execution.execute(alice, f.reference),
+        ).toMatchObject({ state: 'approval_required' });
+        expect(execute).not.toHaveBeenCalled();
+      } finally {
+        await f.service.close();
+      }
+      const stale = await admitted(
+        action({
+          preconditions: {
+            evidenceRefs: [observationId],
+            validUntil: new Date(Date.now() - 1000).toISOString(),
+          },
+        }),
+      );
+      try {
+        expect(
+          await stale.service.execution.execute(alice, stale.reference),
+        ).toMatchObject({ state: 'denied' });
+        expect(execute).not.toHaveBeenCalled();
+      } finally {
+        await stale.service.close();
+      }
+    });
+    it('reconciles uncertain admission without a second dispatch', async () => {
+      const f = await admitted();
+      execute.mockRejectedValue(
+        new ConnectorError({
+          code: 'timeout',
+          effect: 'unknown',
+          retry: 'reconcile',
+          providerRequestId: 'lost-response-42',
+        }),
+      );
+      try {
+        expect(
+          await f.service.execution.execute(alice, f.reference),
+        ).toMatchObject({
+          state: 'reconciliation_required',
+          record: {
+            attempt: {
+              dispatch: 'uncertain',
+              businessOutcome: 'inconclusive',
+              providerRequestId: 'lost-response-42',
+            },
+          },
+        });
+        await f.service.execution.execute(alice, f.reference);
+        expect(
+          await f.service.execution.reconcile(alice, f.step.action.id),
+        ).toMatchObject({
+          state: 'succeeded',
+          record: {
+            attempt: { dispatch: 'uncertain', businessOutcome: 'satisfied' },
+          },
+        });
+        expect(execute).toHaveBeenCalledTimes(1);
+      } finally {
+        await f.service.close();
+      }
+    });
+    it('keeps provider acceptance separate from failed business verification', async () => {
+      const f = await admitted();
+      verify.mockImplementation(async () => ({
+        outcome: 'failed',
+        observationRefs: [observationId],
+        observedAt: new Date().toISOString(),
+        evaluatorVersion: 'business/1',
+      }));
+      try {
+        expect(
+          await f.service.execution.execute(alice, f.reference),
+        ).toMatchObject({
+          state: 'failed',
+          record: {
+            attempt: { dispatch: 'dispatched', businessOutcome: 'violated' },
+          },
+        });
+      } finally {
+        await f.service.close();
+      }
+    });
+    it.each([
+      { capabilityVersion: '2' },
+      { targetKind: 'order' },
+      { minimumRisk: 'high' as const },
+    ])('rejects artifact permission mismatch %j', async (permission) => {
+      const f = await admitted(action(), true, permission);
+      try {
+        await expect(
+          f.service.execution.execute(alice, f.reference),
+        ).rejects.toThrow('activated artifact');
+        expect(execute).not.toHaveBeenCalled();
+      } finally {
+        await f.service.close();
+      }
+    });
+    it('withholds a reserved action if activation is revoked during policy checks', async () => {
+      const f = await admitted();
+      checkPreconditions.mockImplementation(async () => {
+        await f.service.provisioning.revoke(
+          alice,
+          f.artifact.id,
+          f.artifact.version,
+        );
+        return true;
+      });
+      try {
+        expect(
+          await f.service.execution.execute(alice, f.reference),
+        ).toMatchObject({
+          state: 'failed',
+          record: {
+            attempt: {
+              dispatch: 'not_dispatched',
+              businessOutcome: 'inconclusive',
+            },
+          },
+        });
+        expect(execute).not.toHaveBeenCalled();
+      } finally {
+        await f.service.close();
+      }
+    });
+    it.each(['api', 'deterministic_browser', 'sandboxed_code'] as const)(
+      'applies approval and reservation to %s adapters',
+      async (mechanism) => {
+        const f = await admitted(action({ risk: 'high' }));
+        const original = adapter.mechanism;
+        adapter.mechanism = mechanism;
+        try {
+          const waiting = await f.service.execution.execute(alice, f.reference);
+          expect(waiting.state).toBe('approval_required');
+          expect(execute).not.toHaveBeenCalled();
+          if (waiting.state !== 'approval_required')
+            throw new Error('Expected approval');
+          await f.service.policies.respond(
+            bob,
+            waiting.decision.id,
+            'approved',
+            new Date(Date.now() + 60000).toISOString(),
+          );
+          expect(
+            await f.service.execution.execute(alice, f.reference),
+          ).toMatchObject({
+            state: 'succeeded',
+            record: { attempt: { mechanism, dispatch: 'dispatched' } },
+          });
+          await f.service.execution.execute(alice, f.reference);
+          expect(execute).toHaveBeenCalledTimes(1);
+        } finally {
+          adapter.mechanism = original;
+          await f.service.close();
+        }
+      },
+    );
+    it('persists inconclusive reconciliation and rejects a changed provider identity', async () => {
+      const f = await admitted();
+      adapter.dispatchIdentity = 'provider/1';
+      execute.mockRejectedValue(new Error('lost response'));
+      try {
+        await f.service.execution.execute(alice, f.reference);
+        verify.mockImplementation(async () => ({
+          outcome: 'inconclusive',
+          observationRefs: [observationId],
+          observedAt: new Date().toISOString(),
+          evaluatorVersion: 'recovery/1',
+        }));
+        expect(
+          await f.service.execution.reconcile(alice, f.step.action.id),
+        ).toMatchObject({
+          state: 'reconciliation_required',
+          record: {
+            attempt: {
+              dispatchIdentity: 'provider/1',
+              verification: { evaluatorVersion: 'recovery/1' },
+            },
+          },
+        });
+        expect(
+          (await audit(f.step.action.id)).find(
+            (entry) => entry.eventType === 'execution.reconciled',
+          )?.evidenceRefs,
+        ).toContain(observationId);
+        adapter.dispatchIdentity = 'provider/2';
+        await expect(
+          f.service.execution.reconcile(alice, f.step.action.id),
+        ).rejects.toThrow('unavailable');
+        expect(execute).toHaveBeenCalledTimes(1);
+      } finally {
+        delete adapter.dispatchIdentity;
+        await f.service.close();
+      }
+    });
+    it('isolates and protects run and artifact documents under the runtime database role', async () => {
+      const f = await admitted();
+      try {
+        expect(
+          await f.service.provisioning.step(
+            outsider,
+            f.step.runId,
+            f.step.stepId,
+          ),
+        ).toBeNull();
+        expect(
+          await f.service.provisioning.artifact(
+            outsider,
+            f.artifact.id,
+            f.artifact.version,
+          ),
+        ).toBeNull();
+        await expect(
+          f.service.provisioning.bind(alice, {
+            ...f.step,
+            stepId: 'another',
+            action: action(),
+            diagnosisRevision: 2,
+          }),
+        ).rejects.toThrow('Run authority');
+        const db = createTenantDatabase(runtime);
+        for (const table of [
+          'action_artifacts',
+          'action_admission_runs',
+          'action_admission_steps',
+        ]) {
+          await expect(
+            db.transaction(tenantId, (tx) =>
+              tx.query(
+                `UPDATE ${table} SET document='{}'::jsonb WHERE tenant_id=$1`,
+                [tenantId],
+              ),
+            ),
+          ).rejects.toThrow('permission denied');
+          await expect(
+            db.transaction(tenantId, (tx) =>
+              tx.query(`DELETE FROM ${table} WHERE tenant_id=$1`, [tenantId]),
+            ),
+          ).rejects.toThrow('permission denied');
+        }
+        await f.service.provisioning.revoke(
+          alice,
+          f.artifact.id,
+          f.artifact.version,
+        );
+        await expect(
+          db.transaction(tenantId, (tx) =>
+            tx.query(
+              'UPDATE action_artifacts SET active=true WHERE tenant_id=$1 AND id=$2 AND version=$3',
+              [tenantId, f.artifact.id, f.artifact.version],
+            ),
+          ),
+        ).rejects.toThrow('cannot be reactivated');
+      } finally {
+        await f.service.close();
+      }
+    });
     beforeAll(async () => {
       await admin.query(`CREATE DATABASE "${database}"`);
       const url = new URL(databaseUrl!);
@@ -155,6 +600,8 @@ describe.skipIf(!databaseUrl)(
         for (const name of [
           '0001_identity.sql',
           '0002_policy_execution_audit.sql',
+          '0012_action_admission.sql',
+          '0013_preserve_prepared_reconciliation.sql',
         ]) {
           await owner.query(
             await readFile(
@@ -524,6 +971,25 @@ describe.skipIf(!databaseUrl)(
         },
       };
       const businessVerify = vi.fn().mockResolvedValue(true);
+      const admissionSafety = createAdmissionServices(
+        runtimeUrl,
+        { refreshContext },
+        { resolve },
+        { eligible: async () => true },
+      );
+      await admissionSafety.provisioning.activate(alice, {
+        id: 'exception-resolution',
+        version: '1',
+        generation: { kind: 'manual', reference: 'temporal-test' },
+        steps: {
+          execute: {
+            capability: 'stock.correct',
+            capabilityVersion: '1',
+            targetKind: 'sku',
+            minimumRisk: 'low',
+          },
+        },
+      });
       const processRuntime = createExceptionWorkflowRuntime(
         {
           address: env.address,
@@ -553,7 +1019,7 @@ describe.skipIf(!databaseUrl)(
             history: vi.fn(),
           },
         },
-        safety,
+        admissionSafety,
         {
           loadDetection: vi.fn(),
           proposals: {
@@ -593,6 +1059,7 @@ describe.skipIf(!databaseUrl)(
           (await audit(proposal.id)).map((entry) => entry.eventType),
         ).toContain('execution.reconciled');
       } finally {
+        await admissionSafety.close();
         worker.shutdown();
         await running;
         await worker.close();
@@ -708,6 +1175,123 @@ describe.skipIf(!databaseUrl)(
       );
       expect(execute).toHaveBeenCalledTimes(1);
     });
+    it.each(['prepared', 'unknown'] as const)(
+      'reconciles legacy %s attempts using their stored executor binding',
+      async (state) => {
+        const proposal = action();
+        execute.mockRejectedValue(new Error('lost response'));
+        await safety.execution.execute(alice, proposal);
+        // Recreate the document shape persisted before dispatch identity was introduced.
+        await owner.query('ALTER TABLE executed_actions DISABLE TRIGGER USER');
+        try {
+          await owner.query(
+            `UPDATE executed_actions SET state=$2, document=jsonb_set(
+              document #- '{attempt,dispatch}' #- '{attempt,businessOutcome}',
+              '{state}', to_jsonb($2::text)) WHERE proposal_id=$1`,
+            [proposal.id, state],
+          );
+        } finally {
+          await owner.query('ALTER TABLE executed_actions ENABLE TRIGGER USER');
+        }
+        const current = { ...adapter, dispatchIdentity: 'provider/1' };
+        resolve.mockResolvedValue({
+          ...current,
+          mechanism: 'deterministic_browser',
+        });
+        await expect(
+          safety.execution.reconcile(alice, proposal.id),
+        ).rejects.toThrow('Capability unavailable');
+        resolve.mockResolvedValue({
+          ...current,
+          executor: { kind: 'connector', id: 'different' },
+        });
+        await expect(
+          safety.execution.reconcile(alice, proposal.id),
+        ).rejects.toThrow('Capability unavailable');
+        expect(verify).not.toHaveBeenCalled();
+        resolve.mockResolvedValue(current);
+        expect(
+          (await safety.execution.reconcile(alice, proposal.id)).state,
+        ).toBe('succeeded');
+        expect(execute).toHaveBeenCalledTimes(1);
+        expect(verify).toHaveBeenCalledTimes(1);
+      },
+    );
+    it.each(['failed', 'inconclusive'] as const)(
+      'preserves an in-flight completion after %s reconciliation',
+      async (outcome) => {
+        const proposal = action();
+        let notifyStarted!: () => void;
+        const started = new Promise<void>((resolve) => {
+          notifyStarted = resolve;
+        });
+        let release!: (
+          value: Awaited<ReturnType<EffectAdapter['execute']>>,
+        ) => void;
+        const response = new Promise<
+          Awaited<ReturnType<EffectAdapter['execute']>>
+        >((resolve) => {
+          release = resolve;
+        });
+        execute.mockImplementation(async () => {
+          notifyStarted();
+          return response;
+        });
+        verify.mockImplementationOnce(async () => ({
+          outcome,
+          observationRefs: [observationId],
+          observedAt: new Date().toISOString(),
+          evaluatorVersion: 'fixture-1',
+        }));
+        const pending = safety.execution.execute(alice, proposal);
+        await started;
+        try {
+          expect(
+            await safety.execution.reconcile(alice, proposal.id),
+          ).toMatchObject({
+            state: 'reconciliation_required',
+            record: {
+              state: 'prepared',
+              attempt: { verification: { outcome } },
+            },
+          });
+          expect((await safety.execution.execute(alice, proposal)).state).toBe(
+            'reconciliation_required',
+          );
+        } finally {
+          release({
+            evidenceRefs: [observationId],
+            providerRequestId: 'live-request',
+          });
+        }
+        expect(await pending).toMatchObject({
+          state: 'succeeded',
+          record: {
+            attempt: {
+              dispatch: 'dispatched',
+              providerRequestId: 'live-request',
+              verification: { outcome: 'passed' },
+            },
+          },
+        });
+        expect(execute).toHaveBeenCalledTimes(1);
+        const events = await audit(proposal.id);
+        expect(events).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              eventType: 'execution.reconciled',
+              details: expect.objectContaining({ verification: outcome }),
+            }),
+            expect.objectContaining({
+              eventType: 'execution.completed',
+              details: expect.objectContaining({
+                providerRequestId: 'live-request',
+              }),
+            }),
+          ]),
+        );
+      },
+    );
     it('does not equate an accepted request with verified success', async () => {
       verify.mockImplementation(async () => ({
         outcome: 'failed',

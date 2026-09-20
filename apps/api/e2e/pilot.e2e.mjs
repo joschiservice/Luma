@@ -308,7 +308,10 @@ test.each(['before', 'after'])(
         respond(f.pilot, f.manifest, f.client, 'approve'),
       ).rejects.toMatchObject({ statusCode: 409 });
     expect(
-      await f.pilot.safety.execution.execute(actor, proposal.action),
+      await f.pilot.safety.execution.execute(actor, {
+        runId: proposal.action.id,
+        stepId: 'execute',
+      }),
     ).toMatchObject({
       state: 'denied',
       decision: { reason: 'capability_unavailable' },

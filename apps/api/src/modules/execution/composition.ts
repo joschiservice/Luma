@@ -33,3 +33,28 @@ export function createExecution(
 }
 
 export { parseAction } from '#modules/execution/infrastructure/validation';
+
+export { createAdmissionStore } from '#modules/execution/infrastructure/admission';
+import { createActionAdmission } from '#modules/execution/application/admission';
+import type { AdmissionDependencies } from '#modules/execution/application/admission';
+import { parseAdmissionReference } from '#modules/execution/infrastructure/admission';
+export function createAdmission(
+  deps: Omit<AdmissionDependencies, 'parseAction' | 'parseReference'>,
+) {
+  return createActionAdmission({
+    ...deps,
+    parseAction,
+    parseReference: parseAdmissionReference,
+  });
+}
+
+/** Give interpreted logic only this bound, reference-only function. Do not pass the service or provisioning store. */
+export function bindActionAdmission(
+  admission: import('#modules/execution/application/admission').ActionAdmission,
+  context: import('#modules/identity/index').TenantContext,
+  runId: string,
+) {
+  return Object.freeze({
+    execute: (stepId: string) => admission.execute(context, { runId, stepId }),
+  });
+}
