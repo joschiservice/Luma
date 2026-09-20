@@ -102,3 +102,21 @@ export const Unobserved: Story = {
     </CaseNotice>
   ),
 };
+
+export const Unconfirmed: Story = {
+  args: { unconfirmed: true },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByText('Current investigation is unconfirmed'),
+    ).toBeVisible();
+    await expect(
+      canvas.queryByText('Evidence is stale'),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByText(
+        'Review authoritative JTL stock and have an authorized operator correct Shopify.',
+      ),
+    ).not.toBeInTheDocument();
+  },
+};

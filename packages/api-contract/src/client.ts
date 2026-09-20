@@ -33,9 +33,10 @@ export function subscribeToCaseProgress(options: {
     try {
       if (!('data' in event) || typeof event.data !== 'string')
         throw new Error('Invalid case stream event');
-      options.onResync(
-        caseStreamEventSchema.parse(JSON.parse(event.data)).progress,
-      );
+      const snapshot = caseStreamEventSchema.parse(JSON.parse(event.data));
+      if (snapshot.exceptionId !== options.exceptionId)
+        throw new Error('Case stream mismatch');
+      options.onResync(snapshot.progress);
     } catch {
       source.close();
       options.onError();

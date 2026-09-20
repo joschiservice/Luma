@@ -159,8 +159,9 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
     'sync_failure',
   );
   expect(await row.isVisible()).toBe(true);
+  await page.getByText('Live', { exact: true }).waitFor();
   await services.diagnoses.run(tenant, ids[0]);
-  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  // The credentialed stream refreshes the completed investigation without a click.
   await page
     .getByRole('heading', {
       name: 'The connection read needs investigation.',
@@ -168,6 +169,183 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
     })
     .waitFor();
   expect(await page.getByRole('button', { name: /approve/i }).count()).toBe(0);
+  // Exercise presentation of authoritative HTTP snapshots through the live host.
+  const caseApi = `/api/v1/organizations/${organizationId}/exceptions/${ids[0]}`;
+  const baseline = await (await context.request.get(caseApi)).json();
+  const baselineProgress = await (
+    await context.request.get(`${caseApi}/progress`)
+  ).json();
+  let snapshotState = 'awaiting_approval';
+  const executionId = randomUUID();
+  await page.route(`**${caseApi}`, (route) =>
+    route.fulfill({ json: { ...baseline, state: snapshotState } }),
+  );
+  await page.route(`**${caseApi}/progress`, (route) =>
+    route.fulfill({
+      json: {
+        ...baselineProgress,
+        state: snapshotState,
+        execution:
+          snapshotState === 'awaiting_approval'
+            ? null
+            : {
+                id: executionId,
+                proposalId: executionId,
+                attemptId: executionId,
+                attempt: 1,
+                state:
+                  snapshotState === 'failed'
+                    ? 'failed'
+                    : snapshotState === 'executing'
+                      ? 'prepared'
+                      : 'succeeded',
+                requestedBy: 'test-worker',
+                executor: { kind: 'connector', id: 'test-connector' },
+                startedAt: baseline.detectedAt,
+                finishedAt:
+                  snapshotState === 'executing' ? null : baseline.detectedAt,
+                effectEvidenceRefs: ['effect-ref'],
+                verification:
+                  snapshotState === 'resolved'
+                    ? {
+                        outcome: 'passed',
+                        observationRefs: ['verified-ref'],
+                        observedAt: baseline.detectedAt,
+                        evaluatorVersion: 'test-v1',
+                      }
+                    : null,
+              },
+        resolution:
+          snapshotState === 'resolved'
+            ? {
+                kind: 'verification',
+                at: baseline.detectedAt,
+                actorId: 'verifier',
+                evidenceRefs: ['verified-ref'],
+              }
+            : null,
+        workflow: {
+          availability: 'available',
+          progress: {
+            phase: snapshotState === 'failed' ? 'escalated' : snapshotState,
+          },
+        },
+      },
+    }),
+  );
+  for (const state of [
+    'awaiting_approval',
+    'executing',
+    'verifying',
+    'resolved',
+    'failed',
+    'escalated',
+  ]) {
+    snapshotState = state;
+    await page.getByRole('button', { name: 'Refresh progress' }).click();
+    await expect
+      .poll(() => page.locator('.case-progress-state strong').textContent())
+      .toBe(state.replaceAll('_', ' ').replace(/^./, (c) => c.toUpperCase()));
+    if (state === 'verifying') {
+      expect(await page.getByText('Succeeded', { exact: true }).count()).toBe(
+        1,
+      );
+      expect(
+        await page
+          .getByText('Recorded verified resolution', { exact: true })
+          .count(),
+      ).toBe(0);
+    }
+    if (state === 'resolved')
+      await page
+        .getByText('Recorded verified resolution', { exact: true })
+        .waitFor();
+    expect(await page.getByRole('button', { name: /retry/i }).count()).toBe(0);
+  }
+  await page.unroute(`**${caseApi}`);
+  await page.unroute(`**${caseApi}/progress`);
+  await page.getByRole('button', { name: 'Refresh progress' }).click();
+  await expect
+    .poll(() => page.locator('.case-progress-state strong').textContent())
+    .toBe(
+      baselineProgress.state
+        .replaceAll('_', ' ')
+        .replace(/^./, (c) => c.toUpperCase()),
+    );
+  await page.getByText('Live', { exact: true }).waitFor();
+  const recordedTimeline = await (
+    await context.request.get(`${caseApi}/timeline?limit=100`)
+  ).json();
+  const slowEvent = {
+    id: randomUUID(),
+    type: 'review.slow_refresh_completed',
+    occurredAt: baseline.detectedAt,
+    actorId: null,
+    proposalId: null,
+    outcome: null,
+    evidenceRefs: [],
+  };
+  let slowRefresh = true;
+  let releasePage;
+  const pageGate = new Promise((resolve) => {
+    releasePage = resolve;
+  });
+  await page.route(`**${caseApi}/timeline?**`, async (route) => {
+    const laterPage = new URL(route.request().url()).searchParams.has('cursor');
+    if (slowRefresh) await new Promise((resolve) => setTimeout(resolve, 6500));
+    if (laterPage) await pageGate;
+    await route.fulfill({
+      json: {
+        items: laterPage
+          ? [
+              {
+                ...slowEvent,
+                id: randomUUID(),
+                type: 'review.history_page_loaded',
+              },
+            ]
+          : [...recordedTimeline.items, slowEvent],
+        nextCursor: laterPage ? null : 'review-page-2',
+      },
+    });
+  });
+  const recommendations = await page.locator('.case-step').allTextContents();
+  expect(recommendations.length).toBeGreaterThan(0);
+  // The request spans a second SSE heartbeat. It must finish without being cancelled.
+  await page.waitForRequest((request) =>
+    request.url().includes(`${caseApi}/timeline?`),
+  );
+  await page.getByText('Refreshing', { exact: true }).waitFor();
+  expect(await page.locator('.case-step').allTextContents()).toEqual(
+    recommendations,
+  );
+  expect(
+    await page.getByText('Evidence is stale', { exact: true }).count(),
+  ).toBe(0);
+  await page
+    .getByText('Review slow refresh completed', { exact: true })
+    .waitFor();
+  slowRefresh = false;
+  const auditDetails = page.locator('.case-audit details').first();
+  await auditDetails.locator('summary').click();
+  await auditDetails.evaluate((element) => {
+    element.dataset.retained = 'true';
+  });
+  await Promise.all([
+    page.waitForRequest((request) =>
+      request.url().includes('cursor=review-page-2'),
+    ),
+    page
+      .getByRole('button', { name: 'Load more history and evidence' })
+      .click(),
+  ]);
+  expect(await auditDetails.getAttribute('open')).not.toBeNull();
+  expect(await auditDetails.getAttribute('data-retained')).toBe('true');
+  expect(await page.getByLabel('Loading cases').count()).toBe(0);
+  releasePage();
+  await page.getByText('Review history page loaded', { exact: true }).waitFor();
+  expect(await auditDetails.getAttribute('data-retained')).toBe('true');
+  await page.unroute(`**${caseApi}/timeline?**`);
   const evidence = page.locator('.case-evidence summary').first();
   await evidence.focus();
   await page.keyboard.press('Enter');
@@ -226,6 +404,17 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
       exact: true,
     })
     .waitFor();
+  const audit = page.locator('.case-audit > li');
+  const eventCount = await audit.count();
+  await page.getByRole('button', { name: 'Refresh progress' }).click();
+  await expect.poll(() => audit.count()).toBe(eventCount);
+  await context.setOffline(true);
+  await page.getByText('Connection lost', { exact: true }).waitFor();
+  await page
+    .getByText('Current state is unconfirmed', { exact: true })
+    .waitFor();
+  await context.setOffline(false);
+  await page.getByText('Live', { exact: true }).waitFor();
   await services.exceptions.resolve(tenant, ids[0], {
     kind: 'human_disposition',
     reason: 'Handled by operator',
@@ -236,10 +425,16 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
     .getByText('This case has left the current view', { exact: true })
     .waitFor();
   await page
-    .getByText(
-      'Closed by human disposition. This does not establish a verified correction.',
-    )
+    .getByRole('heading', { name: 'Closed by human disposition' })
     .waitFor();
+  await page.reload();
+  await page
+    .getByRole('heading', { name: 'Closed by human disposition' })
+    .waitFor();
+  await page.getByText('Live', { exact: true }).waitFor();
+  await page
+    .locator('.case-progress')
+    .screenshot({ path: '/tmp/luma36-timeline.png' });
   expect(new URL(page.url()).pathname).toContain(ids[0]);
   const foreign = randomUUID();
   const denied = await context.request.get(

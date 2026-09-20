@@ -451,6 +451,102 @@
   }
 }
 
+.case-progress {
+  overflow-wrap: anywhere;
+}
+.case-progress-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.case-live-status {
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.case-progress-state {
+  font-size: 1.25rem;
+  margin-top: 1rem;
+}
+.case-outcomes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-block: 1px solid var(--border);
+  margin-block: 1.4rem;
+}
+.case-outcomes > div {
+  padding: 1rem;
+}
+.case-outcomes > div + div {
+  border-left: 1px solid var(--border);
+}
+.case-outcomes p {
+  font-size: 0.85rem;
+  color: var(--muted-foreground);
+}
+.case-audit {
+  list-style: none;
+  margin: 1rem 0 1.5rem 0.4rem;
+  padding: 0 0 0 1.4rem;
+  border-left: 1px solid var(--border);
+}
+.case-audit > li {
+  position: relative;
+  padding-bottom: 1.5rem;
+}
+.case-audit > li::before {
+  content: '';
+  position: absolute;
+  left: -1.7rem;
+  top: 0.4rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--foreground);
+}
+.case-audit li > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  justify-content: space-between;
+}
+.case-audit time,
+.case-reference-list {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+.case-resolution {
+  border-left: 2px solid var(--brand);
+  padding-left: 1rem;
+  margin-block: 1.5rem;
+}
+@media (max-width: 520px) {
+  .case-outcomes {
+    grid-template-columns: 1fr;
+  }
+  .case-outcomes > div + div {
+    border-left: 0;
+    border-top: 1px solid var(--border);
+  }
+}
+.case-lifecycle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  padding: 0;
+  list-style: none;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+.case-lifecycle li[aria-current='step'] {
+  color: var(--foreground);
+  font-weight: 700;
+  border-bottom: 2px solid var(--brand);
+}
+
 .resolution-facts {
   display: grid;
   grid-template-columns: minmax(100px, 1fr) minmax(0, 2fr);

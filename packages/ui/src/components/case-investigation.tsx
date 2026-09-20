@@ -82,7 +82,15 @@ function Findings({ items }: { items: Diagnosis['facts'] }) {
     </ul>
   );
 }
-export function CaseInvestigation({ item }: { item: CaseDetail }) {
+export function CaseInvestigation({
+  item,
+  progress,
+  unconfirmed = false,
+}: {
+  item: CaseDetail;
+  progress?: ReactNode;
+  unconfirmed?: boolean;
+}) {
   const diagnosis = item.diagnosis;
   const historical =
     diagnosis?.superseded ||
@@ -114,6 +122,12 @@ export function CaseInvestigation({ item }: { item: CaseDetail }) {
           {item.sources.join(' / ') || 'Source system unknown'}
         </p>
       </header>
+      {unconfirmed ? (
+        <CaseNotice title="Current investigation is unconfirmed">
+          These are the last confirmed findings. Reconnect or refresh before
+          choosing a correction.
+        </CaseNotice>
+      ) : null}
       {item.freshness === 'stale' ? (
         <CaseNotice title="Evidence is stale">
           Current conditions are unknown. Fresh observations are needed before
@@ -177,7 +191,12 @@ export function CaseInvestigation({ item }: { item: CaseDetail }) {
         {item.attention.required ? (
           <p className="case-attention">{item.attention.explanation}</p>
         ) : null}
-        {historical ? (
+        {unconfirmed ? (
+          <p>
+            Current recommendations will appear when the investigation is
+            confirmed.
+          </p>
+        ) : historical ? (
           <p>
             This investigation is historical. Its recommendations are no longer
             current.
@@ -332,21 +351,23 @@ export function CaseInvestigation({ item }: { item: CaseDetail }) {
           </p>
         ) : null}
       </section>
-      <section>
-        <h3>
-          <span>05</span> Case progress
-        </h3>
-        <p>
-          {item.resolution === 'verified'
-            ? 'Resolved with fresh verification evidence.'
-            : item.resolution === 'human_disposition'
-              ? 'Closed by human disposition. This does not establish a verified correction.'
-              : `${caseLabel(item.state)}. The case remains active until a terminal disposition is recorded.`}
-        </p>
-        <p className="case-caption">
-          Last activity <CaseTime value={item.lastActivityAt} />
-        </p>
-      </section>
+      {progress ?? (
+        <section>
+          <h3>
+            <span>05</span> Case progress
+          </h3>
+          <p>
+            {item.resolution === 'verified'
+              ? 'Resolved with fresh verification evidence.'
+              : item.resolution === 'human_disposition'
+                ? 'Closed by human disposition. This does not establish a verified correction.'
+                : `${caseLabel(item.state)}. The case remains active until a terminal disposition is recorded.`}
+          </p>
+          <p className="case-caption">
+            Last activity <CaseTime value={item.lastActivityAt} />
+          </p>
+        </section>
+      )}
     </article>
   );
 }

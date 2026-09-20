@@ -10,7 +10,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { caseClasses, caseStates } from '@luma/api-contract';
 import { Button } from '@luma/ui/button';
 import {
-  CaseInvestigation,
   CaseRow,
   CaseNotice,
   CaseLoading,
@@ -25,6 +24,7 @@ import {
 } from './data';
 import { connectionsOptions } from '../connections/data';
 import { IdentityError } from '../identity/data';
+import { LiveCaseDetail } from './progress';
 import { CaseResolution } from './resolution';
 
 export function Inbox() {
@@ -326,10 +326,10 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
               ) : null}
               {item ? (
                 <>
-                  <CaseInvestigation
-                    item={
-                      detail.isError ? { ...item, freshness: 'stale' } : item
-                    }
+                  <LiveCaseDetail
+                    key={`${organizationId}:${exceptionId}`}
+                    organizationId={organizationId}
+                    exceptionId={exceptionId}
                   />
                   <CaseResolution
                     key={exceptionId}

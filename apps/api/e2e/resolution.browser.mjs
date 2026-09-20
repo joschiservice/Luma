@@ -128,7 +128,7 @@ it('reviews decisions, recovers ambiguous commands and escalates through the con
   let receipt;
   let receiptReady = false;
   let holdReview = false;
-  let releaseReview;
+  const reviewReleases = [];
   const json = (route, body, status = 200) =>
     route.fulfill({
       status,
@@ -138,7 +138,7 @@ it('reviews decisions, recovers ambiguous commands and escalates through the con
   await page.route(`**${path}/review`, async (route) => {
     if (holdReview)
       await new Promise((resolve) => {
-        releaseReview = resolve;
+        reviewReleases.push(resolve);
       });
     return json(route, review);
   });
@@ -215,7 +215,7 @@ it('reviews decisions, recovers ambiguous commands and escalates through the con
   progress = { ...progress, caseRevision: 5 };
   holdReview = true;
   await expect
-    .poll(() => Boolean(releaseReview), { timeout: 15_000 })
+    .poll(() => reviewReleases.length > 0, { timeout: 15_000 })
     .toBe(true);
   expect(await reason.isEnabled()).toBe(true);
   expect(await reason.evaluate((el) => el === document.activeElement)).toBe(
@@ -224,7 +224,7 @@ it('reviews decisions, recovers ambiguous commands and escalates through the con
   expect(await approve.isDisabled()).toBe(true);
   await page.keyboard.type(' and risk');
   holdReview = false;
-  releaseReview();
+  for (const releaseReview of reviewReleases) releaseReview();
   await expect.poll(() => approve.isEnabled()).toBe(true);
   expect(await reason.inputValue()).toBe('Reviewed source order and risk');
   expect(await reason.evaluate((el) => el === document.activeElement)).toBe(
