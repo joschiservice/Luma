@@ -23,7 +23,8 @@ import type { ReactNode } from 'react';
 import { Button } from './button';
 import { caseLabel, CaseNotice, CaseTime } from './case-investigation';
 
-export type LiveConnection = 'connecting' | 'syncing' | 'live' | 'disconnected';
+export type LiveConnection =
+  'connecting' | 'syncing' | 'live' | 'disconnected' | 'interrupted';
 
 type Event = CaseTimelinePage['items'][number];
 
@@ -59,16 +60,22 @@ export function CaseTimeline({
   timeline,
   evidence,
   connection,
+  confirmed = connection === 'live' ||
+    connection === 'syncing' ||
+    connection === 'interrupted',
   onRefresh,
   children,
+  historyUnavailable = false,
 }: {
   progress: CaseProgress;
   review: CaseReview;
   timeline: Event[];
   evidence: CaseEvidencePage['items'];
   connection: LiveConnection;
+  confirmed?: boolean;
   onRefresh?: () => void;
   children?: ReactNode;
+  historyUnavailable?: boolean;
 }) {
   const execution = progress.execution;
   const verification = execution?.verification;
@@ -77,7 +84,7 @@ export function CaseTimeline({
     proposal && (!execution || proposal.id === execution.proposalId)
       ? proposal
       : null;
-  const current = connection === 'live';
+  const current = confirmed;
   const workflow = progress.workflow;
 
   return (
@@ -89,14 +96,20 @@ export function CaseTimeline({
         <h3>
           <Activity size={16} aria-hidden="true" /> Execution & verification
         </h3>
-        <span className="case-live-status" data-live={current} role="status">
-          {current
+        <span
+          className="case-live-status"
+          data-live={connection === 'live'}
+          role="status"
+        >
+          {connection === 'live'
             ? 'Live'
             : connection === 'syncing'
               ? 'Refreshing'
               : connection === 'connecting'
                 ? 'Connecting'
-                : 'Connection lost'}
+                : connection === 'interrupted'
+                  ? 'Live updates interrupted'
+                  : 'Connection lost'}
         </span>
       </header>
       {!current ? (
@@ -446,7 +459,11 @@ export function CaseTimeline({
           ))}
         </ol>
       ) : (
-        <p>No audit events recorded yet.</p>
+        <p>
+          {historyUnavailable
+            ? 'Audit history is unavailable.'
+            : 'No audit events recorded yet.'}
+        </p>
       )}
       <h4 className="execution-evidence-heading">
         <Database size={16} aria-hidden="true" /> Evidence provenance
@@ -496,8 +513,9 @@ export function CaseTimeline({
         ))
       ) : (
         <p>
-          No authorized observation references are available in this page. Audit
-          references may describe other evidence types.
+          {historyUnavailable
+            ? 'Evidence history is unavailable.'
+            : 'No authorized observation references are available in this page. Audit references may describe other evidence types.'}
         </p>
       )}
       {children}

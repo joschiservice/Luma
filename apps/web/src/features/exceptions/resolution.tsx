@@ -5,16 +5,14 @@ import {
   CaseNotice,
 } from '@luma/ui/components/case-investigation';
 import { ResolutionReview } from '@luma/ui/components/resolution-review';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { IdentityError } from '../identity/data';
-import { casesKey } from './data';
+import type { CaseObservation } from './observation';
 import {
   decisionCommand,
   decisionError,
   recoverDecision,
-  resolutionOptions,
   sendDecision,
 } from './resolution-data';
 
@@ -26,37 +24,29 @@ export function CaseResolution({
   organizationId,
   exceptionId,
   connectionLabels,
-  disabled = false,
+  observation,
 }: {
   organizationId: string;
   exceptionId: string;
   connectionLabels: Record<string, string>;
-  disabled?: boolean;
+  observation: CaseObservation;
 }) {
-  const client = useQueryClient();
-  const query = useQuery(resolutionOptions(organizationId, exceptionId));
-  const revision = query.data?.progress.caseRevision;
-  const state = query.data?.progress.state;
-  useEffect(() => {
-    if (revision === undefined) return;
-    void client.invalidateQueries({
-      queryKey: casesKey(organizationId),
-      predicate: (entry) => entry.queryKey[4] !== 'resolution',
-    });
-  }, [client, organizationId, exceptionId, revision, state]);
+  const { snapshot: query, confirmed, offline, denied } = observation;
   const lock = useRef(false);
   const [pending, setPending] = useState(false);
   const [uncertain, setUncertain] = useState<CaseDecision>();
   const [message, setMessage] = useState('');
   const [receipt, setReceipt] = useState<DecisionReceipt>();
   const refresh = () =>
-    client.invalidateQueries({ queryKey: casesKey(organizationId) });
+    observation.refresh().catch(() => {
+      /* Query state presents refresh failures. */
+    });
 
   async function decide(kind: CaseDecision['kind'], reason: string) {
     if (
       lock.current ||
       uncertain ||
-      disabled ||
+      !confirmed ||
       query.isError ||
       query.isFetching ||
       !query.data
@@ -103,7 +93,7 @@ export function CaseResolution({
   }
 
   async function recover(retry = false) {
-    if (!uncertain || lock.current) return;
+    if (!uncertain || lock.current || offline) return;
     lock.current = true;
     setPending(true);
     try {
@@ -137,9 +127,6 @@ export function CaseResolution({
     }
   }
 
-  const denied =
-    query.error instanceof IdentityError &&
-    [401, 403, 404].includes(query.error.status);
   const data = denied ? undefined : query.data;
   const proposal = data?.review.proposal;
   const expired =
@@ -148,11 +135,14 @@ export function CaseResolution({
       Date.parse(proposal.expiresAt),
       Date.parse(proposal.preconditions.validUntil),
     ) <= query.dataUpdatedAt;
-  const mismatched =
-    data && data.review.caseRevision !== data.progress.caseRevision;
 
   return (
     <>
+      {offline ? (
+        <CaseNotice title="You’re offline">
+          Decisions are paused until the current case can be confirmed.
+        </CaseNotice>
+      ) : null}
       {query.isPending ? <CaseLoading /> : null}
       {query.isError ? (
         <CaseNotice error title="Resolution review unavailable">
@@ -187,21 +177,21 @@ export function CaseResolution({
         <div className="resolution-actions">
           <Button
             variant="outline"
-            disabled={pending}
+            disabled={pending || offline}
             onClick={() => void recover()}
           >
             Check recorded decision
           </Button>
           <Button
             variant="outline"
-            disabled={pending}
+            disabled={pending || offline}
             onClick={() => void recover(true)}
           >
             Retry same decision
           </Button>
         </div>
       ) : null}
-      {expired || mismatched ? (
+      {expired ? (
         <CaseNotice title="Review needs refreshing">
           The proposal expired or the case changed. Refresh to load current
           decisions.
@@ -223,12 +213,7 @@ export function CaseResolution({
           connectionLabel={
             proposal ? connectionLabels[proposal.connectionId] : undefined
           }
-          disabled={
-            disabled ||
-            query.isError ||
-            Boolean(uncertain) ||
-            Boolean(mismatched)
-          }
+          disabled={!confirmed || query.isError || Boolean(uncertain)}
           pending={pending}
           refreshing={query.isFetching}
           onDecision={(kind, reason) => void decide(kind, reason)}

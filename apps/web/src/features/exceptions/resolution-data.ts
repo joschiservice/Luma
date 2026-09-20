@@ -1,46 +1,14 @@
 import {
   type CaseDecision,
   caseDecisionSchema,
-  caseProgressSchema,
   type CaseReview,
-  caseReviewSchema,
   decisionReceiptSchema,
 } from '@luma/api-contract';
-import { queryOptions } from '@tanstack/react-query';
 
 import { createWebApiClient } from '../../lib/api-client';
-import { privateQueryDefaults } from '../../lib/private-query';
 import { IdentityError } from '../identity/data';
-import { casesKey } from './data';
 
 const api = createWebApiClient();
-
-/** Loads proposal review and execution progress together, refreshing every five seconds. */
-export function resolutionOptions(organizationId: string, exceptionId: string) {
-  return queryOptions({
-    queryKey: [...casesKey(organizationId), 'resolution', exceptionId],
-    ...privateQueryDefaults,
-    refetchOnWindowFocus: 'always',
-    refetchInterval: 5000,
-    queryFn: async ({ signal }) => {
-      const args = {
-        params: { organizationId, exceptionId },
-        fetchOptions: { signal, cache: 'no-store' as const },
-      };
-      const [review, progress] = await Promise.all([
-        api.caseDesk.review(args),
-        api.caseDesk.progress(args),
-      ]);
-      if (review.status !== 200) throw new IdentityError(review.status);
-      if (progress.status !== 200) throw new IdentityError(progress.status);
-
-      return {
-        review: caseReviewSchema.parse(review.body),
-        progress: caseProgressSchema.parse(progress.body),
-      };
-    },
-  });
-}
 
 /**
  * Builds a validated, revision-bound decision; rejects unavailable decisions or missing

@@ -1,107 +1,30 @@
-import { subscribeToCaseProgress } from '@luma/api-contract/client';
 import { Button } from '@luma/ui/button';
 import {
   CaseInvestigation,
   CaseLoading,
   CaseNotice,
 } from '@luma/ui/components/case-investigation';
-import {
-  CaseTimeline,
-  type LiveConnection,
-} from '@luma/ui/components/case-timeline';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { CaseTimeline } from '@luma/ui/components/case-timeline';
 
-import { IdentityError } from '../identity/data';
-import { casesKey } from './data';
-import { progressOptions } from './progress-data';
+import type { CaseObservation } from './observation';
 
 /**
  * Keeps a selected case investigation and history current through progress events and query
  * refreshes.
  */
 export function LiveCaseDetail({
-  organizationId,
-  exceptionId,
+  observation,
 }: {
-  organizationId: string;
-  exceptionId: string;
+  observation: CaseObservation;
 }) {
-  const [pages, setPages] = useState(1);
-  const [streamAttempt, setStreamAttempt] = useState(0);
-  const [connection, setConnection] = useState<LiveConnection>('connecting');
-  const client = useQueryClient();
-  const snapshot = useQuery(
-    progressOptions(organizationId, exceptionId, pages),
-  );
-  useEffect(() => {
-    let active = true;
-    let generation = 0;
-    const close = subscribeToCaseProgress({
-      baseUrl: '/api',
-      organizationId,
-      exceptionId,
-      onResync: () => {
-        if (!active) return;
-        const current = ++generation;
-        setConnection((previous) =>
-          previous === 'live' ? 'syncing' : previous,
-        );
-        void client
-          .invalidateQueries(
-            { queryKey: casesKey(organizationId) },
-            { throwOnError: true, cancelRefetch: false },
-          )
-          .then(() => {
-            if (active && generation === current) setConnection('live');
-          })
-          .catch(() => {
-            if (active && generation === current) setConnection('disconnected');
-          });
-      },
-      onError: () => {
-        generation++;
-        if (active) {
-          setConnection('disconnected');
-          // A closed stream can mean revoked access. Recheck reads to clear protected content.
-          void client.invalidateQueries(
-            { queryKey: casesKey(organizationId) },
-            { cancelRefetch: false },
-          );
-        }
-      },
-    });
-    const offline = () => {
-      // Stop queued stream updates from confirming state after connectivity is lost.
-      active = false;
-      generation++;
-      close();
-      setConnection('disconnected');
-    };
-    const online = () => {
-      setConnection('connecting');
-      setStreamAttempt((attempt) => attempt + 1);
-    };
-    window.addEventListener('offline', offline);
-    window.addEventListener('online', online);
-    if (!navigator.onLine) offline();
-
-    return () => {
-      active = false;
-      generation++;
-      close();
-      window.removeEventListener('offline', offline);
-      window.removeEventListener('online', online);
-    };
-  }, [client, organizationId, exceptionId, streamAttempt]);
-  const refresh = () => {
-    setConnection('connecting');
-    setStreamAttempt((attempt) => attempt + 1);
-    void snapshot.refetch();
-  };
-  const denied =
-    snapshot.error instanceof IdentityError &&
-    [401, 403, 404].includes(snapshot.error.status);
+  const {
+    snapshot,
+    history,
+    denied,
+    confirmed,
+    connection,
+    restart: refresh,
+  } = observation;
   if (denied)
     return (
       <CaseNotice error title="Case unavailable">
@@ -120,29 +43,40 @@ export function LiveCaseDetail({
         </Button>
       </CaseNotice>
     );
-  const unconfirmed =
-    snapshot.isError ||
-    connection === 'disconnected' ||
-    connection === 'connecting';
 
   return (
     <CaseInvestigation
       item={data.detail}
       embedded
-      unconfirmed={unconfirmed}
+      unconfirmed={!confirmed}
       onRefresh={refresh}
       refreshing={snapshot.isFetching}
       progress={
         <CaseTimeline
           {...data}
-          connection={snapshot.isError ? 'disconnected' : connection}
+          timeline={history.data?.timeline ?? []}
+          evidence={history.data?.evidence ?? []}
+          historyUnavailable={history.isError || history.isPending}
+          connection={connection}
+          confirmed={confirmed}
           onRefresh={refresh}
         >
-          {data.hasMore ? (
+          {history.isError ? (
+            <CaseNotice error title="History could not be refreshed">
+              {history.data ? 'Showing previously loaded history. ' : ''}
+              The current case review is shown separately.
+              <Button variant="outline" onClick={observation.retryHistory}>
+                Retry history
+              </Button>
+            </CaseNotice>
+          ) : history.isPending ? (
+            <CaseLoading />
+          ) : null}
+          {history.data?.hasMore ? (
             <Button
               variant="outline"
-              disabled={snapshot.isFetching}
-              onClick={() => setPages((count) => count + 1)}
+              disabled={history.isFetching}
+              onClick={observation.loadMore}
             >
               Load more history and evidence
             </Button>

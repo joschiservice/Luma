@@ -23,13 +23,8 @@ import { useEffect, useRef, useState } from 'react';
 import { connectionsOptions } from '../connections/data';
 import { IdentityError } from '../identity/data';
 import { overviewOptions } from '../overview/data';
-import {
-  caseOptions,
-  casesKey,
-  casesOptions,
-  type InboxSearch,
-  matchesView,
-} from './data';
+import { casesKey, casesOptions, type InboxSearch, matchesView } from './data';
+import { useCaseObservation } from './observation';
 import { LiveCaseDetail } from './progress';
 import { CaseResolution } from './resolution';
 
@@ -55,7 +50,8 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
   const navigate = useNavigate({ from: '/app/$organizationId/exceptions' });
   const client = useQueryClient();
   const list = useQuery(casesOptions(organizationId, search));
-  const detail = useQuery(caseOptions(organizationId, exceptionId ?? ''));
+  const observation = useCaseObservation(organizationId, exceptionId ?? '');
+  const detail = observation.snapshot;
   const connections = useQuery(connectionsOptions(organizationId));
   const overview = useQuery(overviewOptions(organizationId, '24h'));
   const [pageCursors, setPageCursors] = useState<
@@ -121,10 +117,8 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
       search: { ...search, ...patch, cursor: undefined },
       resetScroll: false,
     });
-  const denied =
-    detail.error instanceof IdentityError &&
-    [401, 403, 404].includes(detail.error.status);
-  const item = denied ? undefined : detail.data;
+  const denied = observation.denied;
+  const item = denied ? undefined : detail.data?.detail;
   const moved = item && !matchesView(item, search);
   const listDenied =
     list.error instanceof IdentityError &&
@@ -378,7 +372,9 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
                 className="inbox-case-nav"
                 item={item}
                 fallback={
-                  detail.isError ? 'Issue unavailable' : 'Loading issue…'
+                  detail.isError || denied
+                    ? 'Issue unavailable'
+                    : 'Loading issue…'
                 }
                 onClose={() =>
                   void navigate({
@@ -413,7 +409,7 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
                 Refresh issue
               </Button>
               {detail.isPending ? <CaseLoading /> : null}
-              {detail.isError ? (
+              {detail.isError || denied ? (
                 <CaseNotice
                   error
                   title={
@@ -437,14 +433,13 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
                 <>
                   <LiveCaseDetail
                     key={`${organizationId}:${exceptionId}`}
-                    organizationId={organizationId}
-                    exceptionId={exceptionId}
+                    observation={observation}
                   />
                   <CaseResolution
                     key={exceptionId}
                     organizationId={organizationId}
                     exceptionId={item.id}
-                    disabled={detail.isError}
+                    observation={observation}
                     connectionLabels={Object.fromEntries(
                       (connections.data ?? []).map((connection) => [
                         connection.id,

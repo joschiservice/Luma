@@ -1,10 +1,11 @@
-/* global document, innerWidth */
+/* global document, innerWidth, window */
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
 import { chromium } from 'playwright';
 import { expect, it } from 'vitest';
 
+import { inventoryCase } from '../../../packages/ui/src/components/case-fixtures.ts';
 import {
   resolutionProgress,
   resolutionReview,
@@ -137,6 +138,26 @@ it('reviews decisions, recovers ambiguous commands and escalates through the con
       contentType: 'application/json',
       body: JSON.stringify(body),
     });
+  let diagnosisOffset = 0;
+  let historyFailure = false;
+  await page.route(`**${path}`, (route) =>
+    json(route, {
+      ...inventoryCase,
+      id: exceptionId,
+      revision: progress.caseRevision,
+      state: progress.state,
+      diagnosis: {
+        ...inventoryCase.diagnosis,
+        exceptionId,
+        revision: progress.diagnosisRevision + diagnosisOffset,
+      },
+    }),
+  );
+  await page.route(`**${path}/timeline?*`, (route) =>
+    historyFailure
+      ? json(route, { message: 'Unavailable' }, 503)
+      : route.continue(),
+  );
   await page.route(`**${path}/review`, async (route) => {
     if (holdReview)
       await new Promise((resolve) => {
@@ -203,8 +224,84 @@ it('reviews decisions, recovers ambiguous commands and escalates through the con
   await page
     .getByLabel('Decision reason (required)')
     .fill('Reviewed source order');
+  await expect.poll(() => approve.isEnabled()).toBe(true);
+  await page.evaluate(() => window.dispatchEvent(new Event('offline')));
+  await page.getByText('You’re offline', { exact: true }).waitFor();
+  expect(await approve.isDisabled()).toBe(true);
+  expect(await page.getByLabel('Decision reason (required)').inputValue()).toBe(
+    'Reviewed source order',
+  );
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await expect.poll(() => approve.isEnabled()).toBe(true);
+
+  // Connectivity must recover even when the selected case is closed while offline.
+  await page.evaluate(() => window.dispatchEvent(new Event('offline')));
+  await page.getByRole('button', { name: 'Close panel', exact: true }).click();
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await page.locator(`#case-${exceptionId}`).click();
+  await page
+    .getByLabel('Decision reason (required)')
+    .fill('Reviewed source order');
+  await expect.poll(() => approve.isEnabled()).toBe(true);
+
+  // An interrupted stream still permits decisions after successful authenticated reads.
+  await page.route(`**${path}/events`, (route) => route.abort('failed'));
+  await page
+    .getByRole('button', { name: 'Refresh progress', exact: true })
+    .click();
+  await page.getByText('Live updates interrupted', { exact: true }).waitFor();
+  await expect.poll(() => approve.isEnabled()).toBe(true);
+  await page.screenshot({
+    path: '/tmp/luma-observation-stream.png',
+    fullPage: true,
+  });
+
+  await page.route(
+    `**/api/v1/organizations/${organizationId}/exceptions?*`,
+    (route) => json(route, { message: 'Unavailable' }, 503),
+  );
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page
+    .getByText('Inbox could not be refreshed', { exact: true })
+    .waitFor();
+  await expect.poll(() => approve.isEnabled()).toBe(true);
+  await page.unroute(`**/api/v1/organizations/${organizationId}/exceptions?*`);
+
+  historyFailure = true;
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page
+    .getByText('History could not be refreshed', { exact: true })
+    .waitFor();
+  await expect.poll(() => approve.isEnabled()).toBe(true);
+  await page.screenshot({
+    path: '/tmp/luma-observation-history.png',
+    fullPage: true,
+  });
+  historyFailure = false;
+  await page
+    .getByRole('button', { name: 'Retry history', exact: true })
+    .click();
+  await expect
+    .poll(() =>
+      page.getByText('History could not be refreshed', { exact: true }).count(),
+    )
+    .toBe(0);
+
+  diagnosisOffset = 1;
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page
+    .getByText('Resolution review unavailable', { exact: true })
+    .waitFor();
+  expect(await approve.isDisabled()).toBe(true);
+  diagnosisOffset = 0;
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect.poll(() => approve.isEnabled()).toBe(true);
+  expect(await page.getByLabel('Decision reason (required)').inputValue()).toBe(
+    'Reviewed source order',
+  );
   // Exercise real background polling while the operator continues typing.
   const reason = page.getByLabel('Decision reason (required)');
+  await reason.focus();
   const reevaluatedDecisionId = randomUUID();
   review = {
     ...review,
@@ -350,6 +447,9 @@ it('reviews decisions, recovers ambiguous commands and escalates through the con
   ).toBe(true);
   await page.screenshot({ path: '/tmp/luma-35-mobile.png', fullPage: true });
   // Remove only fixture endpoints; the final decision reaches authenticated policy services and PostgreSQL.
+  await page.unroute(`**${path}`);
+  await page.unroute(`**${path}/events`);
+  await page.unroute(`**${path}/timeline?*`);
   await page.unroute(`**${path}/review`);
   await page.unroute(`**${path}/progress`);
   await page.unroute(`**${path}/decisions/*`);

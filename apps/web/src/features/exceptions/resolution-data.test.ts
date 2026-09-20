@@ -1,16 +1,11 @@
-import { QueryClient } from '@tanstack/react-query';
 import { afterEach, expect, it, vi } from 'vitest';
 
-import {
-  resolutionProgress,
-  resolutionReview,
-} from '../../../../../packages/ui/src/components/resolution-fixtures';
+import { resolutionReview } from '../../../../../packages/ui/src/components/resolution-fixtures';
 import { IdentityError } from '../identity/data';
 import {
   decisionCommand,
   decisionError,
   recoverDecision,
-  resolutionOptions,
   sendDecision,
 } from './resolution-data';
 
@@ -81,32 +76,6 @@ it('does not invent permission or accept an empty reason', () => {
     ),
   ).toThrow();
   expect(() => decisionCommand(resolutionReview, 'reject', '  ')).toThrow();
-});
-
-it('refetches tenant-scoped review and progress without retrying commands', async () => {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(
-      async (url: string) =>
-        new Response(
-          JSON.stringify(
-            url.endsWith('/review') ? resolutionReview : resolutionProgress,
-          ),
-          { headers: { 'Content-Type': 'application/json' } },
-        ),
-    ),
-  );
-  const client = new QueryClient();
-  try {
-    expect(
-      await client.fetchQuery(resolutionOptions(organizationId, exceptionId)),
-    ).toEqual({ review: resolutionReview, progress: resolutionProgress });
-    expect(resolutionOptions('other', exceptionId).queryKey).not.toEqual(
-      resolutionOptions(organizationId, exceptionId).queryKey,
-    );
-  } finally {
-    client.clear();
-  }
 });
 
 it.each([401, 403, 404, 409])(

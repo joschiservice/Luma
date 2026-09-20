@@ -2,7 +2,7 @@ import { caseDetailSchema } from '@luma/api-contract';
 import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import { afterEach, expect, it, vi } from 'vitest';
 
-import { progressOptions } from './progress-data';
+import { historyOptions, observationOptions } from './observation-data';
 
 const id = '11111111-1111-4111-8111-111111111111';
 
@@ -97,7 +97,7 @@ afterEach(() => vi.unstubAllGlobals());
 it('refetches history from page one, deduplicates overlapping events and isolates tenants', async () => {
   mockReads();
   const client = new QueryClient();
-  const options = progressOptions('tenant-a', id, 2);
+  const options = historyOptions('tenant-a', id, 2);
   const first = await client.fetchQuery(options);
   expect(first.timeline).toEqual([event]);
   expect(first.hasMore).toBe(false);
@@ -107,11 +107,11 @@ it('refetches history from page one, deduplicates overlapping events and isolate
   expect(requests.find((url) => url.includes('/timeline'))).not.toContain(
     'cursor=',
   );
-  expect(progressOptions('tenant-b', id).queryKey).not.toEqual(
-    progressOptions('tenant-a', id).queryKey,
+  expect(historyOptions('tenant-b', id).queryKey).not.toEqual(
+    historyOptions('tenant-a', id).queryKey,
   );
-  expect(progressOptions('tenant-a', 'other').queryKey).not.toEqual(
-    progressOptions('tenant-a', id).queryKey,
+  expect(historyOptions('tenant-a', 'other').queryKey).not.toEqual(
+    historyOptions('tenant-a', id).queryKey,
   );
   client.clear();
 });
@@ -120,10 +120,10 @@ it('rejects snapshots that straddle a case transition', async () => {
   mockReads({ progress: { ...progress, caseRevision: 2, state: 'resolved' } });
   const client = new QueryClient();
   await expect(
-    client.fetchQuery(progressOptions('tenant-a', id)),
+    client.fetchQuery(observationOptions('tenant-a', id)),
   ).rejects.toThrow('Case changed during refresh');
   expect(
-    client.getQueryData(progressOptions('tenant-a', id).queryKey),
+    client.getQueryData(observationOptions('tenant-a', id).queryKey),
   ).toBeUndefined();
   client.clear();
 });
@@ -132,7 +132,7 @@ it('rejects malformed progress instead of retaining a success result', async () 
   mockReads({ progress: { ...progress, state: 'success' } });
   const client = new QueryClient();
   await expect(
-    client.fetchQuery(progressOptions('tenant-a', id)),
+    client.fetchQuery(observationOptions('tenant-a', id)),
   ).rejects.toThrow();
   client.clear();
 });
@@ -150,10 +150,10 @@ it('rejects a diagnosis-only transition even when review and progress agree', as
   });
   const client = new QueryClient();
   await expect(
-    client.fetchQuery(progressOptions('tenant-a', id)),
+    client.fetchQuery(observationOptions('tenant-a', id)),
   ).rejects.toThrow('Case changed during refresh');
   expect(
-    client.getQueryData(progressOptions('tenant-a', id).queryKey),
+    client.getQueryData(observationOptions('tenant-a', id).queryKey),
   ).toBeUndefined();
   client.clear();
 });
@@ -161,16 +161,51 @@ it('rejects a diagnosis-only transition even when review and progress agree', as
 it('retains loaded pages only within the same tenant and case', async () => {
   mockReads();
   const client = new QueryClient();
-  const first = await client.fetchQuery(progressOptions('tenant-a', id));
-  const observer = new QueryObserver(client, progressOptions('tenant-a', id));
+  const first = await client.fetchQuery(historyOptions('tenant-a', id));
+  const observer = new QueryObserver(client, historyOptions('tenant-a', id));
   const unsubscribe = observer.subscribe(() => {});
-  observer.setOptions(progressOptions('tenant-a', id, 2));
+  observer.setOptions(historyOptions('tenant-a', id, 2));
   expect(observer.getCurrentResult().data).toEqual(first);
   expect(observer.getCurrentResult().isPlaceholderData).toBe(true);
-  observer.setOptions(progressOptions('tenant-b', id, 2));
+  observer.setOptions(historyOptions('tenant-b', id, 2));
   expect(observer.getCurrentResult().data).toBeUndefined();
-  observer.setOptions(progressOptions('tenant-a', 'other-case', 2));
+  observer.setOptions(historyOptions('tenant-a', 'other-case', 2));
   expect(observer.getCurrentResult().data).toBeUndefined();
   unsubscribe();
   client.clear();
+});
+
+it('keeps coherent case review available when history fails', async () => {
+  mockReads({ timeline: { invalid: true } });
+  const client = new QueryClient();
+  try {
+    await expect(
+      client.fetchQuery(historyOptions('tenant-a', id)),
+    ).rejects.toThrow();
+    const result = await client.fetchQuery(observationOptions('tenant-a', id));
+    expect(result.detail).toEqual(detail);
+    expect(result.review.caseRevision).toBe(result.progress.caseRevision);
+  } finally {
+    client.clear();
+  }
+});
+
+it('rejects a review-only diagnosis transition', async () => {
+  mockReads({
+    review: {
+      schemaVersion: 1,
+      caseRevision: 1,
+      diagnosisRevision: 1,
+      permittedDecisions: [],
+      proposal: null,
+    },
+  });
+  const client = new QueryClient();
+  try {
+    await expect(
+      client.fetchQuery(observationOptions('tenant-a', id)),
+    ).rejects.toThrow('Case changed during refresh');
+  } finally {
+    client.clear();
+  }
 });

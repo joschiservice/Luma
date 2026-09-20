@@ -126,3 +126,19 @@ resynchronizes them. Refresh progress also restarts the stream. Navigation close
 the old stream and isolates caches by organization and case; reload reconstructs
 state from persisted reads. Failed and escalated cases show available decision
 names and direct operators to the current investigation without exposing retries.
+
+### Shared case observation
+
+The selected case header, investigation and resolution review share a case observation.
+Case and diagnosis revisions must agree before refreshed findings replace the displayed
+ones or decisions become available. Routine refreshes preserve decision drafts.
+
+Browser offline events pause decisions and mark retained findings as unconfirmed.
+When the live stream is interrupted but authenticated reads still succeed, the case
+remains available and shows “Live updates interrupted.” Reads poll every five seconds
+until live updates resume. An unrelated inbox error does not change case freshness.
+
+History loads separately. A failed history read shows its own retry action without
+blocking a current review. Loaded records remain visible as previously loaded history;
+access-denied responses hide the selected case. Receipt recovery retains the original
+command identity and is paused while offline.
