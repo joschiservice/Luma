@@ -30,7 +30,9 @@ try {
       ]);
   }
   if (
-    !['setup', 'dev', 'workflows', 'seed', 'down', 'doctor'].includes(command)
+    !['setup', 'dev', 'workflows', 'seed', 'reset', 'down', 'doctor'].includes(
+      command,
+    )
   )
     throw new Error('Unknown development command');
   await run('docker', ['info', '--format', '{{.ServerVersion}}'], {
@@ -87,9 +89,32 @@ try {
       workflows,
     );
     const { provision } = await import('./database.mjs');
+    if (command === 'reset') {
+      console.log('Recreating this worktree’s local database and demo data.');
+      await compose(saved, [
+        'exec',
+        '-T',
+        'postgres',
+        'dropdb',
+        '-U',
+        'postgres',
+        '--force',
+        '--if-exists',
+        'luma',
+      ]);
+      await compose(saved, [
+        'exec',
+        '-T',
+        'postgres',
+        'createdb',
+        '-U',
+        'postgres',
+        'luma',
+      ]);
+    }
     await provision(saved, migrationUrl);
     await saveEnvironment(generated);
-    if (['setup', 'seed'].includes(command)) {
+    if (['setup', 'seed', 'reset'].includes(command)) {
       await run('pnpm', [
         'exec',
         'turbo',
