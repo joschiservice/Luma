@@ -42,7 +42,11 @@ export default tseslint.config(
     rules: { '@typescript-eslint/no-empty-function': 'off' },
   },
   {
-    files: ['apps/web/**/*.{ts,tsx}', 'packages/ui/**/*.{ts,tsx}'],
+    files: [
+      'apps/web/**/*.{ts,tsx}',
+      'packages/ui/**/*.{ts,tsx}',
+      'apps/simulator-web/**/*.js',
+    ],
     languageOptions: { globals: globals.browser },
     plugins: { 'react-hooks': reactHooks },
     rules: reactHooks.configs.recommended.rules,

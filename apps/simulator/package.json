@@ -1,0 +1,23 @@
+{
+  "name": "@luma/simulator",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "start": "node dist/server.js"
+  },
+  "devDependencies": {
+    "@luma/typescript-config": "workspace:*"
+  },
+  "dependencies": {
+    "@luma/simulator-core": "workspace:*",
+    "@luma/simulator-jtl": "workspace:*",
+    "@luma/simulator-shopify": "workspace:*",
+    "fastify": "5.12.5",
+    "zod": "3.25.76"
+  }
+}

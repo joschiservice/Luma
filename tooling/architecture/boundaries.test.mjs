@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { RuleTester } from 'eslint';
 import tseslint from 'typescript-eslint';
 
-import plugin from './eslint-plugin.mjs';
+import plugin, { violation } from './eslint-plugin.mjs';
 import { dependencies } from './policy.mjs';
 
 RuleTester.describe = describe;
@@ -353,4 +353,35 @@ test('the declared module graph is acyclic and references registered modules', (
   }
 
   for (const name of Object.keys(dependencies)) visit(name);
+});
+
+test('simulator packages cannot cross provider or connector boundaries', () => {
+  assert.equal(
+    violation(
+      'packages/simulator/jtl/src/index.ts',
+      'packages/simulator/core/',
+    ),
+    null,
+  );
+  assert.match(
+    violation(
+      'packages/simulator/jtl/src/index.ts',
+      'packages/simulator/shopify/',
+    ),
+    /only on simulator core/,
+  );
+  assert.match(
+    violation(
+      'packages/simulator/core/src/index.ts',
+      'packages/simulator/jtl/',
+    ),
+    /only on simulator core/,
+  );
+  assert.match(
+    violation(
+      'packages/connectors/jtl/src/client.ts',
+      'packages/simulator/jtl/',
+    ),
+    /independent of simulators/,
+  );
 });

@@ -16,8 +16,12 @@ import {
 import { createCapabilityRuntime } from '../../apps/api/dist/modules/connectors/application/capabilities.js';
 import {
   createConnectionCoverage,
+  createInstallationVerifier,
   createInstalledConnections,
+  createInstalledRuntime,
+  createInstalledShippingMethodEffects,
   createShippingMethodEffects,
+  createSimulationTransport,
 } from '../../apps/api/dist/modules/connectors/composition.js';
 import { ConnectorError } from '../../apps/api/dist/modules/connectors/index.js';
 import { createJtlConnector } from '../../apps/api/dist/modules/connectors/infrastructure/jtl/adapter.js';
@@ -81,6 +85,9 @@ export async function createPilot(
       manifest.organizationId,
       'synthetic-pilot-operator',
     );
+  const simulation = manifest.simulator
+    ? createSimulationTransport(manifest.simulator)
+    : undefined;
   const installations = createInstalledConnections(db, {
     refreshContext: identity.service.refreshContext,
     activeKeyId: env.CONNECTIONS_ACTIVE_KEY_ID,
@@ -90,11 +97,13 @@ export async function createPilot(
         Buffer.from(key, 'base64'),
       ]),
     ),
-    verify: async () => {
-      throw new Error(
-        'Synthetic pilot does not verify connected-system health',
-      );
-    },
+    verify: simulation
+      ? createInstallationVerifier({ simulation, jtlEndpoints: [] })
+      : async () => {
+          throw new Error(
+            'Synthetic pilot does not verify connected-system health',
+          );
+        },
   });
   const connections = {
     ...installations,
@@ -121,7 +130,10 @@ export async function createPilot(
 
     // Pending fixture configuration is usable without claiming live provider health.
     return (
-      !!connection && !['disconnected', 'revoked'].includes(connection.status)
+      !!connection &&
+      (simulation
+        ? connection.status === 'active'
+        : !['disconnected', 'revoked'].includes(connection.status))
     );
   }
 
@@ -191,19 +203,38 @@ export async function createPilot(
       return Response.json({ salesOrderId: '10' });
     },
   });
-  const capabilities = createCapabilityRuntime({
-    resolve: async (actor, connectionId) =>
-      (await connectionAvailable(actor, connectionId)) ? connector : null,
-    record: async () => {
-      // The synthetic pilot does not export capability telemetry.
+  const installedOptions = {
+    installations,
+    simulation,
+    jtlEndpoints: [],
+    approveJtlEndpoint: async () => {
+      throw new Error('Synthetic connection has no production destination');
     },
-  });
+    record: async (entry) => {
+      await mutate((state) => {
+        (state.capabilityEvents ??= []).push(entry);
+      });
+    },
+    recordObservations: ({ observations }) =>
+      mutate((state) => {
+        state.observations.push(...observations);
+      }),
+  };
+  const capabilities = simulation
+    ? createInstalledRuntime(installedOptions)
+    : createCapabilityRuntime({
+        resolve: async (actor, connectionId) =>
+          (await connectionAvailable(actor, connectionId)) ? connector : null,
+        record: async () => {
+          // The synthetic pilot does not export capability telemetry.
+        },
+      });
   const supported = (action) =>
     action.tenantId === manifest.organizationId &&
     action.id === manifest.proposalId &&
     action.connectionId === manifest.connections.jtl &&
     action.target.id === manifest.subjects.workflow_failure;
-  const effects = createShippingMethodEffects(capabilities, {
+  const effectBinding = {
     map: async (_actor, action) =>
       supported(action)
         ? {
@@ -225,7 +256,10 @@ export async function createPilot(
         )
       );
     },
-  });
+  };
+  const effects = simulation
+    ? createInstalledShippingMethodEffects(installedOptions, effectBinding)
+    : createShippingMethodEffects(capabilities, effectBinding);
   const verifier = {
     version: 'synthetic-shipping-correction-v1',
     async evaluate(actor, incident) {

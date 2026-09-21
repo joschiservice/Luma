@@ -215,3 +215,7 @@ For URL state, define `validateSearch` on the route, read `Route.useSearch()`, a
 Use `ts-pattern` with `.exhaustive()` for domain discriminated unions. There is no global state library API or custom form framework. TanStack Form internally depends on TanStack Store; Luma does not depend on it directly or create stores.
 
 `packages/ui/src/examples/contact-form.stories.tsx` demonstrates validated submission with the shared Base UI primitives, a local Query provider and injected fake I/O. It covers invalid, pending, conflict, failure and malformed-response states without adding a product API. Form, Query, Zod and ts-pattern are development dependencies of the workshop and runtime dependencies of the web host; shared primitives stay independent of them.
+
+### Stateful commerce simulator
+
+Run `mise exec -- pnpm simulator` to start persistent JTL and Shopify simulations, their control panel, and the Luma pilot API/worker stack. See [the simulator guide](docs/simulator.md) for provisioning, scenarios, fault injection, restart behavior, and tests.

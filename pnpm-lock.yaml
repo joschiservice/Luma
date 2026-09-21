@@ -305,6 +305,30 @@ importers:
         specifier: ^4.20.0
         version: 4.23.13
 
+  apps/simulator:
+    dependencies:
+      '@luma/simulator-core':
+        specifier: workspace:*
+        version: link:../../packages/simulator/core
+      '@luma/simulator-jtl':
+        specifier: workspace:*
+        version: link:../../packages/simulator/jtl
+      '@luma/simulator-shopify':
+        specifier: workspace:*
+        version: link:../../packages/simulator/shopify
+      fastify:
+        specifier: 5.12.5
+        version: 5.12.5
+      zod:
+        specifier: 3.25.76
+        version: 3.25.76
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
+
+  apps/simulator-web: {}
+
   apps/web:
     dependencies:
       '@luma/api-contract':
@@ -431,6 +455,32 @@ importers:
       zod:
         specifier: 3.25.76
         version: 3.25.76
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../../typescript-config
+
+  packages/simulator/core:
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../../typescript-config
+
+  packages/simulator/jtl:
+    dependencies:
+      '@luma/simulator-core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../../typescript-config
+
+  packages/simulator/shopify:
+    dependencies:
+      '@luma/simulator-core':
+        specifier: workspace:*
+        version: link:../core
     devDependencies:
       '@luma/typescript-config':
         specifier: workspace:*

@@ -58,6 +58,25 @@ function moduleInfo(file) {
 export function violation(from, to) {
   const source = moduleInfo(from);
   const target = moduleInfo(to);
+  if (
+    from.startsWith('packages/connectors/') &&
+    to.startsWith('packages/simulator/')
+  )
+    return 'Connectors must remain independent of simulators.';
+  if (from.startsWith('packages/simulator/')) {
+    const provider = from.split('/')[2];
+    if (
+      to.startsWith('packages/simulator/') &&
+      ![provider, 'core'].includes(to.split('/')[2])
+    )
+      return 'Simulator providers may depend only on simulator core.';
+    if (
+      to.startsWith('packages/') &&
+      !to.startsWith('packages/simulator/') &&
+      !to.startsWith('packages/connectors/')
+    )
+      return 'Simulator packages own provider state independently of application models.';
+  }
   if (from.startsWith('packages/') && to.startsWith('apps/')) {
     return 'Packages must not import apps.';
   }
@@ -207,9 +226,11 @@ const rule = {
         );
       } else if (value.startsWith('@luma/')) {
         const [name, ...subpath] = value.slice(6).split('/');
-        to = Object.hasOwn(connectorPackages, name)
-          ? `packages/connectors/${name.slice(10)}/${subpath.join('/')}`
-          : `packages/${name}/${subpath.join('/')}`;
+        to = name.startsWith('simulator-')
+          ? `packages/simulator/${name.slice(10)}/${subpath.join('/')}`
+          : Object.hasOwn(connectorPackages, name)
+            ? `packages/connectors/${name.slice(10)}/${subpath.join('/')}`
+            : `packages/${name}/${subpath.join('/')}`;
       } else {
         // Only package imports with known source targets can be checked for ownership.
         if (
