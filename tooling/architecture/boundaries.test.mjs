@@ -77,6 +77,7 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
         "import { createCases } from '#modules/exceptions/composition';",
       ),
       ...[
+        'resolution-learning.test.ts',
         'connections.test.ts',
         'connections.integration.test.ts',
         'shopify-oauth.integration.test.ts',
@@ -147,6 +148,10 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
       ),
     ].flatMap(withPackageImport),
     invalid: [
+      invalid(
+        filename('apps/api/src/resolution-learning.test.ts'),
+        "import { createLearningService } from '#modules/workflows/application/learning';",
+      ),
       invalid(
         moduleFile('connectors', 'application/installations.ts'),
         "import { createClient } from '@luma/connector-shopify';",

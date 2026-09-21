@@ -48,5 +48,8 @@ export { shippingMethodPlaybook } from '#modules/workflows/domain/shipping-metho
 
 export type {
   LearningService,
+  LearningStore,
+  LearningRunSources,
+  LearningEventSources,
   ResolutionHistory,
 } from '#modules/workflows/application/learning';

@@ -11,89 +11,25 @@ import {
   requireRole,
   requireTenant,
 } from '#modules/identity/index';
+import type {
+  LearningCommand,
+  LearningEvent,
+  LearningEventFacts,
+  LearningSelectionFacts,
+  StartResolutionRun,
+} from '#modules/workflows/domain/learning';
+import {
+  learningEventConflict,
+  learningSelectionConflict,
+} from '#modules/workflows/domain/learning';
 
-export interface ResolutionSelection {
-  id: string;
-  version: string;
-  use: 'created' | 'improved' | 'reused' | 'partner_specific';
-  reasonCode: string;
-  previousVersion?: string | undefined;
-  partnerCodeRef?: string | undefined;
-}
-
-export interface StartResolutionRun {
-  id: string;
-  diagnosisRevision: number;
-  resolution: ResolutionSelection;
-}
-
-export type LearningFact =
-  | {
-      kind: 'cause';
-      code: string;
-      status: 'suspected' | 'confirmed' | 'rejected';
-      supportingEvidenceRefs: string[];
-      contradictingEvidenceRefs: string[];
-      basis: 'model_hypothesis' | 'operator_investigation';
-    }
-  | {
-      kind: 'repair_step';
-      stepId: string;
-      actionCode: string;
-      inputEvidenceRefs: string[];
-      actionHash: string;
-      startedAt: string;
-      finishedAt: string;
-      effortSeconds: number;
-      result: 'accepted' | 'failed' | 'unknown';
-    }
-  | {
-      kind: 'intervention';
-      stepId: string;
-      reasonCode: string;
-      effortSeconds: number;
-      evidenceRefs: string[];
-    }
-  | {
-      kind: 'observation';
-      stepId: string;
-      code: string;
-      evidenceRefs: string[];
-    }
-  | {
-      kind: 'human_edit';
-      stepId: string;
-      beforeHash: string;
-      afterHash: string;
-      reasonCode: string;
-      evidenceRefs: string[];
-    }
-  | {
-      kind: 'outcome';
-      result: 'pending' | 'failed' | 'inconclusive' | 'verified';
-      evaluatorVersion: string;
-      authoritative: boolean;
-      complete: boolean;
-      evidenceRefs: string[];
-      businessResult: {
-        code: string;
-        value: number | null;
-        unit: string | null;
-      };
-    }
-  | { kind: 'recurrence'; incidentId: string; evidenceRefs: string[] };
-
-export interface LearningCommand {
-  id: string;
-  occurredAt: string;
-  fact: LearningFact;
-}
-
-export interface LearningEvent extends LearningCommand {
-  sequence: number;
-  actorId: string;
-  recordedAt: string;
-}
+export type {
+  ResolutionSelection,
+  StartResolutionRun,
+  LearningFact,
+  LearningCommand,
+  LearningEvent,
+} from '#modules/workflows/domain/learning';
 
 export interface ResolutionRun extends StartResolutionRun {
   schemaVersion: 1;
@@ -125,23 +61,50 @@ export interface ResolutionHistory {
   recurrences: { id: string; detectedAt: string }[];
 }
 
+/** Retained sources read under the resolution run lock for a new selection. */
+export interface LearningRunSources extends LearningSelectionFacts {
+  diagnosis: Pick<Diagnosis, 'hypotheses' | 'provenance'>;
+  generation: ResolutionRun['generation'];
+  artifactDigest: string;
+  createdAt: string;
+}
+
+/** Facts read under the run and event locks for a new learning event. */
+export interface LearningEventSources extends LearningEventFacts {
+  sequence: number;
+}
+
 export interface LearningStore {
+  /** Lists retained runs for the incident using tenant-scoped pagination. */
   list(
     context: TenantContext,
     incidentId: string,
     after?: string,
   ): Promise<{ items: ResolutionRun[]; nextCursor: string | null }>;
-  start(
+  /**
+   * Locks the run and checks request, actor and incident identity before invoking accept.
+   * Exact replays return the original record without calling accept. Fresh acceptance and
+   * insertion share the transaction; rejection rolls back and conflicting IDs fail.
+   */
+  recordRun(
     context: TenantContext,
     incidentId: string,
     input: StartResolutionRun,
+    accept: (sources: LearningRunSources) => ResolutionRun,
   ): Promise<ResolutionRun>;
-  append(
+  /**
+   * Locks the run, then event ID, and checks request, actor and run identity before accept.
+   * Exact replays skip accept. Source reads, acceptance, sequence allocation and insertion
+   * share the transaction. Rejection must leave no event or consumed sequence.
+   */
+  recordEvent(
     context: TenantContext,
     incidentId: string,
     runId: string,
     input: LearningCommand,
+    accept: (sources: LearningEventSources) => LearningEvent,
   ): Promise<LearningEvent>;
+  /** Reads all retained history collections from one tenant-scoped statement snapshot. */
   read(
     context: TenantContext,
     incidentId: string,
@@ -209,11 +172,34 @@ export function createLearningService(deps: {
       );
     },
     async start(context: TenantContext, incidentId: string, input: unknown) {
-      return deps.store.start(
-        await authorized(context),
-        deps.parseId(incidentId),
-        deps.parseStart(input),
-      );
+      const fresh = await authorized(context);
+      const incident = deps.parseId(incidentId);
+      const command = deps.parseStart(input);
+
+      return deps.store.recordRun(fresh, incident, command, (sources) => {
+        const conflict = learningSelectionConflict(incident, command, sources);
+        if (conflict) throw new IdentityError(409, 'CONFLICT', conflict);
+        const diagnosis = sources.diagnosis;
+
+        return {
+          ...command,
+          schemaVersion: 1,
+          incidentId: incident,
+          actorId: fresh.actor.id,
+          createdAt: sources.createdAt,
+          context: {
+            evidenceRefs: diagnosis.provenance.evidence.map((e) => e.id),
+            mappingVersions: diagnosis.provenance.mappingVersions,
+            configVersion: diagnosis.provenance.configVersion,
+            ruleVersion: diagnosis.provenance.ruleVersion,
+            diagnosisVersion: diagnosis.provenance.engineVersion,
+            hypotheses: diagnosis.hypotheses,
+            model: diagnosis.provenance.model,
+          },
+          generation: sources.generation,
+          artifactDigest: sources.artifactDigest,
+        };
+      });
     },
     async append(
       context: TenantContext,
@@ -221,11 +207,27 @@ export function createLearningService(deps: {
       runId: string,
       input: unknown,
     ) {
-      return deps.store.append(
-        await authorized(context),
-        deps.parseId(incidentId),
-        deps.parseId(runId),
-        deps.parseEvent(input),
+      const fresh = await authorized(context);
+      const incident = deps.parseId(incidentId);
+      const run = deps.parseId(runId);
+      const command = deps.parseEvent(input);
+
+      return deps.store.recordEvent(
+        fresh,
+        incident,
+        run,
+        command,
+        (sources) => {
+          const conflict = learningEventConflict(command, sources);
+          if (conflict) throw new IdentityError(409, 'CONFLICT', conflict);
+
+          return {
+            ...command,
+            sequence: sources.sequence,
+            actorId: fresh.actor.id,
+            recordedAt: sources.recordedAt,
+          };
+        },
       );
     },
     async read(context: TenantContext, incidentId: string, runId: string) {

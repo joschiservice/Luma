@@ -88,6 +88,7 @@ export function violation(from, to) {
         'apps/api/src/execution.integration.test.ts',
         'apps/api/src/diagnosis-reread.test.ts',
         'apps/api/src/workflow-runtime.test.ts',
+        'apps/api/src/resolution-learning.test.ts',
         'apps/api/src/connections.integration.test.ts',
         'apps/api/src/shopify-oauth.integration.test.ts',
         'apps/api/src/connections.test.ts',

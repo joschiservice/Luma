@@ -4,11 +4,13 @@ import { IdentityError } from '#modules/identity/index';
 import type { SqlTransaction, TenantDatabase } from '#modules/platform/index';
 import type {
   LearningEvent,
-  LearningFact,
+  LearningEventSources,
+  LearningRunSources,
   LearningStore,
   ResolutionHistory,
   ResolutionRun,
 } from '#modules/workflows/application/learning';
+import { learningEvidence } from '#modules/workflows/domain/learning';
 
 const missing = () =>
   new IdentityError(404, 'NOT_FOUND', 'Resolution run or source not found');
@@ -40,14 +42,6 @@ async function run(
   return row.document;
 }
 
-function evidence(fact: LearningFact) {
-  if (fact.kind === 'cause')
-    return [...fact.supportingEvidenceRefs, ...fact.contradictingEvidenceRefs];
-  if (fact.kind === 'repair_step') return fact.inputEvidenceRefs;
-
-  return fact.evidenceRefs;
-}
-
 /**
  * Creates tenant-scoped resolution-run and learning-event storage with idempotent recording
  * and ordered history.
@@ -77,7 +71,7 @@ export function createLearningStore(
           nextCursor: rows.length > 50 ? items.at(-1)!.id : null,
         };
       }),
-    start: (context, incidentId, input) =>
+    recordRun: (context, incidentId, input, accept) =>
       db.transaction(context.tenantId, async (tx) => {
         await lock(tx, context.tenantId, input.id);
         const previous = (
@@ -123,16 +117,7 @@ export function createLearningStore(
             [context.tenantId, input.id],
           )
         ).rows[0]?.document;
-        if (
-          binding &&
-          (binding.incidentId !== incidentId ||
-            binding.diagnosisRevision !== input.diagnosisRevision ||
-            binding.artifactId !== input.resolution.id ||
-            binding.artifactVersion !== input.resolution.version)
-        )
-          conflict('Resolution run binding conflicts');
-        if (!artifact.active && !binding)
-          conflict('Selected resolution is revoked');
+        let previousVersionExists = false;
         if (input.resolution.previousVersion) {
           const base = await tx.query(
             'SELECT 1 FROM action_artifacts WHERE tenant_id=$1 AND id=$2 AND version=$3',
@@ -142,26 +127,18 @@ export function createLearningStore(
               input.resolution.previousVersion,
             ],
           );
-          if (!base.rowCount) conflict('Previous resolution version not found');
+          previousVersionExists = Boolean(base.rowCount);
         }
-        const document: ResolutionRun = {
-          ...input,
-          schemaVersion: 1,
-          incidentId,
-          actorId: context.actor.id,
-          createdAt: now().toISOString(),
-          context: {
-            evidenceRefs: diagnosis.provenance.evidence.map((e) => e.id),
-            mappingVersions: diagnosis.provenance.mappingVersions,
-            configVersion: diagnosis.provenance.configVersion,
-            ruleVersion: diagnosis.provenance.ruleVersion,
-            diagnosisVersion: diagnosis.provenance.engineVersion,
-            hypotheses: diagnosis.hypotheses,
-            model: diagnosis.provenance.model,
-          },
+        const sources: LearningRunSources = {
+          diagnosis,
+          binding: binding ?? null,
+          artifactActive: artifact.active,
+          previousVersionExists,
           generation: artifact.document.generation,
           artifactDigest: artifact.digest,
+          createdAt: now().toISOString(),
         };
+        const document = accept(sources);
         await tx.query(
           'INSERT INTO resolution_runs(tenant_id,id,incident_id,diagnosis_revision,artifact_id,artifact_version,document,request,actor_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)',
           [
@@ -179,7 +156,7 @@ export function createLearningStore(
 
         return document;
       }),
-    append: (context, incidentId, runId, input) =>
+    recordEvent: (context, incidentId, runId, input, accept) =>
       db.transaction(context.tenantId, async (tx) => {
         await lock(tx, context.tenantId, runId);
         const selected = await run(tx, context.tenantId, incidentId, runId);
@@ -199,10 +176,8 @@ export function createLearningStore(
           return previous.document;
         }
         const recordedAt = now().toISOString();
-        if (Date.parse(input.occurredAt) > Date.parse(recordedAt))
-          conflict('Observation time is in the future');
-        const refs = [...new Set(evidence(input.fact))];
-        const owned = await tx.query(
+        const refs = learningEvidence(input.fact);
+        const owned = await tx.query<{ evidence_key: string }>(
           `WITH refs AS (
           SELECT jsonb_array_elements_text(i.document->'facts'->'evidenceRefs') AS id FROM exception_evidence e JOIN exception_inputs i ON i.tenant_id=e.tenant_id AND i.evidence_key=e.evidence_key WHERE e.tenant_id=$1 AND e.exception_id=$2
           UNION SELECT evidence->>'id' FROM exception_diagnoses d CROSS JOIN LATERAL jsonb_array_elements(d.document->'provenance'->'evidence') AS evidence WHERE d.tenant_id=$1 AND d.exception_id=$2
@@ -211,9 +186,10 @@ export function createLearningStore(
         ) SELECT DISTINCT s.evidence_key FROM refs JOIN exception_sources s ON s.tenant_id=$1 AND s.evidence_key=refs.id WHERE s.evidence_key=ANY($3::text[])`,
           [context.tenantId, incidentId, refs],
         );
-        if (owned.rowCount !== refs.length)
-          conflict('Evidence must belong to this incident');
         const fact = input.fact;
+        let stepExists = false;
+        let verification: LearningEventSources['verification'] = null;
+        let recurrenceExists = false;
         if ('stepId' in fact) {
           const human = await tx.query(
             "SELECT 1 FROM resolution_learning_events WHERE tenant_id=$1 AND run_id=$2 AND step_id=$3 AND kind='repair_step'",
@@ -223,17 +199,7 @@ export function createLearningStore(
             'SELECT 1 FROM action_admission_steps WHERE tenant_id=$1 AND run_id=$2 AND step_id=$3',
             [context.tenantId, runId, fact.stepId],
           );
-          if (
-            fact.kind === 'repair_step' &&
-            (human.rowCount || automated.rowCount)
-          )
-            conflict('Step ID is already bound');
-          if (
-            fact.kind !== 'repair_step' &&
-            !human.rowCount &&
-            !automated.rowCount
-          )
-            conflict('Step not found');
+          stepExists = Boolean(human.rowCount || automated.rowCount);
         }
         if (fact.kind === 'outcome' && fact.result === 'verified') {
           // Operator assertions cannot upgrade acceptance into a verified business result.
@@ -243,29 +209,15 @@ export function createLearningStore(
               [context.tenantId, incidentId],
             )
           ).rows[0]?.document;
-          const resolution = incident?.resolution;
-          if (
-            resolution?.kind !== 'verification' ||
-            resolution.outcome !== 'passed' ||
-            !resolution.authoritative ||
-            !resolution.complete ||
-            resolution.evaluatorVersion !== fact.evaluatorVersion ||
-            !fact.evidenceRefs.every((ref) =>
-              resolution.evidenceRefs.includes(ref),
-            ) ||
-            Date.parse(input.occurredAt) < Date.parse(resolution.at)
-          )
-            conflict(
-              'A verified outcome requires the incident’s authoritative verification',
-            );
+          if (incident?.resolution?.kind === 'verification')
+            verification = incident.resolution;
         }
         if (fact.kind === 'recurrence') {
           const recurrence = await tx.query(
             'SELECT 1 FROM exceptions WHERE tenant_id=$1 AND id=$2 AND previous_exception_id=$3',
             [context.tenantId, fact.incidentId, selected.incidentId],
           );
-          if (!recurrence.rowCount)
-            conflict('Incident is not a recorded recurrence of this case');
+          recurrenceExists = Boolean(recurrence.rowCount);
         }
         const sequence = Number(
           (
@@ -275,12 +227,14 @@ export function createLearningStore(
             )
           ).rows[0]!.next,
         );
-        const document: LearningEvent = {
-          ...input,
+        const document = accept({
           sequence,
-          actorId: context.actor.id,
           recordedAt,
-        };
+          ownedEvidenceRefs: owned.rows.map((row) => row.evidence_key),
+          stepExists,
+          verification,
+          recurrenceExists,
+        });
         await tx.query(
           'INSERT INTO resolution_learning_events(tenant_id,id,run_id,sequence,kind,step_id,recurrence_id,document,request,actor_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
           [

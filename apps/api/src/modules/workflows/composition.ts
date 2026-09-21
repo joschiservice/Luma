@@ -1,5 +1,9 @@
 import type { TenantDatabase } from '#modules/platform/index';
 import { learningBoundary } from '#modules/workflows/api/learning';
+import type {
+  LearningService,
+  LearningStore,
+} from '#modules/workflows/application/learning';
 import { createLearningService } from '#modules/workflows/application/learning';
 import type { PlaybookDependencies } from '#modules/workflows/application/playbook';
 import { createPlaybookService } from '#modules/workflows/application/playbook';
@@ -74,10 +78,16 @@ export function createResolutionLearning(
     context: import('#modules/identity/index').TenantContext,
   ) => Promise<import('#modules/identity/index').TenantContext>,
   now: () => Date = () => new Date(),
-) {
-  return createLearningService({
-    store: createLearningStore(db, now),
-    refreshContext,
-    ...learningBoundary,
-  });
+): LearningService {
+  return createLearningCommands(createLearningStore(db, now), refreshContext);
+}
+
+/** Composes authorized learning commands with validation and an atomic storage adapter. */
+export function createLearningCommands(
+  store: LearningStore,
+  refreshContext: (
+    context: import('#modules/identity/index').TenantContext,
+  ) => Promise<import('#modules/identity/index').TenantContext>,
+): LearningService {
+  return createLearningService({ store, refreshContext, ...learningBoundary });
 }

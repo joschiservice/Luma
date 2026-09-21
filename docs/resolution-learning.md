@@ -120,3 +120,19 @@ inconclusive reads, authoritative resolution and recurrence. It also checks
 replay, concurrent commands, RLS, authorization and append-only permissions. A
 production incident can be recorded through the same endpoints; no partner data
 is included in the fixture.
+
+## Command implementation and tests
+
+The learning command module owns selection acceptance, event acceptance and record
+construction. Its domain rules compare validated commands with retained facts. Transport
+schemas continue to validate command shape, cause assertions and repair chronology.
+
+The atomic storage adapter checks exact retries before invoking acceptance. PostgreSQL
+keeps the existing run and event locks, JSONB request comparison, source reads, sequence
+allocation and insertion in one transaction. Rejection rolls back the command. Automated
+binding triggers continue to use the same run lock. Source reads retain their existing
+isolation; only the history export promises one statement snapshot for all collections.
+
+`resolution-learning.test.ts` exercises the public commands with production validation
+and an in-memory adapter. PostgreSQL integration tests remain responsible for concurrency,
+retry matching across runs, rollback, tenant isolation and append-only storage permissions.

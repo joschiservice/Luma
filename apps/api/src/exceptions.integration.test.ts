@@ -500,6 +500,10 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
         artifact.id,
         artifact.version,
       );
+      // Exact retries retain the original selection even after its artifact is revoked.
+      expect(await learning.start(context(), incident.id, selection)).toEqual(
+        run,
+      );
       await services.diagnoses.run(context(), recurrence.id);
       await expect(
         learning.start(context(), recurrence.id, {
@@ -519,6 +523,16 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
           id: randomUUID(),
         }),
       ).rejects.toThrow('revoked');
+      await expect(
+        learning.append(context(), incident.id, historicalRunId, {
+          id: observationId,
+          occurredAt: receipts[0]!.occurredAt,
+          fact: observation,
+        }),
+      ).rejects.toThrow('already belongs');
+      expect(
+        (await learning.read(context(), incident.id, run.id)).events,
+      ).toEqual(history.events);
       await expect(
         safety.provisioning.bind(context(), {
           ...historicalBinding,
