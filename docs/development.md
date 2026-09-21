@@ -22,6 +22,7 @@ keep `.nvmrc`, `mise.toml`, and `package.json` in sync.
 | `pnpm dev`           | Start PostgreSQL if needed, apply migrations, and watch the API, web app, config and contracts.                    |
 | `pnpm dev:workflows` | Also start Temporal and its UI, and watch the workflow worker.                                                     |
 | `pnpm db:seed`       | Create or reuse the demo user/workspace and synthetic exception evidence.                                          |
+| `pnpm db:reset`      | Erase this worktree's local database, apply all migrations, provision roles, and seed demo data.                   |
 | `pnpm dev:doctor`    | Check tool versions, containers, database logins, and API readiness. Run while the app is running.                 |
 | `pnpm dev:down`      | Stop this checkout's containers and remove their network; retain volumes.                                          |
 | `pnpm dev:manual`    | Watch app processes using your app `.env` files and existing services.                                             |
@@ -73,6 +74,12 @@ Ctrl+C stops watched processes; infrastructure remains
 available until `pnpm dev:down`.
 
 ## Demo data
+
+Stop app and worker processes before running `pnpm db:reset`. The command deletes
+all data in this checkout's managed PostgreSQL database and recreates the demo
+workspace. It requires an existing local setup and preserves local credentials
+and configuration. Temporal workflow history is retained; use the
+[pilot reset](pilot-environment.md) when resetting pilot scenarios.
 
 Setup creates `demo@example.test` with a generated password recorded in
 `.luma/demo.json`, one EU workspace, and two synthetic exceptions: a connector

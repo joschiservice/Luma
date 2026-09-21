@@ -30,6 +30,7 @@
     "dev:doctor": "node tooling/dev/cli.mjs doctor",
     "dev:down": "node tooling/dev/cli.mjs down",
     "db:seed": "node tooling/dev/cli.mjs seed",
+    "db:reset": "node tooling/dev/cli.mjs reset",
     "test:local": "pnpm test:tooling && pnpm test:architecture && pnpm test:style && turbo run test",
     "test:full": "node tooling/dev/test.mjs full",
     "test:tooling": "node --test tooling/dev/*.test.mjs",

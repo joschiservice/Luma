@@ -25,6 +25,10 @@ services and preserves database data. Each worktree has its own ports, credentia
 Compose project and volumes. See [local development](docs/development.md) for
 workflow workers, configuration, diagnostics, and manually managed services.
 
+To erase this worktree's local database and restore the demo data, stop the app
+and worker processes, then run `pnpm db:reset`. This reapplies all migrations and
+prints the demo login details.
+
 ## Synthetic pilot
 
 Run `pnpm pilot:seed`, then `pnpm pilot` and `pnpm pilot:worker` in separate terminals
