@@ -45,6 +45,8 @@ A merchant action can change the shipping method while Luma is running. The inte
 
 ## Persistence, reset, and reproduction
 
+Stop the simulator before running `pnpm db:reset`. The reset archives pilot and simulator state under `.luma/backups/database-reset-*`. The next `pnpm simulator` launch creates a new run and provisions its installations in the new database.
+
 The full-stack command stores provider runs in `.luma/simulator/runs.sqlite` using SQLite WAL and full synchronous commits. Each request or clock tick loads the current snapshot and commits provider state, pending events, rule consumption, and journal together. Failed transactions roll back. A crash before commit leaves the event pending; a crash after commit leaves it consumed. Restart preserves running/paused state without replaying committed transitions. Run only one service runner per database. A failed scheduled transition rolls back that tick, pauses the affected run, and records a scenario error; other runs continue. Fix the conflicting provider state or reset before resuming.
 
 **Reset run** replaces provider state, clock, journal, and faults using the original seed and scenario; it pauses the run. It does not reset Luma's existing execution records. To repeat the complete Luma approval journey, stop the stack, move `.luma/simulator` aside, and restart `pnpm simulator`; a new isolated pilot organization is provisioned. Keep the old directory when retaining reproduction evidence.

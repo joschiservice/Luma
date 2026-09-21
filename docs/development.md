@@ -78,8 +78,11 @@ available until `pnpm dev:down`.
 Stop app and worker processes before running `pnpm db:reset`. The command deletes
 all data in this checkout's managed PostgreSQL database and recreates the demo
 workspace. It requires an existing local setup and preserves local credentials
-and configuration. Temporal workflow history is retained; use the
-[pilot reset](pilot-environment.md) when resetting pilot scenarios.
+and configuration. Pilot manifests and simulator state are archived under
+`.luma/backups/database-reset-*`; the next pilot or simulator launch seeds fresh
+state. Temporal workflow history is retained. Use the
+[pilot reset](pilot-environment.md) to reset a pilot scenario without resetting
+the database.
 
 Setup creates `demo@example.test` with a generated password recorded in
 `.luma/demo.json`, one EU workspace, and two synthetic exceptions: a connector

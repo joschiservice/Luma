@@ -9,6 +9,7 @@ import {
   stateDirectory,
 } from './environment.mjs';
 import { fail, root, run } from './process.mjs';
+import { archiveDatabaseState } from './reset-state.mjs';
 
 const command = process.argv[2];
 
@@ -102,6 +103,9 @@ try {
         '--if-exists',
         'luma',
       ]);
+      const backup = await archiveDatabaseState(stateDirectory);
+      if (backup)
+        console.log(`Pilot and simulator state archived to ${backup}`);
       await compose(saved, [
         'exec',
         '-T',
