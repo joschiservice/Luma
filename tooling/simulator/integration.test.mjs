@@ -23,6 +23,7 @@ import {
   mutate,
 } from '../../apps/simulator/dist/run.js';
 import { createTransport } from '../../packages/simulator/core/dist/index.js';
+import { observeProviders } from './observations.mjs';
 
 const tenantId = '00000000-0000-4000-8000-000000000001';
 const context = makeTenantContext(
@@ -169,6 +170,47 @@ test('real installed adapters read remote state, verify a lost write after resta
         new Set(connection.granted),
       );
     const runtime = createInstalledRuntime(options());
+    const checks = [];
+    const observe = () =>
+      observeProviders({
+        context: async () => context,
+        installations: options().installations,
+        capabilities: runtime,
+        manifest: {
+          connections: { jtl: connections[0].id, shopify: connections[1].id },
+        },
+        recordRead: async (_actor, connectionId, capability, result) =>
+          checks.push({ connectionId, capability, result }),
+        onError: (error) => {
+          throw error;
+        },
+      });
+    await observe();
+    assert.equal(checks.length, 9);
+    assert.ok(
+      checks.every((check) => check.result.ok),
+      JSON.stringify(checks),
+    );
+    for (const status of ['unavailable', 'rate-limited', 'healthy']) {
+      checks.length = 0;
+      await call('runs/test/control', {
+        action: 'service-health',
+        instance: 'jtl',
+        status,
+      });
+      await observe();
+      assert.equal(checks.length, 9);
+      assert.ok(
+        checks
+          .filter((check) => check.connectionId === connections[1].id)
+          .every((check) => check.result.ok),
+      );
+      assert.ok(
+        checks
+          .filter((check) => check.connectionId === connections[0].id)
+          .every((check) => check.result.ok === (status === 'healthy')),
+      );
+    }
     for (const connection of connections)
       for (const capability of [
         'orders.read',

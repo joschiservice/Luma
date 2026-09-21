@@ -28,6 +28,25 @@ test('control panel manages runs, merchant actions and every initial fault', asy
     await page.waitForFunction(() =>
       document.querySelector('#status').textContent.includes('Paused'),
     );
+    await page.locator('#service-health').selectOption('unavailable');
+    await page.waitForFunction(() =>
+      document
+        .querySelector('#health-status')
+        .textContent.includes('JTL · Unavailable'),
+    );
+    await page.locator('#provider').selectOption('shopify');
+    assert.equal(await page.locator('#service-health').inputValue(), 'healthy');
+    await page.locator('#service-health').selectOption('rate-limited');
+    await page.waitForFunction(() =>
+      document
+        .querySelector('#health-status')
+        .textContent.includes('SHOPIFY · Rate limited'),
+    );
+    await page.locator('#provider').selectOption('jtl');
+    assert.equal(
+      await page.locator('#service-health').inputValue(),
+      'unavailable',
+    );
     await page.getByRole('button', { name: 'Start / Resume' }).click();
     await page.waitForFunction(() =>
       document.querySelector('#status').textContent.includes('Running'),
@@ -112,6 +131,7 @@ test('control panel manages runs, merchant actions and every initial fault', asy
           .textContent.includes('gid://shopify/Order/11'),
     );
     assert.equal(await page.locator('.fault').count(), 0);
+    assert.equal(await page.locator('#service-health').inputValue(), 'healthy');
     assert.equal(await page.locator('#error').textContent(), '');
     assert.deepEqual(errors, []);
     await page.setViewportSize({ width: 390, height: 844 });

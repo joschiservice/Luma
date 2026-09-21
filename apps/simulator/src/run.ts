@@ -62,6 +62,12 @@ export const faultSchema = z
       });
   });
 
+export const serviceHealthSchema = z.enum([
+  'healthy',
+  'rate-limited',
+  'unavailable',
+]);
+
 export interface Run {
   id: string;
   seed: number;
@@ -69,6 +75,7 @@ export interface Run {
   nextOrder: number;
   scenario: 'commerce' | 'manual';
   clock: Clock;
+  serviceHealth: Record<'jtl' | 'shopify', z.infer<typeof serviceHealthSchema>>;
   jtl: jtl.JtlState;
   shopify: shopify.ShopifyState;
   mappings: { jtl: string; shopify: string }[];
@@ -96,6 +103,7 @@ export function createRun(
     nextOrder: 11,
     scenario,
     clock,
+    serviceHealth: { jtl: 'healthy', shopify: 'healthy' },
     jtl: jtl.seed(),
     shopify: shopify.seed(clock.now),
     mappings: [{ jtl: '1', shopify: 'gid://shopify/Order/1' }],
@@ -183,6 +191,22 @@ export function dispatch(
     instance,
     target.resource,
   );
+  const health = run.serviceHealth[instance];
+  if (health !== 'healthy') {
+    const status = health === 'rate-limited' ? 429 : 503;
+    journal(
+      run.clock,
+      'response',
+      { status, serviceHealth: health },
+      instance,
+      target.resource,
+    );
+
+    return {
+      ...json({ error: health }, status),
+      headers: { 'content-type': 'application/json', 'retry-after': '1' },
+    };
+  }
   const fault = matchFault(run.clock, { ...target, phase: 'before' });
   if (fault)
     return {

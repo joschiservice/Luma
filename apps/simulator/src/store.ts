@@ -23,6 +23,8 @@ export async function openStore(path: string) {
           .prepare('SELECT document FROM simulator_state WHERE id=1')
           .get()!;
         const runs = JSON.parse(String(row.document)) as Record<string, Run>;
+        for (const run of Object.values(runs))
+          run.serviceHealth ??= { jtl: 'healthy', shopify: 'healthy' };
         const result = work(runs);
         const document = JSON.stringify(runs);
         if (document !== row.document)

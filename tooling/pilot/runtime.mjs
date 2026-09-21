@@ -8,6 +8,7 @@ import { Pool } from 'pg';
 import {
   buildApp,
   createAdmissionEligibility,
+  createCommerceServices,
   createDeskServices,
   createDetectionServices,
   createExceptionWorkflowRuntime,
@@ -21,6 +22,7 @@ import {
   createInstalledConnections,
   createInstalledRuntime,
   createInstalledShippingMethodEffects,
+  createReadChecks,
   createShippingMethodEffects,
   createSimulationTransport,
 } from '../../apps/api/dist/modules/connectors/composition.js';
@@ -35,6 +37,7 @@ import {
   createOperationsOverview,
 } from '../../apps/api/dist/modules/workflows/composition.js';
 import { shippingMethodPlaybook } from '../../apps/api/dist/modules/workflows/index.js';
+import { observeProviders } from '../simulator/observations.mjs';
 import { detectionRequest, readJson } from './fixtures.mjs';
 import { identitySettings } from './seed.mjs';
 
@@ -211,6 +214,10 @@ export async function createPilot(
       return Response.json({ salesOrderId: '10' });
     },
   });
+  const commerce = simulation
+    ? createCommerceServices(env.WORKFLOW_DATABASE_URL)
+    : undefined;
+  const recordRead = createReadChecks(db);
   const installedOptions = {
     installations,
     simulation,
@@ -223,10 +230,25 @@ export async function createPilot(
         (state.capabilityEvents ??= []).push(entry);
       });
     },
-    recordObservations: ({ observations }) =>
-      mutate((state) => {
+    recordObservations: async ({ capability, observations }) => {
+      if (
+        commerce &&
+        ['orders.read', 'inventory.read', 'fulfillment.read'].includes(
+          capability,
+        )
+      ) {
+        const actor = await context();
+        for (const observation of observations)
+          await commerce.ingestion.ingest(
+            actor,
+            `simulator:${observation.id}`,
+            { capability, observation },
+          );
+      }
+      await mutate((state) => {
         state.observations.push(...observations);
-      }),
+      });
+    },
   };
   const capabilities = simulation
     ? createInstalledRuntime(installedOptions)
@@ -646,9 +668,21 @@ export async function createPilot(
     safety,
     playbooks,
     provider: () => readJson(path),
+    observe: () =>
+      simulation
+        ? observeProviders({
+            context,
+            installations,
+            capabilities,
+            recordRead,
+            manifest,
+            onError: (error) => app.log.error(error),
+          })
+        : Promise.resolve(),
     async close() {
       await app.close();
       await Promise.all([
+        commerce?.close(),
         identity.close(),
         detection.close(),
         safety.close(),

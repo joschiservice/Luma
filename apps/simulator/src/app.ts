@@ -4,7 +4,14 @@ import { journal } from '@luma/simulator-core';
 import Fastify from 'fastify';
 import { z } from 'zod';
 
-import { advanceRun, createRun, dispatch, faultSchema, mutate } from './run.js';
+import {
+  advanceRun,
+  createRun,
+  dispatch,
+  faultSchema,
+  mutate,
+  serviceHealthSchema,
+} from './run.js';
 import { openStore } from './store.js';
 
 const runId = z.string().regex(/^[a-z0-9-]{1,64}$/);
@@ -24,6 +31,11 @@ const controlSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('speed'), speed: z.number().min(0.1).max(100) }),
   z.object({ action: z.literal('command'), instance, command: z.unknown() }),
   z.object({ action: z.literal('fault'), rule: faultSchema }),
+  z.object({
+    action: z.literal('service-health'),
+    instance,
+    status: serviceHealthSchema,
+  }),
   z.object({ action: z.literal('disable'), id: z.string() }),
 ]);
 
@@ -99,6 +111,8 @@ export async function createApp(
       if (input.action === 'speed') run.clock.speed = input.speed;
       if (input.action === 'command')
         mutate(run, input.instance, input.command);
+      if (input.action === 'service-health')
+        run.serviceHealth[input.instance] = input.status;
       if (input.action === 'fault') {
         const { lifetimeMs, ...rule } = input.rule;
         run.clock.faults.push({

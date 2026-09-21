@@ -29,6 +29,22 @@ Seeded randomness determines quantities; generated order IDs start at `11`. Use 
 
 Pause stops autonomous commerce. Provider reads and control requests remain available. **Advance 30s** advances scheduled events even while paused. Speed changes affect commerce time; HTTP cancellation and client timeouts use real time. The host runs without a browser. It advances by fixed 250 ms ticks, multiplied by speed, and does not catch up for process downtime or event-loop stalls.
 
+## Service health
+
+Choose a provider and set **Service health** in the control panel. Each run stores independent JTL and Shopify settings:
+
+- **Healthy:** requests use normal provider behavior and any armed faults.
+- **Rate limited:** every request returns HTTP 429 with `Retry-After: 1`.
+- **Unavailable:** every request returns HTTP 503 with `Retry-After: 1`.
+
+Health settings persist across restarts, pause, and clock advances until changed. **Reset run** restores both providers to healthy. Existing runs without health settings start healthy. Blocked requests do not read or change provider records or consume fault rules. Fault lifetimes still advance with simulation time. Merchant actions and scheduled commerce continue independently of provider API health. Health changes and blocked responses appear in the journal.
+
+The full-stack simulator reads each permitted provider capability when its API starts and every ten real-time seconds after the previous pass finishes. Reads continue while commerce is paused. Commerce observations go through Luma's ingestion service; read outcomes, including empty results, are stored for Overview coverage. Provider failures show the connection as degraded in Overview until a later read succeeds. Healthy means that recent reads succeeded; it does not clear existing cases or operator decisions. The control panel alone does not collect Luma observations.
+
+Restart `pnpm simulator` after updating the code to apply the database migration and start the observation collector. Overview refreshes automatically; allow one collection pass and a UI refresh after changing health.
+
+The control API accepts `{ "action": "service-health", "instance": "jtl", "status": "unavailable" }` at `POST /api/runs/:id/control`. Instances are `jtl` and `shopify`; statuses are `healthy`, `rate-limited`, and `unavailable`.
+
 ## Faults and uncertain writes
 
 Select a provider, fault, operation, optional resource, occurrence, count, and lifetime. Rules move from **armed** to **triggered**, **expired**, or **disabled**. Lifetimes use simulation time. Occurrence counts matching requests; count controls how many faults follow that occurrence. Rules are evaluated in creation order and the first eligible rule wins per request phase.

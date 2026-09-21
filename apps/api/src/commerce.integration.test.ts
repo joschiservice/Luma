@@ -5,11 +5,16 @@ import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { createCommerceServices } from '#app';
+import {
+  createConnectionCoverage,
+  createReadChecks,
+} from '#modules/connectors/composition';
 import type {
   CommerceObservation,
   SourceIdentity,
 } from '#modules/connectors/index';
 import { makeTenantContext } from '#modules/identity/composition';
+import { createTenantDatabase } from '#modules/platform/composition';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 
@@ -158,6 +163,9 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
             version: 1,
             status: 'active',
             target: { kind: 'shopify' },
+            label: 'Fixture',
+            permissions: [],
+            granted: [],
           },
           'encrypted-fixture',
         ],
@@ -176,6 +184,85 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
     await owner.query(
       'TRUNCATE connector_observations,connector_source_mappings,orders_entities,inventory_entities CASCADE',
     );
+  });
+  it('persists empty read coverage, failures and recovery with tenant isolation', async () => {
+    const db = createTenantDatabase(runtime);
+    const record = createReadChecks(db);
+    const coverage = createConnectionCoverage(db);
+    const readCoverage = async () =>
+      (
+        await coverage(context(), new Date(Date.now() + 1000).toISOString())
+      ).find((item) => item.id === connection);
+    const success = {
+      ok: true as const,
+      value: { items: [], nextCursor: null, completeness: 'complete' as const },
+    };
+    const failed = {
+      ok: false as const,
+      error: {
+        code: 'unavailable' as const,
+        effect: 'none' as const,
+        retry: 'after_delay' as const,
+      },
+    };
+    await owner.query(
+      `UPDATE connector_installations SET document=document || $3::jsonb WHERE tenant_id=$1 AND id=$2`,
+      [
+        tenant,
+        connection,
+        {
+          label: 'Simulated',
+          permissions: ['orders.read', 'fulfillment.read'],
+          granted: ['orders.read', 'fulfillment.read'],
+        },
+      ],
+    );
+    try {
+      expect(await readCoverage()).toMatchObject({
+        freshness: 'unobserved',
+        status: 'active',
+      });
+      await record(context(), connection, 'orders.read', success);
+      expect(await readCoverage()).toMatchObject({ freshness: 'unobserved' });
+      await record(context(), connection, 'fulfillment.read', success);
+      expect(await readCoverage()).toMatchObject({
+        freshness: 'fresh',
+        status: 'active',
+      });
+      await record(context(), connection, 'orders.read', failed);
+      expect(await readCoverage()).toMatchObject({ status: 'degraded' });
+      await record(context(), connection, 'orders.read', success);
+      expect(await readCoverage()).toMatchObject({
+        freshness: 'fresh',
+        status: 'active',
+      });
+      await expect(
+        record(context(), connection, 'products.read', success),
+      ).rejects.toThrow('Connection capability unavailable');
+      expect(
+        await coverage(context(otherTenant), new Date().toISOString()),
+      ).toMatchObject([{ freshness: 'unobserved' }]);
+      expect(
+        (await runtime.query('SELECT * FROM connector_read_checks')).rows,
+      ).toHaveLength(0);
+      await expect(
+        record(context(otherTenant), connection, 'orders.read', success),
+      ).rejects.toThrow('Connection capability unavailable');
+      const stored = await owner.query(
+        'SELECT document FROM connector_read_checks WHERE tenant_id=$1',
+        [tenant],
+      );
+      expect(stored.rows).toHaveLength(4);
+    } finally {
+      await owner.query(
+        'DELETE FROM connector_read_checks WHERE tenant_id=$1',
+        [tenant],
+      );
+      await owner.query(
+        `UPDATE connector_installations SET document=document || '{"permissions":[],"granted":[],"label":"Fixture"}'::jsonb WHERE tenant_id=$1 AND id=$2`,
+        [tenant, connection],
+      );
+    }
   });
   it.each(['orders', 'inventory'] as const)(
     '%s rejects missing, cross-connection and cross-tenant observation references atomically',

@@ -45,6 +45,10 @@ function render() {
     `${run.clock.running ? 'Running' : 'Paused'} · ${run.clock.speed}× · ${run.clock.events.length} scheduled events · seed ${run.seed}`;
   $('#speed').value = String(run.clock.speed);
   const provider = $('#provider').value;
+  $('#service-health').disabled = false;
+  $('#service-health').value = run.serviceHealth[provider];
+  $('#health-status').textContent =
+    `${provider.toUpperCase()} · ${$('#service-health').selectedOptions[0].textContent}`;
   $('#instance').textContent = `SIMULATED / ${run.id} / ${provider}`;
   $('#state').textContent = JSON.stringify(run[provider], null, 2);
   $('#faults').replaceChildren(
@@ -145,6 +149,12 @@ $('#runs').onchange = (event) => {
   render();
 };
 $('#provider').onchange = render;
+$('#service-health').onchange = (event) =>
+  void control({
+    action: 'service-health',
+    instance: $('#provider').value,
+    status: event.target.value,
+  });
 $('#speed').onchange = (event) =>
   void control({ action: 'speed', speed: Number(event.target.value) });
 for (const button of document.querySelectorAll('[data-action]'))

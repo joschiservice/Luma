@@ -115,7 +115,22 @@
           </form>
         </section>
         <section class="panel">
-          <h2>Failure controls</h2>
+          <h2>Service health</h2>
+          <p class="muted">
+            Applies to every request to the selected provider until changed or
+            reset.
+          </p>
+          <label
+            >Service health<select id="service-health" disabled>
+              <option value="healthy">Healthy</option>
+              <option value="rate-limited">Rate limited · HTTP 429</option>
+              <option value="unavailable">Unavailable · HTTP 503</option>
+            </select></label
+          >
+          <p id="health-status" role="status" class="muted">
+            Select a run to set service health.
+          </p>
+          <h3>Failure controls</h3>
           <p class="muted">
             Faults apply to the selected provider. Lifetimes use simulation
             time.

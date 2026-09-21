@@ -1,6 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 
 import { expect, it } from 'vitest';
 
@@ -153,4 +154,160 @@ it.each([
   expect(run.clock.faults[0]!.matches).toBe(0);
   expect(request(path).status).toBe(503);
   expect(run.clock.faults[0]!.status).toBe('triggered');
+});
+
+it.each(['jtl', 'shopify'] as const)(
+  'keeps %s health persistent, isolated and recoverable',
+  async (instance) => {
+    const directory = await mkdtemp(join(tmpdir(), 'luma-health-'));
+    const path = join(directory, 'runs.sqlite');
+    const token = 'test-synthetic-simulator-token';
+    let app = await createApp(path, token, false);
+    const post = async (
+      url: string,
+      payload: unknown,
+      expectedStatus = 200,
+    ) => {
+      const response = await app.inject({
+        method: 'POST',
+        url,
+        headers: {
+          authorization: `Bearer ${token}`,
+          'content-type': 'application/json',
+        },
+        payload: JSON.stringify(payload),
+      });
+      expect(response.statusCode, response.body).toBe(expectedStatus);
+
+      return response.json();
+    };
+    const request =
+      instance === 'jtl'
+        ? {
+            url: 'https://jtl.invalid/api/sales-orders/1',
+            method: 'PATCH',
+            headers: { authorization: 'Wawi synthetic' },
+            body: '{"shippingMethodId":"8"}',
+          }
+        : {
+            url: 'https://shopify.invalid/admin/api/2026-07/graphql.json',
+            method: 'POST',
+            headers: { 'x-shopify-access-token': 'synthetic' },
+            body: JSON.stringify({
+              query:
+                'query LumaPage { page: orders(first: $first) { nodes { id } } }',
+              variables: { first: 10 },
+            }),
+          };
+    try {
+      for (const id of ['a', 'b'])
+        await post('/api/runs', { id, scenario: 'manual' });
+      await post(
+        '/api/runs/a/control',
+        { action: 'service-health', instance, status: 'broken' },
+        400,
+      );
+      await post(
+        '/api/runs/a/control',
+        { action: 'service-health', instance: 'unknown', status: 'healthy' },
+        400,
+      );
+      await post('/api/runs/a/control', {
+        action: 'fault',
+        rule: { instance, operation: '*', phase: 'before', kind: 'outage' },
+      });
+      for (const [status, code] of [
+        ['rate-limited', 429],
+        ['unavailable', 503],
+      ] as const) {
+        const run = await post('/api/runs/a/control', {
+          action: 'service-health',
+          instance,
+          status,
+        });
+        expect(run.serviceHealth[instance]).toBe(status);
+        await app.close();
+        app = await createApp(path, token, false);
+        await post('/api/runs/a/control', {
+          action: 'advance',
+          milliseconds: 86400000,
+        });
+        for (let i = 0; i < 3; i++) {
+          expect(
+            await post(`/api/runs/a/providers/${instance}/request`, request),
+          ).toMatchObject({ status: code, headers: { 'retry-after': '1' } });
+        }
+        expect(
+          await post(`/api/runs/b/providers/${instance}/request`, request),
+        ).toMatchObject({ status: 200 });
+      }
+      const run = await post('/api/runs/a/control', {
+        action: 'service-health',
+        instance,
+        status: 'healthy',
+      });
+      expect(run.jtl.orders[0].shippingMethodId).toBe('7');
+      expect(run.serviceHealth).toEqual({ jtl: 'healthy', shopify: 'healthy' });
+      expect(run.clock.faults[0]).toMatchObject({
+        status: 'armed',
+        matches: 0,
+        remaining: 1,
+      });
+      expect(
+        run.clock.journal.filter(
+          (event: { kind: string }) => event.kind === 'response',
+        ),
+      ).toHaveLength(6);
+      expect(
+        await post(`/api/runs/a/providers/${instance}/request`, request),
+      ).toMatchObject({ status: 503 });
+      expect(
+        await post(`/api/runs/a/providers/${instance}/request`, request),
+      ).toMatchObject({ status: 200 });
+      await post('/api/runs/a/control', {
+        action: 'service-health',
+        instance,
+        status: 'unavailable',
+      });
+      const reset = await post('/api/runs/a/control', { action: 'reset' });
+      expect(reset.serviceHealth).toEqual({
+        jtl: 'healthy',
+        shopify: 'healthy',
+      });
+    } finally {
+      await app.close();
+      await rm(directory, { recursive: true, force: true });
+    }
+  },
+);
+
+it('loads older saved runs with healthy providers', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'luma-health-upgrade-'));
+  const path = join(directory, 'runs.sqlite');
+  const token = 'test-synthetic-simulator-token';
+  const database = new DatabaseSync(path);
+  const legacy: Partial<ReturnType<typeof createRun>> = createRun('legacy');
+  delete legacy.serviceHealth;
+  database.exec(
+    'CREATE TABLE simulator_state (id INTEGER PRIMARY KEY, document TEXT NOT NULL)',
+  );
+  database
+    .prepare('INSERT INTO simulator_state VALUES (1, ?)')
+    .run(JSON.stringify({ legacy }));
+  database.close();
+  const app = await createApp(path, token, false);
+  try {
+    const response = await app.inject({
+      url: '/api/runs',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()[0].serviceHealth).toEqual({
+      jtl: 'healthy',
+      shopify: 'healthy',
+    });
+  } finally {
+    await app.close();
+    await rm(directory, { recursive: true, force: true });
+  }
 });

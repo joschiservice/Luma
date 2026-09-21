@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 
+import { startObservations } from '../simulator/observations.mjs';
 import { readJson } from './fixtures.mjs';
 import { startJourney } from './journey.mjs';
 import { createPilot } from './runtime.mjs';
@@ -20,7 +21,7 @@ const temporal = {
 
 const pilot = await createPilot(process.env, directory, manifest, temporal);
 
-let worker, client, running;
+let worker, client, running, stopObservations;
 
 let stopping = false;
 
@@ -33,6 +34,7 @@ async function stop() {
   });
   await worker?.close();
   await client?.close();
+  await stopObservations?.();
   await pilot.close();
 }
 
@@ -55,6 +57,10 @@ try {
       port: Number(process.env.PORT),
     });
     console.log(`Synthetic pilot API: ${address}`);
+    if (manifest.simulator)
+      stopObservations = startObservations(pilot.observe, (error) =>
+        pilot.app.log.error(error),
+      );
   }
 } catch (error) {
   console.error(error);
