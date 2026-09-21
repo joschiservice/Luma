@@ -2,6 +2,7 @@ packages:
   - apps/*
   - packages/*
   - packages/connectors/*
+  - packages/simulator/*
 
 minimumReleaseAge: 0
 saveExact: true

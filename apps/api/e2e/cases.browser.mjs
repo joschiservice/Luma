@@ -55,10 +55,14 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
     .getByRole('heading', { name: 'Connect your first system.' })
     .waitFor();
   expect(await page.getByText('Unavailable', { exact: true }).count()).toBe(2);
-  await page.getByLabel('Resolution window').selectOption('7d');
+  await page.getByRole('combobox', { name: 'Resolution window' }).click();
+  await page.getByRole('option', { name: 'Last 7 days', exact: true }).click();
   await page.waitForURL('**/overview?window=7d');
   await page.reload();
-  expect(await page.getByLabel('Resolution window').inputValue()).toBe('7d');
+  await page
+    .getByRole('combobox', { name: 'Resolution window' })
+    .getByText('Last 7 days', { exact: true })
+    .waitFor();
   const overviewDenied = await context.request.get(
     `/api/v1/organizations/${randomUUID()}/operations/overview`,
   );
@@ -170,7 +174,8 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
   await page.getByRole('button', { name: 'Next', exact: true }).click();
   await page.getByRole('button', { name: 'Previous', exact: true }).click();
   await page.getByText('Filter issues', { exact: true }).click();
-  await page.getByLabel('Class', { exact: true }).selectOption('sync_failure');
+  await page.getByRole('combobox', { name: 'Class', exact: true }).click();
+  await page.getByRole('option', { name: 'Sync failure', exact: true }).click();
   const row = page.locator(`#case-${ids[0]}`);
   await row.click();
   await page
@@ -189,9 +194,11 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
     .locator('.inbox-detail')
     .getByText('Investigation pending', { exact: true })
     .waitFor();
-  expect(await page.getByLabel('Class', { exact: true }).inputValue()).toBe(
-    'sync_failure',
-  );
+  await page.locator('.inbox-filter-disclosure > summary').click();
+  await page
+    .getByRole('combobox', { name: 'Class', exact: true })
+    .getByText('Sync failure', { exact: true })
+    .waitFor();
   expect(await row.isVisible()).toBe(true);
   await page.getByText('Live', { exact: true }).waitFor();
   await services.diagnoses.run(tenant, ids[0]);

@@ -101,3 +101,7 @@ export type { ShopifyOAuth } from '#modules/connectors/infrastructure/shopify/oa
 export { createSourceRecords } from '#modules/connectors/infrastructure/source-records';
 
 export { createConnectionCoverage } from '#modules/connectors/infrastructure/coverage';
+
+export { createSimulationTransport } from '#modules/connectors/infrastructure/installations/simulation';
+
+export type { SimulationTransport } from '#modules/connectors/infrastructure/installations/simulation';

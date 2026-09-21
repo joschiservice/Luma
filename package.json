@@ -36,7 +36,10 @@
     "pilot": "node tooling/pilot/cli.mjs serve",
     "pilot:seed": "node tooling/pilot/cli.mjs seed",
     "pilot:reset": "node tooling/pilot/cli.mjs reset",
-    "pilot:worker": "node tooling/pilot/cli.mjs worker"
+    "pilot:worker": "node tooling/pilot/cli.mjs worker",
+    "simulator": "node tooling/simulator/cli.mjs",
+    "simulator:service": "pnpm exec turbo run build --filter=@luma/simulator... && node apps/simulator/dist/server.js",
+    "test:simulator": "pnpm exec turbo run build --filter=@luma/api... --filter=@luma/simulator... && pnpm exec turbo run test --filter=@luma/simulator... && node --test tooling/simulator/*.test.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

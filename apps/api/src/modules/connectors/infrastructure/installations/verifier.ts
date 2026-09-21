@@ -13,6 +13,8 @@ import { ConnectorError } from '#modules/connectors/domain/capabilities';
 import type { InstallationCapability } from '#modules/connectors/domain/installation';
 import type { ApprovedJtlEndpoint } from '#modules/connectors/infrastructure/approved-jtl-fetch';
 import { approvedJtlFetch } from '#modules/connectors/infrastructure/approved-jtl-fetch';
+import type { SimulationTransport } from '#modules/connectors/infrastructure/installations/simulation';
+import { simulationTransport } from '#modules/connectors/infrastructure/installations/simulation';
 import * as jtl from '#modules/connectors/infrastructure/jtl/schemas';
 
 /**
@@ -22,14 +24,19 @@ import * as jtl from '#modules/connectors/infrastructure/jtl/schemas';
 export function createInstallationVerifier(options: {
   jtlEndpoints: readonly ApprovedJtlEndpoint[];
   fetch?: typeof globalThis.fetch;
+  /** Trusted local simulation bindings, shared with verification and workers. */
+  simulation?: SimulationTransport;
 }): InstallationDependencies['verify'] {
   return async (connection, credentials) => {
     const target = connection.target;
+    const simulated = simulationTransport(connection, options.simulation);
     if (target.kind === 'shopify') {
       const client = shopifyClient({
         shop: target.shop,
         accessToken: async () => credentials.token,
-        ...(options.fetch ? { fetch: options.fetch } : {}),
+        ...((simulated ?? options.fetch)
+          ? { fetch: simulated ?? options.fetch }
+          : {}),
       });
       const data = shopifyParse(
         z.object({
@@ -66,8 +73,8 @@ export function createInstallationVerifier(options: {
 
       return granted;
     }
-    let transport = options.fetch;
-    if (target.kind === 'jtl-onprem') {
+    let transport = simulated ?? options.fetch;
+    if (target.kind === 'jtl-onprem' && !simulated) {
       const endpoint = options.jtlEndpoints.find(
         (e) =>
           e.tenantId === connection.tenantId && e.baseUrl === target.baseUrl,
@@ -140,7 +147,13 @@ export function createInstallationVerifier(options: {
       }
     }
 
-    // Read probes cannot establish write grants or installation-specific idempotency behavior.
+    // Local synthetic bindings have known write grants; live read probes cannot establish them.
+    if (simulated && granted.includes('orders.read'))
+      granted.push(
+        'orders.shipping-method.read',
+        'orders.shipping-method.write',
+      );
+
     return granted;
   };
 }

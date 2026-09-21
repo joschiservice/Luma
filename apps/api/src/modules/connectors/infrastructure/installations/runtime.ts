@@ -11,6 +11,8 @@ import { ConnectorError } from '#modules/connectors/domain/capabilities';
 import type { InstallationCapability } from '#modules/connectors/domain/installation';
 import type { ApprovedJtlEndpoint } from '#modules/connectors/infrastructure/approved-jtl-fetch';
 import { approvedJtlFetch } from '#modules/connectors/infrastructure/approved-jtl-fetch';
+import type { SimulationTransport } from '#modules/connectors/infrastructure/installations/simulation';
+import { simulationTransport } from '#modules/connectors/infrastructure/installations/simulation';
 import type { JtlEvidence } from '#modules/connectors/infrastructure/jtl/adapter';
 import { createJtlConnector } from '#modules/connectors/infrastructure/jtl/adapter';
 import type { ShopifyEvidence } from '#modules/connectors/infrastructure/shopify/adapter';
@@ -27,6 +29,8 @@ export interface InstalledRuntimeOptions {
   jtlEndpoints: readonly ApprovedJtlEndpoint[];
   /** Transport override for Shopify and JTL Cloud only. */
   fetch?: typeof globalThis.fetch;
+  /** Trusted local simulation bindings, shared with verification and workers. */
+  simulation?: SimulationTransport;
 }
 
 function installedRuntime(options: InstalledRuntimeOptions) {
@@ -45,8 +49,12 @@ function installedRuntime(options: InstalledRuntimeOptions) {
         const build = async (cap: InstallationCapability) => {
           const current = await installations.credential(context, id, cap);
           const target = current.connection.target;
+          const simulated = simulationTransport(
+            current.connection,
+            options.simulation,
+          );
           const token = async () => {
-            if (target.kind === 'jtl-onprem')
+            if (target.kind === 'jtl-onprem' && !simulated)
               await options.approveJtlEndpoint(context, target.baseUrl);
             if (cap === 'orders.shipping-method.write')
               await installations.credential(
@@ -72,7 +80,9 @@ function installedRuntime(options: InstalledRuntimeOptions) {
             tenantId: context.tenantId,
             connectionId: id,
             recordObservations: options.recordObservations,
-            ...(options.fetch ? { fetch: options.fetch } : {}),
+            ...((simulated ?? options.fetch)
+              ? { fetch: simulated ?? options.fetch }
+              : {}),
           };
           if (target.kind === 'shopify')
             return createShopifyConnector({
@@ -83,7 +93,7 @@ function installedRuntime(options: InstalledRuntimeOptions) {
 
           return createJtlConnector({
             ...common,
-            ...(target.kind === 'jtl-onprem'
+            ...(target.kind === 'jtl-onprem' && !simulated
               ? {
                   fetch: async (
                     ...args: Parameters<typeof globalThis.fetch>

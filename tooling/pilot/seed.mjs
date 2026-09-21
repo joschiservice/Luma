@@ -7,7 +7,11 @@ import {
   buildRuntimeApp,
   createDetectionServices,
 } from '../../apps/api/dist/app.js';
-import { createInstalledConnections } from '../../apps/api/dist/modules/connectors/composition.js';
+import {
+  createInstallationVerifier,
+  createInstalledConnections,
+  createSimulationTransport,
+} from '../../apps/api/dist/modules/connectors/composition.js';
 import { createIdentity } from '../../apps/api/dist/modules/identity/composition.js';
 import { createTenantDatabase } from '../../apps/api/dist/modules/platform/composition.js';
 import { detectionRequest, jtl, newManifest, readJson } from './fixtures.mjs';
@@ -31,6 +35,7 @@ export async function seedPilot(
   directory,
   scenario = 'approval-required',
   reset = false,
+  simulator,
 ) {
   const path = join(directory, 'pilot.json');
   if (!reset) {
@@ -41,6 +46,7 @@ export async function seedPilot(
     }
   }
   const manifest = newManifest(scenario);
+  if (simulator) manifest.simulator = { ...simulator, bindings: [] };
   const settings = identitySettings(env);
   const app = buildRuntimeApp(settings);
   const identity = createIdentity(settings);
@@ -56,8 +62,13 @@ export async function seedPilot(
       ]),
     ),
     // Install pending configuration only. Synthetic observations never mark a real connection healthy.
-    verify: async () => {
-      throw new Error('Synthetic connection');
+    verify: async (...args) => {
+      if (!manifest.simulator) throw new Error('Synthetic connection');
+
+      return createInstallationVerifier({
+        jtlEndpoints: [],
+        simulation: createSimulationTransport(manifest.simulator),
+      })(...args);
     },
   });
   let cookie;
@@ -139,13 +150,38 @@ export async function seedPilot(
       const connection = await connections.install(context, {
         label: `SIMULATED ${provider.toUpperCase()} · no live health`,
         target,
-        permissions: ['orders.read', 'inventory.read', 'fulfillment.read'],
+        permissions: [
+          'orders.read',
+          'inventory.read',
+          'fulfillment.read',
+          ...(simulator
+            ? [
+                'products.read',
+                ...(provider === 'jtl'
+                  ? [
+                      'orders.shipping-method.read',
+                      'orders.shipping-method.write',
+                    ]
+                  : []),
+              ]
+            : []),
+        ],
         credentials: {
           token: 'synthetic-not-a-provider-secret',
           challengeCode: 'synthetic',
         },
       });
       manifest.connections[provider] = connection.id;
+      if (simulator) {
+        manifest.simulator.bindings.push({
+          tenantId: manifest.organizationId,
+          connectionId: connection.id,
+          target,
+          runId: simulator.runId,
+          instance: provider,
+        });
+        await connections.check(context, connection.id, connection.version);
+      }
     }
     if (scenario !== 'healthy') {
       for (const kind of [
@@ -194,7 +230,7 @@ export async function seedPilot(
       mode: 0o600,
     });
     console.log(
-      `Synthetic pilot: ${scenario}. Login: pilot-operator@example.test. Password: .luma/demo.json.`,
+      `Synthetic pilot: ${scenario}. Login: pilot-operator@example.test. Password: ${simulator ? '.luma/simulator-login.json' : '.luma/demo.json'}.`,
     );
 
     return manifest;

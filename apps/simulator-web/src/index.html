@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Luma / Simulation lab</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <header>
+      <a href="/">LUMA <span>/ SIMULATION LAB</span></a
+      ><span class="badge">SYNTHETIC SYSTEMS</span>
+    </header>
+    <main>
+      <section class="intro">
+        <div>
+          <p class="eyebrow">COMMERCE, UNDER CONTROL</p>
+          <h1>Watch the system.<br />Change the conditions.</h1>
+          <p>
+            Independent provider state. Repeatable scenarios. Real connector
+            requests.
+          </p>
+        </div>
+        <form id="connect">
+          <label
+            >Service token<input
+              id="token"
+              type="password"
+              value="local-synthetic-simulator-token"
+              required /></label
+          ><button>Connect</button>
+        </form>
+      </section>
+      <p id="error" role="alert"></p>
+      <section class="toolbar">
+        <label>Run<select id="runs" aria-label="Run"></select></label>
+        <form id="create">
+          <label
+            >New run<input
+              name="id"
+              value="commerce-44"
+              pattern="[a-z0-9-]{1,64}"
+              required /></label
+          ><label
+            >Scenario<select name="scenario">
+              <option value="commerce">Autonomous commerce</option>
+              <option value="manual">Manual sandbox</option>
+            </select></label
+          ><label
+            >Seed<input
+              name="seed"
+              type="number"
+              value="44"
+              min="0"
+              max="4294967295" /></label
+          ><button>Create run</button>
+        </form>
+      </section>
+      <section class="run-controls">
+        <div>
+          <p class="eyebrow">SIMULATION CLOCK</p>
+          <strong id="clock">No run selected</strong>
+          <p id="status">Create a run to begin.</p>
+        </div>
+        <div class="buttons">
+          <button data-action="resume">Start / Resume</button
+          ><button data-action="pause" class="secondary">Pause</button
+          ><button data-action="advance" class="secondary">Advance 30s</button
+          ><label
+            >Speed<select id="speed">
+              <option>1</option>
+              <option>5</option>
+              <option>20</option>
+              <option>100</option>
+            </select></label
+          ><button data-action="reset" class="danger">Reset run</button>
+        </div>
+      </section>
+      <div class="columns">
+        <section class="panel">
+          <div class="section-title">
+            <h2>Provider state</h2>
+            <select id="provider" aria-label="Provider">
+              <option value="jtl">JTL</option>
+              <option value="shopify">Shopify</option>
+            </select>
+          </div>
+          <p id="instance" class="muted"></p>
+          <pre id="state"></pre>
+          <h3>Merchant action</h3>
+          <form id="command">
+            <label
+              >Action<select name="kind">
+                <option value="order">Create order</option>
+                <option value="stock">Set stock</option>
+                <option value="ship">Ship order</option>
+                <option value="shipping-method">
+                  Change JTL shipping method
+                </option>
+              </select></label
+            ><label>Order ID<input name="id" value="100" required /></label
+            ><label
+              >Quantity<input
+                name="quantity"
+                type="number"
+                value="2"
+                min="0" /></label
+            ><label
+              >Shipping method<select name="shippingMethodId">
+                <option value="7">Standard · 7</option>
+                <option value="8">Express · 8</option>
+                <option value="9">Pickup · 9</option>
+              </select></label
+            ><button>Apply action</button>
+          </form>
+        </section>
+        <section class="panel">
+          <h2>Failure controls</h2>
+          <p class="muted">
+            Faults apply to the selected provider. Lifetimes use simulation
+            time.
+          </p>
+          <form id="fault">
+            <label
+              >Fault<select name="kind">
+                <option value="outage">Provider outage</option>
+                <option value="rate-limit">Rate limit · retry in 1s</option>
+                <option value="response-loss">
+                  JTL write commits, response lost
+                </option>
+              </select></label
+            ><label
+              >Operation<select name="operation">
+                <option value="*">Any operation</option>
+                <option>orders.read</option>
+                <option>products.read</option>
+                <option value="items.read">
+                  items.read · JTL products / inventory
+                </option>
+                <option>inventory.read</option>
+                <option>fulfillment.read</option>
+                <option>orders.shipping-method.read</option>
+                <option>orders.shipping-method.write</option>
+              </select></label
+            ><label
+              >Resource ID (optional)<input
+                name="resource"
+                placeholder="1 or Shopify global ID"
+            /></label>
+            <div class="fields">
+              <label
+                >Occurrence<input
+                  name="occurrence"
+                  type="number"
+                  value="1"
+                  min="1" /></label
+              ><label
+                >Count<input
+                  name="remaining"
+                  type="number"
+                  value="1"
+                  min="1" /></label
+              ><label
+                >Lifetime (seconds)<input
+                  name="lifetime"
+                  type="number"
+                  value="300"
+                  min="1"
+              /></label>
+            </div>
+            <button>Arm fault</button>
+          </form>
+          <div id="faults"></div>
+        </section>
+      </div>
+      <section class="panel timeline">
+        <div class="section-title">
+          <h2>Activity journal</h2>
+          <span class="muted">Latest 100 events · ordered by sequence</span>
+        </div>
+        <div id="journal"></div>
+      </section>
+    </main>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
