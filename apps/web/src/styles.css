@@ -404,138 +404,286 @@ summary {
 }
 
 .connections-page {
-  max-width: 1100px;
+  max-width: 1200px;
+  margin: 0 auto;
+  font: 12px/1.6 var(--font-sans);
+}
+.connections-page h1 {
+  font: 600 24px/1.3 var(--font-sans);
+  letter-spacing: -0.035em;
+  margin: 0 0 6px;
+}
+.connections-page .desk-intro {
+  font: 12px/1.6 var(--font-sans);
+  margin: 0 0 24px;
+  color: var(--muted-foreground);
 }
 .connections-section {
-  border-top: 1px solid var(--border);
-  margin-top: 40px;
-  padding-top: 24px;
+  margin-top: 24px;
 }
 .connections-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
+  gap: 12px;
   flex-wrap: wrap;
 }
-.connections-heading h2,
-.connections-heading h3 {
-  margin: 8px 0;
+.connections-page h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 600 14px/1.5 var(--font-sans);
+  margin: 0;
+}
+.connections-page h2 svg {
+  color: var(--muted-foreground);
 }
 .connection-list {
   display: grid;
-  gap: 24px;
-  margin-top: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(min(430px, 100%), 1fr));
+  gap: 16px;
+  margin-top: 14px;
+  align-items: start;
 }
 .connection-card {
+  min-width: 0;
+  padding: 18px;
   border: 1px solid var(--border);
+  border-radius: 12px;
   background: var(--card);
-  padding: 28px;
-  border-radius: var(--radius);
+  font: 12px/1.6 var(--font-sans);
+  overflow-wrap: anywhere;
+}
+.connection-identity,
+.connection-provider-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.connection-provider-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--primary);
+  background: var(--accent);
+}
+.connection-provider-shopify {
+  color: var(--status-success);
+  background: var(--status-success-surface);
+}
+.connection-provider-jtl-onprem {
+  color: var(--brand);
+  background: var(--muted);
+}
+.connection-card .eyebrow {
+  font: 10px/1.4 var(--font-sans);
+  text-transform: none;
+  letter-spacing: 0;
+  margin: 0 0 2px;
+  color: var(--muted-foreground);
 }
 .connection-card h3,
 .connection-providers h3,
 .connection-empty h3 {
-  font-size: 26px;
-  font-weight: normal;
-  margin: 8px 0;
-  overflow-wrap: anywhere;
-}
-.connection-card h4 {
-  font: 600 14px var(--font-sans);
-  margin-top: 24px;
+  font: 600 14px/1.5 var(--font-sans);
+  margin: 0;
 }
 .connection-target {
-  overflow-wrap: anywhere;
+  padding: 7px 10px;
+  margin: 14px 0 10px;
+  border-radius: 6px;
+  background: var(--muted);
   color: var(--muted-foreground);
-  font-size: 13px;
+  font: 11px/1.5 var(--font-mono);
+  overflow-wrap: anywhere;
+}
+.connection-description {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  margin: 0 0 16px;
 }
 .connection-status {
-  font: 12px var(--font-sans);
-  padding: 7px 12px;
-  border-radius: 20px;
-  background: var(--secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 7px;
+  border-radius: 5px;
+  font: 10px/1.5 var(--font-sans);
+  background: var(--muted);
+  color: var(--muted-foreground);
   white-space: nowrap;
 }
-.connection-status-active {
-  color: var(--primary-foreground);
-  background: var(--primary);
+.connection-status::before {
+  content: '';
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
 }
-.connection-status-degraded {
-  color: #713b17;
-  background: #f7e2cd;
+.connection-status-active {
+  color: var(--status-success);
+  background: var(--status-success-surface);
+}
+.connection-status-degraded,
+.connection-status-pending {
+  color: var(--status-warning);
+  background: var(--status-warning-surface);
+}
+.connection-status-revoked {
+  color: var(--destructive);
+}
+.connection-access {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.connection-card h4 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font: 500 11px/1.5 var(--font-sans);
+  margin: 0;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--muted) 45%, transparent);
+  border-radius: 7px 7px 0 0;
 }
 .connection-capabilities {
   list-style: none;
-  padding: 0;
-  font: 14px var(--font-sans);
+  padding: 0 12px;
+  margin: 0;
 }
 .connection-capabilities li {
   display: flex;
   justify-content: space-between;
-  gap: 20px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border);
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  font-size: 11px;
 }
-.connection-capabilities span {
+.connection-capabilities li + li {
+  border-top: 1px solid var(--border);
+}
+.connection-capabilities li > span:last-child {
   color: var(--muted-foreground);
+  font-size: 10px;
   text-align: right;
 }
+.connection-capability-name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.connection-capability-name svg {
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+}
+.connection-capabilities [data-enabled='true'] svg {
+  color: var(--status-success);
+}
+.connection-management,
 .connection-actions {
   display: flex;
-  gap: 10px;
+  align-items: center;
+  gap: 8px;
   flex-wrap: wrap;
-  margin-top: 24px;
+  margin-top: 14px;
+}
+.connection-management > .connection-actions {
+  display: contents;
+}
+.connection-management:empty,
+.connection-card > [role='status']:empty,
+.connections-page > [role='status']:empty {
+  display: none;
+}
+.connection-section-description {
+  margin: 5px 0 12px;
+  color: var(--muted-foreground);
 }
 .connection-providers {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 24px;
-  margin-top: 28px;
+  grid-template-columns: repeat(auto-fit, minmax(min(250px, 100%), 1fr));
+  gap: 12px;
 }
 .connection-providers article {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
 }
 .connection-providers p {
   flex: 1;
-  font-size: 14px;
+  margin: 12px 0;
+  color: var(--muted-foreground);
+  font-size: 11px;
 }
 .connection-empty {
   padding: 24px;
-  background: var(--secondary);
-  margin-top: 20px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  margin-top: 14px;
 }
 .connection-notice {
-  font-size: 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--muted);
+  font-size: 11px;
   color: var(--muted-foreground);
 }
 .connection-dialog {
   max-height: calc(100dvh - 40px);
   overflow-y: auto;
 }
+.connection-setup-form {
+  font: 12px/1.6 var(--font-sans);
+}
+.connection-setup-form .field-help {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  margin: 0 0 16px;
+}
+.connection-setup-form .form-field {
+  margin: 0 0 14px;
+}
+.connection-setup-form .form-field label {
+  font-size: 11px;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+.connection-setup-form > .field-help:first-child {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--muted);
+}
 .connection-checkbox {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  font-size: 14px;
-  line-height: 1.5;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 11px;
+  background: var(--muted);
 }
 .connection-checkbox input {
-  margin-top: 4px;
+  margin-top: 3px;
   flex-shrink: 0;
+  accent-color: var(--primary);
 }
-@media (max-width: 1000px) {
-  .connection-providers {
-    grid-template-columns: 1fr;
-    gap: 28px;
-  }
-}
-@media (max-width: 760px) {
-  .connection-card {
-    padding: 18px;
-  }
+.connection-setup-form > button[type='submit'] {
+  width: 100%;
+  margin-top: 8px;
 }
 
 .desk-content:has(.inbox) {
@@ -1047,4 +1195,18 @@ summary {
 }
 .issue-panel-next:hover {
   background: var(--muted);
+}
+
+.connection-dialog[data-slot='dialog-content'] {
+  gap: 14px;
+}
+.connection-dialog [data-slot='dialog-title'] {
+  font: 600 16px/1.4 var(--font-sans);
+  letter-spacing: -0.015em;
+  padding-right: 32px;
+  margin: 0;
+}
+.connection-dialog [data-slot='dialog-description'] {
+  font: 12px/1.6 var(--font-sans);
+  margin: 0;
 }

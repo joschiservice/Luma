@@ -189,7 +189,6 @@ export function AuthForm({
                     {name === 'password' ? (
                       <Button
                         variant="ghost"
-                        size="sm"
                         type="button"
                         aria-controls="password"
                         aria-pressed={visible}
@@ -211,7 +210,7 @@ export function AuthForm({
           >
             {pending ? 'Please wait…' : message}
           </p>
-          <Button type="submit" disabled={pending}>
+          <Button size="lg" type="submit" disabled={pending}>
             {pending ? 'Please wait…' : signup ? 'Create account' : 'Sign in'}
           </Button>
         </form>

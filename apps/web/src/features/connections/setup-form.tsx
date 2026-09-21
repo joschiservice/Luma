@@ -148,6 +148,7 @@ export function SetupForm({
 
   return (
     <form
+      className="connection-setup-form"
       autoComplete="off"
       aria-busy={pending}
       onSubmit={(event) => {

@@ -61,6 +61,7 @@ export function ShopifyForm({
 
   return (
     <form
+      className="connection-setup-form"
       onSubmit={(event) => {
         event.preventDefault();
         void form.handleSubmit();

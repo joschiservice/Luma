@@ -59,3 +59,10 @@ The web app's `components.json` also routes shared primitives into this package.
 `Examples/Validated contact form` composes TanStack Form, direct Zod Standard Schema validation, Query mutations and exhaustive `ts-pattern` result handling. The host supplies the save function; story fixtures provide deterministic results. The example lives in `src/examples`, is excluded from the library build, and is not a public component or production contract.
 
 Reuse the small Field primitives, not an application-wide form abstraction. Connect labels with `htmlFor`, errors with `aria-describedby` and invalid inputs with `aria-invalid`. The example focuses the first invalid field, preserves drafts after failures, disables pending submissions and announces results. Browser tests cover normalization, rejected submissions, retry, unknown response validation and accessibility. Add feature forms in their owning app; extract reusable UI only when needed.
+
+### Button sizing
+
+Buttons default to the compact 36px size with 12px horizontal padding. Use
+`size="lg"` for 44px primary sign-in and onboarding actions. Use `size="icon"`
+for 44px icon-only controls and supply an accessible label. The `sm` size remains
+an alias for compact buttons; ordinary actions do not need an explicit size.

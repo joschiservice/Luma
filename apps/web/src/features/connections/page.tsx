@@ -7,6 +7,7 @@ import {
 } from '@luma/ui/components/dialog';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams, useSearch } from '@tanstack/react-router';
+import { Plug, Plus, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 
 import { SignInRedirect } from '../identity/common';
@@ -14,6 +15,7 @@ import { contextOptions, IdentityError } from '../identity/data';
 import { ConnectionCard } from './connection-card';
 import { connectionError, connectionsOptions } from './data';
 import { type Provider, providers } from './presentation';
+import { ProviderIcon } from './provider-icon';
 import { SetupForm } from './setup-form';
 import { ShopifyForm } from './shopify';
 
@@ -81,12 +83,15 @@ export function Connections({
         className="connections-section"
       >
         <div className="connections-heading">
-          <h2 id="installed-title">Installed in this workspace</h2>
+          <h2 id="installed-title">
+            <Plug size={17} aria-hidden="true" /> Installed in this workspace
+          </h2>
           <Button
             variant="outline"
             disabled={query.isFetching}
             onClick={() => void refresh()}
           >
+            <RefreshCw size={14} aria-hidden="true" />
             {query.isFetching ? 'Refreshing…' : 'Refresh list'}
           </Button>
         </div>
@@ -125,13 +130,19 @@ export function Connections({
       </section>
       {!error && !query.isPending && !access.isPending ? (
         <section aria-labelledby="setup-title" className="connections-section">
-          <p className="eyebrow">Add a system</p>
-          <h2 id="setup-title">Available setup options</h2>
-          <p>These are supported providers, not installed connections.</p>
+          <h2 id="setup-title">
+            <Plus size={17} aria-hidden="true" /> Add a system
+          </h2>
+          <p className="connection-section-description">
+            Choose a provider to connect to this workspace.
+          </p>
           <div className="connection-providers">
             {(Object.keys(providers) as Provider[]).map((kind) => (
               <article key={kind}>
-                <h3>{providers[kind]}</h3>
+                <div className="connection-provider-heading">
+                  <ProviderIcon provider={kind} />
+                  <h3>{providers[kind]}</h3>
+                </div>
                 <p>
                   {kind === 'shopify'
                     ? 'Read orders, products, inventory and fulfillment from your shop.'
@@ -142,6 +153,7 @@ export function Connections({
                   disabled={!canManage}
                   onClick={() => setProvider(kind)}
                 >
+                  <Plus size={14} aria-hidden="true" />
                   {kind === 'shopify'
                     ? 'Connect Shopify'
                     : `Set up ${providers[kind]}`}

@@ -188,7 +188,7 @@ export function NewWorkspace() {
           <p role="status" ref={result} tabIndex={-1}>
             {pending ? 'Creating your workspace…' : message}
           </p>
-          <Button type="submit" disabled={pending || uncertain}>
+          <Button size="lg" type="submit" disabled={pending || uncertain}>
             {pending ? 'Creating…' : 'Create workspace'}
           </Button>
         </form>

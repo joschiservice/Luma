@@ -1,5 +1,6 @@
 import { figmaDesign } from '@luma/ui/lib/figma';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { X } from 'lucide-react';
 import { expect, fn, userEvent, within } from 'storybook/test';
 
 import { Button } from './button';
@@ -83,3 +84,16 @@ export const Destructive: Story = {
 };
 
 export const Dark: Story = { globals: { theme: 'dark' } };
+
+export const Large: Story = {
+  args: { size: 'lg', children: 'Create account' },
+};
+
+export const Icon: Story = {
+  args: {
+    size: 'icon',
+    variant: 'ghost',
+    'aria-label': 'Close panel',
+    children: <X aria-hidden="true" />,
+  },
+};

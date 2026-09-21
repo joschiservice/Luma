@@ -245,12 +245,7 @@ function FailedInvestigation({
         <div className="failed-update-action">
           <p>Check whether new findings are available.</p>
           {onRefresh ? (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={onRefresh}
-              disabled={refreshing}
-            >
+            <Button variant="outline" onClick={onRefresh} disabled={refreshing}>
               <RefreshCw aria-hidden="true" />
               {refreshing ? 'Checking…' : 'Check for updates'}
             </Button>
