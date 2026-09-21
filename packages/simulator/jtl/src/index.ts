@@ -255,7 +255,16 @@ export function handle(
 
     return child === 'line-items'
       ? json(state.lines.filter((l) => l.salesOrderId === id))
-      : json(order);
+      : json({
+          ...order,
+          shippingDetails: {
+            shippingDate:
+              state.notes
+                .find((note) => note.salesOrderId === order.id)
+                ?.packages.find((item) => item.shippingDate)?.shippingDate ??
+              null,
+          },
+        });
   }
   if (!id)
     return page(

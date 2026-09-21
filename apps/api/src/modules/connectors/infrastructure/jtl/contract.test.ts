@@ -89,6 +89,7 @@ describe('JTL 2.2 published contract', () => {
           id: cloudIdForContract,
           shippingMethodId: cloudIdForContract,
           isCancelled: false,
+          shippingDetails: { shippingDate: null },
         });
       });
       const connector = createJtlConnector({
@@ -144,6 +145,7 @@ describe('JTL 2.2 published contract', () => {
         id: cloudIdForContract,
         shippingMethodId: cloudIdForContract,
         isCancelled: false,
+        shippingDetails: { shippingDate: null },
       }),
       response('/v2/sales-orders/{salesOrderId}'),
     );

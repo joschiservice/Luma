@@ -110,6 +110,7 @@ export interface WriteReceipt {
 }
 
 export interface ShippingMethodSnapshot {
+  orderStatus: 'open' | 'shipped' | 'cancelled' | 'unknown';
   shippingMethod: ExternalId;
   isCancelled: boolean;
 }

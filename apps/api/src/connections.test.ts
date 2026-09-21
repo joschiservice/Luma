@@ -503,6 +503,7 @@ describe('installed shipping-method permissions', () => {
         id: 'aaaaaaaa-aaaa-4aaa-8aaa-000000000010',
         shippingMethodId: 'aaaaaaaa-aaaa-4aaa-8aaa-000000000007',
         isCancelled: false,
+        shippingDetails: { shippingDate: null },
       });
     });
     const options = {
@@ -659,7 +660,12 @@ describe('installed JTL address pins', () => {
       return Response.json(
         init?.method === 'PATCH'
           ? { salesOrderId: '10' }
-          : { id: '10', shippingMethodId: '7', isCancelled: false },
+          : {
+              id: '10',
+              shippingMethodId: '7',
+              isCancelled: false,
+              shippingDetails: { shippingDate: null },
+            },
       );
     });
     pinnedProvider(provider);

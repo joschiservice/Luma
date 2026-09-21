@@ -17,6 +17,7 @@ import type {
   DeskStore,
   TimelineEvent,
 } from '#modules/workflows/application/desk';
+import { approvalBlocksRenewal } from '#modules/workflows/domain/proposal-renewal';
 
 const snapshotSql = `SELECT e.document AS incident,e.version AS revision,d.document AS diagnosis,
  (SELECT jsonb_build_object('action',p.document,'actionHash',p.action_hash,'version',p.version,'diagnosisRevision',p.diagnosis_revision)) AS proposal,
@@ -65,7 +66,20 @@ export function createDeskStore(
     ): Promise<number>;
   },
 ): DeskStore {
+  async function refreshLock(tx: SqlTransaction, tenantId: string, id: string) {
+    await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
+      `case-refresh:${tenantId}:${id}`,
+    ]);
+  }
+
   return {
+    withRefresh: (context, id, operation) =>
+      db.transaction(context.tenantId, async (tx) => {
+        requireRole(context, ['owner', 'admin']);
+        await refreshLock(tx, context.tenantId, id);
+
+        return operation(await load(tx, context.tenantId, id));
+      }),
     bindWorkflow: (context, id, source) =>
       db.transaction(context.tenantId, async (tx) => {
         requireRole(context, ['owner', 'admin']);
@@ -102,7 +116,10 @@ export function createDeskStore(
     withCase: (context, id, write, operation) =>
       db.transaction(context.tenantId, async (tx) => {
         requireTenant(context, context.tenantId);
-        if (write) await lock(tx, context.tenantId);
+        if (write) {
+          await refreshLock(tx, context.tenantId, id);
+          await lock(tx, context.tenantId);
+        }
         const snapshot = await load(tx, context.tenantId, id);
         const scoped: TenantDatabase = {
           transaction: async (tenantId, run) => {
@@ -213,6 +230,7 @@ export function createDeskStore(
         const s = await load(tx, context.tenantId, id);
         if (
           s.execution ||
+          approvalBlocksRenewal(s.approval, Date.now()) ||
           s.incident.state === 'resolved' ||
           s.incident.state === 'escalated' ||
           s.diagnosis?.revision !== revision ||

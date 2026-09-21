@@ -87,7 +87,7 @@ export function temporalActivities(
           );
         } catch (error) {
           if (
-            error instanceof IdentityError ||
+            (error instanceof IdentityError && error.statusCode !== 503) ||
             error instanceof WorkflowInputError
           )
             throw ApplicationFailure.nonRetryable(
@@ -171,7 +171,11 @@ export function createWorkflowCommands(
   }
 
   return {
-    async start(context: TenantContext, source: WorkflowSource) {
+    async start(
+      context: TenantContext,
+      source: WorkflowSource,
+      resumeExpired = false,
+    ) {
       const scoped = await scope(context, source);
       const input: ExceptionWorkflowInput = {
         tenantId: scoped.fresh.tenantId,
@@ -190,6 +194,34 @@ export function createWorkflowCommands(
       } catch (error) {
         if (!(error instanceof WorkflowExecutionAlreadyStartedError))
           throw error;
+        if (resumeExpired) {
+          const handle = client.workflow.getHandle(scoped.id);
+          const description = await handle.describe();
+          if (description.status.name === 'COMPLETED') {
+            const previous = (await handle.result()) as WorkflowProgress;
+            if (
+              previous.phase === 'denied' &&
+              previous.reason === 'proposal_expired'
+            ) {
+              try {
+                await client.workflow.start('exceptionWorkflow', {
+                  workflowId: scoped.id,
+                  taskQueue,
+                  args: [input],
+                  workflowIdReusePolicy: WorkflowIdReusePolicy.ALLOW_DUPLICATE,
+                  workflowIdConflictPolicy: WorkflowIdConflictPolicy.FAIL,
+                });
+              } catch (restartError) {
+                if (
+                  !(
+                    restartError instanceof WorkflowExecutionAlreadyStartedError
+                  )
+                )
+                  throw restartError;
+              }
+            }
+          }
+        }
       }
 
       return { workflowId: scoped.id };

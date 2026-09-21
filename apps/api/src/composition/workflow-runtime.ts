@@ -51,7 +51,29 @@ export function createExceptionWorkflowRuntime(
     ): Promise<PlaybookSnapshot>;
   },
 ) {
-  if (desk) bindings = { ...bindings, recordWorkflow: desk.bindWorkflow };
+  if (desk)
+    bindings = {
+      ...bindings,
+      recordWorkflow: desk.bindWorkflow,
+      currentProposal: async (context, id) => {
+        const review = await desk.review(context, id);
+        const p = review.proposal;
+
+        return p
+          ? {
+              id: p.id,
+              revision: p.diagnosisRevision,
+              expiresAt: new Date(
+                Math.min(
+                  Date.parse(p.expiresAt),
+                  Date.parse(p.preconditions.validUntil),
+                ),
+              ).toISOString(),
+              refreshable: Boolean(review.refreshable),
+            }
+          : null;
+      },
+    };
   if (desk && bindings.proposals) {
     const proposals = bindings.proposals;
     bindings = {
@@ -125,7 +147,23 @@ export function createExceptionWorkflowRuntime(
     bindings,
   });
 
+  if (desk) {
+    const execute = activities.execute;
+    activities.execute = async (input, exceptionId, proposal) => {
+      const context = await identity.resolveWorkflowContext(
+        input.userId,
+        input.tenantId,
+        input.requestId,
+      );
+
+      return desk.withExecution(context, exceptionId, () =>
+        execute(input, exceptionId, proposal),
+      );
+    };
+  }
+
   return {
+    activities,
     createClient: () => createExceptionClient(settings, identity),
     createWorker: () => createExceptionWorker(settings, activities),
   };

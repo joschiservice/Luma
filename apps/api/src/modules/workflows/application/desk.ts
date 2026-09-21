@@ -16,6 +16,7 @@ import type {
   WorkflowProgress,
   WorkflowSource,
 } from '#modules/workflows/application/runtime';
+import { approvalBlocksRenewal } from '#modules/workflows/domain/proposal-renewal';
 
 export interface BoundProposal {
   action: ProposedAction;
@@ -82,6 +83,12 @@ export interface DeskSession {
 }
 
 export interface DeskStore {
+  /** Serializes source refresh and execution against decisions for this case across API and worker processes. */
+  withRefresh<T>(
+    context: TenantContext,
+    id: string,
+    operation: (snapshot: DeskSnapshot) => Promise<T>,
+  ): Promise<T>;
   bindWorkflow(
     context: TenantContext,
     id: string,
@@ -131,6 +138,10 @@ export interface DeskDependencies {
     id: string,
     source: WorkflowSource | null,
   ): Promise<WorkflowProgress | null>;
+  /** Read current source facts and publish a new immutable proposal; never carry approvals forward. */
+  refreshProposal?(context: TenantContext, id: string): Promise<void>;
+  /** Wake the workflow after a durable decision; polling recovers a failed notification. */
+  notifyDecision?(context: TenantContext, id: string): Promise<void>;
   now(): Date;
 }
 
@@ -189,7 +200,49 @@ export function createDeskService(deps: DeskDependencies) {
     return decisions;
   }
 
+  const refreshing = new Map<string, Promise<void>>();
+
   return {
+    /** Holds the case renewal lock through proposal selection and execution admission. */
+    async withExecution<T>(
+      context: TenantContext,
+      id: string,
+      operation: () => Promise<T>,
+    ) {
+      context = await fresh(context);
+      requireRole(context, ['owner', 'admin']);
+
+      return deps.store.withRefresh(context, id, operation);
+    },
+    async refresh(context: TenantContext, id: string) {
+      context = await fresh(context);
+      requireRole(context, ['owner', 'admin']);
+      if (!deps.refreshProposal)
+        throw new IdentityError(
+          409,
+          'CONFLICT',
+          'This case requires a new investigation before approval.',
+        );
+      const key = `${context.tenantId}:${id}`;
+      let pending = refreshing.get(key);
+      if (!pending) {
+        pending = deps.store
+          .withRefresh(context, id, async (s) => {
+            if (
+              approvalBlocksRenewal(s.approval, deps.now().getTime()) ||
+              s.execution ||
+              ['resolved', 'escalated'].includes(s.incident.state)
+            )
+              return;
+            context = await fresh(context);
+            requireRole(context, ['owner', 'admin']);
+            await deps.refreshProposal!(context, id);
+          })
+          .finally(() => refreshing.delete(key));
+        refreshing.set(key, pending);
+      }
+      await pending;
+    },
     async bindWorkflow(
       context: TenantContext,
       id: string,
@@ -217,6 +270,12 @@ export function createDeskService(deps: DeskDependencies) {
         false,
         async ({ snapshot: s }) => ({
           schemaVersion: 1 as const,
+          refreshable:
+            ['owner', 'admin'].includes(context.actor.role) &&
+            Boolean(deps.refreshProposal) &&
+            !approvalBlocksRenewal(s.approval, deps.now().getTime()) &&
+            !s.execution &&
+            !['resolved', 'escalated'].includes(s.incident.state),
           caseRevision: s.revision,
           diagnosisRevision: s.diagnosis?.revision ?? 0,
           permittedDecisions: permitted(context, s),
@@ -263,88 +322,98 @@ export function createDeskService(deps: DeskDependencies) {
       context = await fresh(context);
       requireRole(context, ['owner', 'admin']);
 
-      return deps.store.withCase(context, id, true, async (session) => {
-        context = await fresh(context);
-        requireRole(context, ['owner', 'admin']);
-        const previous = await session.receipt(request.commandId);
-        if (previous) {
-          if (
-            previous.receipt.actorId !== context.actor.id ||
-            previous.receipt.exceptionId !== id ||
-            JSON.stringify(Object.entries(previous.request).sort()) !==
-              JSON.stringify(
-                Object.entries(request)
-                  .filter(([, value]) => value !== undefined)
-                  .sort(),
-              )
-          )
-            conflict(
-              'This command ID was already used for a different decision.',
-            );
+      const receipt = await deps.store.withCase(
+        context,
+        id,
+        true,
+        async (session) => {
+          context = await fresh(context);
+          requireRole(context, ['owner', 'admin']);
+          const previous = await session.receipt(request.commandId);
+          if (previous) {
+            if (
+              previous.receipt.actorId !== context.actor.id ||
+              previous.receipt.exceptionId !== id ||
+              JSON.stringify(Object.entries(previous.request).sort()) !==
+                JSON.stringify(
+                  Object.entries(request)
+                    .filter(([, value]) => value !== undefined)
+                    .sort(),
+                )
+            )
+              conflict(
+                'This command ID was already used for a different decision.',
+              );
 
-          return previous.receipt;
-        }
-        const s = session.snapshot;
-        if (
-          s.revision !== request.caseRevision ||
-          (s.diagnosis?.revision ?? 0) !== request.diagnosisRevision
-        )
-          conflict();
-        if (!permitted(context, s).includes(request.kind))
-          conflict('This decision is no longer permitted.');
-        let approvalId: string | null = null;
-        let revision = s.revision;
-        if (request.kind === 'escalate') revision = await session.escalate();
-        else {
-          const p = s.proposal!;
+            return previous.receipt;
+          }
+          const s = session.snapshot;
           if (
-            request.proposalId !== p.action.id ||
-            request.proposalVersion !== p.version ||
-            request.decisionId !== s.decision?.id
+            s.revision !== request.caseRevision ||
+            (s.diagnosis?.revision ?? 0) !== request.diagnosisRevision
           )
             conflict();
-          if (
-            request.kind === 'approve' &&
-            !(await deps.checkCapability(context, p.action))
-          )
-            conflict('The capability or its preconditions are unavailable.');
-          const expiry = new Date(
-            Math.min(
-              Date.parse(p.action.expiresAt),
-              Date.parse(p.action.preconditions.validUntil),
-              s.diagnosis!.provenance.validUntil === null
-                ? Infinity
-                : Date.parse(s.diagnosis!.provenance.validUntil),
-              deps.now().getTime() + 86_400_000,
-            ),
-          ).toISOString();
-          const approval = await session.respond(
-            context,
-            request.decisionId!,
-            request.kind === 'approve' ? 'approved' : 'rejected',
-            expiry,
-          );
-          if (
-            approval.outcome !==
-            (request.kind === 'approve' ? 'approved' : 'rejected')
-          )
-            conflict('A conflicting response already exists.');
-          approvalId = approval.id;
-        }
-        const receipt: DecisionReceipt = {
-          id: request.commandId,
-          exceptionId: id,
-          kind: request.kind,
-          actorId: context.actor.id,
-          caseRevision: revision,
-          approvalId,
-          reason: request.reason,
-          createdAt: deps.now().toISOString(),
-        };
-        await session.save(request, receipt);
+          if (!permitted(context, s).includes(request.kind))
+            conflict('This decision is no longer permitted.');
+          let approvalId: string | null = null;
+          let revision = s.revision;
+          if (request.kind === 'escalate') revision = await session.escalate();
+          else {
+            const p = s.proposal!;
+            if (
+              request.proposalId !== p.action.id ||
+              request.proposalVersion !== p.version ||
+              request.decisionId !== s.decision?.id
+            )
+              conflict();
+            if (
+              request.kind === 'approve' &&
+              !(await deps.checkCapability(context, p.action))
+            )
+              conflict('The capability or its preconditions are unavailable.');
+            const expiry = new Date(
+              Math.min(
+                Date.parse(p.action.expiresAt),
+                Date.parse(p.action.preconditions.validUntil),
+                s.diagnosis!.provenance.validUntil === null
+                  ? Infinity
+                  : Date.parse(s.diagnosis!.provenance.validUntil),
+                deps.now().getTime() + 86_400_000,
+              ),
+            ).toISOString();
+            const approval = await session.respond(
+              context,
+              request.decisionId!,
+              request.kind === 'approve' ? 'approved' : 'rejected',
+              expiry,
+            );
+            if (
+              approval.outcome !==
+              (request.kind === 'approve' ? 'approved' : 'rejected')
+            )
+              conflict('A conflicting response already exists.');
+            approvalId = approval.id;
+          }
+          const receipt: DecisionReceipt = {
+            id: request.commandId,
+            exceptionId: id,
+            kind: request.kind,
+            actorId: context.actor.id,
+            caseRevision: revision,
+            approvalId,
+            reason: request.reason,
+            createdAt: deps.now().toISOString(),
+          };
+          await session.save(request, receipt);
 
-        return receipt;
+          return receipt;
+        },
+      );
+      await deps.notifyDecision?.(context, id).catch(() => {
+        // The decision is committed; the workflow also polls for lost notifications.
       });
+
+      return receipt;
     },
     async receipt(context: TenantContext, id: string, commandId: string) {
       context = await fresh(context);

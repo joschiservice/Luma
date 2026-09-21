@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -25,6 +26,7 @@ import {
 } from '../../apps/api/dist/modules/connectors/composition.js';
 import { ConnectorError } from '../../apps/api/dist/modules/connectors/index.js';
 import { createJtlConnector } from '../../apps/api/dist/modules/connectors/infrastructure/jtl/adapter.js';
+import { parseAction } from '../../apps/api/dist/modules/execution/composition.js';
 import { createIdentity } from '../../apps/api/dist/modules/identity/composition.js';
 import { IdentityError } from '../../apps/api/dist/modules/identity/index.js';
 import { createTenantDatabase } from '../../apps/api/dist/modules/platform/composition.js';
@@ -33,7 +35,7 @@ import {
   createOperationsOverview,
 } from '../../apps/api/dist/modules/workflows/composition.js';
 import { shippingMethodPlaybook } from '../../apps/api/dist/modules/workflows/index.js';
-import { readJson } from './fixtures.mjs';
+import { detectionRequest, readJson } from './fixtures.mjs';
 import { identitySettings } from './seed.mjs';
 
 /**
@@ -45,7 +47,7 @@ export async function createPilot(
   directory,
   manifest,
   temporal,
-  { pause = () => delay(20_000) } = {},
+  { pause = () => delay(20_000), proposalFreshnessMs = 300_000 } = {},
 ) {
   if (process.env.NODE_ENV === 'production' || !manifest.synthetic)
     throw new Error('The synthetic pilot is for local development only');
@@ -172,8 +174,14 @@ export async function createPilot(
       const url = new URL(String(input));
       if (!url.pathname.endsWith('/sales-orders/10'))
         throw new Error('Unknown synthetic provider target');
-      if (init?.method !== 'PATCH')
-        return Response.json((await readJson(path)).order);
+      if (init?.method !== 'PATCH') {
+        const order = (await readJson(path)).order;
+
+        return Response.json({
+          shippingDetails: { shippingDate: null },
+          ...order,
+        });
+      }
       if (manifest.scenario === 'failed')
         return new Response(null, { status: 409 });
       if (manifest.scenario === 'executing') await pause('executing');
@@ -231,7 +239,6 @@ export async function createPilot(
       });
   const supported = (action) =>
     action.tenantId === manifest.organizationId &&
-    action.id === manifest.proposalId &&
     action.connectionId === manifest.connections.jtl &&
     action.target.id === manifest.subjects.workflow_failure;
   const effectBinding = {
@@ -345,6 +352,33 @@ export async function createPilot(
     : null;
   const deskService = createDeskServices(db, identity.service, effects, {
     capability: supported,
+    notifyDecision: async (actor, exceptionId) => {
+      if (!runtime) return;
+      const client = await runtime.createClient();
+      try {
+        await client.notifyApproval(actor, {
+          kind: 'incident',
+          id: exceptionId,
+        });
+      } finally {
+        await client.close();
+      }
+    },
+    refreshProposal: async (_actor, exceptionId) => {
+      await refreshProposal(exceptionId);
+      if (runtime) {
+        const client = await runtime.createClient();
+        try {
+          await client.start(
+            await context(),
+            { kind: 'incident', id: exceptionId },
+            true,
+          );
+        } finally {
+          await client.close();
+        }
+      }
+    },
     ...(reader ? { workflow: reader.get } : {}),
   });
   const desk = {
@@ -387,6 +421,21 @@ export async function createPilot(
         detection,
         safety,
         {
+          refreshProposal: async (actor, exceptionId) => {
+            try {
+              await deskService.refresh(actor, exceptionId);
+            } catch (error) {
+              if (error instanceof IdentityError && error.statusCode === 409)
+                return null;
+              throw error;
+            }
+            const review = await deskService.review(actor, exceptionId);
+
+            return review.proposal
+              ? ((await desk.proposal(actor, review.proposal.id))?.action ??
+                  null)
+              : null;
+          },
           proposals: {
             async prepare(actor, diagnosis) {
               if (
@@ -394,15 +443,29 @@ export async function createPilot(
                 diagnosis.exceptionId !== id
               )
                 return null;
-              const existing = await desk.proposal(actor, manifest.proposalId);
-              if (existing) return existing.action;
-              const expiresAt =
-                diagnosis.provenance.validUntil ??
-                new Date(Date.parse(manifest.epoch) + 300_000).toISOString();
+              const review = await desk.review(actor, id);
+              if (review.proposal?.diagnosisRevision === diagnosis.revision)
+                return (
+                  (await desk.proposal(actor, review.proposal.id))?.action ??
+                  null
+                );
+              const hex = createHash('sha256')
+                .update(`${manifest.proposalId}:${diagnosis.revision}`)
+                .digest('hex');
+              const proposalId = review.proposal
+                ? `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`
+                : manifest.proposalId;
+              const expiresAt = new Date(
+                Math.min(
+                  ...diagnosis.provenance.evidence.map(
+                    (item) => Date.parse(item.observedAt) + proposalFreshnessMs,
+                  ),
+                ),
+              ).toISOString();
 
               return {
                 schemaVersion: 1,
-                id: manifest.proposalId,
+                id: proposalId,
                 tenantId: actor.tenantId,
                 connectionId: manifest.connections.jtl,
                 capability: 'orders.shipping-method.write',
@@ -456,6 +519,122 @@ export async function createPilot(
         },
       )
     : null;
+
+  async function refreshProposal(exceptionId) {
+    if (exceptionId !== id || !runtime)
+      throw new IdentityError(
+        409,
+        'CONFLICT',
+        'This case needs a new investigation.',
+      );
+    const actor = await context();
+    const review = await deskService.review(actor, id);
+    const progress = await deskService.progress(actor, id);
+    if (
+      (review.proposal?.approval && !review.refreshable) ||
+      progress.execution ||
+      ['resolved', 'escalated'].includes(progress.state)
+    )
+      return review.proposal
+        ? ((await desk.proposal(actor, review.proposal.id))?.action ?? null)
+        : null;
+    const result = await capabilities.read(actor, {
+      connectionId: manifest.connections.jtl,
+      capability: 'orders.shipping-method.read',
+      version: '0',
+      input: { order: { externalId: '10', scopeKey: '' }, limit: 1 },
+    });
+    if (
+      !result.ok ||
+      result.value.completeness !== 'complete' ||
+      result.value.items.length !== 1
+    )
+      throw new IdentityError(
+        503,
+        'SERVICE_UNAVAILABLE',
+        'The order could not be checked. Try again shortly.',
+      );
+    const observation = result.value.items[0];
+    if (observation.data.orderStatus !== 'open')
+      throw new IdentityError(
+        409,
+        'CONFLICT',
+        observation.data.orderStatus === 'shipped'
+          ? 'The order has already shipped. Its shipping method can no longer be corrected.'
+          : observation.data.orderStatus === 'cancelled'
+            ? 'The order was cancelled. Review the case before choosing another action.'
+            : 'The order’s current status could not be confirmed. Review the order before continuing.',
+      );
+    if (
+      observation.data.isCancelled ||
+      observation.data.shippingMethod.externalId !== '7'
+    )
+      throw new IdentityError(
+        409,
+        'CONFLICT',
+        observation.data.isCancelled
+          ? 'The order was cancelled. Review the case before choosing another action.'
+          : 'The shipping method changed. Review the order before choosing another action.',
+      );
+    if (
+      review.proposal &&
+      Math.min(
+        Date.parse(review.proposal.expiresAt),
+        Date.parse(review.proposal.preconditions.validUntil),
+      ) >
+        Date.now() + 60_000
+    )
+      return (await desk.proposal(actor, review.proposal.id))?.action ?? null;
+    const request = detectionRequest(
+      manifest,
+      'workflow_failure',
+      observation.id,
+    );
+    request.evidence = request.evidence.map((evidence) => ({
+      ...evidence,
+      observedAt: observation.observedAt,
+      facts: {
+        ...evidence.facts,
+        currentOrder: observation.data,
+        observationId: observation.id,
+        observationSource: observation.source,
+      },
+    }));
+    await detection.exceptions.ingest(actor, request);
+    const diagnosis = await detection.diagnoses.run(actor, id);
+    if (!diagnosis || diagnosis.status !== 'ready' || diagnosis.superseded)
+      throw new IdentityError(
+        409,
+        'CONFLICT',
+        'The investigation changed. Review the current findings.',
+      );
+    const input = {
+      tenantId: actor.tenantId,
+      userId: actor.actor.id,
+      requestId: actor.requestId,
+      source: { kind: 'incident', id },
+    };
+    const proposal = await runtime.activities.propose(
+      input,
+      id,
+      diagnosis.revision,
+    );
+    if (!proposal)
+      throw new IdentityError(
+        409,
+        'CONFLICT',
+        'No current proposal is available.',
+      );
+    // Policy evaluation records the independent approval requirement; this path never approves.
+    const action = (await desk.proposal(actor, proposal.id))?.action;
+    if (!action) return null;
+    await safety.policies.evaluate(actor, action, parseAction(action).hash, {
+      available: true,
+      minimumRisk: 'high',
+    });
+
+    return action;
+  }
 
   return {
     app,

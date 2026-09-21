@@ -6,6 +6,8 @@ import {
   decisionCommand,
   decisionError,
   recoverDecision,
+  refreshResolution,
+  sameResolution,
   sendDecision,
 } from './resolution-data';
 
@@ -105,3 +107,49 @@ it.each([401, 403, 404, 409])(
     expect(decisionError(new IdentityError(status))).not.toContain('uncertain');
   },
 );
+
+it('keeps approval scope stable across refreshed evidence but detects material changes', () => {
+  const refreshed = structuredClone(resolutionReview);
+  refreshed.caseRevision++;
+  refreshed.diagnosisRevision++;
+  refreshed.proposal!.id = '99999999-9999-4999-8999-999999999999';
+  refreshed.proposal!.preconditions.evidenceRefs = ['new-read'];
+  expect(sameResolution(resolutionReview, refreshed)).toBe(true);
+  refreshed.proposal!.expectedPostcondition = { shippingMethodId: '9' };
+  expect(sameResolution(resolutionReview, refreshed)).toBe(false);
+  expect(
+    sameResolution(resolutionReview, { ...refreshed, proposal: null }),
+  ).toBe(false);
+});
+
+it('refreshes through an explicit command and surfaces changed conditions', async () => {
+  const fetch = vi.fn().mockResolvedValue(
+    new Response(
+      JSON.stringify({
+        code: 'CONFLICT',
+        message: 'The order was cancelled.',
+        requestId: 'test',
+      }),
+      { status: 409, headers: { 'Content-Type': 'application/json' } },
+    ),
+  );
+  vi.stubGlobal('fetch', fetch);
+  await expect(refreshResolution(organizationId, exceptionId)).rejects.toThrow(
+    'The order was cancelled.',
+  );
+  expect(fetch.mock.calls[0]![1].method).toBe('POST');
+});
+
+it('treats a failed freshness read as retryable without implying an uncertain approval', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockRejectedValue(new TypeError('Failed to fetch')),
+  );
+  await expect(
+    refreshResolution(organizationId, exceptionId),
+  ).rejects.toMatchObject({
+    status: 503,
+    message:
+      'We couldn’t check the latest conditions. Nothing was approved. Try again shortly.',
+  });
+});

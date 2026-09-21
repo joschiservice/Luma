@@ -60,6 +60,7 @@ export const decisionReceiptSchema = z.object({
 });
 
 export const caseReviewSchema = z.object({
+  refreshable: z.boolean().optional(),
   schemaVersion: z.literal(1),
   caseRevision: z.number().int().positive(),
   diagnosisRevision: z.number().int().nonnegative(),

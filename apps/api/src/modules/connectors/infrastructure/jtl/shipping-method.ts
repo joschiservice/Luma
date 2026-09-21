@@ -65,7 +65,16 @@ const readOutput = z
             adapterVersion: z.literal('jtl/0'),
             schemaVersion: z.literal(1),
             data: z
-              .object({ shippingMethod: ref, isCancelled: z.boolean() })
+              .object({
+                shippingMethod: ref,
+                isCancelled: z.boolean(),
+                orderStatus: z.enum([
+                  'open',
+                  'shipped',
+                  'cancelled',
+                  'unknown',
+                ]),
+              })
               .strict(),
           })
           .strict(),
@@ -123,6 +132,13 @@ export function createJtlShippingMethodCapabilities(
               scopeKey: '',
             },
             isCancelled: state.isCancelled,
+            orderStatus: state.isCancelled
+              ? 'cancelled'
+              : !state.shippingDetails
+                ? 'unknown'
+                : state.shippingDetails.shippingDate
+                  ? 'shipped'
+                  : 'open',
           },
         },
       ],
@@ -180,6 +196,7 @@ export function createJtlShippingMethodCapabilities(
         fail('internal');
       }
       if (
+        before.data.orderStatus !== 'open' ||
         before.data.isCancelled ||
         before.data.shippingMethod.externalId !==
           input.expectedShippingMethod.externalId

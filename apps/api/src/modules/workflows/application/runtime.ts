@@ -30,6 +30,7 @@ export interface ProposalReference {
   id: string;
   revision: number;
   expiresAt: string;
+  refreshable?: boolean;
 }
 
 export interface WorkflowProgress {
@@ -52,10 +53,16 @@ export interface WorkflowProgress {
 }
 
 export type WorkflowExecutionResult =
+  | { state: 'proposal_changed'; proposal: ProposalReference }
   | { state: 'approval_required'; decisionId: string }
   | { state: 'denied' | 'succeeded' | 'failed' | 'reconciliation_required' };
 
 export interface ExceptionActivities {
+  /** Rereads current conditions and returns an immutable proposal, or null when review is needed. */
+  refresh?(
+    input: ExceptionWorkflowInput,
+    exceptionId: string,
+  ): Promise<ProposalReference | null>;
   detect(input: ExceptionWorkflowInput): Promise<string | null>;
   diagnose(
     input: ExceptionWorkflowInput,
@@ -84,6 +91,16 @@ export interface ExceptionActivities {
 }
 
 export interface WorkflowBindings {
+  /** Loads the latest published proposal without changing the case. */
+  currentProposal?(
+    context: TenantContext,
+    exceptionId: string,
+  ): Promise<ProposalReference | null>;
+  /** Rebuilds evidence through authorized reads; preserves decisions and any business deadline. */
+  refreshProposal?(
+    context: TenantContext,
+    exceptionId: string,
+  ): Promise<ProposedAction | null>;
   recordWorkflow?(
     context: TenantContext,
     exceptionId: string,
@@ -171,6 +188,32 @@ export function createExceptionActivities(deps: {
   }
 
   return {
+    async refresh(input, exceptionId) {
+      const fresh = await context(input);
+      const action = await deps.bindings.refreshProposal?.(fresh, exceptionId);
+      if (!action) return null;
+      const stored = await deps.bindings.proposals?.get(fresh, action.id);
+      if (
+        !stored ||
+        stored.exceptionId !== exceptionId ||
+        action.proposedBy.id !== fresh.actor.id
+      )
+        throw new WorkflowInputError(
+          'Refreshed proposal binding does not match',
+        );
+
+      return {
+        id: action.id,
+        revision: stored.revision,
+        expiresAt: new Date(
+          Math.min(
+            Date.parse(action.expiresAt),
+            Date.parse(action.preconditions.validUntil),
+          ),
+        ).toISOString(),
+        refreshable: true,
+      };
+    },
     async detect(input) {
       const fresh = await context(input);
       if (input.source.kind === 'incident') {
@@ -233,12 +276,16 @@ export function createExceptionActivities(deps: {
 
       return {
         id: action.id,
+        ...(deps.bindings.refreshProposal ? { refreshable: true } : {}),
         revision,
         expiresAt: new Date(expiry).toISOString(),
       };
     },
     async execute(input, exceptionId, proposal) {
       const fresh = await context(input);
+      const latest = await deps.bindings.currentProposal?.(fresh, exceptionId);
+      if (latest && latest.id !== proposal.id)
+        return { state: 'proposal_changed', proposal: latest };
       if (deps.playbook) {
         const { run } = await deps.playbook.get(fresh, proposal.id);
         if (

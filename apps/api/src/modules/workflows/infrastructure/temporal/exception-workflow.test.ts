@@ -380,3 +380,114 @@ it('sanitizes stored activity failures and does not retry denied authorization',
     cause: undefined,
   });
 });
+
+it('refreshes expired evidence without ending the human approval wait', async () => {
+  const activities = {
+    ...fixture(),
+    refresh: vi.fn().mockResolvedValue({
+      id: 'renewed',
+      revision: 2,
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      refreshable: true,
+    }),
+  };
+  activities.propose.mockResolvedValue({
+    id: 'proposal',
+    revision: 1,
+    expiresAt: new Date(Date.now() - 1000).toISOString(),
+    refreshable: true,
+  });
+  expect(await run(activities)).toMatchObject({
+    phase: 'resolved',
+    proposalId: 'renewed',
+  });
+  expect(activities.refresh).toHaveBeenCalledTimes(1);
+  expect(activities.execute).toHaveBeenCalledWith(
+    input,
+    'incident',
+    expect.objectContaining({ id: 'renewed', revision: 2 }),
+  );
+}, 15_000);
+
+it('switches to a refreshed immutable proposal before dispatch and reconciliation', async () => {
+  const activities = fixture();
+  activities.execute.mockResolvedValueOnce({
+    state: 'proposal_changed',
+    proposal: {
+      id: 'renewed',
+      revision: 2,
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    },
+  });
+  expect(await run(activities)).toMatchObject({
+    phase: 'resolved',
+    proposalId: 'renewed',
+  });
+  expect(activities.execute).toHaveBeenLastCalledWith(
+    input,
+    'incident',
+    expect.objectContaining({ id: 'renewed' }),
+  );
+  expect(activities.reconcile).not.toHaveBeenCalled();
+}, 15_000);
+
+it('recovers a temporary refresh failure without asking for another decision or dispatching early', async (t) => {
+  const clock = await TestWorkflowEnvironment.createTimeSkipping();
+  t.onTestFinished(() => clock.teardown());
+  const now = await clock.currentTimeMs();
+  const activities = {
+    ...fixture(),
+    refresh: vi
+      .fn()
+      .mockRejectedValueOnce(
+        ApplicationFailure.nonRetryable(
+          'Read temporarily unavailable',
+          'WorkflowActivityUnavailable',
+        ),
+      )
+      .mockResolvedValue({
+        id: 'renewed',
+        revision: 2,
+        expiresAt: new Date(now + 120_000).toISOString(),
+        refreshable: true,
+      }),
+  };
+  activities.propose.mockResolvedValue({
+    id: 'proposal',
+    revision: 1,
+    expiresAt: new Date(now - 1000).toISOString(),
+    refreshable: true,
+  });
+  expect(await run(activities, clock)).toMatchObject({
+    phase: 'resolved',
+    proposalId: 'renewed',
+  });
+  expect(activities.refresh).toHaveBeenCalledTimes(2);
+  expect(activities.execute).toHaveBeenCalledTimes(1);
+}, 40_000);
+
+it('stops refreshing after workflow authorization is revoked', async () => {
+  const activities = {
+    ...fixture(),
+    refresh: vi
+      .fn()
+      .mockRejectedValue(
+        ApplicationFailure.nonRetryable(
+          'Authorization changed',
+          'WorkflowRejected',
+        ),
+      ),
+  };
+  activities.propose.mockResolvedValue({
+    id: 'proposal',
+    revision: 1,
+    expiresAt: new Date(Date.now() - 1000).toISOString(),
+    refreshable: true,
+  });
+  expect(await run(activities)).toMatchObject({
+    phase: 'escalated',
+    reason: 'activity_failed',
+  });
+  expect(activities.refresh).toHaveBeenCalledTimes(1);
+  expect(activities.execute).not.toHaveBeenCalled();
+}, 15_000);

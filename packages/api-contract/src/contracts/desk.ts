@@ -24,6 +24,16 @@ export const caseDeskContract = c.router(
       description:
         'Returns an immutable proposal, its current policy result and permitted decisions. Unavailable capabilities cannot be approved. Manual recommendations remain in the case investigation.',
     },
+    refresh: {
+      method: 'POST',
+      path: '/v1/organizations/:organizationId/exceptions/:exceptionId/review/refresh',
+      pathParams: caseParams,
+      body: z.object({}).strict(),
+      responses: { 200: caseReviewSchema },
+      summary: 'Check current facts for a resolution proposal',
+      description:
+        'Checks current source facts and prepares a current proposal where supported. Existing approvals and execution records are preserved. Changed conditions require review; provider unavailability can be retried.',
+    },
     decide: {
       method: 'POST',
       path: '/v1/organizations/:organizationId/exceptions/:exceptionId/decisions',

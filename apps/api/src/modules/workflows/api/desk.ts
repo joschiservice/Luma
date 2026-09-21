@@ -45,6 +45,17 @@ export function deskRoutes(service?: DeskService) {
         ),
       };
     },
+    refresh: async ({ request, params }) => {
+      const s = use(request, service);
+      await s.service.refresh(s.context, params.exceptionId);
+
+      return {
+        status: 200,
+        body: caseReviewSchema.parse(
+          await s.service.review(s.context, params.exceptionId),
+        ),
+      };
+    },
     decide: async ({ request, params, body }) => {
       const s = use(request, service);
 

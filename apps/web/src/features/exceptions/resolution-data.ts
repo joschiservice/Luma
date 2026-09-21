@@ -2,6 +2,7 @@ import {
   type CaseDecision,
   caseDecisionSchema,
   type CaseReview,
+  caseReviewSchema,
   decisionReceiptSchema,
 } from '@luma/api-contract';
 
@@ -92,4 +93,58 @@ export function decisionError(error: unknown) {
   }
 
   return 'The decision result is uncertain. Current state is being refreshed. Check the recorded decision before taking another action.';
+}
+
+/** Checks current source facts without recording a decision or executing the proposal. */
+export async function refreshResolution(
+  organizationId: string,
+  exceptionId: string,
+) {
+  const unavailable =
+    'We couldn’t check the latest conditions. Nothing was approved. Try again shortly.';
+  const result = await api.caseDesk
+    .refresh({ params: { organizationId, exceptionId }, body: {} })
+    .catch(() => {
+      const error = new IdentityError(503);
+      error.message = unavailable;
+      throw error;
+    });
+  if (result.status !== 200) {
+    const error = new IdentityError(result.status);
+    error.message =
+      result.status === 409
+        ? result.body.message
+        : [401, 403, 404].includes(result.status)
+          ? decisionError(error)
+          : unavailable;
+    throw error;
+  }
+
+  return caseReviewSchema.parse(result.body);
+}
+
+/** Compares the decision's scope, excluding evidence timestamps and immutable revision identifiers. */
+export function sameResolution(left: CaseReview, right: CaseReview) {
+  const scope = (review: CaseReview) => {
+    const p = review.proposal;
+    if (!p) return null;
+
+    return [
+      p.capability,
+      p.capabilityVersion,
+      p.connectionId,
+      p.target.kind,
+      p.target.id,
+      Object.entries(p.parameters).sort(),
+      Object.entries(p.expectedPostcondition).sort(),
+      p.risk,
+      p.requestedBy,
+      p.policy?.policyVersion,
+    ];
+  };
+
+  return (
+    Boolean(left.proposal && right.proposal) &&
+    JSON.stringify(scope(left)) === JSON.stringify(scope(right))
+  );
 }

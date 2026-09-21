@@ -1,3 +1,4 @@
+import { ActivityFailure, ApplicationFailure } from '@temporalio/common';
 import {
   ActivityCancellationType,
   CancellationScope,
@@ -5,6 +6,7 @@ import {
   defineQuery,
   defineSignal,
   isCancellation,
+  patched,
   proxyActivities,
   setHandler,
   sleep,
@@ -32,6 +34,10 @@ const activityOptions = {
 };
 
 const activities = proxyActivities<ExceptionActivities>(activityOptions);
+const refreshActivities =
+  proxyActivities<Required<Pick<ExceptionActivities, 'refresh'>>>(
+    activityOptions,
+  );
 
 const execution = proxyActivities<Pick<ExceptionActivities, 'execute'>>({
   ...activityOptions,
@@ -87,19 +93,55 @@ export async function exceptionWorkflow(
     if (diagnosis.status !== 'ready')
       return finish('escalated', 'diagnosis_requires_review');
     finish('proposing');
-    const proposal = await activities.propose(
+    const initialProposal = await activities.propose(
       input,
       exceptionId,
       diagnosis.revision,
     );
-    if (!proposal) return finish('escalated', 'manual_intervention_required');
+    if (!initialProposal)
+      return finish('escalated', 'manual_intervention_required');
+    let proposal = initialProposal;
     progress = { ...progress, proposalId: proposal.id };
-    const approvalDeadline = Math.min(
+    let approvalDeadline = Math.min(
       Date.parse(proposal.expiresAt),
       Date.now() + 86_400_000,
     );
+    const automaticRefresh =
+      patched('automatic-proposal-refresh-v1') && proposal.refreshable;
     let result;
     while (true) {
+      if (automaticRefresh && Date.now() >= approvalDeadline - 30_000) {
+        finish('proposing', 'checking_current_conditions');
+        try {
+          const next = await refreshActivities.refresh(input, exceptionId);
+          if (next) {
+            proposal = next;
+            approvalDeadline = Date.parse(next.expiresAt);
+            progress = {
+              phase: 'awaiting_approval',
+              exceptionId,
+              proposalId: next.id,
+            };
+          }
+        } catch (error) {
+          if (
+            error instanceof ActivityFailure &&
+            error.cause instanceof ApplicationFailure &&
+            error.cause.type === 'WorkflowRejected'
+          )
+            throw error;
+          finish('awaiting_approval', 'current_conditions_unavailable');
+          await condition(() => wake, 30_000);
+          wake = false;
+          continue;
+        }
+        if (Date.now() >= approvalDeadline) {
+          finish('awaiting_approval', 'current_conditions_changed');
+          await condition(() => wake, 30_000);
+          wake = false;
+          continue;
+        }
+      }
       if (!Number.isFinite(approvalDeadline) || Date.now() >= approvalDeadline)
         return finish('denied', 'proposal_expired');
       finish('executing');
@@ -109,6 +151,17 @@ export async function exceptionWorkflow(
       // Completion can win the activity cancellation race; still honor workflow cancellation.
       if (CancellationScope.current().consideredCancelled)
         await CancellationScope.current().cancelRequested;
+      if (result.state === 'proposal_changed') {
+        dispatched = false;
+        proposal = result.proposal;
+        approvalDeadline = Date.parse(proposal.expiresAt);
+        progress = {
+          phase: 'awaiting_approval',
+          exceptionId,
+          proposalId: proposal.id,
+        };
+        continue;
+      }
       if (result.state !== 'approval_required') break;
       dispatched = false;
       progress = {

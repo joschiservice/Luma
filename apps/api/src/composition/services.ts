@@ -147,6 +147,8 @@ export function createDeskServices(
   options: {
     capability?: (action: ProposedAction) => boolean;
     workflow?: DeskDependencies['workflow'];
+    refreshProposal?: DeskDependencies['refreshProposal'];
+    notifyDecision?: DeskDependencies['notifyDecision'];
     now?: () => Date;
   } = {},
 ) {
@@ -178,6 +180,12 @@ export function createDeskServices(
     },
     now: options.now ?? (() => new Date()),
     ...(options.workflow ? { workflow: options.workflow } : {}),
+    ...(options.refreshProposal
+      ? { refreshProposal: options.refreshProposal }
+      : {}),
+    ...(options.notifyDecision
+      ? { notifyDecision: options.notifyDecision }
+      : {}),
   });
 }
 

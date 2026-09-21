@@ -71,8 +71,16 @@ files out of Git.
 
 Evidence dates move together from the golden corpus to the run's creation time.
 Inventory and fulfillment evidence retains its normal five-minute freshness
-window. The shipping proposal also expires after five minutes. Reset for a fresh
-demo; restarting a worker never extends an approval or an expired proposal.
+window. Shipping evidence has a five-minute freshness window. While an unapproved
+shipping correction waits for review, Luma rereads the order and prepares a new
+immutable proposal when evidence needs updating. The desk also checks current
+conditions before approval. Operators do not need to reset the pilot because
+review took longer than five minutes. Existing decisions and execution records
+are preserved. If an approval expires before execution, fresh evidence produces a
+new proposal that needs a new independent approval; changed, cancelled, shipped, or unknown order states block the
+correction. Temporary read failures can be retried without recording an approval.
+Restart the API and worker after updating their code; old workflows that ended
+with `proposal_expired` can resume through the desk's refresh command.
 
 ## Scenarios
 
@@ -109,7 +117,7 @@ service reserves and persists the action before dispatch.
 
 The execution adapter independently rereads the order. A separate business
 verifier then rereads through the adapter and resolves only this workflow's
-shipping-method postcondition. It does not claim that a shipment was completed,
+shipping-method postcondition. It does not claim that a shipment was shipped,
 or resolve the separate stuck-fulfillment case. The underlying action supports
 reversal with a new approved intent; pilot reset provides a new synthetic order
 with the original method.

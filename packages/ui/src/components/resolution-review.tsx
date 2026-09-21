@@ -39,6 +39,7 @@ export function ResolutionReview({
   connectionLabel,
   disabled = false,
   pending = false,
+  checking = false,
   refreshing = false,
   onDecision,
 }: {
@@ -47,6 +48,7 @@ export function ResolutionReview({
   connectionLabel?: string | undefined;
   disabled?: boolean;
   pending?: boolean;
+  checking?: boolean;
   refreshing?: boolean;
   onDecision: (kind: DecisionKind, reason: string) => void;
 }) {
@@ -115,10 +117,18 @@ export function ResolutionReview({
               <h4>
                 <ListChecks size={14} aria-hidden="true" /> Preconditions
               </h4>
-              <p>
-                Evidence must remain current through{' '}
-                <CaseTime value={proposal.preconditions.validUntil} />.
-              </p>
+              {review.refreshable || proposal.approval ? (
+                <p>
+                  {proposal.approval
+                    ? 'The evidence used for this decision is recorded below.'
+                    : 'We keep the evidence up to date while you review.'}
+                </p>
+              ) : (
+                <p>
+                  Evidence must remain current through{' '}
+                  <CaseTime value={proposal.preconditions.validUntil} />.
+                </p>
+              )}
               {proposal.preconditions.evidenceRefs.length > 0 && (
                 <details className="finding-sources">
                   <summary>
@@ -134,10 +144,12 @@ export function ResolutionReview({
                   </ul>
                 </details>
               )}
-              <p className="case-caption">
-                <Clock3 size={12} aria-hidden="true" /> Proposal expires{' '}
-                <CaseTime value={proposal.expiresAt} />.
-              </p>
+              {!review.refreshable && !proposal.approval ? (
+                <p className="case-caption">
+                  <Clock3 size={12} aria-hidden="true" /> Proposal expires{' '}
+                  <CaseTime value={proposal.expiresAt} />.
+                </p>
+              ) : null}
             </div>
             <CaseNotice
               title={
@@ -150,8 +162,10 @@ export function ResolutionReview({
                       : 'Policy result unavailable'
               }
             >
-              {proposal.policy?.reason ??
-                'Execution is not authorized without a current policy result.'}
+              {proposal.policy?.reason === 'approval_required'
+                ? 'Another authorized operator must approve this change.'
+                : (proposal.policy?.reason ??
+                  'Execution is not authorized without a current policy result.')}
               {proposal.policy?.outcome === 'allowed'
                 ? ' No approval click is needed. Execution and verification are tracked below.'
                 : null}
@@ -186,21 +200,30 @@ export function ResolutionReview({
             manual next steps.
           </p>
         )}
-        {/* Routine policy reevaluations change IDs, not the decision being drafted. */}
+        {review.refreshable ? (
+          <p className="case-caption">
+            We’ll check current conditions before applying your approved change.
+            If the action changes, we’ll ask you to review it again.
+          </p>
+        ) : null}
+        {/* Fresh evidence preserves the draft; a changed action starts a new decision. */}
         <DecisionControls
           key={JSON.stringify([
-            review.diagnosisRevision,
-            proposal?.id,
-            proposal?.version,
+            proposal?.capability,
+            proposal?.connectionId,
+            proposal?.target,
+            proposal?.parameters,
+            proposal?.expectedPostcondition,
+            proposal?.risk,
             proposal?.available,
             proposal?.policy?.policyVersion,
             proposal?.policy?.outcome,
             proposal?.policy?.reason,
-            [...review.permittedDecisions].sort(),
           ])}
           decisions={review.permittedDecisions}
           disabled={disabled}
           pending={pending}
+          checking={checking}
           refreshing={refreshing}
           onDecision={onDecision}
         />
@@ -292,12 +315,14 @@ function DecisionControls({
   decisions,
   disabled,
   pending,
+  checking,
   refreshing,
   onDecision,
 }: {
   decisions: DecisionKind[];
   disabled: boolean;
   pending: boolean;
+  checking: boolean;
   refreshing: boolean;
   onDecision: (kind: DecisionKind, reason: string) => void;
 }) {
@@ -341,7 +366,11 @@ function DecisionControls({
           </Button>
         ))}
       </div>
-      {pending ? <p role="status">Recording decision…</p> : null}
+      {pending ? (
+        <p role="status">
+          {checking ? 'Checking current conditions…' : 'Recording decision…'}
+        </p>
+      ) : null}
     </div>
   );
 }

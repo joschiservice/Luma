@@ -2,7 +2,11 @@
 
 Run `mise exec -- pnpm simulator` from the repository root. It starts local PostgreSQL and Temporal, builds the packages, provisions synthetic installations, and starts the simulator, control panel, Luma API, worker, and web app. The command prints the Luma URL and manifest path. Docker and the repository's Node 24 / pnpm toolchain are required.
 
-Open <http://127.0.0.1:5890> and click **Connect**. The default local token is prefilled. Select `pilot-44`, then **Start / Resume**. The Luma pilot starts at an approval-required shipping correction; use its operator account to approve the proposal. Credentials are in `.luma/simulator-login.json`.
+Open <http://127.0.0.1:5890> and click **Connect**. The default local token is prefilled. Select `pilot-44`, then **Start / Resume**. The Luma pilot starts at an approval-required shipping correction; use its operator account to approve the proposal. Credentials are in `.luma/simulator-login.json`. The approval review refreshes
+expired evidence automatically on the same case. Before approval, it rereads the
+order; changed methods, cancelled orders, shipped orders, and unknown order
+states stop the correction. Use **Retry checks** after a temporary read failure.
+A simulator reset is not needed to recover an expired, unapproved proposal.
 
 For the simulator and panel alone, use `mise exec -- pnpm simulator:service`. Create a run in the panel. This command does not provision Luma installations. Optional service settings are `LUMA_SIMULATOR_PORT`, `LUMA_SIMULATOR_TOKEN`, and `LUMA_SIMULATOR_STORE`.
 

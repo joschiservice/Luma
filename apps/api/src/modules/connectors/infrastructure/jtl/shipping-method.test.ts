@@ -33,6 +33,7 @@ function fixture(cloud = false) {
     id: ids.order,
     shippingMethodId: ids.before,
     isCancelled: false,
+    shippingDetails: { shippingDate: null },
   };
   const ledger = new Map<string, unknown>();
   let effects = 0;
@@ -437,4 +438,25 @@ describe('JTL shipping-method correction', () => {
       }),
     ).toBeNull();
   });
+});
+
+it('withholds the shipping write when shipment has started or shipping state is unknown', async () => {
+  for (const shippingDetails of [
+    { shippingDate: '2026-09-18T00:00:00Z' },
+    undefined,
+  ]) {
+    const f = fixture();
+    f.fetch.mockResolvedValue(
+      Response.json({
+        id: '10',
+        shippingMethodId: '7',
+        isCancelled: false,
+        shippingDetails,
+      }),
+    );
+    expect((await f.write()).ok).toBe(false);
+    expect(
+      f.fetch.mock.calls.some(([, init]) => init?.method === 'PATCH'),
+    ).toBe(false);
+  }
 });

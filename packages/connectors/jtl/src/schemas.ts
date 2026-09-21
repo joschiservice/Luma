@@ -98,6 +98,11 @@ export const page = <T extends z.ZodTypeAny>(row: T) =>
 
 export const shippingMethodState = z.object({
   id,
+  shippingDetails: z
+    .object({
+      shippingDate: z.string().datetime({ offset: true }).nullable().optional(),
+    })
+    .optional(),
   shippingMethodId: id,
   isCancelled: z.boolean(),
 });

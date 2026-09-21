@@ -5,7 +5,7 @@ import {
   CaseNotice,
 } from '@luma/ui/components/case-investigation';
 import { ResolutionReview } from '@luma/ui/components/resolution-review';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { IdentityError } from '../identity/data';
 import type { CaseObservation } from './observation';
@@ -13,6 +13,8 @@ import {
   decisionCommand,
   decisionError,
   recoverDecision,
+  refreshResolution,
+  sameResolution,
   sendDecision,
 } from './resolution-data';
 
@@ -34,6 +36,24 @@ export function CaseResolution({
   const { snapshot: query, confirmed, offline, denied } = observation;
   const lock = useRef(false);
   const [pending, setPending] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [checkFailure, setCheckFailure] = useState<{
+    proposalId: string | undefined;
+    message: string;
+  }>();
+  const checkError =
+    checkFailure?.proposalId === query.data?.review.proposal?.id
+      ? (checkFailure?.message ?? '')
+      : '';
+
+  function setCheckError(
+    message: string,
+    proposalId = query.data?.review.proposal?.id,
+  ) {
+    setCheckFailure(message ? { proposalId, message } : undefined);
+  }
+
+  const automaticCheck = useRef({ key: '', attempts: 0, retryAt: 0 });
   const [uncertain, setUncertain] = useState<CaseDecision>();
   const [message, setMessage] = useState('');
   const [receipt, setReceipt] = useState<DecisionReceipt>();
@@ -58,10 +78,63 @@ export function CaseResolution({
     setReceipt(undefined);
     let command: CaseDecision | undefined;
     try {
-      command = decisionCommand(query.data.review, kind, reason);
-      setReceipt(await sendDecision(organizationId, exceptionId, command));
+      let review = query.data.review;
+      if (kind === 'approve' && review.refreshable) {
+        setChecking(true);
+        setCheckError('');
+        try {
+          const current = await refreshResolution(organizationId, exceptionId);
+          if (!sameResolution(review, current)) {
+            setCheckError(
+              'The proposed action changed. Review the updated details before approving.',
+              current.proposal?.id,
+            );
+
+            return;
+          }
+          review = current;
+        } catch (error) {
+          setCheckError(
+            error instanceof Error
+              ? error.message
+              : 'Current conditions could not be checked. Try again.',
+          );
+
+          return;
+        } finally {
+          setChecking(false);
+        }
+      }
+      command = decisionCommand(review, kind, reason);
+      try {
+        setReceipt(await sendDecision(organizationId, exceptionId, command));
+      } catch (error) {
+        if (
+          !(error instanceof IdentityError) ||
+          error.status !== 409 ||
+          !review.refreshable
+        )
+          throw error;
+        // A rejected version check did not commit. Retry only the same visible action.
+        command = undefined;
+        const current = await refreshResolution(organizationId, exceptionId);
+        if (!sameResolution(review, current)) {
+          setCheckError(
+            'The proposed action changed. Review the updated details before approving.',
+            current.proposal?.id,
+          );
+
+          return;
+        }
+        command = decisionCommand(current, kind, reason);
+        setReceipt(await sendDecision(organizationId, exceptionId, command));
+      }
     } catch (error) {
-      setMessage(decisionError(error));
+      setMessage(
+        !command && error instanceof Error
+          ? error.message
+          : decisionError(error),
+      );
       // A transport or server failure may occur after the transaction commits.
       if (
         command &&
@@ -129,12 +202,63 @@ export function CaseResolution({
 
   const data = denied ? undefined : query.data;
   const proposal = data?.review.proposal;
+  const awaitingDecision =
+    (!proposal?.approval || data?.review.refreshable) &&
+    !data?.progress.execution &&
+    !['resolved', 'escalated'].includes(data?.progress.state ?? '');
   const expired =
+    awaitingDecision &&
     proposal &&
     Math.min(
       Date.parse(proposal.expiresAt),
       Date.parse(proposal.preconditions.validUntil),
     ) <= query.dataUpdatedAt;
+  const needsCheck =
+    awaitingDecision &&
+    proposal &&
+    Math.min(
+      Date.parse(proposal.expiresAt),
+      Date.parse(proposal.preconditions.validUntil),
+    ) <=
+      query.dataUpdatedAt + 60_000;
+
+  async function checkCurrent() {
+    if (lock.current || offline || !confirmed) return;
+    lock.current = true;
+    setChecking(true);
+    setCheckError('');
+    try {
+      await refreshResolution(organizationId, exceptionId);
+    } catch (error) {
+      if (!(error instanceof IdentityError) || error.status !== 503)
+        automaticCheck.current.attempts = 3;
+      automaticCheck.current.retryAt = Date.now() + 15_000;
+      setCheckError(
+        error instanceof Error
+          ? error.message
+          : 'Current conditions could not be checked. Try again.',
+      );
+    } finally {
+      await refresh();
+      setChecking(false);
+      lock.current = false;
+    }
+  }
+
+  useEffect(() => {
+    if (!needsCheck || !data?.review.refreshable || !confirmed || lock.current)
+      return;
+    const key = `${organizationId}:${exceptionId}:${proposal?.id}`;
+    if (automaticCheck.current.key !== key)
+      automaticCheck.current = { key, attempts: 0, retryAt: 0 };
+    if (
+      automaticCheck.current.attempts >= 3 ||
+      Date.now() < automaticCheck.current.retryAt
+    )
+      return;
+    automaticCheck.current.attempts++;
+    void checkCurrent();
+  });
 
   return (
     <>
@@ -191,20 +315,43 @@ export function CaseResolution({
           </Button>
         </div>
       ) : null}
-      {expired ? (
-        <CaseNotice title="Review needs refreshing">
-          The proposal expired or the case changed. Refresh to load current
-          decisions.
+      {checking ? (
+        <CaseNotice title="Checking current conditions">
+          We’re checking the latest facts before you continue.
+        </CaseNotice>
+      ) : null}
+      {checkError ? (
+        <>
+          <CaseNotice error title="Review needs attention">
+            {checkError}
+          </CaseNotice>
+          <div className="resolution-actions">
+            <Button
+              variant="outline"
+              disabled={checking || pending || offline}
+              onClick={() => void checkCurrent()}
+            >
+              Retry checks
+            </Button>
+          </div>
+        </>
+      ) : null}
+      {expired && !data?.review.refreshable ? (
+        <CaseNotice title="Approval window expired">
+          The proposal or its supporting evidence has expired. Approval requires
+          a new proposal based on fresh evidence. Refreshing this page does not
+          extend the approval window.
         </CaseNotice>
       ) : null}
       {data ? (
         <ResolutionReview
           review={
-            expired
+            expired || checkError
               ? {
                   ...data.review,
                   permittedDecisions: data.review.permittedDecisions.filter(
-                    (kind) => kind === 'escalate',
+                    (kind) =>
+                      kind === 'escalate' || (!expired && kind === 'reject'),
                   ),
                 }
               : data.review
@@ -214,7 +361,8 @@ export function CaseResolution({
             proposal ? connectionLabels[proposal.connectionId] : undefined
           }
           disabled={!confirmed || query.isError || Boolean(uncertain)}
-          pending={pending}
+          pending={pending || checking}
+          checking={checking}
           refreshing={query.isFetching}
           onDecision={(kind, reason) => void decide(kind, reason)}
         />
