@@ -216,7 +216,7 @@ p {
   background: var(--primary);
   color: var(--primary-foreground);
   width: 244px;
-  padding: 38px 26px;
+  padding: 30px 16px;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -231,7 +231,7 @@ p {
 }
 .desk-sidebar nav {
   display: grid;
-  gap: 8px;
+  gap: 4px;
 }
 .desk-sidebar nav a {
   padding: 13px 16px;
@@ -348,7 +348,7 @@ summary {
 }
 .navigation-drawer nav {
   display: grid;
-  gap: 20px;
+  gap: 4px;
 }
 @media (max-width: 760px) {
   .auth-page {
@@ -746,20 +746,6 @@ summary {
   flex: 1;
   min-width: 76px;
 }
-.inbox-filters select {
-  display: block;
-  width: 100%;
-  margin-top: 6px;
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  background: var(--card);
-  padding: 7px 3px;
-  font: 11px var(--font-sans);
-  color: var(--foreground);
-}
-.inbox-filters select:focus-visible {
-  outline: 2px solid var(--ring);
-}
 .inbox-rows {
   list-style: none;
   padding: 0;
@@ -893,7 +879,7 @@ summary {
   position: relative;
   background: linear-gradient(160deg, #1e1c48 0%, #090f1d 42%, #0e2731 100%);
   color: #e5eaf5;
-  gap: 32px;
+  gap: 24px;
 }
 .desk-sidebar::before {
   content: '';
@@ -908,7 +894,8 @@ summary {
   position: relative;
 }
 .desk-sidebar .wordmark {
-  font: 600 22px var(--font-sans);
+  font: 600 22px/36px var(--font-sans);
+  padding-left: 13px;
   letter-spacing: -0.8px;
 }
 .desk-sidebar .wordmark span {
@@ -918,11 +905,19 @@ summary {
 .navigation-drawer nav a {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
+  min-height: 36px;
   border: 1px solid transparent;
-  border-radius: 8px;
-  padding: 12px;
-  font-size: 13px;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  line-height: 18px;
+}
+.desk-sidebar nav a svg,
+.navigation-drawer nav a svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
 }
 .desk-sidebar nav a {
   color: #b8c2d9;
@@ -969,7 +964,8 @@ summary {
   align-items: center;
   gap: 8px;
   color: var(--muted-foreground);
-  padding: 8px;
+  min-height: 36px;
+  padding: 6px 12px;
   font-size: 12px;
   cursor: pointer;
   border-radius: 6px;

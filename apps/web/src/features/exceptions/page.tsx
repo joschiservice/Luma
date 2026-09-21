@@ -9,6 +9,7 @@ import {
 import { IssueInspectorHeader } from '@luma/ui/components/issue-inspector-header';
 import { IssueSummary } from '@luma/ui/components/issue-summary';
 import { Pagination } from '@luma/ui/components/pagination';
+import { Select } from '@luma/ui/components/select';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Link,
@@ -209,32 +210,26 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
               {(['state', 'class', 'severity'] as const).map((field) => (
                 <label key={field}>
                   {caseLabel(field)}
-                  <select
+                  <Select
                     aria-label={caseLabel(field)}
+                    className="mt-1.5"
                     value={search[field] ?? ''}
-                    onChange={(event) =>
-                      update({ [field]: event.target.value || undefined })
+                    onValueChange={(value) =>
+                      update({ [field]: value || undefined })
                     }
-                  >
-                    <option value="">
-                      All{' '}
-                      {field === 'class'
-                        ? 'classes'
-                        : field === 'state'
-                          ? 'states'
-                          : 'severities'}
-                    </option>
-                    {(field === 'state'
-                      ? caseStates
-                      : field === 'class'
-                        ? caseClasses
-                        : ['high', 'medium']
-                    ).map((value) => (
-                      <option key={value} value={value}>
-                        {caseLabel(value)}
-                      </option>
-                    ))}
-                  </select>
+                    options={[
+                      {
+                        value: '',
+                        label: `All ${field === 'class' ? 'classes' : field === 'state' ? 'states' : 'severities'}`,
+                      },
+                      ...(field === 'state'
+                        ? caseStates
+                        : field === 'class'
+                          ? caseClasses
+                          : ['high', 'medium']
+                      ).map((value) => ({ value, label: caseLabel(value) })),
+                    ]}
+                  />
                 </label>
               ))}
             </div>

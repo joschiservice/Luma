@@ -351,18 +351,12 @@
   gap: 0.4rem;
   font-size: 0.8rem;
 }
-.operations-controls select {
-  border: 1px solid var(--border);
-  padding: 0.55rem;
-  background: var(--card);
-  border-radius: var(--radius);
-}
 .operations-overview a {
   text-decoration: underline;
   text-underline-offset: 0.2em;
   font-weight: 600;
 }
-.operations-overview :is(a, select):focus-visible {
+.operations-overview a:focus-visible {
   outline: 3px solid var(--ring);
   outline-offset: 4px;
 }
@@ -679,8 +673,8 @@
   gap: 10px;
   width: 256px;
   min-width: 0;
-  height: 50px;
-  padding: 8px 12px;
+  height: 44px;
+  padding: 5px 12px;
   border: 1px solid transparent;
   border-radius: 10px;
   text-align: left;
@@ -822,12 +816,6 @@
 .issue-pagination > span:first-child {
   margin-right: auto;
   color: var(--muted-foreground);
-}
-.issue-pagination button {
-  min-height: 28px;
-  height: 28px;
-  padding: 0 8px;
-  font-size: 11px;
 }
 .pagination-page {
   font-family: var(--font-mono);
@@ -2197,10 +2185,6 @@
 }
 .operations-controls label {
   font-size: 10px;
-}
-.operations-controls select {
-  min-height: 44px;
-  font-size: 12px;
 }
 .operations-overview h2 {
   font: 600 14px/1.5 var(--font-sans);

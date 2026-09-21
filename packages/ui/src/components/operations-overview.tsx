@@ -19,6 +19,7 @@ import type { ReactNode } from 'react';
 
 import { Button } from './button';
 import { CaseLoading, CaseNotice } from './case-investigation';
+import { Select } from './select';
 
 export interface OperationsOverviewProps {
   data?: Summary | undefined;
@@ -134,13 +135,17 @@ export function OperationsOverview({
         <div className="operations-controls">
           <label>
             Resolution window
-            <select
+            <Select<'24h' | '7d'>
+              aria-label="Resolution window"
               value={window}
-              onChange={(e) => onWindowChange(e.target.value as '24h' | '7d')}
-            >
-              <option value="24h">Last 24 hours</option>
-              <option value="7d">Last 7 days</option>
-            </select>
+              onValueChange={(value) => {
+                if (value) onWindowChange(value);
+              }}
+              options={[
+                { value: '24h', label: 'Last 24 hours' },
+                { value: '7d', label: 'Last 7 days' },
+              ]}
+            />
           </label>
           <Button
             variant="outline"

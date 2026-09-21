@@ -1,6 +1,6 @@
 import type { OperationsOverview as Summary } from '@luma/api-contract';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, fn, userEvent, within } from 'storybook/test';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
 import { inventoryCase } from './case-fixtures';
 import { OperationsOverview } from './operations-overview';
@@ -72,8 +72,12 @@ export const Healthy: Story = {
     const select = canvas.getByRole('combobox', { name: 'Resolution window' });
     select.focus();
     await expect(select).toHaveFocus();
-    await userEvent.selectOptions(select, '7d');
+    await userEvent.click(select);
+    await userEvent.click(
+      await within(document.body).findByRole('option', { name: 'Last 7 days' }),
+    );
     await expect(args.onWindowChange).toHaveBeenCalledWith('7d');
+    await waitFor(() => expect(select).toHaveFocus());
     await userEvent.tab();
     await expect(canvas.getByRole('button', { name: 'Refresh' })).toHaveFocus();
     await userEvent.keyboard('{Enter}');
