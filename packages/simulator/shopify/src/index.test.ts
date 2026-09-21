@@ -30,5 +30,15 @@ it('maintains independent Shopify resources and cursor pages', () => {
     { name: 'committed', quantity: 2 },
     { name: 'available', quantity: 95 },
   ]);
+  expect(state.children['gid://shopify/Order/1']!.fulfillmentOrders).toEqual([
+    'gid://shopify/FulfillmentOrder/1',
+  ]);
+  expect(state.nodes['gid://shopify/FulfillmentOrder/1']).toMatchObject({
+    status: 'CLOSED',
+    updatedAt: new Date(2000).toISOString(),
+  });
+  expect(state.nodes['gid://shopify/FulfillmentOrderLineItem/1']).toMatchObject(
+    { remainingQuantity: 0 },
+  );
   expect(other.roots.orders).toEqual([]);
 });

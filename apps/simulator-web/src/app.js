@@ -2,7 +2,8 @@ const $ = (selector) => document.querySelector(selector);
 let runs = [];
 let selected = '';
 let connected = false;
-let busy = false;
+let pending = 0;
+let queue = Promise.resolve();
 const current = () => runs.find((run) => run.id === selected);
 
 async function api(path, body) {
@@ -59,8 +60,7 @@ function render() {
       const button = element('button', 'Disable');
       button.className = 'secondary';
       button.disabled = fault.status !== 'armed';
-      button.onclick = () =>
-        perform(() => control({ action: 'disable', id: fault.id }));
+      button.onclick = () => control({ action: 'disable', id: fault.id });
       row.append(button);
 
       return row;
@@ -97,23 +97,30 @@ async function refresh() {
   render();
 }
 
-async function control(body) {
-  if (!selected) throw new Error('Create or select a run first');
-  await api(`runs/${selected}/control`, body);
-  await refresh();
+function control(body) {
+  const runId = selected;
+
+  return perform(async () => {
+    if (!runId) throw new Error('Create or select a run first');
+    await api(`runs/${runId}/control`, body);
+    await refresh();
+  });
 }
 
-async function perform(work) {
-  if (busy) return;
-  busy = true;
-  $('#error').textContent = '';
-  try {
-    await work();
-  } catch (error) {
-    $('#error').textContent = error.message;
-  } finally {
-    busy = false;
-  }
+function perform(work) {
+  pending += 1;
+  queue = queue.then(async () => {
+    $('#error').textContent = '';
+    try {
+      await work();
+    } catch (error) {
+      $('#error').textContent = error.message;
+    } finally {
+      pending -= 1;
+    }
+  });
+
+  return queue;
 }
 
 $('#connect').onsubmit = (event) => {
@@ -139,17 +146,13 @@ $('#runs').onchange = (event) => {
 };
 $('#provider').onchange = render;
 $('#speed').onchange = (event) =>
-  void perform(() =>
-    control({ action: 'speed', speed: Number(event.target.value) }),
-  );
+  void control({ action: 'speed', speed: Number(event.target.value) });
 for (const button of document.querySelectorAll('[data-action]'))
   button.onclick = () =>
-    void perform(() =>
-      control({
-        action: button.dataset.action,
-        ...(button.dataset.action === 'advance' ? { milliseconds: 30000 } : {}),
-      }),
-    );
+    void control({
+      action: button.dataset.action,
+      ...(button.dataset.action === 'advance' ? { milliseconds: 30000 } : {}),
+    });
 $('#command').onsubmit = (event) => {
   event.preventDefault();
   const data = Object.fromEntries(new FormData(event.target));
@@ -163,9 +166,7 @@ $('#command').onsubmit = (event) => {
       ? { shippingMethodId: data.shippingMethodId }
       : {}),
   };
-  void perform(() =>
-    control({ action: 'command', instance: $('#provider').value, command }),
-  );
+  void control({ action: 'command', instance: $('#provider').value, command });
 };
 $('#fault [name=kind]').onchange = (event) => {
   const operation = $('#fault [name=operation]');
@@ -176,22 +177,20 @@ $('#fault').onsubmit = (event) => {
   event.preventDefault();
   const data = Object.fromEntries(new FormData(event.target));
   const loss = data.kind === 'response-loss';
-  void perform(() =>
-    control({
-      action: 'fault',
-      rule: {
-        instance: $('#provider').value,
-        operation: loss ? 'orders.shipping-method.write' : data.operation,
-        kind: data.kind,
-        phase: loss ? 'after-commit' : 'before',
-        occurrence: Number(data.occurrence),
-        remaining: Number(data.remaining),
-        lifetimeMs: Number(data.lifetime) * 1000,
-        ...(data.resource ? { resource: data.resource } : {}),
-      },
-    }),
-  );
+  void control({
+    action: 'fault',
+    rule: {
+      instance: $('#provider').value,
+      operation: loss ? 'orders.shipping-method.write' : data.operation,
+      kind: data.kind,
+      phase: loss ? 'after-commit' : 'before',
+      occurrence: Number(data.occurrence),
+      remaining: Number(data.remaining),
+      lifetimeMs: Number(data.lifetime) * 1000,
+      ...(data.resource ? { resource: data.resource } : {}),
+    },
+  });
 };
 setInterval(() => {
-  if (connected && !busy) void perform(refresh);
+  if (connected && pending === 0) void perform(refresh);
 }, 2000);

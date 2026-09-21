@@ -33,7 +33,7 @@ Select a provider, fault, operation, optional resource, occurrence, count, and l
 - **Rate limit:** returns HTTP 429 with `Retry-After: 1`.
 - **Response lost:** applies only to JTL `orders.shipping-method.write`, after commit. The mutation, journal entry, and fault consumption commit in one SQLite transaction before transport failure is reported.
 
-JTL products and inventory share the `items.read` provider operation. Shopify operations are identified from the connector's GraphQL queries. JTL resource targets use numeric order IDs; Shopify uses global IDs.
+JTL products and inventory share the `items.read` provider operation. Shopify operations are identified from the connector's GraphQL queries. JTL resource targets use numeric sales-order, delivery-note, or item IDs for detail and nested requests; Shopify uses global IDs.
 
 To reproduce an uncertain write, arm response loss for JTL order `10` before approving the pilot correction. The connector reports an unknown effect requiring reconciliation. A fresh authoritative read can prove the shipping method changed; the existing execution path must not blindly redispatch. `pnpm test:simulator` proves this through the installed runtime across a service restart and asserts there is only one provider write.
 

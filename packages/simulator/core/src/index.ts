@@ -183,11 +183,13 @@ export function createTransport(
   return async (input, init) => {
     const request = new Request(input, init);
     request.signal.throwIfAborted();
+    const body = request.body ? await request.text() : null;
+    request.signal.throwIfAborted();
     const responsePromise = dispatch({
       url: request.url,
       method: request.method,
       headers: Object.fromEntries(request.headers),
-      body: request.body ? await request.text() : null,
+      body,
     });
     let abort: (() => void) | undefined;
     try {

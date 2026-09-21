@@ -32,7 +32,29 @@ test('control panel manages runs, merchant actions and every initial fault', asy
     await page.waitForFunction(() =>
       document.querySelector('#status').textContent.includes('Running'),
     );
+    // A user command must survive a background refresh that is still pending.
+    let releaseRefresh;
+    const refreshGate = new Promise((resolve) => {
+      releaseRefresh = resolve;
+    });
+    let refreshStarted;
+    const started = new Promise((resolve) => {
+      refreshStarted = resolve;
+    });
+    await page.route(
+      '**/api/runs',
+      async (route) => {
+        if (route.request().method() !== 'GET') return route.continue();
+        const response = await route.fetch();
+        refreshStarted();
+        await refreshGate;
+        await route.fulfill({ response });
+      },
+      { times: 1 },
+    );
+    await started;
     await page.getByRole('button', { name: 'Pause', exact: true }).click();
+    releaseRefresh();
     await page.waitForFunction(() =>
       document.querySelector('#status').textContent.includes('Paused'),
     );

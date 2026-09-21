@@ -66,3 +66,21 @@ describe('deterministic clock and fault lifecycle', () => {
     await expect(request).rejects.toMatchObject({ name: 'AbortError' });
   });
 });
+
+it('does not dispatch a mutation aborted while buffering its body', async () => {
+  const controller = new AbortController();
+  let writes = 0;
+  const transport = createTransport(async () => {
+    writes += 1;
+
+    return { status: 200, headers: {}, body: {} };
+  });
+  const request = transport('https://example.test/orders/1', {
+    method: 'PATCH',
+    body: JSON.stringify({ shippingMethodId: '8' }),
+    signal: controller.signal,
+  });
+  controller.abort();
+  await expect(request).rejects.toMatchObject({ name: 'AbortError' });
+  expect(writes).toBe(0);
+});

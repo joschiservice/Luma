@@ -25,6 +25,10 @@ jobs:
             cache: tests
             browser: '@luma/ui'
             command: pnpm test
+          - name: Simulator integration and browser
+            cache: simulator
+            browser: '@luma/api'
+            command: pnpm test:simulator
           - name: Backend E2E
             cache: e2e
             command: pnpm test:e2e

@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { expect, it } from 'vitest';
 
 import { createApp } from './app.js';
-import { advanceRun, createRun } from './run.js';
+import { advanceRun, createRun, dispatch, mutate } from './run.js';
 
 it('reproduces seeded cross-provider propagation with explicit delay', () => {
   const a = createRun('a');
@@ -90,4 +90,67 @@ it('persists a committed write and consumed fault across restart, with isolated 
     await app.close();
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+it('authenticates matched API routes even when their paths are encoded', async () => {
+  const token = 'test-synthetic-simulator-token';
+  const app = await createApp(':memory:', token, false);
+  try {
+    for (const prefix of ['/api', '/%61pi', '/a%70i']) {
+      for (const [method, path, payload] of [
+        ['GET', '/runs', undefined],
+        ['POST', '/runs', { id: 'unauthorized' }],
+        ['POST', '/runs/unauthorized/control', { action: 'resume' }],
+        ['POST', '/runs/unauthorized/providers/jtl/request', {}],
+      ] as const) {
+        const response = await app.inject({
+          method,
+          url: prefix + path,
+          ...(payload ? { payload } : {}),
+        });
+        expect(response.statusCode).toBe(401);
+      }
+    }
+    const response = await app.inject({
+      url: '/%61pi/runs',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual([]);
+    expect((await app.inject({ url: '/' })).statusCode).toBe(200);
+  } finally {
+    await app.close();
+  }
+});
+
+it.each([
+  ['fulfillment.read', 'delivery-notes/1'],
+  ['fulfillment.read', 'delivery-notes/1/line-items?pageNumber=2'],
+  ['items.read', 'warehouses/1/items/1/stocks'],
+])('targets %s faults to the resource in %s', (operation, path) => {
+  const run = createRun('targeted');
+  mutate(run, 'jtl', { kind: 'ship', id: '1' });
+  run.clock.faults.push({
+    id: 'targeted',
+    instance: 'jtl',
+    operation,
+    resource: '1',
+    phase: 'before',
+    kind: 'outage',
+    occurrence: 1,
+    remaining: 1,
+    matches: 0,
+    status: 'armed',
+  });
+  const request = (suffix: string) =>
+    dispatch(run, 'jtl', {
+      url: 'https://jtl.invalid/api/' + suffix,
+      method: 'GET',
+      headers: { authorization: 'Wawi synthetic' },
+      body: null,
+    });
+  request(path.replaceAll('/1', '/2'));
+  expect(run.clock.faults[0]!.matches).toBe(0);
+  expect(request(path).status).toBe(503);
+  expect(run.clock.faults[0]!.status).toBe('triggered');
 });

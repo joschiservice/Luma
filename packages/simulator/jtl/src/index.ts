@@ -160,6 +160,11 @@ export function identify(request: ProviderRequest) {
   const path = new URL(request.url).pathname;
   const order = /sales-orders\/([^/]+)(?:\/line-items)?$/.exec(path);
 
+  const resource =
+    /(?:sales-orders|delivery-notes|items)\/([^/]+)(?:\/(?:line-items|stocks))?$/.exec(
+      path,
+    )?.[1];
+
   return {
     operation:
       request.method === 'PATCH'
@@ -171,7 +176,7 @@ export function identify(request: ProviderRequest) {
           : path.includes('delivery-notes')
             ? 'fulfillment.read'
             : 'items.read',
-    ...(order ? { resource: order[1]! } : {}),
+    ...(resource ? { resource } : {}),
   };
 }
 

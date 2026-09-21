@@ -117,7 +117,6 @@ export function command(
         throw new Error('Order missing or already shipped');
       order.closed = true;
       order.updatedAt = updatedAt;
-      state.children[id]!.fulfillmentOrders = [];
       state.nodes[workId]!.status = 'CLOSED';
       state.nodes[workId]!.updatedAt = updatedAt;
       state.nodes[

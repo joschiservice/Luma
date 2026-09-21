@@ -39,7 +39,7 @@ export async function createApp(
   const app = Fastify({ bodyLimit: 1024 * 1024 });
   app.addHook('onRequest', async (request, reply) => {
     if (
-      request.url.startsWith('/api/') &&
+      request.routeOptions.url?.startsWith('/api/') &&
       request.headers.authorization !== `Bearer ${token}`
     )
       return reply.code(401).send({ error: 'Simulator token required' });

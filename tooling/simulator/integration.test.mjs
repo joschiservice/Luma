@@ -13,9 +13,15 @@ import {
 } from '../../apps/api/dist/modules/connectors/composition.js';
 import { simulationTransport } from '../../apps/api/dist/modules/connectors/infrastructure/installations/simulation.js';
 import { createJtlConnector } from '../../apps/api/dist/modules/connectors/infrastructure/jtl/adapter.js';
+import { createShopifyConnector } from '../../apps/api/dist/modules/connectors/infrastructure/shopify/adapter.js';
 import { makeTenantContext } from '../../apps/api/dist/modules/identity/domain/context.js';
 import { createApp } from '../../apps/simulator/dist/app.js';
-import { createRun, dispatch, mutate } from '../../apps/simulator/dist/run.js';
+import {
+  advanceRun,
+  createRun,
+  dispatch,
+  mutate,
+} from '../../apps/simulator/dist/run.js';
 import { createTransport } from '../../packages/simulator/core/dist/index.js';
 
 const tenantId = '00000000-0000-4000-8000-000000000001';
@@ -356,4 +362,47 @@ test('provider contracts preserve nested pagination beyond one hundred children'
     ).length,
     2,
   );
+});
+
+test('Shopify reads retain closed fulfillment work with zero remaining quantity after shipment', async () => {
+  const run = createRun('shopify-shipping', 44, 'manual');
+  const connector = createShopifyConnector({
+    tenantId,
+    connectionId: 'shopify-shipping',
+    shop: 'test.myshopify.com',
+    accessToken: async () => 'synthetic',
+    fetch: createTransport(async (request) =>
+      dispatch(run, 'shopify', request),
+    ),
+    recordObservations: async () => {},
+  });
+  const runtime = createCapabilityRuntime({
+    resolve: async () => connector,
+    record: async () => {},
+  });
+  const read = async () => {
+    const result = await runtime.read(context, {
+      connectionId: 'shopify-shipping',
+      capability: 'fulfillment.read',
+      version: '0',
+      input: { limit: 100 },
+    });
+    assert.equal(result.ok, true, JSON.stringify(result));
+
+    return result.value.items;
+  };
+  const workId = 'gid://shopify/FulfillmentOrder/1';
+  const before = (await read()).find(
+    (item) => item.source.externalId === workId,
+  );
+  assert.equal(before.data.status, 'pending');
+  advanceRun(run, 1000);
+  mutate(run, 'shopify', { kind: 'ship', id: '1' });
+  const after = await read();
+  const closed = after.find((item) => item.source.externalId === workId);
+  assert.ok(closed);
+  assert.ok(closed.sourceUpdatedAt > before.sourceUpdatedAt);
+  assert.notEqual(closed.data.status, 'pending');
+  assert.equal(closed.data.lines[0].quantity.amount, '0');
+  assert.ok(after.some((item) => item.data.status === 'shipped'));
 });
