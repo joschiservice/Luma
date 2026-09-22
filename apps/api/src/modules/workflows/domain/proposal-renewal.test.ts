@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 
-import { approvalBlocksRenewal } from './proposal-renewal';
+import { approvalBlocksRenewal } from './proposal-renewal.js';
 
 it('permits a new independent decision only after an approval expires', () => {
   const now = Date.parse('2026-09-21T12:00:00Z');

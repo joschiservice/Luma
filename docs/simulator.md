@@ -1,5 +1,7 @@
 # Stateful commerce simulator
 
+`pnpm simulator` includes local Grafana diagnostics for the pilot API, worker, and simulator, including SQLite and simulation timings. See [local performance diagnostics](local-observability.md#pilot-and-simulator).
+
 Run `mise exec -- pnpm simulator` from the repository root. It starts local PostgreSQL and Temporal, builds the packages, provisions synthetic installations, and starts the simulator, control panel, Luma API, worker, and web app. The command prints the Luma URL and manifest path. Docker and the repository's Node 24 / pnpm toolchain are required.
 
 Open <http://127.0.0.1:5890> and click **Connect**. The default local token is prefilled. Select `pilot-44`, then **Start / Resume**. The Luma pilot starts at an approval-required shipping correction; use its operator account to approve the proposal. Credentials are in `.luma/simulator-login.json`. The approval review refreshes

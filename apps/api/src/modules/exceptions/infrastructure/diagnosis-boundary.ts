@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 
+import { context, trace } from '@opentelemetry/api';
 import { z } from 'zod';
 
 import type { ReasoningSelection } from '#modules/exceptions/application/diagnosis';
@@ -75,8 +76,12 @@ export async function boundedInvestigation<T>(
  * Creates trace metadata for a diagnosis request without including case evidence or
  * credentials.
  */
-export const diagnosisTrace = (requestId: string) => ({
-  requestId,
-  traceId: randomBytes(16).toString('hex'),
-  spanId: randomBytes(8).toString('hex'),
-});
+export const diagnosisTrace = (requestId: string) => {
+  const active = trace.getSpanContext(context.active());
+
+  return {
+    requestId,
+    traceId: active?.traceId ?? randomBytes(16).toString('hex'),
+    spanId: active?.spanId ?? randomBytes(8).toString('hex'),
+  };
+};

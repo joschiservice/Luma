@@ -120,7 +120,7 @@ export function compose(saved, args, capture = false) {
  * Builds process settings from worktree state and published service ports, including
  * optional Temporal access.
  */
-export async function environment(saved, workflows = false) {
+export async function environment(saved, workflows = false, observing = false) {
   const binding = await compose(saved, ['port', 'postgres', '5432'], true);
   const dbPort = Number(binding.split(':').at(-1));
   if (!dbPort)
@@ -167,6 +167,20 @@ export async function environment(saved, workflows = false) {
       ['port', 'temporal', '7233'],
       true,
     );
+  }
+
+  if (observing) {
+    generated.LUMA_LOCAL_OTLP_ENDPOINT = `http://${await compose(saved, ['port', 'grafana', '4318'], true)}`;
+    generated.LUMA_LOCAL_PROFILES_ENDPOINT = `http://${await compose(saved, ['port', 'grafana', '4040'], true)}`;
+    generated.OBSERVABILITY_ENVIRONMENT = 'development';
+    generated.OBSERVABILITY_SAMPLE_RATE = '1';
+    for (const key of [
+      'SENTRY_DSN',
+      'POSTHOG_API_KEY',
+      'LANGFUSE_PUBLIC_KEY',
+      'LANGFUSE_SECRET_KEY',
+    ])
+      generated[key] = '';
   }
 
   return {

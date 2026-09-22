@@ -33,3 +33,8 @@ export type {
   ModelToolCall,
   ModelUsage,
 } from '#modules/platform/application/model-gateway';
+
+export {
+  measure,
+  measureSync,
+} from '#modules/platform/application/performance';

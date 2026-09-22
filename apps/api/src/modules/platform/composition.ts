@@ -47,3 +47,5 @@ export function createModelGateway(
     dependencies.routingPolicy,
   );
 }
+
+export { startLocalTelemetry } from '#modules/platform/infrastructure/local-telemetry';

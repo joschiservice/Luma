@@ -45,3 +45,37 @@ describe('observability configuration', () => {
     expect(config.sampleRate).toBe(0.2);
   });
 });
+
+it('local mode ignores hosted credentials and uses only loopback endpoints', () => {
+  expect(
+    readObservabilityConfig({
+      LUMA_LOCAL_OTLP_ENDPOINT: 'http://127.0.0.1:4318',
+      LUMA_LOCAL_PROFILES_ENDPOINT: 'http://localhost:4040/',
+      SENTRY_DSN: 'invalid',
+      POSTHOG_API_KEY: 'secret',
+      LANGFUSE_PUBLIC_KEY: 'partial',
+    }),
+  ).toEqual({
+    environment: 'development',
+    release: 'local',
+    sampleRate: 1,
+    local: {
+      endpoint: 'http://127.0.0.1:4318',
+      profilesEndpoint: 'http://localhost:4040',
+    },
+  });
+});
+
+it.each([
+  { LUMA_LOCAL_OTLP_ENDPOINT: 'https://example.com' },
+  { LUMA_LOCAL_OTLP_ENDPOINT: 'http://127.0.0.1:4318/v1/traces' },
+  { LUMA_LOCAL_OTLP_ENDPOINT: 'http://secret@localhost:4318' },
+  { LUMA_LOCAL_OTLP_ENDPOINT: 'http://localhost:4318?secret=value' },
+  {
+    LUMA_LOCAL_OTLP_ENDPOINT: 'http://localhost:4318',
+    OBSERVABILITY_ENVIRONMENT: 'production',
+  },
+  { LUMA_LOCAL_PROFILES_ENDPOINT: 'http://localhost:4040' },
+])('rejects invalid local telemetry settings: %j', (settings) => {
+  expect(() => readObservabilityConfig(settings)).toThrow();
+});

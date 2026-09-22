@@ -50,7 +50,11 @@ export async function createPilot(
   directory,
   manifest,
   temporal,
-  { pause = () => delay(20_000), proposalFreshnessMs = 300_000 } = {},
+  {
+    pause = () => delay(20_000),
+    proposalFreshnessMs = 300_000,
+    observability,
+  } = {},
 ) {
   if (process.env.NODE_ENV === 'production' || !manifest.synthetic)
     throw new Error('The synthetic pilot is for local development only');
@@ -423,6 +427,7 @@ export async function createPilot(
   const app = buildApp(
     { logger: false },
     {
+      observability,
       identity: identity.service,
       trustedOrigins: settings.trustedOrigins,
       cases: detection.cases,

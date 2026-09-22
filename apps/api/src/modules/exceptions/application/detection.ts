@@ -11,6 +11,7 @@ import type {
 } from '#modules/exceptions/domain/facts';
 import type { TenantContext } from '#modules/identity/index';
 import { requireRole, requireTenant } from '#modules/identity/index';
+import { measureSync } from '#modules/platform/index';
 
 export interface Evidence {
   key: string;
@@ -242,7 +243,9 @@ export function createDetectionService(
           configuration,
           deliveryKey: request.key,
         },
-        decision: evaluate(input, clock, configuration.thresholds),
+        decision: measureSync('detection.evaluate', () =>
+          evaluate(input, clock, configuration.thresholds),
+        ),
         fingerprint,
         now: clock,
       });

@@ -22,6 +22,8 @@ try {
   await compose(saved, [
     '--profile',
     'workflows',
+    '--profile',
+    'observability',
     'up',
     '--detach',
     '--wait',
@@ -29,10 +31,18 @@ try {
     '120',
     'postgres',
     'temporal',
+    'grafana',
   ]);
-  const { generated, migrationUrl, webOrigin } = await environment(saved, true);
+  const { generated, migrationUrl, webOrigin } = await environment(
+    saved,
+    true,
+    true,
+  );
   await provision(saved, migrationUrl);
   await saveEnvironment(generated);
+  console.log(
+    `Grafana: http://${await compose(saved, ['port', 'grafana', '3000'], true)}/d/luma-local`,
+  );
   await run('pnpm', ['exec', 'turbo', 'run', 'build', '--filter=@luma/api...']);
   const { seedPilot } = await import('./seed.mjs');
   const manifest = await seedPilot(

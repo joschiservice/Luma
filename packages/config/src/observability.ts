@@ -3,6 +3,7 @@ export interface ObservabilityConfig {
   release: string;
   sampleRate: number;
   tenantHashKey?: string;
+  local?: { endpoint: string; profilesEndpoint?: string };
   sentryDsn?: string;
   langfuse?: { publicKey: string; secretKey: string; baseUrl: string };
   posthog?: { apiKey: string; host: string };
@@ -29,6 +30,21 @@ export function readObservabilityConfig(
     release,
     sampleRate: Number(rate),
   };
+  if (env.LUMA_LOCAL_OTLP_ENDPOINT) {
+    if (environment !== 'development' && environment !== 'test')
+      throw new Error('Local telemetry requires development or test');
+    config.local = {
+      endpoint: localEndpoint(env.LUMA_LOCAL_OTLP_ENDPOINT),
+      ...(env.LUMA_LOCAL_PROFILES_ENDPOINT
+        ? { profilesEndpoint: localEndpoint(env.LUMA_LOCAL_PROFILES_ENDPOINT) }
+        : {}),
+    };
+
+    // Local diagnostics must never also initialize hosted exporters from .env.
+    return config;
+  }
+  if (env.LUMA_LOCAL_PROFILES_ENDPOINT)
+    throw new Error('Local profiling requires LUMA_LOCAL_OTLP_ENDPOINT');
   if (env.OBSERVABILITY_TENANT_HASH_KEY) {
     if (env.OBSERVABILITY_TENANT_HASH_KEY.length < 32)
       throw new Error(
@@ -85,4 +101,20 @@ export function readObservabilityConfig(
     );
 
   return config;
+}
+
+function localEndpoint(value: string): string {
+  const url = new URL(value);
+  if (
+    url.protocol !== 'http:' ||
+    !['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname) ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash ||
+    url.pathname !== '/'
+  )
+    throw new Error('Local telemetry endpoints must be loopback HTTP origins');
+
+  return url.origin;
 }

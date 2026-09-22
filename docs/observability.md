@@ -1,5 +1,7 @@
 # Observability baseline
 
+For local tracing, CPU/memory profiling, query timing, and dashboards without a vendor account, run `pnpm dev:observe`. See [Local performance diagnostics](local-observability.md).
+
 LUMA-9 adds server-side Sentry errors/performance, Langfuse observations and PostHog events/flags. Each provider is optional. Telemetry is disabled locally unless configured; the API still needs the identity database and auth settings described in the [identity guide](identity.md). The browser sends an action ID through the typed API client; it does not load vendor SDKs, cookies, replay or autocapture.
 
 ## Setup
@@ -62,7 +64,7 @@ The API binds telemetry to `request.tenantContext` after the identity guard succ
 
 Only deployment metadata, opaque correlation IDs, tenant HMACs, fixed operation names, status, timing, approved model names, token counts, model latency and reported cost enter telemetry. There is no general-purpose metadata bag. Do not add emails, names, addresses, commerce identifiers, prompts, completions, tool arguments/results, URLs, query strings, request bodies, headers, cookies or credentials.
 
-Sentry default integrations and automatic instrumentation are disabled. Errors use a fixed message plus correlation IDs; raw exception messages, stacks, breadcrumbs and request context are excluded. Langfuse exports only this adapter's tracer and masks input/output/metadata fields as a second boundary. Media upload is disabled. PostHog disables GeoIP, exception autocapture, automatic flag events and person profiles. Application HTTP logs contain generated request IDs, trace IDs and status; default request logging is disabled.
+Sentry default integrations and hosted automatic instrumentation are disabled. The opt-in local adapter instruments HTTP and PostgreSQL, with export-level redaction tested separately. Errors use a fixed message plus correlation IDs; raw exception messages, stacks, breadcrumbs and request context are excluded. Langfuse exports only this adapter's tracer and masks input/output/metadata fields as a second boundary. Media upload is disabled. PostHog disables GeoIP, exception autocapture, automatic flag events and person profiles. Application HTTP logs contain generated request IDs, trace IDs and status; default request logging is disabled.
 
 Future integrations must retain these rules. In particular, enabling framework/model auto-instrumentation requires export-level redaction tests before deployment.
 

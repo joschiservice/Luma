@@ -60,7 +60,9 @@
         "SHOPIFY_APP_ENVIRONMENT",
         "SHOPIFY_CALLBACK_URL",
         "SHOPIFY_WEB_ORIGIN",
-        "__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS"
+        "__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS",
+        "LUMA_LOCAL_OTLP_ENDPOINT",
+        "LUMA_LOCAL_PROFILES_ENDPOINT"
       ]
     },
     "build:storybook": {
@@ -108,7 +110,9 @@
         "TEMPORAL_API_KEY",
         "WEB_PORT",
         "API_PROXY_TARGET",
-        "BETTER_AUTH_COOKIE_PREFIX"
+        "BETTER_AUTH_COOKIE_PREFIX",
+        "LUMA_LOCAL_OTLP_ENDPOINT",
+        "LUMA_LOCAL_PROFILES_ENDPOINT"
       ]
     }
   }

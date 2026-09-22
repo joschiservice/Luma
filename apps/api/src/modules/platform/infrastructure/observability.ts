@@ -2,7 +2,13 @@ import { createHmac } from 'node:crypto';
 
 import { LangfuseSpanProcessor } from '@langfuse/otel';
 import type { Attributes, Span } from '@opentelemetry/api';
-import { ROOT_CONTEXT, SpanStatusCode, trace } from '@opentelemetry/api';
+import {
+  context as otelContext,
+  ROOT_CONTEXT,
+  SpanStatusCode,
+  trace,
+} from '@opentelemetry/api';
+import { logs, SeverityNumber } from '@opentelemetry/api-logs';
 import type {
   SpanExporter,
   SpanProcessor,
@@ -32,6 +38,7 @@ export interface TelemetrySettings {
   sampleRate: number;
   approvedModels?: readonly string[];
   tenantHashKey?: string;
+  local?: { endpoint: string; profilesEndpoint?: string };
   sentryDsn?: string;
   langfuse?: { publicKey: string; secretKey: string; baseUrl: string };
   posthog?: { apiKey: string; host: string };
@@ -147,7 +154,9 @@ export function createObservability(
       toString: () => 'LumaSampler',
     },
   });
-  const tracer = provider.getTracer('luma');
+  const tracer = settings.local
+    ? trace.getTracer('luma')
+    : provider.getTracer('luma');
   const activeSpans = new Map<string, Span>();
   const posthog =
     testing.posthog ??
@@ -195,7 +204,9 @@ export function createObservability(
             traceFlags: 1,
             isRemote: true,
           })
-        : ROOT_CONTEXT;
+        : settings.local
+          ? otelContext.active()
+          : ROOT_CONTEXT;
     const span = tracer.startSpan(
       operation,
       {
@@ -227,6 +238,14 @@ export function createObservability(
             code: status === 'error' ? SpanStatusCode.ERROR : SpanStatusCode.OK,
           });
           span.end();
+          if (settings.local)
+            logs.getLogger('luma').emit({
+              body: 'Operation completed',
+              severityNumber:
+                status === 'error' ? SeverityNumber.ERROR : SeverityNumber.INFO,
+              attributes: { operation, status, request_id: context.requestId },
+              context: trace.setSpan(ROOT_CONTEXT, span),
+            });
         }
       },
       generation(usage) {
@@ -264,8 +283,24 @@ export function createObservability(
   }
 
   const api: Observability = {
-    request: (requestId, actionId) =>
-      start(undefined, 'api.request', requestId, actionId),
+    request(requestId, actionId, http) {
+      const observation = start(undefined, 'api.request', requestId, actionId);
+      if (http)
+        activeSpans.get(observation.context.spanId)?.setAttributes({
+          'http.route': http.route,
+          'http.request.method': http.method,
+        });
+
+      return observation;
+    },
+    withContext(context, work) {
+      const span = activeSpans.get(context.spanId);
+
+      return otelContext.with(
+        span ? trace.setSpan(otelContext.active(), span) : otelContext.active(),
+        work,
+      );
+    },
     forTenant(context, tenantId, dataRegion) {
       if (dataRegion !== 'EU')
         throw new Error(
@@ -288,7 +323,11 @@ export function createObservability(
     async run(parent, operation, work) {
       const observation = start(parent, operation, parent.requestId);
       try {
-        const result = await work(observation.context, observation);
+        const span = activeSpans.get(observation.context.spanId)!;
+        const result = await otelContext.with(
+          trace.setSpan(otelContext.active(), span),
+          () => work(observation.context, observation),
+        );
         observation.end();
 
         return result;

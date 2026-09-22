@@ -1,48 +1,58 @@
 import { join } from 'node:path';
 
+import { startTelemetry } from '../observability/runtime.mjs';
 import { startObservations } from '../simulator/observations.mjs';
 import { readJson } from './fixtures.mjs';
 import { startJourney } from './journey.mjs';
-import { createPilot } from './runtime.mjs';
 
 const directory = process.env.LUMA_PILOT_DIRECTORY;
-
 if (!directory || process.env.NODE_ENV === 'production')
   throw new Error('A local pilot directory is required');
 
-const manifest = await readJson(join(directory, 'pilot.json'));
+const { settings, telemetry } = await startTelemetry(
+  process.env,
+  process.argv.includes('--worker') ? 'luma-pilot-worker' : 'luma-pilot-api',
+);
+let pilot, observability, worker, client, running, stopObservations;
+let closing;
 
-const temporal = {
-  address: process.env.TEMPORAL_ADDRESS,
-  namespace: 'default',
-  taskQueue: `luma-pilot-${manifest.runId}`,
-  dataRegion: 'EU',
-};
-
-const pilot = await createPilot(process.env, directory, manifest, temporal);
-
-let worker, client, running, stopObservations;
-
-let stopping = false;
-
-async function stop() {
-  if (stopping) return;
-  stopping = true;
-  if (running) worker.shutdown();
-  await running?.catch(() => {
-    // Finish closing clients even if the worker has failed.
-  });
-  await worker?.close();
-  await client?.close();
-  await stopObservations?.();
-  await pilot.close();
+function stop() {
+  return (closing ??= (async () => {
+    try {
+      if (running) worker.shutdown();
+      await running?.catch(() => {
+        // Finish closing clients even if the worker has failed.
+      });
+      await worker?.close();
+      await client?.close();
+      await stopObservations?.();
+      await pilot?.close();
+    } finally {
+      if (!pilot) await observability?.shutdown();
+      await telemetry?.shutdown();
+    }
+  })());
 }
 
 process.once('SIGINT', stop);
-
 process.once('SIGTERM', stop);
 
 try {
+  const { createPilot } = await import('./runtime.mjs');
+  const { createObservability } =
+    await import('../../apps/api/dist/modules/platform/composition.js');
+  observability = createObservability({ ...settings, approvedModels: [] });
+  const manifest = await readJson(join(directory, 'pilot.json'));
+  const temporal = {
+    address: process.env.TEMPORAL_ADDRESS,
+    namespace: 'default',
+    taskQueue: `luma-pilot-${manifest.runId}`,
+    dataRegion: 'EU',
+    telemetry,
+  };
+  pilot = await createPilot(process.env, directory, manifest, temporal, {
+    observability,
+  });
   if (process.argv.includes('--worker')) {
     worker = await pilot.runtime.createWorker();
     client = await pilot.runtime.createClient();

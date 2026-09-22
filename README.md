@@ -223,3 +223,7 @@ Use `ts-pattern` with `.exhaustive()` for domain discriminated unions. There is 
 ### Stateful commerce simulator
 
 Run `mise exec -- pnpm simulator` to start persistent JTL and Shopify simulations, their control panel, and the Luma pilot API/worker stack. See [the simulator guide](docs/simulator.md) for provisioning, scenarios, fault injection, restart behavior, and tests.
+
+## Local performance diagnostics
+
+Run `mise exec -- pnpm dev:observe` to start the app, worker, and local Grafana stack. The terminal prints the dashboard address. See [local observability](docs/local-observability.md) for traces, database queries, CPU profiles, and verification commands.

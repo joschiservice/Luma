@@ -1,5 +1,6 @@
 import type { TenantContext } from '#modules/identity/index';
 import { requireRole, requireTenant } from '#modules/identity/index';
+import { measure } from '#modules/platform/index';
 import type {
   Approval,
   PolicyDecision,
@@ -52,73 +53,76 @@ export function createPolicyService(deps: PolicyDependencies) {
       actionHash: string,
       capability: { available: boolean; minimumRisk: ProposedAction['risk'] },
     ) {
-      requireTenant(context, action.tenantId);
-      const fresh = await deps.refreshContext(context);
-      requireTenant(fresh, action.tenantId);
-      if (fresh.actor.id !== context.actor.id) throw new Error('Actor changed');
-      const now = deps.now();
-      const approval = await deps.repository.findApproval(
-        context.tenantId,
-        action.id,
-        actionHash,
-        policyVersion,
-      );
-      let outcome: PolicyDecision['outcome'] = 'allowed';
-      let reason: PolicyDecision['reason'] = 'authorized';
-      if (!['owner', 'admin'].includes(fresh.actor.role)) {
-        outcome = 'denied';
-        reason = 'permission_denied';
-      } else if (!capability.available) {
-        outcome = 'denied';
-        reason = 'capability_unavailable';
-      } else if (
-        Date.parse(action.expiresAt) <= now.getTime() ||
-        Date.parse(action.preconditions.validUntil) <= now.getTime()
-      ) {
-        outcome = 'denied';
-        reason = 'stale_intent';
-      } else if (approval?.outcome === 'rejected') {
-        // Rejection remains binding when risk metadata or the response expiry changes.
-        outcome = 'denied';
-        reason = 'approval_rejected';
-      } else if (action.risk !== 'low' || capability.minimumRisk !== 'low') {
-        const bound =
-          approval &&
-          approval.requesterId === fresh.actor.id &&
-          Date.parse(approval.expiresAt) > now.getTime();
-        if (!bound || approval.outcome !== 'approved') {
-          outcome = 'approval_required';
-          reason = 'approval_required';
+      return measure('policy.evaluate', async () => {
+        requireTenant(context, action.tenantId);
+        const fresh = await deps.refreshContext(context);
+        requireTenant(fresh, action.tenantId);
+        if (fresh.actor.id !== context.actor.id)
+          throw new Error('Actor changed');
+        const now = deps.now();
+        const approval = await deps.repository.findApproval(
+          context.tenantId,
+          action.id,
+          actionHash,
+          policyVersion,
+        );
+        let outcome: PolicyDecision['outcome'] = 'allowed';
+        let reason: PolicyDecision['reason'] = 'authorized';
+        if (!['owner', 'admin'].includes(fresh.actor.role)) {
+          outcome = 'denied';
+          reason = 'permission_denied';
+        } else if (!capability.available) {
+          outcome = 'denied';
+          reason = 'capability_unavailable';
+        } else if (
+          Date.parse(action.expiresAt) <= now.getTime() ||
+          Date.parse(action.preconditions.validUntil) <= now.getTime()
+        ) {
+          outcome = 'denied';
+          reason = 'stale_intent';
+        } else if (approval?.outcome === 'rejected') {
+          // Rejection remains binding when risk metadata or the response expiry changes.
+          outcome = 'denied';
+          reason = 'approval_rejected';
+        } else if (action.risk !== 'low' || capability.minimumRisk !== 'low') {
+          const bound =
+            approval &&
+            approval.requesterId === fresh.actor.id &&
+            Date.parse(approval.expiresAt) > now.getTime();
+          if (!bound || approval.outcome !== 'approved') {
+            outcome = 'approval_required';
+            reason = 'approval_required';
+          }
         }
-      }
-      const decision: PolicyDecision = {
-        id: deps.id(),
-        correlationId: context.requestId,
-        tenantId: context.tenantId,
-        proposalId: action.id,
-        actionHash,
-        actorId: fresh.actor.id,
-        capability: action.capability,
-        policyVersion,
-        outcome,
-        reason,
-        ...(approval && reason === 'authorized'
-          ? { approvalId: approval.id }
-          : {}),
-        evaluatedAt: now.toISOString(),
-        validUntil: new Date(
-          Math.min(
-            Date.parse(action.expiresAt),
-            Date.parse(action.preconditions.validUntil),
-            now.getTime() + 30_000,
-            ...(approval ? [Date.parse(approval.expiresAt)] : []),
-          ),
-        ).toISOString(),
-      };
-      await deps.repository.saveDecision(decision);
-      await flush(context.tenantId);
+        const decision: PolicyDecision = {
+          id: deps.id(),
+          correlationId: context.requestId,
+          tenantId: context.tenantId,
+          proposalId: action.id,
+          actionHash,
+          actorId: fresh.actor.id,
+          capability: action.capability,
+          policyVersion,
+          outcome,
+          reason,
+          ...(approval && reason === 'authorized'
+            ? { approvalId: approval.id }
+            : {}),
+          evaluatedAt: now.toISOString(),
+          validUntil: new Date(
+            Math.min(
+              Date.parse(action.expiresAt),
+              Date.parse(action.preconditions.validUntil),
+              now.getTime() + 30_000,
+              ...(approval ? [Date.parse(approval.expiresAt)] : []),
+            ),
+          ).toISOString(),
+        };
+        await deps.repository.saveDecision(decision);
+        await flush(context.tenantId);
 
-      return decision;
+        return decision;
+      });
     },
     async respond(
       context: TenantContext,

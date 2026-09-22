@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
+import { metrics } from '@opentelemetry/api';
 import {
   Client,
   Connection,
@@ -13,6 +14,8 @@ import {
   WorkflowIdConflictPolicy,
   WorkflowIdReusePolicy,
 } from '@temporalio/common';
+import type { OpenTelemetryPluginOptions } from '@temporalio/interceptors-opentelemetry-v2';
+import { OpenTelemetryPlugin } from '@temporalio/interceptors-opentelemetry-v2';
 import type { NativeConnectionOptions } from '@temporalio/worker';
 import { NativeConnection, Worker } from '@temporalio/worker';
 import { z } from 'zod';
@@ -28,6 +31,7 @@ import type {
 import { WorkflowInputError } from '#modules/workflows/application/runtime';
 
 export interface TemporalSettings {
+  telemetry?: OpenTelemetryPluginOptions;
   address: string;
   namespace: string;
   taskQueue: string;
@@ -124,7 +128,47 @@ export async function createExceptionWorker(
       namespace: settings.namespace,
       taskQueue: settings.taskQueue,
       workflowsPath: workflowPath(),
+      plugins: settings.telemetry
+        ? [new OpenTelemetryPlugin(settings.telemetry)]
+        : [],
       activities: temporalActivities(activities),
+      ...(settings.telemetry
+        ? {
+            interceptors: {
+              activity: [
+                (ctx) => ({
+                  inbound: {
+                    async execute(input, next) {
+                      const meter = metrics.getMeter('luma.temporal');
+                      const attributes = { activity: ctx.info.activityType };
+                      meter
+                        .createHistogram('luma.activity.queue.duration', {
+                          unit: 's',
+                        })
+                        .record(
+                          Math.max(
+                            0,
+                            Date.now() -
+                              ctx.info.currentAttemptScheduledTimestampMs,
+                          ) / 1000,
+                          attributes,
+                        );
+                      meter
+                        .createCounter('luma.activity.attempts')
+                        .add(1, attributes);
+                      if (ctx.info.attempt > 1)
+                        meter
+                          .createCounter('luma.activity.retries')
+                          .add(1, attributes);
+
+                      return next(input);
+                    },
+                  },
+                }),
+              ],
+            },
+          }
+        : {}),
       shutdownGraceTime: '30 seconds',
     });
 
@@ -266,7 +310,13 @@ export async function createExceptionClient(
     ...(settings.tls === undefined ? {} : { tls: settings.tls }),
     ...(settings.apiKey ? { apiKey: settings.apiKey } : {}),
   });
-  const client = new Client({ connection, namespace: settings.namespace });
+  const client = new Client({
+    connection,
+    namespace: settings.namespace,
+    plugins: settings.telemetry
+      ? [new OpenTelemetryPlugin(settings.telemetry)]
+      : [],
+  });
   const commands = createWorkflowCommands(client, settings.taskQueue, identity);
 
   return {

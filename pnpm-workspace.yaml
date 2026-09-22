@@ -14,6 +14,7 @@ allowBuilds:
   cpu-features: false
   ssh2: false
   protobufjs: false
+  '@datadog/pprof': true
 
 # ts-rest's stable adapter still declares Fastify 4; API integration tests cover 5.
 peerDependencyRules:

@@ -14,6 +14,7 @@ export async function provision(saved, migrationUrl) {
   });
   const client = await pool.connect();
   try {
+    await client.query('CREATE EXTENSION IF NOT EXISTS pg_stat_statements');
     await client.query('BEGIN');
     await client.query(
       "SELECT pg_advisory_xact_lock(hashtext('luma_local_roles'))",

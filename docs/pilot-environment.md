@@ -1,5 +1,7 @@
 # Synthetic pilot environment
 
+Pilot API and worker commands include local Grafana tracing and profiling. See [local performance diagnostics](local-observability.md#pilot-and-simulator) for the service filters and verification command.
+
 The pilot runs the real web app, HTTP API, PostgreSQL services and Temporal
 workflow. JTL responses and writes use local fixture files. No provider, model or
 telemetry credentials are needed. Use Node 24, pnpm 12 and Docker.

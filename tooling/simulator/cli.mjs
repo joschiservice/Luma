@@ -10,8 +10,10 @@ import {
   stateDirectory,
 } from '../dev/environment.mjs';
 import { fail, run } from '../dev/process.mjs';
+import { startTelemetry } from '../observability/runtime.mjs';
 
 let simulator;
+let telemetry;
 
 try {
   if (process.env.NODE_ENV === 'production')
@@ -20,6 +22,8 @@ try {
   await compose(saved, [
     '--profile',
     'workflows',
+    '--profile',
+    'observability',
     'up',
     '--detach',
     '--wait',
@@ -27,10 +31,18 @@ try {
     '120',
     'postgres',
     'temporal',
+    'grafana',
   ]);
-  const { generated, migrationUrl, webOrigin } = await environment(saved, true);
+  const { generated, migrationUrl, webOrigin } = await environment(
+    saved,
+    true,
+    true,
+  );
   await provision(saved, migrationUrl);
   await saveEnvironment(generated);
+  console.log(
+    `Grafana: http://${await compose(saved, ['port', 'grafana', '3000'], true)}/d/luma-local`,
+  );
   await writeFile(
     join(stateDirectory, 'simulator-login.json'),
     JSON.stringify({
@@ -47,11 +59,17 @@ try {
     '--filter=@luma/api...',
     '--filter=@luma/simulator...',
   ]);
+  ({ telemetry } = await startTelemetry(generated, 'luma-simulator'));
   const { createApp } = await import('../../apps/simulator/dist/app.js');
   const directory = join(stateDirectory, 'simulator');
   await mkdir(directory, { recursive: true });
   const token = 'local-synthetic-simulator-token';
-  simulator = await createApp(join(directory, 'runs.sqlite'), token);
+  simulator = await createApp(
+    join(directory, 'runs.sqlite'),
+    token,
+    true,
+    telemetry?.measureSync,
+  );
   await simulator.listen({ host: '127.0.0.1', port: 5890 });
   const call = async (path, payload) => {
     const response = await simulator.inject({
@@ -106,8 +124,10 @@ try {
   } finally {
     process.emit('SIGTERM');
     await simulator.close();
+    await telemetry?.shutdown();
   }
 } catch (error) {
   await simulator?.close();
+  await telemetry?.shutdown();
   fail(error);
 }

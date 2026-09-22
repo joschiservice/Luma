@@ -1,6 +1,14 @@
 services:
   postgres:
     image: postgres:17-alpine
+    command:
+      [
+        'postgres',
+        '-c',
+        'shared_preload_libraries=pg_stat_statements',
+        '-c',
+        'track_io_timing=on',
+      ]
     environment:
       POSTGRES_DB: luma
       POSTGRES_PASSWORD: ${LUMA_DB_PASSWORD:?Run pnpm run setup first}
@@ -44,6 +52,36 @@ services:
       interval: 2s
       timeout: 5s
       retries: 60
+  grafana:
+    image: grafana/otel-lgtm@sha256:d6c52678ab5b7144f27ae569fd778608121c0f4a10eb411983750a0d67c1fbe3
+    profiles: [observability]
+    ports:
+      - '127.0.0.1::3000'
+      - '127.0.0.1::4318'
+      - '127.0.0.1::4040'
+    environment:
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+      GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: 'false'
+      PYROSCOPE_EXTRA_ARGS: '-usage-stats.enabled=false'
+      TEMPO_EXTRA_ARGS: '-reporting.enabled=false'
+      LOKI_EXTRA_ARGS: '-reporting.enabled=false'
+    volumes:
+      - observability:/data
+      - ./tooling/observability/dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/luma.yaml:ro
+      - ./tooling/observability/dashboard.json:/otel-lgtm/dashboards/luma.json:ro
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'curl -fsS http://localhost:3000/api/health && curl -fsS http://localhost:13133/ready && curl -fsS http://localhost:4040/ready',
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+    stop_grace_period: 20s
+
 volumes:
   postgres:
   temporal:
+  observability:

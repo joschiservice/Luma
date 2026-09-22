@@ -32,7 +32,13 @@ export interface Observation {
 }
 
 export interface Observability {
-  request(requestId: string, actionId?: string): Observation;
+  request(
+    requestId: string,
+    actionId?: string,
+    http?: { route: string; method: string },
+  ): Observation;
+  /** Runs a request continuation under its diagnostic span without changing tenant authorization. */
+  withContext?<T>(context: TraceContext, work: () => T): T;
   /** Tenant ID must come from authorized identity context, never request headers. */
   forTenant(
     context: TraceContext,

@@ -4,6 +4,7 @@ import { journal } from '@luma/simulator-core';
 import Fastify from 'fastify';
 import { z } from 'zod';
 
+import { type Measure, unmeasured } from './performance.js';
 import {
   advanceRun,
   createRun,
@@ -44,10 +45,11 @@ export async function createApp(
   path: string,
   token: string,
   autonomous = true,
+  measure: Measure = unmeasured,
 ) {
   if (token.length < 20)
     throw new Error('Simulator token must have at least 20 characters');
-  const store = await openStore(path);
+  const store = await openStore(path, measure);
   const app = Fastify({ bodyLimit: 1024 * 1024 });
   app.addHook('onRequest', async (request, reply) => {
     if (
@@ -107,7 +109,8 @@ export async function createApp(
       if (input.action === 'resume') run.clock.running = true;
       if (input.action === 'reset')
         runs[id] = createRun(id, run.seed, run.scenario);
-      if (input.action === 'advance') advanceRun(run, input.milliseconds);
+      if (input.action === 'advance')
+        measure('simulator.advance', () => advanceRun(run, input.milliseconds));
       if (input.action === 'speed') run.clock.speed = input.speed;
       if (input.action === 'command')
         mutate(run, input.instance, input.command);
@@ -140,7 +143,9 @@ export async function createApp(
       const run = runs[target.id];
       if (!run) throw new Error('Run not found');
 
-      return dispatch(run, target.instance, input);
+      return measure('simulator.dispatch', () =>
+        dispatch(run, target.instance, input),
+      );
     });
   });
   let ticking = false;
@@ -154,7 +159,9 @@ export async function createApp(
               if (!run.clock.running) continue;
               const before = structuredClone(run);
               try {
-                advanceRun(run, 250 * run.clock.speed);
+                measure('simulator.advance', () =>
+                  advanceRun(run, 250 * run.clock.speed),
+                );
               } catch (error) {
                 before.clock.running = false;
                 journal(before.clock, 'scenario-error', {

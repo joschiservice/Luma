@@ -31,22 +31,43 @@ try {
       ]);
   }
   if (
-    !['setup', 'dev', 'workflows', 'seed', 'reset', 'down', 'doctor'].includes(
-      command,
-    )
+    ![
+      'setup',
+      'dev',
+      'workflows',
+      'observe',
+      'seed',
+      'reset',
+      'down',
+      'doctor',
+    ].includes(command)
   )
     throw new Error('Unknown development command');
   await run('docker', ['info', '--format', '{{.ServerVersion}}'], {
     capture: true,
   });
-  const saved = await state(['setup', 'dev', 'workflows'].includes(command));
+  const saved = await state(
+    ['setup', 'dev', 'workflows', 'observe'].includes(command),
+  );
   if (command === 'down') {
-    await compose(saved, ['--profile', 'workflows', 'down']);
+    await compose(saved, [
+      '--profile',
+      'workflows',
+      '--profile',
+      'observability',
+      'down',
+    ]);
   } else if (command === 'doctor') {
     console.log(
       `Node ${process.versions.node}; pnpm ${await run('pnpm', ['--version'], { capture: true })}`,
     );
-    await compose(saved, ['--profile', 'workflows', 'ps']);
+    await compose(saved, [
+      '--profile',
+      'workflows',
+      '--profile',
+      'observability',
+      'ps',
+    ]);
     const { env, generated, webOrigin } = await environment(saved);
     const { Pool } = await import('pg');
     for (const key of ['IDENTITY_DATABASE_URL', 'WORKFLOW_DATABASE_URL']) {
@@ -74,9 +95,11 @@ try {
       throw new Error(`API readiness returned ${response.status}`);
     console.log(`API ready. Web: ${webOrigin}`);
   } else {
-    const workflows = command === 'workflows';
+    const observing = command === 'observe';
+    const workflows = command === 'workflows' || observing;
     await compose(saved, [
       ...(workflows ? ['--profile', 'workflows'] : []),
+      ...(observing ? ['--profile', 'observability'] : []),
       'up',
       '--detach',
       '--wait',
@@ -84,10 +107,12 @@ try {
       '120',
       'postgres',
       ...(workflows ? ['temporal'] : []),
+      ...(observing ? ['grafana'] : []),
     ]);
     const { generated, migrationUrl, env, webOrigin } = await environment(
       saved,
       workflows,
+      observing,
     );
     const { provision } = await import('./database.mjs');
     if (command === 'reset') {
@@ -136,7 +161,11 @@ try {
       console.log(
         `Temporal UI: http://${await compose(saved, ['port', 'temporal', '8233'], true)}`,
       );
-    if (['dev', 'workflows'].includes(command)) {
+    if (observing)
+      console.log(
+        `Grafana: http://${await compose(saved, ['port', 'grafana', '3000'], true)} (admin / admin)`,
+      );
+    if (['dev', 'workflows', 'observe'].includes(command)) {
       try {
         await access(join(root, 'apps/api/.env'));
         console.log(
@@ -147,7 +176,14 @@ try {
       }
       await run(
         'pnpm',
-        ['exec', 'turbo', 'run', 'dev', ...(workflows ? ['dev:worker'] : [])],
+        [
+          'exec',
+          'turbo',
+          'run',
+          'dev',
+          '--concurrency=20',
+          ...(workflows ? ['dev:worker'] : []),
+        ],
         { env },
       );
     } else {

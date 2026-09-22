@@ -140,11 +140,15 @@ export function buildApp(
   app.addHook('preClose', async () => {
     draining = true;
   });
-  app.addHook('onRequest', async (request, reply) => {
+  app.addHook('onRequest', (request, reply, done) => {
     const actionId = request.headers['x-luma-action-id'];
     const observation = dependencies.observability?.request(
       request.id,
       typeof actionId === 'string' ? actionId : undefined,
+      {
+        route: request.routeOptions.url ?? 'unmatched',
+        method: request.method,
+      },
     );
     if (observation) {
       request.observation = observation;
@@ -152,6 +156,9 @@ export function buildApp(
     }
     reply.header('x-request-id', request.id);
     reply.header('cache-control', 'no-store');
+    if (observation && dependencies.observability?.withContext)
+      dependencies.observability.withContext(observation.context, done);
+    else done();
   });
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof IdentityError) {

@@ -10,6 +10,7 @@ import type {
   ModelSchema,
   TraceContext,
 } from '#modules/platform/index';
+import { measureSync } from '#modules/platform/index';
 
 export interface DiagnosisRepository {
   current(
@@ -118,7 +119,9 @@ export function createDiagnosisService(
         Date.parse(row.document.provenance.reread.retryAfter) > now().getTime()
       )
         return this.get(context, id);
-      const value = diagnose(row.snapshot, now().toISOString());
+      const value = measureSync('diagnosis.evaluate', () =>
+        diagnose(row.snapshot, now().toISOString()),
+      );
       if (
         value.status === 'insufficient_evidence' ||
         (row.snapshot.input.exceptionClass === 'inventory_mismatch' &&

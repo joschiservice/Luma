@@ -40,7 +40,10 @@
     "pilot:worker": "node tooling/pilot/cli.mjs worker",
     "simulator": "node tooling/simulator/cli.mjs",
     "simulator:service": "pnpm exec turbo run build --filter=@luma/simulator... && node apps/simulator/dist/server.js",
-    "test:simulator": "pnpm exec turbo run build --filter=@luma/api... --filter=@luma/simulator... && pnpm exec turbo run test --filter=@luma/simulator... && node --test tooling/simulator/*.test.mjs"
+    "test:simulator": "pnpm exec turbo run build --filter=@luma/api... --filter=@luma/simulator... && pnpm exec turbo run test --filter=@luma/simulator... && node --test tooling/simulator/*.test.mjs",
+    "dev:observe": "node tooling/dev/cli.mjs observe",
+    "observe:verify": "node tooling/observability/verify.mjs",
+    "observe:queries": "node tooling/observability/queries.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
