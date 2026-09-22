@@ -19,6 +19,7 @@
     "@luma/typescript-config": "workspace:*",
     "@temporalio/testing": "1.24.0",
     "@types/pg": "8.20.0",
+    "drizzle-kit": "0.31.11",
     "graphql": "^16.14.2",
     "playwright": "1.63.0",
     "tsx": "^4.20.0"

@@ -29,6 +29,17 @@ To erase this worktree's local database and restore the demo data, stop the app
 and worker processes, then run `pnpm db:reset`. This reapplies all migrations and
 prints the demo login details.
 
+To browse and edit this checkout's local database, run `pnpm db:studio` after
+setup and open [Drizzle Studio](https://local.drizzle.studio). The command starts
+PostgreSQL if needed and uses this checkout's saved connection details. Studio
+connects as the local database administrator, so you can view data across all
+organizations. Edits are saved directly to the local database. Ctrl+C stops Studio.
+
+Safari and Brave require HTTPS for Studio's local connection. On macOS, run
+`brew install mkcert` and `mkcert -install` once, then restart `pnpm db:studio`.
+The certificate installation may request your macOS administrator password.
+Drizzle Studio detects mkcert and generates its localhost certificate automatically.
+
 ## Synthetic pilot
 
 Run `pnpm pilot:seed`, then `pnpm pilot` and `pnpm pilot:worker` in separate terminals
