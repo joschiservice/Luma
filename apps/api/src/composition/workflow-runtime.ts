@@ -43,7 +43,13 @@ export function createExceptionWorkflowRuntime(
   artifactReference = { id: 'exception-resolution', version: '1' },
   playbook?: {
     service: PlaybookService;
-    activationId: string;
+    /** Resolves the grant for a new proposal, preserving any existing run binding. */
+    activationId:
+      | string
+      | ((
+          context: TenantContext,
+          action: ProposedAction,
+        ) => Promise<string | null>);
     snapshot(
       context: TenantContext,
       diagnosis: Diagnosis,
@@ -105,8 +111,13 @@ export function createExceptionWorkflowRuntime(
           const action = await proposals.prepare(context, diagnosis);
           if (!action) return null;
           if (playbook) {
+            const activationId =
+              typeof playbook.activationId === 'string'
+                ? playbook.activationId
+                : await playbook.activationId(context, action);
+            if (!activationId) return null;
             await playbook.service.bind(context, {
-              activationId: playbook.activationId,
+              activationId,
               incidentId: diagnosis.exceptionId,
               diagnosisRevision: diagnosis.revision,
               action,

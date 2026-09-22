@@ -91,3 +91,15 @@ export function createLearningCommands(
 ): LearningService {
   return createLearningService({ store, refreshContext, ...learningBoundary });
 }
+
+export { playbookRoutes } from '#modules/workflows/api/playbooks';
+
+export { createPlaybookLibrary } from '#modules/workflows/application/playbook-library';
+
+export { createPlaybookLibraryStore } from '#modules/workflows/infrastructure/playbooks/library';
+
+export { createPlaybookActivations } from '#modules/workflows/application/playbook-activations';
+
+export { createPlaybookStore } from '#modules/workflows/infrastructure/playbooks/store';
+
+export { activationRequestSchema } from '#modules/workflows/infrastructure/playbooks/schema';

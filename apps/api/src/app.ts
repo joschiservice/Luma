@@ -18,3 +18,5 @@ export {
 } from './composition/workflow-runtime.js';
 
 export type { AppDependencies } from './composition/http-app.js';
+
+export { createPersistentPlaybookLibrary } from './composition/playbook-library.js';

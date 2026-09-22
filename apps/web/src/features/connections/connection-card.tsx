@@ -80,7 +80,11 @@ export function ConnectionCard({
   }
 
   return (
-    <article className="connection-card" aria-label={connection.label}>
+    <article
+      id={`connection-${connection.id}`}
+      className="connection-card"
+      aria-label={connection.label}
+    >
       <div className="connections-heading">
         <div className="connection-identity">
           <ProviderIcon provider={connection.target.kind} />

@@ -98,6 +98,98 @@ test('seed reuses its run, covers four classes and keeps simulated health pendin
   ).toEqual(before);
 });
 
+test('serves persisted playbooks through the pilot API', async (t) => {
+  const f = await setup(t, 'diagnosis-pending');
+  const request = await operatorRequest(f);
+  const base = `/v1/organizations/${f.manifest.organizationId}/playbooks`;
+  const list = await request(base);
+  expect(list.statusCode).toBe(200);
+  expect(list.json().items).toEqual([
+    expect.objectContaining({
+      id: 'shipping-method-correction',
+      activeVersions: ['0.1.0'],
+    }),
+  ]);
+  const detail = await request(`${base}/shipping-method-correction`);
+  expect(detail.statusCode).toBe(200);
+  expect(detail.json().activations).toEqual([
+    expect.objectContaining({ id: f.manifest.proposalId, active: true }),
+  ]);
+  const runs = await request(`${base}/shipping-method-correction/runs`);
+  expect(runs.statusCode).toBe(200);
+  expect(runs.json().items).toEqual([]);
+  const activation = detail.json().activations[0];
+  const revoked = await request(
+    `${base}/shipping-method-correction/activations/${activation.id}/revoke`,
+    { artifactDigest: activation.artifactDigest },
+  );
+  expect(revoked.statusCode).toBe(200);
+  expect(revoked.json().active).toBe(false);
+  const restarted = await createPilot(f.env, f.directory, f.manifest, null);
+  t.onTestFinished(() => restarted.close());
+  const reread = await (
+    await operatorRequest({ ...f, pilot: restarted })
+  )(`${base}/shipping-method-correction`);
+  expect(reread.statusCode).toBe(200);
+  expect(reread.json().activations[0].active).toBe(false);
+});
+
+test.each([false, true])(
+  'binds a replacement activation for new runs (restart: %s)',
+  async (restart) => {
+    const t = { onTestFinished };
+    const f = await setup(t, 'approval-required');
+    const actor = await f.pilot.context();
+    await f.pilot.playbooks.revoke(actor, f.manifest.proposalId);
+    const replacement = await f.pilot.playbooks.activate(actor, {
+      id: randomUUID(),
+      definitionId: 'shipping-method-correction',
+      version: '0.1.0',
+      policyVersion: 'v0.1',
+      grants: {
+        principalIds: [actor.actor.id],
+        connectionIds: [f.manifest.connections.jtl],
+        targetIds: [f.manifest.subjects.workflow_failure],
+      },
+    });
+    const pilot = restart
+      ? await createPilot(f.env, f.directory, f.manifest, {
+          address: temporal.address,
+          namespace: 'default',
+          taskQueue: `luma-pilot-${f.manifest.runId}`,
+          dataRegion: 'EU',
+        })
+      : f.pilot;
+    if (restart) t.onTestFinished(() => pilot.close());
+    const id = f.manifest.incidents.workflow_failure;
+    const input = {
+      tenantId: actor.tenantId,
+      userId: actor.actor.id,
+      requestId: actor.requestId,
+      source: { kind: 'incident', id },
+    };
+    const diagnosis = await pilot.detection.diagnoses.get(actor, id);
+    const proposal = await pilot.runtime.activities.propose(
+      input,
+      id,
+      diagnosis.revision,
+    );
+    expect(
+      (await pilot.playbooks.get(actor, proposal.id)).run.activationId,
+    ).toBe(replacement.id);
+    expect(
+      await pilot.runtime.activities.execute(input, id, proposal),
+    ).toMatchObject({ state: 'approval_required' });
+    await pilot.playbooks.revoke(actor, replacement.id);
+    await expect(
+      pilot.runtime.activities.propose(input, id, diagnosis.revision),
+    ).rejects.toThrow();
+    expect(
+      (await pilot.playbooks.get(actor, proposal.id)).run.activationId,
+    ).toBe(replacement.id);
+  },
+);
+
 test.each(['healthy', 'decisions-needed', 'uncertain'])(
   'reproduces %s without executing',
   async (scenario) => {

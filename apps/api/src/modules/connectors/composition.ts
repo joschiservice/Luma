@@ -107,3 +107,5 @@ export { createSimulationTransport } from '#modules/connectors/infrastructure/in
 export type { SimulationTransport } from '#modules/connectors/infrastructure/installations/simulation';
 
 export { createReadChecks } from '#modules/connectors/infrastructure/read-checks';
+
+export { createPlaybookGrantReader } from '#modules/connectors/infrastructure/playbook-grants';

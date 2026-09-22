@@ -12,6 +12,7 @@ import {
   createDeskServices,
   createDetectionServices,
   createExceptionWorkflowRuntime,
+  createPersistentPlaybookLibrary,
   createResolutionPlaybooks,
   createSafetyServices,
 } from '../../apps/api/dist/app.js';
@@ -35,6 +36,7 @@ import { createTenantDatabase } from '../../apps/api/dist/modules/platform/compo
 import {
   createDeskWorkflowReader,
   createOperationsOverview,
+  createPlaybookStore,
 } from '../../apps/api/dist/modules/workflows/composition.js';
 import { shippingMethodPlaybook } from '../../apps/api/dist/modules/workflows/index.js';
 import { observeProviders } from '../simulator/observations.mjs';
@@ -362,17 +364,24 @@ export async function createPilot(
   );
   const playbooks = createResolutionPlaybooks(db, identity.service, safety);
   await playbooks.publish(await context(), shippingMethodPlaybook);
-  const activation = await playbooks.activate(await context(), {
-    id: manifest.proposalId,
-    definitionId: shippingMethodPlaybook.definition.id,
-    version: shippingMethodPlaybook.version,
-    grants: {
-      principalIds: [manifest.requesterId],
-      connectionIds: [manifest.connections.jtl],
-      targetIds: [manifest.subjects.workflow_failure],
-    },
-    policyVersion: 'v0.1',
-  });
+  const library = createPersistentPlaybookLibrary(db, identity.service);
+  // Restarting the pilot must preserve a revocation made through the library.
+  const history = await library.detail(
+    await context(),
+    shippingMethodPlaybook.definition.id,
+  );
+  if (!history.activations.some((item) => item.id === manifest.proposalId))
+    await playbooks.activate(await context(), {
+      id: manifest.proposalId,
+      definitionId: shippingMethodPlaybook.definition.id,
+      version: shippingMethodPlaybook.version,
+      grants: {
+        principalIds: [manifest.requesterId],
+        connectionIds: [manifest.connections.jtl],
+        targetIds: [manifest.subjects.workflow_failure],
+      },
+      policyVersion: 'v0.1',
+    });
   const reader = temporal
     ? createDeskWorkflowReader(temporal, identity.service)
     : null;
@@ -432,6 +441,7 @@ export async function createPilot(
       trustedOrigins: settings.trustedOrigins,
       cases: detection.cases,
       desk,
+      playbooks: library,
       connections,
       operations: createOperationsOverview(
         detection.cases,
@@ -521,7 +531,28 @@ export async function createPilot(
         undefined,
         {
           service: playbooks,
-          activationId: activation.id,
+          async activationId(actor, action) {
+            const existing = await createPlaybookStore(db).run(
+              actor,
+              action.id,
+            );
+            if (existing) return existing.activationId;
+            const current = await library.detail(
+              actor,
+              shippingMethodPlaybook.definition.id,
+            );
+
+            return (
+              current.activations.find(
+                (grant) =>
+                  grant.active &&
+                  grant.policyVersion === current.policyVersion &&
+                  grant.grants.principalIds.includes(actor.actor.id) &&
+                  grant.grants.connectionIds.includes(action.connectionId) &&
+                  grant.grants.targetIds.includes(action.target.id),
+              )?.id ?? null
+            );
+          },
           async snapshot(_actor, diagnosis) {
             return {
               inputs: { shippingMethodId: '8' },

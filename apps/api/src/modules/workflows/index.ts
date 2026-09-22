@@ -53,3 +53,8 @@ export type {
   LearningEventSources,
   ResolutionHistory,
 } from '#modules/workflows/application/learning';
+
+export type {
+  PlaybookLibrary,
+  PlaybookLibraryScope,
+} from '#modules/workflows/application/playbook-library';

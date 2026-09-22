@@ -34,12 +34,14 @@ import {
   deskRoutes,
   learningRoutes,
   operationsRoutes,
+  playbookRoutes,
   registerDeskEvents,
 } from '#modules/workflows/composition';
 import type {
   DeskService,
   LearningService,
   OperationsOverviewService,
+  PlaybookLibrary,
 } from '#modules/workflows/index';
 
 declare module 'fastify' {
@@ -53,6 +55,7 @@ declare module 'fastify' {
 }
 
 export interface AppDependencies {
+  playbooks?: PlaybookLibrary;
   learning?: LearningService;
   desk?: DeskService;
   eventSettings?: { intervalMs: number; lifetimeMs: number };
@@ -214,6 +217,7 @@ export function buildApp(
     s.registerRouter(
       apiContract,
       {
+        playbooks: playbookRoutes(dependencies.playbooks),
         exceptions: caseRoutes(dependencies.cases),
         caseDesk: deskRoutes(dependencies.desk),
         resolutionLearning: learningRoutes(dependencies.learning),

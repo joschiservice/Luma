@@ -57,3 +57,8 @@ export type {
 } from '#modules/connectors/application/source-records';
 
 export type { CoverageReader } from '#modules/connectors/application/coverage';
+
+export type {
+  PlaybookGrantReader,
+  PlaybookGrantSource,
+} from '#modules/connectors/application/playbook-grants';

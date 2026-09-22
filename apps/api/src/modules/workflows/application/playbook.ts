@@ -8,7 +8,7 @@ import { AdmissionRejected } from '#modules/execution/index';
 import type { TenantContext } from '#modules/identity/index';
 import { requireRole, requireTenant } from '#modules/identity/index';
 import type { ProposedAction } from '#modules/policies/index';
-import { currentPolicyVersion } from '#modules/policies/index';
+import { createPlaybookActivations } from '#modules/workflows/application/playbook-activations';
 import type {
   PlaybookActivation,
   PlaybookSnapshot,
@@ -300,56 +300,7 @@ export function createPlaybookService(deps: PlaybookDependencies) {
 
       return version;
     },
-    async activate(context: TenantContext, input: unknown) {
-      context = await authorize(context);
-      const request = deps.parseActivation(input);
-      if (request.policyVersion !== currentPolicyVersion)
-        throw new Error('Unsupported activation policy');
-      const version = await deps.store.version(
-        context,
-        request.definitionId,
-        request.version,
-      );
-      if (!version) throw new Error('Playbook version not found');
-      const action = version.ir.action;
-      const artifact = await deps.provisioning.activate(context, {
-        id: artifactId(request.id),
-        version: version.version,
-        generation: { kind: 'manual', reference: version.digest },
-        playbook: {
-          versionDigest: version.digest,
-          policyVersion: request.policyVersion,
-          ...request.grants,
-        },
-        steps: {
-          [action.id]: {
-            capability: action.capability,
-            capabilityVersion: action.capabilityVersion,
-            targetKind: action.targetKind,
-            minimumRisk: action.minimumRisk,
-          },
-        },
-      });
-      const activation: PlaybookActivation = {
-        ...request,
-        tenantId: context.tenantId,
-        versionDigest: version.digest,
-        artifactDigest: artifact.digest,
-      };
-      await deps.store.activate(context, activation);
-
-      return activation;
-    },
-    async revoke(context: TenantContext, id: string) {
-      context = await authorize(context);
-      const activation = await deps.store.activation(context, id);
-      if (!activation) throw new Error('Playbook activation not found');
-      await deps.provisioning.revoke(
-        context,
-        artifactId(id),
-        activation.version,
-      );
-    },
+    ...createPlaybookActivations(deps),
     async bind(
       context: TenantContext,
       input: {

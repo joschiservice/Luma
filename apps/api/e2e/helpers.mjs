@@ -138,7 +138,7 @@ export async function startApi(
   t,
   db,
   browserOrigin = 'http://localhost:3000',
-  script = 'dist/index.js',
+  script = 'dist/composition/bootstrap.js',
 ) {
   const process = startProcess(
     t,

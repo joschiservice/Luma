@@ -1,7 +1,7 @@
 import { WorkspaceAccountMenu } from '@luma/ui/components/workspace-account-menu';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, Outlet, useLocation, useParams } from '@tanstack/react-router';
-import { Inbox, LayoutDashboard, Unplug } from 'lucide-react';
+import { BookOpen, Inbox, LayoutDashboard, Unplug } from 'lucide-react';
 
 import { Brand, Failure, Pending } from './common';
 import { contextOptions, organizationsOptions, sessionOptions } from './data';
@@ -17,26 +17,30 @@ function Navigation({
 }) {
   return (
     <nav aria-label="Workspace navigation">
-      {(['overview', 'exceptions', 'connections'] as const).map((page) => (
-        <Link
-          key={page}
-          to={`/app/$organizationId/${page}`}
-          params={{ organizationId }}
-          activeProps={{ 'aria-current': 'page', className: 'active' }}
-          onClick={close}
-        >
-          {page === 'overview' ? (
-            <LayoutDashboard size={18} aria-hidden="true" />
-          ) : page === 'exceptions' ? (
-            <Inbox size={18} aria-hidden="true" />
-          ) : (
-            <Unplug size={18} aria-hidden="true" />
-          )}
-          {page === 'exceptions'
-            ? 'Issues'
-            : page[0]!.toUpperCase() + page.slice(1)}
-        </Link>
-      ))}
+      {(['overview', 'exceptions', 'playbooks', 'connections'] as const).map(
+        (page) => (
+          <Link
+            key={page}
+            to={`/app/$organizationId/${page}`}
+            params={{ organizationId }}
+            activeProps={{ 'aria-current': 'page', className: 'active' }}
+            onClick={close}
+          >
+            {page === 'overview' ? (
+              <LayoutDashboard size={18} aria-hidden="true" />
+            ) : page === 'exceptions' ? (
+              <Inbox size={18} aria-hidden="true" />
+            ) : page === 'playbooks' ? (
+              <BookOpen size={18} aria-hidden="true" />
+            ) : (
+              <Unplug size={18} aria-hidden="true" />
+            )}
+            {page === 'exceptions'
+              ? 'Issues'
+              : page[0]!.toUpperCase() + page.slice(1)}
+          </Link>
+        ),
+      )}
     </nav>
   );
 }
@@ -52,9 +56,11 @@ function TenantShell({ organizationId }: { organizationId: string }) {
   const pathname = useLocation({ select: (location) => location.pathname });
   const page = pathname.includes('/exceptions')
     ? 'Issues'
-    : pathname.includes('/connections')
-      ? 'Connections'
-      : 'Overview';
+    : pathname.includes('/playbooks')
+      ? 'Playbooks'
+      : pathname.includes('/connections')
+        ? 'Connections'
+        : 'Overview';
   const client = useQueryClient();
   const access = useQuery(contextOptions(organizationId));
   const organizations = useQuery(organizationsOptions());

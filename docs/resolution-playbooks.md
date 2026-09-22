@@ -133,3 +133,65 @@ same playbook through the real Temporal, policy, database and JTL adapter stack.
 
 Run `pnpm check` and `pnpm test:e2e` for the unit, integration and backend
 regression suites.
+
+## Playbook library and controls
+
+Open **Playbooks** after Issues in workspace navigation. Search by name and filter
+by system or activation status. Each shareable detail page explains the five
+steps, required permissions, approval, verification and recovery. The version
+selector reads immutable published versions; publication and viewing never grant
+execution permission or replace an active version.
+
+Members can inspect versions, historical grants and the 50 most recent runs.
+Owners and admins can review an exact version and activate it for their own
+principal, one eligible JTL connection and explicitly selected mapped orders.
+The current connection must grant both `orders.read` and
+`orders.shipping-method.write`. Unsupported capabilities and interpreter versions
+remain unavailable. Open the linked connection to resolve missing prerequisites.
+An independent approval is still required by the shipping-method playbook.
+
+Activation records retain the reviewed digest, policy, principal, connection and
+order scope. Review metadata records the administrator and time. A newer version
+requires another deliberate review. Overlapping active grants for the same
+principal, connection and orders are rejected; revoke the previous grant first.
+Revocation permanently blocks future admission under that artifact. It preserves
+history and does not undo changes or cancel work already dispatched. Reactivation
+requires a new activation ID.
+
+### API and persistence
+
+All endpoints require a current workspace membership:
+
+- `GET /v1/organizations/:organizationId/playbooks`
+- `GET /v1/organizations/:organizationId/playbooks/:definitionId`
+- `GET /v1/organizations/:organizationId/playbooks/:definitionId/runs`
+- `POST /v1/organizations/:organizationId/playbooks/:definitionId/activations`
+- `POST /v1/organizations/:organizationId/playbooks/:definitionId/activations/:activationId/revoke`
+
+Activation accepts a UUID `id`, `version`, `reviewedDigest`, `policyVersion`,
+`connectionId`, `connectionVersion`, explicit `targetIds` and `scopeReviewed: true`.
+Retry an uncertain response with the same ID and body. Exact retries return the
+original active grant; changed scope, overlapping grants, revoked IDs and stale
+reviews return 409 with a next step. Revocation accepts the exact
+`artifactDigest` and is idempotent. Mutations refresh membership and require an
+owner/admin role. Resources and connections must belong to the current tenant.
+
+The management transaction serializes workspace activation/revocation commands,
+locks current connection grants and commits review, playbook activation and
+admission artifact together. It reuses the existing activation service and
+admission records. Migration `0017_playbook_activation_reviews.sql` adds immutable,
+tenant-isolated review records; migration `0018_playbook_artifact_permissions.sql` grants `luma_desk` tenant-scoped
+playbook artifact insertion and revocation. The API needs `luma_desk` and
+`luma_connectors`; execution writes remain with the worker. Publication remains a trusted
+composition operation, not a browser command.
+
+Run history separates execution from verification. Pilot provenance is explicit.
+Runs without integrated source classification are labeled unclassified and are
+never counted as live verified success. Historical replay and shadow evaluation
+sources are not yet integrated; the detail page reports their absence. A verified
+shipping-method correction still does not establish resumed fulfillment.
+
+Validation includes PostgreSQL/API replay, scope, role and tenant checks;
+Storybook states; and the browser library → detail → activate → reload → revoke
+journey, including a lost response, member access, workspace switching and narrow
+keyboard navigation. Run `pnpm check`, `pnpm test:e2e` and `pnpm test:browser`.

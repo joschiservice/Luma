@@ -7,6 +7,7 @@ import { caseDeskContract } from './contracts/desk.js';
 import { identityContract } from './contracts/identity.js';
 import { resolutionLearningContract } from './contracts/learning.js';
 import { operationsContract } from './contracts/overview.js';
+import { playbooksContract } from './contracts/playbooks.js';
 import { connectorProvidersContract } from './contracts/providers.js';
 import { systemContract } from './contracts/system.js';
 
@@ -14,6 +15,7 @@ const c = initContract();
 
 export const apiContract = c.router(
   {
+    playbooks: playbooksContract,
     resolutionLearning: resolutionLearningContract,
     caseDesk: caseDeskContract,
     operations: operationsContract,
@@ -68,3 +70,5 @@ export { connectorProviderSchema } from './contracts/providers.js';
 export type { ConnectorProvider } from './contracts/providers.js';
 
 export { caseEventsContract } from './contracts/events.js';
+
+export * from './playbooks.js';

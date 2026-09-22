@@ -27,6 +27,7 @@ import {
 } from '#modules/workflows/composition';
 
 import { buildApp } from './http-app.js';
+import { createPersistentPlaybookLibrary } from './playbook-library.js';
 import { createDeskServices } from './services.js';
 
 /**
@@ -91,6 +92,10 @@ export function buildRuntimeApp(
   const app = buildApp(options, {
     cases,
     desk,
+    playbooks: createPersistentPlaybookLibrary(
+      createTenantDatabase(casePool),
+      identity.service,
+    ),
     learning: createResolutionLearning(
       createTenantDatabase(casePool),
       identity.service.refreshContext,
