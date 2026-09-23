@@ -1,8 +1,8 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
-import { parseInput } from '../../apps/api/dist/modules/exceptions/composition.js';
-import { defaultConfiguration } from '../../apps/api/dist/modules/exceptions/index.js';
+import { defaultConfiguration } from '@luma/exceptions';
+import { parseInput } from '@luma/exceptions/composition';
 
 export const scenarios = [
   'healthy',
@@ -28,14 +28,14 @@ export const corpus = await readJson(
 
 export const jtl = await readJson(
   new URL(
-    '../../apps/api/src/modules/connectors/infrastructure/jtl/fixtures/commerce.json',
+    '../../packages/connections/src/infrastructure/jtl/fixtures/commerce.json',
     import.meta.url,
   ),
 );
 
 export const shopify = await readJson(
   new URL(
-    '../../apps/api/src/modules/connectors/infrastructure/shopify/fixtures/commerce.json',
+    '../../packages/connections/src/infrastructure/shopify/fixtures/commerce.json',
     import.meta.url,
   ),
 );

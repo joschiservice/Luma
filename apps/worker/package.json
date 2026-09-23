@@ -1,0 +1,23 @@
+{
+  "name": "@luma/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "start": "node --env-file-if-exists=.env dist/bootstrap.js",
+    "dev:worker": "tsx watch --conditions=luma-source --include \"../../packages/*/src/**/*.ts\" --env-file-if-exists=.env src/bootstrap.ts"
+  },
+  "dependencies": {
+    "@luma/application-runtime": "workspace:*",
+    "@luma/config": "workspace:*",
+    "@luma/platform": "workspace:*",
+    "@opentelemetry/instrumentation": "0.222.0"
+  },
+  "devDependencies": {
+    "@luma/typescript-config": "workspace:*",
+    "tsx": "^4.20.0"
+  }
+}

@@ -209,7 +209,10 @@ export function ResolutionReview({
         {/* Fresh evidence preserves the draft; a changed action starts a new decision. */}
         <DecisionControls
           key={JSON.stringify([
+            proposal?.version,
             proposal?.capability,
+            proposal?.capabilityVersion,
+            proposal?.requestedBy,
             proposal?.connectionId,
             proposal?.target,
             proposal?.parameters,

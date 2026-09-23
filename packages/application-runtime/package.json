@@ -1,0 +1,55 @@
+{
+  "name": "@luma/application-runtime",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "luma-source": "./src/app.ts",
+      "types": "./dist/app.d.ts",
+      "default": "./dist/app.js"
+    },
+    "./worker": {
+      "luma-source": "./src/composition/workflow-runtime.ts",
+      "types": "./dist/composition/workflow-runtime.d.ts",
+      "default": "./dist/composition/workflow-runtime.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "db:migrate": "node scripts/migrate.mjs"
+  },
+  "dependencies": {
+    "@luma/api-contract": "workspace:*",
+    "@luma/audit": "workspace:*",
+    "@luma/commerce-ingestion": "workspace:*",
+    "@luma/config": "workspace:*",
+    "@luma/connections": "workspace:*",
+    "@luma/exceptions": "workspace:*",
+    "@luma/execution": "workspace:*",
+    "@luma/identity": "workspace:*",
+    "@luma/inventory": "workspace:*",
+    "@luma/orders": "workspace:*",
+    "@luma/platform": "workspace:*",
+    "@luma/policies": "workspace:*",
+    "@luma/resolution": "workspace:*",
+    "@luma/workflow-temporal": "workspace:*",
+    "@ts-rest/fastify": "3.52.1",
+    "fastify": "5.12.5",
+    "pg": "8.20.0"
+  },
+  "devDependencies": {
+    "@luma/typescript-config": "workspace:*",
+    "@opentelemetry/api": "1.9.1",
+    "@opentelemetry/resources": "2.11.0",
+    "@opentelemetry/sdk-trace-node": "2.11.0",
+    "@temporalio/testing": "1.24.0",
+    "@types/node": "^24.0.0",
+    "@types/pg": "8.20.0",
+    "graphql": "^16.14.2",
+    "tsx": "^4.20.0",
+    "vitest": "4.1.11"
+  }
+}

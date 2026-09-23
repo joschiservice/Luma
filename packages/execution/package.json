@@ -1,0 +1,35 @@
+{
+  "name": "@luma/execution",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "luma-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./composition": {
+      "luma-source": "./src/composition.ts",
+      "types": "./dist/composition.d.ts",
+      "default": "./dist/composition.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@luma/audit": "workspace:*",
+    "@luma/connections": "workspace:*",
+    "@luma/identity": "workspace:*",
+    "@luma/platform": "workspace:*",
+    "@luma/policies": "workspace:*",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@luma/typescript-config": "workspace:*",
+    "@types/node": "^24.0.0"
+  }
+}

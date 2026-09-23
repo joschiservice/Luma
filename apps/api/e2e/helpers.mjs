@@ -8,6 +8,10 @@ import { assert, vi } from 'vitest';
 
 export const apiDirectory = fileURLToPath(new URL('../', import.meta.url));
 
+export const runtimeDirectory = fileURLToPath(
+  new URL('../../../packages/application-runtime/', import.meta.url),
+);
+
 export const secret = 'backend-e2e-secret-at-least-32-characters';
 
 export async function until(check, description, timeout = 15_000) {
@@ -102,7 +106,10 @@ export async function database(t) {
     owner,
     ownerUrl,
     runtimeUrl: url.toString(),
-    async migrate(script = 'scripts/migrate.mjs', expectedCode = 0) {
+    async migrate(
+      script = `${runtimeDirectory}/scripts/migrate.mjs`,
+      expectedCode = 0,
+    ) {
       // Shared runtime roles are cluster-wide, including across integration suites.
       const lock = await admin.connect();
       try {

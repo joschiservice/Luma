@@ -102,7 +102,7 @@ API build output is `apps/api/dist`; run with `pnpm --filter @luma/api start` af
 
 ## Backend module boundaries
 
-[ADR-001](docs/architecture/001-module-boundaries.md) defines module ownership, public interfaces, allowed dependencies, layering and event rules. Implement features under `apps/api/src/modules/<name>` as needed. `pnpm lint` enforces the boundary policy; `pnpm test:architecture` checks its regression fixtures and acyclic dependency map. Both run in CI through the existing gates.
+[ADR-001](docs/architecture/001-module-boundaries.md) defines module ownership, public interfaces, allowed dependencies, layering and event rules. Implement features in their owning `packages/<domain>` package. [ADR-005](docs/architecture/005-domain-packages-and-runtimes.md) defines the package layout, shared runtime, and separate API/worker processes. `pnpm lint` enforces the boundary policy; `pnpm test:architecture` checks its regression fixtures and acyclic dependency map. Both run in CI through the existing gates.
 
 ## Canonical commerce model
 
@@ -151,13 +151,11 @@ failure modes. Keep business rules in domain files, use cases and ports in
 application files, and database or provider access in infrastructure files.
 Colocate focused unit tests with the behavior they verify.
 
-The API composition root is organized under `apps/api/src/composition`: HTTP
-setup, configured runtime setup, service factories, and workflow setup have
-separate files. `app.ts` keeps their public imports stable. API routes live in
-`packages/api-contract/src/contracts`, grouped by feature; schemas remain next to
-their owning feature. Frontend feature folders separate page orchestration,
-interactive components, forms, and data access. Shared connector transport
-helpers and private-query defaults live with their respective consumers.
+Shared composition lives in `packages/application-runtime/src/composition`.
+`apps/api` starts HTTP and `apps/worker` starts Temporal workers. Domain packages
+expose contracts, construction functions and HTTP adapters through separate exports.
+The pilot and simulator use the same typed service graph with explicit execution
+and provider dependencies. See [ADR-005](docs/architecture/005-domain-packages-and-runtimes.md).
 
 Branch from `main`: `feat/LUMA-<id>-<short-description>`. Use Conventional Commits, for example `chore(repo): bootstrap workspace`. PR titles should be concise and include the issue, for example `LUMA-3: Bootstrap monorepo`.
 

@@ -54,7 +54,7 @@ Regenerate the snapshot from the repository root, then review the schema diff an
 
 ```sh
 pnpm --filter @luma/api exec node scripts/update-shopify-schema.mjs 2026-07
-pnpm exec prettier --write apps/api/src/modules/connectors/infrastructure/shopify/fixtures/admin-2026-07.graphql
+pnpm exec prettier --write packages/connections/src/infrastructure/shopify/fixtures/admin-2026-07.graphql
 ```
 
 References: [orders and historical access](https://shopify.dev/docs/api/admin-graphql/latest/queries/orders), [inventory items](https://shopify.dev/docs/api/admin-graphql/latest/objects/InventoryItem), [fulfillment orders](https://shopify.dev/docs/api/admin-graphql/latest/objects/FulfillmentOrder), [order shipments](https://shopify.dev/docs/api/admin-graphql/latest/objects/Order#field-Order.fields.fulfillments), [webhook verification](https://shopify.dev/docs/apps/build/webhooks/verify-deliveries), [API limits](https://shopify.dev/docs/api/usage/limits).

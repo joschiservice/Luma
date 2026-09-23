@@ -11,6 +11,8 @@ This directory is the source of truth for implementation ADRs. Review and versio
 | [003](003-tenant-isolation-and-data-residency.md) | Tenant isolation and regional data residency           | Proposed | [LUMA-6](https://linear.app/auren-labs/issue/LUMA-6) |
 | [004](004-browser-runtime.md)                     | Browserbase V0 with Playwright/CDP; Anchor alternative | Proposed | [LUMA-2](https://linear.app/auren-labs/issue/LUMA-2) |
 
+[ADR-005](005-domain-packages-and-runtimes.md) defines the accepted domain package layout, API/worker processes, shared composition and persistence ownership. It supersedes ADR-001’s source placement.
+
 ## Baseline
 
 Carried forward from the [Linear architecture register](https://linear.app/auren-labs/document/architecture-decision-register-305db9bed1de):

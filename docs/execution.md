@@ -1,6 +1,6 @@
 # Policy, execution and audit
 
-Workflow activities call `execution.execute(context, { runId, stepId })` through `createSafetyServices` in `apps/api/src/app.ts`. The composition root supplies identity, independent eligibility checks and a trusted connector registry. Activities receive the admission port; connector writes stay in the private execution engine. The [durable workflow runtime](exception-workflows.md) registers Temporal activities around these services. Production connector writes require an installed effect adapter.
+Workflow activities call `execution.execute(context, { runId, stepId })` through `createSafetyServices` in `@luma/application-runtime`. The composition root supplies identity, independent eligibility checks and a trusted connector registry. Activities receive the admission port; connector writes stay in the private execution engine. The [durable workflow runtime](exception-workflows.md) registers Temporal activities around these services. Production connector writes require an installed effect adapter.
 
 ## Policy and approval
 

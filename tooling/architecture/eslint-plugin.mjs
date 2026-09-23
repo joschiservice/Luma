@@ -1,8 +1,12 @@
-import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { connectorPackages, dependencies, layers } from './policy.mjs';
+import {
+  connectorPackages,
+  dependencies,
+  domainPackages,
+  layers,
+} from './policy.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -13,9 +17,22 @@ const codeExtension = /\.(?:[cm]?[jt]sx?)$/;
 const normalize = (file) =>
   file.replaceAll(path.sep, '/').replace(codeExtension, '.ts');
 
-const apiImports = JSON.parse(
-  readFileSync(new URL('../../apps/api/package.json', import.meta.url), 'utf8'),
-).imports;
+const apiImports = {
+  '#modules/*': { 'luma-source': './src/modules/*.ts' },
+  '#test-support/*': { 'luma-source': './src/test-support/*.ts' },
+  '#app': { 'luma-source': './src/app.ts' },
+};
+
+function canonical(file) {
+  const match = /^packages\/([^/]+)\/src\/(.+)$/.exec(file);
+  if (!match) return file;
+  if (match[1] === 'application-runtime') return `apps/api/src/${match[2]}`;
+  if (match[1] === 'workflow-temporal')
+    return `${modulePrefix}temporal/${match[2] === 'index.ts' ? 'composition.ts' : `infrastructure/${match[2]}`}`;
+  const module = domainPackages[match[1]];
+
+  return module ? `${modulePrefix}${module}/${match[2]}` : file;
+}
 
 function apiImportTarget(specifier) {
   for (const [pattern, conditions] of Object.entries(apiImports)) {
@@ -56,6 +73,8 @@ function moduleInfo(file) {
  * permitted.
  */
 export function violation(from, to) {
+  from = canonical(from);
+  to = canonical(to);
   const source = moduleInfo(from);
   const target = moduleInfo(to);
   if (
@@ -77,13 +96,14 @@ export function violation(from, to) {
     )
       return 'Simulator packages own provider state independently of application models.';
   }
-  if (from.startsWith('packages/') && to.startsWith('apps/')) {
+  if (from.startsWith('packages/') && to.startsWith('apps/'))
     return 'Packages must not import apps.';
-  }
   if (
     from.startsWith('apps/') &&
     to.startsWith('apps/') &&
-    from.split('/')[1] !== to.split('/')[1]
+    from.split('/')[1] !== to.split('/')[1] &&
+    !moduleInfo(to) &&
+    to !== 'apps/api/src/app.ts'
   ) {
     return 'Apps must communicate through public API contracts, not source imports.';
   }
@@ -114,14 +134,19 @@ export function violation(from, to) {
         'apps/api/src/test-support/detection-fixtures.ts',
         'apps/api/src/test-support/safety-fixtures.ts',
         'apps/api/src/index.ts',
+        'apps/worker/src/index.ts',
+        'apps/worker/src/bootstrap.ts',
       ].includes(from) &&
-      !/^apps\/api\/src\/composition\/[^/]+\.ts$/.test(from)
+      !/^apps\/api\/src\/composition\/[^/]+\.ts$/.test(from) &&
+      !from.startsWith('apps/api/e2e/')
     ) {
       return 'Only the API composition root may wire backend modules.';
     }
     if (
       !target.entry ||
-      !['index.ts', 'composition.ts'].includes(target.layer)
+      !['index.ts', 'composition.ts', 'http.ts', 'adapters.ts'].includes(
+        target.layer,
+      )
     ) {
       return 'The composition root must use module entry points.';
     }
@@ -134,7 +159,13 @@ export function violation(from, to) {
     return 'Use a registered module and domain/application/infrastructure/api layer.';
   }
   if (!target) {
-    if (source.layer === 'api' && to === 'packages/api-contract/') return null;
+    if (
+      (source.layer === 'api' ||
+        from.endsWith('/infrastructure/learning-validation.ts') ||
+        from.endsWith('/infrastructure/diagnosis-validation.ts')) &&
+      to === 'packages/api-contract/'
+    )
+      return null;
     if (source.name === 'connectors') {
       if (to === 'packages/connectors/core/') return null;
       if (['infrastructure', 'composition.ts'].includes(source.layer)) {
@@ -165,6 +196,12 @@ export function violation(from, to) {
 
     return null;
   }
+  if (
+    source.layer === 'api' &&
+    target.name === 'identity' &&
+    target.layer === 'http.ts'
+  )
+    return null;
   if (!target.entry || target.layer !== 'index.ts')
     return 'Cross-module imports must use index.ts.';
   if (!dependencies[source.name].includes(target.name))
@@ -179,7 +216,8 @@ export function violation(from, to) {
 const rule = {
   meta: { type: 'problem', schema: [], messages: { boundary: '{{reason}}' } },
   create(context) {
-    const from = normalize(path.relative(root, context.filename));
+    const physicalFrom = normalize(path.relative(root, context.filename));
+    const from = canonical(physicalFrom);
     const source = moduleInfo(from);
 
     function report(node, reason) {
@@ -221,16 +259,20 @@ const rule = {
       } else if (value.startsWith('.')) {
         to = normalize(
           path.posix.normalize(
-            path.posix.join(path.posix.dirname(from), value),
+            path.posix.join(path.posix.dirname(physicalFrom), value),
           ),
         );
       } else if (value.startsWith('@luma/')) {
         const [name, ...subpath] = value.slice(6).split('/');
-        to = name.startsWith('simulator-')
-          ? `packages/simulator/${name.slice(10)}/${subpath.join('/')}`
-          : Object.hasOwn(connectorPackages, name)
-            ? `packages/connectors/${name.slice(10)}/${subpath.join('/')}`
-            : `packages/${name}/${subpath.join('/')}`;
+        to = domainPackages[name]
+          ? `apps/api/src/modules/${domainPackages[name]}/${subpath.length ? subpath.join('/') + '.ts' : name === 'workflow-temporal' ? 'composition.ts' : 'index.ts'}`
+          : name === 'application-runtime'
+            ? 'apps/api/src/app.ts'
+            : name.startsWith('simulator-')
+              ? `packages/simulator/${name.slice(10)}/${subpath.join('/')}`
+              : Object.hasOwn(connectorPackages, name)
+                ? `packages/connectors/${name.slice(10)}/${subpath.join('/')}`
+                : `packages/${name}/${subpath.join('/')}`;
       } else {
         // Only package imports with known source targets can be checked for ownership.
         if (
@@ -268,7 +310,12 @@ const rule = {
           (!Object.hasOwn(dependencies, source.name) ||
             !Object.hasOwn(layers, source.layer) ||
             (source.entry &&
-              !['index.ts', 'composition.ts'].includes(source.layer)))
+              ![
+                'index.ts',
+                'composition.ts',
+                'http.ts',
+                'adapters.ts',
+              ].includes(source.layer)))
         ) {
           report(
             node,

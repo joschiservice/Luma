@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
-import { compilePlaybook } from '../dist/modules/workflows/composition.js';
-import { shippingMethodPlaybook } from '../dist/modules/workflows/index.js';
+import { shippingMethodPlaybook } from '@luma/resolution';
+import { compilePlaybook } from '@luma/resolution/composition';
 
 /** Seeds published source data and mapped orders; activations must go through the real API. */
 export async function seedPlaybooks(db, tenantId) {

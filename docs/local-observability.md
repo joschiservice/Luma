@@ -105,7 +105,7 @@ Use a repeatable workload and representative database sizes. Warm up the process
 mise exec -- pnpm exec turbo run build --filter=@luma/api...
 mise exec -- node --env-file-if-exists=apps/api/.env --env-file=.luma/env apps/api/dist/composition/bootstrap.js
 # In another terminal, if workflows are needed:
-mise exec -- node --env-file-if-exists=apps/api/.env --env-file=.luma/env apps/api/dist/composition/bootstrap.js --workflow-worker
+mise exec -- node --env-file-if-exists=apps/worker/.env --env-file=.luma/env apps/worker/dist/bootstrap.js
 ```
 
 Stop the watch processes first to avoid port conflicts; keep the Docker services running. `.luma/env` contains the generated local service settings from `dev:observe`. Run the same workload with `LUMA_LOCAL_OTLP_ENDPOINT=` and `LUMA_LOCAL_PROFILES_ENDPOINT=` to measure instrumentation overhead. Keep hosted credentials unset for that baseline.

@@ -2,12 +2,12 @@
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
+import { createDetectionServices } from '@luma/application-runtime';
+import { defaultConfiguration } from '@luma/exceptions';
+import { makeTenantContext } from '@luma/identity/composition';
 import { chromium } from 'playwright';
 import { expect, it } from 'vitest';
 
-import { createDetectionServices } from '../dist/app.js';
-import { defaultConfiguration } from '../dist/modules/exceptions/index.js';
-import { makeTenantContext } from '../dist/modules/identity/composition.js';
 import { availablePort, database, startApi, startProcess } from './helpers.mjs';
 
 it('reads persisted cases, restores desktop/mobile routes and focus, and denies other tenants', async (t) => {

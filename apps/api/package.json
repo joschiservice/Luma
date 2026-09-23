@@ -6,14 +6,12 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "dev": "tsx watch --conditions=luma-source --include '../../packages/config/dist/**/*.js' --include '../../packages/connectors/*/dist/**/*.js' --include '../../packages/api-contract/dist/**/*.js' --env-file-if-exists=.env src/composition/bootstrap.ts",
+    "test": "vitest run --passWithNoTests",
+    "dev": "tsx watch --conditions=luma-source --include \"../../packages/*/src/**/*.ts\" --env-file-if-exists=.env src/composition/bootstrap.ts",
     "start": "node --env-file-if-exists=.env dist/composition/bootstrap.js",
-    "db:migrate": "node --env-file-if-exists=.env scripts/migrate.mjs",
+    "db:migrate": "node --env-file-if-exists=.env ../../packages/application-runtime/scripts/migrate.mjs",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
-    "test:browser": "vitest run --config vitest.browser.config.ts",
-    "worker": "node --env-file-if-exists=.env dist/composition/bootstrap.js --workflow-worker",
-    "dev:worker": "tsx watch --conditions=luma-source --include '../../packages/config/dist/**/*.js' --include '../../packages/connectors/*/dist/**/*.js' --include 'src/modules/workflows/infrastructure/temporal/exception-workflow.ts' --env-file-if-exists=.env src/composition/bootstrap.ts --workflow-worker"
+    "test:browser": "vitest run --config vitest.browser.config.ts"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",
@@ -25,57 +23,9 @@
     "tsx": "^4.20.0"
   },
   "dependencies": {
-    "@langfuse/otel": "5.11.1",
-    "@luma/api-contract": "workspace:*",
+    "@luma/application-runtime": "workspace:*",
     "@luma/config": "workspace:*",
-    "@luma/connector-core": "workspace:*",
-    "@luma/connector-jtl": "workspace:*",
-    "@luma/connector-shopify": "workspace:*",
-    "@opentelemetry/api": "1.9.1",
-    "@opentelemetry/api-logs": "0.222.0",
-    "@opentelemetry/exporter-logs-otlp-http": "0.222.0",
-    "@opentelemetry/exporter-metrics-otlp-http": "0.222.0",
-    "@opentelemetry/exporter-trace-otlp-http": "0.222.0",
-    "@opentelemetry/instrumentation": "0.222.0",
-    "@opentelemetry/instrumentation-http": "0.222.0",
-    "@opentelemetry/instrumentation-pg": "0.74.0",
-    "@opentelemetry/instrumentation-runtime-node": "0.35.0",
-    "@opentelemetry/instrumentation-undici": "0.32.0",
-    "@opentelemetry/resources": "2.11.0",
-    "@opentelemetry/sdk-logs": "0.222.0",
-    "@opentelemetry/sdk-metrics": "2.11.0",
-    "@opentelemetry/sdk-node": "0.222.0",
-    "@opentelemetry/sdk-trace-node": "2.11.0",
-    "@pyroscope/nodejs": "0.6.3",
-    "@sentry/node": "10.75.0",
-    "@sentry/opentelemetry": "10.75.0",
-    "@temporalio/activity": "1.24.0",
-    "@temporalio/client": "1.24.0",
-    "@temporalio/common": "1.24.0",
-    "@temporalio/interceptors-opentelemetry-v2": "1.24.0",
-    "@temporalio/worker": "1.24.0",
-    "@temporalio/workflow": "1.24.0",
-    "@ts-rest/core": "3.52.1",
-    "@ts-rest/fastify": "3.52.1",
-    "better-auth": "1.7.5",
-    "drizzle-orm": "0.45.2",
-    "fastify": "5.12.5",
-    "pg": "8.20.0",
-    "posthog-node": "5.52.4",
-    "zod": "3.25.76"
-  },
-  "imports": {
-    "#modules/*": {
-      "luma-source": "./src/modules/*.ts",
-      "default": "./dist/modules/*.js"
-    },
-    "#test-support/*": {
-      "luma-source": "./src/test-support/*.ts",
-      "default": "./dist/test-support/*.js"
-    },
-    "#app": {
-      "luma-source": "./src/app.ts",
-      "default": "./dist/app.js"
-    }
+    "@luma/platform": "workspace:*",
+    "@opentelemetry/instrumentation": "0.222.0"
   }
 }

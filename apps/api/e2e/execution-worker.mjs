@@ -1,11 +1,14 @@
 import { appendFile, readFile } from 'node:fs/promises';
 
-import { buildRuntimeApp, createSafetyServices } from '../dist/app.js';
+import {
+  buildRuntimeApp,
+  createSafetyServices,
+} from '@luma/application-runtime';
 
 process.once(
   'message',
   async ({ databaseUrl, secret, origin, cookie, action, ledger, mode }) => {
-    const app = buildRuntimeApp({
+    const app = await buildRuntimeApp({
       databaseUrl,
       secret,
       baseURL: origin,

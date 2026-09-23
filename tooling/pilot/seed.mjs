@@ -1,19 +1,21 @@
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { Pool } from 'pg';
-
 import {
   buildRuntimeApp,
+  createApplicationServices,
   createDetectionServices,
-} from '../../apps/api/dist/app.js';
+} from '@luma/application-runtime';
 import {
   createInstallationVerifier,
   createInstalledConnections,
   createSimulationTransport,
-} from '../../apps/api/dist/modules/connectors/composition.js';
-import { createIdentity } from '../../apps/api/dist/modules/identity/composition.js';
-import { createTenantDatabase } from '../../apps/api/dist/modules/platform/composition.js';
+} from '@luma/connections/composition';
+import { createIdentity } from '@luma/identity/composition';
+import { createTenantDatabase } from '@luma/platform/composition';
+import { shippingMethodPlaybook } from '@luma/resolution';
+import { Pool } from 'pg';
+
 import { detectionRequest, jtl, newManifest, readJson } from './fixtures.mjs';
 
 /** Builds identity-service settings from the pilot's environment. */
@@ -48,7 +50,7 @@ export async function seedPilot(
   const manifest = newManifest(scenario);
   if (simulator) manifest.simulator = { ...simulator, bindings: [] };
   const settings = identitySettings(env);
-  const app = buildRuntimeApp(settings);
+  const app = await buildRuntimeApp(settings);
   const identity = createIdentity(settings);
   const pool = new Pool({ connectionString: env.WORKFLOW_DATABASE_URL });
   const detection = createDetectionServices(env.WORKFLOW_DATABASE_URL);
@@ -211,6 +213,30 @@ export async function seedPilot(
         );
       }
     }
+    const { playbooks, library } = createApplicationServices({
+      database: createTenantDatabase(pool),
+      identity: identity.service,
+      execution: { kind: 'disabled' },
+    });
+    await playbooks.publish(context, shippingMethodPlaybook);
+    // Restarting the pilot must preserve a revocation made through the library.
+    const history = await library.detail(
+      context,
+      shippingMethodPlaybook.definition.id,
+    );
+    if (!history.activations.some((item) => item.id === manifest.proposalId))
+      await playbooks.activate(context, {
+        id: manifest.proposalId,
+        definitionId: shippingMethodPlaybook.definition.id,
+        version: shippingMethodPlaybook.version,
+        grants: {
+          principalIds: [manifest.requesterId],
+          connectionIds: [manifest.connections.jtl],
+          targetIds: [manifest.subjects.workflow_failure],
+        },
+        policyVersion: 'v0.1',
+      });
+
     await request('/auth/sign-out', {});
     await writeFile(
       join(directory, `provider-${manifest.runId}.json`),

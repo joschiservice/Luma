@@ -57,7 +57,7 @@ Synthetic fixtures cover both connection modes, split shipments, unmapped lines,
 
 ```sh
 node apps/api/scripts/update-jtl-schema.mjs
-pnpm exec prettier --write apps/api/src/modules/connectors/infrastructure/jtl/fixtures/erp-2.2.json
+pnpm exec prettier --write packages/connections/src/infrastructure/jtl/fixtures/erp-2.2.json
 ```
 
 References: [JTL ERP 2.2 OpenAPI](https://developer.jtl-software.com/openapi/erp/2.2.json), [authentication](https://developer.jtl-software.com/cloud/guides/essentials/authentication/oauth2-flow), [versioning](https://developer.jtl-software.com/cloud/guides/essentials/common-patterns/versioning).

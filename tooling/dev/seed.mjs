@@ -4,10 +4,11 @@ import { join } from 'node:path';
 import {
   buildRuntimeApp,
   createDetectionServices,
-} from '../../apps/api/dist/app.js';
-import { parseInput } from '../../apps/api/dist/modules/exceptions/composition.js';
-import { defaultConfiguration } from '../../apps/api/dist/modules/exceptions/index.js';
-import { createIdentity } from '../../apps/api/dist/modules/identity/composition.js';
+} from '@luma/application-runtime';
+import { defaultConfiguration } from '@luma/exceptions';
+import { parseInput } from '@luma/exceptions/composition';
+import { createIdentity } from '@luma/identity/composition';
+
 import { stateDirectory } from './environment.mjs';
 
 /**
@@ -22,7 +23,7 @@ export async function seed(saved, env, outputDirectory = stateDirectory) {
     baseURL: env.BETTER_AUTH_URL,
     trustedOrigins: [env.BETTER_AUTH_URL],
   };
-  const app = buildRuntimeApp(settings);
+  const app = await buildRuntimeApp(settings);
   const identity = createIdentity(settings);
   const corpus = JSON.parse(
     await readFile(

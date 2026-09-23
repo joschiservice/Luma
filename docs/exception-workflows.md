@@ -20,8 +20,8 @@ Start a local Temporal development server, then build and run the worker:
 
 ```sh
 temporal server start-dev --ip 127.0.0.1
-pnpm exec turbo run build --filter=@luma/api...
-pnpm --filter @luma/api worker
+pnpm exec turbo run build --filter=@luma/worker...
+pnpm --filter @luma/worker start
 ```
 
 The development server is for local testing. Use a persistent Temporal deployment for durable operation. The worker drains on SIGINT/SIGTERM and closes its connections and database pools after shutdown. It runs separately from the HTTP server.
@@ -30,7 +30,7 @@ The default worker accepts existing incident references, runs persisted diagnosi
 
 ## Compose and start
 
-`createExceptionWorkflowRuntime` in `apps/api/src/app.ts` wires the existing identity, detection and safety services. It returns `createClient()` and `createWorker()` factories. Call `worker.run()`, then `worker.shutdown()` on shutdown; await the run before `worker.close()`. Close the client and owner services separately. Each worker connection belongs to one namespace/task queue.
+`createExceptionWorkflowRuntime` in `@luma/application-runtime/worker` wires the existing identity, detection and safety services. It returns `createClient()` and `createWorker()` factories. Call `worker.run()`, then `worker.shutdown()` on shutdown; await the run before `worker.close()`. Close the client and owner services separately. Each worker connection belongs to one namespace/task queue.
 
 The client accepts an authenticated `TenantContext` and a source reference:
 

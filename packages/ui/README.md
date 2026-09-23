@@ -66,3 +66,15 @@ Buttons default to the compact 36px size with 12px horizontal padding. Use
 `size="lg"` for 44px primary sign-in and onboarding actions. Use `size="icon"`
 for 44px icon-only controls and supply an accessible label. The `sm` size remains
 an alias for compact buttons; ordinary actions do not need an explicit size.
+
+## Workspace checks
+
+Run these commands from the repository root:
+
+```sh
+pnpm exec turbo run build --filter=@luma/ui...
+pnpm exec turbo run typecheck --filter=@luma/ui
+pnpm test:ui
+```
+
+See [package boundaries and runtime composition](../../docs/architecture/005-domain-packages-and-runtimes.md) for workspace ownership.

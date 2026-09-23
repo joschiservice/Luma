@@ -5,11 +5,25 @@ import { fail, run } from './process.mjs';
 const suites = {
   test: [['test:local']],
   e2e: [
-    ['exec', 'turbo', 'run', 'build', '--filter=@luma/api...'],
+    [
+      'exec',
+      'turbo',
+      'run',
+      'build',
+      '--filter=@luma/api...',
+      '--filter=@luma/worker...',
+    ],
     ['--filter', '@luma/api', 'test:e2e'],
   ],
   browser: [
-    ['exec', 'turbo', 'run', 'build', '--filter=@luma/api...'],
+    [
+      'exec',
+      'turbo',
+      'run',
+      'build',
+      '--filter=@luma/api...',
+      '--filter=@luma/worker...',
+    ],
     ['--filter', '@luma/api', 'test:browser'],
   ],
   full: [['check'], ['test:e2e'], ['test:browser']],

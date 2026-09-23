@@ -15,6 +15,7 @@ import { assert, test } from 'vitest';
 import {
   apiDirectory,
   database,
+  runtimeDirectory,
   secret,
   signup,
   startApi,
@@ -97,7 +98,7 @@ test('built API supports the identity lifecycle over HTTP and survives restart',
 
 test('migration command installs, reruns unchanged, and rejects a changed applied migration atomically', async (t) => {
   const db = await database(t);
-  const names = (await readdir(join(apiDirectory, 'migrations')))
+  const names = (await readdir(join(runtimeDirectory, 'migrations')))
     .filter((name) => name.endsWith('.sql'))
     .sort();
   const output = await db.migrate();
@@ -130,12 +131,16 @@ test('migration command installs, reruns unchanged, and rejects a changed applie
   const directory = await temporaryDirectory(t);
   await mkdir(join(directory, 'scripts'));
   await cp(
-    join(apiDirectory, 'scripts/migrate.mjs'),
+    join(runtimeDirectory, 'scripts/migrate.mjs'),
     join(directory, 'scripts/migrate.mjs'),
   );
-  await cp(join(apiDirectory, 'migrations'), join(directory, 'migrations'), {
-    recursive: true,
-  });
+  await cp(
+    join(runtimeDirectory, 'migrations'),
+    join(directory, 'migrations'),
+    {
+      recursive: true,
+    },
+  );
   // Sort a pending migration before the checksum failure to prove transaction rollback.
   await appendFile(
     join(directory, 'migrations/0000_e2e_pending.sql'),

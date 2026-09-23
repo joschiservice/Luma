@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 
+import { shippingMethodPlaybook } from '@luma/resolution';
+import { compilePlaybook } from '@luma/resolution/composition';
 import { expect, it } from 'vitest';
 
-import { compilePlaybook } from '../dist/modules/workflows/composition.js';
-import { shippingMethodPlaybook } from '../dist/modules/workflows/index.js';
 import { database, signup, startApi } from './helpers.mjs';
 import { seedPlaybooks } from './playbooks-fixture.mjs';
 

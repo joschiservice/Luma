@@ -89,7 +89,7 @@ const shippingMethodWrite = {
 
 await writeFile(
   new URL(
-    '../src/modules/connectors/infrastructure/jtl/fixtures/erp-2.2.json',
+    '../../../packages/connections/src/infrastructure/jtl/fixtures/erp-2.2.json',
     import.meta.url,
   ),
   JSON.stringify(

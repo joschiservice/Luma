@@ -1,0 +1,10 @@
+{
+  "extends": "@luma/typescript-config/node.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "noEmit": true,
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src/**/*.ts"]
+}

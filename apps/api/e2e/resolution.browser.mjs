@@ -2,6 +2,9 @@
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
+import { createDetectionServices } from '@luma/application-runtime';
+import { defaultConfiguration } from '@luma/exceptions';
+import { makeTenantContext } from '@luma/identity/composition';
 import { chromium } from 'playwright';
 import { expect, it } from 'vitest';
 
@@ -10,9 +13,6 @@ import {
   resolutionProgress,
   resolutionReview,
 } from '../../../packages/ui/src/components/resolution-fixtures.ts';
-import { createDetectionServices } from '../dist/app.js';
-import { defaultConfiguration } from '../dist/modules/exceptions/index.js';
-import { makeTenantContext } from '../dist/modules/identity/composition.js';
 import { availablePort, database, startApi, startProcess } from './helpers.mjs';
 
 it('reviews decisions, recovers ambiguous commands and escalates through the connected API', async (t) => {

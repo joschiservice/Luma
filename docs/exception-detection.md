@@ -1,6 +1,6 @@
 # Exception detection
 
-`createDetectionServices(databaseUrl, now?, verifier?)` in `apps/api/src/app.ts` composes the exception repository and ingestion pipeline. Use the injected clock for reproducible replay. Call `close()` when the worker stops.
+`createDetectionServices(databaseUrl, now?, verifier?)` in `@luma/application-runtime` composes the exception repository and ingestion pipeline. Use the injected clock for reproducible replay. Call `close()` when the worker stops.
 
 The pipeline evaluates the four [V0 taxonomy](exception-taxonomy.md) classes: sync failure, stuck fulfillment, inventory mismatch and workflow failure. It records every accepted evaluation with its rule version, configuration version, decision, evidence references and delivery correlation ID. Inventory evaluations also retain the exact signed difference, left minus right.
 

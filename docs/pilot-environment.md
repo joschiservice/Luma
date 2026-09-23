@@ -125,7 +125,7 @@ reversal with a new approved intent; pilot reset provides a new synthetic order
 with the original method.
 
 JTL order/product data and Shopify inventory identifiers and quantities reuse
-`apps/api/src/modules/connectors/infrastructure/{jtl,shopify}/fixtures/commerce.json`.
+`packages/connections/src/infrastructure/{jtl,shopify}/fixtures/commerce.json`.
 Detection facts reuse `docs/fixtures/exceptions-v0.json`. The explicit synthetic
 inventory mapping relates the JTL available pool to Shopify location 42 and
 normalizes both to `each`. It is a fixture assumption, not a discovered mapping.

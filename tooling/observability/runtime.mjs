@@ -15,8 +15,7 @@ export async function startTelemetry(env, serviceName) {
     require.resolve('@opentelemetry/instrumentation/hook.mjs'),
     import.meta.url,
   );
-  const { startLocalTelemetry } =
-    await import('../../apps/api/dist/modules/platform/composition.js');
+  const { startLocalTelemetry } = await import('@luma/platform/composition');
   const telemetry = await startLocalTelemetry(settings, serviceName);
 
   return { settings, telemetry };

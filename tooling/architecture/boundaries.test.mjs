@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, it, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -7,7 +8,7 @@ import { RuleTester } from 'eslint';
 import tseslint from 'typescript-eslint';
 
 import plugin, { violation } from './eslint-plugin.mjs';
-import { dependencies } from './policy.mjs';
+import { dependencies, domainPackages } from './policy.mjs';
 
 RuleTester.describe = describe;
 
@@ -384,4 +385,81 @@ test('simulator packages cannot cross provider or connector boundaries', () => {
     ),
     /independent of simulators/,
   );
+});
+
+test('extracted domains retain layer boundaries and narrow public interfaces', () => {
+  assert.equal(
+    violation(
+      'packages/execution/src/application/execution.ts',
+      'packages/policies/src/index.ts',
+    ),
+    null,
+  );
+  assert.match(
+    violation(
+      'packages/execution/src/application/execution.ts',
+      'packages/policies/src/infrastructure/repository.ts',
+    ),
+    /index.ts/,
+  );
+  assert.match(
+    violation(
+      'packages/resolution/src/composition.ts',
+      'packages/resolution/src/api/learning.ts',
+    ),
+    /layer direction/,
+  );
+  assert.match(
+    violation(
+      'packages/resolution/src/application/runtime.ts',
+      'packages/application-runtime/src/app.ts',
+    ),
+    /registered module interfaces/,
+  );
+  assert.equal(
+    violation(
+      'packages/commerce-ingestion/src/index.ts',
+      'packages/orders/src/index.ts',
+    ),
+    null,
+  );
+  assert.match(
+    violation(
+      'packages/workflow-temporal/src/runtime.ts',
+      'packages/execution/src/composition.ts',
+    ),
+    /index.ts/,
+  );
+});
+
+test('domain package exports are explicit and their workspace dependencies are acyclic', () => {
+  const manifests = new Map(
+    Object.keys(domainPackages)
+      .concat('application-runtime')
+      .map((name) => {
+        const manifest = JSON.parse(
+          readFileSync(filename(`packages/${name}/package.json`), 'utf8'),
+        );
+        assert.ok(
+          Object.keys(manifest.exports).every((key) => !key.includes('*')),
+          `${name} exposes private subpaths`,
+        );
+
+        return [manifest.name, manifest];
+      }),
+  );
+
+  function visit(name, ancestors = []) {
+    assert.ok(
+      !ancestors.includes(name),
+      `Package cycle: ${[...ancestors, name].join(' -> ')}`,
+    );
+    for (const dependency of Object.keys(
+      manifests.get(name).dependencies ?? {},
+    )) {
+      if (manifests.has(dependency)) visit(dependency, [...ancestors, name]);
+    }
+  }
+
+  for (const name of manifests.keys()) visit(name);
 });

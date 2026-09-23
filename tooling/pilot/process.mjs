@@ -28,7 +28,7 @@ function stop() {
       await stopObservations?.();
       await pilot?.close();
     } finally {
-      if (!pilot) await observability?.shutdown();
+      if (!pilot?.app) await observability?.shutdown();
       await telemetry?.shutdown();
     }
   })());
@@ -39,8 +39,7 @@ process.once('SIGTERM', stop);
 
 try {
   const { createPilot } = await import('./runtime.mjs');
-  const { createObservability } =
-    await import('../../apps/api/dist/modules/platform/composition.js');
+  const { createObservability } = await import('@luma/platform/composition');
   observability = createObservability({ ...settings, approvedModels: [] });
   const manifest = await readJson(join(directory, 'pilot.json'));
   const temporal = {
@@ -53,6 +52,7 @@ try {
   };
   pilot = await createPilot(process.env, directory, manifest, temporal, {
     observability,
+    role: process.argv.includes('--worker') ? 'worker' : 'api',
   });
   if (process.argv.includes('--worker')) {
     worker = await pilot.runtime.createWorker();

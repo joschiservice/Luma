@@ -15,6 +15,8 @@ export const dependencies = {
   policies: ['platform', 'identity'],
   execution: ['platform', 'identity', 'policies', 'connectors', 'audit'],
   exceptions: ['platform', 'identity', 'orders', 'inventory'],
+  commerce: ['connectors', 'identity', 'orders', 'inventory'],
+  temporal: ['workflows', 'identity', 'platform'],
   workflows: [
     'platform',
     'identity',
@@ -34,11 +36,22 @@ export const layers = {
   infrastructure: ['domain', 'application', 'infrastructure'],
   api: ['domain', 'application', 'api'],
   'index.ts': ['domain', 'application'],
-  'composition.ts': [
-    'domain',
-    'application',
-    'infrastructure',
-    'api',
-    'index.ts',
-  ],
+  'http.ts': ['api', 'application', 'domain', 'composition.ts'],
+  'adapters.ts': ['application', 'infrastructure'],
+  'composition.ts': ['domain', 'application', 'infrastructure', 'index.ts'],
+};
+
+export const domainPackages = {
+  platform: 'platform',
+  identity: 'identity',
+  audit: 'audit',
+  orders: 'orders',
+  inventory: 'inventory',
+  connections: 'connectors',
+  policies: 'policies',
+  execution: 'execution',
+  exceptions: 'exceptions',
+  resolution: 'workflows',
+  'commerce-ingestion': 'commerce',
+  'workflow-temporal': 'temporal',
 };

@@ -130,6 +130,7 @@ export function sameResolution(left: CaseReview, right: CaseReview) {
     if (!p) return null;
 
     return [
+      p.version,
       p.capability,
       p.capabilityVersion,
       p.connectionId,

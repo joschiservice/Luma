@@ -1,16 +1,15 @@
 import { randomBytes } from 'node:crypto';
 
+import { buildRuntimeApp } from '@luma/application-runtime';
 import { readIdentityConfig } from '@luma/config';
+import { createInstalledConnections } from '@luma/connections/composition';
+import { createTenantDatabase } from '@luma/platform/composition';
 import { Pool } from 'pg';
-
-import { buildRuntimeApp } from '../dist/app.js';
-import { createInstalledConnections } from '../dist/modules/connectors/composition.js';
-import { createTenantDatabase } from '../dist/modules/platform/composition.js';
 
 // A deterministic provider boundary; HTTP, authentication, encryption and persistence are real.
 const pool = new Pool({ connectionString: process.env.IDENTITY_DATABASE_URL });
 
-const app = buildRuntimeApp(
+const app = await buildRuntimeApp(
   readIdentityConfig(process.env),
   { logger: false },
   undefined,

@@ -115,6 +115,9 @@ it('keeps approval scope stable across refreshed evidence but detects material c
   refreshed.proposal!.id = '99999999-9999-4999-8999-999999999999';
   refreshed.proposal!.preconditions.evidenceRefs = ['new-read'];
   expect(sameResolution(resolutionReview, refreshed)).toBe(true);
+  refreshed.proposal!.version++;
+  expect(sameResolution(resolutionReview, refreshed)).toBe(false);
+  refreshed.proposal!.version--;
   refreshed.proposal!.expectedPostcondition = { shippingMethodId: '9' };
   expect(sameResolution(resolutionReview, refreshed)).toBe(false);
   expect(

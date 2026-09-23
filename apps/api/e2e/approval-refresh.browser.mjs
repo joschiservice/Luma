@@ -3,13 +3,13 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { parseAction } from '@luma/execution/composition';
 import { TestWorkflowEnvironment } from '@temporalio/testing';
 import { chromium } from 'playwright';
 import { expect, it } from 'vitest';
 
 import { createPilot } from '../../../tooling/pilot/runtime.mjs';
 import { seedPilot } from '../../../tooling/pilot/seed.mjs';
-import { parseAction } from '../dist/modules/execution/composition.js';
 import { availablePort, database, secret, startProcess } from './helpers.mjs';
 
 it('refreshes an expired proposal automatically, preserves the review, and executes one approved change', async (t) => {

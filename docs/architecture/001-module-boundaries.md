@@ -1,5 +1,7 @@
 # ADR-001: Modular monolith boundaries
 
+> Source layout and package placement are superseded by [ADR-005](005-domain-packages-and-runtimes.md). The dependency graph and domain ownership remain applicable.
+
 Status: accepted for the initial backend. Decision: 2026-09-17, LUMA-4.
 
 ## Context and options

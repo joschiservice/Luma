@@ -171,6 +171,45 @@ importers:
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.10.0(jiti@2.7.0)(supports-color@8.1.1))
+      '@luma/application-runtime':
+        specifier: workspace:*
+        version: link:packages/application-runtime
+      '@luma/audit':
+        specifier: workspace:*
+        version: link:packages/audit
+      '@luma/commerce-ingestion':
+        specifier: workspace:*
+        version: link:packages/commerce-ingestion
+      '@luma/connections':
+        specifier: workspace:*
+        version: link:packages/connections
+      '@luma/exceptions':
+        specifier: workspace:*
+        version: link:packages/exceptions
+      '@luma/execution':
+        specifier: workspace:*
+        version: link:packages/execution
+      '@luma/identity':
+        specifier: workspace:*
+        version: link:packages/identity
+      '@luma/inventory':
+        specifier: workspace:*
+        version: link:packages/inventory
+      '@luma/orders':
+        specifier: workspace:*
+        version: link:packages/orders
+      '@luma/platform':
+        specifier: workspace:*
+        version: link:packages/platform
+      '@luma/policies':
+        specifier: workspace:*
+        version: link:packages/policies
+      '@luma/resolution':
+        specifier: workspace:*
+        version: link:packages/resolution
+      '@luma/workflow-temporal':
+        specifier: workspace:*
+        version: link:packages/workflow-temporal
       '@stylistic/eslint-plugin':
         specifier: 5.10.0
         version: 5.10.0(eslint@10.10.0(jiti@2.7.0)(supports-color@8.1.1))
@@ -219,120 +258,18 @@ importers:
 
   apps/api:
     dependencies:
-      '@langfuse/otel':
-        specifier: 5.11.1
-        version: 5.11.1(@opentelemetry/api@1.9.1)(@opentelemetry/core@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/exporter-trace-otlp-http@0.222.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.11.0(@opentelemetry/api@1.9.1))
-      '@luma/api-contract':
+      '@luma/application-runtime':
         specifier: workspace:*
-        version: link:../../packages/api-contract
+        version: link:../../packages/application-runtime
       '@luma/config':
         specifier: workspace:*
         version: link:../../packages/config
-      '@luma/connector-core':
+      '@luma/platform':
         specifier: workspace:*
-        version: link:../../packages/connectors/core
-      '@luma/connector-jtl':
-        specifier: workspace:*
-        version: link:../../packages/connectors/jtl
-      '@luma/connector-shopify':
-        specifier: workspace:*
-        version: link:../../packages/connectors/shopify
-      '@opentelemetry/api':
-        specifier: 1.9.1
-        version: 1.9.1
-      '@opentelemetry/api-logs':
-        specifier: 0.222.0
-        version: 0.222.0
-      '@opentelemetry/exporter-logs-otlp-http':
-        specifier: 0.222.0
-        version: 0.222.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/exporter-metrics-otlp-http':
-        specifier: 0.222.0
-        version: 0.222.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/exporter-trace-otlp-http':
-        specifier: 0.222.0
-        version: 0.222.0(@opentelemetry/api@1.9.1)
+        version: link:../../packages/platform
       '@opentelemetry/instrumentation':
         specifier: 0.222.0
         version: 0.222.0(@opentelemetry/api@1.9.1)(supports-color@8.1.1)
-      '@opentelemetry/instrumentation-http':
-        specifier: 0.222.0
-        version: 0.222.0(@opentelemetry/api@1.9.1)(supports-color@8.1.1)
-      '@opentelemetry/instrumentation-pg':
-        specifier: 0.74.0
-        version: 0.74.0(@opentelemetry/api@1.9.1)(supports-color@8.1.1)
-      '@opentelemetry/instrumentation-runtime-node':
-        specifier: 0.35.0
-        version: 0.35.0(@opentelemetry/api@1.9.1)(supports-color@8.1.1)
-      '@opentelemetry/instrumentation-undici':
-        specifier: 0.32.0
-        version: 0.32.0(@opentelemetry/api@1.9.1)(supports-color@8.1.1)
-      '@opentelemetry/resources':
-        specifier: 2.11.0
-        version: 2.11.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/sdk-logs':
-        specifier: 0.222.0
-        version: 0.222.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/sdk-metrics':
-        specifier: 2.11.0
-        version: 2.11.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/sdk-node':
-        specifier: 0.222.0
-        version: 0.222.0(@opentelemetry/api@1.9.1)(supports-color@8.1.1)
-      '@opentelemetry/sdk-trace-node':
-        specifier: 2.11.0
-        version: 2.11.0(@opentelemetry/api@1.9.1)
-      '@pyroscope/nodejs':
-        specifier: 0.6.3
-        version: 0.6.3(fastify@5.12.5)(supports-color@8.1.1)
-      '@sentry/node':
-        specifier: 10.75.0
-        version: 10.75.0(@opentelemetry/core@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/exporter-trace-otlp-http@0.222.0(@opentelemetry/api@1.9.1))(supports-color@8.1.1)
-      '@sentry/opentelemetry':
-        specifier: 10.75.0
-        version: 10.75.0(@opentelemetry/api@1.9.1)(@opentelemetry/core@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.11.0(@opentelemetry/api@1.9.1))
-      '@temporalio/activity':
-        specifier: 1.24.0
-        version: 1.24.0
-      '@temporalio/client':
-        specifier: 1.24.0
-        version: 1.24.0
-      '@temporalio/common':
-        specifier: 1.24.0
-        version: 1.24.0
-      '@temporalio/interceptors-opentelemetry-v2':
-        specifier: 1.24.0
-        version: 1.24.0(@temporalio/common@1.24.0)(@temporalio/workflow@1.24.0)
-      '@temporalio/worker':
-        specifier: 1.24.0
-        version: 1.24.0(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)
-      '@temporalio/workflow':
-        specifier: 1.24.0
-        version: 1.24.0
-      '@ts-rest/core':
-        specifier: 3.52.1
-        version: 3.52.1(@types/node@24.13.5)(zod@3.25.76)
-      '@ts-rest/fastify':
-        specifier: 3.52.1
-        version: 3.52.1(@ts-rest/core@3.52.1(@types/node@24.13.5)(zod@3.25.76))(fastify@5.12.5)(zod@3.25.76)
-      better-auth:
-        specifier: 1.7.5
-        version: 1.7.5(@opentelemetry/api@1.9.1)(@tanstack/react-start@1.168.54(esbuild@0.28.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)))(drizzle-kit@0.31.11)(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(kysely@0.29.6)(pg@8.20.0))(pg@8.20.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@4.1.11)
-      drizzle-orm:
-        specifier: 0.45.2
-        version: 0.45.2(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(kysely@0.29.6)(pg@8.20.0)
-      fastify:
-        specifier: 5.12.5
-        version: 5.12.5
-      pg:
-        specifier: 8.20.0
-        version: 8.20.0
-      posthog-node:
-        specifier: 5.52.4
-        version: 5.52.4(rxjs@7.8.2)
-      zod:
-        specifier: 3.25.76
-        version: 3.25.76
     devDependencies:
       '@luma/typescript-config':
         specifier: workspace:*
@@ -390,7 +327,7 @@ importers:
         version: link:../../packages/ui
       '@tanstack/react-form':
         specifier: 1.33.5
-        version: 1.33.5(@tanstack/react-start@1.168.54(esbuild@0.28.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2)))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 1.33.5(@tanstack/react-start@1.168.54(esbuild@0.28.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@tanstack/react-query':
         specifier: 5.103.0
         version: 5.103.0(react@19.3.0)
@@ -402,10 +339,10 @@ importers:
         version: 1.167.2(@tanstack/query-core@5.103.0)(@tanstack/react-query@5.103.0(react@19.3.0))(@tanstack/react-router@1.170.36(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(@tanstack/router-core@1.171.30)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@tanstack/react-start':
         specifier: 1.168.54
-        version: 1.168.54(esbuild@0.28.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2))
+        version: 1.168.54(esbuild@0.28.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28))
       better-auth:
         specifier: 1.7.5
-        version: 1.7.5(@opentelemetry/api@1.9.1)(@tanstack/react-start@1.168.54(esbuild@0.28.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)))(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(kysely@0.29.6)(pg@8.23.0))(pg@8.23.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@4.1.11)
+        version: 1.7.5(@opentelemetry/api@1.9.1)(@tanstack/react-start@1.168.54(esbuild@0.28.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)))(drizzle-kit@0.31.11)(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(kysely@0.29.6)(pg@8.23.0))(pg@8.23.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@4.1.11)
       lucide-react:
         specifier: 1.46.0
         version: 1.46.0(react@19.3.0)
@@ -450,6 +387,28 @@ importers:
         specifier: 8.3.0
         version: 8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1)
 
+  apps/worker:
+    dependencies:
+      '@luma/application-runtime':
+        specifier: workspace:*
+        version: link:../../packages/application-runtime
+      '@luma/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@luma/platform':
+        specifier: workspace:*
+        version: link:../../packages/platform
+      '@opentelemetry/instrumentation':
+        specifier: 0.222.0
+        version: 0.222.0(@opentelemetry/api@1.9.1)(supports-color@8.1.1)
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
+      tsx:
+        specifier: ^4.20.0
+        version: 4.23.13
+
   packages/api-contract:
     dependencies:
       '@ts-rest/core':
@@ -466,11 +425,174 @@ importers:
         specifier: workspace:*
         version: link:../typescript-config
 
+  packages/application-runtime:
+    dependencies:
+      '@luma/api-contract':
+        specifier: workspace:*
+        version: link:../api-contract
+      '@luma/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@luma/commerce-ingestion':
+        specifier: workspace:*
+        version: link:../commerce-ingestion
+      '@luma/config':
+        specifier: workspace:*
+        version: link:../config
+      '@luma/connections':
+        specifier: workspace:*
+        version: link:../connections
+      '@luma/exceptions':
+        specifier: workspace:*
+        version: link:../exceptions
+      '@luma/execution':
+        specifier: workspace:*
+        version: link:../execution
+      '@luma/identity':
+        specifier: workspace:*
+        version: link:../identity
+      '@luma/inventory':
+        specifier: workspace:*
+        version: link:../inventory
+      '@luma/orders':
+        specifier: workspace:*
+        version: link:../orders
+      '@luma/platform':
+        specifier: workspace:*
+        version: link:../platform
+      '@luma/policies':
+        specifier: workspace:*
+        version: link:../policies
+      '@luma/resolution':
+        specifier: workspace:*
+        version: link:../resolution
+      '@luma/workflow-temporal':
+        specifier: workspace:*
+        version: link:../workflow-temporal
+      '@ts-rest/fastify':
+        specifier: 3.52.1
+        version: 3.52.1(@ts-rest/core@3.52.1(@types/node@24.13.5)(zod@3.25.76))(fastify@5.12.5)(zod@3.25.76)
+      fastify:
+        specifier: 5.12.5
+        version: 5.12.5
+      pg:
+        specifier: 8.20.0
+        version: 8.20.0
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@opentelemetry/api':
+        specifier: 1.9.1
+        version: 1.9.1
+      '@opentelemetry/resources':
+        specifier: 2.11.0
+        version: 2.11.0(@opentelemetry/api@1.9.1)
+      '@opentelemetry/sdk-trace-node':
+        specifier: 2.11.0
+        version: 2.11.0(@opentelemetry/api@1.9.1)
+      '@temporalio/testing':
+        specifier: 1.24.0
+        version: 1.24.0(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.5
+      '@types/pg':
+        specifier: 8.20.0
+        version: 8.20.0
+      graphql:
+        specifier: ^16.14.2
+        version: 16.14.2
+      tsx:
+        specifier: ^4.20.0
+        version: 4.23.13
+      vitest:
+        specifier: 4.1.11
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(@vitest/browser-playwright@4.1.11)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))
+
+  packages/audit:
+    dependencies:
+      '@luma/platform':
+        specifier: workspace:*
+        version: link:../platform
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.5
+
+  packages/commerce-ingestion:
+    dependencies:
+      '@luma/connections':
+        specifier: workspace:*
+        version: link:../connections
+      '@luma/identity':
+        specifier: workspace:*
+        version: link:../identity
+      '@luma/inventory':
+        specifier: workspace:*
+        version: link:../inventory
+      '@luma/orders':
+        specifier: workspace:*
+        version: link:../orders
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.5
+
   packages/config:
     devDependencies:
       '@luma/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
+
+  packages/connections:
+    dependencies:
+      '@luma/api-contract':
+        specifier: workspace:*
+        version: link:../api-contract
+      '@luma/connector-core':
+        specifier: workspace:*
+        version: link:../connectors/core
+      '@luma/connector-jtl':
+        specifier: workspace:*
+        version: link:../connectors/jtl
+      '@luma/connector-shopify':
+        specifier: workspace:*
+        version: link:../connectors/shopify
+      '@luma/identity':
+        specifier: workspace:*
+        version: link:../identity
+      '@luma/platform':
+        specifier: workspace:*
+        version: link:../platform
+      '@ts-rest/fastify':
+        specifier: 3.52.1
+        version: 3.52.1(@ts-rest/core@3.52.1(@types/node@24.13.5)(zod@3.25.76))(fastify@5.12.5)(zod@3.25.76)
+      fastify:
+        specifier: 5.12.5
+        version: 5.12.5
+      zod:
+        specifier: 3.25.76
+        version: 3.25.76
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.5
+      graphql:
+        specifier: ^16.14.2
+        version: 16.14.2
+      vitest:
+        specifier: 4.1.11
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(@vitest/browser-playwright@4.1.11)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))
 
   packages/connectors/core:
     dependencies:
@@ -510,6 +632,278 @@ importers:
       '@luma/typescript-config':
         specifier: workspace:*
         version: link:../../typescript-config
+
+  packages/exceptions:
+    dependencies:
+      '@luma/api-contract':
+        specifier: workspace:*
+        version: link:../api-contract
+      '@luma/identity':
+        specifier: workspace:*
+        version: link:../identity
+      '@luma/platform':
+        specifier: workspace:*
+        version: link:../platform
+      '@opentelemetry/api':
+        specifier: 1.9.1
+        version: 1.9.1
+      '@ts-rest/fastify':
+        specifier: 3.52.1
+        version: 3.52.1(@ts-rest/core@3.52.1(@types/node@24.13.5)(zod@3.25.76))(fastify@5.12.5)(zod@3.25.76)
+      fastify:
+        specifier: 5.12.5
+        version: 5.12.5
+      zod:
+        specifier: 3.25.76
+        version: 3.25.76
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.5
+      vitest:
+        specifier: 4.1.11
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(@vitest/browser-playwright@4.1.11)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))
+
+  packages/execution:
+    dependencies:
+      '@luma/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@luma/connections':
+        specifier: workspace:*
+        version: link:../connections
+      '@luma/identity':
+        specifier: workspace:*
+        version: link:../identity
+      '@luma/platform':
+        specifier: workspace:*
+        version: link:../platform
+      '@luma/policies':
+        specifier: workspace:*
+        version: link:../policies
+      zod:
+        specifier: 3.25.76
+        version: 3.25.76
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.5
+
+  packages/identity:
+    dependencies:
+      '@luma/api-contract':
+        specifier: workspace:*
+        version: link:../api-contract
+      '@ts-rest/fastify':
+        specifier: 3.52.1
+        version: 3.52.1(@ts-rest/core@3.52.1(@types/node@24.13.5)(zod@3.25.76))(fastify@5.12.5)(zod@3.25.76)
+      better-auth:
+        specifier: 1.7.5
+        version: 1.7.5(@opentelemetry/api@1.9.1)(@tanstack/react-start@1.168.54(esbuild@0.28.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)))(drizzle-kit@0.31.11)(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(kysely@0.29.6)(pg@8.20.0))(pg@8.20.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@4.1.11)
+      drizzle-orm:
+        specifier: 0.45.2
+        version: 0.45.2(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(kysely@0.29.6)(pg@8.20.0)
+      fastify:
+        specifier: 5.12.5
+        version: 5.12.5
+      pg:
+        specifier: 8.20.0
+        version: 8.20.0
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.5
+      '@types/pg':
+        specifier: 8.20.0
+        version: 8.20.0
+      vitest:
+        specifier: 4.1.11
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(@vitest/browser-playwright@4.1.11)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))
+
+  packages/inventory:
+    dependencies:
+      '@luma/identity':
+        specifier: workspace:*
+        version: link:../identity
+      '@luma/platform':
+        specifier: workspace:*
+        version: link:../platform
+      zod:
+        specifier: 3.25.76
+        version: 3.25.76
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.5
+
+  packages/orders:
+    dependencies:
+      '@luma/identity':
+        specifier: workspace:*
+        version: link:../identity
+      '@luma/platform':
+        specifier: workspace:*
+        version: link:../platform
+      zod:
+        specifier: 3.25.76
+        version: 3.25.76
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.5
+
+  packages/platform:
+    dependencies:
+      '@langfuse/otel':
+        specifier: 5.11.1
+        version: 5.11.1(@opentelemetry/api@1.9.1)(@opentelemetry/core@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/exporter-trace-otlp-http@0.222.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.11.0(@opentelemetry/api@1.9.1))
+      '@opentelemetry/api':
+        specifier: 1.9.1
+        version: 1.9.1
+      '@opentelemetry/api-logs':
+        specifier: 0.222.0
+        version: 0.222.0
+      '@opentelemetry/exporter-logs-otlp-http':
+        specifier: 0.222.0
+        version: 0.222.0(@opentelemetry/api@1.9.1)
+      '@opentelemetry/exporter-metrics-otlp-http':
+        specifier: 0.222.0
+        version: 0.222.0(@opentelemetry/api@1.9.1)
+      '@opentelemetry/exporter-trace-otlp-http':
+        specifier: 0.222.0
+        version: 0.222.0(@opentelemetry/api@1.9.1)
+      '@opentelemetry/instrumentation-http':
+        specifier: 0.222.0
+        version: 0.222.0(@opentelemetry/api@1.9.1)(supports-color@8.1.1)
+      '@opentelemetry/instrumentation-pg':
+        specifier: 0.74.0
+        version: 0.74.0(@opentelemetry/api@1.9.1)(supports-color@8.1.1)
+      '@opentelemetry/instrumentation-runtime-node':
+        specifier: 0.35.0
+        version: 0.35.0(@opentelemetry/api@1.9.1)(supports-color@8.1.1)
+      '@opentelemetry/instrumentation-undici':
+        specifier: 0.32.0
+        version: 0.32.0(@opentelemetry/api@1.9.1)(supports-color@8.1.1)
+      '@opentelemetry/resources':
+        specifier: 2.11.0
+        version: 2.11.0(@opentelemetry/api@1.9.1)
+      '@opentelemetry/sdk-logs':
+        specifier: 0.222.0
+        version: 0.222.0(@opentelemetry/api@1.9.1)
+      '@opentelemetry/sdk-metrics':
+        specifier: 2.11.0
+        version: 2.11.0(@opentelemetry/api@1.9.1)
+      '@opentelemetry/sdk-node':
+        specifier: 0.222.0
+        version: 0.222.0(@opentelemetry/api@1.9.1)(supports-color@8.1.1)
+      '@opentelemetry/sdk-trace-node':
+        specifier: 2.11.0
+        version: 2.11.0(@opentelemetry/api@1.9.1)
+      '@pyroscope/nodejs':
+        specifier: 0.6.3
+        version: 0.6.3(fastify@5.12.5)(supports-color@8.1.1)
+      '@sentry/node':
+        specifier: 10.75.0
+        version: 10.75.0(@opentelemetry/core@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/exporter-trace-otlp-http@0.222.0(@opentelemetry/api@1.9.1))(supports-color@8.1.1)
+      '@sentry/opentelemetry':
+        specifier: 10.75.0
+        version: 10.75.0(@opentelemetry/api@1.9.1)(@opentelemetry/core@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.11.0(@opentelemetry/api@1.9.1))
+      pg:
+        specifier: 8.20.0
+        version: 8.20.0
+      posthog-node:
+        specifier: 5.52.4
+        version: 5.52.4(rxjs@7.8.2)
+      zod:
+        specifier: 3.25.76
+        version: 3.25.76
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.5
+      '@types/pg':
+        specifier: 8.20.0
+        version: 8.20.0
+      vitest:
+        specifier: 4.1.11
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(@vitest/browser-playwright@4.1.11)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))
+
+  packages/policies:
+    dependencies:
+      '@luma/identity':
+        specifier: workspace:*
+        version: link:../identity
+      '@luma/platform':
+        specifier: workspace:*
+        version: link:../platform
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.5
+
+  packages/resolution:
+    dependencies:
+      '@luma/api-contract':
+        specifier: workspace:*
+        version: link:../api-contract
+      '@luma/connections':
+        specifier: workspace:*
+        version: link:../connections
+      '@luma/exceptions':
+        specifier: workspace:*
+        version: link:../exceptions
+      '@luma/execution':
+        specifier: workspace:*
+        version: link:../execution
+      '@luma/identity':
+        specifier: workspace:*
+        version: link:../identity
+      '@luma/platform':
+        specifier: workspace:*
+        version: link:../platform
+      '@luma/policies':
+        specifier: workspace:*
+        version: link:../policies
+      '@ts-rest/fastify':
+        specifier: 3.52.1
+        version: 3.52.1(@ts-rest/core@3.52.1(@types/node@24.13.5)(zod@3.25.76))(fastify@5.12.5)(zod@3.25.76)
+      fastify:
+        specifier: 5.12.5
+        version: 5.12.5
+      zod:
+        specifier: 3.25.76
+        version: 3.25.76
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.5
+      vitest:
+        specifier: 4.1.11
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(@vitest/browser-playwright@4.1.11)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))
 
   packages/simulator/core:
     devDependencies:
@@ -583,7 +977,7 @@ importers:
         version: 4.3.3(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))
       '@tanstack/react-form':
         specifier: 1.33.5
-        version: 1.33.5(@tanstack/react-start@1.168.54(esbuild@0.28.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2)))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 1.33.5(@tanstack/react-start@1.168.54(esbuild@0.28.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@tanstack/react-query':
         specifier: 5.103.0
         version: 5.103.0(react@19.3.0)
@@ -623,6 +1017,55 @@ importers:
       zod:
         specifier: 4.6.5
         version: 4.6.5
+
+  packages/workflow-temporal:
+    dependencies:
+      '@luma/identity':
+        specifier: workspace:*
+        version: link:../identity
+      '@luma/platform':
+        specifier: workspace:*
+        version: link:../platform
+      '@luma/resolution':
+        specifier: workspace:*
+        version: link:../resolution
+      '@opentelemetry/api':
+        specifier: 1.9.1
+        version: 1.9.1
+      '@temporalio/activity':
+        specifier: 1.24.0
+        version: 1.24.0
+      '@temporalio/client':
+        specifier: 1.24.0
+        version: 1.24.0
+      '@temporalio/common':
+        specifier: 1.24.0
+        version: 1.24.0
+      '@temporalio/interceptors-opentelemetry-v2':
+        specifier: 1.24.0
+        version: 1.24.0(@temporalio/common@1.24.0)(@temporalio/workflow@1.24.0)
+      '@temporalio/worker':
+        specifier: 1.24.0
+        version: 1.24.0(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)
+      '@temporalio/workflow':
+        specifier: 1.24.0
+        version: 1.24.0
+      zod:
+        specifier: 3.25.76
+        version: 3.25.76
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@temporalio/testing':
+        specifier: 1.24.0
+        version: 1.24.0(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.5
+      vitest:
+        specifier: 4.1.11
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(@vitest/browser-playwright@4.1.11)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))
 
 packages:
 
@@ -7192,13 +7635,13 @@ snapshots:
 
   '@tanstack/query-core@5.103.0': {}
 
-  '@tanstack/react-form@1.33.5(@tanstack/react-start@1.168.54(esbuild@0.28.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2)))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
+  '@tanstack/react-form@1.33.5(@tanstack/react-start@1.168.54(esbuild@0.28.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
     dependencies:
       '@tanstack/form-core': 1.33.5
       '@tanstack/react-store': 0.11.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       react: 19.3.0
     optionalDependencies:
-      '@tanstack/react-start': 1.168.54(esbuild@0.28.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2))
+      '@tanstack/react-start': 1.168.54(esbuild@0.28.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28))
     transitivePeerDependencies:
       - react-dom
 
@@ -7235,14 +7678,14 @@ snapshots:
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
 
-  '@tanstack/react-start-rsc@0.1.53(esbuild@0.28.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2))':
+  '@tanstack/react-start-rsc@0.1.53(esbuild@0.28.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28))':
     dependencies:
       '@tanstack/react-router': 1.170.36(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@tanstack/router-core': 1.171.30
       '@tanstack/router-utils': 1.162.3(supports-color@8.1.1)
       '@tanstack/start-client-core': 1.170.30
       '@tanstack/start-fn-stubs': 1.162.0
-      '@tanstack/start-plugin-core': 1.171.44(@tanstack/react-router@1.170.36(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(esbuild@0.28.2)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2))
+      '@tanstack/start-plugin-core': 1.171.44(@tanstack/react-router@1.170.36(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(esbuild@0.28.2)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28))
       '@tanstack/start-storage-context': 1.167.32
       pathe: 2.0.3
       react: 19.3.0
@@ -7271,15 +7714,15 @@ snapshots:
     transitivePeerDependencies:
       - crossws
 
-  '@tanstack/react-start@1.168.54(esbuild@0.28.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2))':
+  '@tanstack/react-start@1.168.54(esbuild@0.28.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28))':
     dependencies:
       '@tanstack/react-router': 1.170.36(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@tanstack/react-start-client': 1.168.34(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      '@tanstack/react-start-rsc': 0.1.53(esbuild@0.28.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2))
+      '@tanstack/react-start-rsc': 0.1.53(esbuild@0.28.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28))
       '@tanstack/react-start-server': 1.167.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@tanstack/router-utils': 1.162.3(supports-color@8.1.1)
       '@tanstack/start-client-core': 1.170.30
-      '@tanstack/start-plugin-core': 1.171.44(@tanstack/react-router@1.170.36(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(esbuild@0.28.2)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2))
+      '@tanstack/start-plugin-core': 1.171.44(@tanstack/react-router@1.170.36(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(esbuild@0.28.2)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28))
       '@tanstack/start-server-core': 1.169.35
       pathe: 2.0.3
       react: 19.3.0
@@ -7335,7 +7778,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@tanstack/router-plugin@1.168.38(@tanstack/react-router@1.170.36(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(esbuild@0.28.2)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2))':
+  '@tanstack/router-plugin@1.168.38(@tanstack/react-router@1.170.36(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(esbuild@0.28.2)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28))':
     dependencies:
       '@babel/core': 7.29.7(supports-color@8.1.1)
       '@babel/template': 7.29.7
@@ -7344,7 +7787,7 @@ snapshots:
       '@tanstack/router-generator': 1.167.36(supports-color@8.1.1)
       '@tanstack/router-utils': 1.162.3(supports-color@8.1.1)
       chokidar: 5.0.0
-      unplugin: 3.4.0(esbuild@0.28.2)(rolldown@1.2.8)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2))
+      unplugin: 3.4.0(esbuild@0.28.2)(rolldown@1.2.8)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28))
       zod: 4.6.5
     optionalDependencies:
       '@tanstack/react-router': 1.170.36(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -7387,7 +7830,7 @@ snapshots:
 
   '@tanstack/start-fn-stubs@1.162.0': {}
 
-  '@tanstack/start-plugin-core@1.171.44(@tanstack/react-router@1.170.36(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(esbuild@0.28.2)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2))':
+  '@tanstack/start-plugin-core@1.171.44(@tanstack/react-router@1.170.36(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(esbuild@0.28.2)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28))':
     dependencies:
       '@babel/code-frame': 7.29.7
       '@babel/core': 7.29.7(supports-color@8.1.1)
@@ -7395,7 +7838,7 @@ snapshots:
       '@jridgewell/remapping': 2.3.5
       '@tanstack/router-core': 1.171.30
       '@tanstack/router-generator': 1.167.36(supports-color@8.1.1)
-      '@tanstack/router-plugin': 1.168.38(@tanstack/react-router@1.170.36(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(esbuild@0.28.2)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2))
+      '@tanstack/router-plugin': 1.168.38(@tanstack/react-router@1.170.36(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(esbuild@0.28.2)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28))
       '@tanstack/router-utils': 1.162.3(supports-color@8.1.1)
       '@tanstack/start-server-core': 1.169.35
       exsolve: 1.1.1
@@ -8199,7 +8642,7 @@ snapshots:
       nanostores: 1.5.3
       zod: 4.6.5
     optionalDependencies:
-      '@tanstack/react-start': 1.168.54(esbuild@0.28.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2))
+      '@tanstack/react-start': 1.168.54(esbuild@0.28.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28))
       drizzle-kit: 0.31.11
       drizzle-orm: 0.45.2(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(kysely@0.29.6)(pg@8.20.0)
       pg: 8.20.0
@@ -8209,7 +8652,7 @@ snapshots:
     transitivePeerDependencies:
       - '@opentelemetry/api'
 
-  better-auth@1.7.5(@opentelemetry/api@1.9.1)(@tanstack/react-start@1.168.54(esbuild@0.28.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)))(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(kysely@0.29.6)(pg@8.23.0))(pg@8.23.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@4.1.11):
+  better-auth@1.7.5(@opentelemetry/api@1.9.1)(@tanstack/react-start@1.168.54(esbuild@0.28.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)))(drizzle-kit@0.31.11)(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(kysely@0.29.6)(pg@8.23.0))(pg@8.23.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@4.1.11):
     dependencies:
       '@better-auth/core': 1.7.5(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.2)(@opentelemetry/api@1.9.1)(better-call@1.4.0)(jose@6.2.12)(kysely@0.29.6)(nanostores@1.5.3)
       '@better-auth/drizzle-adapter': 1.7.5(@better-auth/core@1.7.5(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.2)(@opentelemetry/api@1.9.1)(better-call@1.4.0)(jose@6.2.12)(kysely@0.29.6)(nanostores@1.5.3))(@better-auth/utils@0.4.2)(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(kysely@0.29.6)(pg@8.23.0))
@@ -8229,7 +8672,8 @@ snapshots:
       nanostores: 1.5.3
       zod: 4.6.5
     optionalDependencies:
-      '@tanstack/react-start': 1.168.54(esbuild@0.28.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2))
+      '@tanstack/react-start': 1.168.54(esbuild@0.28.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28))
+      drizzle-kit: 0.31.11
       drizzle-orm: 0.45.2(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(kysely@0.29.6)(pg@8.23.0)
       pg: 8.23.0
       react: 19.3.0
@@ -10021,7 +10465,7 @@ snapshots:
     dependencies:
       fs-monkey: 1.1.0
 
-  unplugin@3.4.0(esbuild@0.28.2)(rolldown@1.2.8)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2)):
+  unplugin@3.4.0(esbuild@0.28.2)(rolldown@1.2.8)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)):
     dependencies:
       '@jridgewell/remapping': 2.3.5
       picomatch: 4.0.7

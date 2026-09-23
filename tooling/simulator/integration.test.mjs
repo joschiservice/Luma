@@ -4,17 +4,20 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 
-import { createCapabilityRuntime } from '../../apps/api/dist/modules/connectors/application/capabilities.js';
+import {
+  createCapabilityRuntime,
+  createJtlConnector,
+  createShopifyConnector,
+  simulationTransport,
+} from '@luma/connections/adapters';
 import {
   createInstallationVerifier,
   createInstalledRuntime,
   createInstalledShippingMethodEffects,
   createSimulationTransport,
-} from '../../apps/api/dist/modules/connectors/composition.js';
-import { simulationTransport } from '../../apps/api/dist/modules/connectors/infrastructure/installations/simulation.js';
-import { createJtlConnector } from '../../apps/api/dist/modules/connectors/infrastructure/jtl/adapter.js';
-import { createShopifyConnector } from '../../apps/api/dist/modules/connectors/infrastructure/shopify/adapter.js';
-import { makeTenantContext } from '../../apps/api/dist/modules/identity/domain/context.js';
+} from '@luma/connections/composition';
+import { makeTenantContext } from '@luma/identity/composition';
+
 import { createApp } from '../../apps/simulator/dist/app.js';
 import {
   advanceRun,

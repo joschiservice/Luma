@@ -62,6 +62,19 @@
     "turbo": "2.10.13",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.0",
-    "vitest": "4.1.11"
+    "vitest": "4.1.11",
+    "@luma/platform": "workspace:*",
+    "@luma/identity": "workspace:*",
+    "@luma/audit": "workspace:*",
+    "@luma/orders": "workspace:*",
+    "@luma/inventory": "workspace:*",
+    "@luma/connections": "workspace:*",
+    "@luma/policies": "workspace:*",
+    "@luma/execution": "workspace:*",
+    "@luma/exceptions": "workspace:*",
+    "@luma/resolution": "workspace:*",
+    "@luma/application-runtime": "workspace:*",
+    "@luma/commerce-ingestion": "workspace:*",
+    "@luma/workflow-temporal": "workspace:*"
   }
 }
