@@ -58,3 +58,5 @@ export type {
   PlaybookLibrary,
   PlaybookLibraryScope,
 } from '#modules/workflows/application/playbook-library';
+
+export type { ActivityService } from '#modules/workflows/application/activity';

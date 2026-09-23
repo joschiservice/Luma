@@ -71,3 +71,9 @@ approve/reject/escalate commands, retry receipts, execution and verification rea
 audit history and authenticated SSE. All contracts and the stream client are
 exported by `@luma/api-contract`; overview and installed-connection endpoints retain
 their existing module ownership.
+
+## Workspace Activity
+
+The tenant-scoped [Activity API](workspace-activity.md) searches recorded decisions,
+execution and resolution history with bounded date ranges and cursor pagination.
+The shared contract defines searchable fields, outcome distinctions and role-based visibility.

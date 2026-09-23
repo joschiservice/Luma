@@ -1,6 +1,7 @@
 import { initContract } from '@ts-rest/core';
 
 import { apiErrorSchema } from './common.js';
+import { activityContract } from './contracts/activity.js';
 import { exceptionsContract } from './contracts/cases.js';
 import { connectionsContract } from './contracts/connections.js';
 import { caseDeskContract } from './contracts/desk.js';
@@ -15,6 +16,7 @@ const c = initContract();
 
 export const apiContract = c.router(
   {
+    activity: activityContract,
     playbooks: playbooksContract,
     resolutionLearning: resolutionLearningContract,
     caseDesk: caseDeskContract,
@@ -35,6 +37,8 @@ export const apiContract = c.router(
     },
   },
 );
+
+export * from './activity.js';
 
 export * from './learning.js';
 

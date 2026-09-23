@@ -98,6 +98,20 @@ test('seed reuses its run, covers four classes and keeps simulated health pendin
   ).toEqual(before);
 });
 
+test('serves persisted activity through the pilot API', async (t) => {
+  const f = await setup(t, 'diagnosis-pending');
+  const request = await operatorRequest(f);
+  const query = new URLSearchParams({
+    from: new Date(Date.now() - 86400000).toISOString(),
+    to: new Date(Date.now() + 86400000).toISOString(),
+  });
+  const response = await request(
+    `/v1/organizations/${f.manifest.organizationId}/activity?${query}`,
+  );
+  expect(response.statusCode).toBe(200);
+  expect(response.json().items.length).toBeGreaterThan(0);
+});
+
 test('serves persisted playbooks through the pilot API', async (t) => {
   const f = await setup(t, 'diagnosis-pending');
   const request = await operatorRequest(f);

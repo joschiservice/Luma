@@ -7,6 +7,18 @@ export function createQueryClient() {
       onError: (error, query) => {
         if (
           query.queryKey[0] === 'private' &&
+          query.queryKey[3] === 'activity' &&
+          'status' in error &&
+          [403, 404].includes(Number(error.status))
+        ) {
+          const prefix = query.queryKey.slice(0, 4);
+          void client
+            .cancelQueries({ queryKey: prefix })
+            .then(() => client.removeQueries({ queryKey: prefix }));
+        }
+
+        if (
+          query.queryKey[0] === 'private' &&
           'status' in error &&
           error.status === 401
         ) {

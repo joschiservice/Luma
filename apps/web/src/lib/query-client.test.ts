@@ -51,3 +51,38 @@ it('notifies a mounted session observer when a private request returns 401', asy
     client.clear();
   }
 });
+
+it('discards loaded activity pages on workspace access loss', async () => {
+  const client = createQueryClient();
+  const prefix = ['private', 'organization', 'workspace', 'activity'];
+  client.setQueryData([...prefix, 'page'], { items: ['restricted event'] });
+  client.setQueryData(
+    ['private', 'organization', 'other', 'activity', 'page'],
+    { items: ['other workspace'] },
+  );
+  try {
+    await expect(
+      client.fetchQuery({
+        queryKey: [...prefix, 'head'],
+        retry: false,
+        queryFn: () => {
+          throw Object.assign(new Error('Access lost'), { status: 403 });
+        },
+      }),
+    ).rejects.toThrow('Access lost');
+    await expect
+      .poll(() => client.getQueryData([...prefix, 'page']))
+      .toBeUndefined();
+    expect(
+      client.getQueryData([
+        'private',
+        'organization',
+        'other',
+        'activity',
+        'page',
+      ]),
+    ).toBeDefined();
+  } finally {
+    client.clear();
+  }
+});

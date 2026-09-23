@@ -238,3 +238,6 @@ Run `mise exec -- pnpm simulator` to start persistent JTL and Shopify simulation
 ## Local performance diagnostics
 
 Run `mise exec -- pnpm dev:observe` to start the app, worker, and local Grafana stack. The terminal prints the dashboard address. See [local observability](docs/local-observability.md) for traces, database queries, CPU profiles, and verification commands.
+
+The [Workspace Activity guide](docs/workspace-activity.md) describes searchable action history,
+immutable event provenance, pagination and historical coverage.

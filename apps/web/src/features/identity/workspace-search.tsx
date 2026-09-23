@@ -7,12 +7,13 @@ import {
 } from '@luma/ui/components/dialog';
 import { Input } from '@luma/ui/components/input';
 import { Link } from '@tanstack/react-router';
-import { Inbox, LayoutDashboard, Search, Unplug } from 'lucide-react';
+import { Activity, Inbox, LayoutDashboard, Search, Unplug } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 const destinations = [
   { path: 'overview', label: 'Overview', Icon: LayoutDashboard },
   { path: 'exceptions', label: 'Issues', Icon: Inbox },
+  { path: 'activity', label: 'Activity', Icon: Activity },
   { path: 'connections', label: 'Connections', Icon: Unplug },
 ] as const;
 

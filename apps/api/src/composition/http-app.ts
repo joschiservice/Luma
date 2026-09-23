@@ -31,6 +31,7 @@ import type {
   Observation,
 } from '#modules/platform/index';
 import {
+  activityRoutes,
   deskRoutes,
   learningRoutes,
   operationsRoutes,
@@ -38,6 +39,7 @@ import {
   registerDeskEvents,
 } from '#modules/workflows/composition';
 import type {
+  ActivityService,
   DeskService,
   LearningService,
   OperationsOverviewService,
@@ -55,6 +57,7 @@ declare module 'fastify' {
 }
 
 export interface AppDependencies {
+  activity?: ActivityService;
   playbooks?: PlaybookLibrary;
   learning?: LearningService;
   desk?: DeskService;
@@ -217,6 +220,7 @@ export function buildApp(
     s.registerRouter(
       apiContract,
       {
+        activity: activityRoutes(dependencies.activity),
         playbooks: playbookRoutes(dependencies.playbooks),
         exceptions: caseRoutes(dependencies.cases),
         caseDesk: deskRoutes(dependencies.desk),

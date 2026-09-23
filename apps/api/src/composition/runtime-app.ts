@@ -24,6 +24,7 @@ import {
   createDeskWorkflowReader,
   createOperationsOverview,
   createResolutionLearning,
+  createWorkspaceActivity,
 } from '#modules/workflows/composition';
 
 import { buildApp } from './http-app.js';
@@ -91,6 +92,10 @@ export function buildRuntimeApp(
   );
   const app = buildApp(options, {
     cases,
+    activity: createWorkspaceActivity(
+      createTenantDatabase(casePool),
+      identity.service.refreshContext,
+    ),
     desk,
     playbooks: createPersistentPlaybookLibrary(
       createTenantDatabase(casePool),

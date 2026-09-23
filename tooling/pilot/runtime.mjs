@@ -37,6 +37,7 @@ import {
   createDeskWorkflowReader,
   createOperationsOverview,
   createPlaybookStore,
+  createWorkspaceActivity,
 } from '../../apps/api/dist/modules/workflows/composition.js';
 import { shippingMethodPlaybook } from '../../apps/api/dist/modules/workflows/index.js';
 import { observeProviders } from '../simulator/observations.mjs';
@@ -440,6 +441,7 @@ export async function createPilot(
       identity: identity.service,
       trustedOrigins: settings.trustedOrigins,
       cases: detection.cases,
+      activity: createWorkspaceActivity(db, identity.service.refreshContext),
       desk,
       playbooks: library,
       connections,

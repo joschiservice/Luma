@@ -16,6 +16,7 @@ import { Route as SignOutRouteImport } from './routes/sign-out'
 import { Route as SignUpRouteImport } from './routes/sign-up'
 import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as AppOrganizationIdRouteImport } from './routes/app.$organizationId'
+import { Route as AppOrganizationIdActivityRouteImport } from './routes/app.$organizationId.activity'
 import { Route as AppOrganizationIdConnectionsRouteImport } from './routes/app.$organizationId.connections'
 import { Route as AppOrganizationIdExceptionsRouteImport } from './routes/app.$organizationId.exceptions'
 import { Route as AppOrganizationIdOverviewRouteImport } from './routes/app.$organizationId.overview'
@@ -60,6 +61,12 @@ const AppOrganizationIdRoute = AppOrganizationIdRouteImport.update({
   path: '/$organizationId',
   getParentRoute: () => AppRoute,
 } as any)
+const AppOrganizationIdActivityRoute =
+  AppOrganizationIdActivityRouteImport.update({
+    id: '/activity',
+    path: '/activity',
+    getParentRoute: () => AppOrganizationIdRoute,
+  } as any)
 const AppOrganizationIdConnectionsRoute =
   AppOrganizationIdConnectionsRouteImport.update({
     id: '/connections',
@@ -115,6 +122,7 @@ export interface FileRoutesByFullPath {
   '/sign-up': typeof SignUpRoute
   '/app/$organizationId': typeof AppOrganizationIdRouteWithChildren
   '/app/': typeof AppIndexRoute
+  '/app/$organizationId/activity': typeof AppOrganizationIdActivityRoute
   '/app/$organizationId/connections': typeof AppOrganizationIdConnectionsRoute
   '/app/$organizationId/exceptions': typeof AppOrganizationIdExceptionsRouteWithChildren
   '/app/$organizationId/overview': typeof AppOrganizationIdOverviewRoute
@@ -131,6 +139,7 @@ export interface FileRoutesByTo {
   '/sign-up': typeof SignUpRoute
   '/app/$organizationId': typeof AppOrganizationIdRouteWithChildren
   '/app': typeof AppIndexRoute
+  '/app/$organizationId/activity': typeof AppOrganizationIdActivityRoute
   '/app/$organizationId/connections': typeof AppOrganizationIdConnectionsRoute
   '/app/$organizationId/exceptions': typeof AppOrganizationIdExceptionsRouteWithChildren
   '/app/$organizationId/overview': typeof AppOrganizationIdOverviewRoute
@@ -149,6 +158,7 @@ export interface FileRoutesById {
   '/sign-up': typeof SignUpRoute
   '/app/$organizationId': typeof AppOrganizationIdRouteWithChildren
   '/app/': typeof AppIndexRoute
+  '/app/$organizationId/activity': typeof AppOrganizationIdActivityRoute
   '/app/$organizationId/connections': typeof AppOrganizationIdConnectionsRoute
   '/app/$organizationId/exceptions': typeof AppOrganizationIdExceptionsRouteWithChildren
   '/app/$organizationId/overview': typeof AppOrganizationIdOverviewRoute
@@ -168,6 +178,7 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/app/$organizationId'
     | '/app/'
+    | '/app/$organizationId/activity'
     | '/app/$organizationId/connections'
     | '/app/$organizationId/exceptions'
     | '/app/$organizationId/overview'
@@ -184,6 +195,7 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/app/$organizationId'
     | '/app'
+    | '/app/$organizationId/activity'
     | '/app/$organizationId/connections'
     | '/app/$organizationId/exceptions'
     | '/app/$organizationId/overview'
@@ -201,6 +213,7 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/app/$organizationId'
     | '/app/'
+    | '/app/$organizationId/activity'
     | '/app/$organizationId/connections'
     | '/app/$organizationId/exceptions'
     | '/app/$organizationId/overview'
@@ -269,6 +282,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/app/$organizationId'
       preLoaderRoute: typeof AppOrganizationIdRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/app/$organizationId/activity': {
+      id: '/app/$organizationId/activity'
+      path: '/activity'
+      fullPath: '/app/$organizationId/activity'
+      preLoaderRoute: typeof AppOrganizationIdActivityRouteImport
+      parentRoute: typeof AppOrganizationIdRoute
     }
     '/app/$organizationId/connections': {
       id: '/app/$organizationId/connections'
@@ -345,6 +365,7 @@ const AppOrganizationIdExceptionsRouteWithChildren =
   )
 
 interface AppOrganizationIdRouteChildren {
+  AppOrganizationIdActivityRoute: typeof AppOrganizationIdActivityRoute
   AppOrganizationIdConnectionsRoute: typeof AppOrganizationIdConnectionsRoute
   AppOrganizationIdExceptionsRoute: typeof AppOrganizationIdExceptionsRouteWithChildren
   AppOrganizationIdOverviewRoute: typeof AppOrganizationIdOverviewRoute
@@ -353,6 +374,7 @@ interface AppOrganizationIdRouteChildren {
 }
 
 const AppOrganizationIdRouteChildren: AppOrganizationIdRouteChildren = {
+  AppOrganizationIdActivityRoute: AppOrganizationIdActivityRoute,
   AppOrganizationIdConnectionsRoute: AppOrganizationIdConnectionsRoute,
   AppOrganizationIdExceptionsRoute:
     AppOrganizationIdExceptionsRouteWithChildren,

@@ -1,5 +1,7 @@
+import type { TenantContext } from '#modules/identity/index';
 import type { TenantDatabase } from '#modules/platform/index';
 import { learningBoundary } from '#modules/workflows/api/learning';
+import { createActivityService } from '#modules/workflows/application/activity';
 import type {
   LearningService,
   LearningStore,
@@ -7,6 +9,7 @@ import type {
 import { createLearningService } from '#modules/workflows/application/learning';
 import type { PlaybookDependencies } from '#modules/workflows/application/playbook';
 import { createPlaybookService } from '#modules/workflows/application/playbook';
+import { createActivityStore } from '#modules/workflows/infrastructure/persistence/activity';
 import { createLearningStore } from '#modules/workflows/infrastructure/persistence/learning';
 import {
   activationRequestSchema,
@@ -103,3 +106,13 @@ export { createPlaybookActivations } from '#modules/workflows/application/playbo
 export { createPlaybookStore } from '#modules/workflows/infrastructure/playbooks/store';
 
 export { activationRequestSchema } from '#modules/workflows/infrastructure/playbooks/schema';
+
+export { activityRoutes } from '#modules/workflows/api/activity';
+
+/** Composes the workspace activity reader with refreshed membership. */
+export function createWorkspaceActivity(
+  db: TenantDatabase,
+  refreshContext: (context: TenantContext) => Promise<TenantContext>,
+) {
+  return createActivityService(createActivityStore(db), refreshContext);
+}
