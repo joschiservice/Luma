@@ -62,3 +62,5 @@ export { WorkflowInputError } from './application/runtime.js';
 export { createProposalRefresher } from './application/refresh-proposal.js';
 
 export type { ProposalRefreshDependencies } from './application/refresh-proposal.js';
+
+export type { ShadowService } from './application/shadow.js';

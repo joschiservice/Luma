@@ -158,6 +158,7 @@ export const caseProgressSchema = z.object({
           'verifying',
           'resolved',
           'no_incident',
+          'shadow_completed',
           'escalated',
           'denied',
         ]),

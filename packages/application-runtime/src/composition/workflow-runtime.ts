@@ -8,6 +8,7 @@ import type {
   DeskService,
   PlaybookService,
   PlaybookSnapshot,
+  ShadowService,
   WorkflowBindings,
 } from '@luma/resolution';
 import { createExceptionActivities } from '@luma/resolution/composition';
@@ -52,6 +53,7 @@ export function createExceptionWorkflowRuntime(
       action: ProposedAction,
     ): Promise<PlaybookSnapshot>;
   },
+  shadow?: ShadowService,
 ) {
   if (desk)
     bindings = {
@@ -148,6 +150,7 @@ export function createExceptionWorkflowRuntime(
   }
   const activities = createExceptionActivities({
     identity,
+    ...(shadow ? { shadow } : {}),
     ...detection,
     execution: safety.execution,
     ...(playbook ? { playbook: playbook.service } : {}),
@@ -187,7 +190,7 @@ export async function createDefaultExceptionWorker(
     resources.add(identity.close);
     const pool = new Pool({ connectionString: settings.databaseUrl, max: 10 });
     resources.add(() => pool.end());
-    const { detection, safety, desk } = createApplicationServices({
+    const { detection, safety, desk, http } = createApplicationServices({
       database: createTenantDatabase(pool),
       identity: identity.service,
       execution: { kind: 'disabled' },
@@ -213,6 +216,9 @@ export async function createDefaultExceptionWorker(
         },
       },
       desk,
+      undefined,
+      undefined,
+      http.shadow,
     );
     const worker = await runtime.createWorker();
     resources.add(worker.close);

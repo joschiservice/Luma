@@ -6,6 +6,7 @@ import type { TenantDatabase } from '@luma/platform';
 import {
   createOperationsOverview,
   createResolutionLearning,
+  createShadowEvaluations,
   createWorkspaceActivity,
 } from '@luma/resolution/composition';
 
@@ -28,6 +29,7 @@ export interface ApplicationServices {
   playbooks: ReturnType<typeof createResolutionPlaybooks>;
   library: ReturnType<typeof createPersistentPlaybookLibrary>;
   http: {
+    shadow: ReturnType<typeof createShadowEvaluations>;
     cases: ReturnType<typeof createDetectionServices>['cases'];
     desk: ReturnType<typeof createDeskServices>;
     playbooks: ReturnType<typeof createPersistentPlaybookLibrary>;
@@ -75,6 +77,7 @@ export function createApplicationServices(
     playbooks: createResolutionPlaybooks(database, identity, safety),
     library,
     http: {
+      shadow: createShadowEvaluations(database, identity.refreshContext),
       cases: detection.cases,
       desk,
       playbooks: library,

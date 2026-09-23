@@ -7,3 +7,5 @@ export { learningRoutes } from './api/learning.js';
 export { playbookRoutes } from './api/playbooks.js';
 
 export { activityRoutes } from './api/activity.js';
+
+export { shadowRoutes } from './api/shadow.js';

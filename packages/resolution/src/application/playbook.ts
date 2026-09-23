@@ -290,6 +290,78 @@ export function createPlaybookService(deps: PlaybookDependencies) {
     });
   }
 
+  async function preview(
+    context: TenantContext,
+    input: {
+      activationId: string;
+      incidentId: string;
+      diagnosisRevision: number;
+      action: ProposedAction;
+      snapshot: PlaybookSnapshot;
+    },
+  ) {
+    context = await authorize(context);
+    const activation = await deps.store.activation(context, input.activationId);
+    if (
+      !activation ||
+      !activation.grants.principalIds.includes(context.actor.id)
+    )
+      throw new Error('Playbook activation not found');
+    const version = await deps.store.version(
+      context,
+      activation.definitionId,
+      activation.version,
+    );
+    if (!version || version.digest !== activation.versionDigest)
+      throw new Error('Playbook version mismatch');
+    const snapshot = deps.parseSnapshot(input.snapshot, version);
+    const { action, hash } = deps.parseAction(input.action);
+    requireTenant(context, action.tenantId);
+    const node = version.ir.action;
+    const resolve = (values: typeof node.parameters) =>
+      Object.fromEntries(
+        Object.entries(values).map(([key, value]) => [
+          key,
+          playbookValue(value, snapshot),
+        ]),
+      );
+    if (
+      action.proposedBy.kind !== 'user' ||
+      action.proposedBy.id !== context.actor.id ||
+      action.capability !== node.capability ||
+      action.capabilityVersion !== node.capabilityVersion ||
+      action.target.kind !== node.targetKind ||
+      rank[action.risk] < rank[node.minimumRisk] ||
+      !activation.grants.connectionIds.includes(action.connectionId) ||
+      !activation.grants.targetIds.includes(action.target.id) ||
+      deps.hash(action.parameters) !== deps.hash(resolve(node.parameters)) ||
+      deps.hash(action.expectedPostcondition) !==
+        deps.hash(resolve(node.expectedPostcondition)) ||
+      deps.hash([...action.preconditions.evidenceRefs].sort()) !==
+        deps.hash(snapshot.evidence.observations.map((o) => o.id).sort())
+    )
+      throw new Error('Action does not match playbook inputs and grants');
+    const run: PlaybookRun = {
+      id: action.id,
+      tenantId: context.tenantId,
+      principalId: context.actor.id,
+      activationId: activation.id,
+      definitionId: version.definition.id,
+      version: version.version,
+      versionDigest: version.digest,
+      artifactDigest: activation.artifactDigest,
+      incidentId: input.incidentId,
+      diagnosisRevision: input.diagnosisRevision,
+      snapshot,
+      snapshotDigest: deps.hash(snapshot),
+      action,
+      actionHash: hash,
+      createdAt: deps.now().toISOString(),
+    };
+
+    return { run, version, activation, context };
+  }
+
   return {
     async publish(context: TenantContext, source: unknown) {
       context = await authorize(context);
@@ -299,6 +371,13 @@ export function createPlaybookService(deps: PlaybookDependencies) {
       return version;
     },
     ...createPlaybookActivations(deps),
+    /** Builds a validated candidate without persisting a run or granting execution authority. */
+    async preview(
+      context: TenantContext,
+      input: Parameters<typeof preview>[1],
+    ) {
+      return (await preview(context, input)).run;
+    },
     async bind(
       context: TenantContext,
       input: {
@@ -309,67 +388,10 @@ export function createPlaybookService(deps: PlaybookDependencies) {
         snapshot: PlaybookSnapshot;
       },
     ) {
-      context = await authorize(context);
-      const activation = await deps.store.activation(
-        context,
-        input.activationId,
-      );
-      if (
-        !activation ||
-        !activation.grants.principalIds.includes(context.actor.id)
-      )
-        throw new Error('Playbook activation not found');
-      const version = await deps.store.version(
-        context,
-        activation.definitionId,
-        activation.version,
-      );
-      if (!version || version.digest !== activation.versionDigest)
-        throw new Error('Playbook version mismatch');
-      const snapshot = deps.parseSnapshot(input.snapshot, version);
-      const { action, hash } = deps.parseAction(input.action);
-      requireTenant(context, action.tenantId);
+      const prepared = await preview(context, input);
+      const { run, version, activation } = prepared;
+      context = prepared.context;
       const node = version.ir.action;
-      const resolve = (values: typeof node.parameters) =>
-        Object.fromEntries(
-          Object.entries(values).map(([key, value]) => [
-            key,
-            playbookValue(value, snapshot),
-          ]),
-        );
-      if (
-        action.proposedBy.kind !== 'user' ||
-        action.proposedBy.id !== context.actor.id ||
-        action.capability !== node.capability ||
-        action.capabilityVersion !== node.capabilityVersion ||
-        action.target.kind !== node.targetKind ||
-        rank[action.risk] < rank[node.minimumRisk] ||
-        !activation.grants.connectionIds.includes(action.connectionId) ||
-        !activation.grants.targetIds.includes(action.target.id) ||
-        deps.hash(action.parameters) !== deps.hash(resolve(node.parameters)) ||
-        deps.hash(action.expectedPostcondition) !==
-          deps.hash(resolve(node.expectedPostcondition)) ||
-        deps.hash([...action.preconditions.evidenceRefs].sort()) !==
-          deps.hash(snapshot.evidence.observations.map((o) => o.id).sort())
-      )
-        throw new Error('Action does not match playbook inputs and grants');
-      const run: PlaybookRun = {
-        id: action.id,
-        tenantId: context.tenantId,
-        principalId: context.actor.id,
-        activationId: activation.id,
-        definitionId: version.definition.id,
-        version: version.version,
-        versionDigest: version.digest,
-        artifactDigest: activation.artifactDigest,
-        incidentId: input.incidentId,
-        diagnosisRevision: input.diagnosisRevision,
-        snapshot,
-        snapshotDigest: deps.hash(snapshot),
-        action,
-        actionHash: hash,
-        createdAt: deps.now().toISOString(),
-      };
       // Only persisted immutable inputs may grant authority. Retrying a partial bind completes it.
       const stored = await deps.store.bind(context, run);
       if (

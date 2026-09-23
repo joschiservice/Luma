@@ -1,6 +1,1917 @@
 {
   "openapi": "3.0.2",
   "paths": {
+    "/v1/organizations/{organizationId}/exceptions/{exceptionId}/shadow": {
+      "post": {
+        "description": "Evaluate the current diagnosis and bound Playbook proposal without executing it. Set workflow to the Playbook definition ID. Missing candidates are retained. Reuse the evaluation ID for exact retries.",
+        "summary": "Evaluate a resolution in Shadow Mode",
+        "tags": ["shadow"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "exceptionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "operationId": "shadow.evaluate",
+        "requestBody": {
+          "description": "Body",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "workflow": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                },
+                "required": ["id", "workflow"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "incidentId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "actorId": {
+                      "type": "string"
+                    },
+                    "workflow": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": ["shadow"]
+                    },
+                    "executed": {
+                      "type": "boolean",
+                      "enum": [false]
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "diagnosis": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "nullable": true
+                      },
+                      "nullable": true
+                    },
+                    "candidate": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "nullable": true
+                      },
+                      "nullable": true
+                    },
+                    "eligibility": {
+                      "type": "string",
+                      "enum": [
+                        "eligible",
+                        "ineligible",
+                        "stale_evidence",
+                        "no_candidate"
+                      ]
+                    },
+                    "policy": {
+                      "type": "object",
+                      "properties": {
+                        "outcome": {
+                          "type": "string",
+                          "enum": ["allowed", "denied", "approval_required"]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "version": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        }
+                      },
+                      "required": ["outcome", "reason", "version"],
+                      "nullable": true
+                    },
+                    "simulation": {
+                      "type": "object",
+                      "properties": {
+                        "modelVersion": {
+                          "type": "string",
+                          "enum": ["shipping-method-shadow/1"]
+                        },
+                        "effects": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "oneOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 1000
+                              },
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "boolean"
+                              },
+                              {
+                                "type": "string",
+                                "format": "null",
+                                "nullable": true
+                              }
+                            ],
+                            "nullable": true
+                          }
+                        },
+                        "predictedOutcome": {
+                          "type": "string",
+                          "enum": ["passed", "inconclusive"]
+                        },
+                        "evaluatorVersion": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200,
+                          "nullable": true
+                        },
+                        "assumptions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "modelVersion",
+                        "effects",
+                        "predictedOutcome",
+                        "evaluatorVersion",
+                        "assumptions"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "incidentId",
+                    "actorId",
+                    "workflow",
+                    "mode",
+                    "executed",
+                    "createdAt",
+                    "diagnosis",
+                    "candidate",
+                    "eligibility",
+                    "policy",
+                    "simulation"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/shadow/{evaluationId}/review": {
+      "post": {
+        "description": "Record the observed operator action, eligibility assessment and optional trust feedback with evidence from this incident. The first review is retained; conflicting retries return 409. Authoritative outcomes are read separately from verification history.",
+        "summary": "Record an operator comparison",
+        "tags": ["shadow"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "evaluationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "operationId": "shadow.review",
+        "requestBody": {
+          "description": "Body",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "actionNeeded": {
+                    "type": "boolean"
+                  },
+                  "eligible": {
+                    "type": "boolean"
+                  },
+                  "operatorAction": {
+                    "type": "object",
+                    "properties": {
+                      "capability": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200
+                      },
+                      "target": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 200
+                          },
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          }
+                        },
+                        "required": ["kind", "id"],
+                        "additionalProperties": false
+                      },
+                      "parameters": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "oneOf": [
+                            {
+                              "type": "string",
+                              "maxLength": 1000
+                            },
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "boolean"
+                            },
+                            {
+                              "type": "string",
+                              "format": "null",
+                              "nullable": true
+                            }
+                          ],
+                          "nullable": true
+                        }
+                      },
+                      "expectedPostcondition": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "oneOf": [
+                            {
+                              "type": "string",
+                              "maxLength": 1000
+                            },
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "boolean"
+                            },
+                            {
+                              "type": "string",
+                              "format": "null",
+                              "nullable": true
+                            }
+                          ],
+                          "nullable": true
+                        }
+                      }
+                    },
+                    "required": [
+                      "capability",
+                      "target",
+                      "parameters",
+                      "expectedPostcondition"
+                    ],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "evidenceRefs": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "minItems": 1,
+                    "maxItems": 100
+                  },
+                  "occurredAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "feedback": {
+                    "type": "string",
+                    "enum": ["trust", "distrust", "unsure"],
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "actionNeeded",
+                  "eligible",
+                  "operatorAction",
+                  "evidenceRefs",
+                  "occurredAt",
+                  "feedback"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "recorded": {
+                      "type": "boolean",
+                      "enum": [true]
+                    }
+                  },
+                  "required": ["recorded"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/shadow": {
+      "get": {
+        "description": "Owners and admins can compare up to 500 incidents for one Playbook within a time window. The latest evaluation per incident is counted. Rates include denominators and exclude unknown observations. Predictions are conditional simulations, not executed or verified resolutions.",
+        "summary": "Compare Shadow predictions with observed outcomes",
+        "tags": ["shadow"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "workflow",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "operationId": "shadow.report",
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "type": "string",
+                      "enum": ["shadow"]
+                    },
+                    "workflow": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "since": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "until": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "evaluation": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "incidentId": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "actorId": {
+                                "type": "string"
+                              },
+                              "workflow": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 200
+                              },
+                              "mode": {
+                                "type": "string",
+                                "enum": ["shadow"]
+                              },
+                              "executed": {
+                                "type": "boolean",
+                                "enum": [false]
+                              },
+                              "createdAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "diagnosis": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "nullable": true
+                                },
+                                "nullable": true
+                              },
+                              "candidate": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "nullable": true
+                                },
+                                "nullable": true
+                              },
+                              "eligibility": {
+                                "type": "string",
+                                "enum": [
+                                  "eligible",
+                                  "ineligible",
+                                  "stale_evidence",
+                                  "no_candidate"
+                                ]
+                              },
+                              "policy": {
+                                "type": "object",
+                                "properties": {
+                                  "outcome": {
+                                    "type": "string",
+                                    "enum": [
+                                      "allowed",
+                                      "denied",
+                                      "approval_required"
+                                    ]
+                                  },
+                                  "reason": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 200
+                                  },
+                                  "version": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 200
+                                  }
+                                },
+                                "required": ["outcome", "reason", "version"],
+                                "nullable": true
+                              },
+                              "simulation": {
+                                "type": "object",
+                                "properties": {
+                                  "modelVersion": {
+                                    "type": "string",
+                                    "enum": ["shipping-method-shadow/1"]
+                                  },
+                                  "effects": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                      "oneOf": [
+                                        {
+                                          "type": "string",
+                                          "maxLength": 1000
+                                        },
+                                        {
+                                          "type": "number"
+                                        },
+                                        {
+                                          "type": "boolean"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "format": "null",
+                                          "nullable": true
+                                        }
+                                      ],
+                                      "nullable": true
+                                    }
+                                  },
+                                  "predictedOutcome": {
+                                    "type": "string",
+                                    "enum": ["passed", "inconclusive"]
+                                  },
+                                  "evaluatorVersion": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 200,
+                                    "nullable": true
+                                  },
+                                  "assumptions": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "modelVersion",
+                                  "effects",
+                                  "predictedOutcome",
+                                  "evaluatorVersion",
+                                  "assumptions"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "incidentId",
+                              "actorId",
+                              "workflow",
+                              "mode",
+                              "executed",
+                              "createdAt",
+                              "diagnosis",
+                              "candidate",
+                              "eligibility",
+                              "policy",
+                              "simulation"
+                            ]
+                          },
+                          "review": {
+                            "type": "object",
+                            "properties": {
+                              "actionNeeded": {
+                                "type": "boolean"
+                              },
+                              "eligible": {
+                                "type": "boolean"
+                              },
+                              "operatorAction": {
+                                "type": "object",
+                                "properties": {
+                                  "capability": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 200
+                                  },
+                                  "target": {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 200
+                                      },
+                                      "id": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                      }
+                                    },
+                                    "required": ["kind", "id"],
+                                    "additionalProperties": false
+                                  },
+                                  "parameters": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                      "oneOf": [
+                                        {
+                                          "type": "string",
+                                          "maxLength": 1000
+                                        },
+                                        {
+                                          "type": "number"
+                                        },
+                                        {
+                                          "type": "boolean"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "format": "null",
+                                          "nullable": true
+                                        }
+                                      ],
+                                      "nullable": true
+                                    }
+                                  },
+                                  "expectedPostcondition": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                      "oneOf": [
+                                        {
+                                          "type": "string",
+                                          "maxLength": 1000
+                                        },
+                                        {
+                                          "type": "number"
+                                        },
+                                        {
+                                          "type": "boolean"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "format": "null",
+                                          "nullable": true
+                                        }
+                                      ],
+                                      "nullable": true
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "capability",
+                                  "target",
+                                  "parameters",
+                                  "expectedPostcondition"
+                                ],
+                                "additionalProperties": false,
+                                "nullable": true
+                              },
+                              "evidenceRefs": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "minItems": 1,
+                                "maxItems": 100
+                              },
+                              "occurredAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "feedback": {
+                                "type": "string",
+                                "enum": ["trust", "distrust", "unsure"],
+                                "nullable": true
+                              },
+                              "actorId": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "actionNeeded",
+                              "eligible",
+                              "operatorAction",
+                              "evidenceRefs",
+                              "occurredAt",
+                              "feedback",
+                              "actorId"
+                            ],
+                            "additionalProperties": false,
+                            "nullable": true
+                          },
+                          "actual": {
+                            "type": "object",
+                            "properties": {
+                              "outcome": {
+                                "type": "string",
+                                "enum": ["passed", "failed"]
+                              },
+                              "evaluatorVersion": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 200
+                              },
+                              "evidenceRefs": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "occurredAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              }
+                            },
+                            "required": [
+                              "outcome",
+                              "evaluatorVersion",
+                              "evidenceRefs",
+                              "occurredAt"
+                            ],
+                            "nullable": true
+                          }
+                        },
+                        "required": ["evaluation", "review", "actual"]
+                      }
+                    },
+                    "metrics": {
+                      "type": "object",
+                      "properties": {
+                        "evaluations": {
+                          "type": "number"
+                        },
+                        "reviewed": {
+                          "type": "number"
+                        },
+                        "agreementWithOperator": {
+                          "type": "object",
+                          "properties": {
+                            "numerator": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "denominator": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "rate": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1,
+                              "nullable": true
+                            }
+                          },
+                          "required": ["numerator", "denominator", "rate"]
+                        },
+                        "falsePositiveActionRate": {
+                          "type": "object",
+                          "properties": {
+                            "numerator": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "denominator": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "rate": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1,
+                              "nullable": true
+                            }
+                          },
+                          "required": ["numerator", "denominator", "rate"]
+                        },
+                        "missedEligibleCases": {
+                          "type": "object",
+                          "properties": {
+                            "numerator": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "denominator": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "rate": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1,
+                              "nullable": true
+                            }
+                          },
+                          "required": ["numerator", "denominator", "rate"]
+                        },
+                        "predictedVsActualOutcome": {
+                          "type": "object",
+                          "properties": {
+                            "numerator": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "denominator": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "rate": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1,
+                              "nullable": true
+                            }
+                          },
+                          "required": ["numerator", "denominator", "rate"]
+                        },
+                        "projectedAutonomousResolutionRate": {
+                          "type": "object",
+                          "properties": {
+                            "numerator": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "denominator": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "rate": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1,
+                              "nullable": true
+                            }
+                          },
+                          "required": ["numerator", "denominator", "rate"]
+                        },
+                        "projectedUnnecessaryHumanInterventionRate": {
+                          "type": "object",
+                          "properties": {
+                            "numerator": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "denominator": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "rate": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1,
+                              "nullable": true
+                            }
+                          },
+                          "required": ["numerator", "denominator", "rate"]
+                        },
+                        "operatorTrust": {
+                          "type": "object",
+                          "properties": {
+                            "numerator": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "denominator": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "rate": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1,
+                              "nullable": true
+                            }
+                          },
+                          "required": ["numerator", "denominator", "rate"]
+                        }
+                      },
+                      "required": [
+                        "evaluations",
+                        "reviewed",
+                        "agreementWithOperator",
+                        "falsePositiveActionRate",
+                        "missedEligibleCases",
+                        "predictedVsActualOutcome",
+                        "projectedAutonomousResolutionRate",
+                        "projectedUnnecessaryHumanInterventionRate",
+                        "operatorTrust"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "workflow",
+                    "since",
+                    "until",
+                    "items",
+                    "metrics"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/organizations/{organizationId}/activity": {
       "get": {
         "description": "Returns recorded events newest first by recorded timestamp and immutable ID. Date bounds apply to recorded time, including from and excluding to, for at most 366 days. Search matches issue ID, persisted target reference, action label and actor ID (literal, case-insensitive substring). Raw payloads are not searched. Cursors are bound to workspace, role, filters and page size. Connection administration events are visible only to owners and administrators. Approval and provider acceptance do not establish verified resolution.",
@@ -8909,6 +10820,7 @@
                                 "verifying",
                                 "resolved",
                                 "no_incident",
+                                "shadow_completed",
                                 "escalated",
                                 "denied"
                               ]

@@ -82,6 +82,13 @@ export async function exceptionWorkflow(
       await sleep(Math.max(1000, delay));
       diagnosis = await activities.diagnose(input, exceptionId);
     }
+    if (input.shadow) {
+      await proxyActivities<Required<Pick<ExceptionActivities, 'shadow'>>>(
+        activityOptions,
+      ).shadow(input, exceptionId);
+
+      return finish('shadow_completed', 'simulation_only');
+    }
     if (diagnosis.verificationRequired) {
       finish('verifying');
 

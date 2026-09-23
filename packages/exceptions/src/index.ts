@@ -7,6 +7,7 @@ export type {
   DetectionService,
   Evidence,
   Incident,
+  IncidentVerificationAttempt,
   VerificationEvaluator,
   VerificationResult,
 } from './application/detection.js';

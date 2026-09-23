@@ -32,5 +32,6 @@ Use `pnpm test` for cross-package integration coverage, including the applicatio
 
 ## Further reading
 
+- [Shadow Mode integration and metrics](../../docs/shadow-mode.md)
 - [Engineering guide](../../docs/resolution-playbooks.md)
 - [Package boundaries and runtime composition](../../docs/architecture/005-domain-packages-and-runtimes.md)

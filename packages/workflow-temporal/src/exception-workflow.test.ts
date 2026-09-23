@@ -64,7 +64,11 @@ function fixture() {
   };
 }
 
-async function run(activities: ExceptionActivities, environment = env) {
+async function run(
+  activities: ExceptionActivities,
+  environment = env,
+  workflowInput = input,
+) {
   const taskQueue = randomUUID();
   const worker = await Worker.create({
     connection: environment.nativeConnection,
@@ -78,7 +82,7 @@ async function run(activities: ExceptionActivities, environment = env) {
       environment.client.workflow.execute('exceptionWorkflow', {
         workflowId: randomUUID(),
         taskQueue,
-        args: [input],
+        args: [workflowInput],
       }) as Promise<WorkflowProgress>,
   );
 }
@@ -576,3 +580,41 @@ it('stops refreshing after workflow authorization is revoked', async () => {
   expect(activities.refresh).toHaveBeenCalledTimes(1);
   expect(activities.execute).not.toHaveBeenCalled();
 }, 15_000);
+
+it.each(['ready', 'missing', 'insufficient', 'clear'] as const)(
+  'completes Shadow %s evaluation without dispatch, reconciliation or live verification',
+  async (state) => {
+    const activities = {
+      ...fixture(),
+      shadow: vi.fn().mockResolvedValue(undefined),
+    };
+    if (state === 'missing') activities.propose.mockResolvedValue(null);
+    if (state === 'insufficient')
+      activities.diagnose.mockResolvedValue({
+        status: 'insufficient_evidence',
+        revision: 1,
+        verificationRequired: false,
+        retryAfter: null,
+      });
+    if (state === 'clear')
+      activities.diagnose.mockResolvedValue({
+        status: 'ready',
+        revision: 1,
+        verificationRequired: true,
+        retryAfter: null,
+      });
+    const shadow = { id: randomUUID(), workflow: 'shipping-method-correction' };
+    expect(await run(activities, env, { ...input, shadow })).toMatchObject({
+      phase: 'shadow_completed',
+      reason: 'simulation_only',
+    });
+    expect(activities.propose).not.toHaveBeenCalled();
+    expect(activities.shadow).toHaveBeenCalledWith(
+      { ...input, shadow },
+      'incident',
+    );
+    expect(activities.execute).not.toHaveBeenCalled();
+    expect(activities.reconcile).not.toHaveBeenCalled();
+    expect(activities.verify).not.toHaveBeenCalled();
+  },
+);

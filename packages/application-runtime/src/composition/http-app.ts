@@ -22,6 +22,7 @@ import type {
   LearningService,
   OperationsOverviewService,
   PlaybookLibrary,
+  ShadowService,
 } from '@luma/resolution';
 import {
   activityRoutes,
@@ -30,6 +31,7 @@ import {
   operationsRoutes,
   playbookRoutes,
   registerDeskEvents,
+  shadowRoutes,
 } from '@luma/resolution/http';
 import { initServer } from '@ts-rest/fastify';
 import type { FastifyServerOptions } from 'fastify';
@@ -46,6 +48,7 @@ declare module 'fastify' {
 }
 
 export interface AppDependencies {
+  shadow?: ShadowService;
   activity?: ActivityService;
   playbooks?: PlaybookLibrary;
   learning?: LearningService;
@@ -209,6 +212,7 @@ export function buildApp(
     s.registerRouter(
       apiContract,
       {
+        shadow: shadowRoutes(dependencies.shadow),
         activity: activityRoutes(dependencies.activity),
         playbooks: playbookRoutes(dependencies.playbooks),
         exceptions: caseRoutes(dependencies.cases),

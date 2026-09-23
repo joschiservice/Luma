@@ -9,6 +9,7 @@ import type {
   ProposedAction,
 } from '../domain/action.js';
 import { currentPolicyVersion } from '../domain/action.js';
+import { evaluatePolicy } from '../domain/evaluate.js';
 
 export interface PolicyRepository {
   pending(tenantId: string): Promise<PolicyEvidence[]>;
@@ -67,34 +68,14 @@ export function createPolicyService(deps: PolicyDependencies) {
           actionHash,
           policyVersion,
         );
-        let outcome: PolicyDecision['outcome'] = 'allowed';
-        let reason: PolicyDecision['reason'] = 'authorized';
-        if (!['owner', 'admin'].includes(fresh.actor.role)) {
-          outcome = 'denied';
-          reason = 'permission_denied';
-        } else if (!capability.available) {
-          outcome = 'denied';
-          reason = 'capability_unavailable';
-        } else if (
-          Date.parse(action.expiresAt) <= now.getTime() ||
-          Date.parse(action.preconditions.validUntil) <= now.getTime()
-        ) {
-          outcome = 'denied';
-          reason = 'stale_intent';
-        } else if (approval?.outcome === 'rejected') {
-          // Rejection remains binding when risk metadata or the response expiry changes.
-          outcome = 'denied';
-          reason = 'approval_rejected';
-        } else if (action.risk !== 'low' || capability.minimumRisk !== 'low') {
-          const bound =
-            approval &&
-            approval.requesterId === fresh.actor.id &&
-            Date.parse(approval.expiresAt) > now.getTime();
-          if (!bound || approval.outcome !== 'approved') {
-            outcome = 'approval_required';
-            reason = 'approval_required';
-          }
-        }
+        const { outcome, reason } = evaluatePolicy(
+          action,
+          capability,
+          fresh.actor.role,
+          fresh.actor.id,
+          now.getTime(),
+          approval,
+        );
         const decision: PolicyDecision = {
           id: deps.id(),
           correlationId: context.requestId,

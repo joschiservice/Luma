@@ -6,9 +6,11 @@ import type { LearningService, LearningStore } from './application/learning.js';
 import { createLearningService } from './application/learning.js';
 import type { PlaybookDependencies } from './application/playbook.js';
 import { createPlaybookService } from './application/playbook.js';
+import { createShadowService } from './application/shadow.js';
 import { learningBoundary } from './infrastructure/learning-validation.js';
 import { createActivityStore } from './infrastructure/persistence/activity.js';
 import { createLearningStore } from './infrastructure/persistence/learning.js';
+import { createShadowStore } from './infrastructure/persistence/shadow.js';
 import {
   activationRequestSchema,
   compilePlaybook,
@@ -16,6 +18,7 @@ import {
   playbookHash,
 } from './infrastructure/playbooks/schema.js';
 import { createPlaybookStore } from './infrastructure/playbooks/store.js';
+import { shadowBoundary } from './infrastructure/shadow-validation.js';
 
 export { createExceptionActivities } from './application/runtime.js';
 
@@ -95,4 +98,18 @@ export function createWorkspaceActivity(
   refreshContext: (context: TenantContext) => Promise<TenantContext>,
 ) {
   return createActivityService(createActivityStore(db), refreshContext);
+}
+
+/** Composes persistent Shadow evaluations without an execution registry. */
+export function createShadowEvaluations(
+  db: TenantDatabase,
+  refreshContext: (context: TenantContext) => Promise<TenantContext>,
+  now: () => Date = () => new Date(),
+) {
+  return createShadowService({
+    store: createShadowStore(db),
+    refreshContext,
+    now,
+    ...shadowBoundary,
+  });
 }

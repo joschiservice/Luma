@@ -9,7 +9,12 @@ import type { IdentityService, TenantContext } from '@luma/identity';
 import { requireRole, requireTenant } from '@luma/identity';
 import type { ProposedAction } from '@luma/policies';
 
-import type { PlaybookOutcome, PlaybookService } from './playbook.js';
+import type {
+  PlaybookOutcome,
+  PlaybookRun,
+  PlaybookService,
+} from './playbook.js';
+import type { ShadowService } from './shadow.js';
 
 export type WorkflowSource = {
   kind: 'detection' | 'incident';
@@ -22,6 +27,7 @@ export interface ExceptionWorkflowInput {
   userId: string;
   requestId: string;
   source: WorkflowSource;
+  shadow?: { id: string; workflow: string };
 }
 
 export interface ProposalReference {
@@ -33,6 +39,7 @@ export interface ProposalReference {
 
 export interface WorkflowProgress {
   phase:
+    | 'shadow_completed'
     | 'detecting'
     | 'diagnosing'
     | 'proposing'
@@ -56,6 +63,8 @@ export type WorkflowExecutionResult =
   | { state: 'denied' | 'succeeded' | 'failed' | 'reconciliation_required' };
 
 export interface ExceptionActivities {
+  /** Retains a simulation without dispatching or marking the incident resolved. */
+  shadow?(input: ExceptionWorkflowInput, exceptionId: string): Promise<void>;
   /** Rereads current conditions and returns an immutable proposal, or null when review is needed. */
   refresh?(
     input: ExceptionWorkflowInput,
@@ -89,6 +98,12 @@ export interface ExceptionActivities {
 }
 
 export interface WorkflowBindings {
+  /** Builds a Shadow-only candidate without publishing a proposal or granting execution authority. */
+  prepareShadow?(
+    context: TenantContext,
+    diagnosis: Diagnosis,
+    workflow: string,
+  ): Promise<PlaybookRun | null>;
   /** Loads the latest published proposal without changing the case. */
   currentProposal?(
     context: TenantContext,
@@ -139,6 +154,7 @@ export function createExceptionActivities(deps: {
   execution: ActionAdmission;
   bindings: WorkflowBindings;
   playbook?: PlaybookService;
+  shadow?: Pick<ShadowService, 'evaluate'>;
 }): ExceptionActivities {
   async function context(input: ExceptionWorkflowInput) {
     const fresh = await deps.identity.resolveWorkflowContext(
@@ -186,7 +202,25 @@ export function createExceptionActivities(deps: {
   }
 
   return {
+    async shadow(input, exceptionId) {
+      const fresh = await context(input);
+      if (!input.shadow || !deps.shadow)
+        throw new WorkflowInputError('Shadow evaluation is unavailable');
+      const diagnosis = await deps.diagnoses.get(fresh, exceptionId);
+      const candidate = deps.bindings.prepareShadow
+        ? diagnosis?.status === 'ready' && !diagnosis.superseded
+          ? await deps.bindings.prepareShadow(
+              fresh,
+              diagnosis,
+              input.shadow.workflow,
+            )
+          : null
+        : undefined;
+      await deps.shadow.evaluate(fresh, exceptionId, input.shadow, candidate);
+    },
     async refresh(input, exceptionId) {
+      if (input.shadow)
+        throw new WorkflowInputError('Shadow cannot refresh live proposals');
       const fresh = await context(input);
       const action = await deps.bindings.refreshProposal?.(fresh, exceptionId);
       if (!action) return null;
@@ -217,14 +251,19 @@ export function createExceptionActivities(deps: {
       if (input.source.kind === 'incident') {
         const incident = await deps.exceptions.get(fresh, input.source.id);
         if (!incident) throw new WorkflowInputError('Exception not found');
-        await deps.bindings.recordWorkflow?.(fresh, incident.id, input.source);
+        if (!input.shadow)
+          await deps.bindings.recordWorkflow?.(
+            fresh,
+            incident.id,
+            input.source,
+          );
 
         return incident.id;
       }
       const request = await deps.bindings.loadDetection(fresh, input.source.id);
       if (!request) throw new WorkflowInputError('Detection request not found');
       const result = await deps.exceptions.ingest(fresh, request);
-      if (result.incident)
+      if (result.incident && !input.shadow)
         await deps.bindings.recordWorkflow?.(
           fresh,
           result.incident.id,
@@ -251,6 +290,8 @@ export function createExceptionActivities(deps: {
       };
     },
     async propose(input, exceptionId, revision) {
+      if (input.shadow)
+        throw new WorkflowInputError('Shadow cannot prepare live proposals');
       const fresh = await context(input);
       const diagnosis = await current(fresh, exceptionId, revision);
       if (!diagnosis || !deps.bindings.proposals) return null;
@@ -280,6 +321,8 @@ export function createExceptionActivities(deps: {
       };
     },
     async execute(input, exceptionId, proposal) {
+      if (input.shadow)
+        throw new WorkflowInputError('Shadow workflows cannot execute');
       const fresh = await context(input);
       const latest = await deps.bindings.currentProposal?.(fresh, exceptionId);
       if (latest && latest.id !== proposal.id)
@@ -316,6 +359,10 @@ export function createExceptionActivities(deps: {
         : { state: result.state };
     },
     async reconcile(input, proposalId) {
+      if (input.shadow)
+        throw new WorkflowInputError(
+          'Shadow workflows cannot reconcile executions',
+        );
       if (deps.playbook)
         return playbookResult(
           await deps.playbook.reconcile(await context(input), proposalId),
@@ -330,6 +377,10 @@ export function createExceptionActivities(deps: {
       return { state: result.state };
     },
     async verify(input, exceptionId) {
+      if (input.shadow)
+        throw new WorkflowInputError(
+          'Shadow workflows cannot verify live resolution',
+        );
       const fresh = await context(input);
       const incident = await deps.exceptions.get(fresh, exceptionId);
       if (!incident) throw new WorkflowInputError('Exception not found');

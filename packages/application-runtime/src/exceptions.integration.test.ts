@@ -11,6 +11,7 @@ import {
   buildApp,
   createDeskServices,
   createDetectionServices,
+  createResolutionPlaybooks,
   createSafetyServices as createAdmittedSafety,
 } from '@luma/application-runtime';
 import { createConnectionCoverage } from '@luma/connections/composition';
@@ -28,9 +29,11 @@ import { IdentityError } from '@luma/identity';
 import { makeTenantContext } from '@luma/identity/composition';
 import type { ModelGateway } from '@luma/platform';
 import { createTenantDatabase } from '@luma/platform/composition';
+import { shippingMethodPlaybook } from '@luma/resolution';
 import {
   createOperationsOverview,
   createResolutionLearning,
+  createShadowEvaluations,
 } from '@luma/resolution/composition';
 import { Pool } from 'pg';
 import {
@@ -170,6 +173,348 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
     await admin.query(`DROP DATABASE IF EXISTS "${name}"`);
     await admin.query(`DROP ROLE IF EXISTS "${name}"`);
     await admin.end();
+  });
+  it('retains Shadow predictions and evidence-backed comparisons without execution', async () => {
+    now = new Date();
+    const evidenceId = randomUUID();
+    const source = request(evidenceId);
+    source.evidence[0]!.observedAt = now.toISOString();
+    const incident = (await services.exceptions.ingest(context(), source))
+      .incident!;
+    const diagnosis = (await services.diagnoses.run(context(), incident.id))!;
+    const db = createTenantDatabase(runtime);
+    const refreshContext = async (ctx: ReturnType<typeof context>) => ctx;
+    const shadow = createShadowEvaluations(db, refreshContext, () => now);
+    const workflow = `shadow-${randomUUID()}`;
+    const first = { id: randomUUID(), workflow };
+    const noCandidate = await shadow.evaluate(context(), incident.id, first);
+    expect(noCandidate.eligibility).toBe('no_candidate');
+    expect(await shadow.evaluate(context(), incident.id, first)).toEqual(
+      noCandidate,
+    );
+    await expect(
+      shadow.evaluate(context(), incident.id, { ...first, workflow: 'other' }),
+    ).rejects.toThrow('different request');
+    await expect(
+      shadow.evaluate(context(otherTenant), incident.id, {
+        id: randomUUID(),
+        workflow,
+      }),
+    ).rejects.toThrow('not found');
+    const effects = {
+      resolve: vi.fn(async () => {
+        throw new Error('Provider access forbidden');
+      }),
+    };
+    const safety = createAdmittedSafety(
+      runtimeUrl,
+      { refreshContext },
+      effects,
+    );
+    try {
+      const playbooks = createResolutionPlaybooks(
+        db,
+        { refreshContext },
+        safety,
+        () => now,
+      );
+      const playbook = structuredClone(shippingMethodPlaybook);
+      playbook.definition.id = workflow;
+      playbook.ir.evidence.kind = 'sync_failure';
+      const version = await playbooks.publish(context(), playbook);
+      const action = {
+        schemaVersion: 1 as const,
+        id: randomUUID(),
+        tenantId,
+        connectionId,
+        capability: 'orders.shipping-method.write',
+        capabilityVersion: '0',
+        target: { kind: 'order', id: randomUUID() },
+        parameters: {},
+        expectedPostcondition: { shippingMethodId: 'mapped' },
+        risk: 'high' as const,
+        proposedBy: { kind: 'user' as const, id: context().actor.id },
+        expiresAt: new Date(now.getTime() + 60_000).toISOString(),
+        preconditions: {
+          evidenceRefs: [evidenceId],
+          validUntil: new Date(now.getTime() + 60_000).toISOString(),
+        },
+      };
+      const activation = await playbooks.activate(context(), {
+        id: randomUUID(),
+        definitionId: workflow,
+        version: version.version,
+        grants: {
+          principalIds: [context().actor.id],
+          connectionIds: [connectionId],
+          targetIds: [action.target.id],
+        },
+        policyVersion: 'v0.1',
+      });
+      const binding = {
+        activationId: activation.id,
+        incidentId: incident.id,
+        diagnosisRevision: diagnosis.revision,
+        action,
+        snapshot: {
+          inputs: { shippingMethodId: 'mapped' },
+          evidence: {
+            kind: 'sync_failure',
+            facts: { diagnosisReady: true, methodMapped: true },
+            observations: [
+              {
+                id: evidenceId,
+                observedAt: now.toISOString(),
+                source: 'production',
+              },
+            ],
+          },
+          provenance: {
+            reference: 'production',
+            capturedAt: now.toISOString(),
+          },
+        },
+      };
+      const candidate = await playbooks.preview(context(), binding);
+      const isolated = await shadow.evaluate(
+        context(),
+        incident.id,
+        { id: randomUUID(), workflow },
+        candidate,
+      );
+      expect(isolated.candidate).toEqual(candidate);
+      for (const table of [
+        'case_proposals',
+        'playbook_runs',
+        'action_admission_steps',
+      ]) {
+        expect(
+          (
+            await owner.query(`SELECT 1 FROM ${table} WHERE tenant_id=$1`, [
+              tenantId,
+            ])
+          ).rowCount,
+        ).toBe(0);
+      }
+      await playbooks.bind(context(), binding);
+      const desk = createDeskServices(db, { refreshContext });
+      await desk.publish(context(), incident.id, diagnosis.revision, action);
+      now = new Date(now.getTime() + 1);
+      const input = { id: randomUUID(), workflow };
+      const [prediction, retry] = await Promise.all([
+        shadow.evaluate(context(), incident.id, input),
+        shadow.evaluate(context(), incident.id, input),
+      ]);
+      expect(prediction).toEqual(retry);
+      expect(prediction).toMatchObject({
+        mode: 'shadow',
+        executed: false,
+        eligibility: 'eligible',
+        policy: { outcome: 'approval_required' },
+        simulation: { predictedOutcome: 'passed' },
+      });
+      expect(effects.resolve).not.toHaveBeenCalled();
+      expect(
+        (
+          await owner.query(
+            'SELECT 1 FROM executed_actions WHERE tenant_id=$1',
+            [tenantId],
+          )
+        ).rowCount,
+      ).toBe(0);
+      expect(
+        (await services.exceptions.get(context(), incident.id))?.state,
+      ).not.toBe('resolved');
+      const review = {
+        actionNeeded: true,
+        eligible: true,
+        operatorAction: {
+          capability: action.capability,
+          target: action.target,
+          parameters: action.parameters,
+          expectedPostcondition: action.expectedPostcondition,
+        },
+        evidenceRefs: [evidenceId],
+        occurredAt: now.toISOString(),
+        feedback: 'trust' as const,
+      };
+      await expect(
+        shadow.review(context(), input.id, {
+          ...review,
+          evidenceRefs: [randomUUID()],
+        }),
+      ).rejects.toThrow('Evidence must belong');
+      await shadow.review(context(), first.id, {
+        ...review,
+        operatorAction: {
+          ...review.operatorAction,
+          target: { kind: 'order', id: randomUUID() },
+        },
+      });
+      await shadow.review(context(), input.id, review);
+      await shadow.review(context(), input.id, review);
+      await expect(
+        shadow.review(context(), input.id, { ...review, actionNeeded: false }),
+      ).rejects.toThrow('immutable');
+      await expect(
+        shadow.review(context(otherTenant), input.id, review),
+      ).rejects.toThrow('not found');
+      const window = {
+        workflow,
+        since: new Date(now.getTime() - 1000).toISOString(),
+        until: new Date(now.getTime() + 1000).toISOString(),
+      };
+      await owner.query(
+        'INSERT INTO execution_intents(id,tenant_id,action_hash,document) VALUES($1,$2,$3,$4)',
+        [action.id, tenantId, candidate.actionHash, action],
+      );
+      await owner.query(
+        `INSERT INTO executed_actions(id,tenant_id,proposal_id,idempotency_key,action_hash,state,document) VALUES($1,$2,$3,$4,$5,'unknown',$6)`,
+        [
+          randomUUID(),
+          tenantId,
+          action.id,
+          `v0:${action.id}`,
+          candidate.actionHash,
+          {
+            tenantId,
+            proposalId: action.id,
+            state: 'unknown',
+            attempt: {
+              startedAt: new Date(now.getTime() - 301_000).toISOString(),
+            },
+          },
+        ],
+      );
+      const verificationId = randomUUID();
+      await owner.query(
+        `INSERT INTO execution_verifications(tenant_id,id,proposal_id,phase,document) VALUES($1,$2,$3,'completed',$4)`,
+        [
+          tenantId,
+          verificationId,
+          action.id,
+          {
+            id: verificationId,
+            proposalId: action.id,
+            phase: 'completed',
+            result: {
+              outcome: 'passed',
+              evaluatorVersion: 'shipping-method/1',
+              observationRefs: [evidenceId],
+              observedAt: now.toISOString(),
+            },
+          },
+        ],
+      );
+      expect(
+        (await shadow.report(context(), window)).items[0]!.actual,
+      ).toBeNull();
+      const rejectedId = randomUUID();
+      await owner.query(
+        'INSERT INTO exception_outbox(id,tenant_id,exception_id,document) VALUES($1,$2,$3,$4)',
+        [
+          rejectedId,
+          tenantId,
+          incident.id,
+          {
+            type: 'exception.verification_attempt',
+            accepted: false,
+            phase: 'completed',
+            actorId: 'operator',
+            occurredAt: now.toISOString(),
+            evaluatorVersion: 'shipping-method/1',
+            outcome: 'passed',
+            evidenceRefs: [evidenceId],
+            authoritative: true,
+            complete: true,
+          },
+        ],
+      );
+      expect(
+        (await shadow.report(context(), window)).items[0]!.actual,
+      ).toBeNull();
+      await owner.query(
+        "UPDATE exception_outbox SET document=jsonb_set(document,'{accepted}','true') WHERE id=$1",
+        [rejectedId],
+      );
+      const report = await shadow.report(context(), window);
+      expect(report.items).toHaveLength(1);
+      expect(report.items[0]!.actual?.outcome).toBe('passed');
+      expect(report.metrics.agreementWithOperator.rate).toBe(1);
+      expect(report.metrics.predictedVsActualOutcome.rate).toBe(1);
+      const app = buildApp(
+        { logger: false },
+        {
+          shadow,
+          identity: {
+            resolveTenant: async () => context(),
+          } as unknown as IdentityService,
+        },
+      );
+      try {
+        const response = await app.inject(
+          `/v1/organizations/${tenantId}/shadow?${new URLSearchParams(window)}`,
+        );
+        expect(response.statusCode, response.body).toBe(200);
+        expect(response.json().mode).toBe('shadow');
+        expect(response.json().items[0].evaluation.executed).toBe(false);
+        const invalid = await app.inject(
+          `/v1/organizations/${tenantId}/shadow?workflow=${workflow}&since=invalid&until=invalid`,
+        );
+        expect(invalid.statusCode).toBe(400);
+      } finally {
+        await app.close();
+      }
+
+      expect((await shadow.report(context(otherTenant), window)).items).toEqual(
+        [],
+      );
+      await expect(
+        db.transaction(tenantId, (tx) =>
+          tx.query('DELETE FROM shadow_evaluations WHERE id=$1', [input.id]),
+        ),
+      ).rejects.toThrow();
+      const reopened = createShadowEvaluations(db, refreshContext, () => now);
+      expect(await reopened.evaluate(context(), incident.id, input)).toEqual(
+        prediction,
+      );
+      const unexecuted = await playbooks.preview(context(), {
+        ...binding,
+        action: { ...action, id: randomUUID() },
+      });
+      await playbooks.revoke(context(), activation.id);
+      expect(
+        (
+          await shadow.evaluate(
+            context(),
+            incident.id,
+            {
+              id: randomUUID(),
+              workflow,
+            },
+            unexecuted,
+          )
+        ).policy?.outcome,
+      ).toBe('denied');
+      await services.exceptions.resolve(context(), incident.id, {
+        kind: 'human_disposition',
+        reason: 'Operator resolved the incident',
+        evidenceRefs: [evidenceId],
+      });
+      const resolved = await shadow.evaluate(
+        context(),
+        incident.id,
+        {
+          id: randomUUID(),
+          workflow,
+        },
+        unexecuted,
+      );
+      expect(resolved.eligibility).toBe('ineligible');
+      expect(resolved.simulation.predictedOutcome).toBe('inconclusive');
+    } finally {
+      await safety.close();
+    }
   });
   it('reconstructs a resolution run with repairs, delayed verification and recurrence', async () => {
     now = new Date();

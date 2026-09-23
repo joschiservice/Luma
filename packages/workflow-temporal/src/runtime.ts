@@ -238,6 +238,54 @@ export function createWorkflowCommands(
   }
 
   return {
+    /** Starts an isolated Shadow workflow; retries with the same evaluation ID reuse it. */
+    async startShadow(
+      context: TenantContext,
+      source: WorkflowSource,
+      shadow: { id: string; workflow: string },
+    ) {
+      const scoped = await scope(context, source);
+      const parsed = z
+        .object({ id: z.string().uuid(), workflow: z.string().min(1).max(200) })
+        .strict()
+        .parse(shadow);
+      const workflowId = `shadow:${scoped.fresh.tenantId}:${parsed.id}`;
+      const shadowRequest = JSON.stringify([
+        scoped.fresh.tenantId,
+        scoped.fresh.actor.id,
+        scoped.source.kind,
+        scoped.source.id,
+        parsed.workflow,
+      ]);
+      try {
+        await client.workflow.start('exceptionWorkflow', {
+          workflowId,
+          taskQueue,
+          memo: { shadowRequest },
+          args: [
+            {
+              tenantId: scoped.fresh.tenantId,
+              userId: scoped.fresh.actor.id,
+              requestId: scoped.fresh.requestId,
+              source: scoped.source,
+              shadow: parsed,
+            } satisfies ExceptionWorkflowInput,
+          ],
+          workflowIdReusePolicy: WorkflowIdReusePolicy.REJECT_DUPLICATE,
+          workflowIdConflictPolicy: WorkflowIdConflictPolicy.FAIL,
+        });
+      } catch (error) {
+        if (!(error instanceof WorkflowExecutionAlreadyStartedError))
+          throw error;
+        const existing = await client.workflow.getHandle(workflowId).describe();
+        if (existing.memo?.shadowRequest !== shadowRequest)
+          throw new WorkflowInputError(
+            'Shadow evaluation ID already belongs to a different request',
+          );
+      }
+
+      return { workflowId };
+    },
     async start(
       context: TenantContext,
       source: WorkflowSource,
