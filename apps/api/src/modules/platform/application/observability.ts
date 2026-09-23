@@ -31,6 +31,16 @@ export interface Observation {
   }): void;
 }
 
+export interface ActivityFailureContext {
+  workflowId: string;
+  workflowRunId: string;
+  activityId: string;
+  activityType: string;
+  attempt: number;
+  taskQueue: string;
+  namespace: string;
+}
+
 export interface Observability {
   request(
     requestId: string,
@@ -51,6 +61,8 @@ export interface Observability {
     work: (context: TraceContext, observation: Observation) => Promise<T>,
   ): Promise<T>;
   captureError(context: TraceContext): void;
+  /** Captures the original activity exception and Temporal identifiers in Sentry when configured. */
+  captureActivityError(error: unknown, context: ActivityFailureContext): void;
   capture(context: TraceContext, event: ProductEvent): void;
   flag(
     context: TraceContext,

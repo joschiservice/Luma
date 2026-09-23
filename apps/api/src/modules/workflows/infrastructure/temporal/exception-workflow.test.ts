@@ -1,9 +1,12 @@
 import { randomUUID } from 'node:crypto';
 
 import { ApplicationFailure } from '@temporalio/common';
-import { TestWorkflowEnvironment } from '@temporalio/testing';
+import {
+  MockActivityEnvironment,
+  TestWorkflowEnvironment,
+} from '@temporalio/testing';
 import type { WorkflowBundleWithSourceMap } from '@temporalio/worker';
-import { bundleWorkflowCode, Worker } from '@temporalio/worker';
+import { bundleWorkflowCode, DefaultLogger, Worker } from '@temporalio/worker';
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
 
 import { IdentityError } from '#modules/identity/index';
@@ -12,6 +15,7 @@ import type {
   ExceptionWorkflowInput,
   WorkflowProgress,
 } from '#modules/workflows/application/runtime';
+import { WorkflowInputError } from '#modules/workflows/application/runtime';
 import {
   temporalActivities,
   workflowPath,
@@ -359,24 +363,108 @@ it.each(['succeeded', 'reconciliation_required', 'lost_completion'] as const)(
   15_000,
 );
 
-it('sanitizes stored activity failures and does not retry denied authorization', async () => {
-  const activities = fixture();
-  activities.detect.mockRejectedValue(new Error('secret-provider-payload'));
-  await expect(
-    temporalActivities(activities).detect(input),
-  ).rejects.toMatchObject({
-    message: 'Workflow activity unavailable',
+it.each([
+  {
+    error: new TypeError('private activity failure', {
+      cause: new Error('private provider failure'),
+    }),
     nonRetryable: false,
-    cause: undefined,
-  });
-  activities.detect.mockRejectedValue(
-    new IdentityError(403, 'FORBIDDEN', 'private authorization details'),
-  );
-  await expect(
-    temporalActivities(activities).detect(input),
-  ).rejects.toMatchObject({
-    message: 'Workflow authorization or input rejected',
+  },
+  {
+    error: new IdentityError(503, 'SERVICE_UNAVAILABLE', 'private outage'),
+    nonRetryable: false,
+  },
+  {
+    error: new IdentityError(403, 'FORBIDDEN', 'private authorization details'),
     nonRetryable: true,
+  },
+  {
+    error: new WorkflowInputError('private invalid input'),
+    nonRetryable: true,
+  },
+  { error: 'private thrown value', nonRetryable: false },
+])(
+  'logs the original failure and sanitizes Temporal history: $error',
+  async ({ error, nonRetryable }) => {
+    const writeLog = vi.fn();
+    const captureActivityError = vi.fn();
+    const environment = new MockActivityEnvironment(
+      {
+        workflowExecution: { workflowId: 'workflow', runId: 'run' },
+        activityId: '443',
+        activityType: 'refresh',
+        attempt: 5,
+        taskQueue: 'queue',
+      },
+      { logger: new DefaultLogger('WARN', writeLog) },
+    );
+    const activities = temporalActivities(
+      { ...fixture(), refresh: vi.fn().mockRejectedValue(error) },
+      captureActivityError,
+    );
+    const failure = await environment
+      .run(activities.refresh!, input, 'incident')
+      .catch((failure: unknown) => failure);
+
+    expect(failure).toBeInstanceOf(ApplicationFailure);
+    expect(failure).toMatchObject({
+      message: nonRetryable
+        ? 'Workflow authorization or input rejected'
+        : 'Workflow activity unavailable',
+      type: nonRetryable ? 'WorkflowRejected' : 'WorkflowActivityUnavailable',
+      nonRetryable,
+      cause: undefined,
+      details: [],
+    });
+    expect((failure as Error).stack).not.toContain('private');
+    expect(writeLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'ERROR',
+        message: 'Workflow activity failed before sanitization',
+        meta: expect.objectContaining({
+          error,
+          workflowId: 'workflow',
+          workflowRunId: 'run',
+          activityId: '443',
+          activityType: 'refresh',
+          attempt: 5,
+          taskQueue: 'queue',
+        }),
+      }),
+    );
+    const entry = writeLog.mock.calls.find(
+      ([entry]) => entry.level === 'ERROR',
+    )![0];
+    expect(entry.meta.error).toBe(error);
+    expect(entry.meta).not.toHaveProperty('args');
+    expect(captureActivityError).toHaveBeenCalledExactlyOnceWith(error, {
+      workflowId: 'workflow',
+      workflowRunId: 'run',
+      activityId: '443',
+      activityType: 'refresh',
+      attempt: 5,
+      taskQueue: 'queue',
+      namespace: 'test',
+    });
+  },
+);
+
+it('preserves the activity failure when error reporting fails', async () => {
+  const environment = new MockActivityEnvironment(
+    {},
+    {
+      logger: new DefaultLogger('WARN', vi.fn()),
+    },
+  );
+  const activities = fixture();
+  activities.detect.mockRejectedValue(new Error('original failure'));
+  const wrapped = temporalActivities(activities, () => {
+    throw new Error('reporter failure');
+  });
+
+  await expect(environment.run(wrapped.detect, input)).rejects.toMatchObject({
+    type: 'WorkflowActivityUnavailable',
+    nonRetryable: false,
     cause: undefined,
   });
 });

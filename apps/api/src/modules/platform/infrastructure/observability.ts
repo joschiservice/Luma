@@ -25,6 +25,7 @@ import {
 import { PostHog } from 'posthog-node';
 
 import type {
+  ActivityFailureContext,
   Observability,
   Observation,
   Operation,
@@ -82,6 +83,7 @@ export function createObservability(
         environment: settings.environment,
         release: settings.release,
         defaultIntegrations: false,
+        integrations: [Sentry.linkedErrorsIntegration()],
         skipOpenTelemetrySetup: true,
         registerEsmLoaderHooks: false,
         sendDefaultPii: false,
@@ -100,7 +102,10 @@ export function createObservability(
 
           return event;
         },
-        beforeSend(event) {
+        beforeSend(event, hint) {
+          const activity = hint.data?.activityFailure as
+            ActivityFailureContext | undefined;
+
           return {
             type: undefined,
             ...(event.event_id ? { event_id: event.event_id } : {}),
@@ -109,11 +114,26 @@ export function createObservability(
             environment: settings.environment,
             release: settings.release,
             level: 'error',
-            message: 'Operation failed',
+            ...(activity && event.exception
+              ? { exception: event.exception }
+              : { message: 'Operation failed' }),
             tags: safeTags(event.tags),
-            contexts: event.contexts?.trace
-              ? { trace: event.contexts.trace }
-              : {},
+            contexts: {
+              ...(event.contexts?.trace ? { trace: event.contexts.trace } : {}),
+              ...(activity
+                ? {
+                    temporal: {
+                      workflowId: activity.workflowId,
+                      workflowRunId: activity.workflowRunId,
+                      activityId: activity.activityId,
+                      activityType: activity.activityType,
+                      attempt: activity.attempt,
+                      taskQueue: activity.taskQueue,
+                      namespace: activity.namespace,
+                    },
+                  }
+                : {}),
+            },
           };
         },
       })
@@ -344,6 +364,12 @@ export function createObservability(
         contexts: {
           trace: { trace_id: context.traceId, span_id: context.spanId },
         },
+      });
+    },
+    captureActivityError(error, context) {
+      sentry?.captureException(error, {
+        originalException: error,
+        data: { activityFailure: context },
       });
     },
     capture(context, event) {

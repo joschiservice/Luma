@@ -216,7 +216,7 @@ export function createAdmissionEligibility(
 /** Start a worker for persisted incidents and diagnoses. */
 export async function createDefaultExceptionWorker(
   identitySettings: Parameters<typeof createIdentity>[0],
-  settings: WorkflowConfig,
+  settings: WorkflowConfig & { temporal: TemporalSettings },
 ) {
   const identity = createIdentity(identitySettings);
   const detection = createDetectionServices(settings.databaseUrl);

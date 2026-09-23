@@ -22,27 +22,41 @@ export async function main(
 
     return {
       ...config,
-      temporal: { ...config.temporal, telemetry: localTelemetry },
+      temporal: {
+        ...config.temporal,
+        ...(localTelemetry ? { telemetry: localTelemetry } : {}),
+      },
     };
   };
   if (process.argv.includes('--workflow-worker')) {
-    const worker = await createDefaultExceptionWorker(
-      readIdentityConfig(process.env),
-      workflowConfig(),
+    const observability = createObservability(
+      readObservabilityConfig(process.env),
     );
-    const shutdown = () => worker.shutdown();
-    for (const signal of ['SIGINT', 'SIGTERM'] as const)
-      process.once(signal, shutdown);
     try {
-      await worker.run();
-    } finally {
+      const config = workflowConfig();
+      const worker = await createDefaultExceptionWorker(
+        readIdentityConfig(process.env),
+        {
+          ...config,
+          temporal: {
+            ...config.temporal,
+            captureActivityError: observability.captureActivityError,
+          },
+        },
+      );
+      const shutdown = () => worker.shutdown();
       for (const signal of ['SIGINT', 'SIGTERM'] as const)
-        process.removeListener(signal, shutdown);
+        process.once(signal, shutdown);
       try {
-        await worker.close();
+        await worker.run();
       } finally {
-        await localTelemetry?.shutdown();
+        for (const signal of ['SIGINT', 'SIGTERM'] as const)
+          process.removeListener(signal, shutdown);
+        await worker.close();
       }
+    } finally {
+      await observability.shutdown();
+      await localTelemetry?.shutdown();
     }
   } else {
     const config = readApiConfig(process.env);

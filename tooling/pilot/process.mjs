@@ -44,6 +44,7 @@ try {
   observability = createObservability({ ...settings, approvedModels: [] });
   const manifest = await readJson(join(directory, 'pilot.json'));
   const temporal = {
+    captureActivityError: observability.captureActivityError,
     address: process.env.TEMPORAL_ADDRESS,
     namespace: 'default',
     taskQueue: `luma-pilot-${manifest.runId}`,

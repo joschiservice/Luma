@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { metrics } from '@opentelemetry/api';
+import { Context, log } from '@temporalio/activity';
 import {
   Client,
   Connection,
@@ -22,6 +23,7 @@ import { z } from 'zod';
 
 import type { IdentityService, TenantContext } from '#modules/identity/index';
 import { IdentityError, requireRole } from '#modules/identity/index';
+import type { Observability } from '#modules/platform/index';
 import type {
   ExceptionActivities,
   ExceptionWorkflowInput,
@@ -31,6 +33,7 @@ import type {
 import { WorkflowInputError } from '#modules/workflows/application/runtime';
 
 export interface TemporalSettings {
+  captureActivityError?: Observability['captureActivityError'];
   telemetry?: OpenTelemetryPluginOptions;
   address: string;
   namespace: string;
@@ -77,9 +80,14 @@ export function workflowPath() {
     : fileURLToPath(new URL('./exception-workflow.ts', import.meta.url));
 }
 
-/** Sanitize failures before Temporal stores them in activity history. */
+/**
+ * Logs and reports original failures before sanitizing errors for Temporal history.
+ * Reporting failures do not change activity retry behavior.
+ * Wrapped activities must run within a Temporal activity context.
+ */
 export function temporalActivities(
   activities: ExceptionActivities,
+  captureActivityError?: Observability['captureActivityError'],
 ): ExceptionActivities {
   return Object.fromEntries(
     Object.entries(activities).map(([name, fn]) => [
@@ -90,6 +98,22 @@ export function temporalActivities(
             ...args,
           );
         } catch (error) {
+          log.error('Workflow activity failed before sanitization', { error });
+          try {
+            const info = Context.current().info;
+            if (info.workflowExecution)
+              captureActivityError?.(error, {
+                workflowId: info.workflowExecution.workflowId,
+                workflowRunId: info.workflowExecution.runId,
+                activityId: info.activityId,
+                activityType: info.activityType,
+                attempt: info.attempt,
+                taskQueue: info.taskQueue,
+                namespace: info.namespace,
+              });
+          } catch {
+            log.warn('Workflow activity error reporting failed');
+          }
           if (
             (error instanceof IdentityError && error.statusCode !== 503) ||
             error instanceof WorkflowInputError
@@ -131,7 +155,7 @@ export async function createExceptionWorker(
       plugins: settings.telemetry
         ? [new OpenTelemetryPlugin(settings.telemetry)]
         : [],
-      activities: temporalActivities(activities),
+      activities: temporalActivities(activities, settings.captureActivityError),
       ...(settings.telemetry
         ? {
             interceptors: {

@@ -1,6 +1,7 @@
 export { canonicalJson } from '#modules/platform/domain/canonical-json';
 
 export type {
+  ActivityFailureContext,
   FeatureFlag,
   Observability,
   Observation,
