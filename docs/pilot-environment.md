@@ -69,7 +69,8 @@ rewrite existing approvals. Select the new organization after reset.
 `.luma/pilot.json` identifies the current run, users, connections, proposal and
 cases. `.luma/provider-<runId>.json` contains simulated provider state, normalized
 observations, committed effects and the PATCH request count. Keep these local
-files out of Git.
+files out of Git. The file keeps the 200 most recent observations and capability
+events for inspection; the database stores ingested observations separately.
 
 Evidence dates move together from the golden corpus to the run's creation time.
 Inventory and fulfillment evidence retains its normal five-minute freshness

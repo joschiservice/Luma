@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto';
-import { rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
@@ -40,6 +39,7 @@ import { Pool } from 'pg';
 
 import { observeProviders } from '../simulator/observations.mjs';
 import { detectionRequest, readJson } from './fixtures.mjs';
+import { mutateProviderState } from './provider-state.mjs';
 import { identitySettings } from './seed.mjs';
 
 /**
@@ -69,25 +69,7 @@ export async function createPilot(
     resources.add(() => pool.end());
     const db = createTenantDatabase(pool);
     const path = join(directory, `provider-${manifest.runId}.json`);
-    let writes = Promise.resolve();
-    const mutate = (operation) => {
-      const work = writes.then(async () => {
-        const state = await readJson(path);
-        const result = operation(state);
-        await writeFile(`${path}.tmp`, `${JSON.stringify(state, null, 2)}\n`, {
-          mode: 0o600,
-          flush: true,
-        });
-        await rename(`${path}.tmp`, path);
-
-        return result;
-      });
-      writes = work.catch(() => {
-        // Let later mutations proceed; the caller still receives the rejected work.
-      });
-
-      return work;
-    };
+    const mutate = (operation) => mutateProviderState(pool, path, operation);
     const context = () =>
       identity.service.resolveWorkflowContext(
         manifest.requesterId,

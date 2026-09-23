@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { Pool } from 'pg';
 import { afterAll, beforeAll, expect, onTestFinished, test } from 'vitest';
 
 import {
@@ -11,6 +12,7 @@ import {
   startJourney,
   waitFor,
 } from '../../../tooling/pilot/journey.mjs';
+import { mutateProviderState } from '../../../tooling/pilot/provider-state.mjs';
 import { createPilot } from '../../../tooling/pilot/runtime.mjs';
 import { seedPilot } from '../../../tooling/pilot/seed.mjs';
 import { database, secret, startProcess, until } from './helpers.mjs';
@@ -96,6 +98,31 @@ test('seed reuses its run, covers four classes and keeps simulated health pendin
   expect(
     (await f.db.owner.query('SELECT count(*) FROM exception_evaluations')).rows,
   ).toEqual(before);
+});
+
+test('concurrent pilot processes preserve provider updates and bound diagnostics', async (t) => {
+  const f = await setup(t, 'diagnosis-pending');
+  const path = join(f.directory, `provider-${f.manifest.runId}.json`);
+  const pools = [0, 1].map(
+    () => new Pool({ connectionString: f.env.WORKFLOW_DATABASE_URL }),
+  );
+  t.onTestFinished(() => Promise.all(pools.map((pool) => pool.end())));
+
+  await Promise.all(
+    Array.from({ length: 240 }, (_, index) =>
+      mutateProviderState(pools[index % 2], path, (state) => {
+        state.patchRequests = (state.patchRequests ?? 0) + 1;
+        state.observations.push({ index });
+        (state.capabilityEvents ??= []).push({ index });
+      }),
+    ),
+  );
+
+  const state = await f.pilot.provider();
+  expect(state.patchRequests).toBe(240);
+  expect(state.observations).toHaveLength(200);
+  expect(state.capabilityEvents).toHaveLength(200);
+  expect(new Set(state.observations.map((item) => item.index)).size).toBe(200);
 });
 
 test('serves persisted activity through the pilot API', async (t) => {
