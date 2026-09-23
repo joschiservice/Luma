@@ -44,7 +44,10 @@
     "test:simulator": "pnpm exec turbo run build --filter=@luma/api... --filter=@luma/simulator... && pnpm exec turbo run test --filter=@luma/simulator... && node --test tooling/simulator/*.test.mjs",
     "dev:observe": "node tooling/dev/cli.mjs observe",
     "observe:verify": "node tooling/observability/verify.mjs",
-    "observe:queries": "node tooling/observability/queries.mjs"
+    "observe:queries": "node tooling/observability/queries.mjs",
+    "evaluate:playbook": "pnpm exec turbo run build --filter=@luma/resolution... --filter=@luma/simulator... && node tooling/evaluation/cli.mjs",
+    "test:evaluation": "pnpm exec turbo run build --filter=@luma/resolution... --filter=@luma/simulator... && node --test tooling/evaluation/*.test.mjs",
+    "capture:incident": "pnpm exec turbo run build --filter=@luma/resolution... && node tooling/evaluation/capture-cli.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

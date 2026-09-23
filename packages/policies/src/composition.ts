@@ -23,3 +23,5 @@ export function createPolicies(
     id: randomUUID,
   });
 }
+
+export { createPolicyService };

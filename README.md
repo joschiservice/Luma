@@ -239,3 +239,5 @@ Run `mise exec -- pnpm dev:observe` to start the app, worker, and local Grafana 
 
 The [Workspace Activity guide](docs/workspace-activity.md) describes searchable action history,
 immutable event provenance, pagination and historical coverage.
+
+Playbook releases can be checked with `pnpm evaluate:playbook`. See the [evaluation harness](tooling/evaluation/README.md) for historical capture, fixtures and reports.
