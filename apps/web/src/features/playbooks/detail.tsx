@@ -9,6 +9,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@luma/ui/components/dialog';
+import { Select } from '@luma/ui/components/select';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams, useSearch } from '@tanstack/react-router';
 import { ArrowLeft, BookOpen, ShieldCheck } from 'lucide-react';
@@ -263,23 +264,19 @@ export function PlaybookDetailView({
       <div className="playbook-version-bar">
         <label>
           Version
-          <select
+          <Select
             aria-label="Version"
             value={version.version}
-            onChange={(e) => {
-              setSelected(e.target.value);
+            onValueChange={(value) => {
+              if (value === null) return;
+              setSelected(value);
               setActivate(false);
             }}
-          >
-            {detail.versions.map((v) => (
-              <option key={v.version} value={v.version}>
-                {v.version}
-                {v.version === detail.summary.availableVersion
-                  ? ' — latest published'
-                  : ''}
-              </option>
-            ))}
-          </select>
+            options={detail.versions.map((v) => ({
+              value: v.version,
+              label: `${v.version}${v.version === detail.summary.availableVersion ? ' — latest published' : ''}`,
+            }))}
+          />
         </label>
         <span>
           {version.provenance.kind === 'pilot'

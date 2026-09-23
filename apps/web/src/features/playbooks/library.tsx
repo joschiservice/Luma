@@ -1,5 +1,6 @@
 import type { PlaybookSummary } from '@luma/api-contract';
 import { Button } from '@luma/ui/button';
+import { Select } from '@luma/ui/components/select';
 import { useQuery } from '@tanstack/react-query';
 import {
   Link,
@@ -139,33 +140,37 @@ export function PlaybookLibraryView({
         </label>
         <label>
           System
-          <select
+          <Select
             aria-label="System"
             value={filters.system ?? ''}
-            onChange={(e) => change({ ...filters, system: e.target.value })}
-          >
-            <option value="">All systems</option>
-            {Object.entries(systemNames).map(([id, name]) => (
-              <option key={id} value={id}>
-                {name}
-              </option>
-            ))}
-          </select>
+            onValueChange={(value) =>
+              change({ ...filters, system: value ?? '' })
+            }
+            options={[
+              { value: '', label: 'All systems' },
+              ...Object.entries(systemNames).map(([value, label]) => ({
+                value,
+                label,
+              })),
+            ]}
+          />
         </label>
         <label>
           Activation status
-          <select
+          <Select
             aria-label="Activation status"
             value={filters.status ?? ''}
-            onChange={(e) => change({ ...filters, status: e.target.value })}
-          >
-            <option value="">All statuses</option>
-            {Object.entries(statusNames).map(([id, name]) => (
-              <option key={id} value={id}>
-                {name}
-              </option>
-            ))}
-          </select>
+            onValueChange={(value) =>
+              change({ ...filters, status: value ?? '' })
+            }
+            options={[
+              { value: '', label: 'All statuses' },
+              ...Object.entries(statusNames).map(([value, label]) => ({
+                value,
+                label,
+              })),
+            ]}
+          />
         </label>
       </div>
       {error ? (

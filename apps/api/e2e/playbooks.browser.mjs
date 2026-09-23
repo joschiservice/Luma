@@ -57,6 +57,18 @@ it('finds, reviews, activates, reloads and revokes a persisted playbook with wor
     name = version.definition.name;
   await page.getByRole('link', { name: 'Playbooks', exact: true }).click();
   await page.getByRole('link', { name }).waitFor();
+  await page.getByRole('combobox', { name: 'System' }).click();
+  await page.getByRole('option', { name: 'Shopify' }).click();
+  await page.getByRole('heading', { name: 'No matching playbooks' }).waitFor();
+  await page.getByRole('combobox', { name: 'System' }).click();
+  await page.getByRole('option', { name: 'All systems' }).click();
+  await page.getByRole('link', { name }).waitFor();
+  await page.getByRole('combobox', { name: 'Activation status' }).click();
+  await page.getByRole('option', { name: 'Active', exact: true }).click();
+  await page.getByRole('heading', { name: 'No matching playbooks' }).waitFor();
+  await page.getByRole('combobox', { name: 'Activation status' }).click();
+  await page.getByRole('option', { name: 'All statuses' }).click();
+  await page.getByRole('link', { name }).waitFor();
   await page.getByLabel('Search by name').fill('missing');
   await page.getByRole('heading', { name: 'No matching playbooks' }).waitFor();
   await page.getByRole('button', { name: 'Clear filters' }).click();
@@ -69,9 +81,8 @@ it('finds, reviews, activates, reloads and revokes a persisted playbook with wor
     .getByRole('button', { name: 'Review activation', exact: true })
     .click();
   const dialog = page.getByRole('dialog');
-  await dialog
-    .getByLabel('Connection', { exact: true })
-    .selectOption(connectionId);
+  await dialog.getByRole('combobox', { name: 'Connection' }).click();
+  await page.getByRole('option', { name: 'JTL warehouse' }).click();
   await dialog
     .getByRole('checkbox', { name: new RegExp('Order 1042') })
     .check();

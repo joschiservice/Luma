@@ -1274,9 +1274,7 @@ summary {
   gap: 8px;
   align-items: center;
 }
-.playbooks-page input[type='search'],
-.playbooks-page select,
-.playbook-dialog select {
+.playbooks-page input[type='search'] {
   width: 100%;
   min-height: 40px;
   border: 1px solid var(--border);

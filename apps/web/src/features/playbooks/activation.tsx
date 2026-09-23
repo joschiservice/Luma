@@ -1,5 +1,6 @@
 import type { ActivatePlaybook, PlaybookDetail } from '@luma/api-contract';
 import { Button } from '@luma/ui/button';
+import { Select } from '@luma/ui/components/select';
 import { useState } from 'react';
 
 import { IdentityError } from '../identity/data';
@@ -88,24 +89,24 @@ export function ActivationForm({
         <legend>Connection and order scope</legend>
         <label>
           Connection
-          <select
+          <Select
             aria-label="Connection"
             required
             value={connectionId}
-            onChange={(e) => {
-              setConnectionId(e.target.value);
+            onValueChange={(value) => {
+              setConnectionId(value ?? '');
               setTargetIds([]);
               setReviewedRevision(null);
             }}
-          >
-            <option value="">Select an eligible connection</option>
-            {detail.connections.map((c) => (
-              <option key={c.id} value={c.id} disabled={c.blockers.length > 0}>
-                {c.label}
-                {c.blockers.length ? ' — prerequisites missing' : ''}
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: '', label: 'Select an eligible connection' },
+              ...detail.connections.map((c) => ({
+                value: c.id,
+                label: `${c.label}${c.blockers.length ? ' — prerequisites missing' : ''}`,
+                disabled: c.blockers.length > 0,
+              })),
+            ]}
+          />
         </label>
         {connection ? (
           <fieldset className="playbook-targets">
