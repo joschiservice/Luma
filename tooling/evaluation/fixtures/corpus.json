@@ -1,0 +1,2456 @@
+{
+  "schemaVersion": 1,
+  "version": "shipping-correction/1",
+  "fixture": {
+    "version": "1",
+    "provider": {
+      "id": "evaluation",
+      "seed": 44,
+      "random": 44,
+      "nextOrder": 11,
+      "scenario": "manual",
+      "clock": {
+        "now": 1767225600000,
+        "running": false,
+        "speed": 1,
+        "sequence": 4,
+        "events": [],
+        "journal": [
+          {
+            "sequence": 1,
+            "time": 1767225600000,
+            "kind": "merchant",
+            "detail": {
+              "kind": "order",
+              "id": "1",
+              "quantity": 2
+            },
+            "instance": "jtl",
+            "resource": "1"
+          },
+          {
+            "sequence": 2,
+            "time": 1767225600000,
+            "kind": "merchant",
+            "detail": {
+              "kind": "order",
+              "id": "1",
+              "quantity": 2
+            },
+            "instance": "shopify",
+            "resource": "1"
+          },
+          {
+            "sequence": 3,
+            "time": 1767225600000,
+            "kind": "merchant",
+            "detail": {
+              "kind": "order",
+              "id": "10",
+              "quantity": 2
+            },
+            "instance": "jtl",
+            "resource": "10"
+          },
+          {
+            "sequence": 4,
+            "time": 1767225600000,
+            "kind": "merchant",
+            "detail": {
+              "kind": "order",
+              "id": "10",
+              "quantity": 2
+            },
+            "instance": "shopify",
+            "resource": "10"
+          }
+        ],
+        "faults": []
+      },
+      "serviceHealth": {
+        "jtl": "healthy",
+        "shopify": "healthy"
+      },
+      "jtl": {
+        "orders": [
+          {
+            "id": "1",
+            "salesOrderNumber": "SIM-1",
+            "isCancelled": false,
+            "deliveryStatus": 1,
+            "paymentStatus": 2,
+            "shippingMethodId": "7"
+          },
+          {
+            "id": "10",
+            "salesOrderNumber": "SIM-10",
+            "isCancelled": false,
+            "deliveryStatus": 1,
+            "paymentStatus": 2,
+            "shippingMethodId": "7"
+          }
+        ],
+        "lines": [
+          {
+            "id": "1",
+            "salesOrderId": "1",
+            "itemId": "1",
+            "quantity": "2",
+            "salesUnit": "each"
+          },
+          {
+            "id": "10",
+            "salesOrderId": "10",
+            "itemId": "1",
+            "quantity": "2",
+            "salesUnit": "each"
+          }
+        ],
+        "items": [
+          {
+            "id": "1",
+            "sKU": "LUMA-001",
+            "name": "Canvas tote",
+            "unit": "each",
+            "isActive": true,
+            "isInventoryManagementActive": true,
+            "stockTotal": "100",
+            "stockReservedTotal": "4",
+            "stockAvailable": "96"
+          }
+        ],
+        "notes": [],
+        "noteLines": [],
+        "shippingMethods": [
+          {
+            "id": "7",
+            "name": "Standard"
+          },
+          {
+            "id": "8",
+            "name": "Express"
+          },
+          {
+            "id": "9",
+            "name": "Pickup"
+          }
+        ]
+      },
+      "shopify": {
+        "nodes": {
+          "gid://shopify/Product/1": {
+            "id": "gid://shopify/Product/1",
+            "updatedAt": "2026-01-01T00:00:00.000Z",
+            "title": "Canvas tote",
+            "status": "ACTIVE"
+          },
+          "gid://shopify/ProductVariant/1": {
+            "id": "gid://shopify/ProductVariant/1",
+            "sku": "LUMA-001",
+            "inventoryItem": {
+              "id": "gid://shopify/InventoryItem/1"
+            }
+          },
+          "gid://shopify/InventoryItem/1": {
+            "id": "gid://shopify/InventoryItem/1",
+            "tracked": true
+          },
+          "gid://shopify/InventoryLevel/1": {
+            "id": "gid://shopify/InventoryLevel/1",
+            "updatedAt": "2026-01-01T00:00:00.000Z",
+            "location": {
+              "id": "gid://shopify/Location/1"
+            },
+            "quantities": [
+              {
+                "name": "on_hand",
+                "quantity": 100
+              },
+              {
+                "name": "committed",
+                "quantity": 4
+              },
+              {
+                "name": "available",
+                "quantity": 96
+              }
+            ]
+          },
+          "gid://shopify/Order/1": {
+            "id": "gid://shopify/Order/1",
+            "updatedAt": "2026-01-01T00:00:00.000Z",
+            "name": "#SIM-1",
+            "cancelledAt": null,
+            "closed": false,
+            "displayFinancialStatus": "PAID",
+            "fulfillments": []
+          },
+          "gid://shopify/LineItem/1": {
+            "id": "gid://shopify/LineItem/1",
+            "quantity": 2,
+            "variant": {
+              "inventoryItem": {
+                "id": "gid://shopify/InventoryItem/1"
+              }
+            }
+          },
+          "gid://shopify/FulfillmentOrder/1": {
+            "id": "gid://shopify/FulfillmentOrder/1",
+            "updatedAt": "2026-01-01T00:00:00.000Z",
+            "status": "OPEN"
+          },
+          "gid://shopify/FulfillmentOrderLineItem/1": {
+            "id": "gid://shopify/FulfillmentOrderLineItem/1",
+            "remainingQuantity": 2,
+            "lineItem": {
+              "id": "gid://shopify/LineItem/1"
+            }
+          },
+          "gid://shopify/Order/10": {
+            "id": "gid://shopify/Order/10",
+            "updatedAt": "2026-01-01T00:00:00.000Z",
+            "name": "#SIM-10",
+            "cancelledAt": null,
+            "closed": false,
+            "displayFinancialStatus": "PAID",
+            "fulfillments": []
+          },
+          "gid://shopify/LineItem/10": {
+            "id": "gid://shopify/LineItem/10",
+            "quantity": 2,
+            "variant": {
+              "inventoryItem": {
+                "id": "gid://shopify/InventoryItem/1"
+              }
+            }
+          },
+          "gid://shopify/FulfillmentOrder/10": {
+            "id": "gid://shopify/FulfillmentOrder/10",
+            "updatedAt": "2026-01-01T00:00:00.000Z",
+            "status": "OPEN"
+          },
+          "gid://shopify/FulfillmentOrderLineItem/10": {
+            "id": "gid://shopify/FulfillmentOrderLineItem/10",
+            "remainingQuantity": 2,
+            "lineItem": {
+              "id": "gid://shopify/LineItem/10"
+            }
+          }
+        },
+        "roots": {
+          "orders": ["gid://shopify/Order/1", "gid://shopify/Order/10"],
+          "products": ["gid://shopify/Product/1"],
+          "inventoryItems": ["gid://shopify/InventoryItem/1"]
+        },
+        "children": {
+          "gid://shopify/Product/1": {
+            "variants": ["gid://shopify/ProductVariant/1"]
+          },
+          "gid://shopify/InventoryItem/1": {
+            "inventoryLevels": ["gid://shopify/InventoryLevel/1"]
+          },
+          "gid://shopify/Order/1": {
+            "lineItems": ["gid://shopify/LineItem/1"],
+            "fulfillmentOrders": ["gid://shopify/FulfillmentOrder/1"]
+          },
+          "gid://shopify/FulfillmentOrder/1": {
+            "lineItems": ["gid://shopify/FulfillmentOrderLineItem/1"]
+          },
+          "gid://shopify/Order/10": {
+            "lineItems": ["gid://shopify/LineItem/10"],
+            "fulfillmentOrders": ["gid://shopify/FulfillmentOrder/10"]
+          },
+          "gid://shopify/FulfillmentOrder/10": {
+            "lineItems": ["gid://shopify/FulfillmentOrderLineItem/10"]
+          }
+        }
+      },
+      "mappings": [
+        {
+          "jtl": "1",
+          "shopify": "gid://shopify/Order/1"
+        },
+        {
+          "jtl": "10",
+          "shopify": "gid://shopify/Order/10"
+        }
+      ]
+    },
+    "incident": {
+      "id": "00000000-0000-4000-8000-000000000007",
+      "activationId": "00000000-0000-4000-8000-000000000008",
+      "shopifyConnectionId": "00000000-0000-4000-8000-000000000003",
+      "provenance": {
+        "kind": "synthetic",
+        "reference": "LUMA-46:shipping-correction-v1"
+      },
+      "action": {
+        "schemaVersion": 1,
+        "id": "00000000-0000-4000-8000-000000000005",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "connectionId": "00000000-0000-4000-8000-000000000002",
+        "capability": "orders.shipping-method.write",
+        "capabilityVersion": "0",
+        "target": {
+          "kind": "order",
+          "id": "00000000-0000-4000-8000-000000000004"
+        },
+        "parameters": {},
+        "preconditions": {
+          "evidenceRefs": ["00000000-0000-4000-8000-000000000006"],
+          "validUntil": "2026-01-01T01:00:00.000Z"
+        },
+        "expectedPostcondition": {
+          "shippingMethodId": "8"
+        },
+        "risk": "high",
+        "proposedBy": {
+          "kind": "user",
+          "id": "requester"
+        },
+        "expiresAt": "2026-01-01T01:00:00.000Z"
+      },
+      "mapping": {
+        "order": {
+          "externalId": "1",
+          "scopeKey": ""
+        },
+        "expectedShippingMethod": {
+          "externalId": "7",
+          "scopeKey": ""
+        },
+        "shippingMethod": {
+          "externalId": "8",
+          "scopeKey": ""
+        }
+      },
+      "snapshot": {
+        "inputs": {
+          "shippingMethodId": "8"
+        },
+        "evidence": {
+          "kind": "workflow_failure",
+          "facts": {
+            "diagnosisReady": true,
+            "methodMapped": true
+          },
+          "observations": [
+            {
+              "id": "00000000-0000-4000-8000-000000000006",
+              "observedAt": "2026-01-01T00:00:00.000Z",
+              "source": "jtl:historical-snapshot"
+            }
+          ]
+        },
+        "provenance": {
+          "reference": "synthetic:shipping-correction-v1",
+          "capturedAt": "2026-01-01T00:00:00.000Z"
+        }
+      },
+      "reads": [
+        {
+          "connectionId": "00000000-0000-4000-8000-000000000002",
+          "capability": "orders.shipping-method.read",
+          "version": "0",
+          "input": {
+            "order": {
+              "externalId": "1",
+              "scopeKey": ""
+            },
+            "limit": 1
+          }
+        },
+        {
+          "connectionId": "00000000-0000-4000-8000-000000000003",
+          "capability": "orders.read",
+          "version": "0",
+          "input": {
+            "limit": 1
+          }
+        }
+      ],
+      "grants": {
+        "principalIds": ["requester"],
+        "connectionIds": ["00000000-0000-4000-8000-000000000002"],
+        "targetIds": ["00000000-0000-4000-8000-000000000004"]
+      },
+      "authority": {
+        "authoritative": true,
+        "reference": "JTL owns shipping method; Shopify supplies order context"
+      },
+      "diagnosis": {
+        "status": "ready",
+        "revision": 1,
+        "cause": "Mapped shipping method differs from JTL order"
+      }
+    }
+  },
+  "scenarios": [
+    {
+      "id": "verified-correction",
+      "version": "1",
+      "controls": {
+        "commands": [
+          {
+            "kind": "execute"
+          },
+          {
+            "kind": "approve"
+          },
+          {
+            "kind": "execute"
+          }
+        ]
+      },
+      "expected": {
+        "calls": [
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000002",
+            "capability": "orders.shipping-method.read",
+            "version": "0",
+            "input": {
+              "order": {
+                "externalId": "1",
+                "scopeKey": ""
+              },
+              "limit": 1
+            }
+          },
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000003",
+            "capability": "orders.read",
+            "version": "0",
+            "input": {
+              "limit": 1
+            }
+          },
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000002",
+            "capability": "orders.shipping-method.write",
+            "version": "0",
+            "input": {
+              "order": {
+                "externalId": "1",
+                "scopeKey": ""
+              },
+              "expectedShippingMethod": {
+                "externalId": "7",
+                "scopeKey": ""
+              },
+              "shippingMethod": {
+                "externalId": "8",
+                "scopeKey": ""
+              }
+            },
+            "idempotencyKey": "v0:00000000-0000-4000-8000-000000000005"
+          },
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000002",
+            "capability": "orders.shipping-method.read",
+            "version": "0",
+            "input": {
+              "order": {
+                "externalId": "1",
+                "scopeKey": ""
+              },
+              "limit": 1
+            }
+          }
+        ],
+        "providerWrites": [
+          {
+            "instance": "jtl",
+            "method": "PATCH",
+            "path": "/api/eazybusiness/sales-orders/1",
+            "body": {
+              "shippingMethodId": "8",
+              "disableAutomaticWorkflows": true
+            }
+          }
+        ],
+        "outcomes": [
+          {
+            "state": "awaiting_approval",
+            "reason": "approval_required"
+          },
+          {
+            "state": "verified",
+            "reason": "verified"
+          }
+        ],
+        "shippingMethodId": "8"
+      }
+    },
+    {
+      "id": "retry-idempotency",
+      "version": "1",
+      "controls": {
+        "commands": [
+          {
+            "kind": "execute"
+          },
+          {
+            "kind": "approve"
+          },
+          {
+            "kind": "execute"
+          },
+          {
+            "kind": "execute"
+          },
+          {
+            "kind": "restart"
+          },
+          {
+            "kind": "execute"
+          }
+        ]
+      },
+      "expected": {
+        "calls": [
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000002",
+            "capability": "orders.shipping-method.read",
+            "version": "0",
+            "input": {
+              "order": {
+                "externalId": "1",
+                "scopeKey": ""
+              },
+              "limit": 1
+            }
+          },
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000003",
+            "capability": "orders.read",
+            "version": "0",
+            "input": {
+              "limit": 1
+            }
+          },
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000002",
+            "capability": "orders.shipping-method.write",
+            "version": "0",
+            "input": {
+              "order": {
+                "externalId": "1",
+                "scopeKey": ""
+              },
+              "expectedShippingMethod": {
+                "externalId": "7",
+                "scopeKey": ""
+              },
+              "shippingMethod": {
+                "externalId": "8",
+                "scopeKey": ""
+              }
+            },
+            "idempotencyKey": "v0:00000000-0000-4000-8000-000000000005"
+          },
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000002",
+            "capability": "orders.shipping-method.read",
+            "version": "0",
+            "input": {
+              "order": {
+                "externalId": "1",
+                "scopeKey": ""
+              },
+              "limit": 1
+            }
+          }
+        ],
+        "providerWrites": [
+          {
+            "instance": "jtl",
+            "method": "PATCH",
+            "path": "/api/eazybusiness/sales-orders/1",
+            "body": {
+              "shippingMethodId": "8",
+              "disableAutomaticWorkflows": true
+            }
+          }
+        ],
+        "outcomes": [
+          {
+            "state": "awaiting_approval",
+            "reason": "approval_required"
+          },
+          {
+            "state": "verified",
+            "reason": "verified"
+          },
+          {
+            "state": "verified",
+            "reason": "verified"
+          },
+          {
+            "state": "verified",
+            "reason": "verified"
+          }
+        ],
+        "shippingMethodId": "8"
+      }
+    },
+    {
+      "id": "stale-evidence",
+      "version": "1",
+      "controls": {
+        "commands": [
+          {
+            "kind": "advance",
+            "ms": 300000
+          },
+          {
+            "kind": "execute"
+          }
+        ]
+      },
+      "expected": {
+        "calls": [
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000002",
+            "capability": "orders.shipping-method.read",
+            "version": "0",
+            "input": {
+              "order": {
+                "externalId": "1",
+                "scopeKey": ""
+              },
+              "limit": 1
+            }
+          },
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000003",
+            "capability": "orders.read",
+            "version": "0",
+            "input": {
+              "limit": 1
+            }
+          }
+        ],
+        "providerWrites": [],
+        "outcomes": [
+          {
+            "state": "escalated",
+            "reason": "stale_evidence"
+          }
+        ],
+        "shippingMethodId": "7"
+      }
+    },
+    {
+      "id": "policy-denial",
+      "version": "1",
+      "controls": {
+        "commands": [
+          {
+            "kind": "execute"
+          },
+          {
+            "kind": "reject"
+          },
+          {
+            "kind": "execute"
+          }
+        ]
+      },
+      "expected": {
+        "calls": [
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000002",
+            "capability": "orders.shipping-method.read",
+            "version": "0",
+            "input": {
+              "order": {
+                "externalId": "1",
+                "scopeKey": ""
+              },
+              "limit": 1
+            }
+          },
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000003",
+            "capability": "orders.read",
+            "version": "0",
+            "input": {
+              "limit": 1
+            }
+          }
+        ],
+        "providerWrites": [],
+        "outcomes": [
+          {
+            "state": "awaiting_approval",
+            "reason": "approval_required"
+          },
+          {
+            "state": "denied",
+            "reason": "policy_denied"
+          }
+        ],
+        "shippingMethodId": "7"
+      }
+    },
+    {
+      "id": "tenant-isolation",
+      "version": "1",
+      "controls": {
+        "commands": [
+          {
+            "kind": "foreign-tenant"
+          },
+          {
+            "kind": "execute"
+          },
+          {
+            "kind": "approve"
+          },
+          {
+            "kind": "execute"
+          },
+          {
+            "kind": "foreign-tenant"
+          }
+        ]
+      },
+      "expected": {
+        "calls": [
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000002",
+            "capability": "orders.shipping-method.read",
+            "version": "0",
+            "input": {
+              "order": {
+                "externalId": "1",
+                "scopeKey": ""
+              },
+              "limit": 1
+            }
+          },
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000003",
+            "capability": "orders.read",
+            "version": "0",
+            "input": {
+              "limit": 1
+            }
+          },
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000002",
+            "capability": "orders.shipping-method.write",
+            "version": "0",
+            "input": {
+              "order": {
+                "externalId": "1",
+                "scopeKey": ""
+              },
+              "expectedShippingMethod": {
+                "externalId": "7",
+                "scopeKey": ""
+              },
+              "shippingMethod": {
+                "externalId": "8",
+                "scopeKey": ""
+              }
+            },
+            "idempotencyKey": "v0:00000000-0000-4000-8000-000000000005"
+          },
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000002",
+            "capability": "orders.shipping-method.read",
+            "version": "0",
+            "input": {
+              "order": {
+                "externalId": "1",
+                "scopeKey": ""
+              },
+              "limit": 1
+            }
+          }
+        ],
+        "providerWrites": [
+          {
+            "instance": "jtl",
+            "method": "PATCH",
+            "path": "/api/eazybusiness/sales-orders/1",
+            "body": {
+              "shippingMethodId": "8",
+              "disableAutomaticWorkflows": true
+            }
+          }
+        ],
+        "outcomes": [
+          {
+            "state": "awaiting_approval",
+            "reason": "approval_required"
+          },
+          {
+            "state": "verified",
+            "reason": "verified"
+          }
+        ],
+        "shippingMethodId": "8"
+      }
+    },
+    {
+      "id": "worker-restart",
+      "version": "1",
+      "controls": {
+        "commands": [
+          {
+            "kind": "execute"
+          },
+          {
+            "kind": "approve"
+          },
+          {
+            "kind": "execute"
+          },
+          {
+            "kind": "restart"
+          },
+          {
+            "kind": "reconcile"
+          },
+          {
+            "kind": "execute"
+          }
+        ],
+        "crashBeforeCompletion": true
+      },
+      "expected": {
+        "calls": [
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000002",
+            "capability": "orders.shipping-method.read",
+            "version": "0",
+            "input": {
+              "order": {
+                "externalId": "1",
+                "scopeKey": ""
+              },
+              "limit": 1
+            }
+          },
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000003",
+            "capability": "orders.read",
+            "version": "0",
+            "input": {
+              "limit": 1
+            }
+          },
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000002",
+            "capability": "orders.shipping-method.write",
+            "version": "0",
+            "input": {
+              "order": {
+                "externalId": "1",
+                "scopeKey": ""
+              },
+              "expectedShippingMethod": {
+                "externalId": "7",
+                "scopeKey": ""
+              },
+              "shippingMethod": {
+                "externalId": "8",
+                "scopeKey": ""
+              }
+            },
+            "idempotencyKey": "v0:00000000-0000-4000-8000-000000000005"
+          },
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000002",
+            "capability": "orders.shipping-method.read",
+            "version": "0",
+            "input": {
+              "order": {
+                "externalId": "1",
+                "scopeKey": ""
+              },
+              "limit": 1
+            }
+          },
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000002",
+            "capability": "orders.shipping-method.read",
+            "version": "0",
+            "input": {
+              "order": {
+                "externalId": "1",
+                "scopeKey": ""
+              },
+              "limit": 1
+            }
+          }
+        ],
+        "providerWrites": [
+          {
+            "instance": "jtl",
+            "method": "PATCH",
+            "path": "/api/eazybusiness/sales-orders/1",
+            "body": {
+              "shippingMethodId": "8",
+              "disableAutomaticWorkflows": true
+            }
+          }
+        ],
+        "outcomes": [
+          {
+            "state": "awaiting_approval",
+            "reason": "approval_required"
+          },
+          {
+            "state": "escalated",
+            "reason": "reconciliation_required"
+          },
+          {
+            "state": "verified",
+            "reason": "verified"
+          },
+          {
+            "state": "verified",
+            "reason": "verified"
+          }
+        ],
+        "shippingMethodId": "8"
+      }
+    },
+    {
+      "id": "delayed-verification",
+      "version": "1",
+      "controls": {
+        "commands": [
+          {
+            "kind": "execute"
+          },
+          {
+            "kind": "approve"
+          },
+          {
+            "kind": "execute"
+          }
+        ],
+        "verificationDelayMs": 2000
+      },
+      "expected": {
+        "calls": [
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000002",
+            "capability": "orders.shipping-method.read",
+            "version": "0",
+            "input": {
+              "order": {
+                "externalId": "1",
+                "scopeKey": ""
+              },
+              "limit": 1
+            }
+          },
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000003",
+            "capability": "orders.read",
+            "version": "0",
+            "input": {
+              "limit": 1
+            }
+          },
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000002",
+            "capability": "orders.shipping-method.write",
+            "version": "0",
+            "input": {
+              "order": {
+                "externalId": "1",
+                "scopeKey": ""
+              },
+              "expectedShippingMethod": {
+                "externalId": "7",
+                "scopeKey": ""
+              },
+              "shippingMethod": {
+                "externalId": "8",
+                "scopeKey": ""
+              }
+            },
+            "idempotencyKey": "v0:00000000-0000-4000-8000-000000000005"
+          },
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000002",
+            "capability": "orders.shipping-method.read",
+            "version": "0",
+            "input": {
+              "order": {
+                "externalId": "1",
+                "scopeKey": ""
+              },
+              "limit": 1
+            }
+          }
+        ],
+        "providerWrites": [
+          {
+            "instance": "jtl",
+            "method": "PATCH",
+            "path": "/api/eazybusiness/sales-orders/1",
+            "body": {
+              "shippingMethodId": "8",
+              "disableAutomaticWorkflows": true
+            }
+          }
+        ],
+        "outcomes": [
+          {
+            "state": "awaiting_approval",
+            "reason": "approval_required"
+          },
+          {
+            "state": "verified",
+            "reason": "verified"
+          }
+        ],
+        "shippingMethodId": "8"
+      }
+    },
+    {
+      "id": "verification-window-exceeded",
+      "version": "1",
+      "controls": {
+        "commands": [
+          {
+            "kind": "execute"
+          },
+          {
+            "kind": "approve"
+          },
+          {
+            "kind": "execute"
+          }
+        ],
+        "verificationDelayMs": 300001
+      },
+      "expected": {
+        "calls": [
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000002",
+            "capability": "orders.shipping-method.read",
+            "version": "0",
+            "input": {
+              "order": {
+                "externalId": "1",
+                "scopeKey": ""
+              },
+              "limit": 1
+            }
+          },
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000003",
+            "capability": "orders.read",
+            "version": "0",
+            "input": {
+              "limit": 1
+            }
+          },
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000002",
+            "capability": "orders.shipping-method.write",
+            "version": "0",
+            "input": {
+              "order": {
+                "externalId": "1",
+                "scopeKey": ""
+              },
+              "expectedShippingMethod": {
+                "externalId": "7",
+                "scopeKey": ""
+              },
+              "shippingMethod": {
+                "externalId": "8",
+                "scopeKey": ""
+              }
+            },
+            "idempotencyKey": "v0:00000000-0000-4000-8000-000000000005"
+          },
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000002",
+            "capability": "orders.shipping-method.read",
+            "version": "0",
+            "input": {
+              "order": {
+                "externalId": "1",
+                "scopeKey": ""
+              },
+              "limit": 1
+            }
+          }
+        ],
+        "providerWrites": [
+          {
+            "instance": "jtl",
+            "method": "PATCH",
+            "path": "/api/eazybusiness/sales-orders/1",
+            "body": {
+              "shippingMethodId": "8",
+              "disableAutomaticWorkflows": true
+            }
+          }
+        ],
+        "outcomes": [
+          {
+            "state": "awaiting_approval",
+            "reason": "approval_required"
+          },
+          {
+            "state": "escalated",
+            "reason": "verification_window_exceeded"
+          }
+        ],
+        "shippingMethodId": "8"
+      }
+    },
+    {
+      "id": "failed-verification",
+      "version": "1",
+      "controls": {
+        "commands": [
+          {
+            "kind": "execute"
+          },
+          {
+            "kind": "approve"
+          },
+          {
+            "kind": "execute"
+          }
+        ],
+        "changeBeforeVerification": true
+      },
+      "expected": {
+        "calls": [
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000002",
+            "capability": "orders.shipping-method.read",
+            "version": "0",
+            "input": {
+              "order": {
+                "externalId": "1",
+                "scopeKey": ""
+              },
+              "limit": 1
+            }
+          },
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000003",
+            "capability": "orders.read",
+            "version": "0",
+            "input": {
+              "limit": 1
+            }
+          },
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000002",
+            "capability": "orders.shipping-method.write",
+            "version": "0",
+            "input": {
+              "order": {
+                "externalId": "1",
+                "scopeKey": ""
+              },
+              "expectedShippingMethod": {
+                "externalId": "7",
+                "scopeKey": ""
+              },
+              "shippingMethod": {
+                "externalId": "8",
+                "scopeKey": ""
+              }
+            },
+            "idempotencyKey": "v0:00000000-0000-4000-8000-000000000005"
+          },
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000002",
+            "capability": "orders.shipping-method.read",
+            "version": "0",
+            "input": {
+              "order": {
+                "externalId": "1",
+                "scopeKey": ""
+              },
+              "limit": 1
+            }
+          }
+        ],
+        "providerWrites": [
+          {
+            "instance": "jtl",
+            "method": "PATCH",
+            "path": "/api/eazybusiness/sales-orders/1",
+            "body": {
+              "shippingMethodId": "8",
+              "disableAutomaticWorkflows": true
+            }
+          }
+        ],
+        "outcomes": [
+          {
+            "state": "awaiting_approval",
+            "reason": "approval_required"
+          },
+          {
+            "state": "escalated",
+            "reason": "verification_failed"
+          }
+        ],
+        "shippingMethodId": "9"
+      }
+    },
+    {
+      "id": "lost-response",
+      "version": "1",
+      "controls": {
+        "commands": [
+          {
+            "kind": "execute"
+          },
+          {
+            "kind": "approve"
+          },
+          {
+            "kind": "execute"
+          },
+          {
+            "kind": "restart"
+          },
+          {
+            "kind": "reconcile"
+          },
+          {
+            "kind": "execute"
+          }
+        ]
+      },
+      "provider": {
+        "id": "evaluation",
+        "seed": 44,
+        "random": 44,
+        "nextOrder": 11,
+        "scenario": "manual",
+        "clock": {
+          "now": 1767225600000,
+          "running": false,
+          "speed": 1,
+          "sequence": 4,
+          "events": [],
+          "journal": [
+            {
+              "sequence": 1,
+              "time": 1767225600000,
+              "kind": "merchant",
+              "detail": {
+                "kind": "order",
+                "id": "1",
+                "quantity": 2
+              },
+              "instance": "jtl",
+              "resource": "1"
+            },
+            {
+              "sequence": 2,
+              "time": 1767225600000,
+              "kind": "merchant",
+              "detail": {
+                "kind": "order",
+                "id": "1",
+                "quantity": 2
+              },
+              "instance": "shopify",
+              "resource": "1"
+            },
+            {
+              "sequence": 3,
+              "time": 1767225600000,
+              "kind": "merchant",
+              "detail": {
+                "kind": "order",
+                "id": "10",
+                "quantity": 2
+              },
+              "instance": "jtl",
+              "resource": "10"
+            },
+            {
+              "sequence": 4,
+              "time": 1767225600000,
+              "kind": "merchant",
+              "detail": {
+                "kind": "order",
+                "id": "10",
+                "quantity": 2
+              },
+              "instance": "shopify",
+              "resource": "10"
+            }
+          ],
+          "faults": [
+            {
+              "id": "fault-1",
+              "instance": "jtl",
+              "operation": "orders.shipping-method.write",
+              "resource": "1",
+              "kind": "response-loss",
+              "phase": "after-commit",
+              "occurrence": 1,
+              "remaining": 1,
+              "matches": 0,
+              "status": "armed"
+            }
+          ]
+        },
+        "serviceHealth": {
+          "jtl": "healthy",
+          "shopify": "healthy"
+        },
+        "jtl": {
+          "orders": [
+            {
+              "id": "1",
+              "salesOrderNumber": "SIM-1",
+              "isCancelled": false,
+              "deliveryStatus": 1,
+              "paymentStatus": 2,
+              "shippingMethodId": "7"
+            },
+            {
+              "id": "10",
+              "salesOrderNumber": "SIM-10",
+              "isCancelled": false,
+              "deliveryStatus": 1,
+              "paymentStatus": 2,
+              "shippingMethodId": "7"
+            }
+          ],
+          "lines": [
+            {
+              "id": "1",
+              "salesOrderId": "1",
+              "itemId": "1",
+              "quantity": "2",
+              "salesUnit": "each"
+            },
+            {
+              "id": "10",
+              "salesOrderId": "10",
+              "itemId": "1",
+              "quantity": "2",
+              "salesUnit": "each"
+            }
+          ],
+          "items": [
+            {
+              "id": "1",
+              "sKU": "LUMA-001",
+              "name": "Canvas tote",
+              "unit": "each",
+              "isActive": true,
+              "isInventoryManagementActive": true,
+              "stockTotal": "100",
+              "stockReservedTotal": "4",
+              "stockAvailable": "96"
+            }
+          ],
+          "notes": [],
+          "noteLines": [],
+          "shippingMethods": [
+            {
+              "id": "7",
+              "name": "Standard"
+            },
+            {
+              "id": "8",
+              "name": "Express"
+            },
+            {
+              "id": "9",
+              "name": "Pickup"
+            }
+          ]
+        },
+        "shopify": {
+          "nodes": {
+            "gid://shopify/Product/1": {
+              "id": "gid://shopify/Product/1",
+              "updatedAt": "2026-01-01T00:00:00.000Z",
+              "title": "Canvas tote",
+              "status": "ACTIVE"
+            },
+            "gid://shopify/ProductVariant/1": {
+              "id": "gid://shopify/ProductVariant/1",
+              "sku": "LUMA-001",
+              "inventoryItem": {
+                "id": "gid://shopify/InventoryItem/1"
+              }
+            },
+            "gid://shopify/InventoryItem/1": {
+              "id": "gid://shopify/InventoryItem/1",
+              "tracked": true
+            },
+            "gid://shopify/InventoryLevel/1": {
+              "id": "gid://shopify/InventoryLevel/1",
+              "updatedAt": "2026-01-01T00:00:00.000Z",
+              "location": {
+                "id": "gid://shopify/Location/1"
+              },
+              "quantities": [
+                {
+                  "name": "on_hand",
+                  "quantity": 100
+                },
+                {
+                  "name": "committed",
+                  "quantity": 4
+                },
+                {
+                  "name": "available",
+                  "quantity": 96
+                }
+              ]
+            },
+            "gid://shopify/Order/1": {
+              "id": "gid://shopify/Order/1",
+              "updatedAt": "2026-01-01T00:00:00.000Z",
+              "name": "#SIM-1",
+              "cancelledAt": null,
+              "closed": false,
+              "displayFinancialStatus": "PAID",
+              "fulfillments": []
+            },
+            "gid://shopify/LineItem/1": {
+              "id": "gid://shopify/LineItem/1",
+              "quantity": 2,
+              "variant": {
+                "inventoryItem": {
+                  "id": "gid://shopify/InventoryItem/1"
+                }
+              }
+            },
+            "gid://shopify/FulfillmentOrder/1": {
+              "id": "gid://shopify/FulfillmentOrder/1",
+              "updatedAt": "2026-01-01T00:00:00.000Z",
+              "status": "OPEN"
+            },
+            "gid://shopify/FulfillmentOrderLineItem/1": {
+              "id": "gid://shopify/FulfillmentOrderLineItem/1",
+              "remainingQuantity": 2,
+              "lineItem": {
+                "id": "gid://shopify/LineItem/1"
+              }
+            },
+            "gid://shopify/Order/10": {
+              "id": "gid://shopify/Order/10",
+              "updatedAt": "2026-01-01T00:00:00.000Z",
+              "name": "#SIM-10",
+              "cancelledAt": null,
+              "closed": false,
+              "displayFinancialStatus": "PAID",
+              "fulfillments": []
+            },
+            "gid://shopify/LineItem/10": {
+              "id": "gid://shopify/LineItem/10",
+              "quantity": 2,
+              "variant": {
+                "inventoryItem": {
+                  "id": "gid://shopify/InventoryItem/1"
+                }
+              }
+            },
+            "gid://shopify/FulfillmentOrder/10": {
+              "id": "gid://shopify/FulfillmentOrder/10",
+              "updatedAt": "2026-01-01T00:00:00.000Z",
+              "status": "OPEN"
+            },
+            "gid://shopify/FulfillmentOrderLineItem/10": {
+              "id": "gid://shopify/FulfillmentOrderLineItem/10",
+              "remainingQuantity": 2,
+              "lineItem": {
+                "id": "gid://shopify/LineItem/10"
+              }
+            }
+          },
+          "roots": {
+            "orders": ["gid://shopify/Order/1", "gid://shopify/Order/10"],
+            "products": ["gid://shopify/Product/1"],
+            "inventoryItems": ["gid://shopify/InventoryItem/1"]
+          },
+          "children": {
+            "gid://shopify/Product/1": {
+              "variants": ["gid://shopify/ProductVariant/1"]
+            },
+            "gid://shopify/InventoryItem/1": {
+              "inventoryLevels": ["gid://shopify/InventoryLevel/1"]
+            },
+            "gid://shopify/Order/1": {
+              "lineItems": ["gid://shopify/LineItem/1"],
+              "fulfillmentOrders": ["gid://shopify/FulfillmentOrder/1"]
+            },
+            "gid://shopify/FulfillmentOrder/1": {
+              "lineItems": ["gid://shopify/FulfillmentOrderLineItem/1"]
+            },
+            "gid://shopify/Order/10": {
+              "lineItems": ["gid://shopify/LineItem/10"],
+              "fulfillmentOrders": ["gid://shopify/FulfillmentOrder/10"]
+            },
+            "gid://shopify/FulfillmentOrder/10": {
+              "lineItems": ["gid://shopify/FulfillmentOrderLineItem/10"]
+            }
+          }
+        },
+        "mappings": [
+          {
+            "jtl": "1",
+            "shopify": "gid://shopify/Order/1"
+          },
+          {
+            "jtl": "10",
+            "shopify": "gid://shopify/Order/10"
+          }
+        ]
+      },
+      "expected": {
+        "calls": [
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000002",
+            "capability": "orders.shipping-method.read",
+            "version": "0",
+            "input": {
+              "order": {
+                "externalId": "1",
+                "scopeKey": ""
+              },
+              "limit": 1
+            }
+          },
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000003",
+            "capability": "orders.read",
+            "version": "0",
+            "input": {
+              "limit": 1
+            }
+          },
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000002",
+            "capability": "orders.shipping-method.write",
+            "version": "0",
+            "input": {
+              "order": {
+                "externalId": "1",
+                "scopeKey": ""
+              },
+              "expectedShippingMethod": {
+                "externalId": "7",
+                "scopeKey": ""
+              },
+              "shippingMethod": {
+                "externalId": "8",
+                "scopeKey": ""
+              }
+            },
+            "idempotencyKey": "v0:00000000-0000-4000-8000-000000000005"
+          },
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000002",
+            "capability": "orders.shipping-method.read",
+            "version": "0",
+            "input": {
+              "order": {
+                "externalId": "1",
+                "scopeKey": ""
+              },
+              "limit": 1
+            }
+          }
+        ],
+        "providerWrites": [
+          {
+            "instance": "jtl",
+            "method": "PATCH",
+            "path": "/api/eazybusiness/sales-orders/1",
+            "body": {
+              "shippingMethodId": "8",
+              "disableAutomaticWorkflows": true
+            }
+          }
+        ],
+        "outcomes": [
+          {
+            "state": "awaiting_approval",
+            "reason": "approval_required"
+          },
+          {
+            "state": "escalated",
+            "reason": "reconciliation_required"
+          },
+          {
+            "state": "verified",
+            "reason": "verified"
+          },
+          {
+            "state": "verified",
+            "reason": "verified"
+          }
+        ],
+        "shippingMethodId": "8"
+      }
+    },
+    {
+      "id": "partial-failure",
+      "version": "1",
+      "controls": {
+        "commands": [
+          {
+            "kind": "execute"
+          },
+          {
+            "kind": "approve"
+          },
+          {
+            "kind": "execute"
+          },
+          {
+            "kind": "restart"
+          },
+          {
+            "kind": "reconcile"
+          }
+        ]
+      },
+      "provider": {
+        "id": "evaluation",
+        "seed": 44,
+        "random": 44,
+        "nextOrder": 11,
+        "scenario": "manual",
+        "clock": {
+          "now": 1767225600000,
+          "running": false,
+          "speed": 1,
+          "sequence": 4,
+          "events": [],
+          "journal": [
+            {
+              "sequence": 1,
+              "time": 1767225600000,
+              "kind": "merchant",
+              "detail": {
+                "kind": "order",
+                "id": "1",
+                "quantity": 2
+              },
+              "instance": "jtl",
+              "resource": "1"
+            },
+            {
+              "sequence": 2,
+              "time": 1767225600000,
+              "kind": "merchant",
+              "detail": {
+                "kind": "order",
+                "id": "1",
+                "quantity": 2
+              },
+              "instance": "shopify",
+              "resource": "1"
+            },
+            {
+              "sequence": 3,
+              "time": 1767225600000,
+              "kind": "merchant",
+              "detail": {
+                "kind": "order",
+                "id": "10",
+                "quantity": 2
+              },
+              "instance": "jtl",
+              "resource": "10"
+            },
+            {
+              "sequence": 4,
+              "time": 1767225600000,
+              "kind": "merchant",
+              "detail": {
+                "kind": "order",
+                "id": "10",
+                "quantity": 2
+              },
+              "instance": "shopify",
+              "resource": "10"
+            }
+          ],
+          "faults": [
+            {
+              "id": "fault-1",
+              "instance": "jtl",
+              "operation": "orders.shipping-method.read",
+              "resource": "1",
+              "kind": "outage",
+              "phase": "before",
+              "occurrence": 3,
+              "remaining": 1,
+              "matches": 0,
+              "status": "armed"
+            }
+          ]
+        },
+        "serviceHealth": {
+          "jtl": "healthy",
+          "shopify": "healthy"
+        },
+        "jtl": {
+          "orders": [
+            {
+              "id": "1",
+              "salesOrderNumber": "SIM-1",
+              "isCancelled": false,
+              "deliveryStatus": 1,
+              "paymentStatus": 2,
+              "shippingMethodId": "7"
+            },
+            {
+              "id": "10",
+              "salesOrderNumber": "SIM-10",
+              "isCancelled": false,
+              "deliveryStatus": 1,
+              "paymentStatus": 2,
+              "shippingMethodId": "7"
+            }
+          ],
+          "lines": [
+            {
+              "id": "1",
+              "salesOrderId": "1",
+              "itemId": "1",
+              "quantity": "2",
+              "salesUnit": "each"
+            },
+            {
+              "id": "10",
+              "salesOrderId": "10",
+              "itemId": "1",
+              "quantity": "2",
+              "salesUnit": "each"
+            }
+          ],
+          "items": [
+            {
+              "id": "1",
+              "sKU": "LUMA-001",
+              "name": "Canvas tote",
+              "unit": "each",
+              "isActive": true,
+              "isInventoryManagementActive": true,
+              "stockTotal": "100",
+              "stockReservedTotal": "4",
+              "stockAvailable": "96"
+            }
+          ],
+          "notes": [],
+          "noteLines": [],
+          "shippingMethods": [
+            {
+              "id": "7",
+              "name": "Standard"
+            },
+            {
+              "id": "8",
+              "name": "Express"
+            },
+            {
+              "id": "9",
+              "name": "Pickup"
+            }
+          ]
+        },
+        "shopify": {
+          "nodes": {
+            "gid://shopify/Product/1": {
+              "id": "gid://shopify/Product/1",
+              "updatedAt": "2026-01-01T00:00:00.000Z",
+              "title": "Canvas tote",
+              "status": "ACTIVE"
+            },
+            "gid://shopify/ProductVariant/1": {
+              "id": "gid://shopify/ProductVariant/1",
+              "sku": "LUMA-001",
+              "inventoryItem": {
+                "id": "gid://shopify/InventoryItem/1"
+              }
+            },
+            "gid://shopify/InventoryItem/1": {
+              "id": "gid://shopify/InventoryItem/1",
+              "tracked": true
+            },
+            "gid://shopify/InventoryLevel/1": {
+              "id": "gid://shopify/InventoryLevel/1",
+              "updatedAt": "2026-01-01T00:00:00.000Z",
+              "location": {
+                "id": "gid://shopify/Location/1"
+              },
+              "quantities": [
+                {
+                  "name": "on_hand",
+                  "quantity": 100
+                },
+                {
+                  "name": "committed",
+                  "quantity": 4
+                },
+                {
+                  "name": "available",
+                  "quantity": 96
+                }
+              ]
+            },
+            "gid://shopify/Order/1": {
+              "id": "gid://shopify/Order/1",
+              "updatedAt": "2026-01-01T00:00:00.000Z",
+              "name": "#SIM-1",
+              "cancelledAt": null,
+              "closed": false,
+              "displayFinancialStatus": "PAID",
+              "fulfillments": []
+            },
+            "gid://shopify/LineItem/1": {
+              "id": "gid://shopify/LineItem/1",
+              "quantity": 2,
+              "variant": {
+                "inventoryItem": {
+                  "id": "gid://shopify/InventoryItem/1"
+                }
+              }
+            },
+            "gid://shopify/FulfillmentOrder/1": {
+              "id": "gid://shopify/FulfillmentOrder/1",
+              "updatedAt": "2026-01-01T00:00:00.000Z",
+              "status": "OPEN"
+            },
+            "gid://shopify/FulfillmentOrderLineItem/1": {
+              "id": "gid://shopify/FulfillmentOrderLineItem/1",
+              "remainingQuantity": 2,
+              "lineItem": {
+                "id": "gid://shopify/LineItem/1"
+              }
+            },
+            "gid://shopify/Order/10": {
+              "id": "gid://shopify/Order/10",
+              "updatedAt": "2026-01-01T00:00:00.000Z",
+              "name": "#SIM-10",
+              "cancelledAt": null,
+              "closed": false,
+              "displayFinancialStatus": "PAID",
+              "fulfillments": []
+            },
+            "gid://shopify/LineItem/10": {
+              "id": "gid://shopify/LineItem/10",
+              "quantity": 2,
+              "variant": {
+                "inventoryItem": {
+                  "id": "gid://shopify/InventoryItem/1"
+                }
+              }
+            },
+            "gid://shopify/FulfillmentOrder/10": {
+              "id": "gid://shopify/FulfillmentOrder/10",
+              "updatedAt": "2026-01-01T00:00:00.000Z",
+              "status": "OPEN"
+            },
+            "gid://shopify/FulfillmentOrderLineItem/10": {
+              "id": "gid://shopify/FulfillmentOrderLineItem/10",
+              "remainingQuantity": 2,
+              "lineItem": {
+                "id": "gid://shopify/LineItem/10"
+              }
+            }
+          },
+          "roots": {
+            "orders": ["gid://shopify/Order/1", "gid://shopify/Order/10"],
+            "products": ["gid://shopify/Product/1"],
+            "inventoryItems": ["gid://shopify/InventoryItem/1"]
+          },
+          "children": {
+            "gid://shopify/Product/1": {
+              "variants": ["gid://shopify/ProductVariant/1"]
+            },
+            "gid://shopify/InventoryItem/1": {
+              "inventoryLevels": ["gid://shopify/InventoryLevel/1"]
+            },
+            "gid://shopify/Order/1": {
+              "lineItems": ["gid://shopify/LineItem/1"],
+              "fulfillmentOrders": ["gid://shopify/FulfillmentOrder/1"]
+            },
+            "gid://shopify/FulfillmentOrder/1": {
+              "lineItems": ["gid://shopify/FulfillmentOrderLineItem/1"]
+            },
+            "gid://shopify/Order/10": {
+              "lineItems": ["gid://shopify/LineItem/10"],
+              "fulfillmentOrders": ["gid://shopify/FulfillmentOrder/10"]
+            },
+            "gid://shopify/FulfillmentOrder/10": {
+              "lineItems": ["gid://shopify/FulfillmentOrderLineItem/10"]
+            }
+          }
+        },
+        "mappings": [
+          {
+            "jtl": "1",
+            "shopify": "gid://shopify/Order/1"
+          },
+          {
+            "jtl": "10",
+            "shopify": "gid://shopify/Order/10"
+          }
+        ]
+      },
+      "expected": {
+        "calls": [
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000002",
+            "capability": "orders.shipping-method.read",
+            "version": "0",
+            "input": {
+              "order": {
+                "externalId": "1",
+                "scopeKey": ""
+              },
+              "limit": 1
+            }
+          },
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000003",
+            "capability": "orders.read",
+            "version": "0",
+            "input": {
+              "limit": 1
+            }
+          },
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000002",
+            "capability": "orders.shipping-method.write",
+            "version": "0",
+            "input": {
+              "order": {
+                "externalId": "1",
+                "scopeKey": ""
+              },
+              "expectedShippingMethod": {
+                "externalId": "7",
+                "scopeKey": ""
+              },
+              "shippingMethod": {
+                "externalId": "8",
+                "scopeKey": ""
+              }
+            },
+            "idempotencyKey": "v0:00000000-0000-4000-8000-000000000005"
+          },
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000002",
+            "capability": "orders.shipping-method.read",
+            "version": "0",
+            "input": {
+              "order": {
+                "externalId": "1",
+                "scopeKey": ""
+              },
+              "limit": 1
+            }
+          },
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000002",
+            "capability": "orders.shipping-method.read",
+            "version": "0",
+            "input": {
+              "order": {
+                "externalId": "1",
+                "scopeKey": ""
+              },
+              "limit": 1
+            }
+          }
+        ],
+        "providerWrites": [
+          {
+            "instance": "jtl",
+            "method": "PATCH",
+            "path": "/api/eazybusiness/sales-orders/1",
+            "body": {
+              "shippingMethodId": "8",
+              "disableAutomaticWorkflows": true
+            }
+          }
+        ],
+        "outcomes": [
+          {
+            "state": "awaiting_approval",
+            "reason": "approval_required"
+          },
+          {
+            "state": "escalated",
+            "reason": "reconciliation_required"
+          },
+          {
+            "state": "verified",
+            "reason": "verified"
+          }
+        ],
+        "shippingMethodId": "8"
+      }
+    },
+    {
+      "id": "uncertain-dispatch-without-commit",
+      "version": "1",
+      "controls": {
+        "commands": [
+          {
+            "kind": "execute"
+          },
+          {
+            "kind": "approve"
+          },
+          {
+            "kind": "execute"
+          },
+          {
+            "kind": "restart"
+          },
+          {
+            "kind": "reconcile"
+          },
+          {
+            "kind": "execute"
+          }
+        ]
+      },
+      "provider": {
+        "id": "evaluation",
+        "seed": 44,
+        "random": 44,
+        "nextOrder": 11,
+        "scenario": "manual",
+        "clock": {
+          "now": 1767225600000,
+          "running": false,
+          "speed": 1,
+          "sequence": 4,
+          "events": [],
+          "journal": [
+            {
+              "sequence": 1,
+              "time": 1767225600000,
+              "kind": "merchant",
+              "detail": {
+                "kind": "order",
+                "id": "1",
+                "quantity": 2
+              },
+              "instance": "jtl",
+              "resource": "1"
+            },
+            {
+              "sequence": 2,
+              "time": 1767225600000,
+              "kind": "merchant",
+              "detail": {
+                "kind": "order",
+                "id": "1",
+                "quantity": 2
+              },
+              "instance": "shopify",
+              "resource": "1"
+            },
+            {
+              "sequence": 3,
+              "time": 1767225600000,
+              "kind": "merchant",
+              "detail": {
+                "kind": "order",
+                "id": "10",
+                "quantity": 2
+              },
+              "instance": "jtl",
+              "resource": "10"
+            },
+            {
+              "sequence": 4,
+              "time": 1767225600000,
+              "kind": "merchant",
+              "detail": {
+                "kind": "order",
+                "id": "10",
+                "quantity": 2
+              },
+              "instance": "shopify",
+              "resource": "10"
+            }
+          ],
+          "faults": [
+            {
+              "id": "fault-1",
+              "instance": "jtl",
+              "operation": "orders.shipping-method.write",
+              "resource": "1",
+              "kind": "outage",
+              "phase": "before",
+              "occurrence": 1,
+              "remaining": 1,
+              "matches": 0,
+              "status": "armed"
+            }
+          ]
+        },
+        "serviceHealth": {
+          "jtl": "healthy",
+          "shopify": "healthy"
+        },
+        "jtl": {
+          "orders": [
+            {
+              "id": "1",
+              "salesOrderNumber": "SIM-1",
+              "isCancelled": false,
+              "deliveryStatus": 1,
+              "paymentStatus": 2,
+              "shippingMethodId": "7"
+            },
+            {
+              "id": "10",
+              "salesOrderNumber": "SIM-10",
+              "isCancelled": false,
+              "deliveryStatus": 1,
+              "paymentStatus": 2,
+              "shippingMethodId": "7"
+            }
+          ],
+          "lines": [
+            {
+              "id": "1",
+              "salesOrderId": "1",
+              "itemId": "1",
+              "quantity": "2",
+              "salesUnit": "each"
+            },
+            {
+              "id": "10",
+              "salesOrderId": "10",
+              "itemId": "1",
+              "quantity": "2",
+              "salesUnit": "each"
+            }
+          ],
+          "items": [
+            {
+              "id": "1",
+              "sKU": "LUMA-001",
+              "name": "Canvas tote",
+              "unit": "each",
+              "isActive": true,
+              "isInventoryManagementActive": true,
+              "stockTotal": "100",
+              "stockReservedTotal": "4",
+              "stockAvailable": "96"
+            }
+          ],
+          "notes": [],
+          "noteLines": [],
+          "shippingMethods": [
+            {
+              "id": "7",
+              "name": "Standard"
+            },
+            {
+              "id": "8",
+              "name": "Express"
+            },
+            {
+              "id": "9",
+              "name": "Pickup"
+            }
+          ]
+        },
+        "shopify": {
+          "nodes": {
+            "gid://shopify/Product/1": {
+              "id": "gid://shopify/Product/1",
+              "updatedAt": "2026-01-01T00:00:00.000Z",
+              "title": "Canvas tote",
+              "status": "ACTIVE"
+            },
+            "gid://shopify/ProductVariant/1": {
+              "id": "gid://shopify/ProductVariant/1",
+              "sku": "LUMA-001",
+              "inventoryItem": {
+                "id": "gid://shopify/InventoryItem/1"
+              }
+            },
+            "gid://shopify/InventoryItem/1": {
+              "id": "gid://shopify/InventoryItem/1",
+              "tracked": true
+            },
+            "gid://shopify/InventoryLevel/1": {
+              "id": "gid://shopify/InventoryLevel/1",
+              "updatedAt": "2026-01-01T00:00:00.000Z",
+              "location": {
+                "id": "gid://shopify/Location/1"
+              },
+              "quantities": [
+                {
+                  "name": "on_hand",
+                  "quantity": 100
+                },
+                {
+                  "name": "committed",
+                  "quantity": 4
+                },
+                {
+                  "name": "available",
+                  "quantity": 96
+                }
+              ]
+            },
+            "gid://shopify/Order/1": {
+              "id": "gid://shopify/Order/1",
+              "updatedAt": "2026-01-01T00:00:00.000Z",
+              "name": "#SIM-1",
+              "cancelledAt": null,
+              "closed": false,
+              "displayFinancialStatus": "PAID",
+              "fulfillments": []
+            },
+            "gid://shopify/LineItem/1": {
+              "id": "gid://shopify/LineItem/1",
+              "quantity": 2,
+              "variant": {
+                "inventoryItem": {
+                  "id": "gid://shopify/InventoryItem/1"
+                }
+              }
+            },
+            "gid://shopify/FulfillmentOrder/1": {
+              "id": "gid://shopify/FulfillmentOrder/1",
+              "updatedAt": "2026-01-01T00:00:00.000Z",
+              "status": "OPEN"
+            },
+            "gid://shopify/FulfillmentOrderLineItem/1": {
+              "id": "gid://shopify/FulfillmentOrderLineItem/1",
+              "remainingQuantity": 2,
+              "lineItem": {
+                "id": "gid://shopify/LineItem/1"
+              }
+            },
+            "gid://shopify/Order/10": {
+              "id": "gid://shopify/Order/10",
+              "updatedAt": "2026-01-01T00:00:00.000Z",
+              "name": "#SIM-10",
+              "cancelledAt": null,
+              "closed": false,
+              "displayFinancialStatus": "PAID",
+              "fulfillments": []
+            },
+            "gid://shopify/LineItem/10": {
+              "id": "gid://shopify/LineItem/10",
+              "quantity": 2,
+              "variant": {
+                "inventoryItem": {
+                  "id": "gid://shopify/InventoryItem/1"
+                }
+              }
+            },
+            "gid://shopify/FulfillmentOrder/10": {
+              "id": "gid://shopify/FulfillmentOrder/10",
+              "updatedAt": "2026-01-01T00:00:00.000Z",
+              "status": "OPEN"
+            },
+            "gid://shopify/FulfillmentOrderLineItem/10": {
+              "id": "gid://shopify/FulfillmentOrderLineItem/10",
+              "remainingQuantity": 2,
+              "lineItem": {
+                "id": "gid://shopify/LineItem/10"
+              }
+            }
+          },
+          "roots": {
+            "orders": ["gid://shopify/Order/1", "gid://shopify/Order/10"],
+            "products": ["gid://shopify/Product/1"],
+            "inventoryItems": ["gid://shopify/InventoryItem/1"]
+          },
+          "children": {
+            "gid://shopify/Product/1": {
+              "variants": ["gid://shopify/ProductVariant/1"]
+            },
+            "gid://shopify/InventoryItem/1": {
+              "inventoryLevels": ["gid://shopify/InventoryLevel/1"]
+            },
+            "gid://shopify/Order/1": {
+              "lineItems": ["gid://shopify/LineItem/1"],
+              "fulfillmentOrders": ["gid://shopify/FulfillmentOrder/1"]
+            },
+            "gid://shopify/FulfillmentOrder/1": {
+              "lineItems": ["gid://shopify/FulfillmentOrderLineItem/1"]
+            },
+            "gid://shopify/Order/10": {
+              "lineItems": ["gid://shopify/LineItem/10"],
+              "fulfillmentOrders": ["gid://shopify/FulfillmentOrder/10"]
+            },
+            "gid://shopify/FulfillmentOrder/10": {
+              "lineItems": ["gid://shopify/FulfillmentOrderLineItem/10"]
+            }
+          }
+        },
+        "mappings": [
+          {
+            "jtl": "1",
+            "shopify": "gid://shopify/Order/1"
+          },
+          {
+            "jtl": "10",
+            "shopify": "gid://shopify/Order/10"
+          }
+        ]
+      },
+      "expected": {
+        "calls": [
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000002",
+            "capability": "orders.shipping-method.read",
+            "version": "0",
+            "input": {
+              "order": {
+                "externalId": "1",
+                "scopeKey": ""
+              },
+              "limit": 1
+            }
+          },
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000003",
+            "capability": "orders.read",
+            "version": "0",
+            "input": {
+              "limit": 1
+            }
+          },
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000002",
+            "capability": "orders.shipping-method.write",
+            "version": "0",
+            "input": {
+              "order": {
+                "externalId": "1",
+                "scopeKey": ""
+              },
+              "expectedShippingMethod": {
+                "externalId": "7",
+                "scopeKey": ""
+              },
+              "shippingMethod": {
+                "externalId": "8",
+                "scopeKey": ""
+              }
+            },
+            "idempotencyKey": "v0:00000000-0000-4000-8000-000000000005"
+          },
+          {
+            "tenantId": "00000000-0000-4000-8000-000000000001",
+            "connectionId": "00000000-0000-4000-8000-000000000002",
+            "capability": "orders.shipping-method.read",
+            "version": "0",
+            "input": {
+              "order": {
+                "externalId": "1",
+                "scopeKey": ""
+              },
+              "limit": 1
+            }
+          }
+        ],
+        "providerWrites": [
+          {
+            "instance": "jtl",
+            "method": "PATCH",
+            "path": "/api/eazybusiness/sales-orders/1",
+            "body": {
+              "shippingMethodId": "8",
+              "disableAutomaticWorkflows": true
+            }
+          }
+        ],
+        "outcomes": [
+          {
+            "state": "awaiting_approval",
+            "reason": "approval_required"
+          },
+          {
+            "state": "escalated",
+            "reason": "reconciliation_required"
+          },
+          {
+            "state": "escalated",
+            "reason": "reconciliation_required"
+          },
+          {
+            "state": "escalated",
+            "reason": "reconciliation_required"
+          }
+        ],
+        "shippingMethodId": "7"
+      }
+    }
+  ]
+}

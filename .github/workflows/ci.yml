@@ -29,6 +29,9 @@ jobs:
             cache: simulator
             browser: '@luma/api'
             command: pnpm test:simulator
+          - name: Playbook release evaluation
+            cache: evaluation
+            command: pnpm test:evaluation && pnpm evaluate:playbook
           - name: Backend E2E
             cache: e2e
             command: pnpm test:e2e
@@ -56,6 +59,13 @@ jobs:
       - if: matrix.browser
         run: pnpm --filter '${{ matrix.browser }}' exec playwright install --with-deps chromium
       - run: ${{ matrix.command }}
+      - uses: actions/upload-artifact@v4
+        if: always() && matrix.cache == 'evaluation'
+        with:
+          name: playbook-evaluation
+          path: .luma/evaluations/
+          include-hidden-files: true
+          if-no-files-found: warn
   quality:
     name: Quality gates
     if: always()
