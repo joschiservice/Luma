@@ -2,6 +2,7 @@ import '@luma/identity/http';
 
 import {
   apiContract,
+  shadowComparisonSchema,
   shadowEvaluationSchema,
   shadowReportSchema,
 } from '@luma/api-contract';
@@ -27,6 +28,21 @@ export function shadowRoutes(service?: ShadowService) {
   }
 
   return initServer().router(apiContract.shadow, {
+    latest: async ({ request, params, query }) => {
+      const s = use(request);
+      const result = await s.service.latest(
+        s.context,
+        params.exceptionId,
+        query.workflow,
+      );
+
+      return {
+        status: 200,
+        body: {
+          item: result.item ? shadowComparisonSchema.parse(result.item) : null,
+        },
+      };
+    },
     evaluate: async ({ request, params, body }) => {
       const s = use(request);
 

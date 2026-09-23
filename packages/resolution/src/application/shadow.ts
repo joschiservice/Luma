@@ -41,6 +41,7 @@ export interface ShadowStore {
     workflow: string,
     since: string,
     until: string,
+    incidentId?: string,
   ): Promise<ShadowComparison[]>;
 }
 
@@ -73,6 +74,24 @@ export function createShadowService(deps: {
   }
 
   return {
+    /** Reads the latest retained comparison for one case and Playbook. */
+    async latest(context: TenantContext, incidentId: string, workflow: string) {
+      context = await authorize(context);
+      const window = deps.parseWindow({
+        workflow,
+        since: '1970-01-01T00:00:00.000Z',
+        until: new Date(deps.now().getTime() + 1).toISOString(),
+      });
+      const items = await deps.store.list(
+        context,
+        window.workflow,
+        window.since,
+        window.until,
+        deps.parseId(incidentId),
+      );
+
+      return { item: items[0] ?? null };
+    },
     /** Records the current proposal and conditional simulation; exact retries reuse the snapshot. */
     async evaluate(
       context: TenantContext,

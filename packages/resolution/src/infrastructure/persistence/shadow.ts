@@ -210,7 +210,7 @@ export function createShadowStore(db: TenantDatabase): ShadowStore {
           [context.tenantId, id, document],
         );
       }),
-    list: (context, workflow, since, until) =>
+    list: (context, workflow, since, until, incidentId) =>
       db.transaction(context.tenantId, async (tx) => {
         const rows = (
           await tx.query<{
@@ -221,7 +221,7 @@ export function createShadowStore(db: TenantDatabase): ShadowStore {
             `
         WITH selected AS (
           SELECT DISTINCT ON (incident_id) * FROM shadow_evaluations
-          WHERE tenant_id=$1 AND workflow=$2 AND (document->>'createdAt')::timestamptz >= $3 AND (document->>'createdAt')::timestamptz < $4
+          WHERE tenant_id=$1 AND workflow=$2 AND ($5::uuid IS NULL OR incident_id=$5) AND (document->>'createdAt')::timestamptz >= $3 AND (document->>'createdAt')::timestamptz < $4
           ORDER BY incident_id,(document->>'createdAt')::timestamptz DESC,id DESC
         ) SELECT s.document AS evaluation,r.document AS review,v.document AS verification
         FROM selected s LEFT JOIN shadow_reviews r ON r.tenant_id=s.tenant_id AND r.evaluation_id=s.id
@@ -260,7 +260,7 @@ export function createShadowStore(db: TenantDatabase): ShadowStore {
           AND (document->>'occurredAt')::timestamptz >= (s.document->>'createdAt')::timestamptz
           ORDER BY created_at DESC,id DESC LIMIT 1
         ) v ON true ORDER BY s.incident_id LIMIT 501`,
-            [context.tenantId, workflow, since, until],
+            [context.tenantId, workflow, since, until, incidentId ?? null],
           )
         ).rows;
 

@@ -2,6 +2,14 @@
 
 Shadow Mode evaluates production observations without dispatching the proposed action. Its records have `mode: "shadow"` and `executed: false`. A completed Shadow workflow has phase `shadow_completed`; it never marks a case resolved.
 
+## Use the workspace UI
+
+Owners and admins can open an issue and use **Shadow evaluation** to select a Playbook and run a prediction against the retained diagnosis and bound candidate. The result is labeled **Shadow — not executed** and shows eligibility, policy, predicted effects, assumptions and any authoritative outcome. Refreshing or reopening the case reloads the latest saved evaluation.
+
+Use **Save operator comparison** to record whether action was needed, whether the case was eligible, the observed action and optional trust feedback. Choose incident evidence to support the assessment. An alternative action can use a different target. Reviews are immutable; uncertain saves retry the same review.
+
+Open **Compare cases**, or the Playbook's **Shadow comparisons** section, to select an inclusive UTC date range. Each rate shows its numerator and denominator. Missing observations remain unknown. The report uses the latest evaluation per case and supports up to 500 cases per range.
+
 ## Run a bounded workflow
 
 Choose a published Playbook definition and its reviewed activation, with explicit principals, connections and targets. Keep the existing ingestion and diagnosis bindings. Supply `bindings.prepareShadow` to build a candidate through `playbooks.preview`; this validates the Playbook inputs without publishing a proposal, persisting an executable run or granting admission. Without that binding, Shadow reads an existing retained proposal. Pass `application.http.shadow` as the final argument to `createExceptionWorkflowRuntime` and start the workflow through:

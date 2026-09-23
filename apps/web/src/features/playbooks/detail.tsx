@@ -17,6 +17,7 @@ import { useState } from 'react';
 
 import { SignInRedirect } from '../identity/common';
 import { contextOptions, IdentityError } from '../identity/data';
+import { ShadowReport } from '../shadow/report';
 import { ActivationForm } from './activation';
 import {
   playbookError,
@@ -107,6 +108,13 @@ export function PlaybookDetailPage({
             refreshing={query.isFetching || !!query.error}
             accessLost={accessLost}
           />
+          {query.data.canManage ? (
+            <ShadowReport
+              key={`${organizationId}:${definitionId}`}
+              organizationId={organizationId}
+              workflow={definitionId}
+            />
+          ) : null}
           <section className="playbook-section" aria-labelledby="runs-title">
             <div className="playbooks-heading">
               <h2 id="runs-title">Recent runs</h2>
@@ -365,8 +373,8 @@ export function PlaybookDetailView({
           </Link>
           <h3>Evaluation evidence</h3>
           <p>
-            No historical evaluation or shadow results are available for this
-            version.
+            Shadow comparisons are available below for workspace owners and
+            admins. Each prediction retains its exact Playbook version.
           </p>
         </aside>
       </div>

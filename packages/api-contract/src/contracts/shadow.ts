@@ -7,6 +7,7 @@ import {
   organizationParamsSchema,
 } from '../common.js';
 import {
+  shadowComparisonSchema,
   shadowEvaluationSchema,
   shadowReportSchema,
   shadowRequestSchema,
@@ -16,6 +17,16 @@ import {
 
 export const shadowContract = initContract().router(
   {
+    latest: {
+      method: 'GET',
+      path: '/v1/organizations/:organizationId/exceptions/:exceptionId/shadow',
+      pathParams: caseParams,
+      query: z.object({ workflow: z.string().min(1).max(200) }).strict(),
+      responses: { 200: z.object({ item: shadowComparisonSchema.nullable() }) },
+      summary: 'Read the latest Shadow evaluation for a case and Playbook',
+      description:
+        'Returns the retained prediction, operator review and compatible authoritative outcome. Returns null when no evaluation is recorded.',
+    },
     evaluate: {
       method: 'POST',
       path: '/v1/organizations/:organizationId/exceptions/:exceptionId/shadow',

@@ -13,6 +13,7 @@ import { privateQueryDefaults } from '../../lib/private-query';
 import { IdentityError } from '../identity/data';
 
 export const inboxSearch = z.object({
+  shadow: z.string().min(1).max(200).optional().catch(undefined),
   view: z
     .enum(['needs_you', 'active', 'history'])
     .catch('needs_you')

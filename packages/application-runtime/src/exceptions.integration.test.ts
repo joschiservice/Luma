@@ -437,6 +437,16 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
         "UPDATE exception_outbox SET document=jsonb_set(document,'{accepted}','true') WHERE id=$1",
         [rejectedId],
       );
+      expect(
+        (await shadow.latest(context(), incident.id, workflow)).item?.evaluation
+          .id,
+      ).toBe(input.id);
+      expect(
+        (await shadow.latest(context(otherTenant), incident.id, workflow)).item,
+      ).toBeNull();
+      expect(
+        (await shadow.latest(context(), randomUUID(), workflow)).item,
+      ).toBeNull();
       const report = await shadow.report(context(), window);
       expect(report.items).toHaveLength(1);
       expect(report.items[0]!.actual?.outcome).toBe('passed');
@@ -457,6 +467,13 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
         );
         expect(response.statusCode, response.body).toBe(200);
         expect(response.json().mode).toBe('shadow');
+        const latest = await app.inject(
+          `/v1/organizations/${tenantId}/exceptions/${incident.id}/shadow?workflow=${workflow}`,
+        );
+        expect(latest.statusCode, latest.body).toBe(200);
+        expect(latest.json().item.evaluation.id).toBe(input.id);
+        expect(latest.json().item.review.actorId).toBe(context().actor.id);
+
         expect(response.json().items[0].evaluation.executed).toBe(false);
         const invalid = await app.inject(
           `/v1/organizations/${tenantId}/shadow?workflow=${workflow}&since=invalid&until=invalid`,

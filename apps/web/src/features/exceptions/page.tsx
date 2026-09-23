@@ -24,6 +24,7 @@ import { useEffect, useRef, useState } from 'react';
 import { connectionsOptions } from '../connections/data';
 import { IdentityError } from '../identity/data';
 import { overviewOptions } from '../overview/data';
+import { CaseShadow } from '../shadow/case';
 import { casesKey, casesOptions, type InboxSearch, matchesView } from './data';
 import { useCaseObservation } from './observation';
 import { LiveCaseDetail } from './progress';
@@ -441,6 +442,17 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
                         `${connection.label} · ${caseLabel(connection.target.kind)}`,
                       ]),
                     )}
+                  />
+                  <CaseShadow
+                    key={`${organizationId}:${exceptionId}:${search.shadow ?? ''}:shadow`}
+                    organizationId={organizationId}
+                    exceptionId={item.id}
+                    initialWorkflow={search.shadow}
+                    disabled={
+                      !observation.confirmed ||
+                      detail.isError ||
+                      observation.offline
+                    }
                   />
                 </>
               ) : null}

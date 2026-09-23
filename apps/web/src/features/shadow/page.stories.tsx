@@ -1,0 +1,298 @@
+import type { Meta, StoryObj } from '@storybook/react-vite';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRouter,
+  RouterProvider,
+} from '@tanstack/react-router';
+import { useState } from 'react';
+import { expect, userEvent, within } from 'storybook/test';
+
+import appStyles from '../../styles.css?inline';
+import { CaseShadow } from './case';
+import { ShadowReport } from './report';
+import {
+  exceptionId,
+  mockShadow,
+  organizationId,
+  type PreviewState,
+  requests,
+  workflow,
+} from './storybook-support';
+
+function Preview({ state = 'ready' }: { state?: PreviewState }) {
+  const [client] = useState(
+    () => new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+  );
+  const [router] = useState(() =>
+    createRouter({
+      history: createMemoryHistory(),
+      routeTree: createRootRoute({
+        component: () => (
+          <QueryClientProvider client={client}>
+            <style>{appStyles}</style>
+            <main
+              className="playbooks-page"
+              style={{
+                maxWidth: state.startsWith('report') ? 1180 : 740,
+                margin: 'auto',
+                padding: 16,
+              }}
+            >
+              <h1>
+                {state.startsWith('report')
+                  ? 'Correct an order shipping method'
+                  : 'Order 1042'}
+              </h1>
+              {!state.startsWith('report') ? <h2>Case investigation</h2> : null}
+              {state.startsWith('report') ? (
+                <ShadowReport
+                  organizationId={organizationId}
+                  workflow={workflow}
+                />
+              ) : (
+                <CaseShadow
+                  organizationId={organizationId}
+                  exceptionId={exceptionId}
+                />
+              )}
+            </main>
+          </QueryClientProvider>
+        ),
+      }),
+    }),
+  );
+
+  return <RouterProvider router={router} />;
+}
+
+const meta = {
+  title: 'Shadow/Evaluation',
+  component: Preview,
+  parameters: { layout: 'fullscreen' },
+  beforeEach: ({ args }) => mockShadow(args.state ?? 'ready'),
+} satisfies Meta<typeof Preview>;
+
+export default meta;
+
+type Story = StoryObj<typeof meta>;
+
+export const Case: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByText('Shadow — not executed'),
+    ).toBeVisible();
+    await expect(canvas.getByText('Pass, if assumptions hold')).toBeVisible();
+    await expect(
+      canvas.getByText('Not observed', { selector: 'dd' }),
+    ).toBeVisible();
+  },
+};
+
+export const Evaluate: Story = {
+  args: { state: 'empty' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(
+      await canvas.findByRole('button', { name: 'Run Shadow evaluation' }),
+    );
+    await expect(
+      await canvas.findByText('Shadow — not executed'),
+    ).toBeVisible();
+    await expect(requests.filter((r) => r.method === 'POST')).toHaveLength(1);
+  },
+};
+
+export const RetryEvaluation: Story = {
+  args: { state: 'uncertain' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(
+      await canvas.findByRole('button', { name: 'Run Shadow evaluation' }),
+    );
+    await userEvent.click(
+      await canvas.findByRole('button', { name: 'Retry evaluation' }),
+    );
+    await expect(
+      await canvas.findByText('Shadow — not executed'),
+    ).toBeVisible();
+    const writes = requests.filter((r) => r.method === 'POST');
+    await expect(writes).toHaveLength(2);
+    await expect(writes[0]!.body).toEqual(writes[1]!.body);
+  },
+};
+
+export const RecordReview: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(
+      await canvas.findByRole('combobox', { name: 'Was an action needed?' }),
+    );
+    await userEvent.click(
+      await within(document.body).findByRole('option', { name: 'Yes' }),
+    );
+    await userEvent.click(
+      canvas.getByRole('combobox', { name: 'Was this case eligible?' }),
+    );
+    await userEvent.click(
+      await within(document.body).findByRole('option', { name: 'Yes' }),
+    );
+    await userEvent.click(
+      canvas.getByRole('combobox', { name: 'Observed operator action' }),
+    );
+    await userEvent.click(
+      await within(document.body).findByRole('option', {
+        name: 'Same as the proposed action',
+      }),
+    );
+    await userEvent.click(await canvas.findByRole('checkbox'));
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Save operator comparison' }),
+    );
+    await expect(
+      await canvas.findByRole('heading', {
+        name: 'Operator comparison recorded',
+      }),
+    ).toBeVisible();
+    await expect(
+      canvas.queryByRole('button', { name: 'Save operator comparison' }),
+    ).not.toBeInTheDocument();
+  },
+};
+
+export const MissingCandidate: Story = { args: { state: 'no_candidate' } };
+
+export const Member: Story = {
+  args: { state: 'member' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByText(
+        'Workspace owners and admins can evaluate and review Shadow predictions.',
+      ),
+    ).toBeVisible();
+    await expect(
+      canvas.queryByRole('button', { name: 'Run Shadow evaluation' }),
+    ).not.toBeInTheDocument();
+  },
+};
+
+export const AccessDenied: Story = { args: { state: 'denied' } };
+
+export const Unavailable: Story = { args: { state: 'error' } };
+
+export const Comparisons: Story = {
+  args: { state: 'report' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByText('1 case evaluated')).toBeVisible();
+    await expect(
+      canvas.getAllByText('Not enough evidence').length,
+    ).toBeGreaterThan(0);
+    await userEvent.click(canvas.getByText('View prediction and evidence'));
+    await expect(
+      await canvas.findByText('Passed', { selector: 'dd' }),
+    ).toBeVisible();
+    await userEvent.clear(canvas.getByLabelText('From (UTC)'));
+    await userEvent.type(canvas.getByLabelText('From (UTC)'), '2026-01-01');
+    await userEvent.click(canvas.getByRole('button', { name: 'Apply dates' }));
+    await expect(
+      await canvas.findByText(/Showing 2026-01-01 through/),
+    ).toBeVisible();
+  },
+};
+
+export const EmptyComparisons: Story = { args: { state: 'report_empty' } };
+
+export const Narrow: Story = {
+  globals: { viewport: { value: 'mobile1', isRotated: false } },
+};
+
+export const AlternativeAction: Story = {
+  args: { state: 'no_candidate' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    for (const label of ['Was an action needed?', 'Was this case eligible?']) {
+      await userEvent.click(
+        await canvas.findByRole('combobox', { name: label }),
+      );
+      await userEvent.click(
+        await within(document.body).findByRole('option', { name: 'Yes' }),
+      );
+    }
+    await userEvent.click(
+      canvas.getByRole('combobox', { name: 'Observed operator action' }),
+    );
+    await userEvent.click(
+      await within(document.body).findByRole('option', {
+        name: 'Record another action',
+      }),
+    );
+    await userEvent.type(
+      canvas.getByLabelText('Action capability'),
+      'orders.shipping-method.write',
+    );
+    await userEvent.type(
+      canvas.getByLabelText('Target ID'),
+      '55555555-5555-4555-8555-555555555555',
+    );
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Add expected result field' }),
+    );
+    await userEvent.type(
+      canvas.getByLabelText('Field name'),
+      'shippingMethodId',
+    );
+    await userEvent.type(
+      canvas.getByLabelText('Value', { exact: true }),
+      'STANDARD',
+    );
+    await userEvent.click(await canvas.findByRole('checkbox'));
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Save operator comparison' }),
+    );
+    await expect(
+      await canvas.findByRole('heading', {
+        name: 'Operator comparison recorded',
+      }),
+    ).toBeVisible();
+    await expect(
+      requests.find((r) => r.path.endsWith('/review'))?.body.operatorAction,
+    ).toMatchObject({
+      target: { id: '55555555-5555-4555-8555-555555555555' },
+      expectedPostcondition: { shippingMethodId: 'STANDARD' },
+    });
+  },
+};
+
+export const RetryReview: Story = {
+  args: { state: 'review_uncertain' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    for (const label of ['Was an action needed?', 'Was this case eligible?']) {
+      await userEvent.click(
+        await canvas.findByRole('combobox', { name: label }),
+      );
+      await userEvent.click(
+        await within(document.body).findByRole('option', { name: 'Yes' }),
+      );
+    }
+    await userEvent.click(await canvas.findByRole('checkbox'));
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Save operator comparison' }),
+    );
+    await userEvent.click(
+      await canvas.findByRole('button', { name: 'Retry saving comparison' }),
+    );
+    await expect(
+      await canvas.findByRole('heading', {
+        name: 'Operator comparison recorded',
+      }),
+    ).toBeVisible();
+    const writes = requests.filter((r) => r.path.endsWith('/review'));
+    await expect(writes).toHaveLength(2);
+    await expect(writes[0]!.body).toEqual(writes[1]!.body);
+  },
+};

@@ -77,25 +77,25 @@ const rate = z.object({
   rate: z.number().min(0).max(1).nullable(),
 });
 
+export const shadowComparisonSchema = z.object({
+  evaluation: shadowEvaluationSchema,
+  review: shadowReviewSchema.extend({ actorId: z.string() }).nullable(),
+  actual: z
+    .object({
+      outcome: z.enum(['passed', 'failed']),
+      evaluatorVersion: code,
+      evidenceRefs: z.array(z.string()),
+      occurredAt: z.string().datetime(),
+    })
+    .nullable(),
+});
+
 export const shadowReportSchema = z.object({
   mode: z.literal('shadow'),
   workflow: code,
   since: z.string().datetime(),
   until: z.string().datetime(),
-  items: z.array(
-    z.object({
-      evaluation: shadowEvaluationSchema,
-      review: shadowReviewSchema.extend({ actorId: z.string() }).nullable(),
-      actual: z
-        .object({
-          outcome: z.enum(['passed', 'failed']),
-          evaluatorVersion: code,
-          evidenceRefs: z.array(z.string()),
-          occurredAt: z.string().datetime(),
-        })
-        .nullable(),
-    }),
-  ),
+  items: z.array(shadowComparisonSchema),
   metrics: z.object({
     evaluations: z.number(),
     reviewed: z.number(),
