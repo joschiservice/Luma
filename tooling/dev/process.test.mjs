@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import { mkdtemp, open, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
 
 import { freePort, project } from './environment.mjs';
@@ -19,6 +22,28 @@ test('failed child commands retain their exit code', async () => {
     run(process.execPath, ['-e', 'process.exit(7)'], { capture: true }),
     (error) => error.exitCode === 7,
   );
+});
+
+test('file logging preserves both outputs and the failure exit code', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'luma-process-log-'));
+  const path = join(directory, 'step.log');
+  const log = await open(path, 'w');
+  try {
+    await assert.rejects(
+      run(
+        process.execPath,
+        ['-e', 'console.log("out"); console.error("err"); process.exit(7)'],
+        { logFd: log.fd },
+      ),
+      (error) => error.exitCode === 7,
+    );
+    const output = await readFile(path, 'utf8');
+    assert.match(output, /out/);
+    assert.match(output, /err/);
+  } finally {
+    await log.close();
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test('worktree project names are valid Compose identifiers and ports are available', async () => {

@@ -5,19 +5,25 @@ export const root = fileURLToPath(new URL('../../', import.meta.url));
 
 /**
  * Runs a command without a shell and forwards termination signals; resolves trimmed captured
- * output or rejects with the child exit code.
+ * output or rejects with the child exit code. Pass logFd to stream both outputs to
+ * a caller-owned file descriptor instead of the terminal; it overrides capture.
  */
 export function run(
   command,
   args,
-  { env = process.env, capture = false, cwd = root } = {},
+  { env = process.env, capture = false, cwd = root, logFd } = {},
 ) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       cwd,
       env,
       detached: process.platform !== 'win32',
-      stdio: capture ? ['ignore', 'pipe', 'pipe'] : 'inherit',
+      stdio:
+        logFd !== undefined
+          ? ['ignore', logFd, logFd]
+          : capture
+            ? ['ignore', 'pipe', 'pipe']
+            : 'inherit',
     });
     let output = '';
     let stopped;

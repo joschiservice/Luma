@@ -29,6 +29,11 @@ const suites = {
     ['--filter', '@luma/api', 'test:browser'],
   ],
   full: [['check'], ['test:e2e'], ['test:browser']],
+  // Prebuilt platform suites used by verify:feature after its single build step.
+  simulator: [
+    ['--filter', '@luma/api', 'test:e2e', 'simulator.e2e.mjs'],
+    ['--filter', '@luma/api', 'test:browser', 'simulator.browser.mjs'],
+  ],
 };
 
 let container;
@@ -36,7 +41,8 @@ let container;
 try {
   const suite = process.argv[2];
   const commands = suites[suite]?.map((args) => [...args]);
-  if (!commands) throw new Error('Expected test, e2e, browser or full');
+  if (!commands)
+    throw new Error('Expected test, e2e, browser, simulator or full');
   const extraArgs = process.argv.slice(3);
   if (extraArgs.length) {
     if (!['e2e', 'browser'].includes(suite))

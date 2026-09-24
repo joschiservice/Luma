@@ -99,6 +99,8 @@ mise exec -- pnpm test:browser simulator.browser.mjs
 
 ## Extending and checking
 
+Use the [operational scenario recipe](adding-operational-scenarios.md) to add another issue using the inventory implementation and shared test fixture. Run `pnpm verify:feature simulator` for focused validation with saved logs; see [test tiers](development.md#feature-validation).
+
 `@luma/simulator-core` owns scheduling, fault lifecycle, journal contracts, and the in-process fetch transport. Each provider package owns its own records, commands, protocol handler, and response construction. Providers depend only on core; the host coordinates them through public commands and explicit mappings.
 
 Add provider operations in the owning package and test them through the real client/adapter. Add scenario transitions in `apps/simulator/src/run.ts`. New fault kinds should define their phase, matching fields, validation, response behavior, and durable consumption. Future delayed reads and transport delays must not use the commerce clock for HTTP deadlines. Independent connector schema contract tests remain necessary; simulator compatibility alone does not establish live-provider compatibility.

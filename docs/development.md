@@ -28,6 +28,27 @@ keep `.nvmrc`, `mise.toml`, and `package.json` in sync.
 | `pnpm dev:manual`    | Watch app processes using your app `.env` files and existing services.                                             |
 | `pnpm test:full`     | Run every CI gate against a disposable Testcontainers database.                                                    |
 
+## Feature validation
+
+Use the [codebase map](codebase-map.md) to select the relevant tests. For simulator work:
+
+```sh
+mise exec -- pnpm verify:feature simulator
+```
+
+This runs repository formatting and lint, one build of the API and simulator dependency graphs, focused type and unit checks for simulator packages, resolution and exceptions, simulator integration/panel tests, and the inventory platform E2E and browser suites. Steps run sequentially and stop on the first failure. Each step prints its status and writes full output to a numbered log under the printed temporary directory; failures also show the last 30 lines. Logs remain available after the command exits.
+
+Docker and Playwright Chromium are required. Install Chromium with `pnpm --filter @luma/api exec playwright install chromium`. The platform suites share one disposable PostgreSQL server, with isolated databases per test. If `TEST_DATABASE_URL` is set, the existing test runner uses that server instead; use a test administrator connection that can create databases and roles. The command does not start or reset your local simulator workspace.
+
+| Tier              | When to use it                                           | Command                                                         |
+| ----------------- | -------------------------------------------------------- | --------------------------------------------------------------- |
+| Focused unit test | While changing a rule or service                         | `pnpm --filter @luma/resolution test inventory-monitor.test.ts` |
+| Simulator feature | Before handing off a simulator change                    | `pnpm verify:feature simulator`                                 |
+| Repository gate   | Final validation across packages                         | `pnpm check`                                                    |
+| All CI gates      | Changes spanning platform workflows and browser surfaces | `pnpm test:full`                                                |
+
+The feature command currently accepts only `simulator`. It does not replace `pnpm check` or run unrelated platform E2E suites. Individual `test:e2e` and `test:browser` commands still build their prerequisites for standalone use.
+
 ## API imports
 
 Use native package imports such as `#modules/identity/index` and

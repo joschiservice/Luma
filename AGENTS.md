@@ -12,6 +12,7 @@
 
 # Code quality
 
+- Use [the codebase map](docs/codebase-map.md) to find feature entry points and relevant tests. For operational scenarios, follow [the inventory scenario example](docs/adding-operational-scenarios.md).
 - Prefer simple, explicit, readable code over clever abstractions.
 - Keep functions, modules, and components focused and easy to change.
 - Use clear names and predictable interfaces.
