@@ -17,6 +17,7 @@ export const requests: {
 }[] = [];
 
 export type PreviewState =
+  | 'long_evidence'
   | 'ready'
   | 'empty'
   | 'member'
@@ -205,9 +206,13 @@ export function mockShadow(state: PreviewState) {
     if (url.pathname.endsWith('/evidence'))
       return Response.json({
         schemaVersion: 1,
-        items: [
-          {
-            id: evidenceId,
+        items: Array.from(
+          { length: state === 'long_evidence' ? 45 : 1 },
+          (_, index) => ({
+            id:
+              state === 'long_evidence'
+                ? `33333333-3333-4333-8333-${String(index).padStart(12, '0')}`
+                : evidenceId,
             observedAt: new Date(Date.now() - 30_000).toISOString(),
             sourceUpdatedAt: null,
             adapterVersion: '1',
@@ -219,8 +224,8 @@ export function mockShadow(state: PreviewState) {
               scopeKey: 'orders',
             },
             completeness: 'complete',
-          },
-        ],
+          }),
+        ),
         nextCursor: null,
       });
     if (url.pathname.endsWith('/review') && method === 'POST' && item) {

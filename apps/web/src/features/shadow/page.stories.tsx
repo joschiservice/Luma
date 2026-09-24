@@ -1,3 +1,4 @@
+import { IssueDetailViews } from '@luma/ui/components/issue-collection';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
@@ -52,10 +53,12 @@ function Preview({ state = 'ready' }: { state?: PreviewState }) {
                   workflow={workflow}
                 />
               ) : (
-                <CaseShadow
-                  organizationId={organizationId}
-                  exceptionId={exceptionId}
-                />
+                <IssueDetailViews issueTitle="Order 1042">
+                  <CaseShadow
+                    organizationId={organizationId}
+                    exceptionId={exceptionId}
+                  />
+                </IssueDetailViews>
               )}
             </main>
           </QueryClientProvider>
@@ -294,5 +297,61 @@ export const RetryReview: Story = {
     const writes = requests.filter((r) => r.path.endsWith('/review'));
     await expect(writes).toHaveLength(2);
     await expect(writes[0]!.body).toEqual(writes[1]!.body);
+  },
+};
+
+export const LongEvidence: Story = { args: { state: 'long_evidence' } };
+
+export const EvidenceSelection: Story = {
+  args: { state: 'long_evidence' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await canvas.findByRole('button', {
+      name: 'View all 45 incident evidence records',
+    });
+    await expect(canvas.getAllByRole('checkbox')).toHaveLength(3);
+    await userEvent.click(canvas.getAllByRole('checkbox')[0]!);
+    for (const label of ['Was an action needed?', 'Was this case eligible?']) {
+      await userEvent.click(canvas.getByRole('combobox', { name: label }));
+      await userEvent.click(
+        await within(document.body).findByRole('option', { name: 'Yes' }),
+      );
+    }
+    const trigger = canvas.getByRole('button', {
+      name: 'View all 45 incident evidence records',
+    });
+    await userEvent.click(trigger);
+    await expect(
+      canvas.getByRole('heading', { name: 'Supporting incident evidence' }),
+    ).toBeVisible();
+    await expect(canvas.getAllByRole('checkbox')).toHaveLength(20);
+    await userEvent.click(canvas.getByRole('button', { name: 'Next' }));
+    await userEvent.click(canvas.getAllByRole('checkbox')[0]!);
+    await userEvent.click(canvas.getByRole('combobox', { name: 'Selection' }));
+    await userEvent.click(
+      await within(document.body).findByRole('option', {
+        name: 'Selected',
+      }),
+    );
+    await expect(canvas.getAllByRole('checkbox')).toHaveLength(2);
+    for (const checkbox of canvas.getAllByRole('checkbox'))
+      await expect(checkbox).toBeChecked();
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Back to issue' }),
+    );
+    await expect(trigger).toHaveFocus();
+    await expect(canvas.getByText('2 evidence records selected')).toBeVisible();
+    await expect(canvas.getAllByRole('checkbox')[0]!).toBeChecked();
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Save operator comparison' }),
+    );
+    await expect(
+      await canvas.findByRole('heading', {
+        name: 'Operator comparison recorded',
+      }),
+    ).toBeVisible();
+    await expect(
+      requests.find((r) => r.path.endsWith('/review'))?.body.evidenceRefs,
+    ).toHaveLength(2);
   },
 };

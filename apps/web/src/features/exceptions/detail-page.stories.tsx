@@ -1,0 +1,366 @@
+import type { CaseDetail } from '@luma/api-contract';
+import { Button } from '@luma/ui/button';
+import { caseFixture, inventoryCase } from '@luma/ui/components/case-fixtures';
+import {
+  CaseInvestigation,
+  CaseNotice,
+} from '@luma/ui/components/case-investigation';
+import { CaseTimeline } from '@luma/ui/components/case-timeline';
+import { IssueDetailViews } from '@luma/ui/components/issue-collection';
+import { IssueInspectorHeader } from '@luma/ui/components/issue-inspector-header';
+import { IssuePageLayout } from '@luma/ui/components/issue-page-layout';
+import {
+  resolutionProgress,
+  resolutionReview,
+} from '@luma/ui/components/resolution-fixtures';
+import { ResolutionReview } from '@luma/ui/components/resolution-review';
+import { WorkspaceAccountMenu } from '@luma/ui/components/workspace-account-menu';
+import type { Meta, StoryObj } from '@storybook/react-vite';
+import { ArrowLeft, Inbox, Maximize2, RefreshCw } from 'lucide-react';
+import { useState } from 'react';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
+
+import appStyles from '../../styles.css?inline';
+import { Brand } from '../identity/common';
+import { WorkspaceLayout } from '../identity/workspace-layout';
+
+const evidence = Array.from({ length: 48 }, (_, index) => ({
+  ...inventoryCase.diagnosis!.provenance.evidence[0]!,
+  id: `evidence-${index}`,
+  completeness: 'complete' as const,
+}));
+const issue: CaseDetail = {
+  ...inventoryCase,
+  state: 'awaiting_approval',
+  diagnosis: {
+    ...inventoryCase.diagnosis!,
+    provenance: { ...inventoryCase.diagnosis!.provenance, evidence },
+  },
+};
+const timeline = Array.from({ length: 32 }, (_, index) => ({
+  id: `event-${index}`,
+  type: 'execution.prepared',
+  actorId: 'inventory-worker',
+  proposalId: null,
+  outcome: null,
+  evidenceRefs: ['evidence-0'],
+  occurredAt: new Date(
+    Date.parse(inventoryCase.lastActivityAt) - index * 60_000,
+  ).toISOString(),
+}));
+
+function IssuePagePreview({
+  item = issue,
+  initiallyFull = true,
+  unavailable = false,
+}: {
+  item?: CaseDetail;
+  initiallyFull?: boolean;
+  unavailable?: boolean;
+}) {
+  const [full, setFull] = useState(initiallyFull);
+  const content = (
+    <CaseInvestigation
+      item={item}
+      embedded
+      expanded={full}
+      progress={
+        <CaseTimeline
+          expanded={full}
+          progress={resolutionProgress}
+          review={resolutionReview}
+          timeline={timeline}
+          evidence={evidence}
+          connection="live"
+        />
+      }
+    />
+  );
+
+  return (
+    <>
+      <style>{appStyles}</style>
+      <WorkspaceLayout
+        brand={<Brand />}
+        navigation={() => (
+          <nav aria-label="Workspace navigation">
+            <a href="#issues" className="active" aria-current="page">
+              <Inbox size={18} /> Issues
+            </a>
+          </nav>
+        )}
+        context={<>Operations / Issues</>}
+        accountMenu={
+          <WorkspaceAccountMenu
+            name="Alex Morgan"
+            workspace="Northstar Commerce"
+            workspaceId="northstar"
+            workspaces={[
+              {
+                id: 'northstar',
+                name: 'Northstar Commerce',
+                link: <a href="#workspace" />,
+              },
+            ]}
+            createLink={<a href="#new" />}
+            switchLink={<a href="#switch" />}
+          />
+        }
+      >
+        {full ? (
+          <IssuePageLayout
+            item={unavailable ? undefined : item}
+            back={
+              <Button
+                variant="ghost"
+                aria-label="Back to issues"
+                onClick={() => setFull(false)}
+              >
+                <ArrowLeft size={16} /> Issues
+              </Button>
+            }
+            refresh={
+              <Button variant="outline" aria-label="Refresh">
+                <RefreshCw size={14} />
+                <span className="issue-page-desktop-label">Refresh</span>
+              </Button>
+            }
+            canReview={!unavailable}
+            actions={
+              unavailable ? null : (
+                <section tabIndex={-1} aria-label="Resolution review">
+                  <ResolutionReview
+                    review={resolutionReview}
+                    progress={resolutionProgress}
+                    onDecision={fn()}
+                    connectionLabel="JTL · North warehouse"
+                  />
+                </section>
+              )
+            }
+          >
+            {unavailable ? (
+              <CaseNotice error title="Case unavailable">
+                This case is missing or you no longer have access.
+              </CaseNotice>
+            ) : (
+              content
+            )}
+          </IssuePageLayout>
+        ) : (
+          <div className="inbox inbox-selected">
+            <div className="inbox-workspace">
+              <div className="inbox-list">
+                <h1>Issues</h1>
+                <p>All open · High severity</p>
+                <p>{item.summary}</p>
+              </div>
+              <section className="inbox-detail" aria-label="Selected issue">
+                <IssueDetailViews
+                  issueTitle={item.summary}
+                  headerClassName="inbox-case-nav"
+                  header={
+                    <IssueInspectorHeader
+                      item={item}
+                      className="inbox-case-nav"
+                      onClose={fn()}
+                      openPage={
+                        <a
+                          href="#full-page"
+                          className="issue-panel-open-page"
+                          aria-label="Open full page"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            setFull(true);
+                          }}
+                        >
+                          <Maximize2 size={16} />
+                        </a>
+                      }
+                    />
+                  }
+                >
+                  {content}
+                </IssueDetailViews>
+              </section>
+            </div>
+          </div>
+        )}
+      </WorkspaceLayout>
+    </>
+  );
+}
+
+const meta = {
+  title: 'App/Issue full page',
+  component: IssuePagePreview,
+  parameters: { layout: 'fullscreen' },
+} satisfies Meta<typeof IssuePagePreview>;
+
+export default meta;
+
+type Story = StoryObj<typeof meta>;
+
+export const FullPage: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByRole('heading', {
+        level: 1,
+        name: 'Shopify shows 8 more available than JTL',
+      }),
+    ).toBeVisible();
+    await expect(canvas.getByText('Issue ID')).toBeVisible();
+    for (const title of [
+      'Overview',
+      'Findings',
+      'Execution',
+      'Audit history',
+      'Evidence',
+      'Resolution',
+      'Issue details',
+    ]) {
+      const card = canvas.getByRole('region', { name: title });
+      await expect(card).toHaveClass('issue-section-card');
+      await expect(
+        within(card).getByRole('heading', { level: 2, name: title }),
+      ).toBeVisible();
+    }
+    await expect(
+      canvas.getByRole('heading', { level: 1 }).closest('.desk-header'),
+    ).not.toBeNull();
+    await expect(
+      canvas
+        .getByRole('region', { name: 'Issue details' })
+        .closest('.issue-page-main'),
+    ).not.toBeNull();
+
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Audit history' }),
+    );
+    await expect(
+      canvasElement.querySelector('[data-issue-section="history"]'),
+    ).toHaveFocus();
+    await expect(
+      canvas.getByRole('button', { name: 'Audit history' }),
+    ).toHaveAttribute('aria-current', 'location');
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'View all 32 events' }),
+    );
+    await expect(
+      canvas.getByRole('heading', { name: 'Audit history' }),
+    ).toHaveFocus();
+    await expect(
+      canvas.queryByRole('navigation', { name: 'Issue sections' }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Back to issue' }),
+    );
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Review resolution' }),
+    );
+    await expect(
+      canvas.getByRole('region', { name: 'Resolution' }),
+    ).toHaveFocus();
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Back to issues' }),
+    );
+    await expect(
+      canvas.getByRole('region', { name: 'Selected issue' }),
+    ).toBeVisible();
+    await expect(canvas.getByText('All open · High severity')).toBeVisible();
+  },
+};
+
+export const OpenFromPanel: Story = {
+  args: { initiallyFull: false },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole('link', { name: 'Open full page' }));
+    await expect(
+      canvas.queryByRole('combobox', { name: 'On this page' }) ??
+        canvas.getByRole('navigation', { name: 'Issue sections' }),
+    ).toBeVisible();
+    await expect(
+      canvas.queryByRole('region', { name: 'Selected issue' }),
+    ).not.toBeInTheDocument();
+  },
+};
+
+export const FailedInvestigation: Story = {
+  args: { item: caseFixture('failed') },
+};
+
+export const Pending: Story = { args: { item: caseFixture('pending') } };
+
+export const Unavailable: Story = { args: { unavailable: true } };
+
+export const Dark: Story = { globals: { theme: 'dark' } };
+
+export const SectionNavigation: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const scroll = canvasElement.querySelector('.desk-content')!;
+    const evidence = canvasElement.querySelector<HTMLElement>(
+      '[data-issue-section="evidence"]',
+    )!;
+    evidence.scrollIntoView({ block: 'start' });
+    await waitFor(() =>
+      expect(
+        canvasElement.querySelector(
+          '.issue-page-sections [aria-current="location"]',
+        ),
+      ).toHaveTextContent('Evidence'),
+    );
+    const picker = canvas.queryByRole('combobox', { name: 'On this page' });
+    if (picker) {
+      await expect(picker).toHaveTextContent('Evidence');
+      await userEvent.click(picker);
+      await userEvent.click(
+        await within(document.body).findByRole('option', {
+          name: 'Issue details',
+        }),
+      );
+      await expect(picker).toHaveTextContent('Issue details');
+    } else {
+      await userEvent.click(
+        canvas.getByRole('button', { name: 'Issue details' }),
+      );
+      await expect(
+        canvas.getByRole('button', { name: 'Issue details' }),
+      ).toHaveAttribute('aria-current', 'location');
+    }
+    await expect(scroll.scrollTop).toBeGreaterThan(0);
+    scroll.scrollTop = 0;
+    await waitFor(() =>
+      expect(
+        canvasElement.querySelector(
+          '.issue-page-sections [aria-current="location"]',
+        ),
+      ).toHaveTextContent('Overview'),
+    );
+  },
+};
+
+export const LongTitle: Story = {
+  args: {
+    item: {
+      ...issue,
+      summary:
+        'Inventory differs between Shopify and JTL for the linen shirt collection across several fulfillment locations and the shared stock pool.',
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const title = canvas.getByRole('heading', { level: 1 });
+    title.focus();
+    await expect(
+      canvasElement.querySelector('.issue-page-full-title'),
+    ).toBeVisible();
+    await expect(title.closest('.desk-header')).not.toBeNull();
+    canvas.getByRole('button', { name: 'Refresh' }).focus();
+    await expect(
+      canvasElement.querySelector('.issue-page-full-title'),
+    ).not.toBeVisible();
+  },
+};

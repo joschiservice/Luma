@@ -10,19 +10,26 @@ export function IssueInspectorHeader({
   fallback,
   onClose,
   next,
+  openPage,
   className = '',
 }: {
   item?: CaseSummary | undefined;
   fallback?: string | undefined;
   onClose: () => void;
   next?: ReactNode;
+  openPage?: ReactNode;
   className?: string;
 }) {
   return (
     <header className={`issue-inspector-header ${className}`}>
       <IssuePanelClose onClose={onClose} />
       <IssuePanelHeading item={item} {...(fallback ? { fallback } : {})} />
-      {next}
+      {openPage || next ? (
+        <div className="issue-panel-navigation">
+          {openPage}
+          {next}
+        </div>
+      ) : null}
     </header>
   );
 }

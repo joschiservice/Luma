@@ -19,17 +19,16 @@ import {
   useParams,
   useSearch,
 } from '@tanstack/react-router';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Maximize2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 import { connectionsOptions } from '../connections/data';
 import { IdentityError } from '../identity/data';
 import { overviewOptions } from '../overview/data';
-import { CaseShadow } from '../shadow/case';
+import { IssueActions } from './actions';
 import { casesKey, casesOptions, type InboxSearch, matchesView } from './data';
 import { useCaseObservation } from './observation';
 import { LiveCaseDetail } from './progress';
-import { CaseResolution } from './resolution';
 
 /**
  * Displays the filtered case inbox and selected investigation using URL-backed navigation
@@ -385,6 +384,20 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
                       resetScroll: false,
                     })
                   }
+                  openPage={
+                    item ? (
+                      <Link
+                        to="/app/$organizationId/exceptions/$exceptionId/detail"
+                        params={{ organizationId, exceptionId }}
+                        search={search}
+                        className="issue-panel-open-page"
+                        aria-label="Open full page"
+                        title="Open full page"
+                      >
+                        <Maximize2 size={16} aria-hidden="true" />
+                      </Link>
+                    ) : null
+                  }
                   next={
                     next ? (
                       <Link
@@ -438,28 +451,18 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
                     key={`${organizationId}:${exceptionId}`}
                     observation={observation}
                   />
-                  <CaseResolution
+                  <IssueActions
                     key={exceptionId}
                     organizationId={organizationId}
                     exceptionId={item.id}
                     observation={observation}
+                    initialWorkflow={search.shadow}
                     connectionLabels={Object.fromEntries(
                       (connections.data ?? []).map((connection) => [
                         connection.id,
                         `${connection.label} · ${caseLabel(connection.target.kind)}`,
                       ]),
                     )}
-                  />
-                  <CaseShadow
-                    key={`${organizationId}:${exceptionId}:${search.shadow ?? ''}:shadow`}
-                    organizationId={organizationId}
-                    exceptionId={item.id}
-                    initialWorkflow={search.shadow}
-                    disabled={
-                      !observation.confirmed ||
-                      detail.isError ||
-                      observation.offline
-                    }
                   />
                 </>
               ) : null}

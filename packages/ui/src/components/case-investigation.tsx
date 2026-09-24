@@ -20,6 +20,7 @@ import { Button } from './button';
 import { IssueCollection } from './issue-collection';
 import { IssueContext } from './issue-context';
 import { IssueRecordDetails } from './issue-record-details';
+import { IssueSection } from './issue-section';
 
 /** Converts underscore-separated case codes to readable labels. */
 export function caseLabel(value: string) {
@@ -174,6 +175,7 @@ function Findings({ items }: { items: Diagnosis['facts'] }) {
 }
 
 type InvestigationProps = {
+  expanded?: boolean;
   embedded?: boolean;
   item: CaseDetail;
   progress?: ReactNode;
@@ -182,7 +184,10 @@ type InvestigationProps = {
   refreshing?: boolean;
 };
 
-/** Presents investigation status, findings, and next steps without initiating execution. */
+/**
+ * Presents investigation status, findings, and next steps without initiating execution.
+ * Expanded pages open findings and display record metadata in their own surrounding layout.
+ */
 export function CaseInvestigation(props: InvestigationProps) {
   if (props.item.diagnosisStatus === 'failed')
     return <FailedInvestigation {...props} />;
@@ -197,6 +202,7 @@ function FailedInvestigation({
   onRefresh,
   refreshing = false,
   embedded = false,
+  expanded = false,
 }: InvestigationProps) {
   const diagnosis = item.diagnosis;
   const evidenceCount = diagnosis?.provenance.evidence.length ?? 0;
@@ -218,109 +224,106 @@ function FailedInvestigation({
           <IssueContext item={item} />
         </header>
       )}
-      <section
-        className="investigation-failure"
-        aria-label="Investigation status"
-      >
-        <CircleAlert size={22} aria-hidden="true" />
-        <div>
-          <h3>Investigation failed</h3>
-          <p>The investigation could not finish. No recommendation is ready.</p>
-        </div>
-      </section>
-      {unconfirmed || historical ? (
-        <div className="failed-context-warning" role="status">
-          <ShieldQuestion size={18} aria-hidden="true" />
-          <p>
-            {unconfirmed
-              ? 'Current state is unconfirmed. Reconnect or refresh before acting.'
-              : 'Recorded findings are historical. Fresh evidence is needed before acting.'}
-          </p>
-        </div>
-      ) : null}
-      <section className="failed-next-step" aria-label="Next step">
-        <h3>
-          <RefreshCw size={16} aria-hidden="true" />
-          Next step
-        </h3>
-        <div className="failed-update-action">
-          <p>Check whether new findings are available.</p>
-          {onRefresh ? (
-            <Button variant="outline" onClick={onRefresh} disabled={refreshing}>
-              <RefreshCw aria-hidden="true" />
-              {refreshing ? 'Checking…' : 'Check for updates'}
-            </Button>
-          ) : null}
-        </div>
-        <p className="failed-help">
-          {onRefresh
-            ? 'Checks the latest status without restarting the investigation.'
-            : 'Refresh the issue to check the latest status.'}
-        </p>
-        {item.attention.required && (
-          <div className="failed-review-request">
-            <CircleAlert size={16} aria-hidden="true" />
-            <div>
-              <strong>Recorded review request</strong>
-              <p>{item.attention.explanation}</p>
-            </div>
+      <IssueSection section="overview" enabled={expanded}>
+        <section
+          className="investigation-failure"
+          aria-label="Investigation status"
+        >
+          <CircleAlert size={22} aria-hidden="true" />
+          <div>
+            <h3>Investigation failed</h3>
+            <p>
+              The investigation could not finish. No recommendation is ready.
+            </p>
           </div>
-        )}
-      </section>
-      <section
-        className="failed-recorded-context"
-        aria-label="Recorded context"
-      >
-        <div className="failed-context-heading">
+        </section>
+        {unconfirmed || historical ? (
+          <div className="failed-context-warning" role="status">
+            <ShieldQuestion size={18} aria-hidden="true" />
+            <p>
+              {unconfirmed
+                ? 'Current state is unconfirmed. Reconnect or refresh before acting.'
+                : 'Recorded findings are historical. Fresh evidence is needed before acting.'}
+            </p>
+          </div>
+        ) : null}
+        <section className="failed-next-step" aria-label="Next step">
           <h3>
-            <FileText size={16} aria-hidden="true" />
-            Recorded context
+            <RefreshCw size={16} aria-hidden="true" />
+            Next step
           </h3>
-          <span className="failed-freshness">
-            {unconfirmed
-              ? 'Unconfirmed'
-              : historical
-                ? 'Historical evidence'
-                : item.freshness === 'fresh'
-                  ? 'Fresh evidence'
-                  : 'Freshness unknown'}
-          </span>
-        </div>
-        {diagnosis?.impact.exposedQuantity != null ? (
-          <div className="failed-exposure">
-            <div>
-              <span>Potential exposure</span>
-              <p>
-                Recorded before the investigation completed. Does not confirm
-                lost sales or oversold orders.
-              </p>
-            </div>
-            <strong>
-              {diagnosis.impact.exposedQuantity}{' '}
-              <small>{diagnosis.impact.unit}</small>
-            </strong>
+          <div className="failed-update-action">
+            <p>Check whether new findings are available.</p>
+            {onRefresh ? (
+              <Button
+                variant="outline"
+                onClick={onRefresh}
+                disabled={refreshing}
+              >
+                <RefreshCw aria-hidden="true" />
+                {refreshing ? 'Checking…' : 'Check for updates'}
+              </Button>
+            ) : null}
           </div>
-        ) : (
           <p className="failed-help">
-            {diagnosis?.facts.length
-              ? 'Recorded findings are available below. Impact has not been established.'
-              : 'No findings are available yet. Impact remains unknown.'}
+            {onRefresh
+              ? 'Checks the latest status without restarting the investigation.'
+              : 'Refresh the issue to check the latest status.'}
           </p>
-        )}
-      </section>
-      <details className="failed-disclosure">
-        <summary>
-          <FileText size={18} aria-hidden="true" />
-          <span>
-            Findings & evidence
-            <small>
-              {diagnosis?.facts.length ?? 0} findings · {evidenceCount} evidence
-              records
-            </small>
-          </span>
-          <ChevronRight size={16} aria-hidden="true" />
-        </summary>
-        <div className="failed-disclosure-content">
+          {item.attention.required && (
+            <div className="failed-review-request">
+              <CircleAlert size={16} aria-hidden="true" />
+              <div>
+                <strong>Recorded review request</strong>
+                <p>{item.attention.explanation}</p>
+              </div>
+            </div>
+          )}
+        </section>
+        <section
+          className="failed-recorded-context"
+          aria-label="Recorded context"
+        >
+          <div className="failed-context-heading">
+            <h3>
+              <FileText size={16} aria-hidden="true" />
+              Recorded context
+            </h3>
+            <span className="failed-freshness">
+              {unconfirmed
+                ? 'Unconfirmed'
+                : historical
+                  ? 'Historical evidence'
+                  : item.freshness === 'fresh'
+                    ? 'Fresh evidence'
+                    : 'Freshness unknown'}
+            </span>
+          </div>
+          {diagnosis?.impact.exposedQuantity != null ? (
+            <div className="failed-exposure">
+              <div>
+                <span>Potential exposure</span>
+                <p>
+                  Recorded before the investigation completed. Does not confirm
+                  lost sales or oversold orders.
+                </p>
+              </div>
+              <strong>
+                {diagnosis.impact.exposedQuantity}{' '}
+                <small>{diagnosis.impact.unit}</small>
+              </strong>
+            </div>
+          ) : (
+            <p className="failed-help">
+              {diagnosis?.facts.length
+                ? 'Recorded findings are available below. Impact has not been established.'
+                : 'No findings are available yet. Impact remains unknown.'}
+            </p>
+          )}
+        </section>
+      </IssueSection>
+      {expanded ? (
+        <IssueSection section="findings">
           <InvestigationReport
             item={item}
             unconfirmed={unconfirmed}
@@ -328,39 +331,78 @@ function FailedInvestigation({
             recordedOnly
             progress={<></>}
           />
-        </div>
-      </details>
-      <details className="failed-disclosure">
-        <summary>
-          <Activity size={18} aria-hidden="true" />
-          <span>
-            Activity & history
-            <small>
-              {issueStateLabel(item) ?? 'Open issue'} · Updated{' '}
-              <CaseTime value={item.lastActivityAt} />
-            </small>
-          </span>
-          <ChevronRight size={16} aria-hidden="true" />
-        </summary>
-        <div className="failed-disclosure-content">
-          {progress ?? (
-            <>
-              <p>
-                {item.resolution === 'verified'
-                  ? 'Resolved with fresh verification evidence.'
-                  : item.resolution === 'human_disposition'
-                    ? 'Closed by human disposition. This does not establish a verified correction.'
-                    : 'The issue remains open.'}
-              </p>
-              <p className="failed-recorded-time">
-                <Clock3 size={16} aria-hidden="true" />
-                Detected <CaseTime value={item.detectedAt} />
-              </p>
-            </>
-          )}
-        </div>
-      </details>
-      <IssueRecordDetails key={item.id} item={item} />
+        </IssueSection>
+      ) : (
+        <details
+          className="failed-disclosure"
+          data-issue-section="findings"
+          open={expanded}
+        >
+          <summary>
+            <FileText size={18} aria-hidden="true" />
+            <span>
+              Findings & evidence
+              <small>
+                {diagnosis?.facts.length ?? 0} findings · {evidenceCount}{' '}
+                evidence records
+              </small>
+            </span>
+            <ChevronRight size={16} aria-hidden="true" />
+          </summary>
+          <div className="failed-disclosure-content">
+            <InvestigationReport
+              item={item}
+              unconfirmed={unconfirmed}
+              hideHeader
+              recordedOnly
+              progress={<></>}
+            />
+          </div>
+        </details>
+      )}
+      {expanded ? (
+        (progress ?? (
+          <IssueSection section="execution">
+            <p>No activity is available yet.</p>
+          </IssueSection>
+        ))
+      ) : (
+        <details
+          className="failed-disclosure"
+          data-issue-section="execution"
+          open={expanded}
+        >
+          <summary>
+            <Activity size={18} aria-hidden="true" />
+            <span>
+              Activity & history
+              <small>
+                {issueStateLabel(item) ?? 'Open issue'} · Updated{' '}
+                <CaseTime value={item.lastActivityAt} />
+              </small>
+            </span>
+            <ChevronRight size={16} aria-hidden="true" />
+          </summary>
+          <div className="failed-disclosure-content">
+            {progress ?? (
+              <>
+                <p>
+                  {item.resolution === 'verified'
+                    ? 'Resolved with fresh verification evidence.'
+                    : item.resolution === 'human_disposition'
+                      ? 'Closed by human disposition. This does not establish a verified correction.'
+                      : 'The issue remains open.'}
+                </p>
+                <p className="failed-recorded-time">
+                  <Clock3 size={16} aria-hidden="true" />
+                  Detected <CaseTime value={item.detectedAt} />
+                </p>
+              </>
+            )}
+          </div>
+        </details>
+      )}
+      {!expanded && <IssueRecordDetails key={item.id} item={item} />}
     </article>
   );
 }
@@ -372,6 +414,7 @@ function InvestigationReport({
   hideHeader = false,
   recordedOnly = false,
   embedded = false,
+  expanded = false,
 }: {
   item: CaseDetail;
   progress?: ReactNode;
@@ -379,6 +422,7 @@ function InvestigationReport({
   hideHeader?: boolean;
   recordedOnly?: boolean;
   embedded?: boolean;
+  expanded?: boolean;
 }) {
   const diagnosis = item.diagnosis;
   const historical =
@@ -398,45 +442,10 @@ function InvestigationReport({
           <IssueContext item={item} />
         </header>
       )}
-      {!hideHeader && embedded && item.state !== 'detected' && (
+      {!hideHeader && embedded && !expanded && item.state !== 'detected' && (
         <div className="case-badges">
           <span>{issueStateLabel(item)}</span>
         </div>
-      )}
-      {!recordedOnly && (
-        <>
-          {unconfirmed ? (
-            <CaseNotice title="Current investigation is unconfirmed">
-              These are the last confirmed findings. Reconnect or refresh before
-              choosing a correction.
-            </CaseNotice>
-          ) : null}
-          {item.freshness === 'stale' ? (
-            <CaseNotice title="Evidence is stale">
-              Current conditions are unknown. Fresh observations are needed
-              before choosing a correction.
-            </CaseNotice>
-          ) : null}
-          {item.diagnosisStatus === 'pending' ? (
-            <CaseNotice title="Investigation pending">
-              The issue has been detected. Findings and next steps will appear
-              when investigation completes.
-            </CaseNotice>
-          ) : null}
-          {item.diagnosisStatus === 'failed' ? (
-            <CaseNotice title="Investigation could not finish">
-              Refresh to check for a completed investigation. No recommendation
-              is ready.
-            </CaseNotice>
-          ) : null}
-          {item.diagnosisStatus === 'insufficient_evidence' &&
-          item.freshness !== 'stale' ? (
-            <CaseNotice title="More evidence is needed">
-              Mappings, authority or observations do not yet support a confident
-              conclusion.
-            </CaseNotice>
-          ) : null}
-        </>
       )}
       {recordedOnly ? (
         <>
@@ -628,94 +637,121 @@ function InvestigationReport({
         </>
       ) : (
         <>
-          <section>
-            <h3>
-              <ListChecks size={16} aria-hidden="true" /> Recommended next step
-            </h3>
-            {item.attention.required ? (
-              <p className="case-attention">{item.attention.explanation}</p>
-            ) : null}
-            {unconfirmed ? (
-              <p>
-                Current recommendations will appear when the investigation is
-                confirmed.
-              </p>
-            ) : historical ? (
-              <p>
-                This investigation is historical. Its recommendations are no
-                longer current.
-              </p>
-            ) : item.diagnosisStatus !== 'failed' &&
-              diagnosis &&
-              !['pending', 'failed'].includes(diagnosis.status) &&
-              diagnosis.nextSteps.length ? (
-              diagnosis.nextSteps.map((step) => (
-                <div className="case-step" key={step.code}>
-                  <h4>
-                    {step.kind === 'manual_intervention'
-                      ? 'Operator review'
-                      : 'Investigate'}
-                  </h4>
-                  <p>{step.text}</p>
-                  {step.preconditions.length ? (
-                    <>
-                      <h5>Before proceeding</h5>
-                      <ul>
-                        {step.preconditions.map((text) => (
-                          <li key={text}>{text}</li>
-                        ))}
-                      </ul>
-                    </>
-                  ) : null}
-                  <h5>Expected result and verification</h5>
-                  <ul>
-                    {step.verificationCriteria.map((text) => (
-                      <li key={text}>{text}</li>
-                    ))}
-                  </ul>
-                  {step.capabilityLimitations.map((text) => (
-                    <p className="case-caption" key={text}>
-                      {text}
-                    </p>
-                  ))}
-                </div>
-              ))
-            ) : (
-              <p>No current recommendation is available.</p>
+          <IssueSection section="overview" enabled={expanded}>
+            {!recordedOnly && (
+              <>
+                {unconfirmed ? (
+                  <CaseNotice title="Current investigation is unconfirmed">
+                    These are the last confirmed findings. Reconnect or refresh
+                    before choosing a correction.
+                  </CaseNotice>
+                ) : null}
+                {item.freshness === 'stale' ? (
+                  <CaseNotice title="Evidence is stale">
+                    Current conditions are unknown. Fresh observations are
+                    needed before choosing a correction.
+                  </CaseNotice>
+                ) : null}
+                {item.diagnosisStatus === 'pending' ? (
+                  <CaseNotice title="Investigation pending">
+                    The issue has been detected. Findings and next steps will
+                    appear when investigation completes.
+                  </CaseNotice>
+                ) : null}
+                {item.diagnosisStatus === 'failed' ? (
+                  <CaseNotice title="Investigation could not finish">
+                    Refresh to check for a completed investigation. No
+                    recommendation is ready.
+                  </CaseNotice>
+                ) : null}
+                {item.diagnosisStatus === 'insufficient_evidence' &&
+                item.freshness !== 'stale' ? (
+                  <CaseNotice title="More evidence is needed">
+                    Mappings, authority or observations do not yet support a
+                    confident conclusion.
+                  </CaseNotice>
+                ) : null}
+              </>
             )}
-            {diagnosis ? (
-              <p className="case-caption">
-                Investigation revision {diagnosis.revision} ·{' '}
-                {historical ? 'Historical' : caseLabel(diagnosis.status)}
-              </p>
-            ) : null}
-          </section>
+            <section>
+              <h3>
+                <ListChecks size={16} aria-hidden="true" /> Recommended next
+                step
+              </h3>
+              {item.attention.required ? (
+                <p className="case-attention">{item.attention.explanation}</p>
+              ) : null}
+              {unconfirmed ? (
+                <p>
+                  Current recommendations will appear when the investigation is
+                  confirmed.
+                </p>
+              ) : historical ? (
+                <p>
+                  This investigation is historical. Its recommendations are no
+                  longer current.
+                </p>
+              ) : item.diagnosisStatus !== 'failed' &&
+                diagnosis &&
+                !['pending', 'failed'].includes(diagnosis.status) &&
+                diagnosis.nextSteps.length ? (
+                diagnosis.nextSteps.map((step) => (
+                  <div className="case-step" key={step.code}>
+                    <h4>
+                      {step.kind === 'manual_intervention'
+                        ? 'Operator review'
+                        : 'Investigate'}
+                    </h4>
+                    <p>{step.text}</p>
+                    {step.preconditions.length ? (
+                      <>
+                        <h5>Before proceeding</h5>
+                        <ul>
+                          {step.preconditions.map((text) => (
+                            <li key={text}>{text}</li>
+                          ))}
+                        </ul>
+                      </>
+                    ) : null}
+                    <h5>Expected result and verification</h5>
+                    <ul>
+                      {step.verificationCriteria.map((text) => (
+                        <li key={text}>{text}</li>
+                      ))}
+                    </ul>
+                    {step.capabilityLimitations.map((text) => (
+                      <p className="case-caption" key={text}>
+                        {text}
+                      </p>
+                    ))}
+                  </div>
+                ))
+              ) : (
+                <p>No current recommendation is available.</p>
+              )}
+              {diagnosis ? (
+                <p className="case-caption">
+                  Investigation revision {diagnosis.revision} ·{' '}
+                  {historical ? 'Historical' : caseLabel(diagnosis.status)}
+                </p>
+              ) : null}
+            </section>
 
-          {diagnosis?.impact.exposedQuantity != null && (
-            <div className="report-exposure failed-exposure">
-              <div>
-                <span>Potential exposure</span>
-                <p>Does not confirm lost sales or oversold orders.</p>
+            {diagnosis?.impact.exposedQuantity != null && (
+              <div className="report-exposure failed-exposure">
+                <div>
+                  <span>Potential exposure</span>
+                  <p>Does not confirm lost sales or oversold orders.</p>
+                </div>
+                <strong>
+                  {diagnosis.impact.exposedQuantity}{' '}
+                  <small>{diagnosis.impact.unit}</small>
+                </strong>
               </div>
-              <strong>
-                {diagnosis.impact.exposedQuantity}{' '}
-                <small>{diagnosis.impact.unit}</small>
-              </strong>
-            </div>
-          )}
-          <details className="failed-disclosure">
-            <summary>
-              <FileText size={18} aria-hidden="true" />
-              <span>
-                Findings &amp; evidence
-                <small>
-                  {diagnosis?.facts.length ?? 0} findings ·{' '}
-                  {diagnosis?.provenance.evidence.length ?? 0} evidence records
-                </small>
-              </span>
-              <ChevronRight size={16} aria-hidden="true" />
-            </summary>
-            <div className="failed-disclosure-content">
+            )}
+          </IssueSection>
+          {expanded ? (
+            <IssueSection section="findings">
               <InvestigationReport
                 item={item}
                 unconfirmed={unconfirmed}
@@ -723,37 +759,79 @@ function InvestigationReport({
                 recordedOnly
                 progress={<></>}
               />
-            </div>
-          </details>
-          <details className="failed-disclosure" open>
-            <summary>
-              <Activity size={18} aria-hidden="true" />
-              <span>
-                Activity &amp; history
-                <small>
-                  {issueStateLabel(item) ?? 'Open issue'} · Updated{' '}
-                  <CaseTime value={item.lastActivityAt} />
-                </small>
-              </span>
-              <ChevronRight size={16} aria-hidden="true" />
-            </summary>
-            <div className="failed-disclosure-content">
-              {progress ?? (
-                <div>
-                  <p>
-                    {item.resolution === 'verified'
-                      ? 'Resolved with fresh verification evidence.'
-                      : item.resolution === 'human_disposition'
-                        ? 'Closed by human disposition. This does not establish a verified correction.'
-                        : 'This issue is open. Activity will appear here as work progresses.'}
-                  </p>
-                </div>
-              )}
-            </div>
-          </details>
+            </IssueSection>
+          ) : (
+            <details
+              className="failed-disclosure"
+              data-issue-section="findings"
+              open={expanded}
+            >
+              <summary>
+                <FileText size={18} aria-hidden="true" />
+                <span>
+                  Findings &amp; evidence
+                  <small>
+                    {diagnosis?.facts.length ?? 0} findings ·{' '}
+                    {diagnosis?.provenance.evidence.length ?? 0} evidence
+                    records
+                  </small>
+                </span>
+                <ChevronRight size={16} aria-hidden="true" />
+              </summary>
+              <div className="failed-disclosure-content">
+                <InvestigationReport
+                  item={item}
+                  unconfirmed={unconfirmed}
+                  hideHeader
+                  recordedOnly
+                  progress={<></>}
+                />
+              </div>
+            </details>
+          )}
+          {expanded ? (
+            (progress ?? (
+              <IssueSection section="execution">
+                <p>No activity is available yet.</p>
+              </IssueSection>
+            ))
+          ) : (
+            <details
+              className="failed-disclosure"
+              data-issue-section="execution"
+              open
+            >
+              <summary>
+                <Activity size={18} aria-hidden="true" />
+                <span>
+                  Activity &amp; history
+                  <small>
+                    {issueStateLabel(item) ?? 'Open issue'} · Updated{' '}
+                    <CaseTime value={item.lastActivityAt} />
+                  </small>
+                </span>
+                <ChevronRight size={16} aria-hidden="true" />
+              </summary>
+              <div className="failed-disclosure-content">
+                {progress ?? (
+                  <div>
+                    <p>
+                      {item.resolution === 'verified'
+                        ? 'Resolved with fresh verification evidence.'
+                        : item.resolution === 'human_disposition'
+                          ? 'Closed by human disposition. This does not establish a verified correction.'
+                          : 'This issue is open. Activity will appear here as work progresses.'}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </details>
+          )}
         </>
       )}
-      {!hideHeader && <IssueRecordDetails key={item.id} item={item} />}
+      {!hideHeader && !expanded && (
+        <IssueRecordDetails key={item.id} item={item} />
+      )}
     </article>
   );
 }

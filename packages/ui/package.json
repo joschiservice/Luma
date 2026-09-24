@@ -8,7 +8,8 @@
     "./components/*": "./src/components/*.tsx",
     "./lib/*": "./src/lib/*.ts",
     "./styles.css": "./src/styles/globals.css",
-    "./components/case-fixtures": "./src/components/case-fixtures.ts"
+    "./components/case-fixtures": "./src/components/case-fixtures.ts",
+    "./components/resolution-fixtures": "./src/components/resolution-fixtures.ts"
   },
   "sideEffects": [
     "**/*.css"

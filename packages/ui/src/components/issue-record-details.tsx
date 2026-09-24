@@ -14,7 +14,13 @@ import { useState } from 'react';
 import { Button } from './button';
 
 /** Displays issue metadata and lets users copy its identifier. */
-export function IssueRecordDetails({ item }: { item: CaseDetail }) {
+export function IssueRecordDetails({
+  item,
+  expanded = false,
+}: {
+  item: CaseDetail;
+  expanded?: boolean;
+}) {
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>(
     'idle',
   );
@@ -25,7 +31,7 @@ export function IssueRecordDetails({ item }: { item: CaseDetail }) {
   );
 
   return (
-    <details className="issue-record-details">
+    <details className="issue-record-details" open={expanded}>
       <summary>
         <FileText size={16} aria-hidden="true" />
         Issue details

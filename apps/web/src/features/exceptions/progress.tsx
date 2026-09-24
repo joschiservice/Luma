@@ -14,8 +14,10 @@ import type { CaseObservation } from './observation';
  */
 export function LiveCaseDetail({
   observation,
+  expanded = false,
 }: {
   observation: CaseObservation;
+  expanded?: boolean;
 }) {
   const {
     snapshot,
@@ -48,11 +50,13 @@ export function LiveCaseDetail({
     <CaseInvestigation
       item={data.detail}
       embedded
+      expanded={expanded}
       unconfirmed={!confirmed}
       onRefresh={refresh}
       refreshing={snapshot.isFetching}
       progress={
         <CaseTimeline
+          expanded={expanded}
           {...data}
           timeline={history.data?.timeline ?? []}
           evidence={history.data?.evidence ?? []}

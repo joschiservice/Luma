@@ -31,11 +31,13 @@ export function IssueDetailViews({
   header,
   issueTitle,
   headerClassName = '',
+  headerTarget,
 }: {
   children: ReactNode;
   header?: ReactNode;
   issueTitle?: string | undefined;
   headerClassName?: string;
+  headerTarget?: HTMLElement | null;
 }) {
   const [active, setActive] = useState<string | null>(null);
   const [headerOutlet, setHeaderOutlet] = useState<HTMLElement | null>(null);
@@ -84,6 +86,18 @@ export function IssueDetailViews({
     setActive(id);
   }
 
+  const Header = headerTarget ? 'div' : 'header';
+  const headers = (
+    <>
+      {active === null ? header : null}
+      <Header
+        hidden={active === null}
+        ref={setHeaderOutlet}
+        className={`issue-collection-header ${headerClassName}`}
+      />
+    </>
+  );
+
   return (
     <CollectionContext.Provider
       value={{
@@ -114,12 +128,7 @@ export function IssueDetailViews({
           }
         }}
       >
-        {active === null ? header : null}
-        <header
-          hidden={active === null}
-          ref={setHeaderOutlet}
-          className={`issue-collection-header ${headerClassName}`}
-        />
+        {headerTarget ? createPortal(headers, headerTarget) : headers}
         <div hidden={active !== null}>{children}</div>
         <div ref={setOutlet} />
       </div>

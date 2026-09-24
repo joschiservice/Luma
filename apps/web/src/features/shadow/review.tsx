@@ -3,6 +3,7 @@ import { Button } from '@luma/ui/button';
 import { CaseNotice } from '@luma/ui/components/case-investigation';
 import { Field, FieldGroup, FieldLabel } from '@luma/ui/components/field';
 import { Input } from '@luma/ui/components/input';
+import { IssueCollection } from '@luma/ui/components/issue-collection';
 import { Select } from '@luma/ui/components/select';
 import { useQuery } from '@tanstack/react-query';
 import { useId, useRef, useState } from 'react';
@@ -257,7 +258,7 @@ export function ShadowReviewForm({
             <legend>Supporting incident evidence</legend>
             {history.isPending ? (
               <p role="status">Loading evidence…</p>
-            ) : history.error ? (
+            ) : history.error && !history.data ? (
               <CaseNotice error title="Evidence could not be loaded">
                 <Button
                   type="button"
@@ -270,39 +271,76 @@ export function ShadowReviewForm({
             ) : !history.data?.evidence.length ? (
               <p>No retained evidence is available for this case yet.</p>
             ) : (
-              history.data.evidence.map((evidence) => (
-                <label className="shadow-evidence" key={evidence.id}>
-                  <input
-                    type="checkbox"
-                    checked={refs.includes(evidence.id)}
-                    onChange={(e) =>
-                      setRefs(
-                        e.target.checked
-                          ? [...refs, evidence.id]
-                          : refs.filter((ref) => ref !== evidence.id),
-                      )
-                    }
-                  />
-                  <span>
-                    {evidence.source
-                      ? `${evidence.source.provider} · ${evidence.source.resource}`
-                      : 'Observation'}{' '}
-                    · {new Date(evidence.observedAt).toLocaleString()}
-                    <code>{evidence.id}</code>
-                  </span>
-                </label>
-              ))
+              <>
+                <p role="status">{refs.length} evidence records selected</p>
+                <IssueCollection
+                  title="Supporting incident evidence"
+                  noun="incident evidence records"
+                  items={history.data.evidence}
+                  hasMore={history.data.hasMoreEvidence}
+                  loading={history.isFetching}
+                  onLoadMore={() => setPages((value) => value + 1)}
+                  filters={[
+                    {
+                      label: 'Provider',
+                      value: (evidence) =>
+                        evidence.source?.provider ?? 'Observation',
+                    },
+                    {
+                      label: 'Selection',
+                      value: (evidence) =>
+                        refs.includes(evidence.id)
+                          ? 'Selected'
+                          : 'Not selected',
+                    },
+                  ]}
+                  notice={
+                    <>
+                      <p role="status">
+                        {refs.length} evidence records selected
+                      </p>
+                      {history.error ? (
+                        <CaseNotice error title="Evidence could not be loaded">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => void history.refetch()}
+                          >
+                            Retry evidence
+                          </Button>
+                        </CaseNotice>
+                      ) : null}
+                    </>
+                  }
+                  renderItems={(items) =>
+                    items.map((evidence) => (
+                      <label className="shadow-evidence" key={evidence.id}>
+                        <input
+                          type="checkbox"
+                          disabled={pending || !!retry}
+                          checked={refs.includes(evidence.id)}
+                          onChange={(event) => {
+                            const checked = event.target.checked;
+                            setRefs((current) =>
+                              checked
+                                ? [...current, evidence.id]
+                                : current.filter((ref) => ref !== evidence.id),
+                            );
+                          }}
+                        />
+                        <span>
+                          {evidence.source
+                            ? `${evidence.source.provider} · ${evidence.source.resource}`
+                            : 'Observation'}{' '}
+                          · {new Date(evidence.observedAt).toLocaleString()}
+                          <code>{evidence.id}</code>
+                        </span>
+                      </label>
+                    ))
+                  }
+                />
+              </>
             )}
-            {history.data?.hasMore ? (
-              <Button
-                type="button"
-                variant="outline"
-                disabled={history.isFetching}
-                onClick={() => setPages((value) => value + 1)}
-              >
-                Load more evidence
-              </Button>
-            ) : null}
           </fieldset>
           <Field>
             <FieldLabel htmlFor={`${id}-feedback`}>
