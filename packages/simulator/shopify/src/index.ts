@@ -14,9 +14,23 @@ export interface ShopifyState {
 
 export type ShopifyCommand =
   | { kind: 'order'; id: string; quantity: number }
-  | { kind: 'stock'; quantity: number }
+  | { kind: 'stock'; quantity: number; id?: string | undefined }
   | { kind: 'ship'; id: string };
 const gid = (type: string, id = '1') => `gid://shopify/${type}/${id}`;
+
+/** Reads the seeded stock pool's on-hand, reserved, and available quantities. */
+export function stock(state: ShopifyState, id = '1') {
+  const values = state.nodes[gid('InventoryLevel', id)]!.quantities as {
+    name: string;
+    quantity: number;
+  }[];
+
+  return {
+    onHand: values.find((value) => value.name === 'on_hand')!.quantity,
+    reserved: values.find((value) => value.name === 'committed')!.quantity,
+    available: values.find((value) => value.name === 'available')!.quantity,
+  };
+}
 
 /** Seeds Shopify's own resource graph, independently of normalized observations. */
 export function seed(time: number): ShopifyState {
@@ -55,6 +69,40 @@ export function seed(time: number): ShopifyState {
   };
 }
 
+/** Adds a dedicated stock pool for operational scenarios without changing merchant inventory. */
+export function provisionScenarioStock(state: ShopifyState, time: number) {
+  const item = gid('InventoryItem', '2');
+  if (state.nodes[item]) return;
+  const updatedAt = new Date(time).toISOString();
+  state.nodes[gid('Product', '2')] = {
+    id: gid('Product', '2'),
+    updatedAt,
+    title: 'Canvas tote · scenario',
+    status: 'ACTIVE',
+  };
+  state.nodes[gid('ProductVariant', '2')] = {
+    id: gid('ProductVariant', '2'),
+    sku: 'LUMA-SCENARIO-001',
+    inventoryItem: { id: item },
+  };
+  state.nodes[item] = { id: item, tracked: true };
+  state.nodes[gid('InventoryLevel', '2')] = {
+    id: gid('InventoryLevel', '2'),
+    updatedAt,
+    location: { id: gid('Location', '2') },
+    quantities: [
+      { name: 'on_hand', quantity: 100 },
+      { name: 'committed', quantity: 0 },
+      { name: 'available', quantity: 100 },
+    ],
+  };
+  const product = gid('Product', '2');
+  state.roots.products.push(product);
+  state.roots.inventoryItems.push(item);
+  state.children[product] = { variants: [gid('ProductVariant', '2')] };
+  state.children[item] = { inventoryLevels: [gid('InventoryLevel', '2')] };
+}
+
 /** Applies merchant changes using Shopify lifecycle and quantity fields. */
 export function command(
   state: ShopifyState,
@@ -62,7 +110,11 @@ export function command(
   time: number,
 ) {
   const updatedAt = new Date(time).toISOString();
-  const level = state.nodes[gid('InventoryLevel')]!;
+  const level =
+    state.nodes[
+      gid('InventoryLevel', command.kind === 'stock' ? command.id : undefined)
+    ];
+  if (!level) throw new Error('Inventory level not found');
   const quantities = level.quantities as { name: string; quantity: number }[];
   const onHand = quantities.find((q) => q.name === 'on_hand')!;
   const committed = quantities.find((q) => q.name === 'committed')!;

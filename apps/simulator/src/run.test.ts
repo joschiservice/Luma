@@ -281,13 +281,23 @@ it.each(['jtl', 'shopify'] as const)(
   },
 );
 
-it('loads older saved runs with healthy providers', async () => {
+it('loads older saved runs with healthy providers and an isolated scenario stock pool', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'luma-health-upgrade-'));
   const path = join(directory, 'runs.sqlite');
   const token = 'test-synthetic-simulator-token';
   const database = new DatabaseSync(path);
   const legacy: Partial<ReturnType<typeof createRun>> = createRun('legacy');
   delete legacy.serviceHealth;
+  delete legacy.operationalScenarios;
+  legacy.jtl!.items = legacy.jtl!.items.filter((item) => item.id !== '2');
+  for (const key of Object.keys(legacy.shopify!.nodes))
+    if (key.endsWith('/2')) delete legacy.shopify!.nodes[key];
+  for (const key of Object.keys(legacy.shopify!.children))
+    if (key.endsWith('/2')) delete legacy.shopify!.children[key];
+  for (const root of ['products', 'inventoryItems'] as const)
+    legacy.shopify!.roots[root] = legacy.shopify!.roots[root].filter(
+      (key) => !key.endsWith('/2'),
+    );
   database.exec(
     'CREATE TABLE simulator_state (id INTEGER PRIMARY KEY, document TEXT NOT NULL)',
   );
@@ -306,6 +316,13 @@ it('loads older saved runs with healthy providers', async () => {
       jtl: 'healthy',
       shopify: 'healthy',
     });
+    expect(response.json()[0].operationalScenarios).toEqual([]);
+    expect(response.json()[0].jtl.items).toContainEqual(
+      expect.objectContaining({ id: '2', stockAvailable: '100' }),
+    );
+    expect(response.json()[0].shopify.roots.inventoryItems).toContain(
+      'gid://shopify/InventoryItem/2',
+    );
   } finally {
     await app.close();
     await rm(directory, { recursive: true, force: true });

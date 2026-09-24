@@ -11,6 +11,7 @@ import {
 } from '../dev/environment.mjs';
 import { fail, run } from '../dev/process.mjs';
 import { startTelemetry } from '../observability/runtime.mjs';
+import { createOperationsClient } from './platform-client.mjs';
 
 let simulator;
 let telemetry;
@@ -64,11 +65,16 @@ try {
   const directory = join(stateDirectory, 'simulator');
   await mkdir(directory, { recursive: true });
   const token = 'local-synthetic-simulator-token';
+  let operations;
   simulator = await createApp(
     join(directory, 'runs.sqlite'),
     token,
     true,
     telemetry?.measureSync,
+    (id, action) =>
+      operations
+        ? operations(id, action)
+        : Promise.resolve({ connected: false }),
   );
   await simulator.listen({ host: '127.0.0.1', port: 5890 });
   const call = async (path, payload) => {
@@ -87,24 +93,33 @@ try {
     headers: { authorization: `Bearer ${token}` },
   });
   if (!existing.json().some((run) => run.id === 'pilot-44')) {
-    await call('runs', { id: 'pilot-44', seed: 44, scenario: 'commerce' });
+    await call('runs', { id: 'pilot-44', seed: 44, scenario: 'manual' });
   }
   const { seedPilot } = await import('../pilot/seed.mjs');
   const manifest = await seedPilot(
     saved,
     generated,
     directory,
-    'approval-required',
+    process.argv.includes('--approval-required')
+      ? 'approval-required'
+      : 'healthy',
     false,
     { endpoint: 'http://127.0.0.1:5890', token, runId: 'pilot-44' },
   );
+  operations = createOperationsClient({
+    apiOrigin: `http://127.0.0.1:${generated.PORT}`,
+    webOrigin,
+    password: saved.seedPassword,
+    organizationId: manifest.organizationId,
+    runId: manifest.simulator.runId,
+  });
   await writeFile(
     join(directory, 'transport.json'),
     JSON.stringify(manifest.simulator, null, 2),
     { mode: 0o600 },
   );
   console.log(
-    `SIMULATED CONNECTIONS · run pilot-44\nControl panel: http://127.0.0.1:5890\nLuma: ${webOrigin}\nManifest: ${directory}/pilot.json\nAPI and worker share manifest bindings. Start commerce with Start / Resume.`,
+    `SIMULATED CONNECTIONS · run pilot-44\nControl panel: http://127.0.0.1:5890\nLuma: ${webOrigin}\nManifest: ${directory}/pilot.json\nUse Operational issues to create a stock mismatch and follow its case in Luma.`,
   );
   const env = {
     PATH: process.env.PATH,

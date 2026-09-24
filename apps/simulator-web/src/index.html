@@ -76,6 +76,49 @@
           ><button data-action="reset" class="danger">Reset run</button>
         </div>
       </section>
+      <section class="panel operational" aria-labelledby="operational-title">
+        <div class="section-title">
+          <div>
+            <p class="eyebrow">OPERATIONAL ISSUES</p>
+            <h2 id="operational-title">Inventory mismatch</h2>
+          </div>
+          <span id="inventory-condition" class="badge">Select a run</span>
+        </div>
+        <p class="scenario-description">
+          Make Shopify offer 10 more canvas totes than JTL has available in the
+          test stock pool. Luma reads both systems and investigates the
+          difference. Creating a mismatch pauses commerce.
+        </p>
+        <div class="scenario-progress">
+          <div>
+            <span class="eyebrow">PROVIDER AVAILABLE STOCK</span>
+            <p id="inventory-stock">—</p>
+          </div>
+          <div>
+            <span class="eyebrow">LUMA CASE</span>
+            <p id="inventory-case">No case yet</p>
+          </div>
+        </div>
+        <div class="buttons">
+          <button id="inject-inventory" disabled>Create mismatch</button>
+          <button id="recover-inventory" class="secondary" disabled>
+            Match stock
+          </button>
+          <button id="check-inventory" class="secondary" disabled>
+            Check now
+          </button>
+          <a id="inventory-case-link" class="case-link" hidden
+            >Open case in Luma ↗</a
+          >
+        </div>
+        <p id="inventory-check" class="muted" role="status">
+          Connect to the simulator to begin.
+        </p>
+        <p class="muted">
+          Match stock updates Shopify to JTL’s current availability. Luma
+          resolves the case only after independently verifying both systems.
+        </p>
+      </section>
       <div class="columns">
         <section class="panel">
           <div class="section-title">

@@ -5,6 +5,9 @@ let connected = false;
 let pending = 0;
 let queue = Promise.resolve();
 const current = () => runs.find((run) => run.id === selected);
+const operationStatuses = new Map();
+const injectionRequests = new Map();
+let scenarioBusy = false;
 
 async function api(path, body) {
   const response = await fetch(`/api/${path}`, {
@@ -39,6 +42,7 @@ function render() {
     }),
   );
   $('#runs').value = selected;
+  renderInventory();
   if (!run) return;
   $('#clock').textContent = new Date(run.clock.now).toISOString();
   $('#status').textContent =
@@ -98,8 +102,102 @@ function render() {
 async function refresh() {
   runs = await api('runs');
   selected ||= runs[0]?.id ?? '';
+  if (selected) {
+    try {
+      operationStatuses.set(selected, await api(`runs/${selected}/operations`));
+    } catch {
+      operationStatuses.set(selected, {
+        ...operationStatuses.get(selected),
+        unavailable: true,
+      });
+    }
+  }
   render();
 }
+
+function renderInventory() {
+  const run = current();
+  const status = operationStatuses.get(selected);
+  const scenario = run?.operationalScenarios?.at(-1);
+  const active = scenario?.status === 'injected';
+  const left = run?.jtl.items.find((item) => item.id === '2')?.stockAvailable;
+  const right = run?.shopify.nodes[
+    'gid://shopify/InventoryLevel/2'
+  ]?.quantities.find((quantity) => quantity.name === 'available')?.quantity;
+  $('#inventory-stock').textContent = run
+    ? `JTL ${left} · Shopify ${right}`
+    : '—';
+  $('#inventory-condition').textContent = !run
+    ? 'Select a run'
+    : Number(left) === right
+      ? scenario
+        ? 'Problem removed'
+        : 'Stock agrees'
+      : 'Stock differs';
+  const incident = status?.incident;
+  $('#inventory-case').textContent = incident
+    ? incident.state === 'resolved'
+      ? 'Case resolved'
+      : `Open · ${incident.state.replaceAll('_', ' ')}`
+    : 'No case yet';
+  const enabled =
+    !!run && status?.connected && !scenarioBusy && !status.unavailable;
+  $('#inject-inventory').disabled =
+    !enabled || active || (!!incident && incident.state !== 'resolved');
+  $('#recover-inventory').disabled = !enabled || !active;
+  $('#check-inventory').disabled = !enabled;
+  const link = $('#inventory-case-link');
+  link.hidden = !status?.caseUrl;
+  if (status?.caseUrl) link.href = status.caseUrl;
+  else link.removeAttribute('href');
+  const check = status?.lastCheck;
+  $('#inventory-check').textContent = scenarioBusy
+    ? 'Checking the scenario…'
+    : status?.unavailable
+      ? 'Luma is unavailable. Waiting to reconnect.'
+      : !status?.connected
+        ? 'Use the provisioned run from pnpm simulator to detect and resolve issues in Luma.'
+        : !check
+          ? 'Ready. Create a mismatch or check the current stock.'
+          : check.outcome === 'unavailable'
+            ? 'Check could not complete. Restore provider service and try Check now.'
+            : check.outcome === 'defer'
+              ? 'Luma needs complete, comparable stock evidence. The case remains open if one exists.'
+              : `Last checked ${new Date(check.at).toLocaleTimeString()} · ${check.outcome === 'detect' ? 'Mismatch detected' : 'Stock agrees'}`;
+}
+
+function scenarioAction(action) {
+  const runId = selected;
+  const scenarioId = current()?.operationalScenarios?.at(-1)?.id;
+  if (!runId || scenarioBusy) return;
+  scenarioBusy = true;
+  renderInventory();
+  void perform(async () => {
+    try {
+      if (action === 'inject') {
+        if (!injectionRequests.has(runId))
+          injectionRequests.set(runId, crypto.randomUUID());
+        await api(`runs/${runId}/scenarios`, {
+          id: injectionRequests.get(runId),
+          kind: 'inventory-mismatch',
+        });
+        injectionRequests.delete(runId);
+        await api(`runs/${runId}/operations/check`, {});
+      } else if (action === 'recover') {
+        await api(`runs/${runId}/scenarios/${scenarioId}/recover`, {});
+      } else {
+        await api(`runs/${runId}/operations/check`, {});
+      }
+    } finally {
+      scenarioBusy = false;
+      await refresh();
+    }
+  });
+}
+
+$('#inject-inventory').onclick = () => scenarioAction('inject');
+$('#recover-inventory').onclick = () => scenarioAction('recover');
+$('#check-inventory').onclick = () => scenarioAction('check');
 
 function control(body) {
   const runId = selected;
@@ -147,6 +245,7 @@ $('#create').onsubmit = (event) => {
 $('#runs').onchange = (event) => {
   selected = event.target.value;
   render();
+  void perform(refresh);
 };
 $('#provider').onchange = render;
 $('#service-health').onchange = (event) =>

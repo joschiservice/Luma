@@ -37,6 +37,7 @@ import { createPlaybookStore } from '@luma/resolution/composition';
 import { createDeskWorkflowReader } from '@luma/workflow-temporal';
 import { Pool } from 'pg';
 
+import { createInventoryScenario } from '../simulator/inventory.mjs';
 import { observeProviders } from '../simulator/observations.mjs';
 import { detectionRequest, readJson } from './fixtures.mjs';
 import { mutateProviderState } from './provider-state.mjs';
@@ -249,6 +250,14 @@ export async function createPilot(
             // The synthetic pilot does not export capability telemetry.
           },
         });
+    const inventory = simulation
+      ? await createInventoryScenario({
+          commerce,
+          capabilities,
+          operator,
+          manifest,
+        })
+      : null;
     const supported = (action) =>
       action.tenantId === manifest.organizationId &&
       action.connectionId === manifest.connections.jtl &&
@@ -282,8 +291,12 @@ export async function createPilot(
       ? createInstalledShippingMethodEffects(installedOptions, effectBinding)
       : createShippingMethodEffects(capabilities, effectBinding);
     const verifier = {
-      version: 'synthetic-shipping-correction-v1',
+      version: simulation
+        ? 'simulator-verification-v1'
+        : 'synthetic-shipping-correction-v1',
       async evaluate(actor, incident) {
+        if (inventory && incident.exceptionClass === 'inventory_mismatch')
+          return inventory.monitor.verifier.evaluate(actor, incident);
         if (manifest.scenario === 'verifying') await pause('verifying');
         // A fresh adapter read verifies this workflow's shipping correction, not shipment completion.
         const result = await capabilities.read(actor, {
@@ -425,6 +438,15 @@ export async function createPilot(
     if (app) {
       resources.add(() => app.close());
       registerIdentityHttp(app, identity);
+      if (inventory) {
+        const base = '/v1/organizations/:organizationId/simulator/inventory';
+        app.get(base, (request) =>
+          inventory.status(request.tenantContext, detection.exceptions),
+        );
+        app.post(`${base}/check`, (request) =>
+          inventory.check(request.tenantContext, detection),
+        );
+      }
     }
     const runtime = temporal
       ? createExceptionWorkflowRuntime(
@@ -602,18 +624,20 @@ export async function createPilot(
       safety,
       playbooks,
       provider: () => readJson(path),
-      observe: () =>
-        simulation
-          ? observeProviders({
-              context,
-              installations,
-              capabilities,
-              recordRead,
-              manifest,
-              onError: (error) =>
-                app ? app.log.error(error) : console.error(error),
-            })
-          : Promise.resolve(),
+      observe: async () => {
+        if (simulation) {
+          await observeProviders({
+            context,
+            installations,
+            capabilities,
+            recordRead,
+            manifest,
+            onError: (error) =>
+              app ? app.log.error(error) : console.error(error),
+          });
+          await inventory.check(await operator(), detection);
+        }
+      },
       close: resources.close,
     };
   } catch (error) {

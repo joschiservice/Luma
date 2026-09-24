@@ -27,6 +27,7 @@ export interface JtlState {
     stockTotal: string;
     stockReservedTotal: string;
     stockAvailable: string;
+    modifiedTimestamp?: string;
   }[];
   notes: {
     id: string;
@@ -45,7 +46,7 @@ export interface JtlState {
 
 export type JtlCommand =
   | { kind: 'order'; id: string; quantity: number }
-  | { kind: 'stock'; quantity: number }
+  | { kind: 'stock'; quantity: number; id?: string | undefined }
   | { kind: 'ship'; id: string }
   | { kind: 'shipping-method'; id: string; shippingMethodId: string };
 
@@ -77,9 +78,30 @@ export function seed(): JtlState {
   };
 }
 
+/** Adds a dedicated stock pool for operational scenarios without changing merchant inventory. */
+export function provisionScenarioStock(state: JtlState, time: number) {
+  if (state.items.some((item) => item.id === '2')) return;
+  state.items.push({
+    id: '2',
+    sKU: 'LUMA-SCENARIO-001',
+    name: 'Canvas tote · scenario',
+    unit: 'each',
+    isActive: true,
+    isInventoryManagementActive: true,
+    stockTotal: '100',
+    stockReservedTotal: '0',
+    stockAvailable: '100',
+    modifiedTimestamp: new Date(time).toISOString(),
+  });
+}
+
 /** Applies an external merchant action; writes do not promise compare-and-swap or idempotency. */
 export function command(state: JtlState, command: JtlCommand, time: number) {
-  const item = state.items[0]!;
+  const item =
+    command.kind === 'stock' && command.id
+      ? state.items.find((item) => item.id === command.id)
+      : state.items[0];
+  if (!item) throw new Error('Item not found');
   if (command.kind === 'order') {
     if (
       !/^[1-9]\d*$/.test(command.id) ||
@@ -153,6 +175,12 @@ export function command(state: JtlState, command: JtlCommand, time: number) {
   item.stockAvailable = String(
     Number(item.stockTotal) - Number(item.stockReservedTotal),
   );
+  if (command.kind !== 'shipping-method') {
+    const previous = item.modifiedTimestamp
+      ? Date.parse(item.modifiedTimestamp) + 1
+      : time;
+    item.modifiedTimestamp = new Date(Math.max(time, previous)).toISOString();
+  }
 }
 
 /** Identifies a JTL request for fault targeting and journal links. */

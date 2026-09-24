@@ -4,11 +4,13 @@
 
 Run `mise exec -- pnpm simulator` from the repository root. It starts local PostgreSQL and Temporal, builds the packages, provisions synthetic installations, and starts the simulator, control panel, Luma API, worker, and web app. The command prints the Luma URL and manifest path. Docker and the repository's Node 24 / pnpm toolchain are required.
 
-Open <http://127.0.0.1:5890> and click **Connect**. The default local token is prefilled. Select `pilot-44`, then **Start / Resume**. The Luma pilot starts at an approval-required shipping correction; use its operator account to approve the proposal. Credentials are in `.luma/simulator-login.json`. The approval review refreshes
-expired evidence automatically on the same case. Before approval, it rereads the
-order; changed methods, cancelled orders, shipped orders, and unknown order
-states stop the correction. Use **Retry checks** after a temporary read failure.
-A simulator reset is not needed to recover an expired, unapproved proposal.
+Open <http://127.0.0.1:5890> and click **Connect**. The default local token is prefilled. Select `pilot-44`. New workspaces start healthy in a manual sandbox. Credentials for Luma are in `.luma/simulator-login.json`.
+
+Under **Operational issues**, click **Create mismatch**. The simulator pauses commerce and sets Shopify's available stock ten units above JTL's available stock for a dedicated canvas tote test stock pool. Autonomous orders use a separate stock pool. Luma reads both providers, detects the mismatch, and records its evidence. **Open case in Luma** opens that case.
+
+Click **Match stock** to set Shopify availability to JTL's current availability while preserving reservations. The panel shows **Problem removed** separately from **Case resolved**. **Check now** runs detection and, when the stock agrees, independent verification. Background checks also run every ten seconds. A provider outage, incomplete read, stale evidence, or conflicting mapping leaves the case open. After resolution, **Create mismatch** starts another occurrence linked to the previous case; no reset is needed.
+
+Existing workspaces retain their data and startup scenario. To provision the shipping approval example in a new workspace, use `pnpm simulator --approval-required`. The approval review refreshes expired evidence on the same case. Before approval it rereads the order; changed methods, cancelled or shipped orders, and unknown states stop the correction. Use **Retry checks** after a temporary read failure.
 
 For the simulator and panel alone, use `mise exec -- pnpm simulator:service`. Create a run in the panel. This command does not provision Luma installations. Optional service settings are `LUMA_SIMULATOR_PORT`, `LUMA_SIMULATOR_TOKEN`, and `LUMA_SIMULATOR_STORE`.
 
@@ -67,9 +69,33 @@ Stop the simulator before running `pnpm db:reset`. The reset archives pilot and 
 
 The full-stack command stores provider runs in `.luma/simulator/runs.sqlite` using SQLite WAL and full synchronous commits. Each request or clock tick loads the current snapshot and commits provider state, pending events, rule consumption, and journal together. Failed transactions roll back. A crash before commit leaves the event pending; a crash after commit leaves it consumed. Restart preserves running/paused state without replaying committed transitions. Run only one service runner per database. A failed scheduled transition rolls back that tick, pauses the affected run, and records a scenario error; other runs continue. Fix the conflicting provider state or reset before resuming.
 
-**Reset run** replaces provider state, clock, journal, and faults using the original seed and scenario; it pauses the run. It does not reset Luma's existing execution records. To repeat the complete Luma approval journey, stop the stack, move `.luma/simulator` aside, and restart `pnpm simulator`; a new isolated pilot organization is provisioned. Keep the old directory when retaining reproduction evidence.
+**Reset run** replaces provider state, scheduled events, scenario instances, journal, and faults using the original seed and scenario; it pauses the run. Its clock starts after the previous run time and JTL item timestamps so provider changes remain ordered and Luma can accept the reset stock as a new observation. Luma retains its cases, evidence, and execution records. **Check now** can verify an open inventory case against the reset stock. To provision a fresh workspace, stop the stack, move `.luma/simulator` aside, and restart `pnpm simulator` (or `pnpm simulator --approval-required` for the shipping example); a new isolated organization is provisioned. Keep the old directory when retaining reproduction evidence.
 
-To reproduce provider behavior, create the same seed/scenario, replay journaled manual controls in sequence, and advance the clock by the recorded amounts. Request ordering matters for occurrence-based faults; replay those requests in journal order. Run state and journals are local development data and grow until reset.
+To reproduce provider behavior, create the same seed/scenario, replay journaled manual controls in sequence, and advance the clock by the recorded amounts. Request ordering matters for occurrence-based faults; replay those requests in journal order. Run state, scenario request IDs, and journals are local development data and grow until reset.
+
+## Operational scenario API and platform tests
+
+The panel and automated tests share the same authenticated simulator API:
+
+| Request                                            | Behavior                                                                                                                                                                                                                                     |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/runs/:id/scenarios`                     | Accepts `{ "id": "<UUID>", "kind": "inventory-mismatch" }`. Persists the scenario and provider mutation together. Reusing the UUID returns the existing scenario without another mutation. Only one injected mismatch can be active per run. |
+| `POST /api/runs/:id/scenarios/:scenarioId/recover` | Matches Shopify stock to current JTL availability. Repeating recovery is a no-op, including after a later scenario starts.                                                                                                                   |
+| `GET /api/runs/:id/operations`                     | Returns the latest Luma check, case state, and case link. Runs without provisioned bindings return `connected: false`.                                                                                                                       |
+| `POST /api/runs/:id/operations/check`              | Runs a complete inventory check through Luma's authenticated application route, then verifies an existing case if the detection result is clear.                                                                                             |
+
+All simulator requests require its bearer token. The host signs in as the provisioned local operator to call the tenant-scoped Luma routes. The browser never receives the operator password or session. Application routes are registered only by the local pilot runtime and retain the normal session, tenant, origin, and role checks.
+
+`apps/simulator/src/operational-scenarios.ts` owns provider mutations and retry-safe scenario instances. `tooling/simulator/inventory.mjs` provisions explicit canonical SKU and stock-pool bindings: JTL item `2` / `all-warehouses` and Shopify inventory item `2` / location `2`. These records are provisioned for new and existing runs and are separate from the merchant stock used by autonomous commerce. It composes the reusable `createInventoryMonitor` application service from `@luma/resolution`. The monitor completes pagination, reads the mapped records, checks projection currency, and uses the existing inventory rule for detection and independent verification. The simulator stores no copy of Luma's case lifecycle.
+
+Inventory checks use the adapters' observation clock and Luma's evaluation clock, both real time. The simulator clock timestamps provider changes; advancing it does not bypass freshness or detection rules. The inventory scenario needs no timing threshold. Stuck fulfillment and sync failure remain future operational scenarios; the existing service-health and fault controls remain available for provider testing.
+
+The platform suites use an isolated PostgreSQL database, temporary simulator store, healthy workspace, and the same seed and HTTP bridge as the local stack. They assert detection, replay safety, independent verification, recovery during outages, recurrence, reset behavior, and the visible panel journey. Failed tests write provider journals and case evidence to a temporary JSON artifact.
+
+```sh
+mise exec -- pnpm test:e2e simulator.e2e.mjs
+mise exec -- pnpm test:browser simulator.browser.mjs
+```
 
 ## Extending and checking
 

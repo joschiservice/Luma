@@ -11,6 +11,8 @@ import * as jtl from '@luma/simulator-jtl';
 import * as shopify from '@luma/simulator-shopify';
 import { z } from 'zod';
 
+import type { OperationalScenario } from './operational-scenarios.js';
+
 const orderId = z.string().regex(/^[1-9]\d{0,8}$/);
 const quantity = z.number().int().min(1).max(1000);
 
@@ -19,6 +21,7 @@ export const commandSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('stock'),
     quantity: z.number().int().min(0).max(2147483647),
+    id: orderId.optional(),
   }),
   z.object({ kind: z.literal('ship'), id: orderId }),
   z.object({
@@ -79,6 +82,7 @@ export interface Run {
   jtl: jtl.JtlState;
   shopify: shopify.ShopifyState;
   mappings: { jtl: string; shopify: string }[];
+  operationalScenarios: OperationalScenario[];
 }
 const eventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('cycle') }),
@@ -94,8 +98,9 @@ export function createRun(
   id: string,
   seed = 44,
   scenario: Run['scenario'] = 'commerce',
+  startAt?: number,
 ): Run {
-  const clock = createClock();
+  const clock = createClock(startAt);
   const run: Run = {
     id,
     seed,
@@ -107,7 +112,9 @@ export function createRun(
     jtl: jtl.seed(),
     shopify: shopify.seed(clock.now),
     mappings: [{ jtl: '1', shopify: 'gid://shopify/Order/1' }],
+    operationalScenarios: [],
   };
+  provisionOperationalStock(run);
   mutate(run, 'jtl', { kind: 'order', id: '1', quantity: 2 });
   mutate(run, 'shopify', { kind: 'order', id: '1', quantity: 2 });
   mutate(run, 'jtl', { kind: 'order', id: '10', quantity: 2 });
@@ -116,6 +123,12 @@ export function createRun(
   if (scenario === 'commerce') schedule(clock, 10000, { type: 'cycle' });
 
   return run;
+}
+
+/** Ensures the scenario stock pool exists, including when loading runs created before scenario controls. */
+export function provisionOperationalStock(run: Run) {
+  jtl.provisionScenarioStock(run.jtl, run.clock.now);
+  shopify.provisionScenarioStock(run.shopify, run.clock.now);
 }
 
 /** Applies the same provider command for manual inputs and scheduled merchant actions. */

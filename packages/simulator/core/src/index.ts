@@ -39,10 +39,10 @@ export interface Clock {
   faults: Fault[];
 }
 
-/** Creates a deterministic clock; transport deadlines always use real time. */
-export function createClock(): Clock {
+/** Creates a deterministic clock at an epoch in milliseconds; transport deadlines always use real time. */
+export function createClock(now = Date.parse('2026-01-01T00:00:00Z')): Clock {
   return {
-    now: Date.parse('2026-01-01T00:00:00Z'),
+    now,
     running: false,
     speed: 1,
     sequence: 0,

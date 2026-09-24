@@ -8,6 +8,7 @@ import type {
 } from '@luma/connections';
 import type {
   Configuration,
+  DetectionRequest,
   DetectionService,
   Evidence,
   Facts,
@@ -85,6 +86,92 @@ function inventoryEvidence(observation: Observation<InventorySnapshot>) {
   });
 }
 
+export interface InventoryDetectionInput {
+  left: Observation<InventorySnapshot>;
+  right: Observation<InventorySnapshot>;
+  mapping: InventoryMapping;
+  complete: boolean;
+  projectionCurrent: boolean;
+  configuration: Configuration;
+}
+
+/** Builds inventory facts and evidence for detection and independent verification. */
+export function inventoryRequest(
+  context: TenantContext,
+  input: InventoryDetectionInput,
+  hash: (value: string) => string,
+): DetectionRequest {
+  const key = (parts: unknown[]) => hash(JSON.stringify(parts));
+  const { left, right, mapping, configuration } = input;
+  requireTenant(context, mapping.tenantId);
+  requireTenant(context, left.source.tenantId);
+  requireTenant(context, right.source.tenantId);
+  requireTenant(context, mapping.left.source.tenantId);
+  requireTenant(context, mapping.right.source.tenantId);
+  const mappedSku =
+    sourceMatches(left.source, mapping.left.source) &&
+    sourceMatches(right.source, mapping.right.source) &&
+    externalMatches(left.data.sku, mapping.left.sku) &&
+    externalMatches(right.data.sku, mapping.right.sku);
+  const equivalentPool =
+    externalMatches(left.data.location, mapping.left.location) &&
+    externalMatches(right.data.location, mapping.right.location);
+  const mappingKey = `mapping:${key(['inventory', mapping])}`;
+  const facts: Facts<'inventory_mismatch'> = {
+    tenantId: context.tenantId,
+    evidenceTenantId: context.tenantId,
+    subjectId: mapping.skuId,
+    evidenceRefs: [left.id, right.id, mappingKey],
+    connectionIds: [left.source.connectionId, right.source.connectionId],
+    canonicalLocationId: mapping.locationId,
+    leftAvailable: left.data.available,
+    rightAvailable: right.data.available,
+    leftUnit: left.data.unit,
+    rightUnit: right.data.unit,
+    leftObservedAt: left.observedAt,
+    rightObservedAt: right.observedAt,
+    leftBasis: left.data.availabilityBasis,
+    rightBasis: right.data.availabilityBasis,
+    mappedSku,
+    equivalentPool,
+    complete:
+      input.complete && left.kind === 'snapshot' && right.kind === 'snapshot',
+    projectionCurrent: input.projectionCurrent,
+    authority: mapping.authority,
+    sellingSource: mapping.sellingSource,
+    tolerance: configuration.inventoryTolerance,
+  };
+  const mappingEvidence: Evidence = {
+    key: mappingKey,
+    tenantId: context.tenantId,
+    connectionId: null,
+    source: null,
+    observedAt: mapping.publishedAt,
+    sourceUpdatedAt: null,
+    adapterVersion: 'canonical-mapping-v1',
+    schemaVersion: 1,
+    facts: { ...mapping },
+  };
+
+  return {
+    key: key([
+      'inventory',
+      left.id,
+      right.id,
+      mappingKey,
+      input.complete,
+      input.projectionCurrent,
+    ]),
+    input: { exceptionClass: 'inventory_mismatch', facts },
+    evidence: [
+      inventoryEvidence(left),
+      inventoryEvidence(right),
+      mappingEvidence,
+    ],
+    configuration,
+  };
+}
+
 /** Invoke with persisted scan/event IDs and mappings resolved inside the trusted tenant scope. */
 export function createDetectionPipeline(
   service: DetectionService,
@@ -93,87 +180,8 @@ export function createDetectionPipeline(
   const key = (parts: unknown[]) => hash(JSON.stringify(parts));
 
   return {
-    inventory(
-      context: TenantContext,
-      input: {
-        left: Observation<InventorySnapshot>;
-        right: Observation<InventorySnapshot>;
-        mapping: InventoryMapping;
-        complete: boolean;
-        projectionCurrent: boolean;
-        configuration: Configuration;
-      },
-    ) {
-      const { left, right, mapping, configuration } = input;
-      requireTenant(context, mapping.tenantId);
-      requireTenant(context, left.source.tenantId);
-      requireTenant(context, right.source.tenantId);
-      requireTenant(context, mapping.left.source.tenantId);
-      requireTenant(context, mapping.right.source.tenantId);
-      const mappedSku =
-        sourceMatches(left.source, mapping.left.source) &&
-        sourceMatches(right.source, mapping.right.source) &&
-        externalMatches(left.data.sku, mapping.left.sku) &&
-        externalMatches(right.data.sku, mapping.right.sku);
-      const equivalentPool =
-        externalMatches(left.data.location, mapping.left.location) &&
-        externalMatches(right.data.location, mapping.right.location);
-      const mappingKey = `mapping:${key(['inventory', mapping])}`;
-      const facts: Facts<'inventory_mismatch'> = {
-        tenantId: context.tenantId,
-        evidenceTenantId: context.tenantId,
-        subjectId: mapping.skuId,
-        evidenceRefs: [left.id, right.id, mappingKey],
-        connectionIds: [left.source.connectionId, right.source.connectionId],
-        canonicalLocationId: mapping.locationId,
-        leftAvailable: left.data.available,
-        rightAvailable: right.data.available,
-        leftUnit: left.data.unit,
-        rightUnit: right.data.unit,
-        leftObservedAt: left.observedAt,
-        rightObservedAt: right.observedAt,
-        leftBasis: left.data.availabilityBasis,
-        rightBasis: right.data.availabilityBasis,
-        mappedSku,
-        equivalentPool,
-        complete:
-          input.complete &&
-          left.kind === 'snapshot' &&
-          right.kind === 'snapshot',
-        projectionCurrent: input.projectionCurrent,
-        authority: mapping.authority,
-        sellingSource: mapping.sellingSource,
-        tolerance: configuration.inventoryTolerance,
-      };
-      const mappingEvidence: Evidence = {
-        key: mappingKey,
-        tenantId: context.tenantId,
-        connectionId: null,
-        source: null,
-        observedAt: mapping.publishedAt,
-        sourceUpdatedAt: null,
-        adapterVersion: 'canonical-mapping-v1',
-        schemaVersion: 1,
-        facts: { ...mapping },
-      };
-
-      return service.ingest(context, {
-        key: key([
-          'inventory',
-          left.id,
-          right.id,
-          mappingKey,
-          input.complete,
-          input.projectionCurrent,
-        ]),
-        input: { exceptionClass: 'inventory_mismatch', facts },
-        evidence: [
-          inventoryEvidence(left),
-          inventoryEvidence(right),
-          mappingEvidence,
-        ],
-        configuration,
-      });
+    inventory(context: TenantContext, input: InventoryDetectionInput) {
+      return service.ingest(context, inventoryRequest(context, input, hash));
     },
     fulfillment(
       context: TenantContext,

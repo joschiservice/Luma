@@ -4,6 +4,7 @@ import { DatabaseSync } from 'node:sqlite';
 
 import { type Measure, unmeasured } from './performance.js';
 import type { Run } from './run.js';
+import { provisionOperationalStock } from './run.js';
 
 /** Opens a durable SQLite store; each transaction reads current state and commits before exposing its result. */
 export async function openStore(path: string, measure: Measure = unmeasured) {
@@ -33,8 +34,11 @@ export async function openStore(path: string, measure: Measure = unmeasured) {
           const runs = measure('simulator.decode', () =>
             JSON.parse(String(row.document)),
           ) as Record<string, Run>;
-          for (const run of Object.values(runs))
+          for (const run of Object.values(runs)) {
             run.serviceHealth ??= { jtl: 'healthy', shopify: 'healthy' };
+            run.operationalScenarios ??= [];
+            provisionOperationalStock(run);
+          }
           const result = work(runs);
           const document = measure('simulator.encode', () =>
             JSON.stringify(runs),

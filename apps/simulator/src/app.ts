@@ -4,6 +4,10 @@ import { journal } from '@luma/simulator-core';
 import Fastify from 'fastify';
 import { z } from 'zod';
 
+import {
+  injectInventoryMismatch,
+  recoverInventoryMismatch,
+} from './operational-scenarios.js';
 import { type Measure, unmeasured } from './performance.js';
 import {
   advanceRun,
@@ -46,6 +50,7 @@ export async function createApp(
   token: string,
   autonomous = true,
   measure: Measure = unmeasured,
+  operations?: (runId: string, action: 'status' | 'check') => Promise<unknown>,
 ) {
   if (token.length < 20)
     throw new Error('Simulator token must have at least 20 characters');
@@ -108,7 +113,17 @@ export async function createApp(
       if (input.action === 'pause') run.clock.running = false;
       if (input.action === 'resume') run.clock.running = true;
       if (input.action === 'reset')
-        runs[id] = createRun(id, run.seed, run.scenario);
+        runs[id] = createRun(
+          id,
+          run.seed,
+          run.scenario,
+          Math.max(
+            run.clock.now,
+            ...run.jtl.items.map((item) =>
+              item.modifiedTimestamp ? Date.parse(item.modifiedTimestamp) : 0,
+            ),
+          ) + 1,
+        );
       if (input.action === 'advance')
         measure('simulator.advance', () => advanceRun(run, input.milliseconds));
       if (input.action === 'speed') run.clock.speed = input.speed;
@@ -135,6 +150,45 @@ export async function createApp(
       return runs[id];
     });
   });
+  app.post('/api/runs/:id/scenarios', async (request) => {
+    const { id } = z.object({ id: runId }).parse(request.params);
+    const input = z
+      .object({ id: z.string().uuid(), kind: z.literal('inventory-mismatch') })
+      .strict()
+      .parse(request.body);
+
+    return store.transact((runs) => {
+      const run = runs[id];
+      if (!run) throw new Error('Run not found');
+
+      return injectInventoryMismatch(run, input.id);
+    });
+  });
+  app.post('/api/runs/:id/scenarios/:scenarioId/recover', async (request) => {
+    const { id, scenarioId } = z
+      .object({ id: runId, scenarioId: z.string().uuid() })
+      .parse(request.params);
+
+    return store.transact((runs) => {
+      const run = runs[id];
+      if (!run) throw new Error('Run not found');
+
+      return recoverInventoryMismatch(run, scenarioId);
+    });
+  });
+  for (const action of ['status', 'check'] as const) {
+    app.route({
+      method: action === 'status' ? 'GET' : 'POST',
+      url: `/api/runs/:id/operations${action === 'check' ? '/check' : ''}`,
+      async handler(request) {
+        const { id } = z.object({ id: runId }).parse(request.params);
+        const exists = await store.transact((runs) => !!runs[id]);
+        if (!exists) throw new Error('Run not found');
+
+        return operations ? operations(id, action) : { connected: false };
+      },
+    });
+  }
   app.post('/api/runs/:id/providers/:instance/request', async (request) => {
     const target = z.object({ id: runId, instance }).parse(request.params);
     const input = requestSchema.parse(request.body);

@@ -313,16 +313,21 @@ export function createJtlConnector(
                 location === 'all-warehouses'
                   ? known(item.stockAvailable)
                   : null;
-              emit('sku', ref(item.id, location), null, {
-                sku: ref(item.id),
-                location: ref(location),
-                unit: unit(item.unit),
-                onHand: known(stock ? stock.totalQuantity : item.stockTotal),
-                reserved: stock ? null : known(item.stockReservedTotal),
-                available,
-                availabilityBasis:
-                  available === null ? 'unknown' : 'provider_reported',
-              });
+              emit(
+                'sku',
+                ref(item.id, location),
+                item.modifiedTimestamp ?? null,
+                {
+                  sku: ref(item.id),
+                  location: ref(location),
+                  unit: unit(item.unit),
+                  onHand: known(stock ? stock.totalQuantity : item.stockTotal),
+                  reserved: stock ? null : known(item.stockReservedTotal),
+                  available,
+                  availabilityBasis:
+                    available === null ? 'unknown' : 'provider_reported',
+                },
+              );
             }
           }
         } else {

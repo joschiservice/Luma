@@ -158,6 +158,40 @@ select:focus-visible {
   grid-template-columns: 1.2fr 1fr;
   gap: 20px;
 }
+.operational {
+  margin-bottom: 20px;
+  border-left: 4px solid #244c3f;
+}
+.operational h2 {
+  margin-bottom: 0;
+}
+.scenario-description {
+  max-width: 700px;
+  line-height: 1.6;
+}
+.scenario-progress {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px 60px;
+  padding: 16px 0;
+  margin: 16px 0;
+  border-block: 1px solid #dbe0d3;
+}
+.scenario-progress p {
+  margin: 8px 0 0;
+  font-size: 18px;
+}
+.case-link {
+  padding: 10px 0;
+  margin-left: 8px;
+  font-size: 12px;
+  letter-spacing: 0;
+  text-decoration: underline;
+}
+.case-link:focus-visible {
+  outline: 3px solid #cba946;
+  outline-offset: 3px;
+}
 .panel {
   background: #fffef8;
   padding: 26px;
