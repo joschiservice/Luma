@@ -10,6 +10,7 @@ import {
   CaseLoading,
   CaseNotice,
 } from './case-investigation';
+import { IssueDetailViews } from './issue-collection';
 import { IssueInspectorHeader } from './issue-inspector-header';
 
 function InvestigationPreview({
@@ -43,12 +44,18 @@ function InvestigationPreview({
             }
           }}
         >
-          <IssueInspectorHeader
-            item={item}
-            fallback="Investigation"
-            onClose={() => setOpen(false)}
-          />
-          <div className="investigation-preview-body">{children}</div>
+          <IssueDetailViews
+            issueTitle={item?.summary}
+            header={
+              <IssueInspectorHeader
+                item={item}
+                fallback="Investigation"
+                onClose={() => setOpen(false)}
+              />
+            }
+          >
+            <div className="investigation-preview-body">{children}</div>
+          </IssueDetailViews>
         </section>
       ) : (
         <Button variant="outline" onClick={() => setOpen(true)}>
@@ -255,5 +262,45 @@ export const InvestigationFailedWithPreviousFindings: Story = {
         'Review authoritative JTL stock and have an authorized operator correct Shopify.',
       ),
     ).not.toBeInTheDocument();
+  },
+};
+
+export const LongSupportingEvidence: Story = {
+  args: {
+    item: {
+      ...inventoryCase,
+      diagnosis: {
+        ...inventoryCase.diagnosis!,
+        provenance: {
+          ...inventoryCase.diagnosis!.provenance,
+          evidence: Array.from({ length: 24 }, (_, index) => ({
+            ...inventoryCase.diagnosis!.provenance.evidence[0]!,
+            id: `supporting-${index}`,
+          })),
+        },
+      },
+    },
+  },
+
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(
+      canvas.getByText('Findings & evidence', { exact: true }),
+    );
+    const open = canvas.getByRole('button', {
+      name: 'View all 24 supporting evidence records',
+    });
+    await userEvent.click(open);
+    const collection = within(
+      canvas.getByRole('region', { name: 'Supporting evidence' }),
+    );
+    await expect(collection.getByText('1–20 of 24')).toBeVisible();
+    await userEvent.click(collection.getByRole('button', { name: 'Next' }));
+    await expect(collection.getByText('21–24 of 24')).toBeVisible();
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Back to issue' }),
+    );
+    await expect(open).toBeVisible();
+    await expect(open).toHaveFocus();
   },
 };

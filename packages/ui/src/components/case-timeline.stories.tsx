@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, within } from 'storybook/test';
 
 import { CaseTimeline } from './case-timeline';
+import { IssueDetailViews } from './issue-collection';
 
 const id = '11111111-1111-4111-8111-111111111111';
 
@@ -298,5 +299,103 @@ export const HumanDisposition: Story = {
         evidenceRefs: [],
       },
     },
+  },
+};
+
+export const LongCollections: Story = {
+  parameters: { layout: 'fullscreen' },
+  args: {
+    timeline: Array.from({ length: 45 }, (_, index) => ({
+      ...meta.args.timeline[0]!,
+      id: `event-${index}`,
+      occurredAt: new Date(Date.parse(at) - index * 60_000).toISOString(),
+      actorId: `operator-${index}`,
+      type: index % 2 ? 'execution.completed' : 'execution.prepared',
+      outcome: index % 2 ? 'failed' : 'succeeded',
+    })),
+    evidence: Array.from({ length: 24 }, (_, index) => ({
+      ...meta.args.evidence[0]!,
+      id: `evidence-${index}`,
+      observedAt: new Date(Date.parse(at) - index * 60_000).toISOString(),
+      source: {
+        ...meta.args.evidence[0]!.source,
+        provider: index % 2 ? 'JTL' : 'Shopify',
+      },
+    })),
+  },
+  render: (args) => (
+    <div style={{ height: 600, overflowY: 'auto' }} data-testid="issue-scroll">
+      <header>Selected issue</header>
+      <IssueDetailViews>
+        <details>
+          <summary>Issue details</summary>
+          <p>Keep this section open</p>
+        </details>
+        <CaseTimeline {...args} />
+        <p>Other issue details</p>
+      </IssueDetailViews>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByText('Issue details', { exact: true }));
+    await expect(canvas.getAllByText(/^Actor:/)).toHaveLength(3);
+    const open = canvas.getByRole('button', { name: 'View all 45 events' });
+    open.scrollIntoView();
+    const scroll = canvas.getByTestId('issue-scroll');
+    const position = scroll.scrollTop;
+    await userEvent.click(open);
+    const history = within(
+      canvas.getByRole('region', { name: 'Audit history' }),
+    );
+    await expect(
+      canvas.getByRole('heading', { name: 'Audit history' }),
+    ).toHaveFocus();
+    await expect(canvas.getByText('Other issue details')).not.toBeVisible();
+    await expect(history.getAllByText(/^Actor:/)).toHaveLength(20);
+    await userEvent.click(history.getByRole('button', { name: 'Next' }));
+    await expect(history.getByText('21–40 of 45')).toBeVisible();
+    await userEvent.click(history.getByRole('combobox', { name: 'Outcome' }));
+    await userEvent.click(
+      await within(document.body).findByRole('option', { name: 'Failed' }),
+    );
+    await expect(history.getByText('1–20 of 22')).toBeVisible();
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Back to issue' }),
+    );
+    await expect(open).toHaveFocus();
+    await expect(scroll.scrollTop).toBe(position);
+    await expect(canvas.getByText('Keep this section open')).toBeVisible();
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'View all 24 evidence records' }),
+    );
+    const evidence = within(
+      canvas.getByRole('region', { name: 'Evidence provenance' }),
+    );
+    await userEvent.click(evidence.getByRole('combobox', { name: 'Source' }));
+    await userEvent.click(
+      await within(document.body).findByRole('option', {
+        name: 'JTL · Inventory',
+      }),
+    );
+    await expect(evidence.getByText('1–12 of 12')).toBeVisible();
+    await userEvent.click(evidence.getByRole('combobox', { name: 'Source' }));
+    await within(document.body).findByRole('listbox');
+    await userEvent.keyboard('{Escape}');
+    await expect(
+      canvas.getByRole('region', { name: 'Evidence provenance' }),
+    ).toBeVisible();
+
+    await userEvent.click(
+      evidence.getAllByText(/JTL · Inventory/, { selector: 'summary' })[0]!,
+    );
+    await expect(evidence.getAllByText('sku-104')[0]!).toBeVisible();
+    await userEvent.click(
+      canvas.getByRole('heading', { name: 'Evidence provenance' }),
+    );
+    await userEvent.keyboard('{Escape}');
+    await expect(
+      canvas.getByRole('button', { name: 'View all 24 evidence records' }),
+    ).toHaveFocus();
   },
 };

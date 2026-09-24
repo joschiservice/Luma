@@ -17,6 +17,7 @@ import {
 import type { ReactNode } from 'react';
 
 import { Button } from './button';
+import { IssueCollection } from './issue-collection';
 import { IssueContext } from './issue-context';
 import { IssueRecordDetails } from './issue-record-details';
 
@@ -547,52 +548,70 @@ function InvestigationReport({
               Freshness: {caseLabel(item.freshness)}. Source update time may be
               unknown.
             </p>
-            {diagnosis?.provenance.evidence.length ? (
-              diagnosis.provenance.evidence.map((e) => (
-                <details className="case-evidence" key={e.id}>
-                  <summary>
-                    {e.source
-                      ? `${e.source.provider} · ${e.source.resource}`
-                      : 'Canonical evidence'}{' '}
-                    <span>
-                      Observed <CaseTime value={e.observedAt} />
-                    </span>
-                  </summary>
-                  <dl>
-                    <dt>Evidence ID</dt>
-                    <dd>
-                      <code>{e.id}</code>
-                    </dd>
-                    <dt>Observed</dt>
-                    <dd>
-                      <CaseTime value={e.observedAt} />
-                    </dd>
-                    <dt>Source updated</dt>
-                    <dd>
-                      {e.sourceUpdatedAt ? (
-                        <CaseTime value={e.sourceUpdatedAt} />
-                      ) : (
-                        'Unknown'
-                      )}
-                    </dd>
-                    {e.source ? (
-                      <>
-                        <dt>Source object</dt>
-                        <dd>{e.source.externalId}</dd>
-                        <dt>Source scope</dt>
-                        <dd>{e.source.scopeKey || 'Not specified'}</dd>
-                      </>
-                    ) : null}
-                    <dt>Adapter</dt>
-                    <dd>{e.adapterVersion}</dd>
-                    <dt>Schema</dt>
-                    <dd>{e.schemaVersion}</dd>
-                  </dl>
-                </details>
-              ))
-            ) : (
-              <p>No evidence references are available yet.</p>
-            )}
+            <IssueCollection
+              title="Supporting evidence"
+              noun="supporting evidence records"
+              items={[...(diagnosis?.provenance.evidence ?? [])].sort((a, b) =>
+                b.observedAt.localeCompare(a.observedAt),
+              )}
+              filters={[
+                {
+                  label: 'Source',
+                  value: (entry) =>
+                    entry.source
+                      ? `${entry.source.provider} · ${entry.source.resource}`
+                      : 'Canonical evidence',
+                },
+              ]}
+              renderItems={(entries) =>
+                entries.length ? (
+                  entries.map((e) => (
+                    <details className="case-evidence" key={e.id}>
+                      <summary>
+                        {e.source
+                          ? `${e.source.provider} · ${e.source.resource}`
+                          : 'Canonical evidence'}{' '}
+                        <span>
+                          Observed <CaseTime value={e.observedAt} />
+                        </span>
+                      </summary>
+                      <dl>
+                        <dt>Evidence ID</dt>
+                        <dd>
+                          <code>{e.id}</code>
+                        </dd>
+                        <dt>Observed</dt>
+                        <dd>
+                          <CaseTime value={e.observedAt} />
+                        </dd>
+                        <dt>Source updated</dt>
+                        <dd>
+                          {e.sourceUpdatedAt ? (
+                            <CaseTime value={e.sourceUpdatedAt} />
+                          ) : (
+                            'Unknown'
+                          )}
+                        </dd>
+                        {e.source ? (
+                          <>
+                            <dt>Source object</dt>
+                            <dd>{e.source.externalId}</dd>
+                            <dt>Source scope</dt>
+                            <dd>{e.source.scopeKey || 'Not specified'}</dd>
+                          </>
+                        ) : null}
+                        <dt>Adapter</dt>
+                        <dd>{e.adapterVersion}</dd>
+                        <dt>Schema</dt>
+                        <dd>{e.schemaVersion}</dd>
+                      </dl>
+                    </details>
+                  ))
+                ) : (
+                  <p>No evidence references are available yet.</p>
+                )
+              }
+            />
             {diagnosis?.provenance.mappingVersions.length ? (
               <p className="case-caption">
                 Mapping versions:{' '}

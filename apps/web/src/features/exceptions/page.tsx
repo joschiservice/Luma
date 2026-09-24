@@ -6,6 +6,7 @@ import {
   CaseNotice,
   CaseRow,
 } from '@luma/ui/components/case-investigation';
+import { IssueDetailViews } from '@luma/ui/components/issue-collection';
 import { IssueInspectorHeader } from '@luma/ui/components/issue-inspector-header';
 import { IssueSummary } from '@luma/ui/components/issue-summary';
 import { Pagination } from '@luma/ui/components/pagination';
@@ -363,39 +364,45 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
           }}
         >
           {exceptionId ? (
-            <>
-              <IssueInspectorHeader
-                className="inbox-case-nav"
-                item={item}
-                fallback={
-                  detail.isError || denied
-                    ? 'Issue unavailable'
-                    : 'Loading issue…'
-                }
-                onClose={() =>
-                  void navigate({
-                    to: '/app/$organizationId/exceptions',
-                    params: { organizationId },
-                    search,
-                    resetScroll: false,
-                  })
-                }
-                next={
-                  next ? (
-                    <Link
-                      to="/app/$organizationId/exceptions/$exceptionId"
-                      params={{ organizationId, exceptionId: next.id }}
-                      className="issue-panel-next"
-                      aria-label="Next issue"
-                      title="Next issue"
-                      search={search}
-                      resetScroll={false}
-                    >
-                      <ChevronRight size={18} aria-hidden="true" />
-                    </Link>
-                  ) : null
-                }
-              />
+            <IssueDetailViews
+              key={`${organizationId}:${exceptionId}`}
+              issueTitle={item?.summary}
+              headerClassName="inbox-case-nav"
+              header={
+                <IssueInspectorHeader
+                  className="inbox-case-nav"
+                  item={item}
+                  fallback={
+                    detail.isError || denied
+                      ? 'Issue unavailable'
+                      : 'Loading issue…'
+                  }
+                  onClose={() =>
+                    void navigate({
+                      to: '/app/$organizationId/exceptions',
+                      params: { organizationId },
+                      search,
+                      resetScroll: false,
+                    })
+                  }
+                  next={
+                    next ? (
+                      <Link
+                        to="/app/$organizationId/exceptions/$exceptionId"
+                        params={{ organizationId, exceptionId: next.id }}
+                        className="issue-panel-next"
+                        aria-label="Next issue"
+                        title="Next issue"
+                        search={search}
+                        resetScroll={false}
+                      >
+                        <ChevronRight size={18} aria-hidden="true" />
+                      </Link>
+                    ) : null
+                  }
+                />
+              }
+            >
               <Button
                 className="inbox-mobile-refresh"
                 variant="outline"
@@ -456,7 +463,7 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
                   />
                 </>
               ) : null}
-            </>
+            </IssueDetailViews>
           ) : (
             <div className="inbox-placeholder">
               <h2>Select an issue</h2>

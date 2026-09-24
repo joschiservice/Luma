@@ -3,6 +3,7 @@ import {
   CaseInvestigation,
   CaseRow,
 } from '@luma/ui/components/case-investigation';
+import { IssueDetailViews } from '@luma/ui/components/issue-collection';
 import { IssueInspectorHeader } from '@luma/ui/components/issue-inspector-header';
 import { IssueSummary } from '@luma/ui/components/issue-summary';
 import { Pagination } from '@luma/ui/components/pagination';
@@ -28,13 +29,32 @@ const issues = [
 
 function IssuesExample({
   selectedInitially = true,
+  longEvidence = false,
 }: {
   selectedInitially?: boolean;
+  longEvidence?: boolean;
 }) {
   const [selected, setSelected] = useState<number | undefined>(
     selectedInitially ? 0 : undefined,
   );
   const [page, setPage] = useState(1);
+  const selectedItem = selected === undefined ? undefined : issues[selected];
+  const item =
+    selectedItem && longEvidence && selectedItem.diagnosis
+      ? {
+          ...selectedItem,
+          diagnosis: {
+            ...selectedItem.diagnosis,
+            provenance: {
+              ...selectedItem.diagnosis.provenance,
+              evidence: Array.from({ length: 48 }, (_, index) => ({
+                ...selectedItem.diagnosis!.provenance.evidence[0]!,
+                id: `evidence-${index}`,
+              })),
+            },
+          },
+        }
+      : selectedItem;
 
   return (
     <>
@@ -125,12 +145,20 @@ function IssuesExample({
             </div>
             {selected !== undefined && (
               <section className="inbox-detail" aria-label="Selected issue">
-                <IssueInspectorHeader
-                  className="inbox-case-nav"
-                  item={issues[selected]!}
-                  onClose={() => setSelected(undefined)}
-                />
-                <CaseInvestigation item={issues[selected]!} embedded />
+                <IssueDetailViews
+                  key={selected}
+                  issueTitle={item?.summary}
+                  headerClassName="inbox-case-nav"
+                  header={
+                    <IssueInspectorHeader
+                      className="inbox-case-nav"
+                      item={issues[selected]!}
+                      onClose={() => setSelected(undefined)}
+                    />
+                  }
+                >
+                  <CaseInvestigation item={item!} embedded />
+                </IssueDetailViews>
               </section>
             )}
           </div>
@@ -188,4 +216,38 @@ export const InboxOnly: Story = {
 
 export const Mobile: Story = {
   globals: { viewport: { value: 'mobile1', isRotated: false } },
+};
+
+export const LongEvidence: Story = {
+  args: { longEvidence: true },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(
+      canvas.getByText('Findings & evidence', { exact: true }),
+    );
+    await userEvent.click(
+      canvas.getByRole('button', {
+        name: 'View all 48 supporting evidence records',
+      }),
+    );
+    await expect(
+      canvas.getByRole('heading', { name: 'Supporting evidence' }),
+    ).toBeVisible();
+    await expect(
+      canvas.queryByRole('button', { name: 'Close panel' }),
+    ).not.toBeInTheDocument();
+    const header = canvas
+      .getByRole('heading', { name: 'Supporting evidence' })
+      .closest('header')!;
+    await expect(within(header).getByText('48 records')).toBeVisible();
+    await expect(
+      within(header).getByText('Shopify shows 8 more available than JTL.'),
+    ).toBeVisible();
+    await userEvent.click(
+      within(header).getByRole('button', { name: 'Back to issue' }),
+    );
+    await expect(
+      canvas.getByRole('button', { name: 'Close panel' }),
+    ).toBeVisible();
+  },
 };

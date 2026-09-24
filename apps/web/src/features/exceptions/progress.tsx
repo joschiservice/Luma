@@ -57,6 +57,10 @@ export function LiveCaseDetail({
           timeline={history.data?.timeline ?? []}
           evidence={history.data?.evidence ?? []}
           historyUnavailable={history.isError || history.isPending}
+          hasMoreTimeline={history.data?.hasMoreTimeline ?? false}
+          hasMoreEvidence={history.data?.hasMoreEvidence ?? false}
+          loadingHistory={history.isFetching}
+          onLoadMore={observation.loadMore}
           connection={connection}
           confirmed={confirmed}
           onRefresh={refresh}
@@ -71,15 +75,6 @@ export function LiveCaseDetail({
             </CaseNotice>
           ) : history.isPending ? (
             <CaseLoading />
-          ) : null}
-          {history.data?.hasMore ? (
-            <Button
-              variant="outline"
-              disabled={history.isFetching}
-              onClick={observation.loadMore}
-            >
-              Load more history and evidence
-            </Button>
           ) : null}
         </CaseTimeline>
       }

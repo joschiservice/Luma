@@ -126,6 +126,8 @@ export function historyOptions(
         timeline: uniqueEntries(timeline),
         evidence: uniqueEntries(evidence),
         hasMore: Boolean(timelineCursor || evidenceCursor),
+        hasMoreTimeline: Boolean(timelineCursor),
+        hasMoreEvidence: Boolean(evidenceCursor),
       };
     },
     placeholderData: (previous, previousQuery) =>

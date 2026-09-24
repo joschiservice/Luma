@@ -209,3 +209,18 @@ it('rejects a review-only diagnosis transition', async () => {
     client.clear();
   }
 });
+
+it('reports remaining audit and evidence pages independently', async () => {
+  mockReads();
+  const client = new QueryClient();
+  try {
+    const first = await client.fetchQuery(historyOptions('tenant-a', id));
+    expect(first.hasMoreTimeline).toBe(true);
+    expect(first.hasMoreEvidence).toBe(false);
+    const last = await client.fetchQuery(historyOptions('tenant-a', id, 2));
+    expect(last.hasMoreTimeline).toBe(false);
+    expect(last.hasMoreEvidence).toBe(false);
+  } finally {
+    client.clear();
+  }
+});

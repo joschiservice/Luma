@@ -2387,3 +2387,64 @@
     grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
   }
 }
+
+/* Collection views share the issue panel and its single scroll container. */
+.issue-collection-open {
+  margin: 12px 0;
+}
+.issue-collection-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 12px 0 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+}
+.issue-collection-header > button {
+  margin-bottom: 8px;
+}
+.issue-collection-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 12px;
+}
+.issue-collection-heading h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+.issue-collection-heading > span,
+.issue-collection-context {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.issue-collection-context {
+  margin: 6px 0 0;
+}
+.issue-collection-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 20px 0;
+}
+.issue-collection-filters label {
+  display: grid;
+  gap: 6px;
+  flex: 1 1 160px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.issue-collection-pagination {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 20px 0;
+  font-size: 12px;
+}
+.issue-collection-pagination > span {
+  margin-right: auto;
+}

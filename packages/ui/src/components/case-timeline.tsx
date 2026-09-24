@@ -22,6 +22,7 @@ import type { ReactNode } from 'react';
 
 import { Button } from './button';
 import { caseLabel, CaseNotice, CaseTime } from './case-investigation';
+import { IssueCollection } from './issue-collection';
 
 export type LiveConnection =
   'connecting' | 'syncing' | 'live' | 'disconnected' | 'interrupted';
@@ -66,6 +67,10 @@ export function CaseTimeline({
   onRefresh,
   children,
   historyUnavailable = false,
+  hasMoreTimeline = false,
+  hasMoreEvidence = false,
+  loadingHistory = false,
+  onLoadMore,
 }: {
   progress: CaseProgress;
   review: CaseReview;
@@ -76,6 +81,10 @@ export function CaseTimeline({
   onRefresh?: () => void;
   children?: ReactNode;
   historyUnavailable?: boolean;
+  hasMoreTimeline?: boolean;
+  hasMoreEvidence?: boolean;
+  loadingHistory?: boolean;
+  onLoadMore?: (() => void) | undefined;
 }) {
   const execution = progress.execution;
   const verification = execution?.verification;
@@ -400,124 +409,172 @@ export function CaseTimeline({
           </Button>
         ) : null}
       </div>
-      {timeline.length ? (
-        <ol className="case-audit">
-          {timeline.map((event) => (
-            <li key={event.id}>
-              <span className="audit-event-icon" aria-hidden="true">
-                {event.outcome === 'failed' ||
-                event.type === 'execution.withheld' ? (
-                  <CircleAlert size={14} />
-                ) : event.outcome === 'succeeded' ||
-                  event.type === 'execution.reconciled' ? (
-                  <CircleCheck size={14} />
-                ) : (
-                  <Clock3 size={14} />
-                )}
-              </span>
-              <div className="audit-event-heading">
-                <strong>
-                  {eventNames[event.type] ??
-                    caseLabel(event.type.replaceAll('.', ' '))}
-                </strong>
-                <CaseTime value={event.occurredAt} />
-              </div>
-              {event.outcome ? (
-                <p
-                  className="audit-outcome"
-                  data-tone={
-                    event.outcome === 'succeeded'
-                      ? 'success'
-                      : event.outcome === 'failed'
-                        ? 'error'
-                        : 'neutral'
-                  }
-                >
-                  {caseLabel(event.outcome)}
-                </p>
-              ) : null}
-              <p className="case-caption">
-                Actor: {event.actorId ?? 'Not recorded'}
-              </p>
-              <details className="audit-event-details">
-                <summary>Audit evidence</summary>
-                <dl>
-                  <dt>Event</dt>
-                  <dd>{event.id}</dd>
-                  <dt>Event type</dt>
-                  <dd>{event.type}</dd>
-                  {event.proposalId ? (
-                    <>
-                      <dt>Proposal</dt>
-                      <dd>{event.proposalId}</dd>
-                    </>
+      <IssueCollection
+        title="Audit history"
+        noun="events"
+        items={[...timeline].sort((a, b) =>
+          b.occurredAt.localeCompare(a.occurredAt),
+        )}
+        hasMore={hasMoreTimeline}
+        loading={loadingHistory}
+        onLoadMore={onLoadMore}
+        notice={children}
+        filters={[
+          {
+            label: 'Event type',
+            value: (event) =>
+              eventNames[event.type] ??
+              caseLabel(event.type.replaceAll('.', ' ')),
+          },
+          {
+            label: 'Outcome',
+            value: (event) =>
+              event.outcome ? caseLabel(event.outcome) : 'Not recorded',
+          },
+        ]}
+        renderItems={(events) =>
+          events.length ? (
+            <ol className="case-audit">
+              {events.map((event) => (
+                <li key={event.id}>
+                  <span className="audit-event-icon" aria-hidden="true">
+                    {event.outcome === 'failed' ||
+                    event.type === 'execution.withheld' ? (
+                      <CircleAlert size={14} />
+                    ) : event.outcome === 'succeeded' ||
+                      event.type === 'execution.reconciled' ? (
+                      <CircleCheck size={14} />
+                    ) : (
+                      <Clock3 size={14} />
+                    )}
+                  </span>
+                  <div className="audit-event-heading">
+                    <strong>
+                      {eventNames[event.type] ??
+                        caseLabel(event.type.replaceAll('.', ' '))}
+                    </strong>
+                    <CaseTime value={event.occurredAt} />
+                  </div>
+                  {event.outcome ? (
+                    <p
+                      className="audit-outcome"
+                      data-tone={
+                        event.outcome === 'succeeded'
+                          ? 'success'
+                          : event.outcome === 'failed'
+                            ? 'error'
+                            : 'neutral'
+                      }
+                    >
+                      {caseLabel(event.outcome)}
+                    </p>
                   ) : null}
-                </dl>
-                <References refs={event.evidenceRefs} />
-              </details>
-            </li>
-          ))}
-        </ol>
-      ) : (
-        <p>
-          {historyUnavailable
-            ? 'Audit history is unavailable.'
-            : 'No audit events recorded yet.'}
-        </p>
-      )}
+                  <p className="case-caption">
+                    Actor: {event.actorId ?? 'Not recorded'}
+                  </p>
+                  <details className="audit-event-details">
+                    <summary>Audit evidence</summary>
+                    <dl>
+                      <dt>Event</dt>
+                      <dd>{event.id}</dd>
+                      <dt>Event type</dt>
+                      <dd>{event.type}</dd>
+                      {event.proposalId ? (
+                        <>
+                          <dt>Proposal</dt>
+                          <dd>{event.proposalId}</dd>
+                        </>
+                      ) : null}
+                    </dl>
+                    <References refs={event.evidenceRefs} />
+                  </details>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p>
+              {historyUnavailable
+                ? 'Audit history is unavailable.'
+                : 'No audit events recorded yet.'}
+            </p>
+          )
+        }
+      />
       <h4 className="execution-evidence-heading">
         <Database size={16} aria-hidden="true" /> Evidence provenance
       </h4>
-      {evidence.length ? (
-        evidence.map((entry) => (
-          <details className="case-evidence" key={entry.id}>
-            <summary>
-              {entry.source
+      <IssueCollection
+        title="Evidence provenance"
+        noun="evidence records"
+        items={[...evidence].sort((a, b) =>
+          b.observedAt.localeCompare(a.observedAt),
+        )}
+        hasMore={hasMoreEvidence}
+        loading={loadingHistory}
+        onLoadMore={onLoadMore}
+        notice={children}
+        filters={[
+          {
+            label: 'Source',
+            value: (entry) =>
+              entry.source
                 ? `${entry.source.provider} · ${entry.source.resource}`
-                : 'Canonical evidence'}{' '}
-              <span>
-                Observed <CaseTime value={entry.observedAt} />
-              </span>
-            </summary>
-            <dl>
-              <dt>Evidence ID</dt>
-              <dd>{entry.id}</dd>
-              <dt>Observed</dt>
-              <dd>
-                <CaseTime value={entry.observedAt} />
-              </dd>
-              <dt>Source updated</dt>
-              <dd>
-                {entry.sourceUpdatedAt ? (
-                  <CaseTime value={entry.sourceUpdatedAt} />
-                ) : (
-                  'Unknown'
-                )}
-              </dd>
-              <dt>Completeness</dt>
-              <dd>{caseLabel(entry.completeness)}</dd>
-              <dt>Adapter / schema</dt>
-              <dd>
-                {entry.adapterVersion} / {entry.schemaVersion}
-              </dd>
-              {entry.source ? (
-                <>
-                  <dt>Source object</dt>
-                  <dd>{entry.source.externalId}</dd>
-                  <dt>Source scope</dt>
-                  <dd>{entry.source.scopeKey || 'Not specified'}</dd>
-                </>
-              ) : null}
-            </dl>
-          </details>
-        ))
-      ) : (
-        <p>
-          {historyUnavailable
-            ? 'Evidence history is unavailable.'
-            : 'No authorized observation references are available in this page. Audit references may describe other evidence types.'}
-        </p>
-      )}
+                : 'Canonical evidence',
+          },
+        ]}
+        renderItems={(entries) =>
+          entries.length ? (
+            entries.map((entry) => (
+              <details className="case-evidence" key={entry.id}>
+                <summary>
+                  {entry.source
+                    ? `${entry.source.provider} · ${entry.source.resource}`
+                    : 'Canonical evidence'}{' '}
+                  <span>
+                    Observed <CaseTime value={entry.observedAt} />
+                  </span>
+                </summary>
+                <dl>
+                  <dt>Evidence ID</dt>
+                  <dd>{entry.id}</dd>
+                  <dt>Observed</dt>
+                  <dd>
+                    <CaseTime value={entry.observedAt} />
+                  </dd>
+                  <dt>Source updated</dt>
+                  <dd>
+                    {entry.sourceUpdatedAt ? (
+                      <CaseTime value={entry.sourceUpdatedAt} />
+                    ) : (
+                      'Unknown'
+                    )}
+                  </dd>
+                  <dt>Completeness</dt>
+                  <dd>{caseLabel(entry.completeness)}</dd>
+                  <dt>Adapter / schema</dt>
+                  <dd>
+                    {entry.adapterVersion} / {entry.schemaVersion}
+                  </dd>
+                  {entry.source ? (
+                    <>
+                      <dt>Source object</dt>
+                      <dd>{entry.source.externalId}</dd>
+                      <dt>Source scope</dt>
+                      <dd>{entry.source.scopeKey || 'Not specified'}</dd>
+                    </>
+                  ) : null}
+                </dl>
+              </details>
+            ))
+          ) : (
+            <p>
+              {historyUnavailable
+                ? 'Evidence history is unavailable.'
+                : 'No authorized observation references are available in this page. Audit references may describe other evidence types.'}
+            </p>
+          )
+        }
+      />
       {children}
     </section>
   );
