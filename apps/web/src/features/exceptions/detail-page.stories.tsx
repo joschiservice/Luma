@@ -94,7 +94,12 @@ function IssuePagePreview({
             </a>
           </nav>
         )}
-        context={<>Operations / Issues</>}
+        context={
+          <>
+            <Inbox size={16} aria-hidden="true" />
+            <span aria-current="page">Issues</span>
+          </>
+        }
         accountMenu={
           <WorkspaceAccountMenu
             name="Alex Morgan"
@@ -108,7 +113,6 @@ function IssuePagePreview({
               },
             ]}
             createLink={<a href="#new" />}
-            switchLink={<a href="#switch" />}
           />
         }
       >

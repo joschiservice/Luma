@@ -19,6 +19,8 @@ function ShellExample({
 }) {
   const [page, setPage] = useState('Overview');
   const [workspace, setWorkspace] = useState(workspaceName);
+  const PageIcon =
+    page === 'Overview' ? LayoutDashboard : page === 'Issues' ? Inbox : Unplug;
 
   return (
     <>
@@ -54,8 +56,7 @@ function ShellExample({
         )}
         context={
           <>
-            <span>Operations</span>
-            <span>/</span>
+            <PageIcon size={16} aria-hidden="true" />
             <span>{page}</span>
           </>
         }
@@ -78,7 +79,6 @@ function ShellExample({
               ),
             }))}
             createLink={<a href="#create-workspace" />}
-            switchLink={<a href="#workspaces" />}
           />
         }
       >
@@ -119,6 +119,14 @@ export const Desktop: Story = {
       canvas.getByRole('button', { name: /Open account menu/ }),
     );
     const body = within(canvasElement.ownerDocument.body);
+    await userEvent.click(
+      await body.findByRole('menuitem', { name: 'Northstar Commerce' }),
+    );
+    await waitFor(() =>
+      expect(
+        body.getByRole('menuitem', { name: 'Create workspace' }),
+      ).toBeVisible(),
+    );
     await userEvent.click(
       await body.findByRole('menuitem', { name: 'Northstar Europe' }),
     );

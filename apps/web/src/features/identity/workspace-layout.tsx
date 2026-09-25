@@ -64,7 +64,9 @@ export function WorkspaceLayout({
               </Dialog>
             </div>
             <div className="workspace-default-header">
-              <div className="header-context">{context}</div>
+              <nav className="header-context" aria-label="Breadcrumb">
+                {context}
+              </nav>
               {search}
               {workspaceSwitcher}
             </div>

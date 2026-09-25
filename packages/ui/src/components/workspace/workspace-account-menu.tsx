@@ -1,5 +1,12 @@
 import { Menu } from '@base-ui/react/menu';
-import { Check, ChevronDown, ChevronsUpDown, LogOut, Plus } from 'lucide-react';
+import {
+  Building2,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  LogOut,
+  Plus,
+} from 'lucide-react';
 import type { ReactElement } from 'react';
 
 export type WorkspaceChoice = { id: string; name: string; link: ReactElement };
@@ -11,14 +18,12 @@ export function WorkspaceAccountMenu({
   workspaceId,
   workspaces,
   createLink,
-  switchLink,
 }: {
   name: string;
   workspace: string;
   workspaceId: string;
   workspaces: WorkspaceChoice[];
   createLink: ReactElement;
-  switchLink: ReactElement;
 }) {
   const initials =
     name
@@ -55,31 +60,61 @@ export function WorkspaceAccountMenu({
               <Menu.GroupLabel className="account-menu-name">
                 {name}
               </Menu.GroupLabel>
-              {workspaces.map((org) => (
-                <Menu.Item
-                  key={org.id}
-                  render={org.link}
-                  className="account-menu-item"
-                  aria-current={org.id === workspaceId ? 'true' : undefined}
+              <Menu.SubmenuRoot>
+                <Menu.SubmenuTrigger
+                  className="account-menu-item account-workspace-row"
+                  openOnHover={false}
                 >
-                  <Check
-                    size={16}
-                    aria-hidden="true"
-                    style={{ opacity: org.id === workspaceId ? 1 : 0 }}
-                  />
-                  <span>{org.name}</span>
-                </Menu.Item>
-              ))}
+                  <Building2 size={16} aria-hidden="true" />
+                  <span title={workspace}>{workspace}</span>
+                  <ChevronRight size={14} aria-hidden="true" />
+                </Menu.SubmenuTrigger>
+                <Menu.Portal>
+                  <Menu.Positioner
+                    side="left"
+                    align="start"
+                    sideOffset={8}
+                    className="account-positioner"
+                  >
+                    <Menu.Popup className="workspace-account-popup">
+                      <Menu.Group>
+                        <Menu.GroupLabel className="account-menu-name">
+                          Workspaces
+                        </Menu.GroupLabel>
+                        <div className="account-workspace-list">
+                          {workspaces.map((org) => (
+                            <Menu.Item
+                              key={org.id}
+                              render={org.link}
+                              className="account-menu-item"
+                              aria-current={
+                                org.id === workspaceId ? 'true' : undefined
+                              }
+                            >
+                              <Building2 size={16} aria-hidden="true" />
+                              <span className="account-workspace-label">
+                                {org.name}
+                              </span>
+                              {org.id === workspaceId ? (
+                                <Check size={16} aria-hidden="true" />
+                              ) : null}
+                            </Menu.Item>
+                          ))}
+                        </div>
+                      </Menu.Group>
+                      <Menu.Separator className="account-menu-separator" />
+                      <Menu.Item
+                        render={createLink}
+                        className="account-menu-item"
+                      >
+                        <Plus size={16} aria-hidden="true" />
+                        Create workspace
+                      </Menu.Item>
+                    </Menu.Popup>
+                  </Menu.Positioner>
+                </Menu.Portal>
+              </Menu.SubmenuRoot>
             </Menu.Group>
-            <Menu.Separator className="account-menu-separator" />
-            <Menu.Item render={switchLink} className="account-menu-item">
-              <ChevronsUpDown size={16} aria-hidden="true" />
-              Switch workspace
-            </Menu.Item>
-            <Menu.Item render={createLink} className="account-menu-item">
-              <Plus size={16} aria-hidden="true" />
-              Create workspace
-            </Menu.Item>
             <Menu.Separator className="account-menu-separator" />
             <Menu.Item
               render={<a href="/sign-out" />}

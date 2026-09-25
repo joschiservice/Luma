@@ -100,8 +100,7 @@ function IssuesExample({
         brand={<Brand />}
         context={
           <>
-            <span>Operations</span>
-            <span>/</span>
+            <Inbox size={16} aria-hidden="true" />
             <span>Issues</span>
           </>
         }
@@ -137,7 +136,6 @@ function IssuesExample({
               },
             ]}
             createLink={<a href="#new" />}
-            switchLink={<a href="#switch" />}
           />
         }
       >

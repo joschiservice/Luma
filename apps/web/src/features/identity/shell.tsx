@@ -1,16 +1,10 @@
 import { WorkspaceAccountMenu } from '@luma/ui/components/workspace/workspace-account-menu';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, Outlet, useLocation, useParams } from '@tanstack/react-router';
-import {
-  Activity,
-  BookOpen,
-  Inbox,
-  LayoutDashboard,
-  Unplug,
-} from 'lucide-react';
 
 import { Brand, Failure, Pending } from './common';
 import { contextOptions, organizationsOptions, sessionOptions } from './data';
+import { workspaceDestinations } from './workspace-destinations';
 import { WorkspaceLayout } from './workspace-layout';
 import { WorkspaceSearch } from './workspace-search';
 
@@ -23,36 +17,16 @@ function Navigation({
 }) {
   return (
     <nav aria-label="Workspace navigation">
-      {(
-        [
-          'overview',
-          'exceptions',
-          'playbooks',
-          'activity',
-          'connections',
-        ] as const
-      ).map((page) => (
+      {workspaceDestinations.map(({ path, label, Icon }) => (
         <Link
-          key={page}
-          to={`/app/$organizationId/${page}`}
+          key={path}
+          to={`/app/$organizationId/${path}`}
           params={{ organizationId }}
           activeProps={{ 'aria-current': 'page', className: 'active' }}
           onClick={close}
         >
-          {page === 'overview' ? (
-            <LayoutDashboard size={18} aria-hidden="true" />
-          ) : page === 'exceptions' ? (
-            <Inbox size={18} aria-hidden="true" />
-          ) : page === 'playbooks' ? (
-            <BookOpen size={18} aria-hidden="true" />
-          ) : page === 'activity' ? (
-            <Activity size={18} aria-hidden="true" />
-          ) : (
-            <Unplug size={18} aria-hidden="true" />
-          )}
-          {page === 'exceptions'
-            ? 'Issues'
-            : page[0]!.toUpperCase() + page.slice(1)}
+          <Icon size={18} aria-hidden="true" />
+          {label}
         </Link>
       ))}
     </nav>
@@ -68,15 +42,9 @@ export function WorkspaceShell() {
 
 function TenantShell({ organizationId }: { organizationId: string }) {
   const pathname = useLocation({ select: (location) => location.pathname });
-  const page = pathname.includes('/exceptions')
-    ? 'Issues'
-    : pathname.includes('/playbooks')
-      ? 'Playbooks'
-      : pathname.includes('/connections')
-        ? 'Connections'
-        : pathname.includes('/activity')
-          ? 'Activity'
-          : 'Overview';
+  const page =
+    workspaceDestinations.find(({ path }) => pathname.split('/')[3] === path) ??
+    workspaceDestinations[0];
   const client = useQueryClient();
   const access = useQuery(contextOptions(organizationId));
   const organizations = useQuery(organizationsOptions());
@@ -103,9 +71,8 @@ function TenantShell({ organizationId }: { organizationId: string }) {
       )}
       context={
         <>
-          <span>Operations</span>
-          <span aria-hidden="true">/</span>
-          <span>{page}</span>
+          <page.Icon size={16} aria-hidden="true" />
+          <span aria-current="page">{page.label}</span>
         </>
       }
       search={<WorkspaceSearch organizationId={organizationId} />}
@@ -125,7 +92,6 @@ function TenantShell({ organizationId }: { organizationId: string }) {
             ),
           }))}
           createLink={<Link to="/app/workspaces/new" />}
-          switchLink={<Link to="/app/workspaces" />}
         />
       }
     >
