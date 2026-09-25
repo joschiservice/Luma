@@ -1,8 +1,10 @@
-import type { CaseDetail, Diagnosis } from '@luma/api-contract';
+import type { CaseDetail, CaseReview, Diagnosis } from '@luma/api-contract';
 import { ChevronRight } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { type ReactNode, useContext } from 'react';
 
+import { Button } from '../primitives/button';
 import { Disclosure } from '../primitives/disclosure';
+import { IssuePageNavigation } from './issue-section';
 
 /** Removes insignificant decimal zeros without rounding recorded quantities. */
 function quantityLabel(value: string) {
@@ -29,11 +31,14 @@ export function IssueOverview({
   item,
   unconfirmed = false,
   children,
+  review,
 }: {
   item: CaseDetail;
   unconfirmed?: boolean;
   children?: ReactNode;
+  review?: CaseReview | undefined;
 }) {
+  const navigate = useContext(IssuePageNavigation);
   const diagnosis = item.diagnosis;
   const historical =
     item.freshness === 'stale' ||
@@ -45,6 +50,14 @@ export function IssueOverview({
     diagnosis &&
     !['pending', 'failed'].includes(item.diagnosisStatus) &&
     !['pending', 'failed'].includes(diagnosis.status);
+  const needsReview = Boolean(
+    current &&
+    navigate &&
+    review?.proposal?.available &&
+    review.proposal.policy?.outcome === 'approval_required' &&
+    !review.proposal.approval &&
+    review.permittedDecisions.includes('approve'),
+  );
   const steps = current ? diagnosis.nextSteps : [];
   const quantity = diagnosis?.impact.exposedQuantity;
   const formattedQuantity = quantity != null ? quantityLabel(quantity) : null;
@@ -136,6 +149,11 @@ export function IssueOverview({
       {children}
       <div className="issue-overview-action">
         <h3 className="issue-overview-action-label">Next action</h3>
+        {needsReview ? (
+          <Button onClick={() => navigate?.('resolution')}>
+            Review proposed change
+          </Button>
+        ) : null}
         {steps[0] ? (
           <>
             <p className="issue-overview-next">{stepLabel(steps[0])}</p>

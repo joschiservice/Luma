@@ -1,3 +1,4 @@
+import type { CaseQuery } from '@luma/api-contract';
 import {
   caseFixture,
   inventoryCase,
@@ -6,14 +7,29 @@ import {
   CaseInvestigation,
   CaseRow,
 } from '@luma/ui/components/issues/case-investigation';
-import { IssueDetailViews } from '@luma/ui/components/issues/issue-collection';
+import { CaseTimeline } from '@luma/ui/components/issues/case-timeline';
 import { IssueInspectorHeader } from '@luma/ui/components/issues/issue-inspector-header';
+import { IssueListToolbar } from '@luma/ui/components/issues/issue-list-toolbar';
+import { IssuePanelLayout } from '@luma/ui/components/issues/issue-panel-layout';
+import { IssueSplitView } from '@luma/ui/components/issues/issue-split-view';
 import { IssueSummary } from '@luma/ui/components/issues/issue-summary';
+import {
+  resolutionProgress,
+  resolutionReview,
+} from '@luma/ui/components/issues/resolution-fixtures';
+import { ResolutionReview } from '@luma/ui/components/issues/resolution-review';
+import { Button } from '@luma/ui/components/primitives/button';
 import { Pagination } from '@luma/ui/components/primitives/pagination';
 import { WorkspaceAccountMenu } from '@luma/ui/components/workspace/workspace-account-menu';
 import { figmaScreen } from '@luma/ui/lib/figma';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { Inbox, LayoutDashboard, Unplug } from 'lucide-react';
+import {
+  Inbox,
+  LayoutDashboard,
+  Maximize2,
+  RefreshCw,
+  Unplug,
+} from 'lucide-react';
 import { useState } from 'react';
 import { expect, userEvent, within } from 'storybook/test';
 import { MINIMAL_VIEWPORTS } from 'storybook/viewport';
@@ -33,14 +49,28 @@ const issues = [
 function IssuesExample({
   selectedInitially = true,
   longEvidence = false,
+  proposalReady = false,
+  unconfirmed = false,
 }: {
   selectedInitially?: boolean;
   longEvidence?: boolean;
+  proposalReady?: boolean;
+  unconfirmed?: boolean;
 }) {
   const [selected, setSelected] = useState<number | undefined>(
     selectedInitially ? 0 : undefined,
   );
+  const review = proposalReady
+    ? resolutionReview
+    : {
+        ...resolutionReview,
+        proposal: null,
+        permittedDecisions: ['escalate' as const],
+      };
   const [page, setPage] = useState(1);
+  const [filters, setFilters] = useState<
+    Pick<CaseQuery, 'state' | 'class' | 'severity'>
+  >({});
   const selectedItem = selected === undefined ? undefined : issues[selected];
   const item =
     selectedItem && longEvidence && selectedItem.diagnosis
@@ -110,61 +140,113 @@ function IssuesExample({
         <div
           className={`inbox ${selected !== undefined ? 'inbox-selected' : ''}`}
         >
-          <h1 className="sr-only">Issues</h1>
-          <IssueSummary review={3} open={5} verified={12} />
-          <div className="inbox-workspace">
-            <div className="inbox-list">
-              <nav className="inbox-views" aria-label="Issue views">
-                <a href="#review" aria-current="page">
-                  Needs review
-                </a>
-                <a href="#open">All open</a>
-                <a href="#history">History</a>
-              </nav>
-              <ul className="inbox-rows">
-                {issues.map((item, index) => (
-                  <li key={index}>
-                    <a
-                      href={`#issue-${index}`}
-                      aria-current={selected === index ? 'page' : undefined}
-                      onClick={(event) => {
-                        event.preventDefault();
-                        setSelected(index);
-                      }}
-                    >
-                      <CaseRow item={item} />
-                    </a>
-                  </li>
-                ))}
-              </ul>
-              <Pagination
-                count={page === 1 ? 25 : 21}
-                totalCount={46}
-                page={page}
-                hasNext={page === 1}
-                onPrevious={page > 1 ? () => setPage(page - 1) : undefined}
-                onNext={() => setPage(page + 1)}
-              />
-            </div>
-            {selected !== undefined && (
-              <section className="inbox-detail" aria-label="Selected issue">
-                <IssueDetailViews
-                  key={selected}
-                  issueTitle={item?.summary}
-                  headerClassName="inbox-case-nav"
-                  header={
-                    <IssueInspectorHeader
-                      className="inbox-case-nav"
-                      item={issues[selected]!}
-                      onClose={() => setSelected(undefined)}
-                    />
+          <header className="inbox-heading">
+            <h1 className="sr-only">Issues</h1>
+            <IssueSummary review={3} open={5} verified={12} />
+          </header>
+          <IssueSplitView
+            selected={selected !== undefined}
+            list={
+              <div className="inbox-list">
+                <IssueListToolbar
+                  filters={filters}
+                  onFiltersChange={(patch) =>
+                    setFilters((current) => ({ ...current, ...patch }))
                   }
-                >
-                  <CaseInvestigation item={item!} embedded />
-                </IssueDetailViews>
-              </section>
-            )}
-          </div>
+                  onRefresh={() => {}}
+                  views={
+                    <>
+                      <a href="#review" aria-current="page">
+                        Needs review
+                      </a>
+                      <a href="#open">All open</a>
+                      <a href="#history">History</a>
+                    </>
+                  }
+                />
+                <ul className="inbox-rows">
+                  {issues.map((item, index) => (
+                    <li key={index}>
+                      <a
+                        href={`#issue-${index}`}
+                        aria-current={selected === index ? 'page' : undefined}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          setSelected(index);
+                        }}
+                      >
+                        <CaseRow item={item} />
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+                <Pagination
+                  count={page === 1 ? 25 : 21}
+                  totalCount={46}
+                  page={page}
+                  hasNext={page === 1}
+                  onPrevious={page > 1 ? () => setPage(page - 1) : undefined}
+                  onNext={() => setPage(page + 1)}
+                />
+              </div>
+            }
+            detail={
+              selected !== undefined && (
+                <section className="inbox-detail" aria-label="Selected issue">
+                  <IssuePanelLayout
+                    key={selected}
+                    item={item}
+                    actions={
+                      <ResolutionReview
+                        review={review}
+                        progress={resolutionProgress}
+                        onDecision={async () => {}}
+                      />
+                    }
+                    header={
+                      <IssueInspectorHeader
+                        refresh={
+                          <Button variant="ghost" aria-label="Refresh issue">
+                            <RefreshCw size={14} />
+                          </Button>
+                        }
+                        className="inbox-case-nav"
+                        item={issues[selected]!}
+                        openPage={
+                          <a
+                            href="#full-issue"
+                            aria-label="Open full page"
+                            className="issue-panel-open-page"
+                          >
+                            <Maximize2 size={16} />
+                          </a>
+                        }
+                        onClose={() => setSelected(undefined)}
+                      />
+                    }
+                  >
+                    <CaseInvestigation
+                      item={item!}
+                      review={review}
+                      unconfirmed={unconfirmed}
+                      embedded
+                      expanded
+                      progress={
+                        <CaseTimeline
+                          expanded
+                          progress={resolutionProgress}
+                          review={review}
+                          connection="live"
+                          timeline={[]}
+                          evidence={[]}
+                        />
+                      }
+                    />
+                  </IssuePanelLayout>
+                </section>
+              )
+            }
+          />
         </div>
       </WorkspaceLayout>
     </>
@@ -226,11 +308,8 @@ export const LongEvidence: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(
-      canvas.getByText('Findings & evidence', { exact: true }),
-    );
-    await userEvent.click(
       canvas.getByRole('button', {
-        name: 'View all 48 supporting evidence records',
+        name: 'View supporting evidence',
       }),
     );
     await expect(
@@ -252,5 +331,128 @@ export const LongEvidence: Story = {
     await expect(
       canvas.getByRole('button', { name: 'Close panel' }),
     ).toBeVisible();
+  },
+};
+
+export const PanelNavigation: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const panel = within(
+      canvas.getByRole('region', { name: 'Selected issue' }),
+    );
+    await expect(
+      panel.queryByRole('combobox', { name: 'Issue section' }),
+    ).not.toBeInTheDocument();
+    const findings = panel
+      .getByRole('region', { name: 'Findings' })
+      .querySelector('details')!;
+    await expect(findings).toHaveAttribute('open');
+    await userEvent.click(findings.querySelector('summary')!);
+    await expect(findings).not.toHaveAttribute('open');
+    const execution = panel
+      .getByRole('region', { name: 'Execution' })
+      .querySelector('details')!;
+    await expect(execution).not.toHaveAttribute('open');
+    await userEvent.click(execution.querySelector('summary')!);
+    await expect(execution).toHaveAttribute('open');
+    await expect(
+      panel.queryByRole('list', { name: 'Case lifecycle' }),
+    ).not.toBeInTheDocument();
+    const resolution = panel
+      .getByRole('region', { name: 'Resolution' })
+      .querySelector('details')!;
+    await expect(resolution).not.toHaveAttribute('open');
+    await userEvent.click(resolution.querySelector('summary')!);
+    await userEvent.click(
+      panel.getByRole('button', { name: 'View recommended next step' }),
+    );
+    await expect(panel.getByRole('region', { name: 'Overview' })).toHaveFocus();
+  },
+};
+
+export const RemovableFilters: Story = {
+  args: { selectedInitially: false },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByText('Filters', { exact: true }));
+    await userEvent.click(canvas.getByRole('combobox', { name: 'Severity' }));
+    await userEvent.click(
+      await within(document.body).findByRole('option', {
+        name: 'High',
+      }),
+    );
+    await expect(canvas.getByText('Filters · 1 active')).toBeVisible();
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Remove Severity filter: High' }),
+    );
+    await expect(
+      canvas.getByRole('combobox', { name: 'Severity' }),
+    ).toHaveTextContent('All severities');
+    await expect(
+      canvas.queryByRole('button', { name: 'Clear filters' }),
+    ).not.toBeInTheDocument();
+  },
+};
+
+export const ProposedChange: Story = {
+  args: { proposalReady: true },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const overview = within(canvas.getByRole('region', { name: 'Overview' }));
+    const resolution = canvas.getByRole('region', { name: 'Resolution' });
+    await expect(resolution.querySelector('details')).not.toHaveAttribute(
+      'open',
+    );
+    await userEvent.click(
+      overview.getByRole('button', { name: 'Review proposed change' }),
+    );
+    await expect(resolution.querySelector('details')).toHaveAttribute('open');
+    await expect(
+      within(resolution).getByRole('heading', {
+        name: 'Review the proposed correction',
+      }),
+    ).toBeVisible();
+    await expect(
+      canvas.getByRole('region', { name: 'Resolution' }),
+    ).toHaveFocus();
+  },
+};
+
+export const UnconfirmedProposal: Story = {
+  args: { proposalReady: true, unconfirmed: true },
+  play: async ({ canvasElement }) => {
+    await expect(
+      within(canvasElement).queryByRole('button', {
+        name: 'Review proposed change',
+      }),
+    ).not.toBeInTheDocument();
+  },
+};
+
+export const ResizableInspector: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const divider = await canvas.findByRole('separator', {
+      name: 'Resize issue panel',
+    });
+    const detail = canvas.getByRole('region', { name: 'Selected issue' });
+    const initialWidth = detail.getBoundingClientRect().width;
+    divider.focus();
+    await userEvent.keyboard('{ArrowLeft}');
+    await expect(detail.getBoundingClientRect().width).toBeGreaterThan(
+      initialWidth,
+    );
+    const resizedWidth = detail.getBoundingClientRect().width;
+    await userEvent.click(canvas.getByRole('button', { name: 'Close panel' }));
+    await expect(divider).not.toBeVisible();
+    await userEvent.click(
+      canvas.getByText('Shopify shows 8 more available than JTL'),
+    );
+    await expect(divider).toBeVisible();
+    await expect(
+      canvas
+        .getByRole('region', { name: 'Selected issue' })
+        .getBoundingClientRect().width,
+    ).toBeCloseTo(resizedWidth, 0);
   },
 };

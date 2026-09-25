@@ -587,34 +587,29 @@
 .issue-summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  padding-block: 8px;
+  width: 100%;
 }
 .issue-stat {
   display: flex;
-  align-items: stretch;
-  justify-content: space-between;
-  gap: 16px;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
-  height: 96px;
-  padding: 16px 18px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--card);
-}
-.issue-stat > div {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  color: var(--muted-foreground);
+  padding-inline: 20px;
+  border-right: 1px solid var(--border);
   font-size: 12px;
+  color: var(--muted-foreground);
+}
+.issue-stat:first-child {
+  padding-left: 0;
+}
+.issue-stat:last-child {
+  border-right: 0;
 }
 .issue-stat strong {
-  display: block;
-  margin-top: 8px;
   color: var(--foreground);
-  font: 500 28px/1.2 var(--font-mono);
-  letter-spacing: -1px;
+  font: 600 20px/1.4 var(--font-sans);
+  font-variant-numeric: tabular-nums;
 }
 .status-warning {
   color: var(--status-warning);
@@ -854,21 +849,7 @@
     margin: 0;
   }
 }
-@media (max-width: 480px) {
-  .issue-stat {
-    padding: 12px;
-    height: 88px;
-  }
-  .issue-stat > div {
-    font-size: 10px;
-  }
-  .issue-stat strong {
-    font-size: 26px;
-  }
-  .issue-summary {
-    gap: 8px;
-  }
-}
+
 @media (prefers-reduced-motion: reduce) {
   .workspace-account-popup {
     transition: none;
@@ -877,8 +858,8 @@
 
 .issue-stat-icon {
   align-self: center;
-  height: 36px;
-  width: 36px;
+  height: 20px;
+  width: 20px;
   flex-shrink: 0;
 }
 .pagination-controls {
@@ -891,16 +872,6 @@
   font-variant-numeric: tabular-nums;
   min-width: 92px;
   white-space: nowrap;
-}
-@media (max-width: 480px) {
-  .issue-stat {
-    gap: 6px;
-    padding: 10px;
-  }
-  .issue-stat-icon {
-    width: 24px;
-    height: 24px;
-  }
 }
 
 .issue-panel-close {
@@ -1105,16 +1076,7 @@
   overflow-wrap: anywhere;
 }
 .issue-panel-severity {
-  padding: 3px 7px;
-  border-radius: 5px;
   white-space: nowrap;
-  font-size: 10px;
-  color: var(--status-info);
-  background: var(--status-info-surface);
-}
-.issue-panel-severity-high {
-  color: var(--status-warning);
-  background: var(--status-warning-surface);
 }
 .failed-investigation-header > .failed-subject {
   margin-top: 10px;
@@ -1303,46 +1265,59 @@
 }
 
 .issue-inspector-header {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  padding: 10px;
-  gap: 10px;
-  border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--card) 94%, transparent);
-  backdrop-filter: blur(20px);
-}
-
-.issue-inspector-header {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
   align-items: center;
-  row-gap: 4px;
-}
-.issue-inspector-header .issue-panel-close {
-  grid-column: 1;
-  grid-row: 1 / span 2;
+  padding: 10px 12px;
+  background: var(--card);
 }
 .issue-inspector-header .issue-panel-heading {
-  grid-column: 2;
-  grid-row: 1;
-  align-self: end;
+  grid-column: 1;
 }
-.issue-inspector-header .issue-panel-next {
-  grid-column: 4;
-  grid-row: 1 / span 2;
-}
-.issue-panel-context {
+.issue-inspector-header .issue-panel-navigation {
   grid-column: 2;
-  grid-row: 2;
-  align-self: start;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.issue-panel-identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  min-width: 0;
+}
+.issue-panel-identity .issue-panel-heading {
+  flex: 1 1 220px;
+}
+.issue-panel-identity > [data-slot='badge'] {
+  flex-shrink: 0;
+}
+.issue-inspector-header .issue-panel-navigation > :is(button, a) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
   padding: 0;
+  border-radius: 6px;
 }
-
-.issue-inspector-header > .issue-panel-severity {
-  grid-column: 3;
-  grid-row: 1 / span 2;
-  align-self: center;
+@media (max-width: 760px), (pointer: coarse) {
+  .issue-inspector-header .issue-panel-navigation > :is(button, a) {
+    width: 44px;
+    height: 44px;
+  }
+}
+@media (max-width: 480px) {
+  .issue-stat {
+    padding-inline: 10px;
+    gap: 6px;
+    font-size: 11px;
+  }
+  .issue-stat-icon {
+    display: none;
+  }
 }
 
 .failed-next-step,
@@ -2294,22 +2269,6 @@
   margin-right: auto;
 }
 
-.issue-panel-navigation {
-  grid-column: 4;
-  grid-row: 1 / span 2;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.issue-inspector-header .issue-panel-open-page {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius);
-  color: var(--muted-foreground);
-}
 .issue-panel-open-page:hover {
   background: var(--accent);
   color: var(--foreground);
@@ -2563,4 +2522,47 @@
 
 .operations-status {
   margin-top: 16px;
+}
+
+.ui-disclosure[data-slot='disclosure'][data-variant='plain'][open] {
+  padding: 0;
+  background: transparent;
+}
+.issue-section-disclosure > .issue-section-trigger {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  padding-block: 0;
+  min-height: 28px;
+  list-style: none;
+}
+.issue-section-trigger::-webkit-details-marker {
+  display: none;
+}
+.issue-section-trigger > .ui-card-title {
+  flex: 1;
+}
+.issue-section-preview {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  max-width: 55%;
+}
+.issue-section-chevron {
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+}
+.issue-section-disclosure[open] > summary .issue-section-chevron {
+  transform: rotate(180deg);
+}
+.issue-section-disclosure[open] > summary .issue-section-preview {
+  display: none;
+}
+.issue-section-status {
+  margin-bottom: var(--content-gap);
+}
+@media (max-width: 760px), (pointer: coarse) {
+  .issue-section-disclosure > .issue-section-trigger {
+    min-height: 44px;
+  }
 }

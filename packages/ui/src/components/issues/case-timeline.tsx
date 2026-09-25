@@ -23,7 +23,11 @@ import type { ReactNode } from 'react';
 import { Button } from '../primitives/button';
 import { Disclosure } from '../primitives/disclosure';
 import { caseLabel, CaseNotice, CaseTime } from './case-investigation';
-import { ExecutionMetadata, ExecutionSummary } from './execution-summary';
+import {
+  ExecutionMetadata,
+  executionStatus,
+  ExecutionSummary,
+} from './execution-summary';
 import { IssueCollection } from './issue-collection';
 import { IssueSection } from './issue-section';
 
@@ -130,6 +134,9 @@ export function CaseTimeline({
     >
       <IssueSection
         section="execution"
+        preview={
+          confirmed ? executionStatus(progress) : 'Current state unconfirmed'
+        }
         enabled={expanded}
         status={expanded ? liveStatus : undefined}
       >
@@ -449,6 +456,13 @@ export function CaseTimeline({
       </IssueSection>
       <IssueSection
         section="history"
+        preview={
+          historyUnavailable
+            ? loadingHistory
+              ? 'Loading history'
+              : 'History unavailable'
+            : `${timeline.length}${hasMoreTimeline ? '+' : ''} recorded ${timeline.length === 1 && !hasMoreTimeline ? 'event' : 'events'}`
+        }
         enabled={expanded}
         status={
           expanded && onRefresh ? (
@@ -596,7 +610,15 @@ export function CaseTimeline({
           }
         />
       </IssueSection>
-      <IssueSection section="evidence" enabled={expanded}>
+      <IssueSection
+        section="evidence"
+        enabled={expanded}
+        preview={
+          historyUnavailable
+            ? 'Evidence unavailable'
+            : `${evidence.length}${hasMoreEvidence ? '+' : ''} ${evidence.length === 1 && !hasMoreEvidence ? 'record' : 'records'}`
+        }
+      >
         {!expanded && (
           <Subheading
             className="execution-evidence-heading"

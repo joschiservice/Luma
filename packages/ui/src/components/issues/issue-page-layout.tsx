@@ -1,18 +1,15 @@
 import type { CaseDetail } from '@luma/api-contract';
-import { type ReactNode, useContext, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useContext, useEffect, useRef } from 'react';
 
 import { Button } from '../primitives/button';
 import { SectionNavigation } from '../primitives/section-navigation';
-import { Select } from '../primitives/select';
 import { WorkspaceHeaderSlot } from '../workspace/workspace-header-slot';
 import { caseLabel, CaseStatus } from './case-investigation';
 import { IssueDetailViews } from './issue-collection';
 import { IssueRecordDetails } from './issue-record-details';
-import {
-  IssuePageNavigation,
-  IssueSection,
-  issueSections as sections,
-} from './issue-section';
+import { IssuePageNavigation, IssueSection } from './issue-section';
+import { IssueSectionSelect } from './issue-section-select';
+import { useIssueNavigation } from './use-issue-navigation';
 
 /** Provides a compact workspace header, persistent section navigation, and one issue column. */
 export function IssuePageLayout({
@@ -33,90 +30,21 @@ export function IssuePageLayout({
   const headerTarget = useContext(WorkspaceHeaderSlot);
   const root = useRef<HTMLDivElement>(null);
   const mobileNavigation = useRef<HTMLDivElement>(null);
-  const [current, setCurrent] = useState('overview');
-  const hasActions = Boolean(actions);
-  const options = sections.filter(
-    ({ value }) => value !== 'resolution' || hasActions,
-  );
+  const { current, options, jump } = useIssueNavigation({
+    root,
+    navigation: mobileNavigation,
+    scrollSelector: '.desk-content',
+    hasActions: Boolean(actions),
+    issueId: item?.id,
+  });
   const title = item?.summary.replace(/\.+$/, '') ?? 'Issue details';
 
   useEffect(() => {
     root.current?.focus({ preventScroll: true });
   }, [item?.id]);
 
-  useEffect(() => {
-    const element = root.current;
-    const scroll = element?.closest('.desk-content');
-    if (!element || !scroll) return;
-    let frame = 0;
-
-    const update = () => {
-      frame = 0;
-      const threshold =
-        scroll.getBoundingClientRect().top +
-        (mobileNavigation.current?.offsetHeight ?? 0) +
-        32;
-      let selected = 'overview';
-      let visible = false;
-      for (const section of sections) {
-        if (section.value === 'resolution' && !hasActions) continue;
-        const target = element.querySelector<HTMLElement>(
-          `[data-issue-section="${section.value}"]`,
-        );
-        if (!target?.offsetParent) continue;
-        visible = true;
-        if (target.getBoundingClientRect().top <= threshold)
-          selected = section.value;
-      }
-      if (!visible) return;
-      if (
-        scroll.scrollTop > 0 &&
-        scroll.scrollTop + scroll.clientHeight >= scroll.scrollHeight - 2
-      )
-        selected = 'details';
-      setCurrent(selected);
-    };
-
-    function schedule() {
-      if (!frame) frame = requestAnimationFrame(update);
-    }
-
-    scroll.addEventListener('scroll', schedule, { passive: true });
-    element.addEventListener('toggle', schedule, true);
-    const observer = new ResizeObserver(schedule);
-    observer.observe(element);
-    observer.observe(scroll);
-    schedule();
-
-    return () => {
-      scroll.removeEventListener('scroll', schedule);
-      element.removeEventListener('toggle', schedule, true);
-      observer.disconnect();
-      cancelAnimationFrame(frame);
-    };
-  }, [item?.id, hasActions]);
-
-  function jump(section: string) {
-    const target = root.current?.querySelector<HTMLElement>(
-      `[data-issue-section="${section}"]`,
-    );
-    if (!target) return;
-    let parent: HTMLElement | null = target;
-    while (parent && parent !== root.current) {
-      if (parent instanceof HTMLDetailsElement) parent.open = true;
-      parent = parent.parentElement;
-    }
-    const focus =
-      target instanceof HTMLDetailsElement
-        ? target.querySelector('summary')
-        : target;
-    focus?.focus({ preventScroll: true });
-    target.scrollIntoView({ block: 'start' });
-    setCurrent(section);
-  }
-
   return (
-    <div className="issue-page" ref={root} tabIndex={-1}>
+    <div className="issue-page issue-content" ref={root} tabIndex={-1}>
       <IssuePageNavigation.Provider value={jump}>
         <IssueDetailViews
           key={item?.id ?? 'pending'}
@@ -164,18 +92,16 @@ export function IssuePageLayout({
                 />
                 <div className="issue-page-mobile-nav" ref={mobileNavigation}>
                   <span>On this page</span>
-                  <Select
-                    aria-label="On this page"
+                  <IssueSectionSelect
+                    label="On this page"
                     value={current}
                     options={options}
-                    onValueChange={(value) => {
-                      if (value) jump(value);
-                    }}
+                    onNavigate={jump}
                   />
                 </div>
               </>
             ) : null}
-            <div className="issue-page-main">
+            <div className="issue-page-main issue-content-main">
               {children}
               {actions ? (
                 <IssueSection section="resolution">{actions}</IssueSection>

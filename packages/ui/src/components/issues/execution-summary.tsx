@@ -3,17 +3,12 @@ import type { CaseProgress } from '@luma/api-contract';
 import { Badge } from '../primitives/badge';
 import { caseLabel, CaseTime } from './case-investigation';
 
-/** Shows recorded action and verification outcomes without implying that a successful action resolved the issue. */
-export function ExecutionSummary({
-  progress,
-  confirmed,
-}: {
-  progress: CaseProgress;
-  confirmed: boolean;
-}) {
+/** Describes the recorded execution outcome without implying unverified resolution. */
+export function executionStatus(progress: CaseProgress) {
   const execution = progress.execution;
   const verification = execution?.verification;
-  const status = progress.resolution
+
+  return progress.resolution
     ? progress.resolution.kind === 'verification'
       ? 'Resolution verified'
       : 'Closed by human disposition'
@@ -36,6 +31,19 @@ export function ExecutionSummary({
       : progress.state === 'awaiting_approval'
         ? 'Awaiting approval'
         : 'No execution recorded';
+}
+
+/** Shows recorded action and verification outcomes without implying that a successful action resolved the issue. */
+export function ExecutionSummary({
+  progress,
+  confirmed,
+}: {
+  progress: CaseProgress;
+  confirmed: boolean;
+}) {
+  const execution = progress.execution;
+  const verification = execution?.verification;
+  const status = executionStatus(progress);
 
   const tone = !confirmed
     ? undefined

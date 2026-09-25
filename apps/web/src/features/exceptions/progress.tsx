@@ -49,6 +49,7 @@ export function LiveCaseDetail({
   return (
     <CaseInvestigation
       item={data.detail}
+      review={data.review}
       embedded
       expanded={expanded}
       unconfirmed={!confirmed}

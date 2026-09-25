@@ -1,4 +1,9 @@
-import type { CaseDetail, CaseSummary, Diagnosis } from '@luma/api-contract';
+import type {
+  CaseDetail,
+  CaseReview,
+  CaseSummary,
+  Diagnosis,
+} from '@luma/api-contract';
 import {
   Activity,
   ChevronRight,
@@ -89,14 +94,39 @@ export function CaseRow({ item }: { item: CaseSummary }) {
           {item.summary.replace(/\.+$/, '')}
         </strong>
         <span className="case-row-subject">
-          {item.subject.id} ·{' '}
-          {item.sources.join(' / ') || caseLabel(item.subject.kind)}
+          <span>
+            {item.sources
+              .map(
+                (source) =>
+                  ({
+                    shopify: 'Shopify',
+                    jtl: 'JTL',
+                    'jtl-onprem': 'JTL-Wawi',
+                    'jtl-cloud': 'JTL Cloud',
+                  })[source] ?? caseLabel(source),
+              )
+              .join(' · ') || 'Source unknown'}
+          </span>
+          <span title={item.subject.id}>
+            {item.subject.kind === 'sku' ? 'SKU' : caseLabel(item.subject.kind)}{' '}
+            ID:{' '}
+            {item.subject.id.length > 24
+              ? `…${item.subject.id.slice(-8)}`
+              : item.subject.id}
+          </span>
         </span>
       </div>
       <div className="issue-row-meta">
+        <Badge tone={item.severity === 'high' ? 'warning' : 'neutral'}>
+          {caseLabel(item.severity)} severity
+        </Badge>
         <span
           className={
-            item.attention.required ? 'status-warning' : 'case-caption'
+            item.attention.required
+              ? 'status-warning'
+              : item.resolution === 'verified'
+                ? 'status-success'
+                : 'case-caption'
           }
         >
           {item.attention.required
@@ -113,7 +143,6 @@ export function CaseRow({ item }: { item: CaseSummary }) {
         <span className="case-row-time">
           <CaseTime value={item.lastActivityAt} />
         </span>
-        <span className="sr-only">{caseLabel(item.severity)} severity</span>
       </div>
     </div>
   );
@@ -185,6 +214,7 @@ type InvestigationProps = {
   embedded?: boolean;
   item: CaseDetail;
   progress?: ReactNode;
+  review?: CaseReview;
   unconfirmed?: boolean;
   onRefresh?: (() => void) | undefined;
   refreshing?: boolean;
@@ -329,7 +359,10 @@ function FailedInvestigation({
         </section>
       </IssueSection>
       {expanded ? (
-        <IssueSection section="findings">
+        <IssueSection
+          section="findings"
+          preview={`${diagnosis?.facts.length ?? 0} recorded facts`}
+        >
           <IssueFindings item={item} unconfirmed={unconfirmed} />
         </IssueSection>
       ) : (
@@ -410,6 +443,7 @@ function FailedInvestigation({
 function InvestigationReport({
   item,
   progress,
+  review,
   unconfirmed = false,
   hideHeader = false,
   recordedOnly = false,
@@ -418,6 +452,7 @@ function InvestigationReport({
 }: {
   item: CaseDetail;
   progress?: ReactNode;
+  review?: CaseReview;
   unconfirmed?: boolean;
   hideHeader?: boolean;
   recordedOnly?: boolean;
@@ -654,7 +689,11 @@ function InvestigationReport({
             }
           >
             {expanded ? (
-              <IssueOverview item={item} unconfirmed={unconfirmed}>
+              <IssueOverview
+                item={item}
+                unconfirmed={unconfirmed}
+                review={review}
+              >
                 {!recordedOnly && (
                   <>
                     {unconfirmed ? (
@@ -810,7 +849,10 @@ function InvestigationReport({
             )}
           </IssueSection>
           {expanded ? (
-            <IssueSection section="findings">
+            <IssueSection
+              section="findings"
+              preview={`${diagnosis?.facts.length ?? 0} recorded facts`}
+            >
               <IssueFindings item={item} unconfirmed={unconfirmed} />
             </IssueSection>
           ) : (

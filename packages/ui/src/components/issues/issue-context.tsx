@@ -2,7 +2,13 @@ import type { CaseSummary } from '@luma/api-contract';
 import { GitBranch, Package, Truck, Unplug } from 'lucide-react';
 
 /** Displays the affected item, issue type, and source systems. */
-export function IssueContext({ item }: { item: CaseSummary }) {
+export function IssueContext({
+  item,
+  compact = false,
+}: {
+  item: CaseSummary;
+  compact?: boolean;
+}) {
   const types: Record<string, { label: string; Icon: typeof Package }> = {
     inventory_mismatch: { label: 'Inventory mismatch', Icon: Package },
     sync_failure: { label: 'Connection issue', Icon: Unplug },
@@ -21,8 +27,12 @@ export function IssueContext({ item }: { item: CaseSummary }) {
           <Icon size={14} aria-hidden="true" />
           {label}
         </span>
-        <span aria-hidden="true">·</span>
-        <strong title={item.subject.id}>{item.subject.id}</strong>
+        {!compact ? (
+          <>
+            <span aria-hidden="true">·</span>
+            <strong title={item.subject.id}>{item.subject.id}</strong>
+          </>
+        ) : null}
       </div>
       <div className="issue-context-sources">
         <span className="issue-context-divider" aria-hidden="true">

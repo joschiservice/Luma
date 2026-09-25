@@ -16,6 +16,8 @@ Feature compositions live separately in `components/issues`, `components/overvie
 
 Existing shared `Button`, `Input`, `Select`, `Field`, `Dialog`, `Pagination` and `SectionNavigation` remain the interaction primitives. Domain components such as `ConnectionCard`, `IssueSection` and `CaseNotice` compose these primitives and retain domain behavior.
 
+`IssuePageLayout` and `IssuePanelLayout` share section content and navigation behavior. The full page uses `IssueSectionSelect` on small screens to navigate after the Select menu releases focus. The inspector keeps Overview visible and uses native disclosures for supporting sections, with Findings initially open. Contextual actions expand their target section before moving focus. `IssueListToolbar` owns the reusable view/filter controls; its caller owns URL state and fetching.
+
 The application shell, navigation, tables, timelines, comparison grids, form validation and branded landing layout have distinct responsibilities. They should not become generic cards merely because they contain borders or text. The simulator control frontend is a separate plain JavaScript developer tool; it cannot import React components directly.
 
 ## Composition
@@ -49,3 +51,5 @@ The UI stylesheet owns `--card-padding`, `--content-gap`, `--content-related-gap
 Use component variants for appearance and `className` for layout. Do not add page selectors that restyle shared card padding, Alert colors or Badge typography. Touch controls keep a 44px minimum target.
 
 Storybook's **UI / Content surfaces** demonstrates the shared patterns and disclosure interaction. Feature stories cover the actual domain compositions in both themes and at narrow viewport widths.
+
+`ResizablePanelGroup`, `ResizablePanel` and `ResizableHandle` wrap shadcn’s `react-resizable-panels` integration. `IssueSplitView` composes them for the inbox, with minimum list/detail widths and a single-pane layout on narrow screens. Both pane trees stay mounted across layout changes to preserve local interaction state.

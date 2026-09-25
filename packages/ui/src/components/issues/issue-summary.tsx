@@ -20,26 +20,22 @@ export function IssueSummary({
     >
       {[
         { label: 'Needs review', value: review, Icon: Inbox, tone: 'warning' },
-        { label: 'Open issues', value: open, Icon: Search, tone: 'info' },
+        { label: 'Open', value: open, Icon: Search, tone: 'info' },
         {
-          label: 'Verified · 24h',
+          label: 'Verified in 24h',
           value: verified,
           Icon: Check,
           tone: 'success',
         },
       ].map(({ label, value, Icon, tone }) => (
         <div className="issue-stat" key={label}>
-          <div>
-            <span>{label}</span>
-            <strong>
-              {value === undefined ? '—' : value.toLocaleString()}
-            </strong>
-          </div>
           <Icon
             aria-hidden="true"
-            strokeWidth={1.25}
+            strokeWidth={1.5}
             className={`issue-stat-icon status-${tone}`}
           />
+          <strong>{value === undefined ? '—' : value.toLocaleString()}</strong>
+          <span>{label}</span>
         </div>
       ))}
     </section>
