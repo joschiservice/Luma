@@ -3,12 +3,9 @@ import type {
   PlaybookDetail,
 } from '@luma/api-contract';
 import { Alert } from '@luma/ui/components/primitives/alert';
+import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-} from '@luma/ui/components/primitives/card';
+import { Card, CardHeader } from '@luma/ui/components/primitives/card';
 import {
   Dialog,
   DialogContent,
@@ -17,10 +14,12 @@ import {
 } from '@luma/ui/components/primitives/dialog';
 import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import { Select } from '@luma/ui/components/primitives/select';
+import { SectionWorkspace } from '@luma/ui/components/workspace/section-workspace';
+import { WorkspaceBreadcrumb } from '@luma/ui/components/workspace/workspace-breadcrumb';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams, useSearch } from '@tanstack/react-router';
-import { ArrowLeft, BookOpen, ShieldCheck } from 'lucide-react';
-import { useState } from 'react';
+import { ArrowLeft, BookOpen, ChevronRight, RefreshCw } from 'lucide-react';
+import { type ReactNode, useState } from 'react';
 
 import { SignInRedirect } from '../identity/common';
 import { contextOptions, IdentityError } from '../identity/data';
@@ -33,7 +32,14 @@ import {
   playbooksKey,
   revokePlaybook,
 } from './data';
-import { type PlaybookFilters, statusNames, systemNames } from './library';
+import {
+  PlaybookActivations,
+  PlaybookCompatibility,
+  PlaybookOverview,
+  PlaybookSteps,
+  PlaybookVersions,
+} from './detail-sections';
+import { type PlaybookFilters, PlaybookLoading, statusNames } from './library';
 import { OfflineNotice } from './offline';
 
 /** Loads a shareable playbook, resetting private form state when the workspace or playbook changes. */
@@ -87,14 +93,16 @@ export function PlaybookDetailPage({
   return (
     <div className="playbooks-page">
       <OfflineNotice />
-      <Link
-        className="playbook-back"
-        to="/app/$organizationId/playbooks"
-        params={{ organizationId }}
-        search={filters}
-      >
-        <ArrowLeft size={15} aria-hidden="true" /> All playbooks
-      </Link>
+      {!query.data || accessError ? (
+        <Link
+          className="playbook-back"
+          to="/app/$organizationId/playbooks"
+          params={{ organizationId }}
+          search={filters}
+        >
+          <ArrowLeft size={15} aria-hidden="true" /> All playbooks
+        </Link>
+      ) : null}
       {query.error || accessError ? (
         <Alert tone="danger" role="alert" className="playbook-notice">
           {playbookError(query.error ?? accessError)}{' '}
@@ -104,100 +112,106 @@ export function PlaybookDetailPage({
         </Alert>
       ) : null}
       {accessError ? null : query.isPending ? (
-        <p role="status">Loading playbook…</p>
+        <PlaybookLoading detail />
       ) : query.data ? (
-        <>
-          <PlaybookDetailView
-            key={query.data.canManage ? 'manage' : 'read'}
-            detail={query.data}
-            organizationId={organizationId}
-            refresh={refresh}
-            refreshing={query.isFetching || !!query.error}
-            accessLost={accessLost}
-          />
-          {query.data.canManage ? (
-            <ShadowReport
-              key={`${organizationId}:${definitionId}`}
-              organizationId={organizationId}
-              workflow={definitionId}
-            />
-          ) : null}
-          <Card
-            as="section"
-            className="playbook-section"
-            aria-labelledby="runs-title"
-          >
-            <CardHeader className="playbooks-heading">
-              <h2 id="runs-title">Recent runs</h2>
-              <Button
-                variant="outline"
-                disabled={runs.isFetching}
-                onClick={() => void runs.refetch()}
-              >
-                Refresh runs
-              </Button>
-            </CardHeader>
-            <p>
-              Execution acceptance and verified correction are separate results.
-              Pilot, simulation and shadow evidence are not live verified
-              success.
-            </p>
-            {runs.error ? (
-              <p role="alert">
-                Run history is unavailable. {playbookError(runs.error)}
+        <PlaybookDetailView
+          key={query.data.canManage ? 'manage' : 'read'}
+          detail={query.data}
+          organizationId={organizationId}
+          filters={filters}
+          refresh={refresh}
+          refreshing={query.isFetching || !!query.error}
+          accessLost={accessLost}
+          evaluation={
+            query.data.canManage ? (
+              <ShadowReport
+                key={`${organizationId}:${definitionId}`}
+                organizationId={organizationId}
+                workflow={definitionId}
+              />
+            ) : null
+          }
+          runs={
+            <Card
+              as="section"
+              className="playbook-section"
+              aria-labelledby="runs-title"
+            >
+              <CardHeader className="playbooks-heading">
+                <h2 id="runs-title">Recent runs</h2>
+                <Button
+                  variant="outline"
+                  disabled={runs.isFetching}
+                  onClick={() => void runs.refetch()}
+                >
+                  Refresh runs
+                </Button>
+              </CardHeader>
+              <p>
+                Execution acceptance and verified correction are separate
+                results. Pilot, simulation and shadow evidence are not live
+                verified success.
               </p>
-            ) : runs.isPending ? (
-              <p role="status">Loading runs…</p>
-            ) : !runs.data?.length ? (
-              <p>No runs recorded for this playbook.</p>
-            ) : (
-              <div className="playbook-runs">
-                {runs.data.map((run) => (
-                  <article key={run.id}>
-                    <div className="playbooks-heading">
-                      <Link
-                        to="/app/$organizationId/exceptions/$exceptionId"
-                        params={{ organizationId, exceptionId: run.incidentId }}
-                      >
-                        Open issue
-                      </Link>
-                      <time dateTime={run.createdAt}>
-                        {new Date(run.createdAt).toLocaleString()}
-                      </time>
-                    </div>
-                    <p>
-                      Version {run.version} ·{' '}
-                      <strong>
-                        {run.evidenceKind === 'pilot'
-                          ? 'Pilot evidence'
-                          : run.evidenceKind === 'unclassified'
-                            ? 'Unclassified evidence — live success not established'
-                            : `${run.evidenceKind} evidence`}
-                      </strong>
-                    </p>
-                    <dl>
-                      <div>
-                        <dt>Execution</dt>
-                        <dd>{run.execution.replaceAll('_', ' ')}</dd>
+              {runs.error ? (
+                <p role="alert">
+                  Run history is unavailable. {playbookError(runs.error)}
+                </p>
+              ) : runs.isPending ? (
+                <p role="status">Loading runs…</p>
+              ) : !runs.data?.length ? (
+                <p>No runs recorded for this playbook.</p>
+              ) : (
+                <div className="playbook-runs">
+                  {runs.data.map((run) => (
+                    <article key={run.id}>
+                      <div className="playbooks-heading">
+                        <Link
+                          to="/app/$organizationId/exceptions/$exceptionId"
+                          params={{
+                            organizationId,
+                            exceptionId: run.incidentId,
+                          }}
+                        >
+                          Open issue
+                        </Link>
+                        <time dateTime={run.createdAt}>
+                          {new Date(run.createdAt).toLocaleString()}
+                        </time>
                       </div>
-                      <div>
-                        <dt>Verification</dt>
-                        <dd>{run.verification.replaceAll('_', ' ')}</dd>
-                      </div>
-                    </dl>
-                    <p>{run.reason.replaceAll('_', ' ')}</p>
-                    <Disclosure>
-                      <summary>Run evidence references</summary>
-                      <p>Run: {run.id}</p>
-                      <p>Activation: {run.activationId}</p>
-                      <code>{run.versionDigest}</code>
-                    </Disclosure>
-                  </article>
-                ))}
-              </div>
-            )}
-          </Card>
-        </>
+                      <p>
+                        Version {run.version} ·{' '}
+                        <strong>
+                          {run.evidenceKind === 'pilot'
+                            ? 'Pilot evidence'
+                            : run.evidenceKind === 'unclassified'
+                              ? 'Unclassified evidence — live success not established'
+                              : `${run.evidenceKind} evidence`}
+                        </strong>
+                      </p>
+                      <dl>
+                        <div>
+                          <dt>Execution</dt>
+                          <dd>{run.execution.replaceAll('_', ' ')}</dd>
+                        </div>
+                        <div>
+                          <dt>Verification</dt>
+                          <dd>{run.verification.replaceAll('_', ' ')}</dd>
+                        </div>
+                      </dl>
+                      <p>{run.reason.replaceAll('_', ' ')}</p>
+                      <Disclosure>
+                        <summary>Run evidence references</summary>
+                        <p>Run: {run.id}</p>
+                        <p>Activation: {run.activationId}</p>
+                        <code>{run.versionDigest}</code>
+                      </Disclosure>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </Card>
+          }
+        />
       ) : null}
     </div>
   );
@@ -210,8 +224,14 @@ export function PlaybookDetailView({
   refresh,
   refreshing,
   accessLost,
+  filters = {},
+  evaluation,
+  runs,
 }: {
   detail: PlaybookDetail;
+  filters?: PlaybookFilters;
+  evaluation?: ReactNode;
+  runs?: ReactNode;
   organizationId: string;
   refresh: () => Promise<void>;
   refreshing?: boolean;
@@ -249,7 +269,7 @@ export function PlaybookDetailView({
       );
       setRevoke(null);
       setMessage(
-        'Activation revoked. Future admission is blocked; already-dispatched work is not undone.',
+        'Activation revoked. Future runs are blocked; work already dispatched may still complete.',
       );
       await refresh();
     } catch (error) {
@@ -263,26 +283,50 @@ export function PlaybookDetailView({
 
   return (
     <>
-      <div className="playbooks-heading">
-        <div>
-          <p className="playbooks-kicker">
-            <BookOpen size={15} aria-hidden="true" />{' '}
-            {statusNames[detail.summary.status]}
-          </p>
-          <h1>{detail.summary.name}</h1>
-          <p className="desk-intro">{detail.summary.purpose}</p>
-        </div>
+      <WorkspaceBreadcrumb>
+        <BookOpen size={16} aria-hidden="true" />
+        <Link
+          to="/app/$organizationId/playbooks"
+          params={{ organizationId }}
+          search={filters}
+        >
+          Playbooks
+        </Link>
+        <ChevronRight size={14} aria-hidden="true" />
+        <span aria-current="page" title={detail.summary.name}>
+          {detail.summary.name}
+        </span>
+      </WorkspaceBreadcrumb>
+      <h1 className="sr-only">{detail.summary.name}</h1>
+      <div className="playbook-action-bar">
+        <Link
+          className="playbook-back"
+          to="/app/$organizationId/playbooks"
+          params={{ organizationId }}
+          search={filters}
+        >
+          <ArrowLeft size={15} aria-hidden="true" /> All playbooks
+        </Link>
+        <Badge
+          tone={
+            detail.summary.status === 'active'
+              ? 'success'
+              : detail.summary.status === 'unavailable'
+                ? 'warning'
+                : 'neutral'
+          }
+        >
+          {statusNames[detail.summary.status]}
+        </Badge>
         <Button
-          variant="outline"
+          variant="ghost"
+          aria-label="Refresh playbook"
           disabled={refreshing}
           onClick={() => void refresh()}
         >
-          {refreshing ? 'Refreshing…' : 'Refresh playbook'}
+          <RefreshCw size={14} aria-hidden="true" /> Refresh
         </Button>
-      </div>
-      <div className="playbook-version-bar">
-        <label>
-          Version
+        <div className="playbook-version-controls">
           <Select
             aria-label="Version"
             value={version.version}
@@ -293,189 +337,95 @@ export function PlaybookDetailView({
             }}
             options={detail.versions.map((v) => ({
               value: v.version,
-              label: `${v.version}${v.version === detail.summary.availableVersion ? ' — latest published' : ''}`,
+              label: `v${v.version}${v.version === detail.summary.availableVersion ? ' · Latest' : ''}`,
             }))}
           />
-        </label>
-        <span>
-          {version.provenance.kind === 'pilot'
-            ? 'Pilot provenance'
-            : 'Resolution provenance'}
-        </span>
-        <Button
-          disabled={!canActivate || refreshing}
-          onClick={() => setActivate(true)}
-        >
-          Review activation
-        </Button>
+          <Button
+            disabled={!canActivate || refreshing}
+            aria-describedby={
+              !canActivate ? 'playbook-activation-reason' : undefined
+            }
+            onClick={() => setActivate(true)}
+          >
+            Review activation
+          </Button>
+        </div>
       </div>
-      {!detail.canManage ? (
-        <Alert className="playbook-notice">
-          You can inspect playbooks. Only workspace owners and admins can
-          activate or revoke them.
+      {!canActivate ? (
+        <Alert
+          id="playbook-activation-reason"
+          tone={detail.canManage ? 'warning' : 'neutral'}
+          className="playbook-notice"
+        >
+          {!detail.canManage
+            ? 'You can inspect playbooks. Only workspace owners and admins can activate or revoke them.'
+            : !version.compatible
+              ? 'This version cannot be activated. Review the compatibility requirements below.'
+              : 'No eligible connections. Resolve the connection requirements below before activating.'}
         </Alert>
       ) : null}
-      <p>Publishing a newer version never replaces an active version.</p>
-      {message ? <p role="status">{message}</p> : null}
-      <div className="playbook-detail-grid">
-        <Card
-          as="section"
-          className="playbook-section"
-          aria-labelledby="steps-title"
-        >
-          <CardTitle as="h2" id="steps-title">
-            How this playbook works
-          </CardTitle>
-          <ol className="playbook-steps">
-            {version.steps.map((step, i) => (
-              <li key={step.id}>
-                <span className="playbook-step-number" aria-hidden="true">
-                  {String(i + 1).padStart(2, '0')}
-                </span>
-                <div>
-                  <h3>{step.title}</h3>
-                  <p>{step.description}</p>
-                  <ul>
-                    {step.details.map((line) => (
-                      <li key={line}>{line}</li>
-                    ))}
-                  </ul>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </Card>
-        <Card as="aside" className="playbook-section">
-          <CardTitle as="h2">
-            <ShieldCheck size={18} aria-hidden="true" /> Compatibility and
-            permissions
-          </CardTitle>
-          <p>Required: {version.permissions.join(', ')}.</p>
-          {version.blockers.map((reason) => (
-            <Alert key={reason} className="playbook-notice">
-              {reason}
-            </Alert>
-          ))}
-          {!detail.connections.length ? (
-            <p>No connections installed.</p>
-          ) : (
-            detail.connections.map((c) => (
-              <article className="playbook-connection" key={c.id}>
-                <h3>
-                  <Link
-                    to="/app/$organizationId/connections"
-                    params={{ organizationId }}
-                    hash={`connection-${c.id}`}
-                  >
-                    {c.label}
-                  </Link>
-                </h3>
-                <p>
-                  {systemNames[c.system] ?? c.system} ·{' '}
-                  {c.blockers.length
-                    ? 'Prerequisites missing'
-                    : 'Eligible connection'}
-                </p>
-                {c.blockers.map((reason) => (
-                  <p key={reason}>{reason}</p>
-                ))}
-              </article>
-            ))
-          )}
-          <Link
-            to="/app/$organizationId/connections"
-            params={{ organizationId }}
-          >
-            Manage connections
-          </Link>
-          <CardTitle as="h3">Evaluation evidence</CardTitle>
-          <p>
-            Shadow comparisons are available below for workspace owners and
-            admins. Each prediction retains its exact Playbook version.
-          </p>
-        </Card>
-      </div>
-      <Card as="section" className="playbook-section">
-        <CardTitle as="h2">Activation history</CardTitle>
-        <p>
-          Revocation blocks future admission. It preserves the grant and does
-          not undo already-dispatched work.
-        </p>
-        {!detail.activations.length ? (
-          <p>No activations. This playbook is not permitted to run.</p>
-        ) : (
-          detail.activations.map((a) => (
-            <article key={a.id} className="playbook-activation-record">
-              <div className="playbooks-heading">
-                <h3>
-                  Version {a.version} · {a.active ? 'Active' : 'Revoked'}
-                </h3>
-                {detail.canManage && a.active ? (
-                  <Button
-                    variant="outline"
-                    disabled={refreshing}
-                    onClick={() => {
-                      setRevoke(a);
-                      setError('');
-                    }}
-                  >
-                    Revoke activation
-                  </Button>
-                ) : null}
-              </div>
-              <p>
-                Connections:{' '}
-                {a.grants.connectionIds
-                  .map(
-                    (id) =>
-                      detail.connections.find((c) => c.id === id)?.label ?? id,
-                  )
-                  .join(', ')}
-              </p>
-              <p>Orders: {a.grants.targetIds.join(', ')}</p>
-              <p>Principals: {a.grants.principalIds.join(', ')}</p>
-              <Disclosure>
-                <summary>Exact scope and review</summary>
-                <p>Activation: {a.id}</p>
-                <p>Policy: {a.policyVersion}</p>
-                <p>
-                  Reviewed by:{' '}
-                  {a.reviewedBy ??
-                    'Trusted provisioning; no product review record'}
-                </p>
-                {a.reviewedAt ? (
-                  <time dateTime={a.reviewedAt}>
-                    {new Date(a.reviewedAt).toLocaleString()}
-                  </time>
-                ) : null}
-                <p>
-                  Version digest: <code>{a.versionDigest}</code>
-                </p>
-                <p>
-                  Artifact digest: <code>{a.artifactDigest}</code>
-                </p>
-              </Disclosure>
-            </article>
-          ))
-        )}
-      </Card>
-      <Card as="section" className="playbook-section">
-        <CardTitle as="h2">Provenance and version history</CardTitle>
-        {detail.versions.map((v) => (
-          <Disclosure key={v.version}>
-            <summary>
-              Version {v.version} · {v.provenance.kind} ·{' '}
-              {v.compatible ? 'Compatible' : 'Unavailable'}
-            </summary>
-            <p>
-              Authored by {v.provenance.authoredBy}. {v.provenance.reference}
-            </p>
-            <p>Evidence: {v.provenance.evidenceRefs.join(', ')}</p>
-            <code>{v.digest}</code>
-            <pre>{v.representation}</pre>
-          </Disclosure>
-        ))}
-      </Card>
+      {message ? (
+        <Alert tone="success" role="status" className="playbook-notice">
+          {message}
+        </Alert>
+      ) : null}
+      <SectionWorkspace
+        label="Playbook sections"
+        sections={[
+          {
+            value: 'overview',
+            label: 'Overview',
+            content: <PlaybookOverview detail={detail} version={version} />,
+          },
+          {
+            value: 'steps',
+            label: 'How it works',
+            content: <PlaybookSteps version={version} />,
+          },
+          {
+            value: 'compatibility',
+            label: 'Compatibility',
+            content: (
+              <PlaybookCompatibility
+                detail={detail}
+                version={version}
+                organizationId={organizationId}
+              />
+            ),
+          },
+          {
+            value: 'activations',
+            label: 'Activations',
+            content: (
+              <PlaybookActivations
+                detail={detail}
+                refreshing={refreshing}
+                onRevoke={(activation) => {
+                  setRevoke(activation);
+                  setError('');
+                }}
+              />
+            ),
+          },
+          ...(runs
+            ? [{ value: 'runs', label: 'Recent runs', content: runs }]
+            : []),
+          ...(evaluation
+            ? [
+                {
+                  value: 'evaluation',
+                  label: 'Evaluation',
+                  content: evaluation,
+                },
+              ]
+            : []),
+          {
+            value: 'versions',
+            label: 'Version history',
+            content: <PlaybookVersions detail={detail} />,
+          },
+        ]}
+      />
       <Dialog open={activate && detail.canManage} onOpenChange={setActivate}>
         <DialogContent className="playbook-dialog">
           <DialogTitle>Review activation</DialogTitle>
@@ -489,6 +439,7 @@ export function PlaybookDetailView({
             detail={detail}
             version={version.version}
             done={done}
+            cancel={() => setActivate(false)}
             accessLost={accessLost}
           />
         </DialogContent>
@@ -502,17 +453,29 @@ export function PlaybookDetailView({
         <DialogContent className="playbook-dialog">
           <DialogTitle>Revoke activation?</DialogTitle>
           <DialogDescription>
-            Future admission under this artifact will be blocked.
-            Already-dispatched work may still complete. This does not undo
-            changes. A later activation creates a new record.
+            This stops future runs under this activation. Work already
+            dispatched may still complete. Existing changes are not undone.
           </DialogDescription>
           <p>
             Version {revoke?.version} · {revoke?.grants.targetIds.length} orders
           </p>
           {error ? <p role="alert">{error}</p> : null}
-          <Button disabled={pending} onClick={() => void revokeSelected()}>
-            {pending ? 'Confirming revocation…' : 'Confirm revocation'}
-          </Button>
+          <div className="playbook-dialog-actions">
+            <Button
+              variant="outline"
+              disabled={pending}
+              onClick={() => setRevoke(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={pending}
+              onClick={() => void revokeSelected()}
+            >
+              {pending ? 'Confirming revocation…' : 'Confirm revocation'}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </>

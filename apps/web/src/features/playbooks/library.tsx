@@ -2,12 +2,9 @@ import type { PlaybookSummary } from '@luma/api-contract';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-} from '@luma/ui/components/primitives/card';
+import { CollectionToolbar } from '@luma/ui/components/primitives/collection-toolbar';
 import { Empty } from '@luma/ui/components/primitives/empty';
+import { Input } from '@luma/ui/components/primitives/input';
 import { Select } from '@luma/ui/components/primitives/select';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -16,7 +13,8 @@ import {
   useParams,
   useSearch,
 } from '@tanstack/react-router';
-import { ArrowUpRight, BookOpen, Search } from 'lucide-react';
+import { BookOpen, ChevronRight, Search, X } from 'lucide-react';
+import { useRef } from 'react';
 
 import { SignInRedirect } from '../identity/common';
 import { IdentityError } from '../identity/data';
@@ -109,45 +107,137 @@ export function PlaybookLibraryView({
   error?: string | undefined;
   refresh: () => void;
 }) {
-  const filtered = items?.filter(
-    (p) =>
-      p.name.toLowerCase().includes((filters.q ?? '').toLowerCase()) &&
-      (!filters.system || p.systems.includes(filters.system)) &&
-      (!filters.status || p.status === filters.status),
+  const input = useRef<HTMLInputElement>(null);
+  const search = (filters.q ?? '').trim().toLowerCase();
+  const matching = items?.filter(
+    (item) =>
+      (!filters.system || item.systems.includes(filters.system)) &&
+      [
+        item.name,
+        item.purpose,
+        item.issueType.replaceAll('_', ' '),
+        ...item.systems.map((system) => systemNames[system] ?? system),
+      ]
+        .join(' ')
+        .toLowerCase()
+        .includes(search),
   );
+  const filtered = matching?.filter(
+    (item) => !filters.status || item.status === filters.status,
+  );
+  const activeFilters = [
+    ...(filters.q
+      ? [
+          {
+            key: 'q',
+            label: `Search: ${filters.q}`,
+            onRemove: () => change({ ...filters, q: '' }),
+          },
+        ]
+      : []),
+    ...(filters.system
+      ? [
+          {
+            key: 'system',
+            label: systemNames[filters.system]!,
+            onRemove: () => change({ ...filters, system: '' }),
+          },
+        ]
+      : []),
+    ...(filters.status
+      ? [
+          {
+            key: 'status',
+            label: statusNames[filters.status as keyof typeof statusNames],
+            onRemove: () => change({ ...filters, status: '' }),
+          },
+        ]
+      : []),
+  ];
 
   return (
-    <div className="playbooks-page">
+    <div className="playbooks-page playbook-library-page">
+      <h1 className="sr-only">Playbooks</h1>
       <OfflineNotice />
-      <div className="playbooks-heading">
-        <div>
-          <p className="playbooks-kicker">
-            <BookOpen size={15} aria-hidden="true" /> Resolution library
-          </p>
-          <h1>Playbooks</h1>
-          <p className="desk-intro">
-            Understand each correction. Control where a reviewed version may
-            run.
-          </p>
-        </div>
-        <Button variant="outline" disabled={refreshing} onClick={refresh}>
-          {refreshing ? 'Refreshing…' : 'Refresh playbooks'}
-        </Button>
-      </div>
-      <div className="playbook-filters">
-        <label>
-          <span>
-            <Search size={14} aria-hidden="true" /> Search by name
-          </span>
-          <input
-            type="search"
-            value={filters.q ?? ''}
-            onChange={(e) => change({ ...filters, q: e.target.value })}
-            placeholder="Find a playbook"
-          />
-        </label>
-        <label>
-          System
+      <div className="playbook-collection">
+        <CollectionToolbar
+          views={
+            <>
+              <Select
+                className="playbook-mobile-view"
+                aria-label="Activation status"
+                value={filters.status ?? ''}
+                options={[
+                  ['', 'All playbooks'],
+                  ...Object.entries(statusNames),
+                ].map(([value, label]) => ({
+                  value: value!,
+                  label: `${label} (${items ? (value ? matching?.filter((item) => item.status === value).length : matching?.length) : '—'})`,
+                }))}
+                onValueChange={(value) =>
+                  change({ ...filters, status: value ?? '' })
+                }
+              />
+              <div
+                className="playbook-views"
+                role="group"
+                aria-label="Activation status"
+              >
+                {[['', 'All playbooks'], ...Object.entries(statusNames)].map(
+                  ([value, label]) => (
+                    <Button
+                      key={value}
+                      variant="ghost"
+                      aria-pressed={(filters.status ?? '') === value}
+                      onClick={() => change({ ...filters, status: value })}
+                    >
+                      {label}
+                      <span className="playbook-view-count">
+                        {items
+                          ? value
+                            ? matching?.filter((item) => item.status === value)
+                                .length
+                            : matching?.length
+                          : '—'}
+                      </span>
+                    </Button>
+                  ),
+                )}
+              </div>
+            </>
+          }
+          filters={activeFilters}
+          onClear={() => change({})}
+          onRefresh={refresh}
+          refreshing={refreshing}
+          refreshLabel="Refresh playbooks"
+        >
+          <div className="playbook-search">
+            <Search size={16} aria-hidden="true" />
+            <Input
+              ref={input}
+              type="search"
+              aria-label="Search playbooks"
+              value={filters.q ?? ''}
+              onChange={(event) =>
+                change({ ...filters, q: event.target.value })
+              }
+              placeholder="Search playbooks…"
+            />
+            {filters.q ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Clear search"
+                onClick={() => {
+                  change({ ...filters, q: '' });
+                  input.current?.focus();
+                }}
+              >
+                <X aria-hidden="true" />
+              </Button>
+            ) : null}
+          </div>
           <Select
             aria-label="System"
             value={filters.system ?? ''}
@@ -162,117 +252,119 @@ export function PlaybookLibraryView({
               })),
             ]}
           />
-        </label>
-        <label>
-          Activation status
-          <Select
-            aria-label="Activation status"
-            value={filters.status ?? ''}
-            onValueChange={(value) =>
-              change({ ...filters, status: value ?? '' })
-            }
-            options={[
-              { value: '', label: 'All statuses' },
-              ...Object.entries(statusNames).map(([value, label]) => ({
-                value,
-                label,
-              })),
-            ]}
-          />
-        </label>
-      </div>
-      {error ? (
-        <Alert tone="danger" role="alert" className="playbook-notice">
-          {error}{' '}
-          <Button variant="outline" onClick={refresh}>
-            Retry
-          </Button>
-        </Alert>
-      ) : null}
-      {error && !items ? null : loading ? (
-        <p role="status">Loading playbooks…</p>
-      ) : !items?.length ? (
-        <Empty className="playbook-empty">
-          <BookOpen size={28} aria-hidden="true" />
-          <h2>No published playbooks</h2>
-          <p>
-            A workspace administrator must publish a reviewed version before it
-            can be activated.
-          </p>
-        </Empty>
-      ) : (
-        <>
+        </CollectionToolbar>
+        {error ? (
+          <Alert tone="danger" role="alert" className="playbook-notice">
+            <span>
+              {error}
+              {items ? ' The list below may be out of date.' : ''}
+            </span>
+            <Button variant="outline" disabled={refreshing} onClick={refresh}>
+              Retry
+            </Button>
+          </Alert>
+        ) : null}
+        {error && !items ? null : loading ? (
+          <PlaybookLoading />
+        ) : !items?.length ? (
+          <Empty className="playbook-empty">
+            <BookOpen size={28} aria-hidden="true" />
+            <h2>No published playbooks</h2>
+            <p>
+              A workspace administrator must publish a reviewed version before
+              it can be activated.
+            </p>
+          </Empty>
+        ) : !filtered?.length ? (
+          <Empty className="playbook-empty">
+            <Search size={24} aria-hidden="true" />
+            <h2>No matching playbooks</h2>
+            <p>Try a different search, system, or activation status.</p>
+          </Empty>
+        ) : (
+          <ul className="playbook-rows" aria-label="Playbooks">
+            {filtered.map((item) => (
+              <li key={item.id}>
+                <Link
+                  className="playbook-row"
+                  aria-label={item.name}
+                  to="/app/$organizationId/playbooks/$definitionId"
+                  params={{ organizationId, definitionId: item.id }}
+                  search={filters}
+                >
+                  <span className="playbook-row-icon">
+                    <BookOpen size={18} aria-hidden="true" />
+                  </span>
+                  <div className="playbook-row-content">
+                    <h2>{item.name}</h2>
+                    <p>{item.purpose}</p>
+                    <div className="playbook-row-meta">
+                      <span>
+                        {item.systems
+                          .map((system) => systemNames[system] ?? system)
+                          .join(' · ') || 'Unsupported system'}
+                      </span>
+                      <span>{item.issueType.replaceAll('_', ' ')}</span>
+                      <span>v{item.availableVersion}</span>
+                      {item.activeVersions.length ? (
+                        <span>Active: {item.activeVersions.join(', ')}</span>
+                      ) : null}
+                    </div>
+                    {item.blockers.length ? (
+                      <p className="playbook-row-blocker">
+                        {item.blockers[0]}
+                        {item.blockers.length > 1
+                          ? ` (+${item.blockers.length - 1} more)`
+                          : ''}
+                      </p>
+                    ) : null}
+                  </div>
+                  <Badge
+                    tone={
+                      item.status === 'active'
+                        ? 'success'
+                        : item.status === 'unavailable'
+                          ? 'warning'
+                          : 'neutral'
+                    }
+                  >
+                    {statusNames[item.status]}
+                  </Badge>
+                  <ChevronRight
+                    className="playbook-row-chevron"
+                    size={16}
+                    aria-hidden="true"
+                  />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+        {!loading && items ? (
           <p role="status" className="playbook-count">
-            {filtered?.length} playbooks
+            {filtered?.length ?? 0} of {items.length}{' '}
+            {items.length === 1 ? 'playbook' : 'playbooks'}
           </p>
-          {!filtered?.length ? (
-            <Empty className="playbook-empty">
-              <h2>No matching playbooks</h2>
-              <Button variant="outline" onClick={() => change({})}>
-                Clear filters
-              </Button>
-            </Empty>
-          ) : (
-            <div className="playbook-library">
-              {filtered.map((p) => (
-                <Card as="article" key={p.id} className="playbook-card">
-                  <CardHeader className="playbooks-heading">
-                    <Badge
-                      tone={
-                        p.status === 'active'
-                          ? 'success'
-                          : p.status === 'unavailable'
-                            ? 'warning'
-                            : 'neutral'
-                      }
-                    >
-                      {statusNames[p.status]}
-                    </Badge>
-                    <span>v{p.availableVersion}</span>
-                  </CardHeader>
-                  <CardTitle as="h2">
-                    <Link
-                      to="/app/$organizationId/playbooks/$definitionId"
-                      params={{ organizationId, definitionId: p.id }}
-                      search={filters}
-                    >
-                      {p.name}
-                      <ArrowUpRight size={18} aria-hidden="true" />
-                    </Link>
-                  </CardTitle>
-                  <p>{p.purpose}</p>
-                  <dl>
-                    <div>
-                      <dt>Issue type</dt>
-                      <dd>{p.issueType.replaceAll('_', ' ')}</dd>
-                    </div>
-                    <div>
-                      <dt>Capability</dt>
-                      <dd>{p.capability}</dd>
-                    </div>
-                    <div>
-                      <dt>Systems</dt>
-                      <dd>
-                        {p.systems
-                          .map((s) => systemNames[s] ?? s)
-                          .join(' · ') || 'Unsupported'}
-                      </dd>
-                    </div>
-                  </dl>
-                  {p.activeVersions.length ? (
-                    <p>Active versions: {p.activeVersions.join(', ')}</p>
-                  ) : null}
-                  {p.blockers.map((reason) => (
-                    <Alert className="playbook-notice" key={reason}>
-                      {reason}
-                    </Alert>
-                  ))}
-                </Card>
-              ))}
-            </div>
-          )}
-        </>
-      )}
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/** Reserves content space and announces loading without exposing decorative placeholders. */
+export function PlaybookLoading({ detail = false }: { detail?: boolean }) {
+  return (
+    <div className="playbook-loading" role="status">
+      <span className="sr-only">
+        {detail ? 'Loading playbook…' : 'Loading playbooks…'}
+      </span>
+      {[0, 1, 2].map((row) => (
+        <div key={row} aria-hidden="true" className="playbook-skeleton">
+          <span />
+          <span />
+          <span />
+        </div>
+      ))}
     </div>
   );
 }

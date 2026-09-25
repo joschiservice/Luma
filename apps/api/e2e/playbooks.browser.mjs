@@ -63,16 +63,14 @@ it('finds, reviews, activates, reloads and revokes a persisted playbook with wor
   await page.getByRole('combobox', { name: 'System' }).click();
   await page.getByRole('option', { name: 'All systems' }).click();
   await page.getByRole('link', { name }).waitFor();
-  await page.getByRole('combobox', { name: 'Activation status' }).click();
-  await page.getByRole('option', { name: 'Active', exact: true }).click();
+  await page.getByRole('button', { name: /^Active 0$/ }).click();
   await page.getByRole('heading', { name: 'No matching playbooks' }).waitFor();
-  await page.getByRole('combobox', { name: 'Activation status' }).click();
-  await page.getByRole('option', { name: 'All statuses' }).click();
+  await page.getByRole('button', { name: /^All playbooks 1$/ }).click();
   await page.getByRole('link', { name }).waitFor();
-  await page.getByLabel('Search by name').fill('missing');
+  await page.getByLabel('Search playbooks').fill('missing');
   await page.getByRole('heading', { name: 'No matching playbooks' }).waitFor();
   await page.getByRole('button', { name: 'Clear filters' }).click();
-  await page.getByLabel('Search by name').fill('shipping');
+  await page.getByLabel('Search playbooks').fill('shipping');
   await page.getByRole('link', { name }).click();
   await page
     .getByRole('heading', { name: 'How this playbook works' })
@@ -150,6 +148,8 @@ it('finds, reviews, activates, reloads and revokes a persisted playbook with wor
   ).toBe(1);
   await page.reload();
   await page.getByText('Version 0.1.0 · Active', { exact: true }).waitFor();
+  await page.getByText('Orders: Order 1042', { exact: true }).waitFor();
+  await page.getByText('Exact scope and review', { exact: true }).click();
   await page.getByText(`Orders: ${targetId}`, { exact: true }).waitFor();
   await mkdir('/tmp/luma62-browser', { recursive: true });
   await page.screenshot({
@@ -166,7 +166,9 @@ it('finds, reviews, activates, reloads and revokes a persisted playbook with wor
   await page.reload();
   await page.getByText('Version 0.1.0 · Revoked', { exact: true }).waitFor();
   await page.getByRole('link', { name: 'All playbooks' }).click();
-  expect(await page.getByLabel('Search by name').inputValue()).toBe('shipping');
+  expect(await page.getByLabel('Search playbooks').inputValue()).toBe(
+    'shipping',
+  );
   await page.getByRole('link', { name }).click();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload();
@@ -178,6 +180,17 @@ it('finds, reviews, activates, reloads and revokes a persisted playbook with wor
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
+  await page.getByRole('combobox', { name: 'Playbook sections' }).click();
+  await page
+    .getByRole('option', { name: 'Compatibility', exact: true })
+    .click();
+  await expect
+    .poll(() =>
+      page
+        .getByRole('region', { name: 'Compatibility', exact: true })
+        .evaluate((node) => node === document.activeElement),
+    )
+    .toBe(true);
   await page.getByLabel('Version', { exact: true }).focus();
   await page.keyboard.press('Tab');
   expect(

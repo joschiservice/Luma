@@ -1,4 +1,5 @@
 import type { PlaybookDetail, PlaybookSummary } from '@luma/api-contract';
+import { WorkspaceAccountMenu } from '@luma/ui/components/workspace/workspace-account-menu';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import {
   createMemoryHistory,
@@ -6,10 +7,13 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router';
+import { BookOpen } from 'lucide-react';
 import { useState } from 'react';
-import { expect, userEvent, within } from 'storybook/test';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
 
 import appStyles from '../../styles.css?inline';
+import { Brand } from '../identity/common';
+import { WorkspaceLayout } from '../identity/workspace-layout';
 import { PlaybookDetailView } from './detail';
 import { type PlaybookFilters, PlaybookLibraryView } from './library';
 
@@ -107,6 +111,8 @@ function Preview({
     | 'loading'
     | 'error'
     | 'member'
+    | 'admin'
+    | 'blocked'
     | 'unavailable'
     | 'revoked'
     | undefined;
@@ -116,37 +122,138 @@ function Preview({
   return (
     <>
       <style>{appStyles}</style>
-      <div style={{ padding: 24, maxWidth: 1200, margin: 'auto' }}>
-        {state === 'member' ? (
-          <PlaybookDetailView
-            detail={detail}
-            organizationId={organizationId}
-            refresh={async () => {}}
-            accessLost={async () => {}}
+      <WorkspaceLayout
+        brand={<Brand />}
+        navigation={() => (
+          <nav aria-label="Main navigation">
+            <a className="active" href="#">
+              <BookOpen size={16} /> Playbooks
+            </a>
+          </nav>
+        )}
+        context={
+          <>
+            <BookOpen size={16} aria-hidden="true" />
+            <span>Playbooks</span>
+          </>
+        }
+        accountMenu={
+          <WorkspaceAccountMenu
+            name="Alex Morgan"
+            workspace="Northstar Commerce"
+            workspaceId="northstar"
+            workspaces={[
+              {
+                id: 'northstar',
+                name: 'Northstar Commerce',
+                link: <a href="#workspace" />,
+              },
+            ]}
+            createLink={<a href="#new-workspace" />}
           />
+        }
+      >
+        {['member', 'admin', 'blocked'].includes(state) ? (
+          <div className="playbooks-page">
+            <PlaybookDetailView
+              detail={
+                state === 'member'
+                  ? detail
+                  : {
+                      ...detail,
+                      canManage: true,
+                      connections: [
+                        {
+                          id: '33333333-3333-4333-8333-333333333333',
+                          label: 'JTL warehouse',
+                          system: 'jtl-cloud',
+                          version: 1,
+                          blockers:
+                            state === 'blocked'
+                              ? [
+                                  'Validate connection permissions before activation.',
+                                ]
+                              : [],
+                          targets: [
+                            {
+                              id: '44444444-4444-4444-8444-444444444444',
+                              label: 'Order 1042',
+                            },
+                            {
+                              id: '55555555-5555-4555-8555-555555555555',
+                              label: 'Order 1043',
+                            },
+                          ],
+                        },
+                      ],
+                    }
+              }
+              organizationId={organizationId}
+              refresh={async () => {}}
+              accessLost={async () => {}}
+            />
+          </div>
         ) : (
           <PlaybookLibraryView
             organizationId={organizationId}
             items={
               state === 'empty'
                 ? []
-                : [
-                    {
-                      ...summary,
-                      status:
-                        state === 'unavailable'
-                          ? 'unavailable'
-                          : state === 'revoked'
-                            ? 'revoked'
-                            : 'inactive',
-                      blockers:
-                        state === 'unavailable'
-                          ? [
-                              'Validate JTL permissions and ingest mapped orders before activation.',
-                            ]
-                          : [],
-                    },
-                  ]
+                : state === 'loading' || state === 'error'
+                  ? undefined
+                  : [
+                      {
+                        ...summary,
+                        status:
+                          state === 'unavailable'
+                            ? 'unavailable'
+                            : state === 'revoked'
+                              ? 'revoked'
+                              : 'inactive',
+                        blockers:
+                          state === 'unavailable'
+                            ? [
+                                'Validate JTL permissions and ingest mapped orders before activation.',
+                              ]
+                            : [],
+                      },
+                      ...(state === 'ready'
+                        ? [
+                            {
+                              ...summary,
+                              id: 'inventory-correction',
+                              name: 'Reconcile available inventory',
+                              purpose:
+                                'Compare authoritative stock and verify the quantity published to Shopify.',
+                              systems: ['jtl-cloud', 'shopify'],
+                              issueType: 'inventory_mismatch',
+                              status: 'active' as const,
+                              activeVersions: ['0.1.0'],
+                            },
+                            {
+                              ...summary,
+                              id: 'order-recovery',
+                              name: 'Recover a failed order transfer',
+                              purpose:
+                                'Check a failed transfer and confirm the order reaches the warehouse.',
+                              systems: ['shopify', 'jtl-cloud'],
+                              status: 'unavailable' as const,
+                              blockers: [
+                                'Validate JTL permissions before activation.',
+                              ],
+                            },
+                            {
+                              ...summary,
+                              id: 'address-correction',
+                              name: 'Correct a delivery address',
+                              purpose:
+                                'Review an address correction before updating the warehouse order.',
+                              systems: ['jtl-onprem'],
+                              status: 'revoked' as const,
+                            },
+                          ]
+                        : []),
+                    ]
             }
             filters={filters}
             change={setFilters}
@@ -159,7 +266,7 @@ function Preview({
             refresh={() => {}}
           />
         )}
-      </div>
+      </WorkspaceLayout>
     </>
   );
 }
@@ -198,7 +305,10 @@ export const Library: Story = {
     await expect(
       await canvas.findByRole('link', { name: summary.name }),
     ).toBeVisible();
-    await userEvent.type(canvas.getByLabelText('Search by name'), 'not found');
+    await userEvent.type(
+      canvas.getByLabelText('Search playbooks'),
+      'not found',
+    );
     await expect(
       canvas.getByRole('heading', { name: 'No matching playbooks' }),
     ).toBeVisible();
@@ -241,3 +351,98 @@ export const Narrow: Story = {
 };
 
 export const Dark: Story = { globals: { theme: 'dark' } };
+
+export const AdminDetail: Story = {
+  args: { state: 'admin' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Review activation' }),
+    );
+    const dialog = within(await body.findByRole('dialog'));
+    await expect(
+      dialog.getByRole('button', { name: 'Activate reviewed version' }),
+    ).toBeDisabled();
+    await userEvent.click(dialog.getByRole('combobox', { name: 'Connection' }));
+    await userEvent.click(
+      await body.findByRole('option', { name: 'JTL warehouse' }),
+    );
+    await userEvent.click(dialog.getByRole('checkbox', { name: /Order 1042/ }));
+    await userEvent.click(
+      dialog.getByRole('checkbox', {
+        name: 'I reviewed this version, order scope and approval requirements.',
+      }),
+    );
+    await expect(
+      dialog.getByRole('button', { name: 'Activate reviewed version' }),
+    ).toBeEnabled();
+    await userEvent.click(dialog.getByRole('checkbox', { name: /Order 1043/ }));
+    await expect(
+      dialog.getByRole('button', { name: 'Activate reviewed version' }),
+    ).toBeDisabled();
+    await userEvent.click(dialog.getByRole('button', { name: 'Cancel' }));
+    await waitFor(() =>
+      expect(body.queryByRole('dialog')).not.toBeInTheDocument(),
+    );
+  },
+};
+
+export const BlockedDetail: Story = { args: { state: 'blocked' } };
+
+export const Filters: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
+    await userEvent.click(canvas.getByRole('button', { name: 'Active 1' }));
+    await expect(
+      canvas.getByRole('link', { name: 'Reconcile available inventory' }),
+    ).toBeVisible();
+    await expect(
+      canvas.queryByRole('link', { name: summary.name }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(canvas.getByRole('combobox', { name: 'System' }));
+    await userEvent.click(
+      await body.findByRole('option', { name: 'JTL On-Prem' }),
+    );
+    await expect(
+      canvas.getByRole('heading', { name: 'No matching playbooks' }),
+    ).toBeVisible();
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Remove JTL On-Prem filter' }),
+    );
+    await expect(
+      canvas.getByRole('link', { name: 'Reconcile available inventory' }),
+    ).toBeVisible();
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Clear filters' }),
+    );
+    await userEvent.type(
+      canvas.getByLabelText('Search playbooks'),
+      'authoritative',
+    );
+    await expect(
+      canvas.getByRole('link', { name: 'Reconcile available inventory' }),
+    ).toBeVisible();
+    await expect(
+      canvas.queryByRole('link', { name: summary.name }),
+    ).not.toBeInTheDocument();
+  },
+};
+
+export const DetailNavigation: Story = {
+  args: { state: 'admin' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Compatibility' }),
+    );
+    await expect(
+      canvas.getByRole('region', { name: 'Compatibility' }),
+    ).toHaveFocus();
+    await expect(
+      canvas.getByRole('button', { name: 'Compatibility' }),
+    ).toHaveAttribute('aria-current', 'location');
+    await userEvent.click(canvas.getByRole('button', { name: 'Overview' }));
+  },
+};

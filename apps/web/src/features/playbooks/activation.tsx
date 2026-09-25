@@ -1,4 +1,5 @@
 import type { ActivatePlaybook, PlaybookDetail } from '@luma/api-contract';
+import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import { Select } from '@luma/ui/components/primitives/select';
@@ -14,12 +15,14 @@ export function ActivationForm({
   version,
   done,
   accessLost,
+  cancel,
 }: {
   organizationId: string;
   detail: PlaybookDetail;
   version: string;
   done: () => Promise<void>;
   accessLost: () => Promise<void>;
+  cancel: () => void;
 }) {
   const selected = detail.versions.find((v) => v.version === version)!;
   const [connectionId, setConnectionId] = useState('');
@@ -78,14 +81,12 @@ export function ActivationForm({
         void submit();
       }}
     >
-      <p>
-        Version <strong>{version}</strong> · Policy {detail.policyVersion}
-      </p>
-      <p>{selected.approval}</p>
-      <p>
-        This grants your principal ({detail.principalId}) permission to request
-        changes only for the selected orders.
-      </p>
+      <div className="playbook-activation-summary">
+        <strong>
+          {detail.summary.name} · v{version}
+        </strong>
+        <p>{selected.approval}</p>
+      </div>
       <fieldset disabled={pending || request !== null}>
         <legend>Connection and order scope</legend>
         <label>
@@ -112,11 +113,20 @@ export function ActivationForm({
         {connection ? (
           <fieldset className="playbook-targets">
             <legend>Orders permitted to change</legend>
+            {!connection.targets.length ? (
+              <p>
+                No eligible orders on this connection. Choose another connection
+                or sync orders before activating.
+              </p>
+            ) : null}
             {connection.targets.map((target) => (
               <label key={target.id}>
                 <input
                   type="checkbox"
                   checked={targetIds.includes(target.id)}
+                  disabled={
+                    targetIds.length >= 100 && !targetIds.includes(target.id)
+                  }
                   onChange={(e) => {
                     setTargetIds((ids) =>
                       e.target.checked
@@ -134,14 +144,30 @@ export function ActivationForm({
             ))}
           </fieldset>
         ) : null}
-        <p>
-          {targetIds.length} orders selected. No other resources or future
-          orders are granted.
-        </p>
+        <div className="playbook-scope-summary" aria-live="polite">
+          <strong>
+            {targetIds.length} {targetIds.length === 1 ? 'order' : 'orders'}{' '}
+            selected
+          </strong>
+          {targetIds.length ? (
+            <p>
+              {connection?.label} ·{' '}
+              {connection?.targets
+                .filter((target) => targetIds.includes(target.id))
+                .map((target) => target.label)
+                .join(', ')}
+            </p>
+          ) : null}
+          <p>
+            Select up to 100 orders. Other resources and future orders are not
+            included.
+          </p>
+        </div>
         <label className="playbook-review">
           <input
             type="checkbox"
             required
+            disabled={!connection || !targetIds.length}
             checked={reviewed}
             onChange={(e) =>
               setReviewedRevision(e.target.checked ? revision : null)
@@ -151,7 +177,10 @@ export function ActivationForm({
         </label>
       </fieldset>
       <Disclosure>
-        <summary>Exact reviewed version</summary>
+        <summary>Version and access details</summary>
+        <p>
+          Policy {detail.policyVersion} · Principal {detail.principalId}
+        </p>
         <code>{selected.digest}</code>
       </Disclosure>
       {reviewedRevision && !reviewed && !request ? (
@@ -160,28 +189,42 @@ export function ActivationForm({
           activating.
         </p>
       ) : null}
-      {error ? <p role="alert">{error}</p> : null}
+      {error ? (
+        <Alert tone="danger" role="alert">
+          {error}
+        </Alert>
+      ) : null}
       {request && !pending ? (
         <p role="status">
           The request is retained. Retrying uses the same ID and scope.
         </p>
       ) : null}
-      <Button
-        type="submit"
-        disabled={
-          pending ||
-          !connection ||
-          !targetIds.length ||
-          (!request && !reviewed) ||
-          !selected.compatible
-        }
-      >
-        {pending
-          ? 'Confirming activation…'
-          : request
-            ? 'Retry same activation'
-            : 'Activate reviewed version'}
-      </Button>
+      <div className="playbook-dialog-actions">
+        <Button
+          type="button"
+          variant="outline"
+          disabled={pending}
+          onClick={cancel}
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          disabled={
+            pending ||
+            !connection ||
+            !targetIds.length ||
+            (!request && !reviewed) ||
+            !selected.compatible
+          }
+        >
+          {pending
+            ? 'Confirming activation…'
+            : request
+              ? 'Retry same activation'
+              : 'Activate reviewed version'}
+        </Button>
+      </div>
     </form>
   );
 }

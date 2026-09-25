@@ -2801,3 +2801,105 @@
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
+
+/* Collection controls share the compact density of the issue workspace. */
+.collection-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+}
+.collection-toolbar-views {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.collection-toolbar-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+.collection-toolbar-controls > [data-slot='select-trigger'] {
+  width: 180px;
+  min-width: 150px;
+}
+.collection-toolbar-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+.collection-toolbar-filters button {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-align: left;
+  font-weight: 500;
+}
+.section-workspace {
+  display: grid;
+  grid-template-columns: 152px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.section-workspace-navigation {
+  position: sticky;
+  top: 0;
+}
+.section-workspace-main {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.section-workspace-section {
+  min-width: 0;
+  scroll-margin-top: 24px;
+  outline: none;
+}
+.section-workspace-section:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+.section-workspace-mobile {
+  display: none;
+}
+@media (max-width: 760px) {
+  .collection-toolbar {
+    padding: 10px 12px;
+  }
+  .collection-toolbar-views {
+    gap: 4px;
+  }
+  .section-workspace {
+    display: block;
+  }
+  .section-workspace-navigation {
+    display: none;
+  }
+  .section-workspace-mobile > span {
+    white-space: nowrap;
+  }
+  .section-workspace-mobile {
+    display: flex;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: var(--background);
+    padding: 8px 0 12px;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: var(--muted-foreground);
+  }
+  .section-workspace-section {
+    scroll-margin-top: calc(var(--section-navigation-height, 56px) + 12px);
+  }
+}
