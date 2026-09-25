@@ -1,20 +1,23 @@
 import type { CaseDetail } from '@luma/api-contract';
-import { Button } from '@luma/ui/button';
-import { caseFixture, inventoryCase } from '@luma/ui/components/case-fixtures';
+import {
+  caseFixture,
+  inventoryCase,
+} from '@luma/ui/components/issues/case-fixtures';
 import {
   CaseInvestigation,
   CaseNotice,
-} from '@luma/ui/components/case-investigation';
-import { CaseTimeline } from '@luma/ui/components/case-timeline';
-import { IssueDetailViews } from '@luma/ui/components/issue-collection';
-import { IssueInspectorHeader } from '@luma/ui/components/issue-inspector-header';
-import { IssuePageLayout } from '@luma/ui/components/issue-page-layout';
+} from '@luma/ui/components/issues/case-investigation';
+import { CaseTimeline } from '@luma/ui/components/issues/case-timeline';
+import { IssueDetailViews } from '@luma/ui/components/issues/issue-collection';
+import { IssueInspectorHeader } from '@luma/ui/components/issues/issue-inspector-header';
+import { IssuePageLayout } from '@luma/ui/components/issues/issue-page-layout';
 import {
   resolutionProgress,
   resolutionReview,
-} from '@luma/ui/components/resolution-fixtures';
-import { ResolutionReview } from '@luma/ui/components/resolution-review';
-import { WorkspaceAccountMenu } from '@luma/ui/components/workspace-account-menu';
+} from '@luma/ui/components/issues/resolution-fixtures';
+import { ResolutionReview } from '@luma/ui/components/issues/resolution-review';
+import { Button } from '@luma/ui/components/primitives/button';
+import { WorkspaceAccountMenu } from '@luma/ui/components/workspace/workspace-account-menu';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { ArrowLeft, Inbox, Maximize2, RefreshCw } from 'lucide-react';
 import { useState } from 'react';

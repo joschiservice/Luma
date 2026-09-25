@@ -1,7 +1,8 @@
-import { Button } from '@luma/ui/button';
-import { CaseNotice } from '@luma/ui/components/case-investigation';
-import { Field, FieldLabel } from '@luma/ui/components/field';
-import { Select } from '@luma/ui/components/select';
+import { CaseNotice } from '@luma/ui/components/issues/case-investigation';
+import { Button } from '@luma/ui/components/primitives/button';
+import { Card, CardTitle } from '@luma/ui/components/primitives/card';
+import { Field, FieldLabel } from '@luma/ui/components/primitives/field';
+import { Select } from '@luma/ui/components/primitives/select';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useId, useRef, useState } from 'react';
@@ -24,11 +25,13 @@ export function CaseShadow({
   exceptionId,
   initialWorkflow,
   disabled,
+  embedded = false,
 }: {
   organizationId: string;
   exceptionId: string;
   initialWorkflow?: string | undefined;
   disabled?: boolean | undefined;
+  embedded?: boolean;
 }) {
   const context = useQuery(contextOptions(organizationId));
   const canManage =
@@ -36,12 +39,14 @@ export function CaseShadow({
     ['owner', 'admin'].includes(context.data?.actor.role ?? '');
 
   return (
-    <section
+    <Card
+      as="section"
       className="shadow-panel"
+      variant={embedded ? 'plain' : 'default'}
       id="shadow"
       aria-label="Shadow evaluation"
     >
-      <h3>Shadow evaluation</h3>
+      <CardTitle as="h3">Shadow evaluation</CardTitle>
       <p>
         Preview a Playbook against the retained case evidence. No action is
         executed.
@@ -63,7 +68,7 @@ export function CaseShadow({
           disabled={disabled}
         />
       )}
-    </section>
+    </Card>
   );
 }
 

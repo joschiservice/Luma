@@ -20,7 +20,8 @@ import {
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-import { Button } from './button';
+import { Button } from '../primitives/button';
+import { Disclosure } from '../primitives/disclosure';
 import { caseLabel, CaseNotice, CaseTime } from './case-investigation';
 import { ExecutionMetadata, ExecutionSummary } from './execution-summary';
 import { IssueCollection } from './issue-collection';
@@ -293,7 +294,7 @@ export function CaseTimeline({
           </>
         )}
         {boundProposal ? (
-          <details className="case-evidence">
+          <Disclosure className="case-evidence">
             <summary>Action and verification criteria</summary>
             <dl>
               <dt>Proposal</dt>
@@ -341,12 +342,12 @@ export function CaseTimeline({
                 <CaseTime value={boundProposal.approval.createdAt} />
               </p>
             ) : null}
-          </details>
+          </Disclosure>
         ) : execution || !expanded ? (
           <p>Verification criteria are not available for this attempt.</p>
         ) : null}
         {execution ? (
-          <details className="case-evidence">
+          <Disclosure className="case-evidence">
             <summary>
               {expanded
                 ? 'Execution details'
@@ -405,12 +406,12 @@ export function CaseTimeline({
                 </p>
               </>
             ) : null}
-          </details>
+          </Disclosure>
         ) : expanded ? (
-          <details className="case-evidence">
+          <Disclosure className="case-evidence">
             <summary>Execution details</summary>
             <ExecutionMetadata progress={progress} />
-          </details>
+          </Disclosure>
         ) : null}
         {progress.resolution ? (
           <div className="case-resolution">
@@ -558,7 +559,7 @@ export function CaseTimeline({
                         By {event.actorId}
                       </p>
                     ) : null}
-                    <details className="audit-event-details">
+                    <Disclosure className="audit-event-details">
                       <summary>Event details</summary>
                       <dl>
                         <dt>Event</dt>
@@ -581,7 +582,7 @@ export function CaseTimeline({
                         ) : null}
                       </dl>
                       <References refs={event.evidenceRefs} />
-                    </details>
+                    </Disclosure>
                   </li>
                 ))}
               </ol>
@@ -627,7 +628,7 @@ export function CaseTimeline({
           renderItems={(entries) =>
             entries.length ? (
               entries.map((entry) => (
-                <details className="case-evidence" key={entry.id}>
+                <Disclosure className="case-evidence" key={entry.id}>
                   <summary>
                     {entry.source
                       ? `${entry.source.provider} · ${entry.source.resource}`
@@ -666,7 +667,7 @@ export function CaseTimeline({
                       </>
                     ) : null}
                   </dl>
-                </details>
+                </Disclosure>
               ))
             ) : (
               <p>

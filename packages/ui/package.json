@@ -4,12 +4,14 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./button": "./src/components/button.tsx",
-    "./components/*": "./src/components/*.tsx",
+    "./components/primitives/*": "./src/components/primitives/*.tsx",
+    "./components/issues/case-fixtures": "./src/components/issues/case-fixtures.ts",
+    "./components/issues/resolution-fixtures": "./src/components/issues/resolution-fixtures.ts",
+    "./components/issues/*": "./src/components/issues/*.tsx",
+    "./components/overview/*": "./src/components/overview/*.tsx",
+    "./components/workspace/*": "./src/components/workspace/*.tsx",
     "./lib/*": "./src/lib/*.ts",
-    "./styles.css": "./src/styles/globals.css",
-    "./components/case-fixtures": "./src/components/case-fixtures.ts",
-    "./components/resolution-fixtures": "./src/components/resolution-fixtures.ts"
+    "./styles.css": "./src/styles/globals.css"
   },
   "sideEffects": [
     "**/*.css"

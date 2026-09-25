@@ -19,7 +19,16 @@ Owned React source, initialized with shadcn's Base UI registry. `components.json
 - **Field:** composable labels, descriptions and associated validation errors.
 - **Spinner:** composable loading feedback with reduced-motion support.
 
-Components and stories live together in `src/components`. `src/styles/globals.css` owns Tailwind v4, semantic colors, typography and radii. Warm paper, forest green and terracotta replace the neutral preset. The `.dark` token set uses the same component classes. Apply `.dark` to the document element so portals inherit the theme; each host owns the theme preference.
+Components, stories and fixtures are grouped by responsibility under `src/components`:
+
+- `primitives/`: general UI components such as Card, Alert, Badge, Button and Disclosure. These do not import feature components.
+- `issues/`: issue investigation, evidence, execution, resolution and timeline compositions.
+- `overview/`: operations overview components.
+- `workspace/`: workspace header and account menu components.
+
+Import from the matching public path, such as `@luma/ui/components/primitives/card` or `@luma/ui/components/issues/case-timeline`. Keep stories and fixtures beside the components they support. Both shadcn configurations place new primitives in `primitives/`.
+
+`src/styles/globals.css` owns Tailwind v4, semantic colors, typography and radii. Warm paper, forest green and terracotta replace the neutral preset. The `.dark` token set uses the same component classes. Apply `.dark` to the document element so portals inherit the theme; each host owns the theme preference.
 
 ## Consume from React
 
@@ -27,8 +36,8 @@ Add `@luma/ui: workspace:*` and React 19 to the host. Enable `@tailwindcss/vite`
 
 ```tsx
 import '@luma/ui/styles.css';
-import { Button } from '@luma/ui/components/button';
-import { Spinner } from '@luma/ui/components/spinner';
+import { Button } from '@luma/ui/components/primitives/button';
+import { Spinner } from '@luma/ui/components/primitives/spinner';
 
 <Button disabled aria-busy>
   <Spinner aria-hidden="true" data-icon="inline-start" />
@@ -36,7 +45,7 @@ import { Spinner } from '@luma/ui/components/spinner';
 </Button>;
 ```
 
-`@luma/ui/button` remains a compatibility import. The old `pending` prop is replaced by composition: the caller supplies `disabled`, `aria-busy`, and content. No loading, data or business state is inferred inside a primitive.
+The caller supplies `disabled`, `aria-busy`, and content. No loading, data or business state is inferred inside a primitive.
 
 This setup is the same for TanStack Start and a future Tauri + React/Vite frontend. Package exports point to source, including their TypeScript types; the host compiles it. The shared CSS explicitly scans the UI component directory, so utilities are included even when the host lives elsewhere. There are no remote fonts or CDN runtime assets. Tauri commands, permissions and OS integration stay in the desktop host. A native Tauri shell is not part of this package.
 

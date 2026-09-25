@@ -1,6 +1,7 @@
 import type { ActivatePlaybook, PlaybookDetail } from '@luma/api-contract';
-import { Button } from '@luma/ui/button';
-import { Select } from '@luma/ui/components/select';
+import { Button } from '@luma/ui/components/primitives/button';
+import { Disclosure } from '@luma/ui/components/primitives/disclosure';
+import { Select } from '@luma/ui/components/primitives/select';
 import { useState } from 'react';
 
 import { IdentityError } from '../identity/data';
@@ -149,10 +150,10 @@ export function ActivationForm({
           I reviewed this version, order scope and approval requirements.
         </label>
       </fieldset>
-      <details>
+      <Disclosure>
         <summary>Exact reviewed version</summary>
         <code>{selected.digest}</code>
-      </details>
+      </Disclosure>
       {reviewedRevision && !reviewed && !request ? (
         <p role="status">
           The activation requirements changed. Review them again before

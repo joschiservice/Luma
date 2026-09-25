@@ -1,12 +1,12 @@
-import { Button } from '@luma/ui/button';
+import { Button } from '@luma/ui/components/primitives/button';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogTitle,
   DialogTrigger,
-} from '@luma/ui/components/dialog';
-import { WorkspaceHeaderSlot } from '@luma/ui/components/workspace-header-slot';
+} from '@luma/ui/components/primitives/dialog';
+import { WorkspaceHeaderSlot } from '@luma/ui/components/workspace/workspace-header-slot';
 import { Menu } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 

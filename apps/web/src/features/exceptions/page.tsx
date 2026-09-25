@@ -1,16 +1,18 @@
 import { caseClasses, caseStates } from '@luma/api-contract';
-import { Button } from '@luma/ui/button';
 import {
   caseLabel,
   CaseLoading,
   CaseNotice,
   CaseRow,
-} from '@luma/ui/components/case-investigation';
-import { IssueDetailViews } from '@luma/ui/components/issue-collection';
-import { IssueInspectorHeader } from '@luma/ui/components/issue-inspector-header';
-import { IssueSummary } from '@luma/ui/components/issue-summary';
-import { Pagination } from '@luma/ui/components/pagination';
-import { Select } from '@luma/ui/components/select';
+} from '@luma/ui/components/issues/case-investigation';
+import { IssueDetailViews } from '@luma/ui/components/issues/issue-collection';
+import { IssueInspectorHeader } from '@luma/ui/components/issues/issue-inspector-header';
+import { IssueSummary } from '@luma/ui/components/issues/issue-summary';
+import { Button } from '@luma/ui/components/primitives/button';
+import { Disclosure } from '@luma/ui/components/primitives/disclosure';
+import { Empty } from '@luma/ui/components/primitives/empty';
+import { Pagination } from '@luma/ui/components/primitives/pagination';
+import { Select } from '@luma/ui/components/primitives/select';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Link,
@@ -199,7 +201,7 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
               Refresh
             </Button>
           </nav>
-          <details className="inbox-filter-disclosure">
+          <Disclosure className="inbox-filter-disclosure">
             <summary>
               Filter issues
               {[search.class, search.state, search.severity].filter(Boolean)
@@ -234,7 +236,7 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
                 </label>
               ))}
             </div>
-          </details>
+          </Disclosure>
           {connections.isError ? (
             <CaseNotice title="Connection coverage unavailable">
               Your issues may still be available. Refresh to check connections.
@@ -272,7 +274,7 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
                 </CaseNotice>
               ) : null}
               {!listData.items.length ? (
-                <div className="inbox-empty">
+                <Empty className="inbox-empty">
                   <span aria-hidden="true">○</span>
                   <h2>
                     {search.view === 'needs_you'
@@ -286,7 +288,7 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
                       ? 'No issues currently need your review. Check All open for ongoing work.'
                       : 'Try another view or adjust the filters.'}
                   </p>
-                </div>
+                </Empty>
               ) : (
                 <ul className="inbox-rows">
                   {[

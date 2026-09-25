@@ -1,5 +1,5 @@
-import { Button } from '@luma/ui/button';
-import { Input } from '@luma/ui/components/input';
+import { Button } from '@luma/ui/components/primitives/button';
+import { Input } from '@luma/ui/components/primitives/input';
 import { useForm } from '@tanstack/react-form';
 import { useRef, useState } from 'react';
 

@@ -1,4 +1,4 @@
-import { WorkspaceAccountMenu } from '@luma/ui/components/workspace-account-menu';
+import { WorkspaceAccountMenu } from '@luma/ui/components/workspace/workspace-account-menu';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, Outlet, useLocation, useParams } from '@tanstack/react-router';
 import {

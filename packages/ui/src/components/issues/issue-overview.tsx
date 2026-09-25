@@ -2,6 +2,8 @@ import type { CaseDetail, Diagnosis } from '@luma/api-contract';
 import { ChevronRight } from 'lucide-react';
 import type { ReactNode } from 'react';
 
+import { Disclosure } from '../primitives/disclosure';
+
 /** Removes insignificant decimal zeros without rounding recorded quantities. */
 function quantityLabel(value: string) {
   return value.includes('.')
@@ -148,7 +150,7 @@ export function IssueOverview({
                 {text}
               </p>
             ))}
-            <details className="issue-overview-checks">
+            <Disclosure className="issue-overview-checks">
               <summary>
                 <ChevronRight size={14} aria-hidden="true" />
                 Checks and verification
@@ -180,7 +182,7 @@ export function IssueOverview({
                   </li>
                 ))}
               </ol>
-            </details>
+            </Disclosure>
           </>
         ) : (
           <p>

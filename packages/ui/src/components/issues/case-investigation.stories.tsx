@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { type ReactNode, useState } from 'react';
 import { expect, fn, userEvent, within } from 'storybook/test';
 
-import { Button } from './button';
+import { Button } from '../primitives/button';
 import { caseFixture, inventoryCase } from './case-fixtures';
 import {
   CaseInvestigation,

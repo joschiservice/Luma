@@ -1,7 +1,11 @@
-import { Button } from '@luma/ui/button';
-import { Field, FieldGroup, FieldLabel } from '@luma/ui/components/field';
-import { Input } from '@luma/ui/components/input';
-import { Select } from '@luma/ui/components/select';
+import { Button } from '@luma/ui/components/primitives/button';
+import {
+  Field,
+  FieldGroup,
+  FieldLabel,
+} from '@luma/ui/components/primitives/field';
+import { Input } from '@luma/ui/components/primitives/input';
+import { Select } from '@luma/ui/components/primitives/select';
 import { useId } from 'react';
 
 export type ActionField = {

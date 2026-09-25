@@ -1,5 +1,6 @@
 import type { CaseProgress } from '@luma/api-contract';
 
+import { Badge } from '../primitives/badge';
 import { caseLabel, CaseTime } from './case-investigation';
 
 /** Shows recorded action and verification outcomes without implying that a successful action resolved the issue. */
@@ -36,12 +37,29 @@ export function ExecutionSummary({
         ? 'Awaiting approval'
         : 'No execution recorded';
 
+  const tone = !confirmed
+    ? undefined
+    : progress.resolution
+      ? progress.resolution.kind === 'verification'
+        ? 'success'
+        : undefined
+      : execution?.state === 'failed' || verification?.outcome === 'failed'
+        ? 'danger'
+        : execution?.state === 'unknown' ||
+            progress.state === 'awaiting_approval'
+          ? 'warning'
+          : verification?.outcome === 'passed'
+            ? 'success'
+            : execution
+              ? 'info'
+              : undefined;
+
   return (
     <div className="execution-summary">
       {!confirmed ? (
         <p className="case-caption">Last confirmed status</p>
       ) : null}
-      <h3>{status}</h3>
+      <h3>{tone ? <Badge tone={tone}>{status}</Badge> : status}</h3>
       {!execution ? (
         <p>
           {progress.state === 'awaiting_approval' && !progress.resolution

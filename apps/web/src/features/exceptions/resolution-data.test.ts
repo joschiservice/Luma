@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 
-import { resolutionReview } from '../../../../../packages/ui/src/components/resolution-fixtures';
+import { resolutionReview } from '../../../../../packages/ui/src/components/issues/resolution-fixtures';
 import { IdentityError } from '../identity/data';
 import {
   decisionCommand,

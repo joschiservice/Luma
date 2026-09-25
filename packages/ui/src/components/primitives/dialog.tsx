@@ -1,5 +1,5 @@
 import { Dialog as DialogPrimitive } from '@base-ui/react/dialog';
-import { Button } from '@luma/ui/components/button';
+import { Button } from '@luma/ui/components/primitives/button';
 import { cn } from '@luma/ui/lib/utils';
 import { XIcon } from 'lucide-react';
 import * as React from 'react';

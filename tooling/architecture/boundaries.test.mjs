@@ -141,7 +141,7 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
       ),
       sample(
         filename('apps/web/src/home.tsx'),
-        "import { Button } from '@luma/ui/button';",
+        "import { Button } from '@luma/ui/components/primitives/button';",
       ),
       sample(
         moduleFile('orders', 'domain/order.test.ts'),

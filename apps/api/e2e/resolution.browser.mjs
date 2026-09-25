@@ -8,11 +8,11 @@ import { makeTenantContext } from '@luma/identity/composition';
 import { chromium } from 'playwright';
 import { expect, it } from 'vitest';
 
-import { inventoryCase } from '../../../packages/ui/src/components/case-fixtures.ts';
+import { inventoryCase } from '../../../packages/ui/src/components/issues/case-fixtures.ts';
 import {
   resolutionProgress,
   resolutionReview,
-} from '../../../packages/ui/src/components/resolution-fixtures.ts';
+} from '../../../packages/ui/src/components/issues/resolution-fixtures.ts';
 import { availablePort, database, startApi, startProcess } from './helpers.mjs';
 
 it('reviews decisions, recovers ambiguous commands and escalates through the connected API', async (t) => {

@@ -1,12 +1,18 @@
 import { type InstalledConnection } from '@luma/api-contract';
-import { Button } from '@luma/ui/button';
+import { Badge } from '@luma/ui/components/primitives/badge';
+import { Button } from '@luma/ui/components/primitives/button';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+} from '@luma/ui/components/primitives/card';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogTitle,
   DialogTrigger,
-} from '@luma/ui/components/dialog';
+} from '@luma/ui/components/primitives/dialog';
 import {
   Check,
   KeyRound,
@@ -80,25 +86,32 @@ export function ConnectionCard({
   }
 
   return (
-    <article
+    <Card
+      as="article"
       id={`connection-${connection.id}`}
       className="connection-card"
       aria-label={connection.label}
     >
-      <div className="connections-heading">
+      <CardHeader>
         <div className="connection-identity">
           <ProviderIcon provider={connection.target.kind} />
           <div>
             <p className="eyebrow">{providers[connection.target.kind]}</p>
-            <h3>{connection.label}</h3>
+            <CardTitle as="h3">{connection.label}</CardTitle>
           </div>
         </div>
-        <span
-          className={`connection-status connection-status-${connection.status}`}
+        <Badge
+          tone={
+            connection.status === 'active'
+              ? 'success'
+              : terminal
+                ? 'neutral'
+                : 'warning'
+          }
         >
           {statuses[connection.status]}
-        </span>
-      </div>
+        </Badge>
+      </CardHeader>
       <p className="connection-target">{target}</p>
       <p className="connection-description">
         {terminal
@@ -249,6 +262,6 @@ export function ConnectionCard({
         ) : null}
       </div>
       <p role="status">{message}</p>
-    </article>
+    </Card>
   );
 }

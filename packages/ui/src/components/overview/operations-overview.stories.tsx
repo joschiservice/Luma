@@ -2,7 +2,7 @@ import type { OperationsOverview as Summary } from '@luma/api-contract';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
-import { inventoryCase } from './case-fixtures';
+import { inventoryCase } from '../issues/case-fixtures';
 import { OperationsOverview } from './operations-overview';
 
 const data: Summary = {

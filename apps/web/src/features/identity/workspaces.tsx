@@ -1,5 +1,6 @@
-import { Button } from '@luma/ui/button';
-import { Input } from '@luma/ui/components/input';
+import { Button } from '@luma/ui/components/primitives/button';
+import { Card } from '@luma/ui/components/primitives/card';
+import { Input } from '@luma/ui/components/primitives/input';
 import { useForm } from '@tanstack/react-form';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, Navigate, useNavigate } from '@tanstack/react-router';
@@ -150,7 +151,7 @@ export function NewWorkspace() {
         <Brand />
         <a href="/sign-out">Sign out</a>
       </header>
-      <section className="creation-panel">
+      <Card as="section" className="creation-panel">
         <p className="eyebrow">A place for your team</p>
         <h1>Create a workspace.</h1>
         <p>Your workspace data is hosted in the European Union.</p>
@@ -195,7 +196,7 @@ export function NewWorkspace() {
         <Link to="/app/workspaces">
           {uncertain ? 'Check workspace list' : 'Back to workspaces'}
         </Link>
-      </section>
+      </Card>
     </main>
   );
 }

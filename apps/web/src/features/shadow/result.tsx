@@ -1,4 +1,5 @@
-import { caseLabel } from '@luma/ui/components/case-investigation';
+import { caseLabel } from '@luma/ui/components/issues/case-investigation';
+import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import { useState } from 'react';
 
 import { candidateAction, type ShadowComparison } from './data';
@@ -119,7 +120,7 @@ export function ShadowResult({ item }: { item: ShadowComparison }) {
           </p>
         </div>
       ) : null}
-      <details onToggle={(event) => setExpanded(event.currentTarget.open)}>
+      <Disclosure onToggle={(event) => setExpanded(event.currentTarget.open)}>
         <summary>Bound inputs and evidence</summary>
         <p>Evaluation: {evaluation.id}</p>
         {expanded ? (
@@ -136,7 +137,7 @@ export function ShadowResult({ item }: { item: ShadowComparison }) {
             )}
           </pre>
         ) : null}
-      </details>
+      </Disclosure>
     </div>
   );
 }

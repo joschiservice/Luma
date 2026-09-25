@@ -3,9 +3,7 @@ import type {
   OperationsOverview as Summary,
 } from '@luma/api-contract';
 import {
-  Activity,
   ChevronRight,
-  CircleAlert,
   CircleCheck,
   Clock3,
   Gauge,
@@ -17,9 +15,12 @@ import {
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-import { Button } from './button';
-import { CaseLoading, CaseNotice } from './case-investigation';
-import { Select } from './select';
+import { CaseLoading, CaseNotice } from '../issues/case-investigation';
+import { Alert } from '../primitives/alert';
+import { Badge } from '../primitives/badge';
+import { Button } from '../primitives/button';
+import { Card, CardHeader } from '../primitives/card';
+import { Select } from '../primitives/select';
 
 export interface OperationsOverviewProps {
   data?: Summary | undefined;
@@ -40,7 +41,11 @@ function timestamp(value: string) {
 }
 
 /** Classifies an operations summary into the presentation state used by the overview. */
-export function overviewState(data: Summary) {
+export function overviewState(data: Summary): {
+  title: string;
+  tone: 'info' | 'warning' | 'success';
+  description: string;
+} {
   if (!data.connections.length)
     return {
       title: 'Connect your first system.',
@@ -118,12 +123,6 @@ export function OperationsOverview({
   decisionLink,
 }: OperationsOverviewProps) {
   const state = data ? overviewState(data) : undefined;
-  const StatusIcon =
-    state?.tone === 'success'
-      ? CircleCheck
-      : state?.tone === 'warning'
-        ? CircleAlert
-        : Activity;
 
   return (
     <div className="operations-overview">
@@ -171,20 +170,16 @@ export function OperationsOverview({
         </CaseNotice>
       ) : data && state ? (
         <>
-          <section
-            className="operations-status"
-            data-tone={state.tone}
+          <Alert
+            tone={state.tone}
+            role="region"
             aria-label="Operational health"
+            className="operations-status"
           >
-            <span className="operations-status-mark" aria-hidden="true">
-              <StatusIcon size={22} />
-            </span>
-            <div>
-              <h2>{state.title}</h2>
-              <p>{state.description}</p>
-              {connectionsLink}
-            </div>
-          </section>
+            <h2>{state.title}</h2>
+            <p>{state.description}</p>
+            {connectionsLink}
+          </Alert>
           <p className="operations-asof">
             <Clock3 size={12} aria-hidden="true" /> As of{' '}
             <time dateTime={data.generatedAt}>
@@ -196,7 +191,7 @@ export function OperationsOverview({
             aria-label="Operational metrics"
             className="operations-metrics"
           >
-            <div>
+            <Card as="div">
               <ListChecks
                 className="operations-metric-icon"
                 size={28}
@@ -206,8 +201,8 @@ export function OperationsOverview({
               <strong>{data.attentionCount}</strong>
               <p>Decisions requiring attention</p>
               {inboxLink}
-            </div>
-            <div>
+            </Card>
+            <Card as="div">
               <Zap
                 className="operations-metric-icon"
                 size={28}
@@ -224,8 +219,8 @@ export function OperationsOverview({
                 {data.verifiedResolutions} verified resolutions in this window,
                 including issues with human work.
               </small>
-            </div>
-            <div>
+            </Card>
+            <Card as="div">
               <Gauge
                 className="operations-metric-icon"
                 size={28}
@@ -247,7 +242,7 @@ export function OperationsOverview({
               {data.automation?.denominator === 0 ? (
                 <small>No eligible issues in this window.</small>
               ) : null}
-            </div>
+            </Card>
           </section>
           <p className="operations-window">
             Resolution window:{' '}
@@ -259,14 +254,14 @@ export function OperationsOverview({
             . Attention and connection health describe the current state.
           </p>
           <div className="operations-details">
-            <section aria-labelledby="overview-decisions">
-              <div className="operations-section-heading">
+            <Card as="section" aria-labelledby="overview-decisions">
+              <CardHeader className="operations-section-heading">
                 <h2 id="overview-decisions">
                   <ListChecks size={17} aria-hidden="true" /> Your next
                   decisions
                 </h2>
                 <span>Severity, then oldest request</span>
-              </div>
+              </CardHeader>
               {data.prioritizedDecisions.length ? (
                 <ol className="operations-decisions">
                   {data.prioritizedDecisions.map((item) => (
@@ -276,12 +271,13 @@ export function OperationsOverview({
                         <ChevronRight size={15} aria-hidden="true" />
                       </div>
                       <p>
-                        <span
-                          className="operations-severity"
-                          data-severity={item.severity}
+                        <Badge
+                          tone={
+                            item.severity === 'high' ? 'warning' : 'neutral'
+                          }
                         >
                           {item.severity} severity
-                        </span>{' '}
+                        </Badge>{' '}
                         · {item.attention.explanation}
                       </p>
                     </li>
@@ -297,13 +293,13 @@ export function OperationsOverview({
                 </p>
               )}
               {inboxLink}
-            </section>
-            <section aria-labelledby="overview-connections">
-              <div className="operations-section-heading">
+            </Card>
+            <Card as="section" aria-labelledby="overview-connections">
+              <CardHeader className="operations-section-heading">
                 <h2 id="overview-connections">
                   <Network size={17} aria-hidden="true" /> Connection health
                 </h2>
-              </div>
+              </CardHeader>
               {data.connections.length ? (
                 <ul className="operations-connections">
                   {data.connections.map((c) => (
@@ -353,7 +349,7 @@ export function OperationsOverview({
                 capability. It does not prove a complete source scan.
               </p>
               {connectionsLink}
-            </section>
+            </Card>
           </div>
         </>
       ) : null}

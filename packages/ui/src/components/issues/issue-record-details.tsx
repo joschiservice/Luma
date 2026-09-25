@@ -11,7 +11,8 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 
-import { Button } from './button';
+import { Button } from '../primitives/button';
+import { Disclosure } from '../primitives/disclosure';
 
 /** Displays issue metadata and lets users copy its identifier. */
 export function IssueRecordDetails({
@@ -31,7 +32,7 @@ export function IssueRecordDetails({
   );
 
   return (
-    <details className="issue-record-details" open={expanded}>
+    <Disclosure className="issue-record-details" open={expanded}>
       <summary>
         <FileText size={16} aria-hidden="true" />
         Issue details
@@ -123,6 +124,6 @@ export function IssueRecordDetails({
             ? 'Could not copy. Select the issue ID to copy it manually.'
             : ''}
       </span>
-    </details>
+    </Disclosure>
   );
 }

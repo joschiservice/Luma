@@ -1,7 +1,10 @@
 import type { CaseDetail } from '@luma/api-contract';
 import { type ReactNode, useContext, useEffect, useRef, useState } from 'react';
 
-import { Button } from './button';
+import { Button } from '../primitives/button';
+import { SectionNavigation } from '../primitives/section-navigation';
+import { Select } from '../primitives/select';
+import { WorkspaceHeaderSlot } from '../workspace/workspace-header-slot';
 import { caseLabel, CaseStatus } from './case-investigation';
 import { IssueDetailViews } from './issue-collection';
 import { IssueRecordDetails } from './issue-record-details';
@@ -10,9 +13,6 @@ import {
   IssueSection,
   issueSections as sections,
 } from './issue-section';
-import { SectionNavigation } from './section-navigation';
-import { Select } from './select';
-import { WorkspaceHeaderSlot } from './workspace-header-slot';
 
 /** Provides a compact workspace header, persistent section navigation, and one issue column. */
 export function IssuePageLayout({

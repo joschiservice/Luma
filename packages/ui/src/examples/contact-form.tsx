@@ -3,16 +3,16 @@ import { useMutation } from '@tanstack/react-query';
 import { useId, useRef } from 'react';
 import { match } from 'ts-pattern';
 
-import { Button } from '../components/button';
+import { Button } from '../components/primitives/button';
 import {
   Field,
   FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
-} from '../components/field';
-import { Input } from '../components/input';
-import { Spinner } from '../components/spinner';
+} from '../components/primitives/field';
+import { Input } from '../components/primitives/input';
+import { Spinner } from '../components/primitives/spinner';
 import {
   type Contact,
   type ContactInput,

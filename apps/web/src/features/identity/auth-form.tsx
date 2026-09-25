@@ -1,5 +1,6 @@
-import { Button } from '@luma/ui/button';
-import { Input } from '@luma/ui/components/input';
+import { Button } from '@luma/ui/components/primitives/button';
+import { Card } from '@luma/ui/components/primitives/card';
+import { Input } from '@luma/ui/components/primitives/input';
 import { useForm } from '@tanstack/react-form';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
@@ -104,7 +105,7 @@ export function AuthForm({
         </p>
         <span className="folio">LUMA / WORKSPACE</span>
       </section>
-      <section className="auth-panel">
+      <Card as="section" className="auth-panel">
         <p className="eyebrow">
           {signup ? 'Make yourself at home' : 'Welcome back'}
         </p>
@@ -220,7 +221,7 @@ export function AuthForm({
             {signup ? 'Sign in' : 'Create account'}
           </Link>
         </p>
-      </section>
+      </Card>
     </main>
   );
 }

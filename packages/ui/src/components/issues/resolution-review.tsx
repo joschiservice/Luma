@@ -12,13 +12,16 @@ import {
   Clock3,
   ListChecks,
   MessageSquare,
-  ShieldQuestion,
   Target,
   X,
 } from 'lucide-react';
 import { useContext, useEffect, useId, useRef, useState } from 'react';
 
-import { Button } from './button';
+import { Alert, AlertDescription, AlertTitle } from '../primitives/alert';
+import { Badge } from '../primitives/badge';
+import { Button } from '../primitives/button';
+import { Card, CardHeader, CardTitle } from '../primitives/card';
+import { Disclosure } from '../primitives/disclosure';
 import { caseLabel, CaseNotice, CaseTime } from './case-investigation';
 import { IssuePageNavigation } from './issue-section';
 
@@ -70,16 +73,16 @@ export function ResolutionReview({
         </h3>
         {proposal ? (
           <>
-            <div className="resolution-proposal">
-              <div className="resolution-proposal-heading">
+            <Card as="div" variant="subtle" className="resolution-proposal">
+              <CardHeader className="resolution-proposal-heading">
                 <h4>
                   <ArrowRightLeft size={16} aria-hidden="true" />
                   {fieldLabel(proposal.capability)}
                 </h4>
-                <span className="resolution-risk" data-risk={proposal.risk}>
+                <Badge tone={proposal.risk === 'low' ? 'neutral' : 'warning'}>
                   {caseLabel(proposal.risk)} risk
-                </span>
-              </div>
+                </Badge>
+              </CardHeader>
               <p className="case-caption">
                 Proposal version {proposal.version} · Investigation revision{' '}
                 {proposal.diagnosisRevision}
@@ -92,32 +95,29 @@ export function ResolutionReview({
                   {caseLabel(proposal.target.kind)} · {proposal.target.id}
                 </dd>
               </dl>
-            </div>
+            </Card>
             <div className="resolution-change-group">
-              <div className="resolution-change-card">
-                <h4>
+              <Card as="div" className="resolution-change-card">
+                <CardTitle as="h4">
                   <ArrowRightLeft size={14} aria-hidden="true" /> Proposed
                   changes
-                </h4>
+                </CardTitle>
                 <Fields values={proposal.parameters} />
-              </div>
-              <div className="resolution-change-card">
-                <h4>
+              </Card>
+              <Card as="div" className="resolution-change-card">
+                <CardTitle as="h4">
                   <Target size={14} aria-hidden="true" /> Expected result
-                </h4>
+                </CardTitle>
                 <Fields values={proposal.expectedPostcondition} />
-              </div>
+              </Card>
             </div>
-            <div className="resolution-recovery">
-              <ShieldQuestion size={16} aria-hidden="true" />
-              <div>
-                <strong>Recovery not specified</strong>
-                <p>
-                  No recovery action is specified for this proposal. Do not
-                  assume the change can be undone.
-                </p>
-              </div>
-            </div>
+            <Alert tone="warning" className="resolution-recovery">
+              <AlertTitle>Recovery not specified</AlertTitle>
+              <AlertDescription>
+                No recovery action is specified for this proposal. Do not assume
+                the change can be undone.
+              </AlertDescription>
+            </Alert>
             <div className="resolution-preconditions">
               <h4>
                 <ListChecks size={14} aria-hidden="true" /> Preconditions
@@ -135,7 +135,7 @@ export function ResolutionReview({
                 </p>
               )}
               {proposal.preconditions.evidenceRefs.length > 0 && (
-                <details className="finding-sources">
+                <Disclosure className="finding-sources">
                   <summary>
                     Evidence references (
                     {proposal.preconditions.evidenceRefs.length})
@@ -147,7 +147,7 @@ export function ResolutionReview({
                       </li>
                     ))}
                   </ul>
-                </details>
+                </Disclosure>
               )}
               {!review.refreshable && !proposal.approval ? (
                 <p className="case-caption">
@@ -393,11 +393,16 @@ function DecisionControls({
     );
 
   return (
-    <div className="resolution-controls" aria-busy={pending}>
-      <h4>
+    <Card
+      as="div"
+      variant="subtle"
+      className="resolution-controls"
+      aria-busy={pending}
+    >
+      <CardTitle as="h4">
         <MessageSquare size={15} aria-hidden="true" />{' '}
         {compact ? 'Escalate issue' : 'Your decision'}
-      </h4>
+      </CardTitle>
       <label htmlFor={id}>
         {compact
           ? 'Why does this need escalation?'
@@ -454,6 +459,6 @@ function DecisionControls({
           {checking ? 'Checking current conditions…' : 'Recording decision…'}
         </p>
       ) : null}
-    </div>
+    </Card>
   );
 }

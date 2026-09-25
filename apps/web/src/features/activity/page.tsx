@@ -4,7 +4,9 @@ import {
   type ActivityPage as Page,
   activityTypes,
 } from '@luma/api-contract';
-import { Button } from '@luma/ui/button';
+import { Alert } from '@luma/ui/components/primitives/alert';
+import { Button } from '@luma/ui/components/primitives/button';
+import { Empty } from '@luma/ui/components/primitives/empty';
 import { onlineManager, useQuery } from '@tanstack/react-query';
 import {
   Link,
@@ -233,18 +235,18 @@ export function ActivityView({
         IDs. Dates use recorded time; select up to 366 days.
       </p>
       {offline ? (
-        <p role="status" className="playbook-notice">
+        <Alert role="status" className="playbook-notice">
           You are offline. Loaded activity may be outdated. Reconnect to
           refresh.
-        </p>
+        </Alert>
       ) : null}
       {error ? (
-        <div role="alert" className="playbook-notice">
+        <Alert tone="danger" role="alert" className="playbook-notice">
           {error}{' '}
           <Button variant="outline" onClick={refresh}>
             Retry
           </Button>
-        </div>
+        </Alert>
       ) : null}
       {newEvents ? (
         <Button
@@ -266,7 +268,7 @@ export function ActivityView({
         <>
           <p className="activity-coverage">{page.coverage}</p>
           {!page.items.length ? (
-            <section className="playbook-empty">
+            <Empty className="playbook-empty">
               <h2>No matching recorded activity</h2>
               <p>
                 Try another date range or clear the filters. Unrecorded changes
@@ -275,7 +277,7 @@ export function ActivityView({
               <Button variant="outline" onClick={() => change({})}>
                 Clear filters
               </Button>
-            </section>
+            </Empty>
           ) : (
             <ol className="activity-list">
               {Array.from(

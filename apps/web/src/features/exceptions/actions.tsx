@@ -1,4 +1,5 @@
-import { IssuePageNavigation } from '@luma/ui/components/issue-section';
+import { IssuePageNavigation } from '@luma/ui/components/issues/issue-section';
+import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import { useContext } from 'react';
 
 import { CaseShadow } from '../shadow/case';
@@ -20,7 +21,7 @@ export function IssueActions({
   initialWorkflow?: string | undefined;
 }) {
   const navigate = useContext(IssuePageNavigation);
-  const ShadowContainer = navigate ? 'details' : 'div';
+  const ShadowContainer = navigate ? Disclosure : 'div';
 
   return (
     <>
@@ -42,6 +43,7 @@ export function IssueActions({
           </summary>
         ) : null}
         <CaseShadow
+          embedded={!!navigate}
           key={`${exceptionId}:${initialWorkflow ?? ''}`}
           organizationId={organizationId}
           exceptionId={exceptionId}

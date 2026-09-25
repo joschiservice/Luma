@@ -1,10 +1,10 @@
-import { Button } from '@luma/ui/button';
 import {
   CaseInvestigation,
   CaseLoading,
   CaseNotice,
-} from '@luma/ui/components/case-investigation';
-import { CaseTimeline } from '@luma/ui/components/case-timeline';
+} from '@luma/ui/components/issues/case-investigation';
+import { CaseTimeline } from '@luma/ui/components/issues/case-timeline';
+import { Button } from '@luma/ui/components/primitives/button';
 
 import type { CaseObservation } from './observation';
 

@@ -1,4 +1,4 @@
-import { OperationsOverview } from '@luma/ui/components/operations-overview';
+import { OperationsOverview } from '@luma/ui/components/overview/operations-overview';
 import { useQuery } from '@tanstack/react-query';
 import {
   Link,

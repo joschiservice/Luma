@@ -1,11 +1,11 @@
-import { Button } from '@luma/ui/button';
+import { Button } from '@luma/ui/components/primitives/button';
 import {
   Dialog,
   DialogContent,
   DialogTitle,
   DialogTrigger,
-} from '@luma/ui/components/dialog';
-import { Input } from '@luma/ui/components/input';
+} from '@luma/ui/components/primitives/dialog';
+import { Input } from '@luma/ui/components/primitives/input';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it } from 'vitest';
 

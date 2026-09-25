@@ -16,7 +16,10 @@ import {
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-import { Button } from './button';
+import { Alert, AlertDescription, AlertTitle } from '../primitives/alert';
+import { Badge } from '../primitives/badge';
+import { Button } from '../primitives/button';
+import { Disclosure } from '../primitives/disclosure';
 import { IssueCollection } from './issue-collection';
 import { IssueContext } from './issue-context';
 import { IssueFindings } from './issue-findings';
@@ -59,10 +62,10 @@ function issueStateLabel(item: CaseSummary): string | null {
 export function CaseStatus({ item }: { item: CaseSummary }) {
   return (
     <div className="case-badges">
-      <span className={`case-severity case-severity-${item.severity}`}>
+      <Badge tone={item.severity === 'high' ? 'warning' : 'neutral'}>
         {caseLabel(item.severity)} severity
-      </span>
-      {issueStateLabel(item) && <span>{issueStateLabel(item)}</span>}
+      </Badge>
+      {issueStateLabel(item) && <Badge>{issueStateLabel(item)}</Badge>}
     </div>
   );
 }
@@ -127,13 +130,14 @@ export function CaseNotice({
   error?: boolean;
 }) {
   return (
-    <div className="case-notice" role={error ? 'alert' : 'status'}>
-      <CircleAlert size={18} aria-hidden="true" />
-      <div>
-        <strong>{title}</strong>
-        {children ? <p>{children}</p> : null}
-      </div>
-    </div>
+    <Alert
+      className="case-notice"
+      tone={error ? 'danger' : 'neutral'}
+      role={error ? 'alert' : 'status'}
+    >
+      <AlertTitle>{title}</AlertTitle>
+      {children ? <AlertDescription>{children}</AlertDescription> : null}
+    </Alert>
   );
 }
 
@@ -157,7 +161,7 @@ function Findings({ items }: { items: Diagnosis['facts'] }) {
         <li key={item.code}>
           <p>{item.text}</p>
           {item.evidenceRefs.length ? (
-            <details className="finding-sources">
+            <Disclosure className="finding-sources">
               <summary>
                 Evidence references ({item.evidenceRefs.length})
               </summary>
@@ -168,7 +172,7 @@ function Findings({ items }: { items: Diagnosis['facts'] }) {
                   </li>
                 ))}
               </ul>
-            </details>
+            </Disclosure>
           ) : null}
         </li>
       ))}
@@ -329,7 +333,7 @@ function FailedInvestigation({
           <IssueFindings item={item} unconfirmed={unconfirmed} />
         </IssueSection>
       ) : (
-        <details
+        <Disclosure
           className="failed-disclosure"
           data-issue-section="findings"
           open={expanded}
@@ -354,7 +358,7 @@ function FailedInvestigation({
               progress={<></>}
             />
           </div>
-        </details>
+        </Disclosure>
       )}
       {expanded ? (
         (progress ?? (
@@ -363,7 +367,7 @@ function FailedInvestigation({
           </IssueSection>
         ))
       ) : (
-        <details
+        <Disclosure
           className="failed-disclosure"
           data-issue-section="execution"
           open={expanded}
@@ -396,7 +400,7 @@ function FailedInvestigation({
               </>
             )}
           </div>
-        </details>
+        </Disclosure>
       )}
       {!expanded && <IssueRecordDetails key={item.id} item={item} />}
     </article>
@@ -440,7 +444,7 @@ function InvestigationReport({
       )}
       {!hideHeader && embedded && !expanded && item.state !== 'detected' && (
         <div className="case-badges">
-          <span>{issueStateLabel(item)}</span>
+          <Badge>{issueStateLabel(item)}</Badge>
         </div>
       )}
       {recordedOnly ? (
@@ -500,7 +504,7 @@ function InvestigationReport({
               </>
             ) : null}
             {diagnosis?.hypotheses.length ? (
-              <details className="case-hypotheses">
+              <Disclosure className="case-hypotheses">
                 <summary>
                   <ShieldQuestion size={16} aria-hidden="true" />
                   <span>Hypotheses and missing checks</span>
@@ -527,7 +531,7 @@ function InvestigationReport({
                       </div>
                     )}
                     {h.evidenceRefs.length > 0 && (
-                      <details className="finding-sources">
+                      <Disclosure className="finding-sources">
                         <summary>
                           Evidence references ({h.evidenceRefs.length})
                         </summary>
@@ -538,11 +542,11 @@ function InvestigationReport({
                             </li>
                           ))}
                         </ul>
-                      </details>
+                      </Disclosure>
                     )}
                   </div>
                 ))}
-              </details>
+              </Disclosure>
             ) : null}
           </section>
           <section>
@@ -571,7 +575,7 @@ function InvestigationReport({
               renderItems={(entries) =>
                 entries.length ? (
                   entries.map((e) => (
-                    <details className="case-evidence" key={e.id}>
+                    <Disclosure className="case-evidence" key={e.id}>
                       <summary>
                         {e.source
                           ? `${e.source.provider} · ${e.source.resource}`
@@ -610,7 +614,7 @@ function InvestigationReport({
                         <dt>Schema</dt>
                         <dd>{e.schemaVersion}</dd>
                       </dl>
-                    </details>
+                    </Disclosure>
                   ))
                 ) : (
                   <p>No evidence references are available yet.</p>
@@ -645,9 +649,7 @@ function InvestigationReport({
               !['pending', 'failed'].includes(item.diagnosisStatus) &&
               !['pending', 'failed'].includes(diagnosis.status) &&
               item.attention.required ? (
-                <span className="issue-overview-review">
-                  Manual review required
-                </span>
+                <Badge tone="warning">Manual review required</Badge>
               ) : null
             }
           >
@@ -812,7 +814,7 @@ function InvestigationReport({
               <IssueFindings item={item} unconfirmed={unconfirmed} />
             </IssueSection>
           ) : (
-            <details
+            <Disclosure
               className="failed-disclosure"
               data-issue-section="findings"
               open={expanded}
@@ -838,7 +840,7 @@ function InvestigationReport({
                   progress={<></>}
                 />
               </div>
-            </details>
+            </Disclosure>
           )}
           {expanded ? (
             (progress ?? (
@@ -847,7 +849,7 @@ function InvestigationReport({
               </IssueSection>
             ))
           ) : (
-            <details
+            <Disclosure
               className="failed-disclosure"
               data-issue-section="execution"
               open
@@ -876,7 +878,7 @@ function InvestigationReport({
                   </div>
                 )}
               </div>
-            </details>
+            </Disclosure>
           )}
         </>
       )}

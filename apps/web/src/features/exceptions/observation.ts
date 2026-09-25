@@ -1,5 +1,5 @@
 import { subscribeToCaseProgress } from '@luma/api-contract/client';
-import type { LiveConnection } from '@luma/ui/components/case-timeline';
+import type { LiveConnection } from '@luma/ui/components/issues/case-timeline';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 

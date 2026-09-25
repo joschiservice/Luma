@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 import { expect, userEvent, within } from 'storybook/test';
 
-import { Button } from './button';
+import { Button } from '../primitives/button';
 import { IssueCollection, IssueDetailViews } from './issue-collection';
 
 function UpdatingCollection() {

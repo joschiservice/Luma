@@ -1,4 +1,4 @@
-import { WorkspaceAccountMenu } from '@luma/ui/components/workspace-account-menu';
+import { WorkspaceAccountMenu } from '@luma/ui/components/workspace/workspace-account-menu';
 import { figmaDesign, figmaScreen } from '@luma/ui/lib/figma';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Inbox, LayoutDashboard, Unplug } from 'lucide-react';

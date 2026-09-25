@@ -1,7 +1,13 @@
-import { Button } from '@luma/ui/button';
-import { CaseNotice } from '@luma/ui/components/case-investigation';
-import { Field, FieldGroup, FieldLabel } from '@luma/ui/components/field';
-import { Input } from '@luma/ui/components/input';
+import { CaseNotice } from '@luma/ui/components/issues/case-investigation';
+import { Button } from '@luma/ui/components/primitives/button';
+import { Card, CardHeader } from '@luma/ui/components/primitives/card';
+import { Disclosure } from '@luma/ui/components/primitives/disclosure';
+import {
+  Field,
+  FieldGroup,
+  FieldLabel,
+} from '@luma/ui/components/primitives/field';
+import { Input } from '@luma/ui/components/primitives/input';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useId, useState } from 'react';
@@ -73,12 +79,13 @@ export function ShadowReport({
   const query = useQuery(shadowReportOptions(organizationId, window));
 
   return (
-    <section
+    <Card
+      as="section"
       id="shadow-report"
       className="playbook-section shadow-report"
       aria-labelledby={`${id}-title`}
     >
-      <div className="playbooks-heading">
+      <CardHeader className="playbooks-heading">
         <div>
           <p className="shadow-label">Shadow — not executed</p>
           <h2 id={`${id}-title`}>Shadow comparisons</h2>
@@ -90,7 +97,7 @@ export function ShadowReport({
         >
           Refresh comparisons
         </Button>
-      </div>
+      </CardHeader>
       <p>
         Compare the latest prediction per case with operator actions and
         authoritative outcomes. Projected rates do not represent live
@@ -155,7 +162,7 @@ export function ShadowReport({
           organizationId={organizationId}
         />
       ) : null}
-    </section>
+    </Card>
   );
 }
 
@@ -247,10 +254,10 @@ function ComparisonCard({
         · Actual: {item.actual?.outcome ?? 'not observed'} ·{' '}
         {item.review ? 'Reviewed' : 'Awaiting operator review'}
       </p>
-      <details onToggle={(event) => setOpen(event.currentTarget.open)}>
+      <Disclosure onToggle={(event) => setOpen(event.currentTarget.open)}>
         <summary>View prediction and evidence</summary>
         {open ? <ShadowResult item={item} /> : null}
-      </details>
+      </Disclosure>
     </article>
   );
 }

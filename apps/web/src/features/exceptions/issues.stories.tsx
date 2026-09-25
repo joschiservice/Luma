@@ -1,13 +1,16 @@
-import { caseFixture, inventoryCase } from '@luma/ui/components/case-fixtures';
+import {
+  caseFixture,
+  inventoryCase,
+} from '@luma/ui/components/issues/case-fixtures';
 import {
   CaseInvestigation,
   CaseRow,
-} from '@luma/ui/components/case-investigation';
-import { IssueDetailViews } from '@luma/ui/components/issue-collection';
-import { IssueInspectorHeader } from '@luma/ui/components/issue-inspector-header';
-import { IssueSummary } from '@luma/ui/components/issue-summary';
-import { Pagination } from '@luma/ui/components/pagination';
-import { WorkspaceAccountMenu } from '@luma/ui/components/workspace-account-menu';
+} from '@luma/ui/components/issues/case-investigation';
+import { IssueDetailViews } from '@luma/ui/components/issues/issue-collection';
+import { IssueInspectorHeader } from '@luma/ui/components/issues/issue-inspector-header';
+import { IssueSummary } from '@luma/ui/components/issues/issue-summary';
+import { Pagination } from '@luma/ui/components/primitives/pagination';
+import { WorkspaceAccountMenu } from '@luma/ui/components/workspace/workspace-account-menu';
 import { figmaScreen } from '@luma/ui/lib/figma';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Inbox, LayoutDashboard, Unplug } from 'lucide-react';

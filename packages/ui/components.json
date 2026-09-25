@@ -15,7 +15,7 @@
   "aliases": {
     "components": "@luma/ui/components",
     "utils": "@luma/ui/lib/utils",
-    "ui": "@luma/ui/components",
+    "ui": "@luma/ui/components/primitives",
     "lib": "@luma/ui/lib",
     "hooks": "@luma/ui/hooks"
   },

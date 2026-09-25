@@ -1,4 +1,4 @@
-import { IssueDetailViews } from '@luma/ui/components/issue-collection';
+import { IssueDetailViews } from '@luma/ui/components/issues/issue-collection';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {

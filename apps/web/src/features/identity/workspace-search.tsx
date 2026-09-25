@@ -4,8 +4,8 @@ import {
   DialogDescription,
   DialogTitle,
   DialogTrigger,
-} from '@luma/ui/components/dialog';
-import { Input } from '@luma/ui/components/input';
+} from '@luma/ui/components/primitives/dialog';
+import { Input } from '@luma/ui/components/primitives/input';
 import { Link } from '@tanstack/react-router';
 import { Activity, Inbox, LayoutDashboard, Search, Unplug } from 'lucide-react';
 import { useEffect, useState } from 'react';

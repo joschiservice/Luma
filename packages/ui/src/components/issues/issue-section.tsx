@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import { createContext, type ReactNode } from 'react';
 
+import { Card, CardContent, CardHeader, CardTitle } from '../primitives/card';
+
 export const issueSections = [
   { value: 'overview', label: 'Overview', icon: <LayoutList /> },
   { value: 'findings', label: 'Findings', icon: <Search /> },
@@ -35,21 +37,22 @@ export function IssueSection({
   const item = issueSections.find((item) => item.value === section)!;
 
   return (
-    <section
+    <Card
+      as="section"
       className="issue-section-card"
       data-issue-section={section}
       aria-label={item.label}
       tabIndex={-1}
     >
-      <div className="issue-section-heading">
-        <h2 className="issue-page-section-title">
+      <CardHeader>
+        <CardTitle>
           <span aria-hidden="true">{item.icon}</span>
           {item.label}
-        </h2>
+        </CardTitle>
         {status}
-      </div>
-      {children}
-    </section>
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
   );
 }
 

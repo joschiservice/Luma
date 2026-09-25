@@ -1,4 +1,4 @@
-import { Button, buttonVariants } from '@luma/ui/button';
+import { Button, buttonVariants } from '@luma/ui/components/primitives/button';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation, useNavigate } from '@tanstack/react-router';
 import { useEffect } from 'react';

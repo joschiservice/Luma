@@ -1,6 +1,14 @@
 import type { PlaybookSummary } from '@luma/api-contract';
-import { Button } from '@luma/ui/button';
-import { Select } from '@luma/ui/components/select';
+import { Alert } from '@luma/ui/components/primitives/alert';
+import { Badge } from '@luma/ui/components/primitives/badge';
+import { Button } from '@luma/ui/components/primitives/button';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+} from '@luma/ui/components/primitives/card';
+import { Empty } from '@luma/ui/components/primitives/empty';
+import { Select } from '@luma/ui/components/primitives/select';
 import { useQuery } from '@tanstack/react-query';
 import {
   Link,
@@ -174,47 +182,55 @@ export function PlaybookLibraryView({
         </label>
       </div>
       {error ? (
-        <div role="alert" className="playbook-notice">
+        <Alert tone="danger" role="alert" className="playbook-notice">
           {error}{' '}
           <Button variant="outline" onClick={refresh}>
             Retry
           </Button>
-        </div>
+        </Alert>
       ) : null}
       {error && !items ? null : loading ? (
         <p role="status">Loading playbooks…</p>
       ) : !items?.length ? (
-        <section className="playbook-empty">
+        <Empty className="playbook-empty">
           <BookOpen size={28} aria-hidden="true" />
           <h2>No published playbooks</h2>
           <p>
             A workspace administrator must publish a reviewed version before it
             can be activated.
           </p>
-        </section>
+        </Empty>
       ) : (
         <>
           <p role="status" className="playbook-count">
             {filtered?.length} playbooks
           </p>
           {!filtered?.length ? (
-            <section className="playbook-empty">
+            <Empty className="playbook-empty">
               <h2>No matching playbooks</h2>
               <Button variant="outline" onClick={() => change({})}>
                 Clear filters
               </Button>
-            </section>
+            </Empty>
           ) : (
             <div className="playbook-library">
               {filtered.map((p) => (
-                <article key={p.id} className="playbook-card">
-                  <div className="playbooks-heading">
-                    <span className="playbook-status">
+                <Card as="article" key={p.id} className="playbook-card">
+                  <CardHeader className="playbooks-heading">
+                    <Badge
+                      tone={
+                        p.status === 'active'
+                          ? 'success'
+                          : p.status === 'unavailable'
+                            ? 'warning'
+                            : 'neutral'
+                      }
+                    >
                       {statusNames[p.status]}
-                    </span>
+                    </Badge>
                     <span>v{p.availableVersion}</span>
-                  </div>
-                  <h2>
+                  </CardHeader>
+                  <CardTitle as="h2">
                     <Link
                       to="/app/$organizationId/playbooks/$definitionId"
                       params={{ organizationId, definitionId: p.id }}
@@ -223,7 +239,7 @@ export function PlaybookLibraryView({
                       {p.name}
                       <ArrowUpRight size={18} aria-hidden="true" />
                     </Link>
-                  </h2>
+                  </CardTitle>
                   <p>{p.purpose}</p>
                   <dl>
                     <div>
@@ -247,11 +263,11 @@ export function PlaybookLibraryView({
                     <p>Active versions: {p.activeVersions.join(', ')}</p>
                   ) : null}
                   {p.blockers.map((reason) => (
-                    <p className="playbook-notice" key={reason}>
+                    <Alert className="playbook-notice" key={reason}>
                       {reason}
-                    </p>
+                    </Alert>
                   ))}
-                </article>
+                </Card>
               ))}
             </div>
           )}

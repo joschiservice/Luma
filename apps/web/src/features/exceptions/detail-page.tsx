@@ -1,6 +1,6 @@
-import { Button } from '@luma/ui/button';
-import { caseLabel } from '@luma/ui/components/case-investigation';
-import { IssuePageLayout } from '@luma/ui/components/issue-page-layout';
+import { caseLabel } from '@luma/ui/components/issues/case-investigation';
+import { IssuePageLayout } from '@luma/ui/components/issues/issue-page-layout';
+import { Button } from '@luma/ui/components/primitives/button';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams, useSearch } from '@tanstack/react-router';
 import { ArrowLeft, RefreshCw } from 'lucide-react';

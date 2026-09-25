@@ -1,5 +1,6 @@
 import type { CaseDetail, Diagnosis } from '@luma/api-contract';
 
+import { Disclosure } from '../primitives/disclosure';
 import { IssueCollection } from './issue-collection';
 
 type Fact = Diagnosis['facts'][number];
@@ -33,7 +34,7 @@ function Sources({
   if (!ids.length) return null;
 
   return (
-    <details className="finding-sources">
+    <Disclosure className="finding-sources">
       <summary>
         {ids.length} {ids.length === 1 ? 'source' : 'sources'}
       </summary>
@@ -53,7 +54,7 @@ function Sources({
           );
         })}
       </ul>
-    </details>
+    </Disclosure>
   );
 }
 
@@ -192,7 +193,7 @@ export function IssueFindings({
             ))}
           </ul>
           {diagnosis.hypotheses.length ? (
-            <details className="issue-findings-causes">
+            <Disclosure className="issue-findings-causes">
               <summary>Possible causes · {diagnosis.hypotheses.length}</summary>
               {diagnosis.hypotheses.map((hypothesis) => (
                 <div className="issue-findings-cause" key={hypothesis.code}>
@@ -223,18 +224,18 @@ export function IssueFindings({
                   ) : null}
                 </div>
               ))}
-            </details>
+            </Disclosure>
           ) : null}
         </div>
       ) : null}
       {diagnosis.impact.potential.length ? (
-        <details className="issue-findings-impact">
+        <Disclosure className="issue-findings-impact">
           <summary>Potential impact</summary>
           <Facts facts={diagnosis.impact.potential} diagnosis={diagnosis} />
           <p className="case-caption">
             Potential impact does not establish realized losses.
           </p>
-        </details>
+        </Disclosure>
       ) : null}
       <div className="issue-findings-footer">
         <h3>Sources</h3>
@@ -260,7 +261,7 @@ export function IssueFindings({
           ]}
           renderItems={(entries) =>
             entries.map((entry) => (
-              <details className="case-evidence" key={entry.id}>
+              <Disclosure className="case-evidence" key={entry.id}>
                 <summary>
                   {entry.source
                     ? `${entry.source.provider} · ${entry.source.resource}`
@@ -287,11 +288,11 @@ export function IssueFindings({
                   <dt>Schema</dt>
                   <dd>{entry.schemaVersion}</dd>
                 </dl>
-              </details>
+              </Disclosure>
             ))
           }
         />
-        <details className="issue-findings-technical">
+        <Disclosure className="issue-findings-technical">
           <summary>Technical details</summary>
           <dl>
             <dt>Mapping versions</dt>
@@ -304,7 +305,7 @@ export function IssueFindings({
             <dt>Rules</dt>
             <dd>{diagnosis.provenance.ruleVersion}</dd>
           </dl>
-        </details>
+        </Disclosure>
       </div>
     </div>
   );

@@ -1,10 +1,17 @@
-import { Button } from '@luma/ui/button';
+import { Alert } from '@luma/ui/components/primitives/alert';
+import { Button } from '@luma/ui/components/primitives/button';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+} from '@luma/ui/components/primitives/card';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogTitle,
-} from '@luma/ui/components/dialog';
+} from '@luma/ui/components/primitives/dialog';
+import { Empty } from '@luma/ui/components/primitives/empty';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams, useSearch } from '@tanstack/react-router';
 import { Plug, Plus, RefreshCw } from 'lucide-react';
@@ -102,16 +109,16 @@ export function Connections({
         ) : (
           <>
             {!canManage ? (
-              <p className="connection-notice">
+              <Alert className="connection-notice">
                 You can view connections. An owner or admin must manage setup
                 and credentials.
-              </p>
+              </Alert>
             ) : null}
             {query.data?.length === 0 ? (
-              <div className="connection-empty">
+              <Empty className="connection-empty">
                 <h3>No connections yet</h3>
                 <p>Choose a system below to start observing your operations.</p>
-              </div>
+              </Empty>
             ) : (
               <div className="connection-list">
                 {query.data?.map((connection) => (
@@ -138,11 +145,13 @@ export function Connections({
           </p>
           <div className="connection-providers">
             {(Object.keys(providers) as Provider[]).map((kind) => (
-              <article key={kind}>
-                <div className="connection-provider-heading">
-                  <ProviderIcon provider={kind} />
-                  <h3>{providers[kind]}</h3>
-                </div>
+              <Card as="article" key={kind}>
+                <CardHeader className="connection-provider-heading">
+                  <CardTitle as="h3">
+                    <ProviderIcon provider={kind} />
+                    {providers[kind]}
+                  </CardTitle>
+                </CardHeader>
                 <p>
                   {kind === 'shopify'
                     ? 'Read orders, products, inventory and fulfillment from your shop.'
@@ -158,7 +167,7 @@ export function Connections({
                     ? 'Connect Shopify'
                     : `Set up ${providers[kind]}`}
                 </Button>
-              </article>
+              </Card>
             ))}
           </div>
         </section>

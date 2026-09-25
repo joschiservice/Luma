@@ -2,14 +2,21 @@ import type {
   PlaybookActivationView,
   PlaybookDetail,
 } from '@luma/api-contract';
-import { Button } from '@luma/ui/button';
+import { Alert } from '@luma/ui/components/primitives/alert';
+import { Button } from '@luma/ui/components/primitives/button';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+} from '@luma/ui/components/primitives/card';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogTitle,
-} from '@luma/ui/components/dialog';
-import { Select } from '@luma/ui/components/select';
+} from '@luma/ui/components/primitives/dialog';
+import { Disclosure } from '@luma/ui/components/primitives/disclosure';
+import { Select } from '@luma/ui/components/primitives/select';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams, useSearch } from '@tanstack/react-router';
 import { ArrowLeft, BookOpen, ShieldCheck } from 'lucide-react';
@@ -89,12 +96,12 @@ export function PlaybookDetailPage({
         <ArrowLeft size={15} aria-hidden="true" /> All playbooks
       </Link>
       {query.error || accessError ? (
-        <div role="alert" className="playbook-notice">
+        <Alert tone="danger" role="alert" className="playbook-notice">
           {playbookError(query.error ?? accessError)}{' '}
           <Button onClick={() => void refresh()} variant="outline">
             Retry
           </Button>
-        </div>
+        </Alert>
       ) : null}
       {accessError ? null : query.isPending ? (
         <p role="status">Loading playbook…</p>
@@ -115,8 +122,12 @@ export function PlaybookDetailPage({
               workflow={definitionId}
             />
           ) : null}
-          <section className="playbook-section" aria-labelledby="runs-title">
-            <div className="playbooks-heading">
+          <Card
+            as="section"
+            className="playbook-section"
+            aria-labelledby="runs-title"
+          >
+            <CardHeader className="playbooks-heading">
               <h2 id="runs-title">Recent runs</h2>
               <Button
                 variant="outline"
@@ -125,7 +136,7 @@ export function PlaybookDetailPage({
               >
                 Refresh runs
               </Button>
-            </div>
+            </CardHeader>
             <p>
               Execution acceptance and verified correction are separate results.
               Pilot, simulation and shadow evidence are not live verified
@@ -175,17 +186,17 @@ export function PlaybookDetailPage({
                       </div>
                     </dl>
                     <p>{run.reason.replaceAll('_', ' ')}</p>
-                    <details>
+                    <Disclosure>
                       <summary>Run evidence references</summary>
                       <p>Run: {run.id}</p>
                       <p>Activation: {run.activationId}</p>
                       <code>{run.versionDigest}</code>
-                    </details>
+                    </Disclosure>
                   </article>
                 ))}
               </div>
             )}
-          </section>
+          </Card>
         </>
       ) : null}
     </div>
@@ -299,16 +310,22 @@ export function PlaybookDetailView({
         </Button>
       </div>
       {!detail.canManage ? (
-        <p className="playbook-notice">
+        <Alert className="playbook-notice">
           You can inspect playbooks. Only workspace owners and admins can
           activate or revoke them.
-        </p>
+        </Alert>
       ) : null}
       <p>Publishing a newer version never replaces an active version.</p>
       {message ? <p role="status">{message}</p> : null}
       <div className="playbook-detail-grid">
-        <section className="playbook-section" aria-labelledby="steps-title">
-          <h2 id="steps-title">How this playbook works</h2>
+        <Card
+          as="section"
+          className="playbook-section"
+          aria-labelledby="steps-title"
+        >
+          <CardTitle as="h2" id="steps-title">
+            How this playbook works
+          </CardTitle>
           <ol className="playbook-steps">
             {version.steps.map((step, i) => (
               <li key={step.id}>
@@ -327,17 +344,17 @@ export function PlaybookDetailView({
               </li>
             ))}
           </ol>
-        </section>
-        <aside className="playbook-section">
-          <h2>
+        </Card>
+        <Card as="aside" className="playbook-section">
+          <CardTitle as="h2">
             <ShieldCheck size={18} aria-hidden="true" /> Compatibility and
             permissions
-          </h2>
+          </CardTitle>
           <p>Required: {version.permissions.join(', ')}.</p>
           {version.blockers.map((reason) => (
-            <p key={reason} className="playbook-notice">
+            <Alert key={reason} className="playbook-notice">
               {reason}
-            </p>
+            </Alert>
           ))}
           {!detail.connections.length ? (
             <p>No connections installed.</p>
@@ -371,15 +388,15 @@ export function PlaybookDetailView({
           >
             Manage connections
           </Link>
-          <h3>Evaluation evidence</h3>
+          <CardTitle as="h3">Evaluation evidence</CardTitle>
           <p>
             Shadow comparisons are available below for workspace owners and
             admins. Each prediction retains its exact Playbook version.
           </p>
-        </aside>
+        </Card>
       </div>
-      <section className="playbook-section">
-        <h2>Activation history</h2>
+      <Card as="section" className="playbook-section">
+        <CardTitle as="h2">Activation history</CardTitle>
         <p>
           Revocation blocks future admission. It preserves the grant and does
           not undo already-dispatched work.
@@ -417,7 +434,7 @@ export function PlaybookDetailView({
               </p>
               <p>Orders: {a.grants.targetIds.join(', ')}</p>
               <p>Principals: {a.grants.principalIds.join(', ')}</p>
-              <details>
+              <Disclosure>
                 <summary>Exact scope and review</summary>
                 <p>Activation: {a.id}</p>
                 <p>Policy: {a.policyVersion}</p>
@@ -437,15 +454,15 @@ export function PlaybookDetailView({
                 <p>
                   Artifact digest: <code>{a.artifactDigest}</code>
                 </p>
-              </details>
+              </Disclosure>
             </article>
           ))
         )}
-      </section>
-      <section className="playbook-section">
-        <h2>Provenance and version history</h2>
+      </Card>
+      <Card as="section" className="playbook-section">
+        <CardTitle as="h2">Provenance and version history</CardTitle>
         {detail.versions.map((v) => (
-          <details key={v.version}>
+          <Disclosure key={v.version}>
             <summary>
               Version {v.version} · {v.provenance.kind} ·{' '}
               {v.compatible ? 'Compatible' : 'Unavailable'}
@@ -456,9 +473,9 @@ export function PlaybookDetailView({
             <p>Evidence: {v.provenance.evidenceRefs.join(', ')}</p>
             <code>{v.digest}</code>
             <pre>{v.representation}</pre>
-          </details>
+          </Disclosure>
         ))}
-      </section>
+      </Card>
       <Dialog open={activate && detail.canManage} onOpenChange={setActivate}>
         <DialogContent className="playbook-dialog">
           <DialogTitle>Review activation</DialogTitle>

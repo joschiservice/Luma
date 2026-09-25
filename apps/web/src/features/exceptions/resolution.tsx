@@ -1,10 +1,10 @@
 import type { CaseDecision, DecisionReceipt } from '@luma/api-contract';
-import { Button } from '@luma/ui/button';
 import {
   CaseLoading,
   CaseNotice,
-} from '@luma/ui/components/case-investigation';
-import { ResolutionReview } from '@luma/ui/components/resolution-review';
+} from '@luma/ui/components/issues/case-investigation';
+import { ResolutionReview } from '@luma/ui/components/issues/resolution-review';
+import { Button } from '@luma/ui/components/primitives/button';
 import { useEffect, useRef, useState } from 'react';
 
 import { IdentityError } from '../identity/data';

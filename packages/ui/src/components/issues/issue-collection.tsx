@@ -12,8 +12,9 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 
-import { Button } from './button';
-import { Select } from './select';
+import { Button } from '../primitives/button';
+import { Card } from '../primitives/card';
+import { Select } from '../primitives/select';
 
 const CollectionContext = createContext<{
   active: string | null;
@@ -239,7 +240,8 @@ function CollectionView<T extends { id: string }>({
   }
 
   return (
-    <section
+    <Card
+      as="section"
       className="case-investigation case-progress issue-collection-view"
       aria-label={title}
     >
@@ -343,6 +345,6 @@ function CollectionView<T extends { id: string }>({
           {loading ? 'Loading…' : `Load older ${noun}`}
         </Button>
       ) : null}
-    </section>
+    </Card>
   );
 }

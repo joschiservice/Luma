@@ -134,7 +134,6 @@ p {
 }
 .auth-panel {
   width: min(100%, 490px);
-  padding: 70px 40px;
   margin: auto;
 }
 .auth-panel h2 {
@@ -364,7 +363,6 @@ summary {
     display: none;
   }
   .auth-panel {
-    padding: 40px 24px;
   }
   .desk-sidebar {
     display: none;
@@ -447,10 +445,6 @@ summary {
 }
 .connection-card {
   min-width: 0;
-  padding: 18px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--card);
   font: 12px/1.6 var(--font-sans);
   overflow-wrap: anywhere;
 }
@@ -507,35 +501,10 @@ summary {
   color: var(--muted-foreground);
   margin: 0 0 16px;
 }
-.connection-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 7px;
-  border-radius: 5px;
-  font: 10px/1.5 var(--font-sans);
-  background: var(--muted);
-  color: var(--muted-foreground);
-  white-space: nowrap;
-}
-.connection-status::before {
-  content: '';
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: currentColor;
-}
-.connection-status-active {
-  color: var(--status-success);
-  background: var(--status-success-surface);
-}
 .connection-status-degraded,
 .connection-status-pending {
   color: var(--status-warning);
   background: var(--status-warning-surface);
-}
-.connection-status-revoked {
-  color: var(--destructive);
 }
 .connection-access {
   border: 1px solid var(--border);
@@ -615,10 +584,6 @@ summary {
   flex-direction: column;
   align-items: flex-start;
   min-width: 0;
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--card);
 }
 .connection-providers p {
   flex: 1;
@@ -627,18 +592,7 @@ summary {
   font-size: 11px;
 }
 .connection-empty {
-  padding: 24px;
-  border: 1px dashed var(--border);
-  border-radius: 10px;
-  background: var(--card);
   margin-top: 14px;
-}
-.connection-notice {
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: var(--muted);
-  font-size: 11px;
-  color: var(--muted-foreground);
 }
 .connection-dialog {
   max-height: calc(100dvh - 40px);
@@ -1295,27 +1249,15 @@ summary {
 }
 .playbook-card,
 .playbook-section {
-  border: 1px solid var(--border);
-  background: var(--card);
-  border-radius: 12px;
-  padding: 24px;
   min-width: 0;
 }
-.playbook-card h2 {
-  margin: 28px 0 12px;
-}
+
 .playbook-card h2 a {
   display: flex;
   justify-content: space-between;
   gap: 12px;
   color: var(--foreground);
   text-decoration: none;
-}
-.playbook-status {
-  font-size: 12px;
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  padding: 5px 10px;
 }
 .playbooks-page dl {
   display: grid;
@@ -1334,22 +1276,6 @@ summary {
 .playbooks-page dd {
   margin: 0;
   overflow-wrap: anywhere;
-}
-.playbook-notice {
-  padding: 12px 16px;
-  border-left: 3px solid var(--border);
-  background: var(--muted);
-  border-radius: 4px;
-}
-.playbook-empty {
-  padding: 64px 24px;
-  text-align: center;
-  border: 1px dashed var(--border);
-  border-radius: 12px;
-}
-.playbook-empty svg {
-  margin: 0 auto 20px;
-  color: var(--muted-foreground);
 }
 .playbook-count {
   color: var(--muted-foreground);
@@ -1485,10 +1411,6 @@ summary {
   .playbook-library,
   .playbook-detail-grid {
     grid-template-columns: minmax(0, 1fr);
-  }
-  .playbook-section,
-  .playbook-card {
-    padding: 20px;
   }
   .playbook-version-bar > button {
     margin-left: 0;
@@ -1626,13 +1548,8 @@ summary {
 .activity-dates p {
   flex-basis: 100%;
 }
-
 .shadow-panel {
   margin: 24px;
-  padding: 24px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--card);
   min-width: 0;
 }
 .shadow-panel h3,
@@ -1806,7 +1723,6 @@ summary {
 @media (max-width: 700px) {
   .shadow-panel {
     margin: 16px;
-    padding: 16px;
   }
   .shadow-metrics,
   .shadow-form-grid,
@@ -1971,7 +1887,7 @@ summary {
 .issue-page-workspace {
   display: grid;
   grid-template-columns: 152px minmax(0, 1fr);
-  gap: 24px;
+  gap: 20px;
   align-items: start;
 }
 .issue-page-sections {
@@ -1995,30 +1911,7 @@ summary {
 }
 .issue-page .issue-page-main .issue-section-card {
   min-width: 0;
-  margin: 0 0 16px;
-  padding: 20px 24px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--card);
-}
-.issue-page .issue-section-heading > .issue-page-section-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-  font: 600 14px/1.5 var(--font-sans);
-  letter-spacing: 0;
-}
-.issue-page-section-title svg {
-  width: 16px;
-  height: 16px;
-  color: var(--muted-foreground);
-}
-.issue-section-card > section:first-of-type,
-.issue-section-card > .recorded-findings > section:first-child {
-  border-top: 0;
-  margin-top: 0;
-  padding-top: 0;
+  margin: 0 0 var(--content-gap);
 }
 .issue-page-main .case-step {
   border: 0;
@@ -2049,19 +1942,6 @@ summary {
 }
 .issue-page-facts dd {
   margin: 4px 0 0;
-}
-.issue-page .issue-collection-view {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 24px 28px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--card);
-}
-.issue-page-section-title {
-  margin: 0 0 20px;
-  font-size: 16px;
-  font-weight: 600;
 }
 @media (max-width: 1150px) and (min-width: 761px) {
   .issue-page-identity {
@@ -2166,10 +2046,7 @@ summary {
     font-weight: 400;
     color: var(--muted-foreground);
   }
-  .issue-page .issue-page-main .issue-section-card,
-  .issue-page .issue-collection-view {
-    padding: 20px 16px;
-  }
+
   .issue-page [data-issue-section] {
     scroll-margin-top: 68px;
   }
@@ -2201,20 +2078,13 @@ summary {
   font-variant-numeric: tabular-nums;
 }
 .issue-overview-action {
-  margin-top: 24px;
+  margin-top: 20px;
 }
 .issue-overview .issue-overview-action-label {
   margin: 0 0 6px;
   color: var(--muted-foreground);
   font-size: 12px;
   font-weight: 500;
-}
-.issue-overview-review {
-  padding: 2px 8px;
-  border-radius: 4px;
-  color: var(--muted-foreground);
-  background: var(--muted);
-  font-size: 11px;
 }
 .issue-overview .issue-overview-next {
   margin-top: 0;
@@ -2225,7 +2095,7 @@ summary {
   max-width: 80ch;
 }
 .issue-overview-checks {
-  margin-top: 16px;
+  margin-top: 12px;
 }
 .issue-overview-checks > summary {
   display: flex;
@@ -2320,26 +2190,17 @@ summary {
   display: block;
   font-size: 11px;
 }
-
-.issue-section-heading {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 16px;
-}
 .issue-page-main .execution-result-rows {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 0;
-  margin: 16px 0;
+  margin: 12px 0;
 }
 .execution-result-rows > div {
   display: grid;
   grid-template-columns: minmax(120px, 1fr) minmax(0, 2fr);
   gap: 12px;
-  padding: 12px 0;
+  padding: 10px 0;
   border-bottom: 1px solid var(--border);
 }
 .execution-result-rows dt {
@@ -2384,11 +2245,6 @@ summary {
   font-size: 11px;
   font-weight: 400;
 }
-.issue-page-main .resolution-shadow-disclosure .shadow-panel {
-  border: 0;
-  border-radius: 0;
-  padding-inline: 0;
-}
 .resolution-next-step {
   margin-right: 8px;
 }
@@ -2396,4 +2252,73 @@ summary {
 .resolution-escalate-trigger {
   vertical-align: top;
   margin-top: 16px;
+}
+
+/* Issue pages share compact spacing while keeping task boundaries visible. */
+.issue-page .recorded-findings > section:not([data-slot='card']) {
+  margin-top: var(--content-section-gap);
+  padding-top: var(--content-section-gap);
+}
+.issue-page .recorded-findings h3 {
+  margin-top: 0;
+  margin-bottom: var(--content-gap);
+}
+.issue-page .issue-section-card p {
+  margin-block: var(--content-related-gap);
+}
+.issue-page .issue-overview-product p {
+  margin-block: 2px;
+}
+.issue-page .issue-finding-rows p {
+  margin-block: 0 var(--content-related-gap);
+}
+.issue-page .issue-finding-rows > li:first-child {
+  padding-top: 0;
+}
+.issue-page .finding-sources {
+  margin-top: 4px;
+}
+.issue-page .finding-sources > summary {
+  padding-block: 4px;
+}
+.issue-page .issue-overview .issue-overview-action-label {
+  margin-bottom: var(--content-related-gap);
+}
+.issue-page .issue-record-details[open] {
+  padding: 0;
+}
+.issue-page-sections [aria-current='location'] {
+  box-shadow: inset 2px 0 0 var(--primary);
+}
+
+@media (max-width: 760px) {
+  .issue-page-mobile-nav {
+    box-shadow: 0 6px 10px -8px var(--overlay);
+  }
+}
+
+.issue-page .issue-overview-action {
+  margin-top: 16px;
+}
+
+/* Container padding owns the outer edge; content margins separate siblings. */
+.issue-page .issue-overview-action > :last-child,
+.issue-page .issue-findings-footer > :last-child,
+.issue-page .execution-summary > :last-child,
+.issue-page .resolution-controls > :last-child {
+  margin-bottom: 0;
+}
+.issue-page .issue-overview-summary > :first-child {
+  margin-top: 0;
+}
+
+.case-notice,
+.playbook-notice,
+.connection-notice {
+  margin-block: 12px;
+}
+
+.issue-page .issue-collection-view {
+  max-width: 1100px;
+  margin: 0 auto;
 }

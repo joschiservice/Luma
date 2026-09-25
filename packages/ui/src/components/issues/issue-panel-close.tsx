@@ -1,6 +1,6 @@
 import { X } from 'lucide-react';
 
-import { Button } from './button';
+import { Button } from '../primitives/button';
 
 /** Provides an accessible icon control that closes the inspector. */
 export function IssuePanelClose({ onClose }: { onClose: () => void }) {

@@ -1,10 +1,14 @@
 import { shadowReviewSchema } from '@luma/api-contract';
-import { Button } from '@luma/ui/button';
-import { CaseNotice } from '@luma/ui/components/case-investigation';
-import { Field, FieldGroup, FieldLabel } from '@luma/ui/components/field';
-import { Input } from '@luma/ui/components/input';
-import { IssueCollection } from '@luma/ui/components/issue-collection';
-import { Select } from '@luma/ui/components/select';
+import { CaseNotice } from '@luma/ui/components/issues/case-investigation';
+import { IssueCollection } from '@luma/ui/components/issues/issue-collection';
+import { Button } from '@luma/ui/components/primitives/button';
+import {
+  Field,
+  FieldGroup,
+  FieldLabel,
+} from '@luma/ui/components/primitives/field';
+import { Input } from '@luma/ui/components/primitives/input';
+import { Select } from '@luma/ui/components/primitives/select';
 import { useQuery } from '@tanstack/react-query';
 import { useId, useRef, useState } from 'react';
 
