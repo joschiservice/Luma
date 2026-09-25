@@ -1,0 +1,40 @@
+import { CircleDot, History, Inbox } from 'lucide-react';
+import type { ReactElement } from 'react';
+
+import { Tabs, TabsList, TabsTrigger } from '../primitives/tabs';
+
+const views = [
+  { value: 'needs_you', label: 'Needs review', icon: Inbox },
+  { value: 'active', label: 'All open', icon: CircleDot },
+  { value: 'history', label: 'History', icon: History },
+] as const;
+
+type IssueView = (typeof views)[number]['value'];
+
+/** Displays URL-backed issue views with manual keyboard activation and semantic status accents. */
+export function IssueViewTabs({
+  value,
+  renderLink,
+}: {
+  value: IssueView;
+  renderLink: (view: IssueView) => ReactElement;
+}) {
+  return (
+    <Tabs value={value} className="issue-view-tabs">
+      <TabsList aria-label="Issue views" activateOnFocus={false}>
+        {views.map(({ value: view, label, icon: Icon }) => (
+          <TabsTrigger
+            key={view}
+            value={view}
+            data-view={view}
+            nativeButton={false}
+            render={renderLink(view)}
+          >
+            <Icon aria-hidden="true" />
+            {label}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+    </Tabs>
+  );
+}

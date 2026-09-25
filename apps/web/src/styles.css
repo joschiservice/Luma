@@ -675,31 +675,7 @@ summary {
   border-right: 1px solid var(--border);
   background: var(--background);
 }
-.inbox .inbox-views {
-  display: flex;
-  padding: 12px 12px 0;
-  gap: 2px;
-}
-.inbox-views a[aria-current='page'] {
-  background: var(--primary);
-  color: var(--primary-foreground);
-}
-.inbox .inbox-views a {
-  padding: 10px 12px;
-  font-size: 12px;
-}
-.inbox-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 16px;
-  border-bottom: 1px solid var(--border);
-}
-.inbox-filters label {
-  font-size: 10px;
-  flex: 1;
-  min-width: 76px;
-}
+
 .inbox-rows {
   list-style: none;
   padding: 0;
@@ -973,40 +949,7 @@ summary {
 .inbox:not(.inbox-selected) .inbox-detail {
   display: none;
 }
-.inbox .inbox-views {
-  align-items: center;
-  padding: 12px 16px;
-  gap: 4px;
-  border-bottom: 1px solid var(--border);
-}
-.inbox .inbox-views a {
-  padding: 7px 9px;
-  white-space: nowrap;
-  border-radius: 6px;
-}
-.inbox-views a[aria-current='page'] {
-  background: var(--muted);
-  color: var(--foreground);
-  font-weight: 600;
-}
-.inbox-views button {
-  margin-left: auto;
-  height: 30px;
-  font-size: 11px;
-  padding: 0 8px;
-}
-.inbox-filter-disclosure {
-  border-bottom: 1px solid var(--border);
-}
-.inbox-filter-disclosure > summary {
-  padding: 8px 20px;
-  color: var(--muted-foreground);
-  font-size: 11px;
-}
-.inbox-filters {
-  padding: 8px 16px 16px;
-  border-bottom: 0;
-}
+
 .inbox-rows {
   flex: 1;
 }
@@ -1111,13 +1054,6 @@ summary {
   .inbox-case-nav {
     margin: 0 -16px 16px;
     padding: 10px;
-  }
-  .inbox .inbox-views {
-    padding: 10px 8px;
-  }
-  .inbox .inbox-views a {
-    padding: 7px;
-    font-size: 11px;
   }
 }
 
@@ -2328,14 +2264,6 @@ summary {
 .inbox-list {
   container-type: inline-size;
 }
-.inbox-active-filters {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  border-bottom: 1px solid var(--border);
-}
 .inbox-rows .case-row-subject {
   display: flex;
   flex-wrap: wrap;
@@ -2426,9 +2354,7 @@ summary {
     min-width: 44px;
     min-height: 44px;
   }
-  .inbox .inbox-views {
-    flex-wrap: wrap;
-  }
+
   .issue-panel-content {
     padding: 8px;
   }
@@ -2438,14 +2364,6 @@ summary {
   top: 0;
   z-index: 2;
   background: var(--card);
-}
-.inbox-filter-disclosure > summary svg {
-  display: inline;
-  vertical-align: middle;
-  margin-right: 4px;
-}
-.inbox-filters label > [data-slot='select-trigger'] {
-  margin-top: 6px;
 }
 .issue-panel [data-issue-section] {
   scroll-margin-top: calc(var(--issue-navigation-height, 150px) + 12px);

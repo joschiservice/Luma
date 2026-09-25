@@ -9,6 +9,7 @@ import { IssueListToolbar } from '@luma/ui/components/issues/issue-list-toolbar'
 import { IssuePanelLayout } from '@luma/ui/components/issues/issue-panel-layout';
 import { IssueSplitView } from '@luma/ui/components/issues/issue-split-view';
 import { IssueSummary } from '@luma/ui/components/issues/issue-summary';
+import { IssueViewTabs } from '@luma/ui/components/issues/issue-view-tabs';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Empty } from '@luma/ui/components/primitives/empty';
 import { Pagination } from '@luma/ui/components/primitives/pagination';
@@ -186,24 +187,16 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
               onRefresh={refresh}
               refreshing={list.isFetching || detail.isFetching}
               views={
-                <>
-                  {' '}
-                  {(['needs_you', 'active', 'history'] as const).map((view) => (
+                <IssueViewTabs
+                  value={search.view}
+                  renderLink={(view) => (
                     <Link
-                      key={view}
                       {...destination}
                       search={{ ...search, view, cursor: undefined }}
                       resetScroll={false}
-                      aria-current={search.view === view ? 'page' : undefined}
-                    >
-                      {view === 'needs_you'
-                        ? 'Needs review'
-                        : view === 'active'
-                          ? 'All open'
-                          : 'History'}
-                    </Link>
-                  ))}
-                </>
+                    />
+                  )}
+                />
               }
             />
             {connections.isError ? (

@@ -13,6 +13,7 @@ import { IssueListToolbar } from '@luma/ui/components/issues/issue-list-toolbar'
 import { IssuePanelLayout } from '@luma/ui/components/issues/issue-panel-layout';
 import { IssueSplitView } from '@luma/ui/components/issues/issue-split-view';
 import { IssueSummary } from '@luma/ui/components/issues/issue-summary';
+import { IssueViewTabs } from '@luma/ui/components/issues/issue-view-tabs';
 import {
   resolutionProgress,
   resolutionReview,
@@ -68,6 +69,9 @@ function IssuesExample({
         permittedDecisions: ['escalate' as const],
       };
   const [page, setPage] = useState(1);
+  const [view, setView] = useState<'needs_you' | 'active' | 'history'>(
+    'needs_you',
+  );
   const [filters, setFilters] = useState<
     Pick<CaseQuery, 'state' | 'class' | 'severity'>
   >({});
@@ -155,13 +159,19 @@ function IssuesExample({
                   }
                   onRefresh={() => {}}
                   views={
-                    <>
-                      <a href="#review" aria-current="page">
-                        Needs review
-                      </a>
-                      <a href="#open">All open</a>
-                      <a href="#history">History</a>
-                    </>
+                    <IssueViewTabs
+                      value={view}
+                      renderLink={(next) => (
+                        <a
+                          href={`#${next}`}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            setView(next);
+                            setPage(1);
+                          }}
+                        />
+                      )}
+                    />
                   }
                 />
                 <ul className="inbox-rows">
@@ -374,20 +384,34 @@ export const RemovableFilters: Story = {
   args: { selectedInitially: false },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByText('Filters', { exact: true }));
-    await userEvent.click(canvas.getByRole('combobox', { name: 'Severity' }));
-    await userEvent.click(
-      await within(document.body).findByRole('option', {
-        name: 'High',
-      }),
+    const body = within(document.body);
+    await userEvent.click(canvas.getByRole('button', { name: 'Add filter' }));
+    await userEvent.hover(
+      await body.findByRole('menuitem', { name: 'Severity' }),
     );
-    await expect(canvas.getByText('Filters · 1 active')).toBeVisible();
     await userEvent.click(
-      canvas.getByRole('button', { name: 'Remove Severity filter: High' }),
+      await body.findByRole('menuitemradio', { name: 'High' }),
     );
     await expect(
-      canvas.getByRole('combobox', { name: 'Severity' }),
-    ).toHaveTextContent('All severities');
+      canvas.getByRole('button', { name: 'Edit Severity filter: High' }),
+    ).toBeVisible();
+    await userEvent.click(canvas.getByRole('button', { name: 'Add filter' }));
+    await expect(
+      body.queryByRole('menuitem', { name: 'Severity' }),
+    ).not.toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Edit Severity filter: High' }),
+    );
+    await userEvent.click(
+      await body.findByRole('menuitemradio', { name: 'Medium' }),
+    );
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Remove Severity filter: Medium' }),
+    );
+    await expect(
+      canvas.getByRole('button', { name: 'Add filter' }),
+    ).toHaveFocus();
     await expect(
       canvas.queryByRole('button', { name: 'Clear filters' }),
     ).not.toBeInTheDocument();
@@ -454,5 +478,26 @@ export const ResizableInspector: Story = {
         .getByRole('region', { name: 'Selected issue' })
         .getBoundingClientRect().width,
     ).toBeCloseTo(resizedWidth, 0);
+  },
+};
+
+export const ViewNavigation: Story = {
+  args: { selectedInitially: false },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const review = canvas.getByRole('tab', { name: 'Needs review' });
+    const open = canvas.getByRole('tab', { name: 'All open' });
+    await expect(review).toHaveAttribute('aria-selected', 'true');
+    review.focus();
+    await userEvent.keyboard('{ArrowRight}');
+    await expect(open).toHaveFocus();
+    await expect(review).toHaveAttribute('aria-selected', 'true');
+    await userEvent.keyboard('{Enter}');
+    await expect(open).toHaveAttribute('aria-selected', 'true');
+    await userEvent.click(canvas.getByRole('tab', { name: 'History' }));
+    await expect(canvas.getByRole('tab', { name: 'History' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
   },
 };
