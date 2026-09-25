@@ -7,7 +7,7 @@ import {
   Play,
   Search,
 } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { createContext, type ReactNode } from 'react';
 
 export const issueSections = [
   { value: 'overview', label: 'Overview', icon: <LayoutList /> },
@@ -23,10 +23,12 @@ export const issueSections = [
 export function IssueSection({
   section,
   children,
+  status,
   enabled = true,
 }: {
   section: (typeof issueSections)[number]['value'];
   children: ReactNode;
+  status?: ReactNode;
   enabled?: boolean;
 }) {
   if (!enabled) return <>{children}</>;
@@ -39,11 +41,19 @@ export function IssueSection({
       aria-label={item.label}
       tabIndex={-1}
     >
-      <h2 className="issue-page-section-title">
-        <span aria-hidden="true">{item.icon}</span>
-        {item.label}
-      </h2>
+      <div className="issue-section-heading">
+        <h2 className="issue-page-section-title">
+          <span aria-hidden="true">{item.icon}</span>
+          {item.label}
+        </h2>
+        {status}
+      </div>
       {children}
     </section>
   );
 }
+
+/** Connects full-page section actions to the page's scrolling and focus behavior. */
+export const IssuePageNavigation = createContext<
+  ((section: string) => void) | null
+>(null);

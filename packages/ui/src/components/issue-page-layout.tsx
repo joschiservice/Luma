@@ -5,7 +5,11 @@ import { Button } from './button';
 import { caseLabel, CaseStatus } from './case-investigation';
 import { IssueDetailViews } from './issue-collection';
 import { IssueRecordDetails } from './issue-record-details';
-import { IssueSection, issueSections as sections } from './issue-section';
+import {
+  IssuePageNavigation,
+  IssueSection,
+  issueSections as sections,
+} from './issue-section';
 import { SectionNavigation } from './section-navigation';
 import { Select } from './select';
 import { WorkspaceHeaderSlot } from './workspace-header-slot';
@@ -113,94 +117,96 @@ export function IssuePageLayout({
 
   return (
     <div className="issue-page" ref={root} tabIndex={-1}>
-      <IssueDetailViews
-        key={item?.id ?? 'pending'}
-        issueTitle={item?.summary}
-        headerClassName="issue-page-collection-header"
-        headerTarget={headerTarget}
-        header={
-          <div className="issue-page-header">
-            <div className="issue-page-back">{back}</div>
-            <div className="issue-page-identity">
-              <div className="issue-page-title">
-                <h1 tabIndex={0}>{title}</h1>
-                <span className="issue-page-full-title" aria-hidden="true">
-                  {title}
-                </span>
-              </div>
-              {item ? <CaseStatus item={item} /> : null}
-            </div>
-            <div className="issue-page-actions">
-              {refresh}
-              {canReview ? (
-                <Button
-                  aria-label="Review resolution"
-                  onClick={() => jump('resolution')}
-                >
-                  <span className="issue-page-desktop-label">
-                    Review resolution
+      <IssuePageNavigation.Provider value={jump}>
+        <IssueDetailViews
+          key={item?.id ?? 'pending'}
+          issueTitle={item?.summary}
+          headerClassName="issue-page-collection-header"
+          headerTarget={headerTarget}
+          header={
+            <div className="issue-page-header">
+              <div className="issue-page-back">{back}</div>
+              <div className="issue-page-identity">
+                <div className="issue-page-title">
+                  <h1 tabIndex={0}>{title}</h1>
+                  <span className="issue-page-full-title" aria-hidden="true">
+                    {title}
                   </span>
-                  <span className="issue-page-mobile-label">Review</span>
-                </Button>
+                </div>
+                {item ? <CaseStatus item={item} /> : null}
+              </div>
+              <div className="issue-page-actions">
+                {refresh}
+                {canReview ? (
+                  <Button
+                    aria-label="Review resolution"
+                    onClick={() => jump('resolution')}
+                  >
+                    <span className="issue-page-desktop-label">
+                      Review resolution
+                    </span>
+                    <span className="issue-page-mobile-label">Review</span>
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          }
+        >
+          <div className="issue-page-workspace">
+            {item ? (
+              <>
+                <SectionNavigation
+                  className="issue-page-sections"
+                  aria-label="Issue sections"
+                  items={options}
+                  value={current}
+                  onValueChange={jump}
+                />
+                <div className="issue-page-mobile-nav" ref={mobileNavigation}>
+                  <span>On this page</span>
+                  <Select
+                    aria-label="On this page"
+                    value={current}
+                    options={options}
+                    onValueChange={(value) => {
+                      if (value) jump(value);
+                    }}
+                  />
+                </div>
+              </>
+            ) : null}
+            <div className="issue-page-main">
+              {children}
+              {actions ? (
+                <IssueSection section="resolution">{actions}</IssueSection>
+              ) : null}
+              {item ? (
+                <IssueSection section="details">
+                  <dl className="issue-page-facts">
+                    <div>
+                      <dt>Source systems</dt>
+                      <dd>
+                        {item.sources.length
+                          ? item.sources.join(' · ')
+                          : 'Source system unknown'}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Issue type</dt>
+                      <dd>{caseLabel(item.class)}</dd>
+                    </div>
+                    <div>
+                      <dt>Evidence freshness</dt>
+                      <dd>{caseLabel(item.freshness)}</dd>
+                    </div>
+                  </dl>
+                  <IssueRecordDetails item={item} expanded />
+                </IssueSection>
               ) : null}
             </div>
           </div>
-        }
-      >
-        <div className="issue-page-workspace">
-          {item ? (
-            <>
-              <SectionNavigation
-                className="issue-page-sections"
-                aria-label="Issue sections"
-                items={options}
-                value={current}
-                onValueChange={jump}
-              />
-              <div className="issue-page-mobile-nav" ref={mobileNavigation}>
-                <span>On this page</span>
-                <Select
-                  aria-label="On this page"
-                  value={current}
-                  options={options}
-                  onValueChange={(value) => {
-                    if (value) jump(value);
-                  }}
-                />
-              </div>
-            </>
-          ) : null}
-          <div className="issue-page-main">
-            {children}
-            {actions ? (
-              <IssueSection section="resolution">{actions}</IssueSection>
-            ) : null}
-            {item ? (
-              <IssueSection section="details">
-                <dl className="issue-page-facts">
-                  <div>
-                    <dt>Source systems</dt>
-                    <dd>
-                      {item.sources.length
-                        ? item.sources.join(' · ')
-                        : 'Source system unknown'}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Issue type</dt>
-                    <dd>{caseLabel(item.class)}</dd>
-                  </div>
-                  <div>
-                    <dt>Evidence freshness</dt>
-                    <dd>{caseLabel(item.freshness)}</dd>
-                  </div>
-                </dl>
-                <IssueRecordDetails item={item} expanded />
-              </IssueSection>
-            ) : null}
-          </div>
-        </div>
-      </IssueDetailViews>
+        </IssueDetailViews>
+      </IssuePageNavigation.Provider>
     </div>
   );
 }

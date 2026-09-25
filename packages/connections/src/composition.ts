@@ -96,3 +96,5 @@ export type { SimulationTransport } from './infrastructure/installations/simulat
 export { createReadChecks } from './infrastructure/read-checks.js';
 
 export { createPlaybookGrantReader } from './infrastructure/playbook-grants.js';
+
+export { createProductIdentityReader } from './infrastructure/product-identities.js';

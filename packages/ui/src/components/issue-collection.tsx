@@ -142,6 +142,8 @@ type Filter<T> = {
 };
 
 type CollectionProps<T extends { id: string }> = {
+  previewCount?: number;
+  triggerLabel?: string;
   title: string;
   noun: string;
   items: T[];
@@ -153,7 +155,7 @@ type CollectionProps<T extends { id: string }> = {
   notice?: ReactNode;
 };
 
-/** Shows three records and opens the full collection in the enclosing issue panel. */
+/** Opens a collection in the enclosing issue view. Previews three records by default; zero shows only the trigger. */
 export function IssueCollection<T extends { id: string }>(
   props: CollectionProps<T>,
 ) {
@@ -166,16 +168,17 @@ export function IssueCollection<T extends { id: string }>(
 
   return (
     <>
-      {props.renderItems(props.items.slice(0, 3))}
-      {props.items.length > 3 || props.hasMore ? (
+      {props.renderItems(props.items.slice(0, props.previewCount ?? 3))}
+      {props.items.length > (props.previewCount ?? 3) || props.hasMore ? (
         <Button
           variant="outline"
           className="issue-collection-open"
           onClick={() => context.open(id)}
         >
-          {props.hasMore
-            ? `View ${props.noun}`
-            : `View all ${props.items.length} ${props.noun}`}
+          {props.triggerLabel ??
+            (props.hasMore
+              ? `View ${props.noun}`
+              : `View all ${props.items.length} ${props.noun}`)}
         </Button>
       ) : null}
       {context.active === id && context.outlet

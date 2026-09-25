@@ -10,7 +10,8 @@ import type {
   CaseReader,
 } from '../application/cases.js';
 import type { Incident } from '../application/detection.js';
-import type { Diagnosis } from '../domain/diagnosis.js';
+import type { Diagnosis, DiagnosisInput } from '../domain/diagnosis.js';
+import { inventorySources } from '../domain/inventory-sources.js';
 
 type Row = {
   document: Incident;
@@ -398,12 +399,23 @@ export function createCaseReader(
     get: (tenantId, id) =>
       db.transaction(tenantId, async (tx) => {
         const clock = now();
-        const result = await tx.query<Row>(
-          `${projection} SELECT * FROM ordered WHERE document->>'id'=$3`,
+        const result = await tx.query<
+          Row & { diagnosis_snapshot: DiagnosisInput | null }
+        >(
+          `${projection} SELECT ordered.*, (SELECT d.snapshot FROM exception_diagnoses d
+            WHERE d.tenant_id=$1 AND d.exception_id=$3::text::uuid AND d.revision=(ordered.diagnosis->>'revision')::integer) AS diagnosis_snapshot
+            FROM ordered WHERE document->>'id'=$3`,
           [tenantId, clock.toISOString(), id],
         );
 
-        return result.rows[0] ? project(result.rows[0], clock) : null;
+        const row = result.rows[0];
+
+        return row
+          ? {
+              ...project(row, clock),
+              inventorySources: inventorySources(row.diagnosis_snapshot),
+            }
+          : null;
       }),
   };
 }

@@ -291,7 +291,7 @@ export function CaseResolution({
           }
         >
           {receipt.kind === 'approve'
-            ? 'This acknowledges your decision. Execution and verification are tracked separately below.'
+            ? 'This acknowledges your decision. Execution and verification are tracked separately.'
             : receipt.kind === 'reject'
               ? 'The proposal was rejected. The case remains open for follow-up.'
               : 'The case was escalated for further review.'}

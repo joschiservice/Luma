@@ -5,6 +5,7 @@ import { createCommerceServices } from '@luma/application-runtime';
 import type { CommerceObservation, SourceIdentity } from '@luma/connections';
 import {
   createConnectionCoverage,
+  createProductIdentityReader,
   createReadChecks,
 } from '@luma/connections/composition';
 import { makeTenantContext } from '@luma/identity/composition';
@@ -137,7 +138,7 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
       `CREATE ROLE "${name}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`,
     );
     await admin.query(
-      `GRANT luma_connectors,luma_orders,luma_inventory TO "${name}"`,
+      `GRANT luma_connectors,luma_orders,luma_inventory,luma_case_reader TO "${name}"`,
     );
     url.username = name;
     url.password = password;
@@ -180,6 +181,93 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
     await owner.query(
       'TRUNCATE connector_observations,connector_source_mappings,orders_entities,inventory_entities CASCADE',
     );
+  });
+  it('reads product labels by mapped SKU with tenant isolation and latest product revisions', async () => {
+    const db = createTenantDatabase(runtime);
+    const read = createProductIdentityReader({
+      transaction: (tenantId, operation) =>
+        db.transaction(tenantId, async (tx) => {
+          await tx.query('SET LOCAL ROLE luma_case_reader');
+
+          return operation(tx);
+        }),
+    });
+    const record = createReadChecks(db);
+    const inventory = stock();
+    await mapStock(inventory, 'product-stock');
+    const skuId = (await services.sources.resolve(context(), {
+      ...inventory.observation.source,
+      ...inventory.observation.data.sku,
+    }))!;
+    await owner.query(
+      `UPDATE connector_installations SET document=document || '{"permissions":["products.read"],"granted":["products.read"]}'::jsonb WHERE tenant_id=$1`,
+      [tenant],
+    );
+    const product = {
+      ...inventory.observation,
+      source: {
+        ...inventory.observation.source,
+        resource: 'product' as const,
+        externalId: 'product-1',
+      },
+      data: {
+        title: 'Blue shirt',
+        status: 'active' as const,
+        skus: [
+          {
+            id: inventory.observation.data.sku,
+            code: 'SHIRT-BLUE',
+            unit: 'each',
+          },
+          {
+            id: { externalId: 'unmapped', scopeKey: '' },
+            code: 'WRONG',
+            unit: 'each',
+          },
+        ],
+      },
+    };
+    const save = (item: typeof product) =>
+      record(context(), connection, 'products.read', {
+        ok: true,
+        value: { items: [item], nextCursor: null, completeness: 'complete' },
+      });
+    try {
+      expect(await read(tenant, skuId)).toEqual([]);
+      await save(product);
+      expect(await read(tenant, skuId)).toEqual([
+        { source: 'shopify', title: 'Blue shirt', sku: 'SHIRT-BLUE' },
+      ]);
+      expect(await read(otherTenant, skuId)).toEqual([]);
+      await save({
+        ...product,
+        observedAt: '2030-01-02T00:00:00Z',
+        data: {
+          ...product.data,
+          title: 'Renamed shirt',
+          skus: [{ ...product.data.skus[0]!, code: 'NEW-SKU' }],
+        },
+      });
+      await save(product); // A late older observation must not replace a newer label.
+      expect(await read(tenant, skuId)).toEqual([
+        { source: 'shopify', title: 'Renamed shirt', sku: 'NEW-SKU' },
+      ]);
+      await save({
+        ...product,
+        observedAt: '2030-01-03T00:00:00Z',
+        data: { ...product.data, skus: [] },
+      });
+      expect(await read(tenant, skuId)).toEqual([]);
+    } finally {
+      await owner.query(
+        'DELETE FROM connector_read_checks WHERE tenant_id=$1',
+        [tenant],
+      );
+      await owner.query(
+        `UPDATE connector_installations SET document=document || '{"permissions":[],"granted":[]}'::jsonb WHERE tenant_id=$1`,
+        [tenant],
+      );
+    }
   });
   it('persists empty read coverage, failures and recovery with tenant isolation', async () => {
     const db = createTenantDatabase(runtime);

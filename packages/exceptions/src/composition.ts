@@ -64,8 +64,9 @@ export function createDiagnoses(
 export function createCases(
   db: TenantDatabase,
   now: () => Date = () => new Date(),
+  productIdentities?: Parameters<typeof createCaseService>[1],
 ) {
-  return createCaseService(createCaseReader(db, now));
+  return createCaseService(createCaseReader(db, now), productIdentities);
 }
 
 /** Creates a persistent command for escalating a tenant's incident to manual attention. */

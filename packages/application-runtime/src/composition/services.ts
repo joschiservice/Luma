@@ -4,7 +4,10 @@ import type { AuditLog } from '@luma/audit';
 import { createAuditLog } from '@luma/audit/composition';
 import { createCommerceIngestion } from '@luma/commerce-ingestion';
 import type { EffectRegistry } from '@luma/connections';
-import { createSourceRecords } from '@luma/connections/composition';
+import {
+  createProductIdentityReader,
+  createSourceRecords,
+} from '@luma/connections/composition';
 import type { DiagnosisOptions, VerificationEvaluator } from '@luma/exceptions';
 import {
   createCaseEscalation,
@@ -95,7 +98,7 @@ export function createDetectionServices(
 
   return {
     exceptions,
-    cases: createCases(db, now),
+    cases: createCases(db, now, createProductIdentityReader(db)),
     diagnoses: createDiagnoses(db, now, diagnosisOptions),
     pipeline: createDetectionPipeline(exceptions, (value) =>
       createHash('sha256').update(value).digest('hex'),

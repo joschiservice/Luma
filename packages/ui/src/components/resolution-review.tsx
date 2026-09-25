@@ -16,10 +16,11 @@ import {
   Target,
   X,
 } from 'lucide-react';
-import { useId, useState } from 'react';
+import { useContext, useEffect, useId, useRef, useState } from 'react';
 
 import { Button } from './button';
 import { caseLabel, CaseNotice, CaseTime } from './case-investigation';
+import { IssuePageNavigation } from './issue-section';
 
 type DecisionKind = CaseDecision['kind'];
 
@@ -53,6 +54,7 @@ export function ResolutionReview({
   onDecision: (kind: DecisionKind, reason: string) => void;
 }) {
   const proposal = review.proposal;
+  const navigate = useContext(IssuePageNavigation);
 
   return (
     <article
@@ -61,7 +63,10 @@ export function ResolutionReview({
     >
       <section>
         <h3>
-          <ClipboardCheck size={16} aria-hidden="true" /> Review the resolution
+          <ClipboardCheck size={16} aria-hidden="true" />{' '}
+          {proposal
+            ? 'Review the proposed correction'
+            : 'No proposed correction'}
         </h3>
         {proposal ? (
           <>
@@ -167,7 +172,7 @@ export function ResolutionReview({
                 : (proposal.policy?.reason ??
                   'Execution is not authorized without a current policy result.')}
               {proposal.policy?.outcome === 'allowed'
-                ? ' No approval click is needed. Execution and verification are tracked below.'
+                ? ' No approval click is needed. Execution and verification are tracked separately.'
                 : null}
             </CaseNotice>
             {!proposal.available ? (
@@ -189,18 +194,32 @@ export function ResolutionReview({
                 }
               >
                 {proposal.approval.outcome === 'approved'
-                  ? 'The decision is recorded. Execution and verification are tracked separately below.'
+                  ? 'The decision is recorded. Execution and verification are tracked separately.'
                   : 'This proposal has not been approved for execution.'}
               </CaseNotice>
             ) : null}
           </>
         ) : (
-          <p>
-            No resolution proposal is available. Review the investigation for
-            manual next steps.
-          </p>
+          <>
+            <p>
+              {progress?.resolution
+                ? 'This issue is closed. No correction is available to review.'
+                : review.permittedDecisions.includes('escalate')
+                  ? 'Follow the recommended manual steps or escalate this issue for further review.'
+                  : 'Review the investigation for the recommended next step.'}
+            </p>
+            {navigate ? (
+              <Button
+                className="resolution-next-step"
+                variant="outline"
+                onClick={() => navigate('overview')}
+              >
+                View recommended next step
+              </Button>
+            ) : null}
+          </>
         )}
-        {review.refreshable ? (
+        {proposal && review.refreshable ? (
           <p className="case-caption">
             We’ll check current conditions before applying your approved change.
             If the action changes, we’ll ask you to review it again.
@@ -223,6 +242,7 @@ export function ResolutionReview({
             proposal?.policy?.outcome,
             proposal?.policy?.reason,
           ])}
+          compactEscalation={!proposal && !!navigate}
           decisions={review.permittedDecisions}
           disabled={disabled}
           pending={pending}
@@ -231,66 +251,80 @@ export function ResolutionReview({
           onDecision={onDecision}
         />
       </section>
-      <section aria-label="Execution and verification">
-        <h3>
-          <Activity size={16} aria-hidden="true" /> Execution and verification
-        </h3>
-        {progress ? (
-          <>
-            <p className="case-caption">Issue: {caseLabel(progress.state)}</p>
-            <div className="resolution-outcomes">
-              <p>
-                Execution:{' '}
-                {progress.execution
-                  ? caseLabel(progress.execution.state)
-                  : 'Not recorded'}
-              </p>
-              <p>
-                Verification:{' '}
-                {progress.execution?.verification
-                  ? caseLabel(progress.execution.verification.outcome)
-                  : 'Not recorded'}
-              </p>
-            </div>
-            {progress.execution?.verification ? (
-              <p className="case-caption">
-                Observed{' '}
-                <CaseTime value={progress.execution.verification.observedAt} />{' '}
-                · Evidence:{' '}
-                {progress.execution.verification.observationRefs.join(', ') ||
-                  'None recorded'}
-              </p>
-            ) : null}
-            {progress.workflow.availability === 'unavailable' ? (
-              <CaseNotice title="Workflow progress unavailable">
-                Execution status is uncertain. Refresh to check current
-                progress.
-              </CaseNotice>
-            ) : progress.workflow.progress ? (
-              <p>Workflow: {caseLabel(progress.workflow.progress.phase)}</p>
-            ) : null}
-            {progress.resolution ? (
-              <CaseNotice
-                title={
-                  progress.resolution.kind === 'verification'
-                    ? 'Resolution verified'
-                    : 'Closed by human disposition'
-                }
-              >
-                {progress.resolution.kind === 'verification'
-                  ? 'Fresh evidence confirms the correction.'
-                  : 'Closure does not establish a verified correction.'}
-              </CaseNotice>
-            ) : (
-              <p className="case-caption">
-                A recorded decision does not establish a successful correction.
-              </p>
-            )}
-          </>
-        ) : (
-          <p>Current execution and verification status is unavailable.</p>
-        )}
-      </section>
+      {navigate ? (
+        proposal?.approval ||
+        progress?.execution ||
+        progress?.resolution ||
+        progress?.state === 'escalated' ? (
+          <Button variant="ghost" onClick={() => navigate('execution')}>
+            View execution status
+          </Button>
+        ) : null
+      ) : (
+        <section aria-label="Execution and verification">
+          <h3>
+            <Activity size={16} aria-hidden="true" /> Execution and verification
+          </h3>
+          {progress ? (
+            <>
+              <p className="case-caption">Issue: {caseLabel(progress.state)}</p>
+              <div className="resolution-outcomes">
+                <p>
+                  Execution:{' '}
+                  {progress.execution
+                    ? caseLabel(progress.execution.state)
+                    : 'Not recorded'}
+                </p>
+                <p>
+                  Verification:{' '}
+                  {progress.execution?.verification
+                    ? caseLabel(progress.execution.verification.outcome)
+                    : 'Not recorded'}
+                </p>
+              </div>
+              {progress.execution?.verification ? (
+                <p className="case-caption">
+                  Observed{' '}
+                  <CaseTime
+                    value={progress.execution.verification.observedAt}
+                  />{' '}
+                  · Evidence:{' '}
+                  {progress.execution.verification.observationRefs.join(', ') ||
+                    'None recorded'}
+                </p>
+              ) : null}
+              {progress.workflow.availability === 'unavailable' ? (
+                <CaseNotice title="Workflow progress unavailable">
+                  Execution status is uncertain. Refresh to check current
+                  progress.
+                </CaseNotice>
+              ) : progress.workflow.progress ? (
+                <p>Workflow: {caseLabel(progress.workflow.progress.phase)}</p>
+              ) : null}
+              {progress.resolution ? (
+                <CaseNotice
+                  title={
+                    progress.resolution.kind === 'verification'
+                      ? 'Resolution verified'
+                      : 'Closed by human disposition'
+                  }
+                >
+                  {progress.resolution.kind === 'verification'
+                    ? 'Fresh evidence confirms the correction.'
+                    : 'Closure does not establish a verified correction.'}
+                </CaseNotice>
+              ) : (
+                <p className="case-caption">
+                  A recorded decision does not establish a successful
+                  correction.
+                </p>
+              )}
+            </>
+          ) : (
+            <p>Current execution and verification status is unavailable.</p>
+          )}
+        </section>
+      )}
     </article>
   );
 }
@@ -315,6 +349,7 @@ function Fields({
 }
 
 function DecisionControls({
+  compactEscalation = false,
   decisions,
   disabled,
   pending,
@@ -322,6 +357,7 @@ function DecisionControls({
   refreshing,
   onDecision,
 }: {
+  compactEscalation?: boolean;
   decisions: DecisionKind[];
   disabled: boolean;
   pending: boolean;
@@ -330,26 +366,58 @@ function DecisionControls({
   onDecision: (kind: DecisionKind, reason: string) => void;
 }) {
   const [reason, setReason] = useState('');
+  const [escalating, setEscalating] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const textarea = useRef<HTMLTextAreaElement>(null);
+  const compact =
+    compactEscalation && decisions.length === 1 && decisions[0] === 'escalate';
   const id = useId();
+  useEffect(() => {
+    if (compact && escalating) textarea.current?.focus({ preventScroll: true });
+  }, [compact, escalating]);
   if (!decisions.length)
     return <p>No decisions are currently available to you.</p>;
+
+  if (compact && !escalating)
+    return (
+      <Button
+        ref={trigger}
+        className="resolution-escalate-trigger"
+        variant="outline"
+        disabled={disabled || pending || refreshing}
+        onClick={() => setEscalating(true)}
+      >
+        <ArrowUpRight size={15} aria-hidden="true" />
+        Escalate issue
+      </Button>
+    );
 
   return (
     <div className="resolution-controls" aria-busy={pending}>
       <h4>
-        <MessageSquare size={15} aria-hidden="true" /> Your decision
+        <MessageSquare size={15} aria-hidden="true" />{' '}
+        {compact ? 'Escalate issue' : 'Your decision'}
       </h4>
-      <label htmlFor={id}>Decision reason (required)</label>
+      <label htmlFor={id}>
+        {compact
+          ? 'Why does this need escalation?'
+          : 'Decision reason (required)'}
+      </label>
       <textarea
         id={id}
+        ref={textarea}
         value={reason}
         required
         maxLength={1000}
-        rows={3}
+        rows={compact ? 2 : 3}
         disabled={disabled || pending}
         onChange={(event) => setReason(event.target.value)}
       />
-      <p className="case-caption">Your reason is recorded with the decision.</p>
+      <p className="case-caption">
+        {compact
+          ? 'A reason is required. Escalation marks this issue for further review and records your reason. It does not apply a correction.'
+          : 'Your reason is recorded with the decision.'}
+      </p>
       <div className="resolution-actions">
         {decisions.map((kind) => (
           <Button
@@ -365,9 +433,21 @@ function DecisionControls({
             ) : (
               <ArrowUpRight size={15} aria-hidden="true" />
             )}
-            {caseLabel(kind)}
+            {compact ? 'Confirm escalation' : caseLabel(kind)}
           </Button>
         ))}
+        {compact ? (
+          <Button
+            variant="ghost"
+            disabled={pending}
+            onClick={() => {
+              setEscalating(false);
+              requestAnimationFrame(() => trigger.current?.focus());
+            }}
+          >
+            Cancel
+          </Button>
+        ) : null}
       </div>
       {pending ? (
         <p role="status">

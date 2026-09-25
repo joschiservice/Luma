@@ -3026,6 +3026,10 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
       freshness: 'fresh',
       attention: { required: true, reason: 'manual_intervention' },
       diagnosis: { impact: { exposedQuantity: '8.000000' } },
+      inventorySources: {
+        left: left.source.provider,
+        right: right.source.provider,
+      },
     });
     now = new Date(now.getTime() + 301_000);
     expect(await services.cases.get(context(), id)).toMatchObject({

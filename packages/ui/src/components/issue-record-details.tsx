@@ -42,7 +42,7 @@ export function IssueRecordDetails({
           <div>
             <dt>
               <Package size={13} aria-hidden="true" />
-              {item.subject.kind === 'sku' ? 'SKU / product' : 'Affected item'}
+              {item.subject.kind === 'sku' ? 'SKU ID' : 'Affected item'}
             </dt>
             <dd>{item.subject.id}</dd>
           </div>
@@ -77,6 +77,14 @@ export function IssueRecordDetails({
             <dd>{timestamp(item.lastActivityAt)}</dd>
           </div>
         </dl>
+        {item.diagnosis ? (
+          <dl className="issue-record-reference">
+            <div>
+              <dt>Investigation revision</dt>
+              <dd>{item.diagnosis.revision}</dd>
+            </div>
+          </dl>
+        ) : null}
         <dl className="issue-record-reference">
           <div>
             <dt>

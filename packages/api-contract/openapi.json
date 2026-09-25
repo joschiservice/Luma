@@ -14559,6 +14559,42 @@
                       ],
                       "additionalProperties": false,
                       "nullable": true
+                    },
+                    "productIdentities": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "source": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "sku": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": ["source", "title", "sku"]
+                      }
+                    },
+                    "inventorySources": {
+                      "type": "object",
+                      "properties": {
+                        "left": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "right": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": ["left", "right"],
+                      "additionalProperties": false,
+                      "nullable": true
                     }
                   },
                   "required": [

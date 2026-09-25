@@ -19,6 +19,8 @@ import type { ReactNode } from 'react';
 import { Button } from './button';
 import { IssueCollection } from './issue-collection';
 import { IssueContext } from './issue-context';
+import { IssueFindings } from './issue-findings';
+import { IssueOverview } from './issue-overview';
 import { IssueRecordDetails } from './issue-record-details';
 import { IssueSection } from './issue-section';
 
@@ -324,13 +326,7 @@ function FailedInvestigation({
       </IssueSection>
       {expanded ? (
         <IssueSection section="findings">
-          <InvestigationReport
-            item={item}
-            unconfirmed={unconfirmed}
-            hideHeader
-            recordedOnly
-            progress={<></>}
-          />
+          <IssueFindings item={item} unconfirmed={unconfirmed} />
         </IssueSection>
       ) : (
         <details
@@ -637,128 +633,183 @@ function InvestigationReport({
         </>
       ) : (
         <>
-          <IssueSection section="overview" enabled={expanded}>
-            {!recordedOnly && (
+          <IssueSection
+            section="overview"
+            enabled={expanded}
+            status={
+              !unconfirmed &&
+              item.freshness !== 'stale' &&
+              !diagnosis?.superseded &&
+              item.state !== 'resolved' &&
+              diagnosis &&
+              !['pending', 'failed'].includes(item.diagnosisStatus) &&
+              !['pending', 'failed'].includes(diagnosis.status) &&
+              item.attention.required ? (
+                <span className="issue-overview-review">
+                  Manual review required
+                </span>
+              ) : null
+            }
+          >
+            {expanded ? (
+              <IssueOverview item={item} unconfirmed={unconfirmed}>
+                {!recordedOnly && (
+                  <>
+                    {unconfirmed ? (
+                      <CaseNotice title="Current investigation is unconfirmed">
+                        These are the last confirmed findings. Reconnect or
+                        refresh before choosing a correction.
+                      </CaseNotice>
+                    ) : null}
+                    {item.freshness === 'stale' ? (
+                      <CaseNotice title="Evidence is stale">
+                        Current conditions are unknown. Fresh observations are
+                        needed before choosing a correction.
+                      </CaseNotice>
+                    ) : null}
+                    {item.diagnosisStatus === 'pending' ? (
+                      <CaseNotice title="Investigation pending">
+                        The issue has been detected. Findings and next steps
+                        will appear when investigation completes.
+                      </CaseNotice>
+                    ) : null}
+                    {item.diagnosisStatus === 'failed' ? (
+                      <CaseNotice title="Investigation could not finish">
+                        Refresh to check for a completed investigation. No
+                        recommendation is ready.
+                      </CaseNotice>
+                    ) : null}
+                    {item.diagnosisStatus === 'insufficient_evidence' &&
+                    item.freshness !== 'stale' ? (
+                      <CaseNotice title="More evidence is needed">
+                        Mappings, authority or observations do not yet support a
+                        confident conclusion.
+                      </CaseNotice>
+                    ) : null}
+                  </>
+                )}
+              </IssueOverview>
+            ) : (
               <>
-                {unconfirmed ? (
-                  <CaseNotice title="Current investigation is unconfirmed">
-                    These are the last confirmed findings. Reconnect or refresh
-                    before choosing a correction.
-                  </CaseNotice>
-                ) : null}
-                {item.freshness === 'stale' ? (
-                  <CaseNotice title="Evidence is stale">
-                    Current conditions are unknown. Fresh observations are
-                    needed before choosing a correction.
-                  </CaseNotice>
-                ) : null}
-                {item.diagnosisStatus === 'pending' ? (
-                  <CaseNotice title="Investigation pending">
-                    The issue has been detected. Findings and next steps will
-                    appear when investigation completes.
-                  </CaseNotice>
-                ) : null}
-                {item.diagnosisStatus === 'failed' ? (
-                  <CaseNotice title="Investigation could not finish">
-                    Refresh to check for a completed investigation. No
-                    recommendation is ready.
-                  </CaseNotice>
-                ) : null}
-                {item.diagnosisStatus === 'insufficient_evidence' &&
-                item.freshness !== 'stale' ? (
-                  <CaseNotice title="More evidence is needed">
-                    Mappings, authority or observations do not yet support a
-                    confident conclusion.
-                  </CaseNotice>
-                ) : null}
-              </>
-            )}
-            <section>
-              <h3>
-                <ListChecks size={16} aria-hidden="true" /> Recommended next
-                step
-              </h3>
-              {item.attention.required ? (
-                <p className="case-attention">{item.attention.explanation}</p>
-              ) : null}
-              {unconfirmed ? (
-                <p>
-                  Current recommendations will appear when the investigation is
-                  confirmed.
-                </p>
-              ) : historical ? (
-                <p>
-                  This investigation is historical. Its recommendations are no
-                  longer current.
-                </p>
-              ) : item.diagnosisStatus !== 'failed' &&
-                diagnosis &&
-                !['pending', 'failed'].includes(diagnosis.status) &&
-                diagnosis.nextSteps.length ? (
-                diagnosis.nextSteps.map((step) => (
-                  <div className="case-step" key={step.code}>
-                    <h4>
-                      {step.kind === 'manual_intervention'
-                        ? 'Operator review'
-                        : 'Investigate'}
-                    </h4>
-                    <p>{step.text}</p>
-                    {step.preconditions.length ? (
-                      <>
-                        <h5>Before proceeding</h5>
+                {!recordedOnly && (
+                  <>
+                    {unconfirmed ? (
+                      <CaseNotice title="Current investigation is unconfirmed">
+                        These are the last confirmed findings. Reconnect or
+                        refresh before choosing a correction.
+                      </CaseNotice>
+                    ) : null}
+                    {item.freshness === 'stale' ? (
+                      <CaseNotice title="Evidence is stale">
+                        Current conditions are unknown. Fresh observations are
+                        needed before choosing a correction.
+                      </CaseNotice>
+                    ) : null}
+                    {item.diagnosisStatus === 'pending' ? (
+                      <CaseNotice title="Investigation pending">
+                        The issue has been detected. Findings and next steps
+                        will appear when investigation completes.
+                      </CaseNotice>
+                    ) : null}
+                    {item.diagnosisStatus === 'failed' ? (
+                      <CaseNotice title="Investigation could not finish">
+                        Refresh to check for a completed investigation. No
+                        recommendation is ready.
+                      </CaseNotice>
+                    ) : null}
+                    {item.diagnosisStatus === 'insufficient_evidence' &&
+                    item.freshness !== 'stale' ? (
+                      <CaseNotice title="More evidence is needed">
+                        Mappings, authority or observations do not yet support a
+                        confident conclusion.
+                      </CaseNotice>
+                    ) : null}
+                  </>
+                )}
+                <section>
+                  <h3>
+                    <ListChecks size={16} aria-hidden="true" /> Recommended next
+                    step
+                  </h3>
+                  {item.attention.required ? (
+                    <p className="case-attention">
+                      {item.attention.explanation}
+                    </p>
+                  ) : null}
+                  {unconfirmed ? (
+                    <p>
+                      Current recommendations will appear when the investigation
+                      is confirmed.
+                    </p>
+                  ) : historical ? (
+                    <p>
+                      This investigation is historical. Its recommendations are
+                      no longer current.
+                    </p>
+                  ) : item.diagnosisStatus !== 'failed' &&
+                    diagnosis &&
+                    !['pending', 'failed'].includes(diagnosis.status) &&
+                    diagnosis.nextSteps.length ? (
+                    diagnosis.nextSteps.map((step) => (
+                      <div className="case-step" key={step.code}>
+                        <h4>
+                          {step.kind === 'manual_intervention'
+                            ? 'Operator review'
+                            : 'Investigate'}
+                        </h4>
+                        <p>{step.text}</p>
+                        {step.preconditions.length ? (
+                          <>
+                            <h5>Before proceeding</h5>
+                            <ul>
+                              {step.preconditions.map((text) => (
+                                <li key={text}>{text}</li>
+                              ))}
+                            </ul>
+                          </>
+                        ) : null}
+                        <h5>Expected result and verification</h5>
                         <ul>
-                          {step.preconditions.map((text) => (
+                          {step.verificationCriteria.map((text) => (
                             <li key={text}>{text}</li>
                           ))}
                         </ul>
-                      </>
-                    ) : null}
-                    <h5>Expected result and verification</h5>
-                    <ul>
-                      {step.verificationCriteria.map((text) => (
-                        <li key={text}>{text}</li>
-                      ))}
-                    </ul>
-                    {step.capabilityLimitations.map((text) => (
-                      <p className="case-caption" key={text}>
-                        {text}
-                      </p>
-                    ))}
-                  </div>
-                ))
-              ) : (
-                <p>No current recommendation is available.</p>
-              )}
-              {diagnosis ? (
-                <p className="case-caption">
-                  Investigation revision {diagnosis.revision} ·{' '}
-                  {historical ? 'Historical' : caseLabel(diagnosis.status)}
-                </p>
-              ) : null}
-            </section>
+                        {step.capabilityLimitations.map((text) => (
+                          <p className="case-caption" key={text}>
+                            {text}
+                          </p>
+                        ))}
+                      </div>
+                    ))
+                  ) : (
+                    <p>No current recommendation is available.</p>
+                  )}
+                  {diagnosis ? (
+                    <p className="case-caption">
+                      Investigation revision {diagnosis.revision} ·{' '}
+                      {historical ? 'Historical' : caseLabel(diagnosis.status)}
+                    </p>
+                  ) : null}
+                </section>
 
-            {diagnosis?.impact.exposedQuantity != null && (
-              <div className="report-exposure failed-exposure">
-                <div>
-                  <span>Potential exposure</span>
-                  <p>Does not confirm lost sales or oversold orders.</p>
-                </div>
-                <strong>
-                  {diagnosis.impact.exposedQuantity}{' '}
-                  <small>{diagnosis.impact.unit}</small>
-                </strong>
-              </div>
+                {diagnosis?.impact.exposedQuantity != null && (
+                  <div className="report-exposure failed-exposure">
+                    <div>
+                      <span>Potential exposure</span>
+                      <p>Does not confirm lost sales or oversold orders.</p>
+                    </div>
+                    <strong>
+                      {diagnosis.impact.exposedQuantity}{' '}
+                      <small>{diagnosis.impact.unit}</small>
+                    </strong>
+                  </div>
+                )}
+              </>
             )}
           </IssueSection>
           {expanded ? (
             <IssueSection section="findings">
-              <InvestigationReport
-                item={item}
-                unconfirmed={unconfirmed}
-                hideHeader
-                recordedOnly
-                progress={<></>}
-              />
+              <IssueFindings item={item} unconfirmed={unconfirmed} />
             </IssueSection>
           ) : (
             <details

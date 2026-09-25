@@ -53,10 +53,12 @@ function IssuePagePreview({
   item = issue,
   initiallyFull = true,
   unavailable = false,
+  noProposal = false,
 }: {
   item?: CaseDetail;
   initiallyFull?: boolean;
   unavailable?: boolean;
+  noProposal?: boolean;
 }) {
   const [full, setFull] = useState(initiallyFull);
   const content = (
@@ -130,7 +132,16 @@ function IssuePagePreview({
               unavailable ? null : (
                 <section tabIndex={-1} aria-label="Resolution review">
                   <ResolutionReview
-                    review={resolutionReview}
+                    review={
+                      noProposal
+                        ? {
+                            ...resolutionReview,
+                            proposal: null,
+                            permittedDecisions: ['escalate'],
+                            refreshable: true,
+                          }
+                        : resolutionReview
+                    }
                     progress={resolutionProgress}
                     onDecision={fn()}
                     connectionLabel="JTL · North warehouse"
@@ -245,7 +256,7 @@ export const FullPage: Story = {
       canvas.getByRole('button', { name: 'Audit history' }),
     ).toHaveAttribute('aria-current', 'location');
     await userEvent.click(
-      canvas.getByRole('button', { name: 'View all 32 events' }),
+      canvas.getByRole('button', { name: 'View full history (32)' }),
     );
     await expect(
       canvas.getByRole('heading', { name: 'Audit history' }),
@@ -362,5 +373,240 @@ export const LongTitle: Story = {
     await expect(
       canvasElement.querySelector('.issue-page-full-title'),
     ).not.toBeVisible();
+  },
+};
+
+export const OverviewActions: Story = {
+  args: {
+    item: {
+      ...issue,
+      summary:
+        'Selling availability exceeds the configured authority by 10.000000 each.',
+      diagnosis: {
+        ...issue.diagnosis!,
+        summary:
+          'Selling availability exceeds the configured authority by 10.000000 each.',
+        impact: {
+          ...issue.diagnosis!.impact,
+          exposedQuantity: '10.000000',
+          unit: 'each',
+        },
+        nextSteps: [
+          {
+            code: 'reread_inventory',
+            kind: 'read_investigate',
+            text: 'Reread both mapped stock pools through scoped inventory reads.',
+            evidenceRefs: [],
+            preconditions: [],
+            verificationCriteria: [
+              'Fresh complete observations agree within the configured tolerance.',
+            ],
+            capabilityLimitations: [
+              'Current adapters do not provide a safe write or retry capability.',
+            ],
+          },
+          {
+            code: 'manual_inventory_review',
+            kind: 'manual_intervention',
+            text: 'Ask an authorized operator to review correction against the left authority.',
+            evidenceRefs: [],
+            preconditions: [
+              'Confirm current mapping, authority and available-stock semantics.',
+              'Obtain current observations before correcting.',
+            ],
+            verificationCriteria: [
+              'Reread both equivalent pools after correction and verify the intended quantity.',
+            ],
+            capabilityLimitations: [
+              'Current adapters do not provide a safe write or retry capability.',
+            ],
+          },
+        ],
+      },
+    },
+  },
+};
+
+export const OverviewChecks: Story = {
+  args: OverviewActions.args!,
+  play: async ({ canvasElement }) => {
+    const overview = within(
+      within(canvasElement).getByRole('region', { name: 'Overview' }),
+    );
+    await expect(overview.getByText('10 units')).toBeVisible();
+    await expect(
+      overview.getByText(
+        'Selling availability is 10 units above the configured stock authority.',
+      ),
+    ).toBeVisible();
+    await expect(
+      overview.getByText('Check current stock in both systems.', {
+        selector: 'p',
+      }),
+    ).toBeVisible();
+    await expect(
+      overview.getAllByText(
+        'Automatic correction and retries are not available for this issue.',
+      ),
+    ).toHaveLength(1);
+    await expect(
+      overview.getByText('Obtain current observations before correcting.'),
+    ).not.toBeVisible();
+    await userEvent.click(overview.getByText('Checks and verification'));
+    await expect(
+      overview.getByText('Obtain current observations before correcting.'),
+    ).toBeVisible();
+    await expect(
+      overview.getByText(
+        'Reread both equivalent pools after correction and verify the intended quantity.',
+      ),
+    ).toBeVisible();
+    await expect(
+      overview.queryByText(/Investigation revision/),
+    ).not.toBeInTheDocument();
+  },
+};
+
+export const HistoricalOverview: Story = {
+  args: { item: { ...OverviewActions.args!.item!, freshness: 'stale' } },
+  play: async ({ canvasElement }) => {
+    const overview = within(
+      within(canvasElement).getByRole('region', { name: 'Overview' }),
+    );
+    await expect(
+      overview.getByText('Recorded potential exposure'),
+    ).toBeVisible();
+    await expect(
+      overview.queryByText('Checks and verification'),
+    ).not.toBeInTheDocument();
+    await expect(
+      overview.queryByText('Manual review required'),
+    ).not.toBeInTheDocument();
+  },
+};
+
+export const FindingsComparison: Story = {
+  args: {
+    item: {
+      inventorySources: { left: 'jtl-onprem', right: 'shopify' },
+      ...OverviewActions.args!.item!,
+      diagnosis: {
+        ...OverviewActions.args!.item!.diagnosis!,
+        provenance: {
+          ...OverviewActions.args!.item!.diagnosis!.provenance,
+          evidence:
+            OverviewActions.args!.item!.diagnosis!.provenance.evidence.slice(
+              0,
+              3,
+            ),
+        },
+        facts: [
+          {
+            code: 'reported_availability',
+            text: 'The left source reported 100 each; the right source reported 110 each.',
+            evidenceRefs: ['shopify-stock', 'jtl-stock'],
+          },
+          {
+            code: 'signed_difference',
+            text: 'Left minus right availability is -10.000000 each.',
+            evidenceRefs: ['shopify-stock', 'jtl-stock'],
+          },
+        ],
+      },
+    },
+  },
+};
+
+export const FindingsEvidence: Story = {
+  args: FindingsComparison.args!,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const findings = within(canvas.getByRole('region', { name: 'Findings' }));
+    await expect(
+      findings.getByText('100', { exact: false, selector: 'dd' }),
+    ).toBeVisible();
+    await expect(
+      findings.getByText('110', { exact: false, selector: 'dd' }),
+    ).toBeVisible();
+    await expect(findings.getByText('10', { selector: 'dd' })).toBeVisible();
+    await expect(findings.getByText('JTL-Wawi')).toBeVisible();
+    await expect(
+      findings.getByText('Shopify', { selector: 'dt' }),
+    ).toBeVisible();
+    await userEvent.click(findings.getByText('2 sources'));
+    await expect(
+      within(findings.getByText('2 sources').parentElement!).getByText(
+        'shopify-stock',
+      ),
+    ).toBeVisible();
+    await userEvent.click(findings.getByText('Possible causes · 1'));
+    await expect(findings.getByText('Unconfirmed')).toBeVisible();
+    await expect(
+      findings.getByText(
+        'Inspect sync job evidence before attributing a cause.',
+      ),
+    ).toBeVisible();
+    const trigger = findings.getByRole('button', {
+      name: 'View supporting evidence',
+    });
+    await userEvent.click(trigger);
+    await expect(
+      canvas.getByRole('heading', { name: 'Supporting evidence' }),
+    ).toHaveFocus();
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Back to issue' }),
+    );
+    await expect(trigger).toHaveFocus();
+    await expect(
+      findings.getByText(
+        'Inspect sync job evidence before attributing a cause.',
+      ),
+    ).toBeVisible();
+  },
+};
+
+export const ResolutionWithoutProposal: Story = { args: { noProposal: true } };
+
+export const OverviewProduct: Story = {
+  args: {
+    item: {
+      ...OverviewActions.args!.item!,
+      productIdentities: [
+        { source: 'jtl', title: 'Cotton T-shirt', sku: 'TS-BLUE-M' },
+        { source: 'shopify', title: 'Cotton T-shirt', sku: 'TS-BLUE-M' },
+      ],
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const overview = within(
+      within(canvasElement).getByRole('region', { name: 'Overview' }),
+    );
+    await expect(overview.getByText('Cotton T-shirt')).toBeVisible();
+    await expect(overview.getAllByText('SKU: TS-BLUE-M')).toHaveLength(1);
+    await expect(overview.queryByText(/SKU ID:/)).not.toBeInTheDocument();
+    await expect(overview.getByText(/JTL · Shopify/)).toBeVisible();
+  },
+};
+
+export const OverviewDifferentSkus: Story = {
+  args: {
+    item: {
+      ...OverviewActions.args!.item!,
+      productIdentities: [
+        { source: 'jtl', title: 'Cotton T-shirt', sku: 'TS-BLUE-M' },
+        { source: 'shopify', title: 'Cotton T-shirt', sku: 'BLUE-M' },
+      ],
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const overview = within(
+      within(canvasElement).getByRole('region', { name: 'Overview' }),
+    );
+    await expect(
+      overview.getByText('SKU: TS-BLUE-M').closest('p'),
+    ).toHaveTextContent('JTL');
+    await expect(
+      overview.getByText('SKU: BLUE-M').closest('p'),
+    ).toHaveTextContent('Shopify');
   },
 };

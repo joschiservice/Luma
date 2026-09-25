@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, within } from 'storybook/test';
 
+import { IssuePageNavigation } from './issue-section';
 import { resolutionProgress, resolutionReview } from './resolution-fixtures';
 import { ResolutionReview } from './resolution-review';
 
@@ -158,5 +159,90 @@ export const Unavailable: Story = {
       permittedDecisions: ['reject', 'escalate'],
       proposal: { ...resolutionReview.proposal!, available: false },
     },
+  },
+};
+
+export const PageNoProposal: Story = {
+  args: {
+    review: {
+      ...resolutionReview,
+      proposal: null,
+      permittedDecisions: ['escalate'],
+      refreshable: true,
+    },
+  },
+  decorators: [
+    (Story) => (
+      <IssuePageNavigation.Provider value={fn()}>
+        <Story />
+      </IssuePageNavigation.Provider>
+    ),
+  ],
+};
+
+export const PageEscalation: Story = {
+  ...PageNoProposal,
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByRole('heading', { name: 'No proposed correction' }),
+    ).toBeVisible();
+    await expect(canvas.queryByRole('textbox')).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByRole('region', { name: 'Execution and verification' }),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByText(/We’ll check current conditions/),
+    ).not.toBeInTheDocument();
+    const trigger = canvas.getByRole('button', { name: 'Escalate issue' });
+    await userEvent.click(trigger);
+    const reason = canvas.getByLabelText('Why does this need escalation?');
+    await expect(reason).toHaveFocus();
+    await expect(
+      canvas.getByRole('button', { name: 'Confirm escalation' }),
+    ).toBeDisabled();
+    await userEvent.type(reason, 'Stock mapping needs review');
+    await expect(args.onDecision).not.toHaveBeenCalled();
+    await userEvent.click(canvas.getByRole('button', { name: 'Cancel' }));
+    await expect(canvas.queryByRole('textbox')).not.toBeInTheDocument();
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Escalate issue' }),
+    );
+    await expect(
+      canvas.getByLabelText('Why does this need escalation?'),
+    ).toHaveValue('Stock mapping needs review');
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Confirm escalation' }),
+    );
+    await expect(args.onDecision).toHaveBeenCalledWith(
+      'escalate',
+      'Stock mapping needs review',
+    );
+  },
+};
+
+export const PageNoDecisions: Story = {
+  ...PageNoProposal,
+  args: {
+    review: { ...resolutionReview, proposal: null, permittedDecisions: [] },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.queryByRole('button', { name: 'Escalate issue' }),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.getByRole('button', { name: 'View recommended next step' }),
+    ).toBeVisible();
+  },
+};
+
+export const PageEscalationPending: Story = {
+  ...PageNoProposal,
+  args: { ...PageNoProposal.args!, pending: true },
+  play: async ({ canvasElement }) => {
+    await expect(
+      within(canvasElement).getByRole('button', { name: 'Escalate issue' }),
+    ).toBeDisabled();
   },
 };

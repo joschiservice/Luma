@@ -79,6 +79,20 @@ export const caseListSchema = z.object({
 
 export const caseDetailSchema = caseSummarySchema.extend({
   diagnosis: diagnosisSchema.nullable(),
+  productIdentities: z
+    .array(
+      z.object({
+        source: z.string(),
+        title: z.string().nullable(),
+        sku: z.string().nullable(),
+      }),
+    )
+    .optional(),
+  inventorySources: z
+    .object({ left: z.string().nullable(), right: z.string().nullable() })
+    .strict()
+    .nullable()
+    .optional(),
 });
 
 export type CaseSummary = z.infer<typeof caseSummarySchema>;

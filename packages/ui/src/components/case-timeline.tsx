@@ -22,6 +22,7 @@ import type { ReactNode } from 'react';
 
 import { Button } from './button';
 import { caseLabel, CaseNotice, CaseTime } from './case-investigation';
+import { ExecutionMetadata, ExecutionSummary } from './execution-summary';
 import { IssueCollection } from './issue-collection';
 import { IssueSection } from './issue-section';
 
@@ -31,6 +32,7 @@ export type LiveConnection =
 type Event = CaseTimelinePage['items'][number];
 
 const eventNames: Record<string, string> = {
+  'exception.detected': 'Issue detected',
   'execution.prepared': 'Execution reserved',
   'execution.completed': 'Execution attempt finished',
   'execution.withheld': 'Execution withheld',
@@ -100,34 +102,47 @@ export function CaseTimeline({
   const current = confirmed;
   const workflow = progress.workflow;
 
+  const liveStatus = (
+    <span
+      className="case-live-status"
+      data-live={connection === 'live'}
+      role="status"
+    >
+      {connection === 'live'
+        ? expanded
+          ? 'Live updates'
+          : 'Live'
+        : connection === 'syncing'
+          ? 'Refreshing'
+          : connection === 'connecting'
+            ? 'Connecting'
+            : connection === 'interrupted'
+              ? 'Live updates interrupted'
+              : 'Connection lost'}
+    </span>
+  );
+
   return (
     <section
       className="case-progress recorded-findings"
       aria-label="Execution and audit timeline"
     >
-      <IssueSection section="execution" enabled={expanded}>
-        <header className="case-progress-heading">
-          {!expanded && (
-            <h3>
-              <Activity size={16} aria-hidden="true" /> Execution & verification
-            </h3>
-          )}
-          <span
-            className="case-live-status"
-            data-live={connection === 'live'}
-            role="status"
-          >
-            {connection === 'live'
-              ? 'Live'
-              : connection === 'syncing'
-                ? 'Refreshing'
-                : connection === 'connecting'
-                  ? 'Connecting'
-                  : connection === 'interrupted'
-                    ? 'Live updates interrupted'
-                    : 'Connection lost'}
-          </span>
-        </header>
+      <IssueSection
+        section="execution"
+        enabled={expanded}
+        status={expanded ? liveStatus : undefined}
+      >
+        {!expanded && (
+          <header className="case-progress-heading">
+            {!expanded && (
+              <h3>
+                <Activity size={16} aria-hidden="true" /> Execution &
+                verification
+              </h3>
+            )}
+            {liveStatus}
+          </header>
+        )}
         {!current ? (
           <CaseNotice title="Current state is unconfirmed">
             {connection === 'disconnected'
@@ -136,137 +151,147 @@ export function CaseTimeline({
             The records below show the last confirmed state.
           </CaseNotice>
         ) : null}
-        <ol className="case-lifecycle" aria-label="Case lifecycle">
-          {[
-            {
-              states: ['detected', 'diagnosed'],
-              label: 'Investigation',
-              icon: Search,
-              tone: 'investigation',
-            },
-            {
-              states: ['proposed', 'awaiting_approval', 'allowed'],
-              label: 'Review',
-              icon: ClipboardCheck,
-              tone: 'review',
-            },
-            {
-              states: ['executing'],
-              label: 'Execution',
-              icon: Play,
-              tone: 'execution',
-            },
-            {
-              states: ['verifying'],
-              label: 'Verification',
-              icon: ShieldCheck,
-              tone: 'verification',
-            },
-            {
-              states: ['resolved', 'escalated', 'failed'],
-              label: 'Outcome',
-              icon:
-                progress.state === 'failed' || progress.state === 'escalated'
-                  ? CircleAlert
-                  : progress.resolution?.kind === 'verification'
-                    ? CircleCheck
-                    : Flag,
-              tone:
-                progress.state === 'failed'
-                  ? 'failed'
-                  : progress.state === 'escalated'
-                    ? 'review'
-                    : progress.resolution?.kind === 'verification'
-                      ? 'resolved'
-                      : 'outcome',
-            },
-          ].map(({ states, label, icon: Icon, tone }) => (
-            <li
-              key={label}
-              data-stage={tone}
-              aria-current={
-                states.includes(progress.state) ? 'step' : undefined
-              }
-            >
-              <span className="lifecycle-node">
-                <Icon size={16} aria-hidden="true" />
-              </span>
-              <span>{label}</span>
-            </li>
-          ))}
-        </ol>
-        <div className="execution-state-card">
-          <p className="case-progress-state">
-            {current ? 'Case state' : 'Last confirmed case state'}:{' '}
-            <strong>{caseLabel(progress.state)}</strong>
-          </p>
-          <p className="case-caption">
-            Case revision {progress.caseRevision} · Investigation revision{' '}
-            {progress.diagnosisRevision}
-          </p>
-          <p>
-            Workflow:{' '}
-            {workflow.availability === 'unavailable'
-              ? 'Unavailable. Current activity is unknown.'
-              : workflow.availability === 'not_started'
-                ? 'Not started'
-                : workflow.progress
-                  ? caseLabel(workflow.progress.phase)
-                  : 'Current phase unknown'}
-          </p>
-          {workflow.progress?.reason ? (
-            <p>{caseLabel(workflow.progress.reason)}</p>
-          ) : null}
-        </div>
-        <div className="case-outcomes">
-          <div
-            data-tone={
-              execution?.state === 'succeeded'
-                ? 'success'
-                : execution?.state === 'failed'
-                  ? 'error'
-                  : 'neutral'
-            }
-          >
-            <Subheading>
-              <Play size={15} aria-hidden="true" /> Execution result
-            </Subheading>
-            <strong>
-              {execution
-                ? {
-                    prepared: 'Reserved; result pending',
-                    unknown: 'Effect unknown',
-                    succeeded: 'Succeeded',
-                    failed: 'Failed',
-                  }[execution.state]
-                : 'No attempt recorded'}
-            </strong>
-            <p>A successful action alone does not establish resolution.</p>
-          </div>
-          <div
-            data-tone={
-              verification?.outcome === 'passed'
-                ? 'success'
-                : verification?.outcome === 'failed'
-                  ? 'error'
-                  : 'neutral'
-            }
-          >
-            <Subheading>
-              <ShieldCheck size={15} aria-hidden="true" /> Verification result
-            </Subheading>
-            <strong>
-              {verification ? caseLabel(verification.outcome) : 'Not recorded'}
-            </strong>
-            <p>
-              {verification?.outcome === 'passed'
-                ? 'The recorded verification criteria passed.'
-                : verification?.outcome === 'failed'
-                  ? 'The intended outcome was not confirmed.'
-                  : 'The intended outcome remains uncertain.'}
-            </p>
-          </div>
-        </div>
+        {expanded ? (
+          <ExecutionSummary progress={progress} confirmed={current} />
+        ) : (
+          <>
+            <ol className="case-lifecycle" aria-label="Case lifecycle">
+              {[
+                {
+                  states: ['detected', 'diagnosed'],
+                  label: 'Investigation',
+                  icon: Search,
+                  tone: 'investigation',
+                },
+                {
+                  states: ['proposed', 'awaiting_approval', 'allowed'],
+                  label: 'Review',
+                  icon: ClipboardCheck,
+                  tone: 'review',
+                },
+                {
+                  states: ['executing'],
+                  label: 'Execution',
+                  icon: Play,
+                  tone: 'execution',
+                },
+                {
+                  states: ['verifying'],
+                  label: 'Verification',
+                  icon: ShieldCheck,
+                  tone: 'verification',
+                },
+                {
+                  states: ['resolved', 'escalated', 'failed'],
+                  label: 'Outcome',
+                  icon:
+                    progress.state === 'failed' ||
+                    progress.state === 'escalated'
+                      ? CircleAlert
+                      : progress.resolution?.kind === 'verification'
+                        ? CircleCheck
+                        : Flag,
+                  tone:
+                    progress.state === 'failed'
+                      ? 'failed'
+                      : progress.state === 'escalated'
+                        ? 'review'
+                        : progress.resolution?.kind === 'verification'
+                          ? 'resolved'
+                          : 'outcome',
+                },
+              ].map(({ states, label, icon: Icon, tone }) => (
+                <li
+                  key={label}
+                  data-stage={tone}
+                  aria-current={
+                    states.includes(progress.state) ? 'step' : undefined
+                  }
+                >
+                  <span className="lifecycle-node">
+                    <Icon size={16} aria-hidden="true" />
+                  </span>
+                  <span>{label}</span>
+                </li>
+              ))}
+            </ol>
+            <div className="execution-state-card">
+              <p className="case-progress-state">
+                {current ? 'Case state' : 'Last confirmed case state'}:{' '}
+                <strong>{caseLabel(progress.state)}</strong>
+              </p>
+              <p className="case-caption">
+                Case revision {progress.caseRevision} · Investigation revision{' '}
+                {progress.diagnosisRevision}
+              </p>
+              <p>
+                Workflow:{' '}
+                {workflow.availability === 'unavailable'
+                  ? 'Unavailable. Current activity is unknown.'
+                  : workflow.availability === 'not_started'
+                    ? 'Not started'
+                    : workflow.progress
+                      ? caseLabel(workflow.progress.phase)
+                      : 'Current phase unknown'}
+              </p>
+              {workflow.progress?.reason ? (
+                <p>{caseLabel(workflow.progress.reason)}</p>
+              ) : null}
+            </div>
+            <div className="case-outcomes">
+              <div
+                data-tone={
+                  execution?.state === 'succeeded'
+                    ? 'success'
+                    : execution?.state === 'failed'
+                      ? 'error'
+                      : 'neutral'
+                }
+              >
+                <Subheading>
+                  <Play size={15} aria-hidden="true" /> Execution result
+                </Subheading>
+                <strong>
+                  {execution
+                    ? {
+                        prepared: 'Reserved; result pending',
+                        unknown: 'Effect unknown',
+                        succeeded: 'Succeeded',
+                        failed: 'Failed',
+                      }[execution.state]
+                    : 'No attempt recorded'}
+                </strong>
+                <p>A successful action alone does not establish resolution.</p>
+              </div>
+              <div
+                data-tone={
+                  verification?.outcome === 'passed'
+                    ? 'success'
+                    : verification?.outcome === 'failed'
+                      ? 'error'
+                      : 'neutral'
+                }
+              >
+                <Subheading>
+                  <ShieldCheck size={15} aria-hidden="true" /> Verification
+                  result
+                </Subheading>
+                <strong>
+                  {verification
+                    ? caseLabel(verification.outcome)
+                    : 'Not recorded'}
+                </strong>
+                <p>
+                  {verification?.outcome === 'passed'
+                    ? 'The recorded verification criteria passed.'
+                    : verification?.outcome === 'failed'
+                      ? 'The intended outcome was not confirmed.'
+                      : 'The intended outcome remains uncertain.'}
+                </p>
+              </div>
+            </div>
+          </>
+        )}
         {boundProposal ? (
           <details className="case-evidence">
             <summary>Action and verification criteria</summary>
@@ -317,15 +342,20 @@ export function CaseTimeline({
               </p>
             ) : null}
           </details>
-        ) : (
+        ) : execution || !expanded ? (
           <p>Verification criteria are not available for this attempt.</p>
-        )}
+        ) : null}
         {execution ? (
           <details className="case-evidence">
             <summary>
-              Attempt {execution.attempt} · {caseLabel(execution.state)}
+              {expanded
+                ? 'Execution details'
+                : `Attempt ${execution.attempt} · ${caseLabel(execution.state)}`}
             </summary>
+            {expanded ? <ExecutionMetadata progress={progress} /> : null}
             <dl>
+              <dt>Attempt</dt>
+              <dd>{execution.attempt}</dd>
               <dt>Attempt ID</dt>
               <dd>{execution.attemptId}</dd>
               <dt>Execution</dt>
@@ -376,6 +406,11 @@ export function CaseTimeline({
               </>
             ) : null}
           </details>
+        ) : expanded ? (
+          <details className="case-evidence">
+            <summary>Execution details</summary>
+            <ExecutionMetadata progress={progress} />
+          </details>
         ) : null}
         {progress.resolution ? (
           <div className="case-resolution">
@@ -393,11 +428,11 @@ export function CaseTimeline({
             </p>
             <References refs={progress.resolution.evidenceRefs} />
           </div>
-        ) : (
+        ) : !expanded ? (
           <p className="case-caption">
             This issue is still open. No resolution has been recorded.
           </p>
-        )}
+        ) : null}
         {['failed', 'escalated'].includes(progress.state) ? (
           <CaseNotice title="Next steps">
             <span>
@@ -411,7 +446,22 @@ export function CaseTimeline({
           </CaseNotice>
         ) : null}
       </IssueSection>
-      <IssueSection section="history" enabled={expanded}>
+      <IssueSection
+        section="history"
+        enabled={expanded}
+        status={
+          expanded && onRefresh ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onRefresh}
+              disabled={loadingHistory}
+            >
+              <RefreshCw size={14} aria-hidden="true" /> Refresh history
+            </Button>
+          ) : undefined
+        }
+      >
         <div
           className="case-progress-heading"
           data-issue-section={expanded ? undefined : 'history'}
@@ -422,14 +472,20 @@ export function CaseTimeline({
               <History size={16} aria-hidden="true" /> Audit history
             </Subheading>
           )}
-          {onRefresh ? (
+          {!expanded && onRefresh ? (
             <Button variant="outline" onClick={onRefresh}>
               <RefreshCw size={14} aria-hidden="true" /> Refresh progress
             </Button>
           ) : null}
         </div>
+        {timeline.length ? <p className="case-caption">Newest first</p> : null}
         <IssueCollection
           title="Audit history"
+          triggerLabel={
+            hasMoreTimeline
+              ? 'View full history'
+              : `View full history (${timeline.length})`
+          }
           noun="events"
           items={[...timeline].sort((a, b) =>
             b.occurredAt.localeCompare(a.occurredAt),
@@ -453,7 +509,7 @@ export function CaseTimeline({
           ]}
           renderItems={(events) =>
             events.length ? (
-              <ol className="case-audit">
+              <ol className={`case-audit${expanded ? ' audit-compact' : ''}`}>
                 {events.map((event) => (
                   <li key={event.id}>
                     <span className="audit-event-icon" aria-hidden="true">
@@ -472,7 +528,16 @@ export function CaseTimeline({
                         {eventNames[event.type] ??
                           caseLabel(event.type.replaceAll('.', ' '))}
                       </strong>
-                      <CaseTime value={event.occurredAt} />
+                      <time
+                        dateTime={event.occurredAt}
+                        title={event.occurredAt}
+                      >
+                        {new Date(event.occurredAt)
+                          .toISOString()
+                          .replace('T', ' ')
+                          .slice(0, 19)}{' '}
+                        UTC
+                      </time>
                     </div>
                     {event.outcome ? (
                       <p
@@ -488,16 +553,26 @@ export function CaseTimeline({
                         {caseLabel(event.outcome)}
                       </p>
                     ) : null}
-                    <p className="case-caption">
-                      Actor: {event.actorId ?? 'Not recorded'}
-                    </p>
+                    {event.actorId ? (
+                      <p className="case-caption audit-actor">
+                        By {event.actorId}
+                      </p>
+                    ) : null}
                     <details className="audit-event-details">
-                      <summary>Audit evidence</summary>
+                      <summary>Event details</summary>
                       <dl>
                         <dt>Event</dt>
                         <dd>{event.id}</dd>
                         <dt>Event type</dt>
                         <dd>{event.type}</dd>
+                        <dt>Recorded at</dt>
+                        <dd>
+                          <time dateTime={event.occurredAt}>
+                            {event.occurredAt}
+                          </time>
+                        </dd>
+                        <dt>Actor</dt>
+                        <dd>{event.actorId ?? 'Not recorded'}</dd>
                         {event.proposalId ? (
                           <>
                             <dt>Proposal</dt>

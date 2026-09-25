@@ -2469,3 +2469,45 @@
   background: var(--accent);
   color: var(--foreground);
 }
+
+/* Full-page audit previews and collections share compact timeline rows. */
+.case-progress .case-audit.audit-compact {
+  margin-block: 8px 16px;
+}
+.case-progress .audit-compact > li {
+  border: 0;
+  border-radius: 0;
+  padding: 10px 0;
+  margin: 0;
+  background: transparent;
+}
+.case-progress .audit-compact > li::before {
+  bottom: -12px;
+}
+.case-progress .audit-compact .audit-event-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  flex-wrap: wrap;
+}
+.case-progress .audit-compact .audit-event-heading > time {
+  flex-shrink: 0;
+}
+.case-progress .audit-compact .audit-event-details {
+  border: 0;
+  margin-top: 4px;
+}
+.case-progress .audit-compact .audit-event-details[open] > dl {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+.case-progress .audit-compact .audit-actor {
+  margin: 4px 0;
+}
+@media (max-width: 760px) {
+  .case-progress .audit-compact .audit-event-heading {
+    flex-direction: column;
+    gap: 2px;
+  }
+}

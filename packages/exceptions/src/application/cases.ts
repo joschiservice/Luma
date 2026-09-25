@@ -37,6 +37,12 @@ export interface CaseSummary {
 }
 
 export interface CaseDetail extends CaseSummary {
+  inventorySources?: { left: string | null; right: string | null } | null;
+  productIdentities?: {
+    source: string;
+    title: string | null;
+    sku: string | null;
+  }[];
   diagnosis: Diagnosis | null;
 }
 
@@ -84,7 +90,13 @@ export interface CaseReader {
  * Creates case reads that require a resolved tenant context before accessing the supplied
  * reader.
  */
-export function createCaseService(reader: CaseReader) {
+export function createCaseService(
+  reader: CaseReader,
+  productIdentities?: (
+    tenantId: string,
+    skuId: string,
+  ) => Promise<NonNullable<CaseDetail['productIdentities']>>,
+) {
   return {
     evidence(context: TenantContext, id: string, query: CaseEvidenceQuery) {
       requireTenant(context, context.tenantId);
@@ -101,10 +113,20 @@ export function createCaseService(reader: CaseReader) {
 
       return reader.list(context.tenantId, query);
     },
-    get(context: TenantContext, id: string) {
+    async get(context: TenantContext, id: string) {
       requireTenant(context, context.tenantId);
 
-      return reader.get(context.tenantId, id);
+      const item = await reader.get(context.tenantId, id);
+      if (!item || item.subject.kind !== 'sku' || !productIdentities)
+        return item;
+
+      return {
+        ...item,
+        productIdentities: await productIdentities(
+          context.tenantId,
+          item.subject.id,
+        ),
+      };
     },
   };
 }
