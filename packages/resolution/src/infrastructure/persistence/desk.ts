@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { IdentityError, requireRole, requireTenant } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
 import type { PolicyService, ProposedAction } from '@luma/policies';
+import { workspacePolicyVersion } from '@luma/policies';
 import { z } from 'zod';
 
 import type {
@@ -35,6 +36,22 @@ async function load(tx: SqlTransaction, tenantId: string, id: string) {
   ).rows[0];
   if (!row) throw new IdentityError(404, 'NOT_FOUND', 'Case not found');
   if (!row.proposal?.action) row.proposal = null;
+  const revision =
+    (
+      await tx.query<{ revision: number }>(
+        'SELECT policy_revision AS revision FROM workspace_settings WHERE tenant_id=$1',
+        [tenantId],
+      )
+    ).rows[0]?.revision ?? 0;
+  row.effectivePolicyVersion = workspacePolicyVersion(revision);
+  row.policyStale =
+    !!row.decision && row.decision.policyVersion !== row.effectivePolicyVersion;
+  if (row.policyStale) row.decision = null;
+  if (
+    row.approval?.outcome === 'approved' &&
+    row.approval.policyVersion !== row.effectivePolicyVersion
+  )
+    row.approval = null;
 
   return row;
 }

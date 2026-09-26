@@ -98,6 +98,7 @@ export async function buildRuntimeApp(
         ? { shopify: installedConnections.shopify }
         : {}),
       identity: identity.service,
+      settings: identity.settings,
       trustedOrigins: settings.trustedOrigins,
       checkReadiness: createReadinessCheck(
         identity.checkReadiness,
@@ -114,6 +115,16 @@ export async function buildRuntimeApp(
       app.log.error('Case database connection failed'),
     );
     registerIdentityHttp(app, identity);
+    const deliveryTimer = setInterval(() => {
+      void identity.mailDelivery
+        .drain()
+        .catch(() => app.log.error('Email delivery pass failed'));
+    }, 5000);
+    deliveryTimer.unref();
+    resources.add(async () => {
+      clearInterval(deliveryTimer);
+      await identity.mailDelivery.drain();
+    });
     app.addHook('onClose', resources.close);
 
     return app;

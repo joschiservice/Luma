@@ -4,6 +4,11 @@ import {
   type ActivityQuery,
   activityTypes,
 } from '@luma/api-contract';
+import {
+  nextCalendarDay,
+  workspaceDateValue,
+  workspaceInstant,
+} from '@luma/ui/lib/timezone';
 import { queryOptions } from '@tanstack/react-query';
 
 import { createWebApiClient } from '../../lib/api-client';
@@ -32,7 +37,7 @@ const day = (v: unknown) =>
 const text = (v: unknown, max: number) =>
   typeof v === 'string' ? v.slice(0, max) : undefined;
 
-/** Keeps supported search fields and ignores malformed URL values. Dates are UTC calendar days. */
+/** Keeps supported search fields and ignores malformed URL values. Dates are workspace calendar days. */
 export function parseActivityFilters(
   value: Record<string, unknown>,
 ): ActivityFilters {
@@ -73,9 +78,13 @@ export function parseActivityFilters(
   };
 }
 
-/** Resolves the default 30 calendar days to an explicit, reproducible UTC range. */
-export function activityRange(filters: ActivityFilters, now = new Date()) {
-  const to = filters.to ?? now.toISOString().slice(0, 10);
+/** Resolves the default 30 calendar days to an explicit workspace calendar range. */
+export function activityRange(
+  filters: ActivityFilters,
+  now = new Date(),
+  timeZone = 'UTC',
+) {
+  const to = filters.to ?? workspaceDateValue(now, timeZone);
   const from =
     filters.from ??
     new Date(Date.parse(to) - 29 * 86400000).toISOString().slice(0, 10);
@@ -89,12 +98,13 @@ export function activityOptions(
   organizationId: string,
   filters: ActivityFilters,
   head = false,
+  timeZone = 'UTC',
 ) {
-  const range = activityRange(filters);
+  const range = activityRange(filters, new Date(), timeZone);
   const query = {
     ...filters,
-    from: `${range.from}T00:00:00.000Z`,
-    to: new Date(Date.parse(range.to) + 86400000).toISOString(),
+    from: workspaceInstant(range.from, timeZone),
+    to: workspaceInstant(nextCalendarDay(range.to), timeZone),
     limit: 30,
     cursor: head ? undefined : filters.cursor,
   };

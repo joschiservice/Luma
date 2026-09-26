@@ -422,6 +422,7 @@ export async function createPilot(
             {
               observability,
               identity: identity.service,
+              settings: identity.settings,
               trustedOrigins: settings.trustedOrigins,
               ...application.http,
               desk,
@@ -438,6 +439,16 @@ export async function createPilot(
     if (app) {
       resources.add(() => app.close());
       registerIdentityHttp(app, identity);
+      const mailTimer = setInterval(() => {
+        void identity.mailDelivery
+          .drain()
+          .catch(() => app.log.error('Email delivery pass failed'));
+      }, 5000);
+      mailTimer.unref();
+      app.addHook('onClose', async () => {
+        clearInterval(mailTimer);
+        await identity.mailDelivery.drain();
+      });
       if (inventory) {
         const base = '/v1/organizations/:organizationId/simulator/inventory';
         app.get(base, (request) =>

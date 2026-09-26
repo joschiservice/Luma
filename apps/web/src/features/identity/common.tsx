@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from '@tanstack/react-router';
 import { useEffect } from 'react';
 
 import { clearPrivate, IdentityError, returnPath } from './data';
+import { retainInvitationToken } from './invitation-return';
 
 /** Renders the shared Luma wordmark linked to the public home page. */
 export function Brand() {
@@ -32,7 +33,7 @@ export function SignInRedirect() {
     void clearPrivate(client).then(() =>
       navigate({
         to: '/sign-in',
-        search: { returnTo: returnPath(href) },
+        search: { returnTo: returnPath(retainInvitationToken(href)) },
         replace: true,
       }),
     );

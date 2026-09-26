@@ -50,7 +50,7 @@ The typed contract and OpenAPI document describe organization routes. Send the s
 | `PATCH /v1/organizations/:organizationId/members/:memberId`  | Change a role                                                                                     |
 | `DELETE /v1/organizations/:organizationId/members/:memberId` | Remove a member                                                                                   |
 
-Owners and admins manage members; only owners may grant or revoke ownership. The last owner cannot be removed or demoted. Membership mutations serialize on the organization row and recheck the acting membership after acquiring the lock. Adding users is an explicit administrator action; email invitations and verification delivery are not enabled in this foundation.
+Owners and admins manage members; only owners may grant or revoke ownership. The last owner cannot be removed or demoted. Membership mutations serialize on the organization row and recheck the acting membership after acquiring the lock. Adding users by UUID remains an explicit administrator action. [Workspace Settings](workspace-settings.md) also provides expiring email invitations, audited access changes and email preferences.
 
 The auth bridge also permits session listing/revocation and password changes. Other Better Auth routes, including direct organization routes, return 404. Organization creation uses Better Auth's organization plugin inside the identity transaction; Luma's API owns membership management and placement rules. Cookie cache and automatic account linking are disabled.
 
@@ -153,3 +153,5 @@ return-path validation, tenant switching with a delayed response, separate tabs,
 access revocation, recoverable service failures, sign-out, and keyboard navigation
 at 1440×1000 and 390×844. The delayed-query unit check also verifies cancellation
 and removal of the previous tenant's cache entries.
+
+See [workspace settings](workspace-settings.md) for invitation acceptance, timezone controls, mail configuration and approval preferences.

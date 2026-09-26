@@ -15,3 +15,5 @@ export function registerIdentityHttp(
   );
   registerAuthHandler(app, identity.handler, identity.baseURL);
 }
+
+export { settingsRoutes } from './api/settings.js';

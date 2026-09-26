@@ -368,6 +368,12 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
         'INSERT INTO execution_intents(id,tenant_id,action_hash,document) VALUES($1,$2,$3,$4)',
         [action.id, tenantId, candidate.actionHash, action],
       );
+      const admission = await safety.policies.evaluate(
+        context(),
+        action,
+        candidate.actionHash,
+        { available: true, minimumRisk: 'high' },
+      );
       await owner.query(
         `INSERT INTO executed_actions(id,tenant_id,proposal_id,idempotency_key,action_hash,state,document) VALUES($1,$2,$3,$4,$5,'unknown',$6)`,
         [
@@ -381,6 +387,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
             proposalId: action.id,
             state: 'unknown',
             attempt: {
+              policyDecisionId: admission.id,
               startedAt: new Date(now.getTime() - 301_000).toISOString(),
             },
           },

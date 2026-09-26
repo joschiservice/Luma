@@ -13,14 +13,16 @@ import {
   RefreshCw,
   Zap,
 } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { type ReactNode, useContext } from 'react';
 
+import { workspaceDateValue } from '../../lib/timezone';
 import { CaseLoading, CaseNotice } from '../issues/case-investigation';
 import { Alert } from '../primitives/alert';
 import { Badge } from '../primitives/badge';
 import { Button } from '../primitives/button';
 import { Card, CardHeader } from '../primitives/card';
 import { Select } from '../primitives/select';
+import { WorkspaceTimezone } from '../primitives/workspace-date';
 
 export interface OperationsOverviewProps {
   data?: Summary | undefined;
@@ -34,10 +36,6 @@ export interface OperationsOverviewProps {
   connectionsLink: ReactNode;
   inboxLink: ReactNode;
   decisionLink: (item: CaseSummary) => ReactNode;
-}
-
-function timestamp(value: string) {
-  return value.replace('T', ' ').slice(0, 16) + ' UTC';
 }
 
 /** Classifies an operations summary into the presentation state used by the overview. */
@@ -122,6 +120,9 @@ export function OperationsOverview({
   inboxLink,
   decisionLink,
 }: OperationsOverviewProps) {
+  const timezone = useContext(WorkspaceTimezone);
+  const timestamp = (value: string) =>
+    `${workspaceDateValue(new Date(value), timezone, true).replace('T', ' ').slice(0, 16)} ${timezone}`;
   const state = data ? overviewState(data) : undefined;
 
   return (

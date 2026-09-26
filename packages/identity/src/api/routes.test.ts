@@ -49,6 +49,9 @@ afterEach(async () => {
 
 function fixture() {
   const tx = {
+    memberCommand: vi.fn<IdentityTransaction['memberCommand']>(),
+    saveMemberCommand: vi.fn<IdentityTransaction['saveMemberCommand']>(),
+    auditMember: vi.fn<IdentityTransaction['auditMember']>(),
     listOrganizations: vi.fn<IdentityTransaction['listOrganizations']>(),
     createOrganization: vi.fn<IdentityTransaction['createOrganization']>(),
     findMembership: vi

@@ -1,0 +1,139 @@
+import { Alert } from '@luma/ui/components/primitives/alert';
+import { Button } from '@luma/ui/components/primitives/button';
+import { onlineManager, useQueryClient } from '@tanstack/react-query';
+import { useRef, useState, useSyncExternalStore } from 'react';
+
+import { IdentityError } from '../identity/data';
+import { settingsApi, SettingsError } from './data';
+
+const subscribe = (changed: () => void) => onlineManager.subscribe(changed);
+
+/** Subscribes to connectivity without queuing writes while offline. */
+export function useSettingsOnline() {
+  return useSyncExternalStore(
+    subscribe,
+    () => onlineManager.isOnline(),
+    () => true,
+  );
+}
+
+/** Reconciles uncertain writes before allowing another command; retries retain their identity. */
+export function useSettingsCommand(organizationId: string) {
+  const client = useQueryClient();
+  const [pending, setPending] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState<unknown>(null);
+  const uncertain = useRef<{
+    id: string;
+    operation: (id: string) => Promise<unknown>;
+    success: string;
+  } | null>(null);
+  const [needsCheck, setNeedsCheck] = useState(false);
+
+  async function refresh() {
+    await Promise.all([
+      client.invalidateQueries({
+        queryKey: ['private', 'organization', organizationId],
+      }),
+      client.invalidateQueries({ queryKey: ['private', 'organizations'] }),
+    ]);
+  }
+
+  async function run(
+    operation: (id: string) => Promise<unknown>,
+    success = 'Changes saved.',
+  ) {
+    if (pending || uncertain.current) return;
+    const command = { id: crypto.randomUUID(), operation, success };
+    setPending(true);
+    setError(null);
+    setMessage('');
+    try {
+      await operation(command.id);
+      setMessage(success);
+      await refresh();
+    } catch (error) {
+      setError(error);
+      if (!(error instanceof IdentityError) || error.status >= 500) {
+        uncertain.current = command;
+        setNeedsCheck(true);
+      }
+      await refresh();
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function reconcile() {
+    const command = uncertain.current;
+    if (!command || pending) return;
+    setPending(true);
+    setError(null);
+    try {
+      const result = await settingsApi.settings.receipt({
+        params: { organizationId, commandId: command.id },
+      });
+      if (result.status !== 200)
+        throw new SettingsError(result.status, result.body.message);
+      await command.operation(command.id);
+      uncertain.current = null;
+      setNeedsCheck(false);
+      setMessage(command.success);
+      await refresh();
+    } catch (error) {
+      if (error instanceof IdentityError && error.status < 500) {
+        uncertain.current = null;
+        setNeedsCheck(false);
+      }
+      setError(error);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return {
+    run,
+    pending,
+    message,
+    error,
+    needsCheck,
+    reconcile,
+    locked: pending || needsCheck,
+  };
+}
+
+/** Announces command progress and offers safe recovery for an uncertain response. */
+export function CommandFeedback({
+  command,
+}: {
+  command: ReturnType<typeof useSettingsCommand>;
+}) {
+  return (
+    <div className="settings-feedback" aria-live="polite">
+      {command.pending ? <span role="status">Saving changes…</span> : null}
+      {command.message ? (
+        <span className="settings-saved" role="status">
+          {command.message}
+        </span>
+      ) : null}
+      {command.error ? (
+        <Alert tone="danger" role="alert">
+          {command.needsCheck
+            ? 'We could not confirm the result. Check its status before making another change.'
+            : command.error instanceof Error
+              ? command.error.message
+              : 'Could not save. Try again.'}
+        </Alert>
+      ) : null}
+      {command.needsCheck ? (
+        <Button
+          variant="outline"
+          disabled={command.pending}
+          onClick={() => void command.reconcile()}
+        >
+          Check status and retry
+        </Button>
+      ) : null}
+    </div>
+  );
+}

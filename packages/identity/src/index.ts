@@ -9,3 +9,7 @@ export type {
 } from './domain/context.js';
 
 export type { Credentials, IdentityService } from './application/identity.js';
+
+export type { SettingsService } from './application/settings.js';
+
+export type { MailProvider } from './application/mail.js';

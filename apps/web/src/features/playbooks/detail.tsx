@@ -14,6 +14,7 @@ import {
 } from '@luma/ui/components/primitives/dialog';
 import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import { Select } from '@luma/ui/components/primitives/select';
+import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { SectionWorkspace } from '@luma/ui/components/workspace/section-workspace';
 import { WorkspaceBreadcrumb } from '@luma/ui/components/workspace/workspace-breadcrumb';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -175,7 +176,7 @@ export function PlaybookDetailPage({
                           Open issue
                         </Link>
                         <time dateTime={run.createdAt}>
-                          {new Date(run.createdAt).toLocaleString()}
+                          <WorkspaceDate value={run.createdAt} />
                         </time>
                       </div>
                       <p>

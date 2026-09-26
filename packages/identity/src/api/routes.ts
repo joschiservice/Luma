@@ -62,6 +62,9 @@ export function identityRoutes(service?: IdentityService) {
     },
     updateMember: async ({ request, params, body }) => {
       const member = await use().changeMember(tenantContext(request), {
+        ...(request.headers['x-command-id']
+          ? { commandId: String(request.headers['x-command-id']) }
+          : {}),
         action: 'update',
         memberId: params.memberId,
         role: body.role,
@@ -71,6 +74,9 @@ export function identityRoutes(service?: IdentityService) {
     },
     removeMember: async ({ request, params }) => {
       await use().changeMember(tenantContext(request), {
+        ...(request.headers['x-command-id']
+          ? { commandId: String(request.headers['x-command-id']) }
+          : {}),
         action: 'remove',
         memberId: params.memberId,
       });
@@ -125,7 +131,11 @@ export function registerIdentityGuards(
         'FORBIDDEN',
         'A trusted Origin header is required',
       );
-    if (route === '/v1/organizations') {
+    if (
+      route === '/v1/organizations' ||
+      route === '/v1/invitations/preview' ||
+      route === '/v1/invitations/accept'
+    ) {
       await service.authenticate(credentials(request));
 
       return;

@@ -76,13 +76,17 @@ it('filters, expands, returns, paginates and recovers workspace activity on desk
   await page.getByLabel('Outcome', { exact: true }).selectOption('');
   // Applying both endpoints together allows a valid range outside the current year.
   const rangeFrom = await page
-    .getByLabel('From (UTC)', { exact: true })
+    .getByLabel('From (workspace time)', { exact: true })
     .inputValue();
   const rangeTo = await page
-    .getByLabel('Through (UTC)', { exact: true })
+    .getByLabel('Through (workspace time)', { exact: true })
     .inputValue();
-  await page.getByLabel('From (UTC)', { exact: true }).fill('2020-01-01');
-  await page.getByLabel('Through (UTC)', { exact: true }).fill('2020-01-31');
+  await page
+    .getByLabel('From (workspace time)', { exact: true })
+    .fill('2020-01-01');
+  await page
+    .getByLabel('Through (workspace time)', { exact: true })
+    .fill('2020-01-31');
   await page.getByRole('button', { name: 'Apply dates', exact: true }).click();
   await page
     .getByRole('heading', { name: 'No matching recorded activity' })
@@ -90,10 +94,16 @@ it('filters, expands, returns, paginates and recovers workspace activity on desk
   expect(new URL(page.url()).searchParams.get('from')).toBe('2020-01-01');
   await page.reload();
   expect(
-    await page.getByLabel('Through (UTC)', { exact: true }).inputValue(),
+    await page
+      .getByLabel('Through (workspace time)', { exact: true })
+      .inputValue(),
   ).toBe('2020-01-31');
-  await page.getByLabel('From (UTC)', { exact: true }).fill(rangeFrom);
-  await page.getByLabel('Through (UTC)', { exact: true }).fill(rangeTo);
+  await page
+    .getByLabel('From (workspace time)', { exact: true })
+    .fill(rangeFrom);
+  await page
+    .getByLabel('Through (workspace time)', { exact: true })
+    .fill(rangeTo);
   await page.getByRole('button', { name: 'Apply dates', exact: true }).click();
   await page.locator('.activity-event').first().waitFor();
   let failOlder = true;

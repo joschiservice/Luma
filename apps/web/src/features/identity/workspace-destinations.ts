@@ -3,6 +3,7 @@ import {
   BookOpen,
   Inbox,
   LayoutDashboard,
+  Settings,
   Unplug,
 } from 'lucide-react';
 
@@ -37,5 +38,11 @@ export const workspaceDestinations = [
     label: 'Connections',
     Icon: Unplug,
     description: 'Manage connected systems',
+  },
+  {
+    path: 'settings',
+    label: 'Settings',
+    Icon: Settings,
+    description: 'Workspace, team, notifications, and approvals',
   },
 ] as const;

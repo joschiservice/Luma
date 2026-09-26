@@ -8,6 +8,7 @@ export function evaluatePolicy(
   actorId: string,
   now: number,
   approval: Approval | null = null,
+  alwaysRequireApproval = false,
 ): Pick<PolicyDecision, 'outcome' | 'reason'> {
   let outcome: PolicyDecision['outcome'] = 'allowed';
   let reason: PolicyDecision['reason'] = 'authorized';
@@ -27,7 +28,11 @@ export function evaluatePolicy(
     // Rejection remains binding when risk metadata or the response expiry changes.
     outcome = 'denied';
     reason = 'approval_rejected';
-  } else if (action.risk !== 'low' || capability.minimumRisk !== 'low') {
+  } else if (
+    alwaysRequireApproval ||
+    action.risk !== 'low' ||
+    capability.minimumRisk !== 'low'
+  ) {
     const bound =
       approval &&
       approval.requesterId === actorId &&

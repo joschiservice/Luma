@@ -16,6 +16,8 @@ export interface BoundProposal {
 }
 
 export interface DeskSnapshot {
+  policyStale?: boolean;
+  effectivePolicyVersion?: string;
   incident: Incident;
   revision: number;
   diagnosis: Diagnosis | null;
@@ -176,7 +178,7 @@ export function createDeskService(deps: DeskDependencies) {
       d.proposalId === p.action.id &&
       d.actionHash === p.actionHash &&
       d.outcome === 'approval_required' &&
-      d.policyVersion === currentPolicyVersion &&
+      d.policyVersion === (s.effectivePolicyVersion ?? currentPolicyVersion) &&
       d.actorId !== context.actor.id &&
       Date.parse(p.action.expiresAt) > deps.now().getTime() &&
       Date.parse(p.action.preconditions.validUntil) > deps.now().getTime() &&
@@ -260,6 +262,7 @@ export function createDeskService(deps: DeskDependencies) {
         false,
         async ({ snapshot: s }) => ({
           schemaVersion: 1 as const,
+          policyStale: s.policyStale ?? false,
           refreshable:
             ['owner', 'admin'].includes(context.actor.role) &&
             Boolean(deps.refreshProposal) &&

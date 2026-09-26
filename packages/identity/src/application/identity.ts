@@ -15,6 +15,31 @@ import {
 export type Credentials = Readonly<Record<string, string>>;
 
 export interface IdentityTransaction {
+  /** Reads a membership command receipt within the locked workspace. */
+  memberCommand(
+    organizationId: string,
+    id: string,
+  ): Promise<{
+    actorId: string;
+    request: string;
+    result: Membership | null;
+  } | null>;
+  /** Persists the membership outcome atomically with its mutation. */
+  saveMemberCommand(
+    organizationId: string,
+    id: string,
+    actorId: string,
+    request: string,
+    result: Membership | null,
+  ): Promise<void>;
+  /** Records bounded access evidence in the membership transaction. */
+  auditMember(
+    organizationId: string,
+    actorId: string,
+    action: string,
+    before: Membership | null,
+    after: Membership | null,
+  ): Promise<void>;
   listOrganizations(): Promise<Organization[]>;
   findMembership(organizationId: string): Promise<Membership | null>;
   findOrganization(organizationId: string): Promise<Organization | null>;
@@ -160,10 +185,11 @@ export function createIdentityService(repository: IdentityRepository) {
     },
     changeMember(
       initialContext: TenantContext,
-      command:
+      command: { commandId?: string } & (
         | { action: 'add'; userId: string; role: Role }
         | { action: 'update'; memberId: string; role: Role }
-        | { action: 'remove'; memberId: string },
+        | { action: 'remove'; memberId: string }
+      ),
     ) {
       const { tenantId: organizationId, requestId } = initialContext;
 
@@ -176,6 +202,26 @@ export function createIdentityService(repository: IdentityRepository) {
         };
         const context = await resolve(tx, session, organizationId, requestId);
         requireRole(context, ['owner', 'admin']);
+        const request = JSON.stringify(command);
+        if (command.commandId) {
+          const previous = await tx.memberCommand(
+            organizationId,
+            command.commandId,
+          );
+          if (previous) {
+            if (
+              previous.actorId !== context.actor.id ||
+              previous.request !== request
+            )
+              throw new IdentityError(
+                409,
+                'CONFLICT',
+                'This command ID was already used for another request.',
+              );
+
+            return previous.result;
+          }
+        }
         const members = await tx.listMembers(organizationId);
         const target =
           command.action === 'add'
@@ -199,17 +245,47 @@ export function createIdentityService(repository: IdentityRepository) {
             'CONFLICT',
             'An organization must have an owner',
           );
+        let result: Membership | null = null;
         if (command.action === 'add')
-          return tx.addMember(organizationId, command.userId, command.role);
-        if (command.action === 'update')
-          return tx.updateMember(
+          result = await tx.addMember(
+            organizationId,
+            command.userId,
+            command.role,
+          );
+        else if (command.action === 'update')
+          result = await tx.updateMember(
             organizationId,
             command.memberId,
             command.role,
           );
-        await tx.removeMember(organizationId, command.memberId);
+        else await tx.removeMember(organizationId, command.memberId);
+        const bounded = (member: Membership | null | undefined) =>
+          member
+            ? {
+                id: member.id,
+                organizationId: member.organizationId,
+                userId: member.userId,
+                role: member.role,
+              }
+            : null;
+        await tx.auditMember(
+          organizationId,
+          context.actor.id,
+          command.action,
+          bounded(target),
+          bounded(result),
+        );
 
-        return null;
+        if (command.commandId)
+          await tx.saveMemberCommand(
+            organizationId,
+            command.commandId,
+            context.actor.id,
+            request,
+            result,
+          );
+
+        return result;
       });
     },
   };

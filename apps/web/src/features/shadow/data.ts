@@ -5,6 +5,7 @@ import {
   shadowReviewSchema,
   shadowWindowSchema,
 } from '@luma/api-contract';
+import { nextCalendarDay, workspaceInstant } from '@luma/ui/lib/timezone';
 import { queryOptions } from '@tanstack/react-query';
 
 import { createWebApiClient } from '../../lib/api-client';
@@ -71,8 +72,13 @@ export function shadowLatestOptions(
   });
 }
 
-/** Includes both selected calendar dates, using UTC day boundaries. Invalid ranges throw. */
-export function shadowWindow(workflow: string, from: string, to: string) {
+/** Includes both selected calendar dates, using workspace day boundaries. Invalid ranges throw. */
+export function shadowWindow(
+  workflow: string,
+  from: string,
+  to: string,
+  timeZone = 'UTC',
+) {
   const valid = (day: string) =>
     /^\d{4}-\d{2}-\d{2}$/.test(day) &&
     Number.isFinite(Date.parse(day)) &&
@@ -82,8 +88,8 @@ export function shadowWindow(workflow: string, from: string, to: string) {
 
   return shadowWindowSchema.parse({
     workflow,
-    since: `${from}T00:00:00.000Z`,
-    until: new Date(Date.parse(`${to}T00:00:00Z`) + 86_400_000).toISOString(),
+    since: workspaceInstant(from, timeZone),
+    until: workspaceInstant(nextCalendarDay(to), timeZone),
   });
 }
 

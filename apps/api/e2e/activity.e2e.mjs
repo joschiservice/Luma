@@ -273,6 +273,23 @@ it('reads deterministic tenant history, safe provenance, bounded filters and rol
       { id: unboundProposal, tenantId },
     ],
   );
+  const policyDecisionId = randomUUID();
+  await db.owner.query(
+    'INSERT INTO policy_decisions(id,tenant_id,proposal_id,action_hash,document) VALUES($1,$2,$3,$4,$5)',
+    [
+      policyDecisionId,
+      tenantId,
+      unboundProposal,
+      'd'.repeat(64),
+      {
+        id: policyDecisionId,
+        tenantId,
+        proposalId: unboundProposal,
+        outcome: 'allowed',
+        policyVersion: 'v0.1',
+      },
+    ],
+  );
   await db.owner.query(
     "INSERT INTO executed_actions(id,tenant_id,proposal_id,idempotency_key,action_hash,state,document) VALUES($1,$2,$3,$4,$5,'prepared',$6)",
     [
@@ -286,6 +303,7 @@ it('reads deterministic tenant history, safe provenance, bounded filters and rol
         tenantId,
         proposalId: unboundProposal,
         state: 'prepared',
+        attempt: { policyDecisionId },
       },
     ],
   );

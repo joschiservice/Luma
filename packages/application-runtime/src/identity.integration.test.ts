@@ -88,6 +88,12 @@ describe.skipIf(!databaseUrl)(
         );
         roleSetup.release();
       }
+      await owner.query(
+        await readFile(
+          new URL('../migrations/0023_workspace_settings.sql', import.meta.url),
+          'utf8',
+        ),
+      );
       await admin.query(
         `CREATE ROLE "${login}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`,
       );

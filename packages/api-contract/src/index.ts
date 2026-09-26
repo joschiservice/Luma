@@ -10,6 +10,7 @@ import { resolutionLearningContract } from './contracts/learning.js';
 import { operationsContract } from './contracts/overview.js';
 import { playbooksContract } from './contracts/playbooks.js';
 import { connectorProvidersContract } from './contracts/providers.js';
+import { settingsContract } from './contracts/settings.js';
 import { shadowContract } from './contracts/shadow.js';
 import { systemContract } from './contracts/system.js';
 
@@ -25,6 +26,7 @@ export const apiContract = c.router(
     operations: operationsContract,
     exceptions: exceptionsContract,
     identity: identityContract,
+    settings: settingsContract,
     connections: connectionsContract,
     system: systemContract,
     connectorProviders: connectorProvidersContract,
@@ -80,3 +82,5 @@ export { caseEventsContract } from './contracts/events.js';
 export * from './playbooks.js';
 
 export * from './shadow.js';
+
+export * from './settings.js';

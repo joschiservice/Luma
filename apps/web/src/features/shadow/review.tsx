@@ -9,8 +9,13 @@ import {
 } from '@luma/ui/components/primitives/field';
 import { Input } from '@luma/ui/components/primitives/input';
 import { Select } from '@luma/ui/components/primitives/select';
+import {
+  WorkspaceDate,
+  WorkspaceTimezone,
+} from '@luma/ui/components/primitives/workspace-date';
+import { workspaceDateValue, workspaceInstant } from '@luma/ui/lib/timezone';
 import { useQuery } from '@tanstack/react-query';
-import { useId, useRef, useState } from 'react';
+import { useContext, useId, useRef, useState } from 'react';
 
 import { historyOptions } from '../exceptions/observation-data';
 import { IdentityError } from '../identity/data';
@@ -37,6 +42,7 @@ export function ShadowReviewForm({
   accessLost: (error: unknown) => void;
 }) {
   const id = useId();
+  const timeZone = useContext(WorkspaceTimezone);
   const [pages, setPages] = useState(1);
   const history = useQuery(
     historyOptions(organizationId, evaluation.incidentId, pages),
@@ -56,9 +62,11 @@ export function ShadowReviewForm({
   const [expected, setExpected] = useState(() =>
     fieldRows(action?.expectedPostcondition ?? {}),
   );
-  const [occurredAt, setOccurredAt] = useState(() =>
-    new Date().toISOString().slice(0, 23),
-  );
+  const [occurredAt, setOccurredAt] = useState(() => {
+    const now = new Date();
+
+    return `${workspaceDateValue(now, timeZone, true)}.${String(now.getMilliseconds()).padStart(3, '0')}`;
+  });
   const [error, setError] = useState('');
   const [pending, setPending] = useState(false);
   const [retry, setRetry] = useState<ShadowReview>();
@@ -90,7 +98,7 @@ export function ShadowReviewForm({
                   }
                 : null,
           evidenceRefs: refs,
-          occurredAt: new Date(`${occurredAt}Z`).toISOString(),
+          occurredAt: workspaceInstant(occurredAt, timeZone),
           feedback: feedback === 'none' ? null : feedback,
         });
       if (
@@ -248,7 +256,9 @@ export function ShadowReviewForm({
             </>
           ) : null}
           <Field>
-            <FieldLabel htmlFor={`${id}-when`}>Observed at (UTC)</FieldLabel>
+            <FieldLabel htmlFor={`${id}-when`}>
+              Observed at ({timeZone})
+            </FieldLabel>
             <Input
               id={`${id}-when`}
               type="datetime-local"
@@ -336,7 +346,7 @@ export function ShadowReviewForm({
                           {evidence.source
                             ? `${evidence.source.provider} · ${evidence.source.resource}`
                             : 'Observation'}{' '}
-                          · {new Date(evidence.observedAt).toLocaleString()}
+                          · <WorkspaceDate value={evidence.observedAt} />
                           <code>{evidence.id}</code>
                         </span>
                       </label>

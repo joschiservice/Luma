@@ -34,6 +34,7 @@ export function readApiConfig(
 }
 
 export interface IdentityConfig {
+  mail?: { apiKey: string; from: string; origin: string };
   databaseUrl: string;
   secret: string;
   baseURL: string;
@@ -94,7 +95,30 @@ export function readIdentityConfig(
       'BETTER_AUTH_COOKIE_PREFIX must contain 1–64 letters, numbers, underscores or hyphens',
     );
 
+  let mail: IdentityConfig['mail'];
+  if (env.MAIL_RESEND_API_KEY || env.MAIL_FROM || env.MAIL_PUBLIC_ORIGIN) {
+    if (!env.MAIL_RESEND_API_KEY || !env.MAIL_FROM || !env.MAIL_PUBLIC_ORIGIN)
+      throw new Error(
+        'Configure MAIL_RESEND_API_KEY, MAIL_FROM and MAIL_PUBLIC_ORIGIN together',
+      );
+    const origin = new URL(env.MAIL_PUBLIC_ORIGIN);
+    if (
+      origin.origin !== env.MAIL_PUBLIC_ORIGIN ||
+      !['https:', 'http:'].includes(origin.protocol) ||
+      origin.username ||
+      origin.password ||
+      (env.NODE_ENV === 'production' && origin.protocol !== 'https:')
+    )
+      throw new Error('MAIL_PUBLIC_ORIGIN must be the public web origin');
+    mail = {
+      apiKey: env.MAIL_RESEND_API_KEY,
+      from: env.MAIL_FROM,
+      origin: origin.origin,
+    };
+  }
+
   return {
+    ...(mail ? { mail } : {}),
     databaseUrl,
     secret,
     baseURL: base.origin,

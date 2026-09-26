@@ -20,6 +20,8 @@ export const organizationSchema = z.object({
 });
 
 export const membershipSchema = z.object({
+  name: z.string().optional(),
+  email: z.string().optional(),
   id: z.string().uuid(),
   organizationId: z.string().uuid(),
   userId: z.string().uuid(),
@@ -96,6 +98,7 @@ export const identityContract = c.router(
         'Owners and admins can add users. Only owners can grant ownership.',
     },
     updateMember: {
+      headers: z.object({ 'x-command-id': z.string().uuid().optional() }),
       method: 'PATCH',
       path: '/v1/organizations/:organizationId/members/:memberId',
       pathParams: memberParamsSchema,
@@ -104,6 +107,7 @@ export const identityContract = c.router(
       summary: 'Change a member role',
     },
     removeMember: {
+      headers: z.object({ 'x-command-id': z.string().uuid().optional() }),
       method: 'DELETE',
       path: '/v1/organizations/:organizationId/members/:memberId',
       pathParams: memberParamsSchema,

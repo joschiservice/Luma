@@ -14,6 +14,15 @@ Start with the row closest to the change. Follow imports from these entry points
 | Local simulator wiring                   | `tooling/simulator/cli.mjs`, `platform-client.mjs`, `tooling/pilot/runtime.mjs`                                                                                                           | `apps/api/e2e/simulator.e2e.mjs`                                                                |
 | Isolated platform tests                  | `apps/api/e2e/simulator-fixture.mjs`, `tooling/simulator/e2e-environment.mjs`; database runner in `tooling/dev/test.mjs`                                                                  | Reuse `setupSimulator(t)` in API E2E and browser tests                                          |
 
+## Workspace settings
+
+Start at `packages/identity/src/application/settings.ts` for authorized edits and invitations,
+`packages/identity/src/infrastructure/mail-delivery.ts` for durable delivery, and
+`apps/web/src/features/settings/page.tsx` for Settings UI. Approval preferences feed
+`packages/policies/src/application/policies.ts` and execution admission. Tests are
+`apps/api/e2e/settings.e2e.mjs`, `settings.browser.mjs` and the Settings stories.
+See [workspace settings](workspace-settings.md) for configuration and retry semantics.
+
 ## Operational issue flow
 
 **Provider state → observation → detection → case → provider recovery → fresh verification**

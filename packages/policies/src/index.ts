@@ -1,4 +1,7 @@
-export { currentPolicyVersion } from './domain/action.js';
+export {
+  currentPolicyVersion,
+  workspacePolicyVersion,
+} from './domain/action.js';
 
 export type {
   Approval,

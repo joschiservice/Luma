@@ -12,9 +12,13 @@ import {
 } from '@luma/connections/http';
 import type { CaseService } from '@luma/exceptions';
 import { caseRoutes } from '@luma/exceptions/http';
-import type { IdentityService } from '@luma/identity';
+import type { IdentityService, SettingsService } from '@luma/identity';
 import { IdentityError } from '@luma/identity';
-import { identityRoutes, registerIdentityGuards } from '@luma/identity/http';
+import {
+  identityRoutes,
+  registerIdentityGuards,
+  settingsRoutes,
+} from '@luma/identity/http';
 import type { ModelGateway, Observability, Observation } from '@luma/platform';
 import type {
   ActivityService,
@@ -60,6 +64,7 @@ export interface AppDependencies {
   connections?: ConnectionManagement;
   modelGateway?: ModelGateway;
   identity?: IdentityService;
+  settings?: SettingsService;
   trustedOrigins?: readonly string[];
   providerCatalog?: ProviderCatalog;
   observability?: Observability;
@@ -220,6 +225,7 @@ export function buildApp(
         resolutionLearning: learningRoutes(dependencies.learning),
         operations: operationsRoutes(dependencies.operations),
         identity: identityRoutes(dependencies.identity),
+        settings: settingsRoutes(dependencies.settings),
         connections: connectionRoutes(
           dependencies.connections,
           dependencies.shopify,

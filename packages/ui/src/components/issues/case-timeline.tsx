@@ -22,6 +22,7 @@ import type { ReactNode } from 'react';
 
 import { Button } from '../primitives/button';
 import { Disclosure } from '../primitives/disclosure';
+import { WorkspaceDate } from '../primitives/workspace-date';
 import { caseLabel, CaseNotice, CaseTime } from './case-investigation';
 import {
   ExecutionMetadata,
@@ -543,16 +544,7 @@ export function CaseTimeline({
                         {eventNames[event.type] ??
                           caseLabel(event.type.replaceAll('.', ' '))}
                       </strong>
-                      <time
-                        dateTime={event.occurredAt}
-                        title={event.occurredAt}
-                      >
-                        {new Date(event.occurredAt)
-                          .toISOString()
-                          .replace('T', ' ')
-                          .slice(0, 19)}{' '}
-                        UTC
-                      </time>
+                      <WorkspaceDate value={event.occurredAt} />
                     </div>
                     {event.outcome ? (
                       <p

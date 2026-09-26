@@ -8,9 +8,11 @@ import {
   FieldLabel,
 } from '@luma/ui/components/primitives/field';
 import { Input } from '@luma/ui/components/primitives/input';
+import { WorkspaceTimezone } from '@luma/ui/components/primitives/workspace-date';
+import { workspaceDateValue } from '@luma/ui/lib/timezone';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { useId, useState } from 'react';
+import { useContext, useId, useState } from 'react';
 
 import {
   type ShadowComparison,
@@ -59,7 +61,7 @@ const metrics = [
   ],
 ] as const;
 
-/** Compares the latest evaluation per case for a Playbook within an explicit UTC date range. */
+/** Compares the latest evaluation per case for a Playbook within an explicit workspace date range. */
 export function ShadowReport({
   organizationId,
   workflow,
@@ -68,12 +70,13 @@ export function ShadowReport({
   workflow: string;
 }) {
   const id = useId();
+  const timeZone = useContext(WorkspaceTimezone);
   const [dates, setDates] = useState(() => ({
-    from: new Date(Date.now() - 29 * 86_400_000).toISOString().slice(0, 10),
-    to: new Date().toISOString().slice(0, 10),
+    from: workspaceDateValue(new Date(Date.now() - 29 * 86400000), timeZone),
+    to: workspaceDateValue(new Date(), timeZone),
   }));
   const [window, setWindow] = useState(() =>
-    shadowWindow(workflow, dates.from, dates.to),
+    shadowWindow(workflow, dates.from, dates.to, timeZone),
   );
   const [error, setError] = useState('');
   const query = useQuery(shadowReportOptions(organizationId, window));
@@ -107,7 +110,7 @@ export function ShadowReport({
         onSubmit={(e) => {
           e.preventDefault();
           try {
-            setWindow(shadowWindow(workflow, dates.from, dates.to));
+            setWindow(shadowWindow(workflow, dates.from, dates.to, timeZone));
             setError('');
           } catch (error) {
             setError(
@@ -120,7 +123,7 @@ export function ShadowReport({
       >
         <FieldGroup className="shadow-date-fields">
           <Field data-invalid={!!error}>
-            <FieldLabel htmlFor={`${id}-from`}>From (UTC)</FieldLabel>
+            <FieldLabel htmlFor={`${id}-from`}>From ({timeZone})</FieldLabel>
             <Input
               id={`${id}-from`}
               type="date"
@@ -131,7 +134,7 @@ export function ShadowReport({
             />
           </Field>
           <Field data-invalid={!!error}>
-            <FieldLabel htmlFor={`${id}-to`}>Through (UTC)</FieldLabel>
+            <FieldLabel htmlFor={`${id}-to`}>Through ({timeZone})</FieldLabel>
             <Input
               id={`${id}-to`}
               type="date"
@@ -146,9 +149,9 @@ export function ShadowReport({
         {error ? <p role="alert">{error}</p> : null}
       </form>
       <p className="shadow-meta">
-        Showing {window.since.slice(0, 10)} through{' '}
-        {new Date(Date.parse(window.until) - 1).toISOString().slice(0, 10)} UTC.
-        Up to 500 cases; narrow the dates for larger reports.
+        Showing {workspaceDateValue(new Date(window.since), timeZone)} through{' '}
+        {workspaceDateValue(new Date(Date.parse(window.until) - 1), timeZone)}{' '}
+        {timeZone}. Up to 500 cases; narrow the dates for larger reports.
       </p>
       {query.error ? (
         <CaseNotice error title="Comparisons unavailable">

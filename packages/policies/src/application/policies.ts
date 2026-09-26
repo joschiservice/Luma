@@ -1,5 +1,5 @@
 import type { TenantContext } from '@luma/identity';
-import { requireRole, requireTenant } from '@luma/identity';
+import { IdentityError, requireRole, requireTenant } from '@luma/identity';
 import { measure } from '@luma/platform';
 
 import type {
@@ -8,10 +8,14 @@ import type {
   PolicyEvidence,
   ProposedAction,
 } from '../domain/action.js';
-import { currentPolicyVersion } from '../domain/action.js';
+import { workspacePolicyVersion } from '../domain/action.js';
 import { evaluatePolicy } from '../domain/evaluate.js';
 
 export interface PolicyRepository {
+  /** Reads the current workspace approval requirement and its revision. */
+  workspacePolicy(
+    tenantId: string,
+  ): Promise<{ revision: number; required: boolean }>;
   pending(tenantId: string): Promise<PolicyEvidence[]>;
   delivered(tenantId: string, id: string): Promise<void>;
   saveDecision(decision: PolicyDecision): Promise<void>;
@@ -39,7 +43,10 @@ export interface PolicyDependencies {
  * decision evidence.
  */
 export function createPolicyService(deps: PolicyDependencies) {
-  const policyVersion = currentPolicyVersion;
+  const version = async (tenantId: string) =>
+    workspacePolicyVersion(
+      (await deps.repository.workspacePolicy(tenantId)).revision,
+    );
 
   async function flush(tenantId: string) {
     for (const evidence of await deps.repository.pending(tenantId)) {
@@ -49,6 +56,8 @@ export function createPolicyService(deps: PolicyDependencies) {
   }
 
   return {
+    /** Reads the effective policy version for a fresh admission check. */
+    currentVersion: version,
     async evaluate(
       context: TenantContext,
       action: ProposedAction,
@@ -61,6 +70,10 @@ export function createPolicyService(deps: PolicyDependencies) {
         requireTenant(fresh, action.tenantId);
         if (fresh.actor.id !== context.actor.id)
           throw new Error('Actor changed');
+        const workspace = await deps.repository.workspacePolicy(
+          context.tenantId,
+        );
+        const policyVersion = workspacePolicyVersion(workspace.revision);
         const now = deps.now();
         const approval = await deps.repository.findApproval(
           context.tenantId,
@@ -75,6 +88,7 @@ export function createPolicyService(deps: PolicyDependencies) {
           fresh.actor.id,
           now.getTime(),
           approval,
+          workspace.required,
         );
         const decision: PolicyDecision = {
           id: deps.id(),
@@ -116,16 +130,23 @@ export function createPolicyService(deps: PolicyDependencies) {
       const fresh = await deps.refreshContext(context);
       requireTenant(fresh, context.tenantId);
       requireRole(fresh, ['owner', 'admin']);
+      const policyVersion = await version(context.tenantId);
       const decision = await deps.repository.findDecision(
         context.tenantId,
         decisionId,
       );
-      if (
-        !decision ||
-        decision.outcome !== 'approval_required' ||
-        decision.policyVersion !== policyVersion
-      )
-        throw new Error('Approval request not found');
+      if (!decision || decision.outcome !== 'approval_required')
+        throw new IdentityError(
+          404,
+          'NOT_FOUND',
+          'Approval decision not found.',
+        );
+      if (decision.policyVersion !== policyVersion)
+        throw new IdentityError(
+          409,
+          'CONFLICT',
+          'Approval policy changed. Refresh the review.',
+        );
       if (fresh.actor.id === decision.actorId)
         throw new Error('A different approver is required');
       const now = deps.now();

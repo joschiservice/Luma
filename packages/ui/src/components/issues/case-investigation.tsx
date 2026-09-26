@@ -25,6 +25,7 @@ import { Alert, AlertDescription, AlertTitle } from '../primitives/alert';
 import { Badge } from '../primitives/badge';
 import { Button } from '../primitives/button';
 import { Disclosure } from '../primitives/disclosure';
+import { WorkspaceDate } from '../primitives/workspace-date';
 import { IssueCollection } from './issue-collection';
 import { IssueContext } from './issue-context';
 import { IssueFindings } from './issue-findings';
@@ -37,13 +38,9 @@ export function caseLabel(value: string) {
   return value.replaceAll('_', ' ').replace(/^./, (c) => c.toUpperCase());
 }
 
-/** Renders a case timestamp using a stable, locale-independent presentation. */
+/** Renders a case timestamp in the workspace display timezone. */
 export function CaseTime({ value }: { value: string }) {
-  return (
-    <time dateTime={value}>
-      {new Date(value).toISOString().replace('T', ' ').slice(0, 16)} UTC
-    </time>
-  );
+  return <WorkspaceDate value={value} />;
 }
 
 function issueStateLabel(item: CaseSummary): string | null {

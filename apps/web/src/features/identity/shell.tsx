@@ -1,7 +1,10 @@
+import { Alert } from '@luma/ui/components/primitives/alert';
+import { WorkspaceTimezone } from '@luma/ui/components/primitives/workspace-date';
 import { WorkspaceAccountMenu } from '@luma/ui/components/workspace/workspace-account-menu';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, Outlet, useLocation, useParams } from '@tanstack/react-router';
 
+import { settingsOptions } from '../settings/data';
 import { Brand, Failure, Pending } from './common';
 import { contextOptions, organizationsOptions, sessionOptions } from './data';
 import { workspaceDestinations } from './workspace-destinations';
@@ -20,6 +23,9 @@ function Navigation({
       {workspaceDestinations.map(({ path, label, Icon }) => (
         <Link
           key={path}
+          className={
+            path === 'settings' ? 'workspace-settings-link' : undefined
+          }
           to={`/app/$organizationId/${path}`}
           params={{ organizationId }}
           activeProps={{ 'aria-current': 'page', className: 'active' }}
@@ -48,6 +54,10 @@ function TenantShell({ organizationId }: { organizationId: string }) {
   const client = useQueryClient();
   const access = useQuery(contextOptions(organizationId));
   const organizations = useQuery(organizationsOptions());
+  const settings = useQuery({
+    ...settingsOptions(organizationId),
+    refetchInterval: false,
+  });
   const session = client.getQueryData(sessionOptions().queryKey);
   if (access.isError)
     return <Failure error={access.error} retry={() => void access.refetch()} />;
@@ -58,7 +68,8 @@ function TenantShell({ organizationId }: { organizationId: string }) {
         retry={() => void organizations.refetch()}
       />
     );
-  if (access.isPending || organizations.isPending) return <Pending />;
+  if (access.isPending || organizations.isPending || settings.isPending)
+    return <Pending />;
   const organization = organizations.data.find(
     (org) => org.id === organizationId,
   );
@@ -95,7 +106,16 @@ function TenantShell({ organizationId }: { organizationId: string }) {
         />
       }
     >
-      <Outlet />
+      <WorkspaceTimezone value={settings.data?.workspace.timezone ?? 'UTC'}>
+        {settings.isError ? (
+          <Alert tone="warning" role="status">
+            {settings.data
+              ? 'Workspace settings could not refresh. Dates use the last known timezone.'
+              : 'Display timezone unavailable. Dates are shown in UTC.'}
+          </Alert>
+        ) : null}
+        <Outlet />
+      </WorkspaceTimezone>
     </WorkspaceLayout>
   );
 }

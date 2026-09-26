@@ -11,6 +11,8 @@ export interface Organization {
 }
 
 export interface Membership {
+  name?: string;
+  email?: string;
   id: string;
   organizationId: string;
   userId: string;

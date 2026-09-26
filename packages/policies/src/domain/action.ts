@@ -70,3 +70,10 @@ export interface Approval {
 export type PolicyEvidence =
   | { type: 'policy.evaluated'; document: PolicyDecision }
   | { type: 'approval.responded'; document: Approval };
+
+/** Binds policy decisions to the platform version and workspace approval revision. */
+export function workspacePolicyVersion(revision: number): string {
+  return revision === 0
+    ? currentPolicyVersion
+    : `${currentPolicyVersion}:workspace:${revision}`;
+}

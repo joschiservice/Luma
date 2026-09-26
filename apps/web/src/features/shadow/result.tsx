@@ -1,5 +1,6 @@
 import { caseLabel } from '@luma/ui/components/issues/case-investigation';
 import { Disclosure } from '@luma/ui/components/primitives/disclosure';
+import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { useState } from 'react';
 
 import { candidateAction, type ShadowComparison } from './data';
@@ -16,7 +17,7 @@ export function ShadowResult({ item }: { item: ShadowComparison }) {
       <p className="shadow-label">Shadow — not executed</p>
       <p className="shadow-meta">
         <time dateTime={evaluation.createdAt}>
-          {new Date(evaluation.createdAt).toLocaleString()}
+          <WorkspaceDate value={evaluation.createdAt} />
         </time>
         {typeof version === 'string' ? ` · Playbook ${version}` : ''}
       </p>
@@ -83,7 +84,7 @@ export function ShadowResult({ item }: { item: ShadowComparison }) {
       ) : null}
       {actual ? (
         <p>
-          Observed {new Date(actual.occurredAt).toLocaleString()} ·{' '}
+          Observed <WorkspaceDate value={actual.occurredAt} /> ·{' '}
           {actual.evidenceRefs.length} evidence references ·{' '}
           {actual.evaluatorVersion}
         </p>
@@ -116,7 +117,7 @@ export function ShadowResult({ item }: { item: ShadowComparison }) {
           )}
           <p>
             {review.evidenceRefs.length} evidence references ·{' '}
-            {new Date(review.occurredAt).toLocaleString()}
+            <WorkspaceDate value={review.occurredAt} />
           </p>
         </div>
       ) : null}

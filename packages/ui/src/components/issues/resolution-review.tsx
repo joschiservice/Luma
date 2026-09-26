@@ -158,19 +158,23 @@ export function ResolutionReview({
             </div>
             <CaseNotice
               title={
-                proposal.policy?.outcome === 'allowed'
-                  ? 'Automatic execution allowed'
-                  : proposal.policy?.outcome === 'denied'
-                    ? 'Action prohibited by policy'
-                    : proposal.policy?.outcome === 'approval_required'
-                      ? 'Human approval required'
-                      : 'Policy result unavailable'
+                review.policyStale
+                  ? 'Approval settings changed'
+                  : proposal.policy?.outcome === 'allowed'
+                    ? 'Automatic execution allowed'
+                    : proposal.policy?.outcome === 'denied'
+                      ? 'Action prohibited by policy'
+                      : proposal.policy?.outcome === 'approval_required'
+                        ? 'Human approval required'
+                        : 'Policy result unavailable'
               }
             >
-              {proposal.policy?.reason === 'approval_required'
-                ? 'Another authorized operator must approve this change.'
-                : (proposal.policy?.reason ??
-                  'Execution is not authorized without a current policy result.')}
+              {review.policyStale
+                ? 'Refresh this review before deciding. The previous policy result no longer authorizes execution.'
+                : proposal.policy?.reason === 'approval_required'
+                  ? 'Another authorized operator must approve this change.'
+                  : (proposal.policy?.reason ??
+                    'Execution is not authorized without a current policy result.')}
               {proposal.policy?.outcome === 'allowed'
                 ? ' No approval click is needed. Execution and verification are tracked separately.'
                 : null}

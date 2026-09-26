@@ -13,6 +13,7 @@ import { useState } from 'react';
 
 import { Button } from '../primitives/button';
 import { Disclosure } from '../primitives/disclosure';
+import { WorkspaceDate } from '../primitives/workspace-date';
 
 /** Displays issue metadata and lets users copy its identifier. */
 export function IssueRecordDetails({
@@ -25,11 +26,7 @@ export function IssueRecordDetails({
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>(
     'idle',
   );
-  const timestamp = (value: string) => (
-    <time dateTime={value}>
-      {new Date(value).toISOString().replace('T', ' ').slice(0, 19)} UTC
-    </time>
-  );
+  const timestamp = (value: string) => <WorkspaceDate value={value} />;
 
   return (
     <Disclosure className="issue-record-details" open={expanded}>

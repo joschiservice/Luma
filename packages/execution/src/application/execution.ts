@@ -366,6 +366,8 @@ export function createExecutionService(deps: ExecutionDependencies) {
         : true;
       if (
         !admissionCurrent ||
+        (await deps.policies.currentVersion(context.tenantId)) !==
+          decision.policyVersion ||
         deps.now().getTime() >= Date.parse(decision.validUntil)
       ) {
         record.state = 'failed';

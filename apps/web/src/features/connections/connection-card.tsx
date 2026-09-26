@@ -21,7 +21,7 @@ import {
   ShieldCheck,
   Unplug,
 } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { changeConnection, connectionError } from './data';
 import { capabilities, providers, statuses } from './presentation';
@@ -46,6 +46,13 @@ export function ConnectionCard({
 }) {
   const [dialog, setDialog] = useState<'rotate' | 'disconnect' | null>(null);
   const [pending, setPending] = useState(false);
+  useEffect(() => {
+    if (window.location.hash === `#connection-${connection.id}`) {
+      const element = document.getElementById(`connection-${connection.id}`);
+      element?.scrollIntoView({ block: 'center' });
+      element?.focus({ preventScroll: true });
+    }
+  }, [connection.id]);
   const [message, setMessage] = useState('');
   const lock = useRef(false);
   const terminal =
@@ -91,6 +98,7 @@ export function ConnectionCard({
       id={`connection-${connection.id}`}
       className="connection-card"
       aria-label={connection.label}
+      tabIndex={-1}
     >
       <CardHeader>
         <div className="connection-identity">

@@ -1,15 +1,27 @@
+import { createHash, createHmac, randomUUID } from 'node:crypto';
+
 import { Pool } from 'pg';
 
 import { createIdentityService } from './application/identity.js';
+import type { MailProvider } from './application/mail.js';
+import { createSettingsService } from './application/settings.js';
 import type { AuthSettings } from './infrastructure/auth.js';
+import { createResendMail } from './infrastructure/mail.js';
+import { createMailDelivery } from './infrastructure/mail-delivery.js';
 import { createRepository } from './infrastructure/repository.js';
+import { createSettingsRepository } from './infrastructure/settings.js';
 
 /**
  * Creates identity services, an authentication handler, and readiness checks. Call close to
  * release the owned database pool.
  */
 export function createIdentity(
-  settings: AuthSettings & { databaseUrl: string },
+  settings: AuthSettings & {
+    databaseUrl: string;
+    mail?: { apiKey: string; from: string; origin: string };
+    mailProvider?: MailProvider;
+    mailOrigin?: string;
+  },
 ) {
   const pool = new Pool({
     connectionString: settings.databaseUrl,
@@ -20,8 +32,34 @@ export function createIdentity(
   });
   const { repository, auth } = createRepository(pool, settings);
 
+  const service = createIdentityService(repository);
+  const provider =
+    settings.mailProvider ??
+    (settings.mail ? createResendMail(settings.mail) : undefined);
+  const token = (tenantId: string, id: string, generation: number) =>
+    createHmac('sha256', settings.secret)
+      .update(`invitation:${tenantId}:${id}:${generation}`)
+      .digest('hex');
+  const workspaceSettings = createSettingsService({
+    repository: createSettingsRepository(pool, !!provider),
+    identity: service,
+    deliveryAvailable: !!provider,
+    now: () => new Date(),
+    id: randomUUID,
+    token,
+    hash: (value) => createHash('sha256').update(value).digest('hex'),
+  });
+  const mailDelivery = createMailDelivery(
+    pool,
+    provider,
+    settings.mail?.origin ?? settings.mailOrigin ?? settings.baseURL,
+    token,
+  );
+
   return {
-    service: createIdentityService(repository),
+    service,
+    settings: workspaceSettings,
+    mailDelivery,
     trustedOrigins: settings.trustedOrigins,
     handler: auth.handler,
     baseURL: settings.baseURL,

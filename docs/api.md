@@ -77,3 +77,7 @@ their existing module ownership.
 The tenant-scoped [Activity API](workspace-activity.md) searches recorded decisions,
 execution and resolution history with bounded date ranges and cursor pagination.
 The shared contract defines searchable fields, outcome distinctions and role-based visibility.
+
+## Workspace Settings
+
+The `settings` contract provides authorized workspace edits, email invitations, personal notifications and approval preferences. See [workspace settings](workspace-settings.md) for routes, command reconciliation and mail configuration.

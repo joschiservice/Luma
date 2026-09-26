@@ -1,3 +1,4 @@
+import { IdentityError } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
 
 import type { PolicyRepository } from '../application/policies.js';
@@ -6,6 +7,7 @@ import type {
   PolicyDecision,
   PolicyEvidence,
 } from '../domain/action.js';
+import { workspacePolicyVersion } from '../domain/action.js';
 
 /**
  * Creates tenant-scoped storage for policy decisions and approvals with idempotency and
@@ -13,6 +15,17 @@ import type {
  */
 export function createPolicyRepository(db: TenantDatabase): PolicyRepository {
   return {
+    workspacePolicy: (tenantId) =>
+      db.transaction(tenantId, async (tx) => {
+        const row = (
+          await tx.query<{ revision: number; required: boolean }>(
+            'SELECT policy_revision AS revision,always_require_approval AS required FROM workspace_settings WHERE tenant_id=$1',
+            [tenantId],
+          )
+        ).rows[0];
+
+        return row ?? { revision: 0, required: false };
+      }),
     pending: (tenantId) =>
       db.transaction(tenantId, async (tx) => {
         const result = await tx.query<{ document: PolicyEvidence }>(
@@ -62,7 +75,7 @@ export function createPolicyRepository(db: TenantDatabase): PolicyRepository {
     findApproval: (tenantId, proposalId, hash, version) =>
       db.transaction(tenantId, async (tx) => {
         const result = await tx.query<{ document: Approval }>(
-          'SELECT document FROM policy_approvals WHERE tenant_id=$1 AND proposal_id=$2 AND action_hash=$3 AND policy_version=$4',
+          "SELECT document FROM policy_approvals WHERE tenant_id=$1 AND proposal_id=$2 AND action_hash=$3 AND (policy_version=$4 OR document->>'outcome'='rejected') ORDER BY (document->>'outcome'='rejected') DESC,created_at DESC LIMIT 1",
           [tenantId, proposalId, hash, version],
         );
 
@@ -70,6 +83,22 @@ export function createPolicyRepository(db: TenantDatabase): PolicyRepository {
       }),
     saveApproval: (approval) =>
       db.transaction(approval.tenantId, async (tx) => {
+        await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
+          `exceptions:${approval.tenantId}`,
+        ]);
+        const current =
+          (
+            await tx.query<{ revision: number }>(
+              'SELECT policy_revision AS revision FROM workspace_settings WHERE tenant_id=$1',
+              [approval.tenantId],
+            )
+          ).rows[0]?.revision ?? 0;
+        if (workspacePolicyVersion(current) !== approval.policyVersion)
+          throw new IdentityError(
+            409,
+            'CONFLICT',
+            'Approval policy changed. Refresh the review.',
+          );
         await tx.query(
           'INSERT INTO policy_approvals(id, tenant_id, proposal_id, action_hash, policy_version, document) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (tenant_id, proposal_id, action_hash, policy_version) DO NOTHING',
           [

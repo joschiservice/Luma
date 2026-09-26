@@ -163,12 +163,55 @@ export function createRepository(pool: Pool, settings: AuthSettings) {
                 .for('update');
             },
             async listMembers(organizationId) {
+              const rows = await tx
+                .select({
+                  member: schema.member,
+                  name: schema.user.name,
+                  email: schema.user.email,
+                })
+                .from(schema.member)
+                .innerJoin(
+                  schema.user,
+                  eq(schema.member.userId, schema.user.id),
+                )
+                .where(eq(schema.member.organizationId, organizationId));
+
+              return rows.map((row) => ({
+                ...memberDto(row.member),
+                name: row.name,
+                email: row.email,
+              }));
+            },
+            async memberCommand(organizationId, id) {
+              const result = await tx.execute(
+                sql`SELECT actor_id AS "actorId",request,result FROM workspace_commands WHERE tenant_id=${organizationId} AND id=${id}`,
+              );
+
               return (
-                await tx
-                  .select()
-                  .from(schema.member)
-                  .where(eq(schema.member.organizationId, organizationId))
-              ).map(memberDto);
+                (result.rows[0] as
+                  | {
+                      actorId: string;
+                      request: string;
+                      result: Membership | null;
+                    }
+                  | undefined) ?? null
+              );
+            },
+            async saveMemberCommand(
+              organizationId,
+              id,
+              actorId,
+              request,
+              result,
+            ) {
+              await tx.execute(
+                sql`INSERT INTO workspace_commands(tenant_id,id,actor_id,request,result) VALUES(${organizationId},${id},${actorId},${JSON.stringify(request)}::jsonb,${JSON.stringify(result)}::jsonb)`,
+              );
+            },
+            async auditMember(organizationId, actorId, action, before, after) {
+              await tx.execute(
+                sql`INSERT INTO workspace_access_events(id,tenant_id,actor_id,event_type,target_id,before_value,after_value) VALUES(${randomUUID()},${organizationId},${actorId},${`member.${action}`},${after?.id ?? before!.id},${JSON.stringify(before)}::jsonb,${JSON.stringify(after)}::jsonb)`,
+              );
             },
             async addMember(organizationId, newUserId, role) {
               const [row] = await tx

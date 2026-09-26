@@ -8,6 +8,7 @@ import { Button } from '@luma/ui/components/primitives/button';
 import { Card, CardTitle } from '@luma/ui/components/primitives/card';
 import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import { Empty } from '@luma/ui/components/primitives/empty';
+import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { Link } from '@tanstack/react-router';
 import { ShieldCheck } from 'lucide-react';
 
@@ -228,7 +229,7 @@ export function PlaybookActivations({
               </p>
               {a.reviewedAt ? (
                 <time dateTime={a.reviewedAt}>
-                  {new Date(a.reviewedAt).toLocaleString()}
+                  <WorkspaceDate value={a.reviewedAt} />
                 </time>
               ) : null}
               <p>

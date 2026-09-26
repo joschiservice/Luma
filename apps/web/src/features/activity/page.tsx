@@ -7,6 +7,10 @@ import {
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Empty } from '@luma/ui/components/primitives/empty';
+import {
+  WorkspaceDate,
+  WorkspaceTimezone,
+} from '@luma/ui/components/primitives/workspace-date';
 import { onlineManager, useQuery } from '@tanstack/react-query';
 import {
   Link,
@@ -15,7 +19,7 @@ import {
   useSearch,
 } from '@tanstack/react-router';
 import { Activity } from 'lucide-react';
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useContext, useEffect, useState, useSyncExternalStore } from 'react';
 
 import { SignInRedirect } from '../identity/common';
 import { IdentityError } from '../identity/data';
@@ -37,8 +41,13 @@ export function ActivityPage() {
   const { organizationId } = useParams({ from: '/app/$organizationId' });
   const filters = useSearch({ from: '/app/$organizationId/activity' });
   const navigate = useNavigate({ from: '/app/$organizationId/activity' });
-  const page = useQuery(activityOptions(organizationId, filters));
-  const head = useQuery(activityOptions(organizationId, filters, true));
+  const timeZone = useContext(WorkspaceTimezone);
+  const page = useQuery(
+    activityOptions(organizationId, filters, false, timeZone),
+  );
+  const head = useQuery(
+    activityOptions(organizationId, filters, true, timeZone),
+  );
   const refreshPage = page.refetch;
   const visibilityChanged =
     !!page.data && !!head.data && page.data.visibility !== head.data.visibility;
@@ -71,7 +80,7 @@ export function ActivityPage() {
   return (
     <ActivityView
       organizationId={organizationId}
-      filters={{ ...filters, ...activityRange(filters) }}
+      filters={{ ...filters, ...activityRange(filters, new Date(), timeZone) }}
       page={accessLost || visibilityChanged ? undefined : page.data}
       loading={page.isPending}
       refreshing={page.isFetching || head.isFetching}
@@ -372,7 +381,7 @@ function ActivityRow({
         onClick={expand}
       >
         <time dateTime={item.recordedAt}>
-          {new Date(item.recordedAt).toLocaleString()}
+          <WorkspaceDate value={item.recordedAt} />
         </time>
         <span>
           <strong>{item.action}</strong>
@@ -510,7 +519,7 @@ function ActivityDates({
       }}
     >
       <label>
-        From (UTC)
+        From (workspace time)
         <input
           type="date"
           required
@@ -519,7 +528,7 @@ function ActivityDates({
         />
       </label>
       <label>
-        Through (UTC)
+        Through (workspace time)
         <input
           type="date"
           required
