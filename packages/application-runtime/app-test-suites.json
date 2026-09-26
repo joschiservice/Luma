@@ -1,0 +1,17 @@
+[
+  {
+    "apps": ["jtl", "shopify"],
+    "files": [
+      "src/connections.test.ts",
+      "src/installation-verifier.test.ts",
+      "src/shopify-oauth.integration.test.ts",
+      "src/exceptions.integration.test.ts",
+      "src/test-support/apps.ts",
+      "src/test-support/detection-fixtures.ts"
+    ]
+  },
+  {
+    "apps": ["shopify"],
+    "files": ["src/connections-startup.integration.test.ts"]
+  }
+]

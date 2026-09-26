@@ -1,13 +1,5 @@
 import type { InstallationCapability } from '@luma/api-contract';
 
-export const providers = {
-  shopify: 'Shopify',
-  'jtl-cloud': 'JTL Cloud',
-  'jtl-onprem': 'JTL-Wawi on-premise',
-} as const;
-
-export type Provider = keyof typeof providers;
-
 export const reads = [
   'orders.read',
   'products.read',

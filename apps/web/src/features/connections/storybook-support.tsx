@@ -7,6 +7,8 @@ import appStyles from '../../styles.css?inline';
 export const organizationId = '22222222-2222-4222-8222-222222222222';
 
 export const warehouse: InstalledConnection = {
+  appId: 'jtl',
+  provider: 'jtl',
   id: '11111111-1111-4111-8111-111111111111',
   tenantId: organizationId,
   label: 'North warehouse',
@@ -39,6 +41,8 @@ export const warehouse: InstalledConnection = {
 
 export const shopify: InstalledConnection = {
   ...warehouse,
+  appId: 'shopify',
+  provider: 'shopify',
   id: '44444444-4444-4444-8444-444444444444',
   label: 'Main store',
   target: { kind: 'shopify', shop: 'luma-demo.myshopify.com' },
@@ -78,6 +82,38 @@ export type MockState = 'ready' | 'empty' | 'loading' | 'error' | 'member';
 export function mockConnections(state: MockState = 'ready') {
   const original = globalThis.fetch;
   let items = state === 'empty' ? [] : structuredClone([shopify, warehouse]);
+  const catalog = [
+    {
+      id: 'shopify',
+      name: 'Shopify',
+      description: 'Read commerce data from your stores.',
+      version: '1.0.0',
+      category: 'storefront',
+      ui: ['connections', 'settings'],
+      connectionTypes: [{ kind: 'shopify', name: 'Shopify' }],
+    },
+    {
+      id: 'jtl',
+      name: 'JTL',
+      description: 'Connect JTL Cloud or JTL-Wawi.',
+      version: '1.0.0',
+      category: 'erp',
+      ui: ['connections', 'settings'],
+      connectionTypes: [
+        { kind: 'jtl-cloud', name: 'JTL Cloud' },
+        { kind: 'jtl-onprem', name: 'JTL-Wawi on-premise' },
+      ],
+    },
+  ];
+  const installations =
+    state === 'empty'
+      ? []
+      : catalog.map((app) => ({
+          appId: app.id,
+          status: 'installed',
+          version: 1,
+          updatedAt: '2026-09-18T00:00:00Z',
+        }));
   globalThis.fetch = async (input, init) => {
     const url = new URL(
       input instanceof Request ? input.url : String(input),
@@ -122,6 +158,25 @@ export function mockConnections(state: MockState = 'ready') {
         },
       });
     if (state === 'error') return fail(503);
+    if (url.pathname.endsWith('/apps'))
+      return Response.json({ catalog, installations });
+    const appAction = /\/apps\/([^/]+)\/(install|uninstall)$/.exec(
+      url.pathname,
+    );
+    if (appAction) {
+      const appId = appAction[1]!;
+      const previous = installations.find((app) => app.appId === appId);
+      const next = {
+        appId,
+        status: appAction[2] === 'install' ? 'installed' : 'uninstalled',
+        version: (previous?.version ?? 0) + 1,
+        updatedAt: new Date().toISOString(),
+      };
+      if (previous) Object.assign(previous, next);
+      else installations.push(next);
+
+      return Response.json(next);
+    }
     // OAuth is deliberately a local error, never a redirect to a real shop.
     if (url.pathname.endsWith('/shopify/authorize')) return fail(503);
     if (url.pathname.endsWith('/connections') && method === 'GET')

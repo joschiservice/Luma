@@ -21,12 +21,6 @@ import { IdentityError } from '../identity/data';
 import { playbookError, playbooksOptions } from './data';
 import { OfflineNotice } from './offline';
 
-export const systemNames: Record<string, string> = {
-  'jtl-cloud': 'JTL Cloud',
-  'jtl-onprem': 'JTL On-Prem',
-  shopify: 'Shopify',
-};
-
 export const statusNames = {
   active: 'Active',
   inactive: 'Inactive',
@@ -47,8 +41,7 @@ export function parsePlaybookFilters(
   return {
     q: typeof value.q === 'string' ? value.q.slice(0, 200) : '',
     system:
-      typeof value.system === 'string' &&
-      Object.hasOwn(systemNames, value.system)
+      typeof value.system === 'string' && value.system.length <= 100
         ? value.system
         : '',
     status:
@@ -116,7 +109,7 @@ export function PlaybookLibraryView({
         item.name,
         item.purpose,
         item.issueType.replaceAll('_', ' '),
-        ...item.systems.map((system) => systemNames[system] ?? system),
+        ...item.systems,
       ]
         .join(' ')
         .toLowerCase()
@@ -139,7 +132,7 @@ export function PlaybookLibraryView({
       ? [
           {
             key: 'system',
-            label: systemNames[filters.system]!,
+            label: filters.system,
             onRemove: () => change({ ...filters, system: '' }),
           },
         ]
@@ -246,9 +239,11 @@ export function PlaybookLibraryView({
             }
             options={[
               { value: '', label: 'All systems' },
-              ...Object.entries(systemNames).map(([value, label]) => ({
+              ...[
+                ...new Set((items ?? []).flatMap((item) => item.systems)),
+              ].map((value) => ({
                 value,
-                label,
+                label: value,
               })),
             ]}
           />
@@ -300,9 +295,8 @@ export function PlaybookLibraryView({
                     <p>{item.purpose}</p>
                     <div className="playbook-row-meta">
                       <span>
-                        {item.systems
-                          .map((system) => systemNames[system] ?? system)
-                          .join(' · ') || 'Unsupported system'}
+                        {item.systems.map((system) => system).join(' · ') ||
+                          'Unsupported system'}
                       </span>
                       <span>{item.issueType.replaceAll('_', ' ')}</span>
                       <span>v{item.availableVersion}</span>

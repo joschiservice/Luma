@@ -65,7 +65,7 @@ export interface ConnectionManagement {
 
 /** Adds trusted adapter operations to the public connection management contract. */
 export interface InstallationService extends ConnectionManagement {
-  /** Records Shopify access failures only when the active credential version still matches. */
+  /** Records provider access failures only when the active credential version still matches. */
   recordFailure(
     context: TenantContext,
     id: string,
@@ -92,15 +92,33 @@ export interface InstallationDependencies {
   repository: InstallationRepository;
   cipher: SecretCipher;
   refreshContext(context: TenantContext): Promise<TenantContext>;
-  /** Verify account identity and provider grants. Must enforce approved JTL network destinations before connecting. */
+  /** Verify account identity and provider grants. Must enforce deployment network policy before connecting. */
   verify(
     connection: InstalledConnection,
     credentials: InstallationCredentials,
   ): Promise<InstallationCapability[]>;
-  shopifyCredential?(
+  refreshCredential?(
     context: TenantContext,
     id: string,
-  ): Promise<InstallationCredentials>;
+    target: InstalledConnection['target'],
+  ): Promise<InstallationCredentials | void>;
+  /** Checks app availability and validates app-owned settings before use. */
+  provider?(
+    context: TenantContext,
+    target: InstalledConnection['target'],
+  ): Promise<{
+    appId: string;
+    provider: string;
+    appInstallationVersion: number;
+    management?: ('check' | 'rotate')[];
+  }>;
+  /** Rejects manual health checks when an app requires its own authorization flow. */
+  beforeCheck?(target: InstalledConnection['target']): void;
+  validate?(input: InstallationInput): InstallationInput;
+  validateCredentials?(
+    target: InstalledConnection['target'],
+    value: unknown,
+  ): InstallationCredentials;
   id(): string;
   now(): Date;
 }
@@ -189,13 +207,16 @@ export function createInstallationService(
       let parsed: InstallationInput;
       try {
         parsed = deps.boundary.input(input);
+        if (deps.validate) parsed = deps.validate(parsed);
       } catch {
         throw new IdentityError(422, 'CONFLICT', 'Invalid connection settings');
       }
+      const ownership = await deps.provider?.(fresh, parsed.target);
       const { credentials, ...settings } = parsed;
       const timestamp = deps.now().toISOString();
       const connection: InstalledConnection = {
         ...settings,
+        ...ownership,
         id: deps.id(),
         tenantId: fresh.tenantId,
         granted: [],
@@ -229,14 +250,15 @@ export function createInstallationService(
         ['revoked', 'disconnected'].includes(record.connection.status)
       )
         throw conflict();
+      await deps.provider?.(fresh, record.connection.target);
       let credentials: InstallationCredentials;
       try {
         credentials = deps.boundary.credentials(input);
-        if (
-          record.connection.target.kind === 'jtl-onprem' &&
-          !credentials.challengeCode
-        )
-          throw new Error();
+        if (deps.validateCredentials)
+          credentials = deps.validateCredentials(
+            record.connection.target,
+            input,
+          );
       } catch {
         throw new IdentityError(422, 'CONFLICT', 'Invalid credentials');
       }
@@ -268,6 +290,8 @@ export function createInstallationService(
         ['revoked', 'disconnected'].includes(record.connection.status)
       )
         throw conflict();
+      await deps.provider?.(fresh, record.connection.target);
+      deps.beforeCheck?.(record.connection.target);
       let granted: InstallationCapability[] = [];
       let status: InstalledConnection['status'] = 'degraded';
       try {
@@ -344,7 +368,6 @@ export function createInstallationService(
       const fresh = await authorize(context);
       const record = await get(fresh, id);
       if (
-        record.connection.target.kind !== 'shopify' ||
         record.connection.status !== 'active' ||
         record.connection.credentialVersion !== credentialVersion
       )
@@ -362,7 +385,7 @@ export function createInstallationService(
         },
         record.connection.version,
         fresh.actor.id,
-        'shopify_access_failed',
+        'provider_access_failed',
       );
     },
     /** Trusted adapter port. Never expose credentials through HTTP or workflow interfaces. */
@@ -379,12 +402,10 @@ export function createInstallationService(
           effect: 'none',
           retry: 'never',
         });
+      await deps.provider?.(fresh, record.connection.target);
       requireCapability(record.connection, capability);
-      if (
-        record.connection.target.kind === 'shopify' &&
-        deps.shopifyCredential
-      ) {
-        await deps.shopifyCredential(fresh, id);
+      if (deps.refreshCredential) {
+        await deps.refreshCredential(fresh, id, record.connection.target);
         const latest = await get(fresh, id);
         if (latest.connection.status !== 'active' || !latest.secret)
           throw unavailable();

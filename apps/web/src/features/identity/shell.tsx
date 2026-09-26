@@ -4,6 +4,7 @@ import { WorkspaceAccountMenu } from '@luma/ui/components/workspace/workspace-ac
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, Outlet, useLocation, useParams } from '@tanstack/react-router';
 
+import { AppNavigation } from '../apps/navigation';
 import { settingsOptions } from '../settings/data';
 import { Brand, Failure, Pending } from './common';
 import { contextOptions, organizationsOptions, sessionOptions } from './data';
@@ -35,6 +36,7 @@ function Navigation({
           {label}
         </Link>
       ))}
+      <AppNavigation organizationId={organizationId} close={close} />
     </nav>
   );
 }

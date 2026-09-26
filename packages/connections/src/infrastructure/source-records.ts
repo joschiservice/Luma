@@ -34,7 +34,11 @@ export function createSourceRecords(
       return db.transaction(context.tenantId, async (tx) => {
         const source = value.observation.source;
         const installed = await tx.query<{
-          document: { status: string; target: { kind: string } };
+          document: {
+            status: string;
+            provider?: string;
+            target: { kind: string };
+          };
         }>(
           'SELECT document FROM connector_installations WHERE tenant_id=$1 AND id=$2',
           [context.tenantId, source.connectionId],
@@ -42,8 +46,7 @@ export function createSourceRecords(
         const connection = installed.rows[0]?.document;
         if (
           !connection ||
-          (connection.target.kind === 'shopify' ? 'shopify' : 'jtl') !==
-            source.provider ||
+          (connection.provider ?? connection.target.kind) !== source.provider ||
           !['active', 'degraded'].includes(connection.status)
         )
           throw new Error('Connection unavailable');

@@ -4,7 +4,7 @@ import type { Pool } from 'pg';
 export function createReadinessCheck(
   identityReady: () => Promise<boolean>,
   connectionPool?: Pool,
-  shopify = false,
+  appsReady?: () => Promise<boolean>,
 ) {
   return async () => {
     if (!(await identityReady())) return false;
@@ -18,14 +18,8 @@ export function createReadinessCheck(
       await connectionPool.query(
         'SELECT id FROM connector_installations LIMIT 0',
       );
-      if (shopify) {
-        await connectionPool.query(
-          'SELECT digest FROM shopify_oauth_states LIMIT 0',
-        );
-        await connectionPool.query(
-          'SELECT connection_id FROM shopify_installation_bindings LIMIT 0',
-        );
-      }
+      await connectionPool.query('SELECT app_id FROM workspace_apps LIMIT 0');
+      if (appsReady && !(await appsReady())) return false;
     }
 
     return true;

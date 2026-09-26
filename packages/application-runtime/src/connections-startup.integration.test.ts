@@ -121,6 +121,7 @@ describe.skipIf(!databaseUrl)('connections through the API CLI', () => {
       for (const migration of [
         '0001_identity.sql',
         '0004_connector_installations.sql',
+        '0024_workspace_apps.sql',
       ]) {
         await owner.query(
           await readFile(
@@ -174,6 +175,13 @@ describe.skipIf(!databaseUrl)('connections through the API CLI', () => {
     const list = await call(path);
     expect(list.status).toBe(200);
     expect(await list.json()).toEqual({ items: [] });
+    expect(
+      (
+        await call(`/v1/organizations/${organizationId}/apps/shopify/install`, {
+          version: null,
+        })
+      ).status,
+    ).toBe(200);
     const created = await call(path, {
       label: 'Store',
       target: { kind: 'shopify', shop: 'example.myshopify.com' },

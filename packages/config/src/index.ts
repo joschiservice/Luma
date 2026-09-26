@@ -142,5 +142,3 @@ export type { WorkflowConfig } from './workflows.js';
 export { readConnectionsConfig } from './connections.js';
 
 export type { ConnectionsConfig } from './connections.js';
-
-export type { ShopifyConfig } from './shopify.js';

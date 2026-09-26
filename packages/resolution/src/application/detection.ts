@@ -242,10 +242,7 @@ export function createDetectionPipeline(
         mapped,
         complete: input.complete && o.kind === 'snapshot',
         eligibility: input.eligibility,
-        progressBasis:
-          o.source.provider === 'jtl'
-            ? 'note_created_or_package_shipped'
-            : 'source_updated',
+        progressBasis: o.data.progressBasis ?? 'unknown',
         otherOperationShippedQuantity: '0',
       };
       const mappingEvidence: Evidence = {

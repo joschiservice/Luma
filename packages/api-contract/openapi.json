@@ -2644,7 +2644,8 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "enum": ["jtl-cloud", "jtl-onprem", "shopify"]
+              "minLength": 1,
+              "maxLength": 100
             }
           },
           {
@@ -22304,428 +22305,6 @@
         }
       }
     },
-    "/v1/organizations/{organizationId}/connections/shopify/authorize": {
-      "post": {
-        "description": "Owners and admins receive a Shopify authorization URL. Approve access in Shopify to connect the store to this workspace.",
-        "summary": "Connect or reconnect Shopify",
-        "tags": ["connections"],
-        "parameters": [
-          {
-            "name": "organizationId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "operationId": "connections.shopifyStart",
-        "requestBody": {
-          "description": "Body",
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "shop": {
-                    "type": "string",
-                    "maxLength": 253,
-                    "pattern": "^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.myshopify\\.com$"
-                  },
-                  "label": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 120
-                  }
-                },
-                "required": ["shop", "label"],
-                "additionalProperties": false
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "200",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "authorizationUrl": {
-                      "type": "string",
-                      "format": "uri"
-                    }
-                  },
-                  "required": ["authorizationUrl"]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "400",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": [
-                        "VALIDATION_ERROR",
-                        "UNAUTHENTICATED",
-                        "FORBIDDEN",
-                        "NOT_FOUND",
-                        "CONFLICT",
-                        "REGION_UNAVAILABLE",
-                        "SERVICE_UNAVAILABLE",
-                        "NOT_READY",
-                        "INTERNAL_ERROR",
-                        "PAYLOAD_TOO_LARGE",
-                        "TOO_MANY_REQUESTS",
-                        "UNSUPPORTED_MEDIA_TYPE"
-                      ]
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["code", "message", "requestId"]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "401",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": [
-                        "VALIDATION_ERROR",
-                        "UNAUTHENTICATED",
-                        "FORBIDDEN",
-                        "NOT_FOUND",
-                        "CONFLICT",
-                        "REGION_UNAVAILABLE",
-                        "SERVICE_UNAVAILABLE",
-                        "NOT_READY",
-                        "INTERNAL_ERROR",
-                        "PAYLOAD_TOO_LARGE",
-                        "TOO_MANY_REQUESTS",
-                        "UNSUPPORTED_MEDIA_TYPE"
-                      ]
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["code", "message", "requestId"]
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "403",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": [
-                        "VALIDATION_ERROR",
-                        "UNAUTHENTICATED",
-                        "FORBIDDEN",
-                        "NOT_FOUND",
-                        "CONFLICT",
-                        "REGION_UNAVAILABLE",
-                        "SERVICE_UNAVAILABLE",
-                        "NOT_READY",
-                        "INTERNAL_ERROR",
-                        "PAYLOAD_TOO_LARGE",
-                        "TOO_MANY_REQUESTS",
-                        "UNSUPPORTED_MEDIA_TYPE"
-                      ]
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["code", "message", "requestId"]
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "404",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": [
-                        "VALIDATION_ERROR",
-                        "UNAUTHENTICATED",
-                        "FORBIDDEN",
-                        "NOT_FOUND",
-                        "CONFLICT",
-                        "REGION_UNAVAILABLE",
-                        "SERVICE_UNAVAILABLE",
-                        "NOT_READY",
-                        "INTERNAL_ERROR",
-                        "PAYLOAD_TOO_LARGE",
-                        "TOO_MANY_REQUESTS",
-                        "UNSUPPORTED_MEDIA_TYPE"
-                      ]
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["code", "message", "requestId"]
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "409",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": [
-                        "VALIDATION_ERROR",
-                        "UNAUTHENTICATED",
-                        "FORBIDDEN",
-                        "NOT_FOUND",
-                        "CONFLICT",
-                        "REGION_UNAVAILABLE",
-                        "SERVICE_UNAVAILABLE",
-                        "NOT_READY",
-                        "INTERNAL_ERROR",
-                        "PAYLOAD_TOO_LARGE",
-                        "TOO_MANY_REQUESTS",
-                        "UNSUPPORTED_MEDIA_TYPE"
-                      ]
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["code", "message", "requestId"]
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "413",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": [
-                        "VALIDATION_ERROR",
-                        "UNAUTHENTICATED",
-                        "FORBIDDEN",
-                        "NOT_FOUND",
-                        "CONFLICT",
-                        "REGION_UNAVAILABLE",
-                        "SERVICE_UNAVAILABLE",
-                        "NOT_READY",
-                        "INTERNAL_ERROR",
-                        "PAYLOAD_TOO_LARGE",
-                        "TOO_MANY_REQUESTS",
-                        "UNSUPPORTED_MEDIA_TYPE"
-                      ]
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["code", "message", "requestId"]
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "415",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": [
-                        "VALIDATION_ERROR",
-                        "UNAUTHENTICATED",
-                        "FORBIDDEN",
-                        "NOT_FOUND",
-                        "CONFLICT",
-                        "REGION_UNAVAILABLE",
-                        "SERVICE_UNAVAILABLE",
-                        "NOT_READY",
-                        "INTERNAL_ERROR",
-                        "PAYLOAD_TOO_LARGE",
-                        "TOO_MANY_REQUESTS",
-                        "UNSUPPORTED_MEDIA_TYPE"
-                      ]
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["code", "message", "requestId"]
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "422",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": [
-                        "VALIDATION_ERROR",
-                        "UNAUTHENTICATED",
-                        "FORBIDDEN",
-                        "NOT_FOUND",
-                        "CONFLICT",
-                        "REGION_UNAVAILABLE",
-                        "SERVICE_UNAVAILABLE",
-                        "NOT_READY",
-                        "INTERNAL_ERROR",
-                        "PAYLOAD_TOO_LARGE",
-                        "TOO_MANY_REQUESTS",
-                        "UNSUPPORTED_MEDIA_TYPE"
-                      ]
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["code", "message", "requestId"]
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "500",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": [
-                        "VALIDATION_ERROR",
-                        "UNAUTHENTICATED",
-                        "FORBIDDEN",
-                        "NOT_FOUND",
-                        "CONFLICT",
-                        "REGION_UNAVAILABLE",
-                        "SERVICE_UNAVAILABLE",
-                        "NOT_READY",
-                        "INTERNAL_ERROR",
-                        "PAYLOAD_TOO_LARGE",
-                        "TOO_MANY_REQUESTS",
-                        "UNSUPPORTED_MEDIA_TYPE"
-                      ]
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["code", "message", "requestId"]
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "503",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": [
-                        "VALIDATION_ERROR",
-                        "UNAUTHENTICATED",
-                        "FORBIDDEN",
-                        "NOT_FOUND",
-                        "CONFLICT",
-                        "REGION_UNAVAILABLE",
-                        "SERVICE_UNAVAILABLE",
-                        "NOT_READY",
-                        "INTERNAL_ERROR",
-                        "PAYLOAD_TOO_LARGE",
-                        "TOO_MANY_REQUESTS",
-                        "UNSUPPORTED_MEDIA_TYPE"
-                      ]
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["code", "message", "requestId"]
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/v1/organizations/{organizationId}/connections": {
       "get": {
         "summary": "List installed organization connections",
@@ -22755,6 +22334,24 @@
                       "items": {
                         "type": "object",
                         "properties": {
+                          "provider": {
+                            "type": "string"
+                          },
+                          "appId": {
+                            "type": "string"
+                          },
+                          "management": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": ["check", "rotate"]
+                            }
+                          },
+                          "appInstallationVersion": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": 0
+                          },
                           "id": {
                             "type": "string",
                             "format": "uuid"
@@ -22767,73 +22364,19 @@
                             "type": "string"
                           },
                           "target": {
-                            "discriminator": {
-                              "propertyName": "kind"
-                            },
-                            "oneOf": [
-                              {
-                                "type": "object",
-                                "properties": {
-                                  "kind": {
-                                    "type": "string",
-                                    "enum": ["shopify"]
-                                  },
-                                  "shop": {
-                                    "type": "string",
-                                    "pattern": "^[a-z0-9][a-z0-9-]*\\.myshopify\\.com$"
-                                  }
-                                },
-                                "required": ["kind", "shop"],
-                                "additionalProperties": false
-                              },
-                              {
-                                "type": "object",
-                                "properties": {
-                                  "kind": {
-                                    "type": "string",
-                                    "enum": ["jtl-cloud"]
-                                  },
-                                  "jtlTenantId": {
-                                    "type": "string",
-                                    "format": "uuid"
-                                  }
-                                },
-                                "required": ["kind", "jtlTenantId"],
-                                "additionalProperties": false
-                              },
-                              {
-                                "type": "object",
-                                "properties": {
-                                  "kind": {
-                                    "type": "string",
-                                    "enum": ["jtl-onprem"]
-                                  },
-                                  "baseUrl": {
-                                    "type": "string",
-                                    "format": "uri"
-                                  },
-                                  "appId": {
-                                    "type": "string",
-                                    "minLength": 1,
-                                    "maxLength": 4096,
-                                    "pattern": "^[\\x20-\\x7e]+$"
-                                  },
-                                  "appVersion": {
-                                    "type": "string",
-                                    "minLength": 1,
-                                    "maxLength": 4096,
-                                    "pattern": "^[\\x20-\\x7e]+$"
-                                  }
-                                },
-                                "required": [
-                                  "kind",
-                                  "baseUrl",
-                                  "appId",
-                                  "appVersion"
-                                ],
-                                "additionalProperties": false
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100
                               }
-                            ]
+                            },
+                            "required": ["kind"],
+                            "additionalProperties": {
+                              "type": "string",
+                              "maxLength": 4096
+                            }
                           },
                           "permissions": {
                             "type": "array",
@@ -23304,68 +22847,19 @@
                     "maxLength": 120
                   },
                   "target": {
-                    "discriminator": {
-                      "propertyName": "kind"
-                    },
-                    "oneOf": [
-                      {
-                        "type": "object",
-                        "properties": {
-                          "kind": {
-                            "type": "string",
-                            "enum": ["shopify"]
-                          },
-                          "shop": {
-                            "type": "string",
-                            "pattern": "^[a-z0-9][a-z0-9-]*\\.myshopify\\.com$"
-                          }
-                        },
-                        "required": ["kind", "shop"],
-                        "additionalProperties": false
-                      },
-                      {
-                        "type": "object",
-                        "properties": {
-                          "kind": {
-                            "type": "string",
-                            "enum": ["jtl-cloud"]
-                          },
-                          "jtlTenantId": {
-                            "type": "string",
-                            "format": "uuid"
-                          }
-                        },
-                        "required": ["kind", "jtlTenantId"],
-                        "additionalProperties": false
-                      },
-                      {
-                        "type": "object",
-                        "properties": {
-                          "kind": {
-                            "type": "string",
-                            "enum": ["jtl-onprem"]
-                          },
-                          "baseUrl": {
-                            "type": "string",
-                            "format": "uri"
-                          },
-                          "appId": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 4096,
-                            "pattern": "^[\\x20-\\x7e]+$"
-                          },
-                          "appVersion": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 4096,
-                            "pattern": "^[\\x20-\\x7e]+$"
-                          }
-                        },
-                        "required": ["kind", "baseUrl", "appId", "appVersion"],
-                        "additionalProperties": false
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 100
                       }
-                    ]
+                    },
+                    "required": ["kind"],
+                    "additionalProperties": {
+                      "type": "string",
+                      "maxLength": 4096
+                    }
                   },
                   "permissions": {
                     "type": "array",
@@ -23391,16 +22885,12 @@
                         "minLength": 1,
                         "maxLength": 4096,
                         "pattern": "^[\\x20-\\x7e]+$"
-                      },
-                      "challengeCode": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 4096,
-                        "pattern": "^[\\x20-\\x7e]+$"
                       }
                     },
                     "required": ["token"],
-                    "additionalProperties": false
+                    "additionalProperties": {
+                      "nullable": true
+                    }
                   }
                 },
                 "required": ["label", "target", "permissions", "credentials"],
@@ -23417,6 +22907,24 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "provider": {
+                      "type": "string"
+                    },
+                    "appId": {
+                      "type": "string"
+                    },
+                    "management": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": ["check", "rotate"]
+                      }
+                    },
+                    "appInstallationVersion": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "exclusiveMinimum": 0
+                    },
                     "id": {
                       "type": "string",
                       "format": "uuid"
@@ -23429,73 +22937,19 @@
                       "type": "string"
                     },
                     "target": {
-                      "discriminator": {
-                        "propertyName": "kind"
-                      },
-                      "oneOf": [
-                        {
-                          "type": "object",
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": ["shopify"]
-                            },
-                            "shop": {
-                              "type": "string",
-                              "pattern": "^[a-z0-9][a-z0-9-]*\\.myshopify\\.com$"
-                            }
-                          },
-                          "required": ["kind", "shop"],
-                          "additionalProperties": false
-                        },
-                        {
-                          "type": "object",
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": ["jtl-cloud"]
-                            },
-                            "jtlTenantId": {
-                              "type": "string",
-                              "format": "uuid"
-                            }
-                          },
-                          "required": ["kind", "jtlTenantId"],
-                          "additionalProperties": false
-                        },
-                        {
-                          "type": "object",
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": ["jtl-onprem"]
-                            },
-                            "baseUrl": {
-                              "type": "string",
-                              "format": "uri"
-                            },
-                            "appId": {
-                              "type": "string",
-                              "minLength": 1,
-                              "maxLength": 4096,
-                              "pattern": "^[\\x20-\\x7e]+$"
-                            },
-                            "appVersion": {
-                              "type": "string",
-                              "minLength": 1,
-                              "maxLength": 4096,
-                              "pattern": "^[\\x20-\\x7e]+$"
-                            }
-                          },
-                          "required": [
-                            "kind",
-                            "baseUrl",
-                            "appId",
-                            "appVersion"
-                          ],
-                          "additionalProperties": false
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
                         }
-                      ]
+                      },
+                      "required": ["kind"],
+                      "additionalProperties": {
+                        "type": "string",
+                        "maxLength": 4096
+                      }
                     },
                     "permissions": {
                       "type": "array",
@@ -23986,6 +23440,24 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "provider": {
+                      "type": "string"
+                    },
+                    "appId": {
+                      "type": "string"
+                    },
+                    "management": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": ["check", "rotate"]
+                      }
+                    },
+                    "appInstallationVersion": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "exclusiveMinimum": 0
+                    },
                     "id": {
                       "type": "string",
                       "format": "uuid"
@@ -23998,73 +23470,19 @@
                       "type": "string"
                     },
                     "target": {
-                      "discriminator": {
-                        "propertyName": "kind"
-                      },
-                      "oneOf": [
-                        {
-                          "type": "object",
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": ["shopify"]
-                            },
-                            "shop": {
-                              "type": "string",
-                              "pattern": "^[a-z0-9][a-z0-9-]*\\.myshopify\\.com$"
-                            }
-                          },
-                          "required": ["kind", "shop"],
-                          "additionalProperties": false
-                        },
-                        {
-                          "type": "object",
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": ["jtl-cloud"]
-                            },
-                            "jtlTenantId": {
-                              "type": "string",
-                              "format": "uuid"
-                            }
-                          },
-                          "required": ["kind", "jtlTenantId"],
-                          "additionalProperties": false
-                        },
-                        {
-                          "type": "object",
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": ["jtl-onprem"]
-                            },
-                            "baseUrl": {
-                              "type": "string",
-                              "format": "uri"
-                            },
-                            "appId": {
-                              "type": "string",
-                              "minLength": 1,
-                              "maxLength": 4096,
-                              "pattern": "^[\\x20-\\x7e]+$"
-                            },
-                            "appVersion": {
-                              "type": "string",
-                              "minLength": 1,
-                              "maxLength": 4096,
-                              "pattern": "^[\\x20-\\x7e]+$"
-                            }
-                          },
-                          "required": [
-                            "kind",
-                            "baseUrl",
-                            "appId",
-                            "appVersion"
-                          ],
-                          "additionalProperties": false
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
                         }
-                      ]
+                      },
+                      "required": ["kind"],
+                      "additionalProperties": {
+                        "type": "string",
+                        "maxLength": 4096
+                      }
                     },
                     "permissions": {
                       "type": "array",
@@ -24549,16 +23967,12 @@
                         "minLength": 1,
                         "maxLength": 4096,
                         "pattern": "^[\\x20-\\x7e]+$"
-                      },
-                      "challengeCode": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 4096,
-                        "pattern": "^[\\x20-\\x7e]+$"
                       }
                     },
                     "required": ["token"],
-                    "additionalProperties": false
+                    "additionalProperties": {
+                      "nullable": true
+                    }
                   }
                 },
                 "required": ["version", "credentials"],
@@ -24575,6 +23989,24 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "provider": {
+                      "type": "string"
+                    },
+                    "appId": {
+                      "type": "string"
+                    },
+                    "management": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": ["check", "rotate"]
+                      }
+                    },
+                    "appInstallationVersion": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "exclusiveMinimum": 0
+                    },
                     "id": {
                       "type": "string",
                       "format": "uuid"
@@ -24587,73 +24019,19 @@
                       "type": "string"
                     },
                     "target": {
-                      "discriminator": {
-                        "propertyName": "kind"
-                      },
-                      "oneOf": [
-                        {
-                          "type": "object",
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": ["shopify"]
-                            },
-                            "shop": {
-                              "type": "string",
-                              "pattern": "^[a-z0-9][a-z0-9-]*\\.myshopify\\.com$"
-                            }
-                          },
-                          "required": ["kind", "shop"],
-                          "additionalProperties": false
-                        },
-                        {
-                          "type": "object",
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": ["jtl-cloud"]
-                            },
-                            "jtlTenantId": {
-                              "type": "string",
-                              "format": "uuid"
-                            }
-                          },
-                          "required": ["kind", "jtlTenantId"],
-                          "additionalProperties": false
-                        },
-                        {
-                          "type": "object",
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": ["jtl-onprem"]
-                            },
-                            "baseUrl": {
-                              "type": "string",
-                              "format": "uri"
-                            },
-                            "appId": {
-                              "type": "string",
-                              "minLength": 1,
-                              "maxLength": 4096,
-                              "pattern": "^[\\x20-\\x7e]+$"
-                            },
-                            "appVersion": {
-                              "type": "string",
-                              "minLength": 1,
-                              "maxLength": 4096,
-                              "pattern": "^[\\x20-\\x7e]+$"
-                            }
-                          },
-                          "required": [
-                            "kind",
-                            "baseUrl",
-                            "appId",
-                            "appVersion"
-                          ],
-                          "additionalProperties": false
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
                         }
-                      ]
+                      },
+                      "required": ["kind"],
+                      "additionalProperties": {
+                        "type": "string",
+                        "maxLength": 4096
+                      }
                     },
                     "permissions": {
                       "type": "array",
@@ -25145,6 +24523,24 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "provider": {
+                      "type": "string"
+                    },
+                    "appId": {
+                      "type": "string"
+                    },
+                    "management": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": ["check", "rotate"]
+                      }
+                    },
+                    "appInstallationVersion": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "exclusiveMinimum": 0
+                    },
                     "id": {
                       "type": "string",
                       "format": "uuid"
@@ -25157,73 +24553,19 @@
                       "type": "string"
                     },
                     "target": {
-                      "discriminator": {
-                        "propertyName": "kind"
-                      },
-                      "oneOf": [
-                        {
-                          "type": "object",
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": ["shopify"]
-                            },
-                            "shop": {
-                              "type": "string",
-                              "pattern": "^[a-z0-9][a-z0-9-]*\\.myshopify\\.com$"
-                            }
-                          },
-                          "required": ["kind", "shop"],
-                          "additionalProperties": false
-                        },
-                        {
-                          "type": "object",
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": ["jtl-cloud"]
-                            },
-                            "jtlTenantId": {
-                              "type": "string",
-                              "format": "uuid"
-                            }
-                          },
-                          "required": ["kind", "jtlTenantId"],
-                          "additionalProperties": false
-                        },
-                        {
-                          "type": "object",
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": ["jtl-onprem"]
-                            },
-                            "baseUrl": {
-                              "type": "string",
-                              "format": "uri"
-                            },
-                            "appId": {
-                              "type": "string",
-                              "minLength": 1,
-                              "maxLength": 4096,
-                              "pattern": "^[\\x20-\\x7e]+$"
-                            },
-                            "appVersion": {
-                              "type": "string",
-                              "minLength": 1,
-                              "maxLength": 4096,
-                              "pattern": "^[\\x20-\\x7e]+$"
-                            }
-                          },
-                          "required": [
-                            "kind",
-                            "baseUrl",
-                            "appId",
-                            "appVersion"
-                          ],
-                          "additionalProperties": false
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
                         }
-                      ]
+                      },
+                      "required": ["kind"],
+                      "additionalProperties": {
+                        "type": "string",
+                        "maxLength": 4096
+                      }
                     },
                     "permissions": {
                       "type": "array",
@@ -25553,6 +24895,1246 @@
           },
           "422": {
             "description": "422",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/apps": {
+      "get": {
+        "summary": "List available apps and workspace installations",
+        "tags": ["apps"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "operationId": "apps.list",
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "catalog": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "string"
+                          },
+                          "category": {
+                            "type": "string",
+                            "enum": ["storefront", "erp", "utility"]
+                          },
+                          "ui": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": ["connections", "settings", "page"]
+                            }
+                          },
+                          "connectionTypes": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["kind", "name"]
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "description",
+                          "version",
+                          "category",
+                          "ui",
+                          "connectionTypes"
+                        ]
+                      }
+                    },
+                    "installations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "appId": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": ["installed", "uninstalled"]
+                          },
+                          "version": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": 0
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": ["appId", "status", "version", "updatedAt"]
+                      }
+                    }
+                  },
+                  "required": ["catalog", "installations"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/apps/{appId}/install": {
+      "post": {
+        "description": "Owners and admins can install an available app. Use null for a first installation or the current version to reinstall.",
+        "summary": "Install an app in this workspace",
+        "tags": ["apps"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "appId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+            }
+          }
+        ],
+        "operationId": "apps.install",
+        "requestBody": {
+          "description": "Body",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": 0,
+                    "nullable": true
+                  }
+                },
+                "required": ["version"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "appId": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["installed", "uninstalled"]
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "exclusiveMinimum": 0
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": ["appId", "status", "version", "updatedAt"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/apps/{appId}/uninstall": {
+      "post": {
+        "description": "Stops new app operations and deletes its connection credentials. Historical records remain. Requests already dispatched may finish.",
+        "summary": "Uninstall an app",
+        "tags": ["apps"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "appId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+            }
+          }
+        ],
+        "operationId": "apps.uninstall",
+        "requestBody": {
+          "description": "Body",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": 0
+                  }
+                },
+                "required": ["version"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "appId": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["installed", "uninstalled"]
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "exclusiveMinimum": 0
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": ["appId", "status", "version", "updatedAt"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
             "content": {
               "application/json": {
                 "schema": {

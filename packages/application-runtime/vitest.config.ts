@@ -1,4 +1,6 @@
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
+
+import appTests from './tsconfig.apps.json' with { type: 'json' };
 
 export default defineConfig({
   ssr: {
@@ -7,5 +9,6 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts'],
+    exclude: [...configDefaults.exclude, ...appTests.exclude],
   },
 });

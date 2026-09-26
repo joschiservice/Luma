@@ -188,16 +188,12 @@ export function ActivityView({
         />
         <label>
           System
-          <select
+          <input
             aria-label="System"
             value={filters.system ?? ''}
+            placeholder="All systems"
             onChange={(e) => update('system', e.target.value)}
-          >
-            <option value="">All systems</option>
-            <option value="jtl-cloud">JTL Cloud</option>
-            <option value="jtl-onprem">JTL On-Prem</option>
-            <option value="shopify">Shopify</option>
-          </select>
+          />
         </label>
         <label>
           Connection ID

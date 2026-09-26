@@ -10,12 +10,9 @@ export interface ProviderCatalog {
 }
 
 /** Creates a provider catalog with category filtering and lookup by ID. */
-export function createProviderCatalog(): ProviderCatalog {
-  const providers: Provider[] = [
-    { id: 'shopify', name: 'Shopify', category: 'storefront' },
-    { id: 'jtl', name: 'JTL', category: 'erp' },
-  ];
-
+export function createProviderCatalog(
+  providers: readonly Provider[] = [],
+): ProviderCatalog {
   return {
     list: (category) =>
       providers

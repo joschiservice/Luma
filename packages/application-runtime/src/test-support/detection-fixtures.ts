@@ -1,16 +1,14 @@
 import { readFileSync } from 'node:fs';
 
-import {
-  createCapabilityRuntime,
-  createJtlConnector,
-  createShopifyConnector,
-} from '@luma/connections/adapters';
+import { createJtlConnector } from '@luma/app-jtl';
+import { createShopifyConnector } from '@luma/app-shopify';
+import { createCapabilityRuntime } from '@luma/connections/adapters';
 import type { TenantContext } from '@luma/identity';
 
 const jtl = JSON.parse(
   readFileSync(
     new URL(
-      '../../../connections/src/infrastructure/jtl/fixtures/commerce.json',
+      '../../../apps/jtl/src/infrastructure/fixtures/commerce.json',
       import.meta.url,
     ),
     'utf8',
@@ -20,7 +18,7 @@ const jtl = JSON.parse(
 const shopify = JSON.parse(
   readFileSync(
     new URL(
-      '../../../connections/src/infrastructure/shopify/fixtures/commerce.json',
+      '../../../apps/shopify/src/infrastructure/fixtures/commerce.json',
       import.meta.url,
     ),
     'utf8',

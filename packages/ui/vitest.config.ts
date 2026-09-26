@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
@@ -17,6 +18,11 @@ export default mergeConfig(
     ],
     test: {
       name: 'storybook',
+      exclude: ['jtl', 'shopify'].every((app) =>
+        existsSync(new URL(`../apps/${app}/package.json`, import.meta.url)),
+      )
+        ? []
+        : ['../../apps/web/src/features/connections/*.stories.tsx'],
       browser: {
         enabled: true,
         provider: playwright(),

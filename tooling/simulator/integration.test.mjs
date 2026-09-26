@@ -4,18 +4,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 
+import { createJtlConnector } from '@luma/app-jtl';
+import { createShopifyConnector } from '@luma/app-shopify';
 import {
   createCapabilityRuntime,
-  createJtlConnector,
-  createShopifyConnector,
   simulationTransport,
 } from '@luma/connections/adapters';
-import {
-  createInstallationVerifier,
-  createInstalledRuntime,
-  createInstalledShippingMethodEffects,
-  createSimulationTransport,
-} from '@luma/connections/composition';
+import { createSimulationTransport } from '@luma/connections/composition';
 import { makeTenantContext } from '@luma/identity/composition';
 
 import { createApp } from '../../apps/simulator/dist/app.js';
@@ -26,6 +21,11 @@ import {
   mutate,
 } from '../../apps/simulator/dist/run.js';
 import { createTransport } from '../../packages/simulator/core/dist/index.js';
+import {
+  createInstallationVerifier,
+  createInstalledRuntime,
+  createInstalledShippingMethodEffects,
+} from '../apps/providers.mjs';
 import { observeProviders } from './observations.mjs';
 
 const tenantId = '00000000-0000-4000-8000-000000000001';
@@ -78,6 +78,8 @@ test('real installed adapters read remote state, verify a lost write after resta
       id: '00000000-0000-4000-8000-000000000002',
       tenantId,
       label: 'SIMULATED JTL',
+      provider: 'jtl',
+      appId: 'jtl',
       target,
       permissions: [
         'orders.read',
@@ -92,6 +94,8 @@ test('real installed adapters read remote state, verify a lost write after resta
       id: '00000000-0000-4000-8000-000000000003',
       tenantId,
       label: 'SIMULATED Shopify',
+      provider: 'shopify',
+      appId: 'shopify',
       target: { kind: 'shopify', shop: 'luma-synthetic-test.myshopify.com' },
       permissions: [
         'orders.read',

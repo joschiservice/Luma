@@ -30,6 +30,11 @@ async function fixture(t) {
   });
   const page = await context.newPage();
   const errors = [];
+  const appModules = [];
+  page.on('request', (request) => {
+    if (/packages\/apps\/[^/]+\/src\/web/.test(request.url()))
+      appModules.push(request.url());
+  });
   page.on('pageerror', (error) => errors.push(error.message));
   page.setDefaultTimeout(15_000);
   await page.goto('/sign-up');
@@ -48,15 +53,26 @@ async function fixture(t) {
   await page.getByRole('heading', { name: 'Operations overview' }).waitFor();
   const organizationId = new URL(page.url()).pathname.split('/')[2];
   await page.getByRole('link', { name: 'Connections', exact: true }).click();
-  await page.getByText('No connections yet', { exact: true }).waitFor();
+  await page.getByText('No connections yet.', { exact: false }).waitFor();
+  expect(appModules).toEqual([]);
 
-  return { db, api, page, context, organizationId, errors };
+  return { db, api, page, context, organizationId, errors, appModules };
 }
 
 async function setup(page, provider, label, token = 'valid-test-token') {
-  await page
-    .getByRole('button', { name: `Set up ${provider}`, exact: true })
-    .click();
+  const install = page.getByRole('button', {
+    name: 'Install JTL',
+    exact: true,
+  });
+  if (await install.count()) await install.click();
+  else
+    await page
+      .getByRole('article')
+      .filter({ has: page.getByRole('heading', { name: 'JTL', exact: true }) })
+      .getByRole('button', { name: 'Configure', exact: true })
+      .click();
+  if (provider === 'JTL-Wawi on-premise')
+    await page.getByLabel('Connection type').selectOption('jtl-onprem');
   await page.getByLabel('Connection name').fill(label);
   await page.getByLabel('Access token', { exact: true }).fill(token);
 
@@ -74,9 +90,12 @@ async function save(page, label) {
 }
 
 it('connects JTL targets, validates, replaces invalid credentials and disconnects', async (t) => {
-  const { page, context, db, errors, organizationId } = await fixture(t);
+  const { page, context, db, errors, organizationId, appModules } =
+    await fixture(t);
   expect(await page.title()).toBe('Luma');
   await setup(page, 'JTL Cloud', 'Main shop', 'invalid-test-token');
+  expect(appModules.some((url) => url.includes('/jtl/'))).toBe(true);
+  expect(appModules.some((url) => url.includes('/shopify/'))).toBe(false);
   await page
     .getByLabel('JTL Cloud tenant ID')
     .fill('22222222-2222-4222-8222-222222222222');
@@ -84,7 +103,7 @@ it('connects JTL targets, validates, replaces invalid credentials and disconnect
   await shop.getByRole('button', { name: 'Validate access' }).click();
   await shop.getByText('Needs attention', { exact: true }).waitFor();
   expect(await shop.getByText('Permitted', { exact: true }).count()).toBe(0);
-  await shop.getByRole('button', { name: 'Replace credentials' }).click();
+  await shop.getByRole('button', { name: 'App settings' }).click();
   expect(
     await page.getByLabel('Access token', { exact: true }).inputValue(),
   ).toBe('');
@@ -157,26 +176,76 @@ it('connects JTL targets, validates, replaces invalid credentials and disconnect
   });
   await page.getByRole('button', { name: 'Confirm disconnect' }).click();
   await shop.getByText('Disconnected', { exact: true }).waitFor();
-  expect(await shop.getByRole('button').count()).toBe(0);
+  expect(
+    await shop.getByRole('button', { name: 'Validate access' }).count(),
+  ).toBe(0);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
+  await shop.getByRole('button', { name: 'App settings' }).click();
+  await page
+    .getByRole('dialog')
+    .getByLabel('Connection name')
+    .fill('Reconnected shop');
+  await page
+    .getByRole('dialog')
+    .getByLabel('Access token', { exact: true })
+    .fill('valid-test-token');
+  await page
+    .getByRole('button', { name: 'Save connection', exact: true })
+    .click();
+  const reconnected = page.getByRole('article').filter({
+    has: page.getByRole('heading', { name: 'Reconnected shop', exact: true }),
+  });
+  await reconnected.getByRole('button', { name: 'Validate access' }).click();
+  await reconnected.getByText('Validated', { exact: true }).waitFor();
+  await shop.getByText('Disconnected', { exact: true }).waitFor();
+  const jtlApp = page
+    .getByRole('article')
+    .filter({ has: page.getByRole('heading', { name: 'JTL', exact: true }) });
+  await jtlApp.getByRole('button', { name: 'Uninstall', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Confirm uninstall', exact: true })
+    .click();
+  await page
+    .getByRole('button', { name: 'Install JTL', exact: true })
+    .waitFor();
+  const disconnected = await (
+    await context.request.get(
+      `/api/v1/organizations/${organizationId}/connections`,
+    )
+  ).json();
+  expect(
+    disconnected.items.every(
+      (connection) => connection.status === 'disconnected',
+    ),
+  ).toBe(true);
+  appModules.length = 0;
+  await page.reload();
+  await page
+    .getByRole('button', { name: 'Install JTL', exact: true })
+    .waitFor();
+  expect(appModules).toEqual([]);
   await db.owner.query(
     "UPDATE memberships SET role = 'member' WHERE tenant_id = $1",
     [organizationId],
   );
   await page.reload();
-  await page.getByText('You can view connections.', { exact: false }).waitFor();
+  await page
+    .getByText('An owner or admin can install and configure apps.', {
+      exact: false,
+    })
+    .waitFor();
   expect(
     await page
-      .getByRole('button', { name: 'Connect Shopify', exact: true })
+      .getByRole('button', { name: 'Install Shopify', exact: true })
       .isDisabled(),
   ).toBe(true);
   expect(
     await page
-      .getByRole('button', { name: 'Replace credentials', exact: true })
+      .getByRole('button', { name: 'App settings', exact: true })
       .count(),
   ).toBe(0);
   const denied = await context.request.post(
@@ -268,7 +337,7 @@ it('preserves non-secret input on errors, handles stale versions and unavailable
     .getByRole('alert')
     .filter({ hasText: 'Connection service unavailable.' })
     .waitFor();
-  expect(await page.getByRole('article').count()).toBe(0);
+  expect(await card.count()).toBe(0);
   await page.unroute('**/api/v1/organizations/*/connections');
   await page.getByRole('button', { name: 'Refresh list' }).click();
   await card.waitFor();
@@ -277,14 +346,14 @@ it('preserves non-secret input on errors, handles stale versions and unavailable
 it('starts Shopify authorization without token fields and reports callback outcomes', async (t) => {
   const { page, errors } = await fixture(t);
   await page
-    .getByRole('button', { name: 'Connect Shopify', exact: true })
+    .getByRole('button', { name: 'Install Shopify', exact: true })
     .click();
   expect(await page.getByLabel('Access token', { exact: true }).count()).toBe(
     0,
   );
   await page.getByLabel('Connection name').fill('Dev shop');
   await page.getByLabel('Shop hostname').fill('dev-shop.myshopify.com');
-  await page.route('**/connections/shopify/authorize', (route) =>
+  await page.route('**/apps/shopify/authorize', (route) =>
     route.fulfill({
       status: 200,
       json: {
@@ -299,9 +368,9 @@ it('starts Shopify authorization without token fields and reports callback outco
   const returnUrl = page.url();
   await page.getByRole('button', { name: 'Continue to Shopify' }).click();
   await page.waitForURL('https://dev-shop.myshopify.com/**');
-  await page.goto(returnUrl + '?shopify=denied');
+  await page.goto(returnUrl + '?appResult=denied');
   await page
-    .getByText('Shopify access was not approved. Connect again when ready.')
+    .getByText('Authorization needs attention. Open app settings to try again.')
     .waitFor();
   expect(errors).toEqual([]);
 }, 120000);

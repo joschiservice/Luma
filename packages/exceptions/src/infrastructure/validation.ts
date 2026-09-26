@@ -80,6 +80,7 @@ export const factSchemas = {
       progressBasis: z.enum([
         'note_created_or_package_shipped',
         'source_updated',
+        'unknown',
       ]),
       otherOperationShippedQuantity: decimal,
     })

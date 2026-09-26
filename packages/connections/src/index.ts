@@ -59,3 +59,33 @@ export type {
   PlaybookGrantReader,
   PlaybookGrantSource,
 } from './application/playbook-grants.js';
+
+export type {
+  CapabilityDependencies,
+  CapabilityHandler,
+  ConnectorConnection,
+  InvocationContext,
+} from './application/capabilities.js';
+
+export type {
+  InstallationDependencies,
+  InstallationService,
+  InstallationRepository,
+  StoredInstallation,
+  SecretCipher,
+} from './application/installations.js';
+
+export { secretBinding } from './application/installations.js';
+
+export type {
+  InstallationInput,
+  InstallationCredentials,
+} from './domain/installation.js';
+
+export { createShippingMethodEffects } from './application/shipping-method-effects.js';
+
+export type {
+  ConnectionProvider,
+  ConnectorEvidence,
+  ProviderRuntimeOptions,
+} from './application/provider.js';

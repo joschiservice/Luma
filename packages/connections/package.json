@@ -33,8 +33,6 @@
   "dependencies": {
     "@luma/api-contract": "workspace:*",
     "@luma/connector-core": "workspace:*",
-    "@luma/connector-jtl": "workspace:*",
-    "@luma/connector-shopify": "workspace:*",
     "@luma/identity": "workspace:*",
     "@luma/platform": "workspace:*",
     "@ts-rest/fastify": "3.52.1",

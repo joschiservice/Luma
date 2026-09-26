@@ -49,10 +49,7 @@ export function presentPlaybook(version: PlaybookVersion) {
     capabilityVersion: ir.action.capabilityVersion,
     targetKind: ir.action.targetKind,
     issueType: ir.evidence.kind,
-    systems:
-      ir.action.capability === 'orders.shipping-method.write'
-        ? ['jtl-cloud', 'jtl-onprem']
-        : [],
+    systems: [] as string[],
     approval,
     permissions: [ir.action.capability, 'orders.read'],
     provenance: version.provenance,

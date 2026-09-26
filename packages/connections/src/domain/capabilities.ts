@@ -94,6 +94,7 @@ export interface FulfillmentSnapshot {
     | 'unknown';
   lines: { orderLine: ExternalId; quantity: Quantity }[];
   lastProgressAt: string | null;
+  progressBasis?: 'note_created_or_package_shipped' | 'source_updated';
   failureCode: string | null;
 }
 

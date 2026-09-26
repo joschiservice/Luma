@@ -12,8 +12,6 @@ import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { Link } from '@tanstack/react-router';
 import { ShieldCheck } from 'lucide-react';
 
-import { systemNames } from './library';
-
 /** Summarizes the selected version, approval requirements, and currently active versions. */
 export function PlaybookOverview({
   detail,
@@ -29,9 +27,8 @@ export function PlaybookOverview({
         <div>
           <dt>Systems</dt>
           <dd>
-            {version.systems
-              .map((system) => systemNames[system] ?? system)
-              .join(' · ') || 'Unsupported'}
+            {version.systems.map((system) => system).join(' · ') ||
+              'Unsupported'}
           </dd>
         </div>
         <div>
@@ -134,7 +131,7 @@ export function PlaybookCompatibility({
               </Link>
             </h3>
             <p>
-              {systemNames[c.system] ?? c.system} ·{' '}
+              {c.system} ·{' '}
               {c.blockers.length
                 ? 'Prerequisites missing'
                 : 'Eligible connection'}

@@ -27,7 +27,7 @@ export const sourceSchema = external
   .extend({
     tenantId: uuid,
     connectionId: uuid,
-    provider: z.enum(['shopify', 'jtl']),
+    provider: z.string().min(1).max(100),
     resource: z.enum([
       'order',
       'order_line',
@@ -149,6 +149,9 @@ export const commerceSchema = z.discriminatedUnion('capability', [
               z.object({ orderLine: external, quantity }).strict(),
             ),
             lastProgressAt: timestamp.nullable(),
+            progressBasis: z
+              .enum(['note_created_or_package_shipped', 'source_updated'])
+              .optional(),
             failureCode: z.string().nullable(),
           })
           .strict(),

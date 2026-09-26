@@ -35,3 +35,5 @@ Carried forward from the [Linear architecture register](https://linear.app/auren
 Create a numbered Markdown file for each material decision. Include status/date, context, options considered, decision, consequences, reversal cost, evidence and related Linear issues. Add it to this register. Preserve decision history; mark replaced decisions as superseded and link their successors.
 
 Update ADRs through pull requests. After pushing, link the repository file from Linear with a short summary. Use a commit permalink for the recorded version; this register provides navigation to current files. A pushed branch can be linked while awaiting review, with that state stated explicitly. Update Linear when a decision's status changes, without copying its full text.
+
+- [ADR-006: First-party workspace apps](006-workspace-apps.md)

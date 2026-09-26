@@ -27,7 +27,7 @@ export const activityQuerySchema = z
     from: z.string().datetime(),
     to: z.string().datetime(),
     q: z.string().trim().max(200).optional(),
-    system: z.enum(['jtl-cloud', 'jtl-onprem', 'shopify']).optional(),
+    system: z.string().min(1).max(100).optional(),
     connectionId: z.string().uuid().optional(),
     type: z.enum(activityTypes).optional(),
     outcome: z.enum(activityOutcomes).optional(),

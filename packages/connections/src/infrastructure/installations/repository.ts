@@ -36,6 +36,12 @@ export function createInstallationRepository(
     save: (record, expectedVersion, actorId, event) =>
       db.transaction(record.connection.tenantId, async (tx) => {
         const c = record.connection;
+        // Lock app state before connection rows, matching uninstall and OAuth refresh.
+        if (c.appId && c.appInstallationVersion)
+          await tx.query(
+            'SELECT app_id FROM workspace_apps WHERE tenant_id=$1 AND app_id=$2 FOR SHARE',
+            [c.tenantId, c.appId],
+          );
         const result =
           expectedVersion === null
             ? await tx.query(

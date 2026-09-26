@@ -1,5 +1,5 @@
 {
-  "extends": "@luma/typescript-config/node.json",
+  "extends": ["@luma/typescript-config/node.json", "./tsconfig.apps.json"],
   "compilerOptions": {
     "types": ["node"],
     "noEmit": true,

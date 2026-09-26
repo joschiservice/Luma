@@ -28,14 +28,14 @@ export const corpus = await readJson(
 
 export const jtl = await readJson(
   new URL(
-    '../../packages/connections/src/infrastructure/jtl/fixtures/commerce.json',
+    '../../packages/apps/jtl/src/infrastructure/fixtures/commerce.json',
     import.meta.url,
   ),
 );
 
 export const shopify = await readJson(
   new URL(
-    '../../packages/connections/src/infrastructure/shopify/fixtures/commerce.json',
+    '../../packages/apps/shopify/src/infrastructure/fixtures/commerce.json',
     import.meta.url,
   ),
 );

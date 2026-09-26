@@ -2,22 +2,22 @@ import { createHmac, randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 
+import { createAppRegistry, createAppService } from '@luma/app-host';
+import { createShopifyOAuth } from '@luma/app-shopify';
 import { ConnectorError } from '@luma/connections';
-import {
-  createInstalledConnections,
-  createSecretCipher,
-  createShopifyOAuth,
-} from '@luma/connections/composition';
+import { createSecretCipher } from '@luma/connections/composition';
 import { makeTenantContext } from '@luma/identity/composition';
 import { createTenantDatabase } from '@luma/platform/composition';
 import { buildSchema, parse, validate } from 'graphql';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
+import { createInstalledConnections } from './test-support/apps.js';
+
 const schema = buildSchema(
   readFileSync(
     new URL(
-      '../../connections/src/infrastructure/shopify/fixtures/admin-2026-07.graphql',
+      '../../apps/shopify/src/infrastructure/fixtures/admin-2026-07.graphql',
       import.meta.url,
     ),
     'utf8',
@@ -94,6 +94,12 @@ describe.skipIf(!databaseUrl)('Shopify OAuth on PostgreSQL', () => {
         'utf8',
       ),
     );
+    await owner.query(
+      await readFile(
+        new URL('../migrations/0024_workspace_apps.sql', import.meta.url),
+        'utf8',
+      ),
+    );
     const password = randomUUID();
     await admin.query(
       `CREATE ROLE "${name}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`,
@@ -165,6 +171,20 @@ describe.skipIf(!databaseUrl)('Shopify OAuth on PostgreSQL', () => {
       fetch: transport,
       refreshContext: async (c: ReturnType<typeof context>) => c,
       now: () => clock,
+      requireInstalled: async (c: ReturnType<typeof context>) =>
+        db.transaction(c.tenantId, async (tx) => {
+          await tx.query(
+            "INSERT INTO workspace_apps(tenant_id,app_id,status,version) VALUES($1,'shopify','installed',1) ON CONFLICT DO NOTHING",
+            [c.tenantId],
+          );
+          const result = await tx.query<{ version: number }>(
+            "SELECT version FROM workspace_apps WHERE tenant_id=$1 AND app_id='shopify' AND status='installed'",
+            [c.tenantId],
+          );
+          if (!result.rows[0]) throw new Error('App not installed');
+
+          return result.rows[0].version;
+        }),
     };
     const oauth = createShopifyOAuth(db, config, deps);
     const ctx = context();
@@ -234,6 +254,79 @@ describe.skipIf(!databaseUrl)('Shopify OAuth on PostgreSQL', () => {
       },
     };
   }
+
+  it('serializes uninstall with an in-flight token refresh without losing the refresh transaction', async () => {
+    const f = fixture();
+    await f.oauth.callback(f.ctx, await f.query());
+    const connection = await f.connection();
+    f.advance();
+    let notifyEntered!: () => void;
+    let releaseRefresh!: () => void;
+    const entered = new Promise<void>((resolve) => {
+      notifyEntered = resolve;
+    });
+    const released = new Promise<void>((resolve) => {
+      releaseRefresh = resolve;
+    });
+    const transport = f.transport.getMockImplementation()!;
+    f.transport.mockImplementationOnce(async (...args) => {
+      notifyEntered();
+      await released;
+
+      return transport(...args);
+    });
+    const refresh = f.oauth.credential(f.ctx, connection.id);
+    await entered;
+    const apps = createAppService(
+      f.db,
+      createAppRegistry([]),
+      f.deps.refreshContext,
+    );
+    const uninstall = apps.uninstall(f.ctx, 'shopify', 1);
+    try {
+      await expect
+        .poll(
+          async () =>
+            (
+              await owner.query(
+                "SELECT 1 FROM pg_stat_activity WHERE datname=$1 AND wait_event_type='Lock'",
+                [name],
+              )
+            ).rowCount,
+          { timeout: 3000 },
+        )
+        .toBeGreaterThan(0);
+    } finally {
+      releaseRefresh();
+    }
+    const [credentials] = await Promise.all([refresh, uninstall]);
+    expect(credentials.token).toBe('private-access-2');
+    expect((await f.connection()).status).toBe('disconnected');
+    expect(
+      (
+        await owner.query(
+          'SELECT secret FROM connector_installations WHERE tenant_id=$1',
+          [f.ctx.tenantId],
+        )
+      ).rows[0].secret,
+    ).toBeNull();
+  });
+
+  it('rejects an authorization callback from a previous app installation', async () => {
+    const f = fixture();
+    let installationVersion = 1;
+    const oauth = createShopifyOAuth(f.db, config, {
+      ...f.deps,
+      requireInstalled: async () => installationVersion,
+    });
+    const query = await f.query({}, oauth);
+
+    installationVersion = 3;
+
+    await expect(oauth.callback(f.ctx, query)).rejects.toThrow();
+    expect(f.transport).not.toHaveBeenCalled();
+    expect(f.verify).not.toHaveBeenCalled();
+  });
 
   it('authorizes, stores encrypted credentials and blocks replay and foreign tenants', async () => {
     const f = fixture();
@@ -345,7 +438,9 @@ describe.skipIf(!databaseUrl)('Shopify OAuth on PostgreSQL', () => {
       'private-access-2',
       'private-access-2',
     ]);
-    expect(results[0]!.shopify!.refreshToken).toBe('private-refresh-2');
+    expect((results[0]!.shopify as { refreshToken: string }).refreshToken).toBe(
+      'private-refresh-2',
+    );
     expect(
       f.transport.mock.calls.filter(([url]) =>
         String(url).includes('access_token'),
@@ -445,8 +540,11 @@ describe.skipIf(!databaseUrl)('Shopify OAuth on PostgreSQL', () => {
     ).toBe('connected');
     expect((await f.connection()).id).toBe(previous.id);
     await expect(f.oauth.credential(f.ctx, previous.id)).rejects.toThrow();
-    expect((await production.credential(f.ctx, previous.id)).shopify?.app).toBe(
-      'production:production-client',
-    );
+    expect(
+      (
+        (await production.credential(f.ctx, previous.id)).shopify as
+          { app: string } | undefined
+      )?.app,
+    ).toBe('production:production-client');
   });
 });

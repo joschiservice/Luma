@@ -4,7 +4,7 @@ Manages installed connections, encrypted credentials, permissions, provider capa
 
 ## Responsibilities
 
-This package adapts provider protocol clients to Luma contracts. It owns installation lifecycle, OAuth state, capability validation, and snapshot mapping. Low-level Shopify and JTL protocol clients live in the connector packages.
+This package owns connection permissions, encrypted credential storage, shared capability validation, and source observations. Apps supply provider-specific validation, credential refresh, and adapters through `ConnectionProvider`. OAuth, normalization, and setup UI live in `packages/apps/*`.
 
 ## Public entry points
 
@@ -17,7 +17,7 @@ Import through these package exports. Private source paths are not supported acr
 
 ## Workspace dependencies
 
-[@luma/api-contract](../api-contract/README.md), [@luma/connector-core](../connectors/core/README.md), [@luma/connector-jtl](../connectors/jtl/README.md), [@luma/connector-shopify](../connectors/shopify/README.md), [@luma/identity](../identity/README.md), [@luma/platform](../platform/README.md).
+[@luma/api-contract](../api-contract/README.md), [@luma/connector-core](../connectors/core/README.md), [@luma/identity](../identity/README.md), [@luma/platform](../platform/README.md).
 
 ## Development
 

@@ -1,13 +1,10 @@
+import { createAppHost } from '@luma/app-catalog';
 import type {
   ConnectionsConfig,
   ModelGatewayConfig,
   WorkflowConfig,
 } from '@luma/config';
 import type { ConnectionManagement } from '@luma/connections';
-import {
-  createInstallationVerifier,
-  createInstalledConnections,
-} from '@luma/connections/composition';
 import type { IdentityService } from '@luma/identity';
 import { createIdentity } from '@luma/identity/composition';
 import { registerIdentityHttp } from '@luma/identity/http';
@@ -35,7 +32,10 @@ export async function buildRuntimeApp(
   observability?: Observability,
   modelSettings?: ModelGatewayConfig,
   connections?:
-    ConnectionsConfig | ((identity: IdentityService) => ConnectionManagement),
+    | ConnectionsConfig
+    | ((
+        identity: IdentityService,
+      ) => ConnectionManagement | ReturnType<typeof createAppHost>),
   workflowSettings?: WorkflowConfig,
 ) {
   if (modelSettings && !observability)
@@ -48,37 +48,32 @@ export async function buildRuntimeApp(
   try {
     const identity = createIdentity(settings);
     resources.add(identity.close);
-    const connectionPool =
-      connections && typeof connections !== 'function'
-        ? new Pool({
-            connectionString: settings.databaseUrl,
-            max: 10,
-            connectionTimeoutMillis: 5000,
-            statement_timeout: 5000,
-            idle_in_transaction_session_timeout: 10000,
-          })
-        : undefined;
-    if (connectionPool) resources.add(() => connectionPool.end());
-    const installedConnections =
-      connections && typeof connections !== 'function' && connectionPool
-        ? createInstalledConnections(createTenantDatabase(connectionPool), {
-            ...connections,
-            refreshContext: identity.service.refreshContext,
-            verify: createInstallationVerifier({
-              jtlEndpoints: connections.jtlEndpoints,
-            }),
-          })
-        : undefined;
-    const connectionService =
-      typeof connections === 'function'
-        ? connections(identity.service)
-        : installedConnections;
     const casePool = new Pool({
       connectionString: settings.databaseUrl,
       max: 5,
       statement_timeout: 5000,
     });
     resources.add(() => casePool.end());
+    const configured =
+      typeof connections === 'function'
+        ? connections(identity.service)
+        : undefined;
+    const installedConnections =
+      configured && 'registry' in configured
+        ? configured
+        : createAppHost(createTenantDatabase(casePool), {
+            ...(connections && typeof connections !== 'function'
+              ? connections
+              : {}),
+            refreshContext: identity.service.refreshContext,
+          });
+    const connectionService =
+      configured && !('registry' in configured)
+        ? configured
+        : connections
+          ? installedConnections.connections
+          : undefined;
+
     const workflowReader = workflowSettings
       ? createDeskWorkflowReader(workflowSettings.temporal, identity.service)
       : undefined;
@@ -94,23 +89,22 @@ export async function buildRuntimeApp(
       ...(observability ? { observability } : {}),
       ...(modelGateway ? { modelGateway } : {}),
       ...(connectionService ? { connections: connectionService } : {}),
-      ...(installedConnections?.shopify
-        ? { shopify: installedConnections.shopify }
+      ...(installedConnections
+        ? {
+            apps: installedConnections.apps,
+            appRegistry: installedConnections.registry,
+            providerCatalog: installedConnections.providerCatalog,
+          }
         : {}),
       identity: identity.service,
       settings: identity.settings,
       trustedOrigins: settings.trustedOrigins,
       checkReadiness: createReadinessCheck(
         identity.checkReadiness,
-        connectionPool,
-        !!installedConnections?.shopify,
+        connections ? casePool : undefined,
+        installedConnections?.registry.ready,
       ),
     });
-    if (connectionPool) {
-      connectionPool.on('error', () =>
-        app.log.error('Connection database connection failed'),
-      );
-    }
     casePool.on('error', () =>
       app.log.error('Case database connection failed'),
     );

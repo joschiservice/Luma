@@ -13,21 +13,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@luma/ui/components/primitives/dialog';
-import {
-  Check,
-  KeyRound,
-  Minus,
-  RefreshCw,
-  ShieldCheck,
-  Unplug,
-} from 'lucide-react';
+import { Check, Minus, ShieldCheck, Unplug } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
+import { AppExtension } from '../apps/extension';
 import { changeConnection, connectionError } from './data';
-import { capabilities, providers, statuses } from './presentation';
+import { capabilities, statuses } from './presentation';
 import { ProviderIcon } from './provider-icon';
-import { SetupForm } from './setup-form';
-import { ShopifyForm } from './shopify';
 
 /**
  * Shows a connection's verified permissions and management actions, refreshing the list
@@ -37,14 +29,16 @@ export function ConnectionCard({
   connection,
   organizationId,
   canManage,
+  appAvailable = true,
   refresh,
 }: {
   connection: InstalledConnection;
   organizationId: string;
   canManage: boolean;
+  appAvailable?: boolean;
   refresh: () => Promise<void>;
 }) {
-  const [dialog, setDialog] = useState<'rotate' | 'disconnect' | null>(null);
+  const [dialog, setDialog] = useState<'settings' | 'disconnect' | null>(null);
   const [pending, setPending] = useState(false);
   useEffect(() => {
     if (window.location.hash === `#connection-${connection.id}`) {
@@ -58,15 +52,13 @@ export function ConnectionCard({
   const terminal =
     connection.status === 'disconnected' || connection.status === 'revoked';
   const permitted =
-    connection.status === 'active'
+    connection.status === 'active' && appAvailable
       ? connection.permissions.filter((p) => connection.granted.includes(p))
       : [];
-  const target =
-    connection.target.kind === 'shopify'
-      ? connection.target.shop
-      : connection.target.kind === 'jtl-cloud'
-        ? connection.target.jtlTenantId
-        : connection.target.baseUrl;
+  const target = Object.entries(connection.target)
+    .filter(([key]) => key !== 'kind')
+    .map(([, value]) => value)
+    .join(' · ');
 
   async function run(action: 'check' | 'disconnect') {
     if (lock.current) return;
@@ -104,7 +96,7 @@ export function ConnectionCard({
         <div className="connection-identity">
           <ProviderIcon provider={connection.target.kind} />
           <div>
-            <p className="eyebrow">{providers[connection.target.kind]}</p>
+            <p className="eyebrow">{connection.target.kind}</p>
             <CardTitle as="h3">{connection.label}</CardTitle>
           </div>
         </div>
@@ -122,17 +114,13 @@ export function ConnectionCard({
       </CardHeader>
       <p className="connection-target">{target}</p>
       <p className="connection-description">
-        {terminal
-          ? connection.target.kind === 'shopify'
-            ? 'Access stopped. Reconnect Shopify to restore reads.'
-            : 'Access stopped. Create a new installation to reconnect.'
-          : connection.status === 'active'
-            ? 'Credentials and requested permissions validated. Observation freshness is unknown.'
-            : connection.status === 'pending'
-              ? 'Validate access before Luma can use this connection.'
-              : connection.target.kind === 'shopify'
-                ? 'Confirm the app permissions and reconnect Shopify to restore access.'
-                : 'Check missing provider scopes, expired credentials or provider availability. Replace credentials if needed, then validate again.'}
+        {!appAvailable
+          ? 'This app is unavailable in the workspace. Historical connection data remains accessible.'
+          : terminal
+            ? 'Access stopped. Configure the app to reconnect.'
+            : connection.status === 'active'
+              ? 'Credentials and requested permissions validated. Observation freshness is unknown.'
+              : 'Open app settings to validate or restore access.'}
       </p>
       <div className="connection-access">
         <h4>
@@ -166,63 +154,41 @@ export function ConnectionCard({
         </ul>
       </div>
       <div className="connection-management">
-        {canManage && connection.target.kind === 'shopify' ? (
-          <Dialog>
+        {canManage && appAvailable && connection.appId ? (
+          <Dialog
+            open={dialog === 'settings'}
+            onOpenChange={(open) => setDialog(open ? 'settings' : null)}
+          >
             <DialogTrigger render={<Button variant="outline" />}>
-              <RefreshCw size={14} aria-hidden="true" /> Reconnect Shopify
+              App settings
             </DialogTrigger>
             <DialogContent className="connection-dialog">
-              <DialogTitle>Reconnect Shopify</DialogTitle>
+              <DialogTitle>Connection settings</DialogTitle>
               <DialogDescription>
-                Approve access again to restore this connection.
+                Manage this connection through its app.
               </DialogDescription>
-              <ShopifyForm
+              <AppExtension
+                appId={connection.appId}
                 organizationId={organizationId}
-                shop={connection.target.shop}
-                label={connection.label}
+                slot="settings"
+                connection={connection}
+                done={async () => {
+                  setDialog(null);
+                  await refresh();
+                }}
               />
             </DialogContent>
           </Dialog>
         ) : null}
         {canManage && !terminal ? (
           <div className="connection-actions">
-            {connection.target.kind !== 'shopify' ? (
+            {appAvailable &&
+            (!connection.management ||
+              connection.management.includes('check')) ? (
               <Button disabled={pending} onClick={() => void run('check')}>
                 <ShieldCheck size={14} aria-hidden="true" />
                 {pending ? 'Please wait…' : 'Validate access'}
               </Button>
-            ) : null}
-            {connection.target.kind !== 'shopify' ? (
-              <Dialog
-                open={dialog === 'rotate'}
-                onOpenChange={(open) => setDialog(open ? 'rotate' : null)}
-              >
-                <DialogTrigger
-                  render={<Button variant="outline" disabled={pending} />}
-                >
-                  <KeyRound size={14} aria-hidden="true" /> Replace credentials
-                </DialogTrigger>
-                <DialogContent className="connection-dialog">
-                  <DialogTitle>Replace credentials</DialogTitle>
-                  <DialogDescription>
-                    Current credentials will stop working in Luma. Reads and
-                    writes pause until the replacement passes validation. The
-                    account and endpoint stay the same.
-                  </DialogDescription>
-                  <SetupForm
-                    provider={connection.target.kind}
-                    organizationId={organizationId}
-                    connection={connection}
-                    done={async () => {
-                      setDialog(null);
-                      setMessage(
-                        'Credentials replaced. Validate access to restore capabilities.',
-                      );
-                      await refresh();
-                    }}
-                  />
-                </DialogContent>
-              </Dialog>
             ) : null}
             <Dialog
               open={dialog === 'disconnect'}
@@ -244,9 +210,6 @@ export function ConnectionCard({
                   Luma will delete stored credentials and stop new reads and
                   writes. Requests already sent may finish. This does not revoke
                   the provider token; revoke it with the provider if needed.
-                  {connection.target.kind === 'shopify'
-                    ? 'Use Reconnect Shopify to restore access.'
-                    : 'Reconnecting requires a new installation.'}
                 </DialogDescription>
                 <div className="connection-actions">
                   <Button

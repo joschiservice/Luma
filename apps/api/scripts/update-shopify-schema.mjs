@@ -153,7 +153,7 @@ const document = `# Generated from ${source}\n# Adapter surface only; regenerate
 assertValidSchema(buildSchema(document));
 
 const destination = new URL(
-  `../../../packages/connections/src/infrastructure/shopify/fixtures/admin-${version}.graphql`,
+  `../../../packages/apps/shopify/src/infrastructure/fixtures/admin-${version}.graphql`,
   import.meta.url,
 );
 

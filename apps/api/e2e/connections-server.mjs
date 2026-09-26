@@ -1,8 +1,10 @@
 import { randomBytes } from 'node:crypto';
 
+import { createAppHost } from '@luma/app-catalog';
+import { createApp as jtl } from '@luma/app-jtl';
+import { createApp as shopify } from '@luma/app-shopify';
 import { buildRuntimeApp } from '@luma/application-runtime';
 import { readIdentityConfig } from '@luma/config';
-import { createInstalledConnections } from '@luma/connections/composition';
 import { createTenantDatabase } from '@luma/platform/composition';
 import { Pool } from 'pg';
 
@@ -15,23 +17,34 @@ const app = await buildRuntimeApp(
   undefined,
   undefined,
   (identity) =>
-    createInstalledConnections(createTenantDatabase(pool), {
+    createAppHost(createTenantDatabase(pool), {
       refreshContext: identity.refreshContext,
       activeKeyId: 'test',
       keys: new Map([['test', randomBytes(32)]]),
-      verify: async (_connection, credentials) => {
-        if (credentials.token !== 'valid-test-token')
-          throw new Error('Invalid fixture credential');
+      env: {},
+      factories: [jtl, shopify].map((factory) => (context) => {
+        const app = factory(context);
 
-        return [
-          'orders.read',
-          'products.read',
-          'inventory.read',
-          'fulfillment.read',
-          'orders.shipping-method.read',
-          'orders.shipping-method.write',
-        ];
-      },
+        return {
+          ...app,
+          connector: {
+            ...app.connector,
+            verify: async (_connection, credentials) => {
+              if (credentials.token !== 'valid-test-token')
+                throw new Error('Invalid fixture credential');
+
+              return [
+                'orders.read',
+                'products.read',
+                'inventory.read',
+                'fulfillment.read',
+                'orders.shipping-method.read',
+                'orders.shipping-method.write',
+              ];
+            },
+          },
+        };
+      }),
     }),
 );
 

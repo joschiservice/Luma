@@ -64,14 +64,13 @@ export const ReplaceCredentials: Story = {
   play: async ({ canvasElement }) => {
     await userEvent.click(
       within(canvasElement).getByRole('button', {
-        name: 'Replace credentials',
+        name: 'App settings',
       }),
     );
     const d = within(await within(document.body).findByRole('dialog'));
-    await expect(d.getByLabelText('Access token')).toHaveAttribute(
-      'type',
-      'password',
-    );
+    await expect(
+      await d.findByLabelText('Access token', {}, { timeout: 5000 }),
+    ).toHaveAttribute('type', 'password');
   },
 };
 
@@ -93,10 +92,12 @@ export const ReconnectShopify: Story = {
   args: { connection: { ...shopify, status: 'revoked' } },
   play: async ({ canvasElement }) => {
     await userEvent.click(
-      within(canvasElement).getByRole('button', { name: 'Reconnect Shopify' }),
+      within(canvasElement).getByRole('button', { name: 'App settings' }),
     );
     const d = within(await within(document.body).findByRole('dialog'));
-    await expect(d.getByLabelText('Shop hostname')).toBeDisabled();
+    await expect(
+      await d.findByLabelText('Shop hostname', {}, { timeout: 5000 }),
+    ).toBeDisabled();
   },
 };
 

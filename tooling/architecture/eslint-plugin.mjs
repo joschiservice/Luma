@@ -78,6 +78,37 @@ export function violation(from, to) {
   const source = moduleInfo(from);
   const target = moduleInfo(to);
   if (
+    from.startsWith('packages/app-host/') &&
+    (to.startsWith('packages/apps/') ||
+      (to.startsWith('packages/app-') && !to.startsWith('packages/app-host/')))
+  )
+    return 'The app host must remain independent of app implementations.';
+  const extension =
+    from.startsWith('packages/apps/') ||
+    from.startsWith('packages/app-host/') ||
+    from.startsWith('packages/app-catalog/');
+  if (extension && target) {
+    if (
+      target.entry &&
+      ['index.ts', 'composition.ts', 'adapters.ts', 'http.ts'].includes(
+        target.layer,
+      )
+    )
+      return null;
+
+    return 'Apps must use public host package entry points.';
+  }
+  if (to.startsWith('packages/app-') || to.startsWith('packages/apps/')) {
+    if (
+      source ||
+      (from.startsWith('packages/') &&
+        !from.startsWith('packages/app-') &&
+        !from.startsWith('packages/apps/') &&
+        !from.startsWith('apps/api/'))
+    )
+      return 'Core modules must not depend on app implementations.';
+  }
+  if (
     from.startsWith('packages/connectors/') &&
     to.startsWith('packages/simulator/')
   )
@@ -131,6 +162,9 @@ export function violation(from, to) {
         'apps/api/src/connections.integration.test.ts',
         'apps/api/src/shopify-oauth.integration.test.ts',
         'apps/api/src/connections.test.ts',
+        'apps/api/src/installation-verifier.test.ts',
+        'apps/api/src/apps.integration.test.ts',
+        'apps/api/src/test-support/apps.ts',
         'apps/api/src/test-support/detection-fixtures.ts',
         'apps/api/src/test-support/safety-fixtures.ts',
         'apps/api/src/index.ts',

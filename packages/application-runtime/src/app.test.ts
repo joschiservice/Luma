@@ -5,6 +5,7 @@ import { apiErrorSchema } from '@luma/api-contract';
 import { createApiClient } from '@luma/api-contract/client';
 import { openApiDocument } from '@luma/api-contract/openapi';
 import { buildApp } from '@luma/application-runtime';
+import { createProviderCatalog } from '@luma/connections/composition';
 import type { IdentityService, TenantContext } from '@luma/identity';
 import { IdentityError } from '@luma/identity';
 import { createObservability } from '@luma/platform/composition';
@@ -42,7 +43,15 @@ describe('HTTP foundation', () => {
   });
 
   it('consumes a real HTTP server through the typed client', async () => {
-    const app = createApp();
+    const app = createApp(
+      {},
+      {
+        providerCatalog: createProviderCatalog([
+          { id: 'shopify', name: 'Shopify', category: 'storefront' },
+          { id: 'jtl', name: 'JTL', category: 'erp' },
+        ]),
+      },
+    );
     const baseUrl = await app.listen({ host: '127.0.0.1', port: 0 });
     const client = createApiClient({ baseUrl });
     const response = await client.connectorProviders.get({
@@ -484,7 +493,15 @@ describe('observability baseline', () => {
 
   it('records the catalog action through the real typed HTTP client', async () => {
     const { observability, posthog } = fixture();
-    const app = buildApp({}, { observability });
+    const app = buildApp(
+      {},
+      {
+        observability,
+        providerCatalog: createProviderCatalog([
+          { id: 'shopify', name: 'Shopify', category: 'storefront' },
+        ]),
+      },
+    );
     try {
       const baseUrl = await app.listen({ host: '127.0.0.1', port: 0 });
       const actionId = randomUUID();

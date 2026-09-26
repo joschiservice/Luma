@@ -6,7 +6,6 @@ import { initServer } from '@ts-rest/fastify';
 import type { FastifyRequest } from 'fastify';
 
 import type { InstallationService } from '../application/installations.js';
-import type { ShopifyOAuth } from '../application/shopify.js';
 
 type ConnectionManagement = Omit<
   InstallationService,
@@ -17,10 +16,7 @@ type ConnectionManagement = Omit<
  * Creates authenticated connection-management handlers; returns service unavailable when
  * management is not configured.
  */
-export function connectionRoutes(
-  service?: ConnectionManagement,
-  shopify?: ShopifyOAuth,
-) {
+export function connectionRoutes(service?: ConnectionManagement) {
   function use(request: FastifyRequest) {
     if (!request.tenantContext)
       throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
@@ -38,17 +34,6 @@ export function connectionRoutes(
   const summary = (value: unknown) => installedConnectionSchema.parse(value);
 
   return initServer().router(apiContract.connections, {
-    shopifyStart: async ({ request, body }) => {
-      const { context } = use(request);
-      if (!shopify)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
-          'Shopify is not configured',
-        );
-
-      return { status: 200, body: await shopify.start(context, body) };
-    },
     list: async ({ request }) => {
       const { service, context } = use(request);
 
@@ -59,12 +44,6 @@ export function connectionRoutes(
     },
     install: async ({ request, body }) => {
       const { service, context } = use(request);
-      if (shopify && body.target.kind === 'shopify')
-        throw new IdentityError(
-          422,
-          'CONFLICT',
-          'Use Connect Shopify to authorize this store',
-        );
 
       return {
         status: 201,
@@ -73,17 +52,6 @@ export function connectionRoutes(
     },
     check: async ({ request, params, body }) => {
       const { service, context } = use(request);
-      if (
-        shopify &&
-        (await service.list(context)).some(
-          (c) => c.id === params.connectionId && c.target.kind === 'shopify',
-        )
-      )
-        throw new IdentityError(
-          422,
-          'CONFLICT',
-          'Use Reconnect Shopify to validate access',
-        );
 
       return {
         status: 200,
@@ -94,17 +62,6 @@ export function connectionRoutes(
     },
     rotate: async ({ request, params, body }) => {
       const { service, context } = use(request);
-      if (
-        shopify &&
-        (await service.list(context)).some(
-          (c) => c.id === params.connectionId && c.target.kind === 'shopify',
-        )
-      )
-        throw new IdentityError(
-          422,
-          'CONFLICT',
-          'Use Reconnect Shopify to renew access',
-        );
 
       return {
         status: 200,

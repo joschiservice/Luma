@@ -48,7 +48,8 @@
     "observe:queries": "node tooling/observability/queries.mjs",
     "evaluate:playbook": "pnpm exec turbo run build --filter=@luma/resolution... --filter=@luma/simulator... && node tooling/evaluation/cli.mjs",
     "test:evaluation": "pnpm exec turbo run build --filter=@luma/resolution... --filter=@luma/simulator... && node --test tooling/evaluation/*.test.mjs",
-    "capture:incident": "pnpm exec turbo run build --filter=@luma/resolution... && node tooling/evaluation/capture-cli.mjs"
+    "capture:incident": "pnpm exec turbo run build --filter=@luma/resolution... && node tooling/evaluation/capture-cli.mjs",
+    "apps:sync": "node tooling/apps/generate.mjs && prettier --write packages/app-catalog/src/generated.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -79,6 +80,10 @@
     "@luma/resolution": "workspace:*",
     "@luma/application-runtime": "workspace:*",
     "@luma/commerce-ingestion": "workspace:*",
-    "@luma/workflow-temporal": "workspace:*"
+    "@luma/workflow-temporal": "workspace:*",
+    "@luma/app-host": "workspace:*",
+    "@luma/app-catalog": "workspace:*",
+    "@luma/app-jtl": "workspace:*",
+    "@luma/app-shopify": "workspace:*"
   }
 }

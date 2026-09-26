@@ -52,11 +52,7 @@ export function parseActivityFilters(
     from: valid ? from : undefined,
     to: valid ? to : undefined,
     q: text(value.q, 200),
-    system: ['jtl-cloud', 'jtl-onprem', 'shopify'].includes(
-      String(value.system),
-    )
-      ? (value.system as ActivityQuery['system'])
-      : undefined,
+    system: text(value.system, 100),
     connectionId:
       typeof value.connectionId === 'string' &&
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(

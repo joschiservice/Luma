@@ -2,6 +2,7 @@ import { initContract } from '@ts-rest/core';
 
 import { apiErrorSchema } from './common.js';
 import { activityContract } from './contracts/activity.js';
+import { appsContract } from './contracts/apps.js';
 import { exceptionsContract } from './contracts/cases.js';
 import { connectionsContract } from './contracts/connections.js';
 import { caseDeskContract } from './contracts/desk.js';
@@ -28,6 +29,7 @@ export const apiContract = c.router(
     identity: identityContract,
     settings: settingsContract,
     connections: connectionsContract,
+    apps: appsContract,
     system: systemContract,
     connectorProviders: connectorProvidersContract,
   },
@@ -84,3 +86,5 @@ export * from './playbooks.js';
 export * from './shadow.js';
 
 export * from './settings.js';
+
+export * from './apps.js';

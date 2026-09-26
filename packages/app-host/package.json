@@ -1,0 +1,42 @@
+{
+  "name": "@luma/app-host",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "luma-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./http": {
+      "luma-source": "./src/http.ts",
+      "types": "./dist/http.d.ts",
+      "default": "./dist/http.js"
+    },
+    "./web": {
+      "types": "./src/web.ts",
+      "default": "./src/web.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@luma/connections": "workspace:*",
+    "@luma/identity": "workspace:*",
+    "@luma/platform": "workspace:*",
+    "zod": "3.25.76",
+    "@luma/api-contract": "workspace:*",
+    "fastify": "5.12.5",
+    "@ts-rest/fastify": "3.52.1"
+  },
+  "devDependencies": {
+    "@luma/typescript-config": "workspace:*",
+    "@types/node": "^24.0.0",
+    "graphql": "^16.14.2",
+    "vitest": "4.1.11"
+  }
+}

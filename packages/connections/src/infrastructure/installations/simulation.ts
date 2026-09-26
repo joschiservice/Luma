@@ -12,7 +12,7 @@ const bindingSchema = z.object({
   tenantId: z.string().uuid(),
   connectionId: z.string().uuid(),
   runId: z.string().regex(/^[a-z0-9-]{1,64}$/),
-  instance: z.enum(['jtl', 'shopify']),
+  instance: z.string().min(1),
   target: z.unknown(),
 });
 const configSchema = z.object({
@@ -29,10 +29,10 @@ export function simulationTransport(
   const transport = select?.(connection);
   const marked =
     connection.label.startsWith('SIMULATED ') ||
-    (connection.target.kind === 'jtl-onprem' &&
-      new URL(connection.target.baseUrl).hostname.endsWith('.invalid')) ||
-    (connection.target.kind === 'shopify' &&
-      connection.target.shop.startsWith('luma-synthetic-'));
+    Object.values(connection.target).some(
+      (value) =>
+        value.includes('.invalid') || value.startsWith('luma-synthetic-'),
+    );
   if (marked && !transport)
     throw new ConnectorError({
       code: 'unavailable',
@@ -73,8 +73,7 @@ export function createSimulationTransport(input: unknown): SimulationTransport {
     if (
       JSON.stringify(Object.entries(target).sort()) !==
         JSON.stringify(Object.entries(connection.target).sort()) ||
-      binding.instance !==
-        (connection.target.kind === 'shopify' ? 'shopify' : 'jtl')
+      binding.instance !== (connection.provider ?? connection.target.kind)
     )
       throw new Error('Simulation target does not match installation');
 

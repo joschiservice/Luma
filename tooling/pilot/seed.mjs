@@ -6,16 +6,16 @@ import {
   createApplicationServices,
   createDetectionServices,
 } from '@luma/application-runtime';
-import {
-  createInstallationVerifier,
-  createInstalledConnections,
-  createSimulationTransport,
-} from '@luma/connections/composition';
+import { createSimulationTransport } from '@luma/connections/composition';
 import { createIdentity } from '@luma/identity/composition';
 import { createTenantDatabase } from '@luma/platform/composition';
 import { shippingMethodPlaybook } from '@luma/resolution';
 import { Pool } from 'pg';
 
+import {
+  createInstallationVerifier,
+  createInstalledConnections,
+} from '../apps/providers.mjs';
 import { detectionRequest, jtl, newManifest, readJson } from './fixtures.mjs';
 
 /** Builds identity-service settings from the pilot's environment. */
@@ -149,6 +149,16 @@ export async function seedPilot(
         { kind: 'shopify', shop: 'luma-synthetic-pilot.myshopify.com' },
       ],
     ]) {
+      const appId = target.kind === 'shopify' ? 'shopify' : 'jtl';
+      const appState = (
+        await connections.apps.list(context)
+      ).installations.find((app) => app.appId === appId);
+      if (appState?.status !== 'installed')
+        await connections.apps.install(
+          context,
+          appId,
+          appState?.version ?? null,
+        );
       const connection = await connections.install(context, {
         label: `SIMULATED ${provider.toUpperCase()} · no live health`,
         target,

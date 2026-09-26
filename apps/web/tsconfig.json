@@ -3,5 +3,10 @@
   "compilerOptions": {
     "types": ["vite/client", "node"]
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "*.ts"]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "*.ts",
+    "../../packages/apps/*/src/web/**/*.tsx"
+  ]
 }

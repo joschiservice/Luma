@@ -68,13 +68,14 @@ it('shows members capability information without management controls', () => {
   expect(html).not.toContain('<button');
 });
 
-it('offers Shopify reconnect for revoked installations without manual credentials', () => {
+it('offers app-owned settings for revoked installations', () => {
   const html = render({
     ...fixture,
     target: { kind: 'shopify', shop: 'dev.myshopify.com' },
+    appId: 'shopify',
     status: 'revoked',
   });
-  expect(html).toContain('Reconnect Shopify');
+  expect(html).toContain('App settings');
   expect(html).not.toContain('Replace credentials');
   expect(html).not.toContain('Validate access');
 });

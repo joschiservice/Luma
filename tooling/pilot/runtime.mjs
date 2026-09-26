@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
+import { createJtlConnector } from '@luma/app-jtl';
 import {
   buildApp,
   createApplicationServices,
@@ -11,15 +12,8 @@ import {
   createResourceScope,
 } from '@luma/application-runtime';
 import { ConnectorError } from '@luma/connections';
+import { createCapabilityRuntime } from '@luma/connections/adapters';
 import {
-  createCapabilityRuntime,
-  createJtlConnector,
-} from '@luma/connections/adapters';
-import {
-  createInstallationVerifier,
-  createInstalledConnections,
-  createInstalledRuntime,
-  createInstalledShippingMethodEffects,
   createReadChecks,
   createShippingMethodEffects,
   createSimulationTransport,
@@ -37,6 +31,12 @@ import { createPlaybookStore } from '@luma/resolution/composition';
 import { createDeskWorkflowReader } from '@luma/workflow-temporal';
 import { Pool } from 'pg';
 
+import {
+  createInstallationVerifier,
+  createInstalledConnections,
+  createInstalledRuntime,
+  createInstalledShippingMethodEffects,
+} from '../apps/providers.mjs';
 import { createInventoryScenario } from '../simulator/inventory.mjs';
 import { observeProviders } from '../simulator/observations.mjs';
 import { detectionRequest, readJson } from './fixtures.mjs';
@@ -428,6 +428,9 @@ export async function createPilot(
               desk,
               playbooks: library,
               connections,
+              apps: installations.apps,
+              appRegistry: installations.registry,
+              providerCatalog: installations.providerCatalog,
 
               checkReadiness: createReadinessCheck(
                 identity.checkReadiness,

@@ -8,14 +8,15 @@ import * as connectorPublic from '@luma/connections';
 import { ConnectorError } from '@luma/connections';
 import type { StoredInstallation } from '@luma/connections/composition';
 import * as connectorComposition from '@luma/connections/composition';
+import { createSecretCipher } from '@luma/connections/composition';
+import { makeTenantContext } from '@luma/identity/composition';
+import { describe, expect, it, vi } from 'vitest';
+
 import {
   createInstallationService,
   createInstalledRuntime,
   createInstalledShippingMethodEffects,
-  createSecretCipher,
-} from '@luma/connections/composition';
-import { makeTenantContext } from '@luma/identity/composition';
-import { describe, expect, it, vi } from 'vitest';
+} from './test-support/apps.js';
 
 it('keeps raw runtime and handler factories out of application entry points', () => {
   for (const exports of [connectorPublic, connectorComposition]) {

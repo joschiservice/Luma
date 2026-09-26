@@ -3,13 +3,10 @@ import { randomUUID } from 'node:crypto';
 import type { ApiError } from '@luma/api-contract';
 import { apiContract } from '@luma/api-contract';
 import { openApiDocument } from '@luma/api-contract/openapi';
+import type { AppRegistry, AppService } from '@luma/app-host';
+import { appRoutes } from '@luma/app-host/http';
 import type { ConnectionManagement, ProviderCatalog } from '@luma/connections';
-import type { ShopifyOAuth } from '@luma/connections/composition';
-import {
-  connectionRoutes,
-  createConnectors,
-  registerShopifyRoutes,
-} from '@luma/connections/http';
+import { connectionRoutes, createConnectors } from '@luma/connections/http';
 import type { CaseService } from '@luma/exceptions';
 import { caseRoutes } from '@luma/exceptions/http';
 import type { IdentityService, SettingsService } from '@luma/identity';
@@ -59,7 +56,8 @@ export interface AppDependencies {
   desk?: DeskService;
   eventSettings?: { intervalMs: number; lifetimeMs: number };
   operations?: OperationsOverviewService;
-  shopify?: ShopifyOAuth;
+  apps?: AppService;
+  appRegistry?: AppRegistry;
   cases?: CaseService;
   connections?: ConnectionManagement;
   modelGateway?: ModelGateway;
@@ -226,10 +224,8 @@ export function buildApp(
         operations: operationsRoutes(dependencies.operations),
         identity: identityRoutes(dependencies.identity),
         settings: settingsRoutes(dependencies.settings),
-        connections: connectionRoutes(
-          dependencies.connections,
-          dependencies.shopify,
-        ),
+        apps: appRoutes(dependencies.apps),
+        connections: connectionRoutes(dependencies.connections),
         system: {
           health: async () => ({ status: 200, body: { status: 'ok' } }),
           ready: async ({ request }) => {
@@ -285,7 +281,7 @@ export function buildApp(
       },
     );
   });
-  registerShopifyRoutes(app, dependencies.shopify, dependencies.identity);
+  dependencies.appRegistry?.registerHttp(app, dependencies.identity);
   registerDeskEvents(
     app,
     dependencies.desk,

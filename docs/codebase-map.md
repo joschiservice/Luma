@@ -39,3 +39,17 @@ The local pilot composes this monitor in `tooling/pilot/runtime.mjs`. Its authen
 - Reuse test identity and database provisioning. Assert real evidence and case transitions through application services or HTTP.
 
 See [architecture decisions](architecture/README.md) for boundaries, [the scenario recipe](adding-operational-scenarios.md) for a worked example, and [development validation](development.md#feature-validation) for commands.
+
+## Workspace apps and connectors
+
+Start with `packages/app-host/src/application/contracts.ts` for app contracts and
+`packages/app-host/src/application/installations.ts` for installation authorization.
+`packages/app-host/src/infrastructure/installations.ts` persists tenant app state.
+`packages/app-catalog/src/index.ts` composes apps and connections.
+Provider adapters and UI live in `packages/apps/jtl/src` and `packages/apps/shopify/src`.
+The app store and deferred loader are in `apps/web/src/features/apps`.
+
+Tests: `packages/app-host/src/registry.test.ts`,
+`packages/application-runtime/src/apps.integration.test.ts`, app-owned adapter tests,
+`tooling/architecture/apps.test.mjs`, and `apps/api/e2e/connections.browser.mjs`.
+See [Workspace apps](apps.md) for adding and removing an app.

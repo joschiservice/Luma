@@ -38,7 +38,9 @@
     "@luma/workflow-temporal": "workspace:*",
     "@ts-rest/fastify": "3.52.1",
     "fastify": "5.12.5",
-    "pg": "8.20.0"
+    "pg": "8.20.0",
+    "@luma/app-host": "workspace:*",
+    "@luma/app-catalog": "workspace:*"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",
@@ -50,6 +52,8 @@
     "@types/pg": "8.20.0",
     "graphql": "^16.14.2",
     "tsx": "^4.20.0",
-    "vitest": "4.1.11"
+    "vitest": "4.1.11",
+    "@luma/app-jtl": "workspace:*",
+    "@luma/app-shopify": "workspace:*"
   }
 }

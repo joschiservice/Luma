@@ -4,7 +4,7 @@ import {
   type ProviderCatalog,
 } from './application/providers.js';
 
-/** Creates provider-catalog routes, using the built-in catalog unless one is supplied. */
+/** Creates provider-catalog routes, using only the supplied provider catalog. */
 export function createConnectors(
   catalog: ProviderCatalog = createProviderCatalog(),
 ) {
@@ -12,5 +12,3 @@ export function createConnectors(
 }
 
 export { connectionRoutes } from './api/installations.js';
-
-export { registerShopifyRoutes } from './api/shopify.js';

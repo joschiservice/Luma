@@ -64,7 +64,8 @@ interface FactMap {
     mapped: boolean;
     complete: boolean;
     eligibility: 'eligible' | 'exempt' | 'unknown';
-    progressBasis: 'note_created_or_package_shipped' | 'source_updated';
+    progressBasis:
+      'note_created_or_package_shipped' | 'source_updated' | 'unknown';
     otherOperationShippedQuantity: string;
   };
   inventory_mismatch: Common & {

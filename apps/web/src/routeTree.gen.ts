@@ -22,6 +22,7 @@ import { Route as AppOrganizationIdExceptionsRouteImport } from './routes/app.$o
 import { Route as AppOrganizationIdOverviewRouteImport } from './routes/app.$organizationId.overview'
 import { Route as AppWorkspacesIndexRouteImport } from './routes/app.workspaces.index'
 import { Route as AppWorkspacesNewRouteImport } from './routes/app.workspaces.new'
+import { Route as AppOrganizationIdAppsAppIdRouteImport } from './routes/app.$organizationId.apps.$appId'
 import { Route as AppOrganizationIdExceptionsExceptionIdRouteImport } from './routes/app.$organizationId.exceptions.$exceptionId'
 import { Route as AppOrganizationIdPlaybooksIndexRouteImport } from './routes/app.$organizationId.playbooks.index'
 import { Route as AppOrganizationIdPlaybooksDefinitionIdRouteImport } from './routes/app.$organizationId.playbooks.$definitionId'
@@ -99,6 +100,12 @@ const AppWorkspacesNewRoute = AppWorkspacesNewRouteImport.update({
   path: '/workspaces/new',
   getParentRoute: () => AppRoute,
 } as any)
+const AppOrganizationIdAppsAppIdRoute =
+  AppOrganizationIdAppsAppIdRouteImport.update({
+    id: '/apps/$appId',
+    path: '/apps/$appId',
+    getParentRoute: () => AppOrganizationIdRoute,
+  } as any)
 const AppOrganizationIdExceptionsExceptionIdRoute =
   AppOrganizationIdExceptionsExceptionIdRouteImport.update({
     id: '/$exceptionId',
@@ -156,6 +163,7 @@ export interface FileRoutesByFullPath {
   '/app/$organizationId/overview': typeof AppOrganizationIdOverviewRoute
   '/app/workspaces/new': typeof AppWorkspacesNewRoute
   '/app/workspaces/': typeof AppWorkspacesIndexRoute
+  '/app/$organizationId/apps/$appId': typeof AppOrganizationIdAppsAppIdRoute
   '/app/$organizationId/exceptions/$exceptionId': typeof AppOrganizationIdExceptionsExceptionIdRoute
   '/app/$organizationId/playbooks/$definitionId': typeof AppOrganizationIdPlaybooksDefinitionIdRoute
   '/app/$organizationId/settings/$section': typeof AppOrganizationIdSettingsSectionRoute
@@ -177,6 +185,7 @@ export interface FileRoutesByTo {
   '/app/$organizationId/overview': typeof AppOrganizationIdOverviewRoute
   '/app/workspaces/new': typeof AppWorkspacesNewRoute
   '/app/workspaces': typeof AppWorkspacesIndexRoute
+  '/app/$organizationId/apps/$appId': typeof AppOrganizationIdAppsAppIdRoute
   '/app/$organizationId/exceptions/$exceptionId': typeof AppOrganizationIdExceptionsExceptionIdRoute
   '/app/$organizationId/playbooks/$definitionId': typeof AppOrganizationIdPlaybooksDefinitionIdRoute
   '/app/$organizationId/settings/$section': typeof AppOrganizationIdSettingsSectionRoute
@@ -200,6 +209,7 @@ export interface FileRoutesById {
   '/app/$organizationId/overview': typeof AppOrganizationIdOverviewRoute
   '/app/workspaces/new': typeof AppWorkspacesNewRoute
   '/app/workspaces/': typeof AppWorkspacesIndexRoute
+  '/app/$organizationId/apps/$appId': typeof AppOrganizationIdAppsAppIdRoute
   '/app/$organizationId/exceptions/$exceptionId': typeof AppOrganizationIdExceptionsExceptionIdRoute
   '/app/$organizationId/playbooks/$definitionId': typeof AppOrganizationIdPlaybooksDefinitionIdRoute
   '/app/$organizationId/settings/$section': typeof AppOrganizationIdSettingsSectionRoute
@@ -224,6 +234,7 @@ export interface FileRouteTypes {
     | '/app/$organizationId/overview'
     | '/app/workspaces/new'
     | '/app/workspaces/'
+    | '/app/$organizationId/apps/$appId'
     | '/app/$organizationId/exceptions/$exceptionId'
     | '/app/$organizationId/playbooks/$definitionId'
     | '/app/$organizationId/settings/$section'
@@ -245,6 +256,7 @@ export interface FileRouteTypes {
     | '/app/$organizationId/overview'
     | '/app/workspaces/new'
     | '/app/workspaces'
+    | '/app/$organizationId/apps/$appId'
     | '/app/$organizationId/exceptions/$exceptionId'
     | '/app/$organizationId/playbooks/$definitionId'
     | '/app/$organizationId/settings/$section'
@@ -267,6 +279,7 @@ export interface FileRouteTypes {
     | '/app/$organizationId/overview'
     | '/app/workspaces/new'
     | '/app/workspaces/'
+    | '/app/$organizationId/apps/$appId'
     | '/app/$organizationId/exceptions/$exceptionId'
     | '/app/$organizationId/playbooks/$definitionId'
     | '/app/$organizationId/settings/$section'
@@ -377,6 +390,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppWorkspacesNewRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/$organizationId/apps/$appId': {
+      id: '/app/$organizationId/apps/$appId'
+      path: '/apps/$appId'
+      fullPath: '/app/$organizationId/apps/$appId'
+      preLoaderRoute: typeof AppOrganizationIdAppsAppIdRouteImport
+      parentRoute: typeof AppOrganizationIdRoute
+    }
     '/app/$organizationId/exceptions/$exceptionId': {
       id: '/app/$organizationId/exceptions/$exceptionId'
       path: '/$exceptionId'
@@ -449,6 +469,7 @@ interface AppOrganizationIdRouteChildren {
   AppOrganizationIdConnectionsRoute: typeof AppOrganizationIdConnectionsRoute
   AppOrganizationIdExceptionsRoute: typeof AppOrganizationIdExceptionsRouteWithChildren
   AppOrganizationIdOverviewRoute: typeof AppOrganizationIdOverviewRoute
+  AppOrganizationIdAppsAppIdRoute: typeof AppOrganizationIdAppsAppIdRoute
   AppOrganizationIdPlaybooksDefinitionIdRoute: typeof AppOrganizationIdPlaybooksDefinitionIdRoute
   AppOrganizationIdSettingsSectionRoute: typeof AppOrganizationIdSettingsSectionRoute
   AppOrganizationIdPlaybooksIndexRoute: typeof AppOrganizationIdPlaybooksIndexRoute
@@ -462,6 +483,7 @@ const AppOrganizationIdRouteChildren: AppOrganizationIdRouteChildren = {
   AppOrganizationIdExceptionsRoute:
     AppOrganizationIdExceptionsRouteWithChildren,
   AppOrganizationIdOverviewRoute: AppOrganizationIdOverviewRoute,
+  AppOrganizationIdAppsAppIdRoute: AppOrganizationIdAppsAppIdRoute,
   AppOrganizationIdPlaybooksDefinitionIdRoute:
     AppOrganizationIdPlaybooksDefinitionIdRoute,
   AppOrganizationIdSettingsSectionRoute: AppOrganizationIdSettingsSectionRoute,

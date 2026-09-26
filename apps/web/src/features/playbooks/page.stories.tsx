@@ -403,13 +403,13 @@ export const Filters: Story = {
     ).not.toBeInTheDocument();
     await userEvent.click(canvas.getByRole('combobox', { name: 'System' }));
     await userEvent.click(
-      await body.findByRole('option', { name: 'JTL On-Prem' }),
+      await body.findByRole('option', { name: 'jtl-onprem' }),
     );
     await expect(
       canvas.getByRole('heading', { name: 'No matching playbooks' }),
     ).toBeVisible();
     await userEvent.click(
-      canvas.getByRole('button', { name: 'Remove JTL On-Prem filter' }),
+      canvas.getByRole('button', { name: 'Remove jtl-onprem filter' }),
     );
     await expect(
       canvas.getByRole('link', { name: 'Reconcile available inventory' }),

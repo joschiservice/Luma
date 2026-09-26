@@ -71,7 +71,9 @@
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/apps/web/src/**",
         "$TURBO_ROOT$/apps/web/package.json",
-        "$TURBO_ROOT$/apps/web/tsconfig.json"
+        "$TURBO_ROOT$/apps/web/tsconfig.json",
+        "$TURBO_ROOT$/packages/apps/*/src/**",
+        "$TURBO_ROOT$/packages/apps/*/package.json"
       ],
       "outputs": ["storybook-static/**"]
     },
@@ -114,6 +116,24 @@
         "LUMA_LOCAL_OTLP_ENDPOINT",
         "LUMA_LOCAL_PROFILES_ENDPOINT"
       ]
+    },
+    "@luma/web#build": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/apps/*/src/**",
+        "$TURBO_ROOT$/packages/apps/*/package.json"
+      ],
+      "outputs": ["dist/**"]
+    },
+    "@luma/web#typecheck": {
+      "dependsOn": ["^build", "^typecheck"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/apps/*/src/**",
+        "$TURBO_ROOT$/packages/apps/*/package.json"
+      ],
+      "outputs": []
     }
   }
 }

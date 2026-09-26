@@ -113,13 +113,25 @@ export function createPlaybookLibrary(deps: PlaybookLibraryDependencies) {
       );
     });
     const versions = published.map(presentPlaybook);
+    for (const version of versions)
+      version.systems = [
+        ...new Set(
+          sources
+            .filter(
+              ({ connection }) =>
+                connection.permissions.includes(
+                  version.capability as 'orders.shipping-method.write',
+                ) &&
+                connection.granted.includes(
+                  version.capability as 'orders.shipping-method.write',
+                ),
+            )
+            .map(({ connection }) => connection.target.kind),
+        ),
+      ];
     const latest = versions[0]!;
     const connections = sources.map(({ connection, targets }) => {
       const blockers: string[] = [];
-      if (!['jtl-cloud', 'jtl-onprem'].includes(connection.target.kind))
-        blockers.push(
-          'Choose a JTL connection for shipping-method corrections.',
-        );
       if (connection.status !== 'active')
         blockers.push(
           'Validate or reconnect this connection before activation.',

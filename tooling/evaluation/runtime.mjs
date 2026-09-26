@@ -1,10 +1,8 @@
 import assert from 'node:assert/strict';
 
-import {
-  createCapabilityRuntime,
-  createJtlConnector,
-  createShopifyConnector,
-} from '@luma/connections/adapters';
+import { createJtlConnector } from '@luma/app-jtl';
+import { createShopifyConnector } from '@luma/app-shopify';
+import { createCapabilityRuntime } from '@luma/connections/adapters';
 import { createShippingMethodEffects } from '@luma/connections/composition';
 import {
   createActionAdmission,

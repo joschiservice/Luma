@@ -62,7 +62,7 @@ export const ReadOnly: Story = {
   play: async ({ canvasElement }) => {
     const c = within(canvasElement);
     await expect(
-      await c.findByRole('button', { name: 'Connect Shopify' }),
+      (await c.findAllByRole('button', { name: 'Configure' }))[0]!,
     ).toBeDisabled();
     await expect(
       c.queryByRole('button', { name: 'Validate access' }),
@@ -70,33 +70,37 @@ export const ReadOnly: Story = {
   },
 };
 
-export const ShopifyConnected: Story = { args: { shopifyResult: 'connected' } };
+export const ShopifyConnected: Story = { args: { appResult: 'connected' } };
 
-export const ShopifyDenied: Story = { args: { shopifyResult: 'denied' } };
+export const ShopifyDenied: Story = { args: { appResult: 'denied' } };
 
 export const ShopifyPermissions: Story = {
-  args: { shopifyResult: 'permissions' },
+  args: { appResult: 'permissions' },
 };
 
 export const ShopifySetup: Story = {
+  parameters: { connectionState: 'empty' },
   play: async ({ canvasElement }) => {
     await userEvent.click(
       await within(canvasElement).findByRole('button', {
-        name: 'Connect Shopify',
+        name: 'Install Shopify',
       }),
     );
     const dialog = await within(document.body).findByRole('dialog');
-    await waitFor(() =>
-      expect(within(dialog).getByLabelText('Shop hostname')).toBeVisible(),
+    await waitFor(
+      () =>
+        expect(within(dialog).getByLabelText('Shop hostname')).toBeVisible(),
+      { timeout: 5000 },
     );
   },
 };
 
 export const JtlCloudSetup: Story = {
+  parameters: { connectionState: 'empty' },
   play: async ({ canvasElement }) => {
     await userEvent.click(
       await within(canvasElement).findByRole('button', {
-        name: 'Set up JTL Cloud',
+        name: 'Install JTL',
       }),
     );
     const dialog = await within(document.body).findByRole('dialog');
@@ -109,13 +113,18 @@ export const JtlCloudSetup: Story = {
 };
 
 export const JtlOnPremiseSetup: Story = {
+  parameters: { connectionState: 'empty' },
   play: async ({ canvasElement }) => {
     await userEvent.click(
       await within(canvasElement).findByRole('button', {
-        name: 'Set up JTL-Wawi on-premise',
+        name: 'Install JTL',
       }),
     );
     const dialog = await within(document.body).findByRole('dialog');
+    await userEvent.selectOptions(
+      await within(dialog).findByLabelText('Connection type'),
+      'jtl-onprem',
+    );
     await expect(
       within(dialog).getByLabelText('Challenge code'),
     ).toHaveAttribute('type', 'password');

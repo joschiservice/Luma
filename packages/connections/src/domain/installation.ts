@@ -3,24 +3,11 @@ import type { ReadCapability } from './capabilities.js';
 export type InstallationCapability =
   ReadCapability | 'orders.shipping-method.write';
 
-export type InstallationTarget =
-  | { kind: 'shopify'; shop: string }
-  | { kind: 'jtl-cloud'; jtlTenantId: string }
-  | { kind: 'jtl-onprem'; baseUrl: string; appId: string; appVersion: string };
+/** Public provider settings; each app validates its own fields. */
+export type InstallationTarget = { kind: string; [key: string]: string };
 
-export type InstallationCredentials = {
-  token: string;
-  shopify?:
-    | {
-        app: string;
-        refreshToken: string;
-        expiresAt: string;
-        refreshExpiresAt: string;
-        scopes: string[];
-      }
-    | undefined;
-  challengeCode?: string | undefined;
-};
+/** Encrypted app-owned credentials. Never return this object through public APIs. */
+export type InstallationCredentials = { token: string; [key: string]: unknown };
 
 export type InstallationInput = {
   label: string;
@@ -30,6 +17,10 @@ export type InstallationInput = {
 };
 
 export type InstalledConnection = {
+  provider?: string;
+  appId?: string;
+  management?: ('check' | 'rotate')[];
+  appInstallationVersion?: number;
   id: string;
   tenantId: string;
   label: string;

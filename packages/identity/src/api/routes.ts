@@ -88,8 +88,6 @@ export function identityRoutes(service?: IdentityService) {
 
 // Deliberate public surface: newly registered routes require tenant authorization.
 const publicRoutes = new Set([
-  'GET /v1/shopify/callback',
-  'POST /v1/shopify/uninstall/:organizationId/:connectionId',
   'GET /health',
   'GET /ready',
   'GET /openapi.json',
@@ -110,6 +108,7 @@ export function registerIdentityGuards(
     const route = request.routeOptions.url;
     if (
       !route ||
+      request.routeOptions.config.authentication === 'app' ||
       publicRoutes.has(
         `${request.method === 'HEAD' ? 'GET' : request.method} ${route}`,
       )
@@ -157,6 +156,11 @@ export function registerIdentityGuards(
 }
 
 declare module 'fastify' {
+  interface FastifyContextConfig {
+    /** App-owned handlers authenticate signed callbacks and webhooks themselves. */
+    authentication?: 'app';
+  }
+
   interface FastifyRequest {
     tenantContext: import('../domain/context.js').TenantContext | null;
   }

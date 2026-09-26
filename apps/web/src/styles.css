@@ -466,14 +466,6 @@ summary {
   color: var(--primary);
   background: var(--accent);
 }
-.connection-provider-shopify {
-  color: var(--status-success);
-  background: var(--status-success-surface);
-}
-.connection-provider-jtl-onprem {
-  color: var(--brand);
-  background: var(--muted);
-}
 .connection-card .eyebrow {
   font: 10px/1.4 var(--font-sans);
   text-transform: none;

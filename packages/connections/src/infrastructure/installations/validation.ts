@@ -9,66 +9,15 @@ export const installationPermissions = z.enum([
   'orders.shipping-method.write',
 ]);
 
-const header = z
-  .string()
-  .min(1)
-  .max(4096)
-  .regex(/^[\x20-\x7e]+$/)
-  .refine((s) => !!s.trim());
-
-export const installationTarget = z.discriminatedUnion('kind', [
-  z
-    .object({
-      kind: z.literal('shopify'),
-      shop: z.string().regex(/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/),
-    })
-    .strict(),
-  z
-    .object({ kind: z.literal('jtl-cloud'), jtlTenantId: z.string().uuid() })
-    .strict(),
-  z
-    .object({
-      kind: z.literal('jtl-onprem'),
-      baseUrl: z
-        .string()
-        .url()
-        .refine((value) => {
-          const url = new URL(value);
-
-          return (
-            url.protocol === 'https:' &&
-            !url.username &&
-            !url.password &&
-            !url.search &&
-            !url.hash &&
-            url.pathname.endsWith('/')
-          );
-        }),
-      appId: header,
-      appVersion: header,
-    })
-    .strict(),
-]);
+export const installationTarget = z
+  .object({ kind: z.string().min(1).max(100) })
+  .catchall(z.string().max(4096));
 
 export const installationCredentials = z
-  .object({
-    token: header,
-    challengeCode: header.refine((s) => s.length <= 30).optional(),
-  })
-  .strict();
+  .object({ token: z.string().min(1).max(4096) })
+  .catchall(z.unknown());
 
-export const storedCredentials = installationCredentials.extend({
-  shopify: z
-    .object({
-      app: z.string().min(1),
-      refreshToken: header,
-      expiresAt: z.string().datetime(),
-      refreshExpiresAt: z.string().datetime(),
-      scopes: z.array(z.string()),
-    })
-    .strict()
-    .optional(),
-});
+export const storedCredentials = installationCredentials;
 
 export const installationInput = z
   .object({
@@ -81,20 +30,7 @@ export const installationInput = z
       .refine((v) => new Set(v).size === v.length),
     credentials: installationCredentials,
   })
-  .strict()
-  .refine(
-    (v) => v.target.kind !== 'jtl-onprem' || !!v.credentials.challengeCode,
-  )
-  .refine(
-    (v) =>
-      v.target.kind !== 'shopify' ||
-      !v.permissions.some((p) => p.startsWith('orders.shipping-method.')),
-  )
-  .refine(
-    (v) =>
-      !v.permissions.includes('orders.shipping-method.write') ||
-      v.permissions.includes('orders.shipping-method.read'),
-  );
+  .strict();
 
 export const installationBoundary = {
   input: (value: unknown) => installationInput.parse(value),
