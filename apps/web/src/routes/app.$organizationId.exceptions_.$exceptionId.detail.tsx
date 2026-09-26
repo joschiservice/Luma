@@ -7,5 +7,6 @@ export const Route = createFileRoute(
   '/app/$organizationId/exceptions_/$exceptionId/detail',
 )({
   validateSearch: inboxSearch,
+  staticData: { help: 'issues/investigate' },
   component: IssueDetailPage,
 });

@@ -11,11 +11,14 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteImport } from './routes/app'
+import { Route as DocsSearchRouteImport } from './routes/docs-search'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as SignOutRouteImport } from './routes/sign-out'
 import { Route as SignUpRouteImport } from './routes/sign-up'
 import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as AppOrganizationIdRouteImport } from './routes/app.$organizationId'
+import { Route as DocsIndexRouteImport } from './routes/docs.index'
+import { Route as DocsSplatRouteImport } from './routes/docs.$'
 import { Route as AppOrganizationIdActivityRouteImport } from './routes/app.$organizationId.activity'
 import { Route as AppOrganizationIdConnectionsRouteImport } from './routes/app.$organizationId.connections'
 import { Route as AppOrganizationIdExceptionsRouteImport } from './routes/app.$organizationId.exceptions'
@@ -39,6 +42,11 @@ const IndexRoute = IndexRouteImport.update({
 const AppRoute = AppRouteImport.update({
   id: '/app',
   path: '/app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocsSearchRoute = DocsSearchRouteImport.update({
+  id: '/docs-search',
+  path: '/docs-search',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SignInRoute = SignInRouteImport.update({
@@ -65,6 +73,16 @@ const AppOrganizationIdRoute = AppOrganizationIdRouteImport.update({
   id: '/$organizationId',
   path: '/$organizationId',
   getParentRoute: () => AppRoute,
+} as any)
+const DocsIndexRoute = DocsIndexRouteImport.update({
+  id: '/docs/',
+  path: '/docs/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocsSplatRoute = DocsSplatRouteImport.update({
+  id: '/docs/$',
+  path: '/docs/$',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AppOrganizationIdActivityRoute =
   AppOrganizationIdActivityRouteImport.update({
@@ -152,11 +170,14 @@ const AppOrganizationIdExceptionsExceptionIdDetailRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
+  '/docs-search': typeof DocsSearchRoute
   '/sign-in': typeof SignInRoute
   '/sign-out': typeof SignOutRoute
   '/sign-up': typeof SignUpRoute
   '/app/$organizationId': typeof AppOrganizationIdRouteWithChildren
+  '/docs/$': typeof DocsSplatRoute
   '/app/': typeof AppIndexRoute
+  '/docs/': typeof DocsIndexRoute
   '/app/$organizationId/activity': typeof AppOrganizationIdActivityRoute
   '/app/$organizationId/connections': typeof AppOrganizationIdConnectionsRoute
   '/app/$organizationId/exceptions': typeof AppOrganizationIdExceptionsRouteWithChildren
@@ -174,11 +195,14 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/docs-search': typeof DocsSearchRoute
   '/sign-in': typeof SignInRoute
   '/sign-out': typeof SignOutRoute
   '/sign-up': typeof SignUpRoute
   '/app/$organizationId': typeof AppOrganizationIdRouteWithChildren
+  '/docs/$': typeof DocsSplatRoute
   '/app': typeof AppIndexRoute
+  '/docs': typeof DocsIndexRoute
   '/app/$organizationId/activity': typeof AppOrganizationIdActivityRoute
   '/app/$organizationId/connections': typeof AppOrganizationIdConnectionsRoute
   '/app/$organizationId/exceptions': typeof AppOrganizationIdExceptionsRouteWithChildren
@@ -198,11 +222,14 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
+  '/docs-search': typeof DocsSearchRoute
   '/sign-in': typeof SignInRoute
   '/sign-out': typeof SignOutRoute
   '/sign-up': typeof SignUpRoute
   '/app/$organizationId': typeof AppOrganizationIdRouteWithChildren
+  '/docs/$': typeof DocsSplatRoute
   '/app/': typeof AppIndexRoute
+  '/docs/': typeof DocsIndexRoute
   '/app/$organizationId/activity': typeof AppOrganizationIdActivityRoute
   '/app/$organizationId/connections': typeof AppOrganizationIdConnectionsRoute
   '/app/$organizationId/exceptions': typeof AppOrganizationIdExceptionsRouteWithChildren
@@ -223,11 +250,14 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/app'
+    | '/docs-search'
     | '/sign-in'
     | '/sign-out'
     | '/sign-up'
     | '/app/$organizationId'
+    | '/docs/$'
     | '/app/'
+    | '/docs/'
     | '/app/$organizationId/activity'
     | '/app/$organizationId/connections'
     | '/app/$organizationId/exceptions'
@@ -245,11 +275,14 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/docs-search'
     | '/sign-in'
     | '/sign-out'
     | '/sign-up'
     | '/app/$organizationId'
+    | '/docs/$'
     | '/app'
+    | '/docs'
     | '/app/$organizationId/activity'
     | '/app/$organizationId/connections'
     | '/app/$organizationId/exceptions'
@@ -268,11 +301,14 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/app'
+    | '/docs-search'
     | '/sign-in'
     | '/sign-out'
     | '/sign-up'
     | '/app/$organizationId'
+    | '/docs/$'
     | '/app/'
+    | '/docs/'
     | '/app/$organizationId/activity'
     | '/app/$organizationId/connections'
     | '/app/$organizationId/exceptions'
@@ -292,9 +328,12 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
+  DocsSearchRoute: typeof DocsSearchRoute
   SignInRoute: typeof SignInRoute
   SignOutRoute: typeof SignOutRoute
   SignUpRoute: typeof SignUpRoute
+  DocsSplatRoute: typeof DocsSplatRoute
+  DocsIndexRoute: typeof DocsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -311,6 +350,13 @@ declare module '@tanstack/react-router' {
       path: '/app'
       fullPath: '/app'
       preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs-search': {
+      id: '/docs-search'
+      path: '/docs-search'
+      fullPath: '/docs-search'
+      preLoaderRoute: typeof DocsSearchRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sign-in': {
@@ -347,6 +393,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/app/$organizationId'
       preLoaderRoute: typeof AppOrganizationIdRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/docs/': {
+      id: '/docs/'
+      path: '/docs'
+      fullPath: '/docs/'
+      preLoaderRoute: typeof DocsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs/$': {
+      id: '/docs/$'
+      path: '/docs/$'
+      fullPath: '/docs/$'
+      preLoaderRoute: typeof DocsSplatRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/app/$organizationId/activity': {
       id: '/app/$organizationId/activity'
@@ -518,9 +578,12 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
+  DocsSearchRoute: DocsSearchRoute,
   SignInRoute: SignInRoute,
   SignOutRoute: SignOutRoute,
   SignUpRoute: SignUpRoute,
+  DocsSplatRoute: DocsSplatRoute,
+  DocsIndexRoute: DocsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

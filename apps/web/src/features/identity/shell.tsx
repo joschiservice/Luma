@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, Outlet, useLocation, useParams } from '@tanstack/react-router';
 
 import { AppNavigation } from '../apps/navigation';
+import { ContextHelp } from '../help/context-help';
 import { settingsOptions } from '../settings/data';
 import { Brand, Failure, Pending } from './common';
 import { contextOptions, organizationsOptions, sessionOptions } from './data';
@@ -89,6 +90,7 @@ function TenantShell({ organizationId }: { organizationId: string }) {
         </>
       }
       search={<WorkspaceSearch organizationId={organizationId} />}
+      help={<ContextHelp />}
       accountMenu={
         <WorkspaceAccountMenu
           name={session?.user.name ?? 'Account'}

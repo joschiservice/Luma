@@ -14,6 +14,15 @@ Start with the row closest to the change. Follow imports from these entry points
 | Local simulator wiring                   | `tooling/simulator/cli.mjs`, `platform-client.mjs`, `tooling/pilot/runtime.mjs`                                                                                                           | `apps/api/e2e/simulator.e2e.mjs`                                                                |
 | Isolated platform tests                  | `apps/api/e2e/simulator-fixture.mjs`, `tooling/simulator/e2e-environment.mjs`; database runner in `tooling/dev/test.mjs`                                                                  | Reuse `setupSimulator(t)` in API E2E and browser tests                                          |
 
+## Documentation and contextual help
+
+Start at `apps/web/src/features/help/context-help.tsx` for the navbar drawer,
+`portal.tsx` in the same directory for the documentation portal, and
+`apps/web/content/docs` for shared MDX articles. Routes select their guide through
+`staticData.help`. See [contextual help](contextual-help.md) for authoring and
+validation; browser tests are `apps/api/e2e/docs.browser.mjs` and
+`apps/api/e2e/issues-help.browser.mjs`.
+
 ## Workspace settings
 
 Start at `packages/identity/src/application/settings.ts` for authorized edits and invitations,

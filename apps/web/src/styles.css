@@ -1,4 +1,5 @@
 @import '@luma/ui/styles.css';
+@import './features/help/help.css';
 
 :root {
   font-family: var(--font-heading);

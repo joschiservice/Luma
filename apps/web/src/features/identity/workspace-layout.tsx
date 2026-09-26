@@ -18,6 +18,7 @@ type WorkspaceLayoutProps = {
   context?: ReactNode;
   search?: ReactNode;
   accountMenu: ReactNode;
+  help?: ReactNode;
   children: ReactNode;
 };
 
@@ -29,6 +30,7 @@ export function WorkspaceLayout({
   context,
   search,
   accountMenu,
+  help,
   children,
 }: WorkspaceLayoutProps) {
   const [open, setOpen] = useState(false);
@@ -80,6 +82,7 @@ export function WorkspaceLayout({
                 {workspaceSwitcher}
               </div>
               <div className="workspace-page-header" ref={setPageHeader} />
+              {help}
               {accountMenu}
             </header>
             <main id="workspace-content" tabIndex={-1} className="desk-content">

@@ -5,5 +5,6 @@ import { Inbox } from '../features/exceptions/page';
 
 export const Route = createFileRoute('/app/$organizationId/exceptions')({
   validateSearch: inboxSearch,
+  staticData: { help: 'issues' },
   component: Inbox,
 });

@@ -1,13 +1,19 @@
 import tailwindcss from '@tailwindcss/vite';
 import { tanstackStart } from '@tanstack/react-start/plugin/vite';
 import react from '@vitejs/plugin-react';
+import { fumadocsMdx } from 'fumadocs-mdx/vite';
 import { defineConfig, loadEnv } from 'vite';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, import.meta.dirname, '');
 
   return {
-    plugins: [tailwindcss(), tanstackStart(), react()],
+    plugins: [
+      fumadocsMdx({ index: false }),
+      tailwindcss(),
+      tanstackStart(),
+      react(),
+    ],
     server: {
       host: '127.0.0.1',
       allowedHosts: ['luma-dev.tail2dda1b.ts.net'],
