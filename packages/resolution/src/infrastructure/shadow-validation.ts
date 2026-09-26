@@ -3,10 +3,10 @@ import {
   shadowReviewSchema,
   shadowWindowSchema,
 } from '@luma/api-contract';
+import { canonicalJson as canonicalPlaybook } from '@luma/platform';
 import { z } from 'zod';
 
 import type { ShadowReview } from '../application/shadow-evaluation.js';
-import { canonicalPlaybook } from './playbooks/schema.js';
 
 function parse<T>(schema: z.ZodType<T>, input: unknown): T {
   const result = schema.safeParse(input);

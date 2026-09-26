@@ -1,11 +1,16 @@
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, redirect } from '@tanstack/react-router';
 
-import {
-  parsePlaybookFilters,
-  PlaybooksPage,
-} from '../features/playbooks/library';
+import { parseWorkflowFilters } from '../features/workflows/library';
 
 export const Route = createFileRoute('/app/$organizationId/playbooks/')({
-  validateSearch: parsePlaybookFilters,
-  component: PlaybooksPage,
+  validateSearch: parseWorkflowFilters,
+  beforeLoad: ({ params, search, location }) => {
+    throw redirect({
+      to: '/app/$organizationId/workflows',
+      params,
+      search,
+      hash: location.hash,
+      replace: true,
+    });
+  },
 });

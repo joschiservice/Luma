@@ -11,7 +11,7 @@ export function OfflineNotice() {
   const online = useSyncExternalStore(subscribe, snapshot, serverSnapshot);
 
   return online ? null : (
-    <Alert tone="warning" role="status" className="playbook-notice">
+    <Alert tone="warning" role="status" className="workflow-notice">
       You are offline. Previously loaded information may be outdated. Reconnect
       and refresh before changing activations.
     </Alert>

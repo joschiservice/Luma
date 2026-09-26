@@ -52,8 +52,8 @@ export const Open: Story = {
     await expect(body.getByRole('link', { name: /Overview/ })).toHaveFocus();
     await userEvent.keyboard('{ArrowUp}');
     await expect(input).toHaveFocus();
-    await userEvent.type(input, 'playbook');
-    await expect(body.getByRole('link', { name: /Playbooks/ })).toBeVisible();
+    await userEvent.type(input, 'workflow');
+    await expect(body.getByRole('link', { name: /Workflows/ })).toBeVisible();
     await expect(
       body.queryByRole('link', { name: /Overview/ }),
     ).not.toBeInTheDocument();

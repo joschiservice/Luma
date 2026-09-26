@@ -1,7 +1,7 @@
 import type { Diagnosis } from '@luma/exceptions';
+import type { PlaybookRun } from '@luma/workflows';
 import { describe, expect, it } from 'vitest';
 
-import type { PlaybookRun } from '../application/playbook.js';
 import type { ShadowComparison } from '../application/shadow-evaluation.js';
 import { evaluateShadow } from '../application/shadow-evaluation.js';
 import { shadowMetrics } from '../domain/shadow.js';

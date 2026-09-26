@@ -222,6 +222,9 @@ importers:
       '@luma/workflow-temporal':
         specifier: workspace:*
         version: link:packages/workflow-temporal
+      '@luma/workflows':
+        specifier: workspace:*
+        version: link:packages/workflows
       '@stylistic/eslint-plugin':
         specifier: 5.10.0
         version: 5.10.0(eslint@10.10.0(jiti@2.7.0)(supports-color@8.1.1))
@@ -573,6 +576,9 @@ importers:
       '@luma/workflow-temporal':
         specifier: workspace:*
         version: link:../workflow-temporal
+      '@luma/workflows':
+        specifier: workspace:*
+        version: link:../workflows
       '@ts-rest/fastify':
         specifier: 3.52.1
         version: 3.52.1(@ts-rest/core@3.52.1(@types/node@24.13.5)(zod@3.25.76))(fastify@5.12.5)(zod@3.25.76)
@@ -1093,6 +1099,9 @@ importers:
       '@luma/policies':
         specifier: workspace:*
         version: link:../policies
+      '@luma/workflows':
+        specifier: workspace:*
+        version: link:../workflows
       '@ts-rest/fastify':
         specifier: 3.52.1
         version: 3.52.1(@ts-rest/core@3.52.1(@types/node@24.13.5)(zod@3.25.76))(fastify@5.12.5)(zod@3.25.76)
@@ -1271,6 +1280,46 @@ importers:
       '@temporalio/testing':
         specifier: 1.24.0
         version: 1.24.0(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.5
+      vitest:
+        specifier: 4.1.11
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(@vitest/browser-playwright@4.1.11)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))
+
+  packages/workflows:
+    dependencies:
+      '@luma/api-contract':
+        specifier: workspace:*
+        version: link:../api-contract
+      '@luma/connections':
+        specifier: workspace:*
+        version: link:../connections
+      '@luma/execution':
+        specifier: workspace:*
+        version: link:../execution
+      '@luma/identity':
+        specifier: workspace:*
+        version: link:../identity
+      '@luma/platform':
+        specifier: workspace:*
+        version: link:../platform
+      '@luma/policies':
+        specifier: workspace:*
+        version: link:../policies
+      '@ts-rest/fastify':
+        specifier: 3.52.1
+        version: 3.52.1(@ts-rest/core@3.52.1(@types/node@24.13.5)(zod@3.25.76))(fastify@5.12.5)(zod@3.25.76)
+      fastify:
+        specifier: 5.12.5
+        version: 5.12.5
+      zod:
+        specifier: 3.25.76
+        version: 3.25.76
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
       '@types/node':
         specifier: ^24.0.0
         version: 24.13.5

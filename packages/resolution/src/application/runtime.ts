@@ -8,12 +8,12 @@ import type { ActionAdmission } from '@luma/execution';
 import type { IdentityService, TenantContext } from '@luma/identity';
 import { requireRole, requireTenant } from '@luma/identity';
 import type { ProposedAction } from '@luma/policies';
-
 import type {
   PlaybookOutcome,
   PlaybookRun,
   PlaybookService,
-} from './playbook.js';
+} from '@luma/workflows';
+
 import type { ShadowService } from './shadow.js';
 
 export type WorkflowSource = {

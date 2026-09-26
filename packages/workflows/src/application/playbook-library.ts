@@ -65,7 +65,7 @@ const conflict = (message: string): never => {
   throw new IdentityError(409, 'CONFLICT', message);
 };
 const missing = (): never => {
-  throw new IdentityError(404, 'NOT_FOUND', 'Playbook not found');
+  throw new IdentityError(404, 'NOT_FOUND', 'Workflow not found');
 };
 const equalRequest = (left: ActivatePlaybook, right: ActivatePlaybook) =>
   left.id === right.id &&

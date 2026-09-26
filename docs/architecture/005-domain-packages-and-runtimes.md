@@ -6,18 +6,19 @@ Status: Accepted. Date: 2026-09-23.
 
 Luma remains a modular monolith with one PostgreSQL schema history. Domain packages enforce public contracts; API and worker are separate executable applications. This supersedes ADR-001's source layout and package placement, while retaining its domain dependency directions and tenant isolation rules.
 
-| Owner                                                                      | Responsibility                                                                                   |
-| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `apps/api`                                                                 | HTTP process configuration, instrumentation, listening, signals                                  |
-| `apps/worker`                                                              | Temporal worker configuration, instrumentation, running, signals                                 |
-| `packages/application-runtime`                                             | Typed service assembly, resource ownership, API and worker runtime builders, ordered migrations  |
-| `packages/resolution`                                                      | Case desk, proposals, playbooks, approval orchestration, learning, activity and overview queries |
-| `packages/commerce-ingestion`                                              | Replayable orchestration from provider observations to canonical projections                     |
-| `packages/workflow-temporal`                                               | Durable workflow implementation and Temporal client/worker adapters                              |
-| `packages/connections`                                                     | Installation lifecycle, credentials, capability adapters, source mappings and coverage           |
-| `packages/{identity,audit,orders,inventory,exceptions,policies,execution}` | Their existing domain rules, ports, persistence and public service contracts                     |
-| `packages/platform`                                                        | Tenant database abstraction and technical observability/model infrastructure                     |
-| `tooling/pilot`                                                            | Synthetic provider behavior, fixture provisioning and scenario orchestration                     |
+| Owner                                                                      | Responsibility                                                                                  |
+| -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `apps/api`                                                                 | HTTP process configuration, instrumentation, listening, signals                                 |
+| `apps/worker`                                                              | Temporal worker configuration, instrumentation, running, signals                                |
+| `packages/application-runtime`                                             | Typed service assembly, resource ownership, API and worker runtime builders, ordered migrations |
+| `packages/resolution`                                                      | Case desk, proposals, approval orchestration, learning, activity and overview queries           |
+| `packages/commerce-ingestion`                                              | Replayable orchestration from provider observations to canonical projections                    |
+| `packages/workflows`                                                       | Workflow definitions, immutable versions, scoped activations, runs and provenance               |
+| `packages/workflow-temporal`                                               | Durable workflow implementation and Temporal client/worker adapters                             |
+| `packages/connections`                                                     | Installation lifecycle, credentials, capability adapters, source mappings and coverage          |
+| `packages/{identity,audit,orders,inventory,exceptions,policies,execution}` | Their existing domain rules, ports, persistence and public service contracts                    |
+| `packages/platform`                                                        | Tenant database abstraction and technical observability/model infrastructure                    |
+| `tooling/pilot`                                                            | Synthetic provider behavior, fixture provisioning and scenario orchestration                    |
 
 The existing connector SDKs and simulator packages retain their independent provider boundaries. Simulated transport continues to exercise installed connectors and the real policy/execution path.
 
@@ -29,7 +30,7 @@ Resolution and diagnosis persistence validate stored documents with shared API-c
 
 Commerce ingestion depends on owner interfaces. The Temporal adapter depends on resolution contracts; resolution does not depend on Temporal. Application runtime composes these packages and must not become the owner of new business rules.
 
-The architecture linter enforces package and layer directions. Existing logical module names `connectors` and `workflows` identify the connections and resolution packages in the dependency policy. Regression fixtures also cover the former source layout to retain the existing boundary checks.
+The architecture linter enforces package and layer directions. The logical module name `connectors` identifies connections. Resolution and Workflows have separate entries in the dependency policy; see [ADR-007](007-workflow-model.md). Regression fixtures also cover the former source layout to retain the existing boundary checks.
 
 ## Composition and capabilities
 
@@ -41,7 +42,7 @@ Resource scopes drain in reverse acquisition order, attempt every close even aft
 
 ## Persistence ownership
 
-Each domain owns writes to its tables. Connections owns installations and source mappings; orders and inventory own canonical projections; exceptions owns incidents/diagnoses; policies owns decisions/approvals; execution owns admission/execution records; resolution owns case commands, proposals, playbook and learning records; audit owns append-only audit records; identity owns authentication and membership data.
+Each domain owns writes to its tables. Connections owns installations and source mappings; orders and inventory own canonical projections; exceptions owns incidents/diagnoses; policies owns decisions/approvals; execution owns admission/execution records; resolution owns case commands, proposals and learning records; workflows owns definition, version, activation, run and outcome records; audit owns append-only audit records; identity owns authentication and membership data.
 
 Cross-domain reads are allowed only in deliberate query/persistence adapters, including desk snapshots, activity history and learning reads. These adapters have schema dependencies even when the TypeScript import graph does not show them. Changes to those tables must run their integration tests.
 

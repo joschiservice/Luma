@@ -39,7 +39,7 @@ export function IssueActions({
       >
         {navigate ? (
           <summary>
-            Evaluate a Playbook <span>Preview only · No action executed</span>
+            Evaluate a Workflow <span>Preview only · No action executed</span>
           </summary>
         ) : null}
         <CaseShadow

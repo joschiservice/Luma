@@ -1,0 +1,44 @@
+{
+  "name": "@luma/workflows",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "luma-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./composition": {
+      "luma-source": "./src/composition.ts",
+      "types": "./dist/composition.d.ts",
+      "default": "./dist/composition.js"
+    },
+    "./http": {
+      "luma-source": "./src/http.ts",
+      "types": "./dist/http.d.ts",
+      "default": "./dist/http.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@luma/api-contract": "workspace:*",
+    "@luma/connections": "workspace:*",
+    "@luma/execution": "workspace:*",
+    "@luma/identity": "workspace:*",
+    "@luma/platform": "workspace:*",
+    "@luma/policies": "workspace:*",
+    "@ts-rest/fastify": "3.52.1",
+    "fastify": "5.12.5",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@luma/typescript-config": "workspace:*",
+    "@types/node": "^24.0.0",
+    "vitest": "4.1.11"
+  }
+}

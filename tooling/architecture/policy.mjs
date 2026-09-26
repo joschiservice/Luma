@@ -16,8 +16,10 @@ export const dependencies = {
   execution: ['platform', 'identity', 'policies', 'connectors', 'audit'],
   exceptions: ['platform', 'identity', 'orders', 'inventory'],
   commerce: ['connectors', 'identity', 'orders', 'inventory'],
-  temporal: ['workflows', 'identity', 'platform'],
-  workflows: [
+  temporal: ['resolution', 'identity', 'platform'],
+  workflows: ['platform', 'identity', 'policies', 'execution', 'connectors'],
+  resolution: [
+    'workflows',
     'platform',
     'identity',
     'orders',
@@ -51,7 +53,8 @@ export const domainPackages = {
   policies: 'policies',
   execution: 'execution',
   exceptions: 'exceptions',
-  resolution: 'workflows',
+  resolution: 'resolution',
+  workflows: 'workflows',
   'commerce-ingestion': 'commerce',
   'workflow-temporal': 'temporal',
 };

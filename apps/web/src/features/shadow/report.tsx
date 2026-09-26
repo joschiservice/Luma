@@ -61,7 +61,7 @@ const metrics = [
   ],
 ] as const;
 
-/** Compares the latest evaluation per case for a Playbook within an explicit workspace date range. */
+/** Compares the latest evaluation per case for a Workflow within an explicit workspace date range. */
 export function ShadowReport({
   organizationId,
   workflow,
@@ -85,10 +85,10 @@ export function ShadowReport({
     <Card
       as="section"
       id="shadow-report"
-      className="playbook-section shadow-report"
+      className="workflow-section shadow-report"
       aria-labelledby={`${id}-title`}
     >
-      <CardHeader className="playbooks-heading">
+      <CardHeader className="workflows-heading">
         <div>
           <p className="shadow-label">Shadow — not executed</p>
           <h2 id={`${id}-title`}>Shadow comparisons</h2>
@@ -235,7 +235,7 @@ function ComparisonCard({
 
   return (
     <article>
-      <div className="playbooks-heading">
+      <div className="workflows-heading">
         <h3>Case {item.evaluation.incidentId.slice(0, 8)}</h3>
         <Link
           to="/app/$organizationId/exceptions/$exceptionId"

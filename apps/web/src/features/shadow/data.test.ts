@@ -22,7 +22,7 @@ describe('Shadow comparison inputs', () => {
       shadowWindow('shipping', '2026-09-24', '2026-09-23'),
     ).toThrow();
   });
-  it('isolates case and Playbook queries by workspace', () => {
+  it('isolates case and Workflow queries by workspace', () => {
     expect(shadowLatestOptions('a', 'case', 'shipping').queryKey).not.toEqual(
       shadowLatestOptions('b', 'case', 'shipping').queryKey,
     );

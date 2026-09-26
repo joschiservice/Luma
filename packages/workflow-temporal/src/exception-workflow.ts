@@ -6,6 +6,7 @@ import type {
 import { ActivityFailure, ApplicationFailure } from '@temporalio/common';
 import {
   ActivityCancellationType,
+  type ActivityOptions,
   CancellationScope,
   condition,
   defineQuery,
@@ -22,7 +23,7 @@ export const progressQuery = defineQuery<WorkflowProgress>('progress');
 /** A wake-up hint only. The execution service reads the persisted approval. */
 export const approvalChanged = defineSignal('approvalChanged');
 
-const activityOptions = {
+const activityOptions: ActivityOptions = {
   startToCloseTimeout: '1 minute',
   scheduleToCloseTimeout: '5 minutes',
   retry: {

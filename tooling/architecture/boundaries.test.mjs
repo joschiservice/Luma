@@ -463,3 +463,32 @@ test('domain package exports are explicit and their workspace dependencies are a
 
   for (const name of manifests.keys()) visit(name);
 });
+
+test('Workflows own definitions and runs without depending on Resolution or Exceptions', () => {
+  assert.equal(domainPackages.workflows, 'workflows');
+  assert.equal(domainPackages.resolution, 'resolution');
+  assert.ok(dependencies.resolution.includes('workflows'));
+  assert.ok(!dependencies.workflows.includes('resolution'));
+  assert.ok(!dependencies.workflows.includes('exceptions'));
+  assert.match(
+    violation(
+      'packages/workflows/src/application/catalog.ts',
+      'packages/resolution/src/index.ts',
+    ),
+    /dependency map/,
+  );
+  assert.equal(
+    violation(
+      'packages/resolution/src/composition.ts',
+      'packages/workflows/src/composition.ts',
+    ),
+    null,
+  );
+  assert.match(
+    violation(
+      'packages/resolution/src/application/runtime.ts',
+      'packages/workflows/src/composition.ts',
+    ),
+    /index.ts/,
+  );
+});

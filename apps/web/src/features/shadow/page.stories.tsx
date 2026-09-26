@@ -34,7 +34,7 @@ function Preview({ state = 'ready' }: { state?: PreviewState }) {
           <QueryClientProvider client={client}>
             <style>{appStyles}</style>
             <main
-              className="playbooks-page"
+              className="workflows-page"
               style={{
                 maxWidth: state.startsWith('report') ? 1180 : 740,
                 margin: 'auto',

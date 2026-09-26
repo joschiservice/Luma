@@ -1,11 +1,10 @@
 import type { Diagnosis } from '@luma/exceptions';
 import type { PolicyDecision, ProposedAction } from '@luma/policies';
 import { currentPolicyVersion, evaluatePolicy } from '@luma/policies';
+import type { PlaybookRun, PlaybookVersion } from '@luma/workflows';
+import { playbookEligible } from '@luma/workflows';
 
-import type { PlaybookVersion } from '../domain/playbook.js';
-import { playbookEligible } from '../domain/playbook.js';
 import { simulateShadow } from '../domain/shadow.js';
-import type { PlaybookRun } from './playbook.js';
 
 export interface ShadowEvaluation {
   id: string;

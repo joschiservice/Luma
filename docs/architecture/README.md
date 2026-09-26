@@ -37,3 +37,5 @@ Create a numbered Markdown file for each material decision. Include status/date,
 Update ADRs through pull requests. After pushing, link the repository file from Linear with a short summary. Use a commit permalink for the recorded version; this register provides navigation to current files. A pushed branch can be linked while awaiting review, with that state stated explicitly. Update Linear when a decision's status changes, without copying its full text.
 
 - [ADR-006: First-party workspace apps](006-workspace-apps.md)
+
+- [ADR-007: First-class Workflow ownership](007-workflow-model.md)

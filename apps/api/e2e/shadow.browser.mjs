@@ -115,6 +115,15 @@ it('evaluates, retries, reloads and reviews a Shadow case through the real API w
   });
   await services.diagnoses.run(tenant, incident.id);
   await page.goto(`/app/${tenantId}/exceptions/${incident.id}?view=active`);
+  await page
+    .getByRole('region', { name: 'Resolution', exact: true })
+    .locator('summary')
+    .first()
+    .click();
+  await page
+    .locator('summary')
+    .filter({ hasText: 'Evaluate a Workflow' })
+    .click();
   const panel = page.getByRole('region', { name: 'Shadow evaluation' });
   let lost = false;
   const commands = [];
@@ -137,8 +146,17 @@ it('evaluates, retries, reloads and reviews a Shadow case through the real API w
   expect(commands).toHaveLength(2);
   expect(commands[0]).toEqual(commands[1]);
   await page.reload();
+  await page
+    .getByRole('region', { name: 'Resolution', exact: true })
+    .locator('summary')
+    .first()
+    .click();
+  await page
+    .locator('summary')
+    .filter({ hasText: 'Evaluate a Workflow' })
+    .click();
   await panel
-    .getByText('No bound candidate was available for this case and Playbook.')
+    .getByText('No bound candidate was available for this case and Workflow.')
     .waitFor();
   for (const name of ['Was an action needed?', 'Was this case eligible?']) {
     await panel.getByRole('combobox', { name }).click();
@@ -150,6 +168,15 @@ it('evaluates, retries, reloads and reviews a Shadow case through the real API w
     .getByRole('heading', { name: 'Operator comparison recorded' })
     .waitFor();
   await page.reload();
+  await page
+    .getByRole('region', { name: 'Resolution', exact: true })
+    .locator('summary')
+    .first()
+    .click();
+  await page
+    .locator('summary')
+    .filter({ hasText: 'Evaluate a Workflow' })
+    .click();
   await panel
     .getByRole('heading', { name: 'Operator comparison recorded' })
     .waitFor();
@@ -183,6 +210,15 @@ it('evaluates, retries, reloads and reviews a Shadow case through the real API w
     [tenantId],
   );
   await page.goto(`/app/${tenantId}/exceptions/${incident.id}?view=active`);
+  await page
+    .getByRole('region', { name: 'Resolution', exact: true })
+    .locator('summary')
+    .first()
+    .click();
+  await page
+    .locator('summary')
+    .filter({ hasText: 'Evaluate a Workflow' })
+    .click();
   await page
     .getByText(
       'Workspace owners and admins can evaluate and review Shadow predictions.',

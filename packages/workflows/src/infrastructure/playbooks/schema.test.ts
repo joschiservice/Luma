@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { playbookEligible } from '../../domain/playbook.js';
-import { shippingMethodPlaybook } from '../../domain/shipping-method-playbook.js';
+import { shippingMethodPlaybook } from '../../domain/shipping-method.fixture.js';
 import {
   compilePlaybook,
   definePlaybook,

@@ -8,7 +8,7 @@ import { Link } from '@tanstack/react-router';
 import { useId, useRef, useState } from 'react';
 
 import { contextOptions, IdentityError } from '../identity/data';
-import { playbooksOptions } from '../playbooks/data';
+import { resolutionWorkflowsOptions } from '../workflows/data';
 import {
   evaluateShadow,
   shadowAccessDenied,
@@ -48,7 +48,7 @@ export function CaseShadow({
     >
       <CardTitle as="h3">Shadow evaluation</CardTitle>
       <p>
-        Preview a Playbook against the retained case evidence. No action is
+        Preview a Workflow against the retained case evidence. No action is
         executed.
       </p>
       {context.isPending ? (
@@ -84,9 +84,11 @@ function ShadowCaseControls({
   disabled?: boolean | undefined;
 }) {
   const id = useId();
-  const books = useQuery(playbooksOptions(organizationId));
+  const books = useQuery(resolutionWorkflowsOptions(organizationId));
   const [selected, setSelected] = useState(initialWorkflow ?? '');
-  const workflow = selected || books.data?.[0]?.id || '';
+  const workflow = books.data?.some((item) => item.id === selected)
+    ? selected
+    : (books.data?.[0]?.id ?? '');
   const latest = useQuery(
     shadowLatestOptions(organizationId, exceptionId, workflow),
   );
@@ -127,25 +129,25 @@ function ShadowCaseControls({
         {shadowError(denied)}
       </CaseNotice>
     );
-  if (books.isPending) return <p role="status">Loading Playbooks…</p>;
+  if (books.isPending) return <p role="status">Loading Workflows…</p>;
   if (books.error)
     return (
-      <CaseNotice error title="Playbooks unavailable">
+      <CaseNotice error title="Workflows unavailable">
         <Button variant="outline" onClick={() => void books.refetch()}>
-          Retry Playbooks
+          Retry Workflows
         </Button>
       </CaseNotice>
     );
   if (!books.data?.length)
-    return <p>Publish a Playbook before evaluating this case.</p>;
+    return <p>Publish a Workflow before evaluating this case.</p>;
 
   return (
     <>
       <Field>
-        <FieldLabel htmlFor={`${id}-playbook`}>Playbook to evaluate</FieldLabel>
+        <FieldLabel htmlFor={`${id}-workflow`}>Workflow to evaluate</FieldLabel>
         <Select
-          id={`${id}-playbook`}
-          aria-label="Playbook to evaluate"
+          id={`${id}-workflow`}
+          aria-label="Workflow to evaluate"
           value={workflow}
           disabled={pending || !!request}
           onValueChange={(value) => {
@@ -181,7 +183,7 @@ function ShadowCaseControls({
           Refresh results
         </Button>
         <Link
-          to="/app/$organizationId/playbooks/$definitionId"
+          to="/app/$organizationId/workflows/$definitionId"
           params={{ organizationId, definitionId: workflow }}
           hash="shadow-report"
         >
@@ -210,7 +212,7 @@ function ShadowCaseControls({
         </>
       ) : (
         <p>
-          No Shadow evaluation has been recorded for this case and Playbook.
+          No Shadow evaluation has been recorded for this case and Workflow.
         </p>
       )}
     </>

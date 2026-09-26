@@ -1,19 +1,20 @@
 import type { Diagnosis, IncidentVerificationAttempt } from '@luma/exceptions';
 import { IdentityError } from '@luma/identity';
-import type { TenantDatabase } from '@luma/platform';
+import {
+  canonicalJson as canonicalPlaybook,
+  type TenantDatabase,
+} from '@luma/platform';
+import type {
+  PlaybookActivation,
+  PlaybookRun,
+  PlaybookVersion,
+} from '@luma/workflows';
 
-import type { PlaybookRun } from '../../application/playbook.js';
 import type { ShadowStore } from '../../application/shadow.js';
 import type {
   ShadowComparison,
   ShadowEvaluation,
 } from '../../application/shadow-evaluation.js';
-import type { PlaybookActivation } from '../../domain/playbook.js';
-import {
-  canonicalPlaybook,
-  compilePlaybook,
-  playbookHash,
-} from '../playbooks/schema.js';
 
 const missing = () =>
   new IdentityError(404, 'NOT_FOUND', 'Shadow evaluation or case not found');
@@ -21,7 +22,15 @@ const conflict = (message: string) =>
   new IdentityError(409, 'CONFLICT', message);
 
 /** Stores immutable Shadow snapshots and reviews under tenant RLS; reads only retained production evidence. */
-export function createShadowStore(db: TenantDatabase): ShadowStore {
+export function createShadowStore(
+  db: TenantDatabase,
+  validation: {
+    compilePlaybook(input: unknown): PlaybookVersion;
+    playbookHash(input: unknown): string;
+  },
+): ShadowStore {
+  const { compilePlaybook, playbookHash } = validation;
+
   return {
     evaluate: (context, incidentId, request, evaluate, prepared) =>
       db.transaction(context.tenantId, async (tx) => {

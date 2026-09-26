@@ -1,4 +1,4 @@
-import type { ActivatePlaybook, PlaybookDetail } from '@luma/api-contract';
+import type { ActivateWorkflow, WorkflowDetail } from '@luma/api-contract';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Disclosure } from '@luma/ui/components/primitives/disclosure';
@@ -6,7 +6,7 @@ import { Select } from '@luma/ui/components/primitives/select';
 import { useState } from 'react';
 
 import { IdentityError } from '../identity/data';
-import { activatePlaybook, playbookError } from './data';
+import { activateWorkflow, workflowError } from './data';
 
 /** Reviews one immutable version and explicit order grants before submitting a retry-safe activation. */
 export function ActivationForm({
@@ -18,7 +18,7 @@ export function ActivationForm({
   cancel,
 }: {
   organizationId: string;
-  detail: PlaybookDetail;
+  detail: WorkflowDetail;
   version: string;
   done: () => Promise<void>;
   accessLost: () => Promise<void>;
@@ -28,7 +28,7 @@ export function ActivationForm({
   const [connectionId, setConnectionId] = useState('');
   const [targetIds, setTargetIds] = useState<string[]>([]);
   const [reviewedRevision, setReviewedRevision] = useState<string | null>(null);
-  const [request, setRequest] = useState<ActivatePlaybook | null>(null);
+  const [request, setRequest] = useState<ActivateWorkflow | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   const connection = detail.connections.find((c) => c.id === connectionId);
@@ -57,10 +57,10 @@ export function ActivationForm({
     setPending(true);
     setError('');
     try {
-      await activatePlaybook(organizationId, detail.summary.id, body);
+      await activateWorkflow(organizationId, detail.summary.id, body);
       await done();
     } catch (error) {
-      setError(playbookError(error));
+      setError(workflowError(error));
       if (
         error instanceof IdentityError &&
         [400, 403, 404, 409].includes(error.status)
@@ -75,13 +75,13 @@ export function ActivationForm({
 
   return (
     <form
-      className="playbook-activation"
+      className="workflow-activation"
       onSubmit={(e) => {
         e.preventDefault();
         void submit();
       }}
     >
-      <div className="playbook-activation-summary">
+      <div className="workflow-activation-summary">
         <strong>
           {detail.summary.name} · v{version}
         </strong>
@@ -111,7 +111,7 @@ export function ActivationForm({
           />
         </label>
         {connection ? (
-          <fieldset className="playbook-targets">
+          <fieldset className="workflow-targets">
             <legend>Orders permitted to change</legend>
             {!connection.targets.length ? (
               <p>
@@ -144,7 +144,7 @@ export function ActivationForm({
             ))}
           </fieldset>
         ) : null}
-        <div className="playbook-scope-summary" aria-live="polite">
+        <div className="workflow-scope-summary" aria-live="polite">
           <strong>
             {targetIds.length} {targetIds.length === 1 ? 'order' : 'orders'}{' '}
             selected
@@ -163,7 +163,7 @@ export function ActivationForm({
             included.
           </p>
         </div>
-        <label className="playbook-review">
+        <label className="workflow-review">
           <input
             type="checkbox"
             required
@@ -199,7 +199,7 @@ export function ActivationForm({
           The request is retained. Retrying uses the same ID and scope.
         </p>
       ) : null}
-      <div className="playbook-dialog-actions">
+      <div className="workflow-dialog-actions">
         <Button
           type="button"
           variant="outline"

@@ -237,11 +237,23 @@ export function violation(from, to) {
     target.layer === 'http.ts'
   )
     return null;
+  // Resolution's former public entry points forward to the Workflow owner during migration.
+  if (
+    source.name === 'resolution' &&
+    target.name === 'workflows' &&
+    ['composition.ts', 'http.ts'].includes(source.layer) &&
+    source.layer === target.layer
+  )
+    return null;
   if (!target.entry || target.layer !== 'index.ts')
     return 'Cross-module imports must use index.ts.';
   if (!dependencies[source.name].includes(target.name))
     return 'Import violates the module dependency map.';
-  if (source.layer === 'domain' && target.name !== 'platform') {
+  if (
+    source.layer === 'domain' &&
+    target.name !== 'platform' &&
+    !(source.name === 'resolution' && target.name === 'workflows')
+  ) {
     return 'Domain code may only import its own domain and platform primitives.';
   }
 

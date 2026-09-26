@@ -5,6 +5,7 @@ import type {
   PlaybookRun,
 } from '../../application/playbook.js';
 import type { PlaybookLibraryStore } from '../../application/playbook-library.js';
+import { presentResolutionRun } from '../../application/run-presentation.js';
 import type {
   PlaybookActivation,
   PlaybookVersion,
@@ -20,7 +21,7 @@ export function createPlaybookLibraryStore(
     versions: (context, id) =>
       db.transaction(context.tenantId, async (tx) => {
         const rows = await tx.query<{ document: PlaybookVersion }>(
-          `SELECT document FROM playbook_versions WHERE tenant_id=$1 AND ($2::text IS NULL OR definition_id=$2) ORDER BY definition_id,version`,
+          `SELECT document FROM playbook_versions WHERE tenant_id=$1 AND ($2::text IS NULL OR definition_id=$2) AND NOT (document ? 'format') ORDER BY definition_id,version`,
           [context.tenantId, id ?? null],
         );
 
@@ -90,41 +91,9 @@ export function createPlaybookLibraryStore(
           [context.tenantId, id],
         );
 
-        return rows.rows.map(({ document: run, version, outcome }) => {
-          const trusted = compilePlaybook(version);
-          // Pilot authorship proves non-live provenance. Other runs need an integrated evidence source.
-          const evidenceKind =
-            trusted.provenance.kind === 'pilot'
-              ? ('pilot' as const)
-              : ('unclassified' as const);
-
-          return {
-            id: run.id,
-            incidentId: run.incidentId,
-            createdAt: run.createdAt,
-            version: run.version,
-            versionDigest: run.versionDigest,
-            activationId: run.activationId,
-            evidenceKind,
-            execution:
-              outcome?.execution?.state ??
-              (outcome?.state === 'awaiting_approval'
-                ? 'awaiting_approval'
-                : outcome?.state === 'denied'
-                  ? 'denied'
-                  : 'not_recorded'),
-            verification:
-              outcome?.state === 'verified'
-                ? 'verified'
-                : outcome?.reason === 'verification_failed'
-                  ? 'failed'
-                  : outcome?.reason === 'verification_inconclusive' ||
-                      outcome?.reason === 'verification_window_exceeded'
-                    ? 'inconclusive'
-                    : 'not_verified',
-            reason: outcome?.reason ?? 'No outcome recorded',
-          };
-        });
+        return rows.rows.map(({ document: run, version, outcome }) =>
+          presentResolutionRun(run, compilePlaybook(version), outcome),
+        );
       }),
   };
 }

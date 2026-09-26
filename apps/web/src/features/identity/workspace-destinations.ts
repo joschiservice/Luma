@@ -1,10 +1,10 @@
 import {
   Activity,
-  BookOpen,
   Inbox,
   LayoutDashboard,
   Settings,
   Unplug,
+  Workflow,
 } from 'lucide-react';
 
 /** Pages available through workspace navigation and search. */
@@ -22,10 +22,10 @@ export const workspaceDestinations = [
     description: 'Investigate and resolve issues',
   },
   {
-    path: 'playbooks',
-    label: 'Playbooks',
-    Icon: BookOpen,
-    description: 'Manage resolution playbooks',
+    path: 'workflows',
+    label: 'Workflows',
+    Icon: Workflow,
+    description: 'Manage resolution workflows',
   },
   {
     path: 'activity',

@@ -19,7 +19,7 @@ export function ShadowResult({ item }: { item: ShadowComparison }) {
         <time dateTime={evaluation.createdAt}>
           <WorkspaceDate value={evaluation.createdAt} />
         </time>
-        {typeof version === 'string' ? ` · Playbook ${version}` : ''}
+        {typeof version === 'string' ? ` · Workflow ${version}` : ''}
       </p>
       <dl className="shadow-facts">
         <div>
@@ -65,7 +65,7 @@ export function ShadowResult({ item }: { item: ShadowComparison }) {
           />
         </>
       ) : (
-        <p>No bound candidate was available for this case and Playbook.</p>
+        <p>No bound candidate was available for this case and Workflow.</p>
       )}
       <h4>Predicted effects</h4>
       <ActionFields

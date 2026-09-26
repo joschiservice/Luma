@@ -9,6 +9,7 @@ import {
   createShadowEvaluations,
   createWorkspaceActivity,
 } from '@luma/resolution/composition';
+import { createWorkflows } from '@luma/workflows/composition';
 
 import { createAdmissionEligibility } from './admission.js';
 import { createPersistentPlaybookLibrary } from './playbook-library.js';
@@ -27,11 +28,13 @@ export interface ApplicationServices {
   safety: ReturnType<typeof createSafetyServices>;
   desk: ReturnType<typeof createDeskServices>;
   playbooks: ReturnType<typeof createResolutionPlaybooks>;
+  workflows: ReturnType<typeof createWorkflows>;
   library: ReturnType<typeof createPersistentPlaybookLibrary>;
   http: {
     shadow: ReturnType<typeof createShadowEvaluations>;
     cases: ReturnType<typeof createDetectionServices>['cases'];
     desk: ReturnType<typeof createDeskServices>;
+    workflows: ReturnType<typeof createWorkflows>;
     playbooks: ReturnType<typeof createPersistentPlaybookLibrary>;
     activity: ReturnType<typeof createWorkspaceActivity>;
     learning: ReturnType<typeof createResolutionLearning>;
@@ -70,13 +73,17 @@ export function createApplicationServices(
   const desk = createDeskServices(database, identity, effects, options.desk);
   const library = createPersistentPlaybookLibrary(database, identity);
 
+  const workflows = createWorkflows(database, library, identity.refreshContext);
+
   return {
+    workflows,
     detection,
     safety,
     desk,
     playbooks: createResolutionPlaybooks(database, identity, safety),
     library,
     http: {
+      workflows,
       shadow: createShadowEvaluations(database, identity.refreshContext),
       cases: detection.cases,
       desk,

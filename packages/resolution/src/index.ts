@@ -34,13 +34,13 @@ export type {
   PlaybookIR,
   PlaybookSnapshot,
   PlaybookVersion,
-} from './domain/playbook.js';
+} from '@luma/workflows';
 
 export type {
   PlaybookOutcome,
   PlaybookRun,
   PlaybookService,
-} from './application/playbook.js';
+} from '@luma/workflows';
 
 export { shippingMethodPlaybook } from './domain/shipping-method-playbook.js';
 
@@ -52,10 +52,7 @@ export type {
   ResolutionHistory,
 } from './application/learning.js';
 
-export type {
-  PlaybookLibrary,
-  PlaybookLibraryScope,
-} from './application/playbook-library.js';
+export type { PlaybookLibrary, PlaybookLibraryScope } from '@luma/workflows';
 
 export type { ActivityService } from './application/activity.js';
 

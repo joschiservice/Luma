@@ -1,4 +1,4 @@
-import type { PlaybookDetail, PlaybookSummary } from '@luma/api-contract';
+import type { WorkflowDetail, WorkflowSummary } from '@luma/api-contract';
 import { WorkspaceAccountMenu } from '@luma/ui/components/workspace/workspace-account-menu';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import {
@@ -14,24 +14,24 @@ import { expect, userEvent, waitFor, within } from 'storybook/test';
 import appStyles from '../../styles.css?inline';
 import { Brand } from '../identity/common';
 import { WorkspaceLayout } from '../identity/workspace-layout';
-import { PlaybookDetailView } from './detail';
-import { type PlaybookFilters, PlaybookLibraryView } from './library';
+import { WorkflowDetailView } from './detail';
+import { type WorkflowFilters, WorkflowLibraryView } from './library';
 
 const organizationId = '22222222-2222-4222-8222-222222222222';
-const summary: PlaybookSummary = {
+const summary: WorkflowSummary = {
   id: 'shipping-method-correction',
   name: 'Correct an order shipping method',
   purpose:
     'Apply the mapped shipping method to an eligible order and verify the correction.',
   capability: 'orders.shipping-method.write',
-  issueType: 'workflow_failure',
+  category: 'resolution',
   systems: ['jtl-cloud', 'jtl-onprem'],
   availableVersion: '0.1.0',
   activeVersions: [],
   status: 'inactive',
   blockers: [],
 };
-const detail: PlaybookDetail = {
+const detail: WorkflowDetail = {
   summary,
   canManage: false,
   principalId: 'ada',
@@ -48,7 +48,24 @@ const detail: PlaybookDetail = {
       capability: summary.capability,
       capabilityVersion: '0',
       targetKind: 'order',
-      issueType: summary.issueType,
+      category: 'resolution',
+      format: 'resolution-playbook/0',
+      applicability: {
+        trigger: { kind: 'exception', issueType: 'workflow_failure' },
+        subjectKind: 'order',
+      },
+      inputs: { shippingMethodId: 'number' },
+      context: {
+        kind: 'workflow_failure',
+        fields: { diagnosisReady: 'boolean', methodMapped: 'boolean' },
+        maxAgeSeconds: 300,
+      },
+      policy: { approval: 'required', minimumRisk: 'medium' },
+      outcome: {
+        kind: 'verified_postcondition',
+        evaluatorVersion: 'shipping-method/1',
+        onUnverified: 'escalate',
+      },
       systems: summary.systems,
       approval: 'An independent administrator must approve each change.',
       permissions: ['orders.read', 'orders.shipping-method.write'],
@@ -117,7 +134,7 @@ function Preview({
     | 'revoked'
     | undefined;
 }) {
-  const [filters, setFilters] = useState<PlaybookFilters>({});
+  const [filters, setFilters] = useState<WorkflowFilters>({});
 
   return (
     <>
@@ -127,14 +144,14 @@ function Preview({
         navigation={() => (
           <nav aria-label="Main navigation">
             <a className="active" href="#">
-              <BookOpen size={16} /> Playbooks
+              <BookOpen size={16} /> Workflows
             </a>
           </nav>
         )}
         context={
           <>
             <BookOpen size={16} aria-hidden="true" />
-            <span>Playbooks</span>
+            <span>Workflows</span>
           </>
         }
         accountMenu={
@@ -154,8 +171,8 @@ function Preview({
         }
       >
         {['member', 'admin', 'blocked'].includes(state) ? (
-          <div className="playbooks-page">
-            <PlaybookDetailView
+          <div className="workflows-page">
+            <WorkflowDetailView
               detail={
                 state === 'member'
                   ? detail
@@ -194,7 +211,7 @@ function Preview({
             />
           </div>
         ) : (
-          <PlaybookLibraryView
+          <WorkflowLibraryView
             organizationId={organizationId}
             items={
               state === 'empty'
@@ -226,7 +243,7 @@ function Preview({
                               purpose:
                                 'Compare authoritative stock and verify the quantity published to Shopify.',
                               systems: ['jtl-cloud', 'shopify'],
-                              issueType: 'inventory_mismatch',
+                              category: 'resolution',
                               status: 'active' as const,
                               activeVersions: ['0.1.0'],
                             },
@@ -260,7 +277,7 @@ function Preview({
             loading={state === 'loading'}
             error={
               state === 'error'
-                ? 'Playbooks are unavailable. Check your connection and retry.'
+                ? 'Workflows are unavailable. Check your connection and retry.'
                 : undefined
             }
             refresh={() => {}}
@@ -289,7 +306,7 @@ function RoutedPreview({
 }
 
 const meta = {
-  title: 'Playbooks/Library',
+  title: 'Workflows/Library',
   component: Preview,
   parameters: { layout: 'fullscreen' },
   render: (args) => <RoutedPreview state={args.state} />,
@@ -306,11 +323,11 @@ export const Library: Story = {
       await canvas.findByRole('link', { name: summary.name }),
     ).toBeVisible();
     await userEvent.type(
-      canvas.getByLabelText('Search playbooks'),
+      canvas.getByLabelText('Search workflows'),
       'not found',
     );
     await expect(
-      canvas.getByRole('heading', { name: 'No matching playbooks' }),
+      canvas.getByRole('heading', { name: 'No matching workflows' }),
     ).toBeVisible();
     await userEvent.click(
       canvas.getByRole('button', { name: 'Clear filters' }),
@@ -403,13 +420,13 @@ export const Filters: Story = {
     ).not.toBeInTheDocument();
     await userEvent.click(canvas.getByRole('combobox', { name: 'System' }));
     await userEvent.click(
-      await body.findByRole('option', { name: 'jtl-onprem' }),
+      await body.findByRole('option', { name: 'JTL-Wawi' }),
     );
     await expect(
-      canvas.getByRole('heading', { name: 'No matching playbooks' }),
+      canvas.getByRole('heading', { name: 'No matching workflows' }),
     ).toBeVisible();
     await userEvent.click(
-      canvas.getByRole('button', { name: 'Remove jtl-onprem filter' }),
+      canvas.getByRole('button', { name: 'Remove JTL-Wawi filter' }),
     );
     await expect(
       canvas.getByRole('link', { name: 'Reconcile available inventory' }),
@@ -418,7 +435,7 @@ export const Filters: Story = {
       canvas.getByRole('button', { name: 'Clear filters' }),
     );
     await userEvent.type(
-      canvas.getByLabelText('Search playbooks'),
+      canvas.getByLabelText('Search workflows'),
       'authoritative',
     );
     await expect(

@@ -1,23 +1,15 @@
 import type { TenantContext } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
+import { compilePlaybook, playbookHash } from '@luma/workflows/composition';
 
 import { createActivityService } from './application/activity.js';
 import type { LearningService, LearningStore } from './application/learning.js';
 import { createLearningService } from './application/learning.js';
-import type { PlaybookDependencies } from './application/playbook.js';
-import { createPlaybookService } from './application/playbook.js';
 import { createShadowService } from './application/shadow.js';
 import { learningBoundary } from './infrastructure/learning-validation.js';
 import { createActivityStore } from './infrastructure/persistence/activity.js';
 import { createLearningStore } from './infrastructure/persistence/learning.js';
 import { createShadowStore } from './infrastructure/persistence/shadow.js';
-import {
-  activationRequestSchema,
-  compilePlaybook,
-  parsePlaybookSnapshot,
-  playbookHash,
-} from './infrastructure/playbooks/schema.js';
-import { createPlaybookStore } from './infrastructure/playbooks/store.js';
 import { shadowBoundary } from './infrastructure/shadow-validation.js';
 
 export { createExceptionActivities } from './application/runtime.js';
@@ -27,36 +19,6 @@ export { createOperationsOverview } from './application/overview.js';
 export { createDeskStore } from './infrastructure/persistence/desk.js';
 
 export { createDeskService } from './application/desk.js';
-
-/**
- * Creates persistent playbook services with compilation, snapshot validation, and action-
- * admission boundaries.
- */
-export function createPlaybooks(
-  db: TenantDatabase,
-  dependencies: Pick<
-    PlaybookDependencies,
-    'admission' | 'provisioning' | 'refreshContext' | 'parseAction'
-  >,
-  now: () => Date = () => new Date(),
-) {
-  return createPlaybookService({
-    ...dependencies,
-    store: createPlaybookStore(db),
-    compile: compilePlaybook,
-    parseSnapshot: parsePlaybookSnapshot,
-    parseActivation: (input) => activationRequestSchema.parse(input),
-    hash: playbookHash,
-    now,
-  });
-}
-
-export {
-  compilePlaybook,
-  definePlaybook,
-  parsePlaybookCode,
-  printPlaybookCode,
-} from './infrastructure/playbooks/schema.js';
 
 /**
  * Creates persistent resolution learning with fresh authorization and validated commands and
@@ -82,16 +44,6 @@ export function createLearningCommands(
   return createLearningService({ store, refreshContext, ...learningBoundary });
 }
 
-export { createPlaybookLibrary } from './application/playbook-library.js';
-
-export { createPlaybookLibraryStore } from './infrastructure/playbooks/library.js';
-
-export { createPlaybookActivations } from './application/playbook-activations.js';
-
-export { createPlaybookStore } from './infrastructure/playbooks/store.js';
-
-export { activationRequestSchema } from './infrastructure/playbooks/schema.js';
-
 /** Composes the workspace activity reader with refreshed membership. */
 export function createWorkspaceActivity(
   db: TenantDatabase,
@@ -107,11 +59,25 @@ export function createShadowEvaluations(
   now: () => Date = () => new Date(),
 ) {
   return createShadowService({
-    store: createShadowStore(db),
+    store: createShadowStore(db, { compilePlaybook, playbookHash }),
     refreshContext,
     now,
     ...shadowBoundary,
   });
 }
 
-export { createPlaybookService, parsePlaybookSnapshot, playbookHash };
+export {
+  createPlaybooks,
+  compilePlaybook,
+  definePlaybook,
+  parsePlaybookCode,
+  printPlaybookCode,
+  createPlaybookLibrary,
+  createPlaybookLibraryStore,
+  createPlaybookActivations,
+  createPlaybookStore,
+  activationRequestSchema,
+  createPlaybookService,
+  parsePlaybookSnapshot,
+  playbookHash,
+} from '@luma/workflows/composition';

@@ -8,7 +8,7 @@ import { expect, it } from 'vitest';
 import { availablePort, database, startApi, startProcess } from './helpers.mjs';
 import { seedPlaybooks } from './playbooks-fixture.mjs';
 
-it('finds, reviews, activates, reloads and revokes a persisted playbook with workspace and member isolation', async (t) => {
+it('finds, reviews, activates, reloads and revokes a persisted workflow with workspace and member isolation', async (t) => {
   const port = await availablePort(),
     origin = `http://127.0.0.1:${port}`;
   const db = await database(t);
@@ -39,42 +39,59 @@ it('finds, reviews, activates, reloads and revokes a persisted playbook with wor
   await page.getByLabel('Name', { exact: true }).fill('Ada');
   await page
     .getByLabel('Email', { exact: true })
-    .fill('playbooks@example.test');
+    .fill('workflows@example.test');
   await page
     .getByLabel('Password', { exact: true })
     .fill('browser-test-password-123');
   await page
     .getByRole('button', { name: 'Create account', exact: true })
     .click();
-  await page.getByLabel('Workspace name').fill('Playbook studio');
+  await page.getByLabel('Workspace name').fill('Workflow studio');
   await page
     .getByRole('button', { name: 'Create workspace', exact: true })
     .click();
   await page.getByRole('heading', { name: 'Operations overview' }).waitFor();
   const tenantId = new URL(page.url()).pathname.split('/')[2];
   const { version, connectionId, targetId } = await seedPlaybooks(db, tenantId);
-  const url = `/app/${tenantId}/playbooks`,
+  const url = `/app/${tenantId}/workflows`,
     name = version.definition.name;
-  await page.getByRole('link', { name: 'Playbooks', exact: true }).click();
+  await page.getByRole('link', { name: 'Workflows', exact: true }).click();
+  expect(await page.title()).toBe('Luma');
+  page.on('console', (message) => {
+    if (
+      ['error', 'warning'].includes(message.type()) &&
+      !/Failed to load resource.*(?:net::ERR_FAILED|status of (?:401|404|409))/.test(
+        message.text(),
+      )
+    )
+      errors.push(message.text());
+  });
   await page.getByRole('link', { name }).waitFor();
+  await page.goto(`/app/${tenantId}/playbooks?q=shipping`);
+  await page.waitForURL(`**/app/${tenantId}/workflows?q=shipping*`);
   await page.getByRole('combobox', { name: 'System' }).click();
-  await page.getByRole('option', { name: 'Shopify' }).click();
-  await page.getByRole('heading', { name: 'No matching playbooks' }).waitFor();
+  await page.getByRole('option', { name: 'JTL Cloud' }).click();
+  await page.getByRole('link', { name }).waitFor();
   await page.getByRole('combobox', { name: 'System' }).click();
   await page.getByRole('option', { name: 'All systems' }).click();
   await page.getByRole('link', { name }).waitFor();
   await page.getByRole('button', { name: /^Active 0$/ }).click();
-  await page.getByRole('heading', { name: 'No matching playbooks' }).waitFor();
-  await page.getByRole('button', { name: /^All playbooks 1$/ }).click();
+  await page.getByRole('heading', { name: 'No matching workflows' }).waitFor();
+  await page.getByRole('button', { name: /^All workflows 1$/ }).click();
   await page.getByRole('link', { name }).waitFor();
-  await page.getByLabel('Search playbooks').fill('missing');
-  await page.getByRole('heading', { name: 'No matching playbooks' }).waitFor();
+  await page.getByLabel('Search workflows').fill('missing');
+  await page.getByRole('heading', { name: 'No matching workflows' }).waitFor();
   await page.getByRole('button', { name: 'Clear filters' }).click();
-  await page.getByLabel('Search playbooks').fill('shipping');
+  await page.getByLabel('Search workflows').fill('shipping');
   await page.getByRole('link', { name }).click();
   await page
-    .getByRole('heading', { name: 'How this playbook works' })
+    .getByRole('heading', { name: 'How this workflow works' })
     .waitFor();
+  await mkdir('/tmp/luma66-browser', { recursive: true });
+  await page.screenshot({
+    path: '/tmp/luma66-browser/overview-desktop.png',
+    fullPage: false,
+  });
   await page
     .getByRole('button', { name: 'Review activation', exact: true })
     .click();
@@ -90,7 +107,7 @@ it('finds, reviews, activates, reloads and revokes a persisted playbook with wor
     })
     .check();
   // A background refresh must invalidate approval of the previous requirements.
-  const detailUrl = `**/v1/organizations/${tenantId}/playbooks/${version.definition.id}`;
+  const detailUrl = `**/v1/organizations/${tenantId}/workflows/${version.definition.id}`;
   let policyVersion;
   let reads = 0;
   await page.route(detailUrl, async (route) => {
@@ -127,7 +144,7 @@ it('finds, reviews, activates, reloads and revokes a persisted playbook with wor
   }
   // Drop a successful response once; retry must recover the original persisted activation.
   let lost = false;
-  await page.route('**/playbooks/*/activations', async (route) => {
+  await page.route('**/workflows/*/activations', async (route) => {
     if (route.request().method() === 'POST' && !lost) {
       lost = true;
       await route.fetch();
@@ -151,9 +168,9 @@ it('finds, reviews, activates, reloads and revokes a persisted playbook with wor
   await page.getByText('Orders: Order 1042', { exact: true }).waitFor();
   await page.getByText('Exact scope and review', { exact: true }).click();
   await page.getByText(`Orders: ${targetId}`, { exact: true }).waitFor();
-  await mkdir('/tmp/luma62-browser', { recursive: true });
+  await mkdir('/tmp/luma66-browser', { recursive: true });
   await page.screenshot({
-    path: '/tmp/luma62-browser/detail-desktop.png',
+    path: '/tmp/luma66-browser/detail-desktop.png',
     fullPage: true,
   });
   await page
@@ -165,22 +182,26 @@ it('finds, reviews, activates, reloads and revokes a persisted playbook with wor
   await page.getByText('Version 0.1.0 · Revoked', { exact: true }).waitFor();
   await page.reload();
   await page.getByText('Version 0.1.0 · Revoked', { exact: true }).waitFor();
-  await page.getByRole('link', { name: 'All playbooks' }).click();
-  expect(await page.getByLabel('Search playbooks').inputValue()).toBe(
+  await page.getByRole('link', { name: 'All workflows' }).click();
+  expect(await page.getByLabel('Search workflows').inputValue()).toBe(
     'shipping',
   );
   await page.getByRole('link', { name }).click();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload();
   await page
-    .getByRole('heading', { name: 'How this playbook works' })
+    .getByRole('heading', { name: 'How this workflow works' })
     .waitFor();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await page.getByRole('combobox', { name: 'Playbook sections' }).click();
+  await page.screenshot({
+    path: '/tmp/luma66-browser/overview-mobile.png',
+    fullPage: false,
+  });
+  await page.getByRole('combobox', { name: 'Workflow sections' }).click();
   await page
     .getByRole('option', { name: 'Compatibility', exact: true })
     .click();
@@ -199,7 +220,7 @@ it('finds, reviews, activates, reloads and revokes a persisted playbook with wor
       .evaluate((node) => node === document.activeElement),
   ).toBe(true);
   await page.screenshot({
-    path: '/tmp/luma62-browser/detail-mobile.png',
+    path: '/tmp/luma66-browser/detail-mobile.png',
     fullPage: true,
   });
   await db.owner.query(
@@ -209,7 +230,7 @@ it('finds, reviews, activates, reloads and revokes a persisted playbook with wor
   await page.reload();
   await page
     .getByText(
-      'You can inspect playbooks. Only workspace owners and admins can activate or revoke them.',
+      'You can inspect workflows. Only workspace owners and admins can activate or revoke them.',
     )
     .waitFor();
   expect(
@@ -236,13 +257,15 @@ it('finds, reviews, activates, reloads and revokes a persisted playbook with wor
     "INSERT INTO memberships(id,tenant_id,user_id,role,created_at) VALUES($1,$2,$3,'owner',now())",
     [randomUUID(), other, user],
   );
-  await page.goto(`/app/${other}/playbooks`);
-  await page.getByRole('heading', { name: 'No published playbooks' }).waitFor();
+  await page.goto(`/app/${other}/workflows`);
+  await page.getByRole('heading', { name: 'No published workflows' }).waitFor();
   expect(await page.getByText(name, { exact: true }).count()).toBe(0);
-  await page.goto(`/app/${other}/playbooks/${version.definition.id}`);
-  await page.getByText('Playbook not found', { exact: false }).waitFor();
+  await page.goto(`/app/${other}/workflows/${version.definition.id}`);
+  await page.getByText('Workflow not found', { exact: false }).waitFor();
   expect(await page.getByText('Order 1042', { exact: false }).count()).toBe(0);
   expect(errors).toEqual([]);
+  await page.goto(`/app/${tenantId}/playbooks?q=shipping`);
+  await page.waitForURL(`**/app/${tenantId}/workflows?q=shipping*`);
   await page.goto(url);
   await page.getByRole('link', { name }).waitFor();
 });

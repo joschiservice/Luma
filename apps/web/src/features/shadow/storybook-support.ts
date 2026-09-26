@@ -1,4 +1,4 @@
-import type { PlaybookSummary } from '@luma/api-contract';
+import type { WorkflowSummary } from '@luma/api-contract';
 
 import type { ShadowComparison, ShadowReport } from './data';
 
@@ -28,12 +28,12 @@ export type PreviewState =
   | 'no_candidate'
   | 'report'
   | 'report_empty';
-const summary: PlaybookSummary = {
+const summary: WorkflowSummary = {
   id: workflow,
   name: 'Correct an order shipping method',
   purpose: 'Apply the mapped shipping method.',
   capability: 'orders.shipping-method.write',
-  issueType: 'workflow_failure',
+  category: 'resolution',
   systems: ['jtl-cloud'],
   availableVersion: '0.1.0',
   activeVersions: ['0.1.0'],
@@ -200,7 +200,9 @@ export function mockShadow(state: PreviewState) {
     if (state === 'denied') return fail(403);
     if (state === 'error') return fail(503);
     if (url.pathname.endsWith('/playbooks'))
-      return Response.json({ items: [summary] });
+      return Response.json({
+        items: [{ ...summary, issueType: 'workflow_failure' }],
+      });
     if (url.pathname.endsWith('/timeline'))
       return Response.json({ schemaVersion: 1, items: [], nextCursor: null });
     if (url.pathname.endsWith('/evidence'))

@@ -1,5 +1,6 @@
 import type { TenantContext } from '@luma/identity';
 import { IdentityError, requireRole, requireTenant } from '@luma/identity';
+import type { PlaybookRun } from '@luma/workflows';
 
 import type {
   ShadowComparison,
@@ -7,7 +8,6 @@ import type {
   ShadowReview,
 } from '../application/shadow-evaluation.js';
 import { shadowMetrics } from '../domain/shadow.js';
-import type { PlaybookRun } from './playbook.js';
 import { evaluateShadow } from './shadow-evaluation.js';
 
 export interface ShadowRequest {

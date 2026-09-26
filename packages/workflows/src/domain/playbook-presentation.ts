@@ -51,7 +51,10 @@ export function presentPlaybook(version: PlaybookVersion) {
     issueType: ir.evidence.kind,
     systems: [] as string[],
     approval,
-    permissions: [ir.action.capability, 'orders.read'],
+    permissions:
+      ir.action.targetKind === 'order'
+        ? [ir.action.capability, 'orders.read']
+        : [ir.action.capability],
     provenance: version.provenance,
     representation: JSON.stringify(version.ir, null, 2),
     steps: [
@@ -95,10 +98,14 @@ export function presentPlaybook(version: PlaybookVersion) {
       {
         id: ir.verification.id,
         title: 'Verify the result',
-        description: `Read the authoritative order and check the expected result within ${ir.verification.maxDurationSeconds} seconds. Provider acceptance alone is not verified success.`,
+        description: `Read the authoritative ${ir.action.targetKind} and check the expected result within ${ir.verification.maxDurationSeconds} seconds. Provider acceptance alone is not verified success.`,
         details: [
           `Evaluator: ${ir.verification.evaluatorVersion}. One initial verification attempt.`,
-          'A verified shipping-method correction does not prove that fulfillment resumed.',
+          ...(ir.action.capability === 'orders.shipping-method.write'
+            ? [
+                'A verified shipping-method correction does not prove that fulfillment resumed.',
+              ]
+            : []),
         ],
       },
       {

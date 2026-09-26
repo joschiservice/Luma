@@ -141,7 +141,7 @@ export function WorkspaceSearch({
             <div className="command-empty" role="status">
               <Search size={24} aria-hidden="true" />
               <strong>No pages found</strong>
-              <span>Try Issues, Playbooks, or Connections.</span>
+              <span>Try Issues, Workflows, or Connections.</span>
             </div>
           )}
         </nav>

@@ -1,4 +1,4 @@
-import type { PlaybookIR, PlaybookScalar } from './playbook.js';
+import type { PlaybookIR, PlaybookScalar } from '@luma/workflows';
 
 type Action = {
   capability: string;

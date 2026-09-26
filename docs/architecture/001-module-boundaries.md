@@ -12,22 +12,24 @@ Choose explicit modules inside `apps/api/src/modules`, with dependency injection
 
 ## Module map and allowed imports
 
-Rows are consumers; listed providers are the only permitted cross-module imports, including type-only imports and event schemas. Dependencies are not transitive permissions. No module may import workflows. `identity` includes organizations and tenancy.
+Rows are consumers; listed providers are the only permitted cross-module imports, including type-only imports and event schemas. Dependencies are not transitive permissions. Resolution imports the Workflow owner through its public contract. `identity` includes organizations and tenancy.
 
-| Module     | Owns / public interface intent                                                                                                  | May import                                                                                |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| platform   | Technical primitives, clock/ID/event ports, database, telemetry and model gateway ports/adapters; health                        | none                                                                                      |
-| identity   | Users, organizations, membership, tenant/actor context; identity and permission queries                                         | platform                                                                                  |
-| audit      | Append-only evidence and audit queries; append/query ports                                                                      | platform                                                                                  |
-| orders     | Canonical orders, lines and fulfillment references; ingest/query use cases                                                      | platform, identity                                                                        |
-| inventory  | Canonical SKU, stock positions and reservations; ingest/query use cases                                                         | platform, identity                                                                        |
-| connectors | Connections, secret references, external IDs, raw payloads/provenance, typed capabilities and normalized external observations  | platform, identity                                                                        |
-| policies   | Policy versions, risk/permission decisions, approval requests and grants; evaluate/approve use cases                            | platform, identity                                                                        |
-| execution  | Action attempts, idempotency, mechanism selection, verification and compensation; execute/status use cases                      | platform, identity, policies, connectors, audit                                           |
-| exceptions | Incident lifecycle, diagnosis, proposed resolution and human escalation; detect/query/transition use cases                      | platform, identity, orders, inventory                                                     |
-| workflows  | Cross-module coordination, playbook definitions/versions/activations/runs, durable progress and retries; start/resume use cases | platform, identity, orders, inventory, exceptions, policies, execution, connectors, audit |
+| Module     | Owns / public interface intent                                                                                                 | May import                                                                                           |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| platform   | Technical primitives, clock/ID/event ports, database, telemetry and model gateway ports/adapters; health                       | none                                                                                                 |
+| identity   | Users, organizations, membership, tenant/actor context; identity and permission queries                                        | platform                                                                                             |
+| audit      | Append-only evidence and audit queries; append/query ports                                                                     | platform                                                                                             |
+| orders     | Canonical orders, lines and fulfillment references; ingest/query use cases                                                     | platform, identity                                                                                   |
+| inventory  | Canonical SKU, stock positions and reservations; ingest/query use cases                                                        | platform, identity                                                                                   |
+| connectors | Connections, secret references, external IDs, raw payloads/provenance, typed capabilities and normalized external observations | platform, identity                                                                                   |
+| policies   | Policy versions, risk/permission decisions, approval requests and grants; evaluate/approve use cases                           | platform, identity                                                                                   |
+| execution  | Action attempts, idempotency, mechanism selection, verification and compensation; execute/status use cases                     | platform, identity, policies, connectors, audit                                                      |
+| exceptions | Incident lifecycle, diagnosis, proposed resolution and human escalation; detect/query/transition use cases                     | platform, identity, orders, inventory                                                                |
+| workflows  | Workflow definitions, versions, activations, runs and provenance                                                               | platform, identity, policies, execution, connectors                                                  |
+| resolution | Diagnosis and case coordination, proposals, learning, activity and overview                                                    | workflows, platform, identity, orders, inventory, exceptions, policies, execution, connectors, audit |
+| temporal   | Durable Resolution scheduling and replay                                                                                       | resolution, identity, platform                                                                       |
 
-Orders and inventory do not call each other. Workflows combine their snapshots. Connectors expose provider-independent observations/capabilities; workflows map observations into owner-specific ingestion commands. Core modules must not branch on Shopify/JTL payloads. Execution owns action mechanics; workflows own the longer business process. Exceptions propose actions; execution checks current authorization, policy and approval before each external effect. Approval is not permission to bypass verification or audit.
+Orders and inventory do not call each other. Resolution combines their snapshots. Connectors expose provider-independent observations/capabilities; commerce ingestion maps observations into owner-specific ingestion commands. Core modules must not branch on Shopify/JTL payloads. Execution owns action mechanics; workflows own the longer business process. Exceptions propose actions; execution checks current authorization, policy and approval before each external effect. Approval is not permission to bypass verification or audit.
 
 Audit accepts generic evidence envelopes, not imports from every producer. Producers use an injected append port or committed events wired by the composition root. Platform must remain technical: it cannot own policies, commerce models, approvals or a generic business service locator.
 
@@ -78,8 +80,8 @@ Group infrastructure files by responsibility when several files implement one fe
 
 - `connectors/infrastructure/installations` owns credential storage, input validation, verification, and installed adapter wiring. Provider protocol clients and schemas live in `packages/connectors/jtl` and `packages/connectors/shopify`; local provider folders adapt their results to Luma capabilities.
 - `workflows/infrastructure/playbooks` owns playbook validation and persistence.
-- `workflows/infrastructure/temporal` owns worker setup and durable workflow execution. Keep the worker entry point beside its runtime loader.
-- `workflows/infrastructure/persistence` owns operator desk and resolution learning storage.
+- `packages/workflow-temporal/src` owns worker setup and durable workflow execution. Keep the worker entry point beside its runtime loader.
+- `resolution/infrastructure/persistence` owns operator desk and resolution learning storage.
 
 Nested folders retain their layer's dependency rules. Other modules use `index.ts`; application wiring uses `composition.ts`. File moves must update runtime paths and development watch paths as well as imports.
 

@@ -1222,7 +1222,7 @@ summary {
   margin: 0;
 }
 
-.playbooks-page {
+.workflows-page {
   display: grid;
   gap: 16px;
   max-width: 1440px;
@@ -1231,7 +1231,7 @@ summary {
   font-family: var(--font-sans);
   font-size: 13px;
 }
-.playbooks-page h2 {
+.workflows-page h2 {
   font-family: var(--font-sans);
   font-size: 14px;
   font-weight: 600;
@@ -1239,60 +1239,60 @@ summary {
   margin: 0 0 16px;
   line-height: 1.5;
 }
-.playbooks-page h3 {
+.workflows-page h3 {
   font-family: var(--font-sans);
   font-size: 13px;
   font-weight: 600;
   margin: 0 0 6px;
   line-height: 1.5;
 }
-.playbooks-page p {
+.workflows-page p {
   line-height: 1.6;
   font-size: 13px;
   margin: 8px 0;
 }
-.playbooks-heading {
+.workflows-heading {
   display: flex;
   justify-content: space-between;
   gap: 16px;
   align-items: center;
   flex-wrap: wrap;
 }
-.playbook-collection {
+.workflow-collection {
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--card);
   overflow: clip;
   min-width: 0;
 }
-.playbook-views {
+.workflow-views {
   display: flex;
   align-items: center;
   gap: 4px;
   overflow-x: auto;
   min-width: 0;
 }
-.playbook-views button {
+.workflow-views button {
   white-space: nowrap;
   color: var(--muted-foreground);
   font-weight: 500;
 }
-.playbook-views button[aria-pressed='true'] {
+.workflow-views button[aria-pressed='true'] {
   background: var(--accent);
   color: var(--primary);
   font-weight: 600;
 }
-.playbook-view-count {
+.workflow-view-count {
   font-size: 11px;
   font-variant-numeric: tabular-nums;
   opacity: 0.8;
 }
-.playbook-search {
+.workflow-search {
   position: relative;
   flex: 1;
   min-width: 180px;
 }
-.playbook-search > svg {
+.workflow-search > svg {
   position: absolute;
   top: 50%;
   left: 12px;
@@ -1300,29 +1300,29 @@ summary {
   color: var(--muted-foreground);
   pointer-events: none;
 }
-.playbook-search input {
+.workflow-search input {
   padding: 8px 38px 8px 36px;
   min-height: 36px;
   font-size: 13px;
   border-color: var(--border);
 }
-.playbook-search input::-webkit-search-cancel-button {
+.workflow-search input::-webkit-search-cancel-button {
   display: none;
 }
-.playbook-search > button {
+.workflow-search > button {
   position: absolute;
   right: 0;
   top: 0;
 }
-.playbook-rows {
+.workflow-rows {
   list-style: none;
   padding: 0;
   margin: 0;
 }
-.playbook-rows > li + li {
+.workflow-rows > li + li {
   border-top: 1px solid var(--border);
 }
-.playbook-row {
+.workflow-row {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr) auto 16px;
   gap: 16px;
@@ -1332,13 +1332,13 @@ summary {
   color: var(--foreground);
   transition: background 120ms;
 }
-.playbook-row:hover {
+.workflow-row:hover {
   background: var(--muted);
 }
-.playbook-row:focus-visible {
+.workflow-row:focus-visible {
   outline-offset: -3px;
 }
-.playbook-row-icon {
+.workflow-row-icon {
   display: grid;
   place-items: center;
   width: 34px;
@@ -1347,66 +1347,66 @@ summary {
   border-radius: 8px;
   color: var(--muted-foreground);
 }
-.playbook-row-content {
+.workflow-row-content {
   min-width: 0;
 }
-.playbook-row h2 {
+.workflow-row h2 {
   margin: 0;
 }
-.playbook-row p {
+.workflow-row p {
   color: var(--muted-foreground);
   margin: 4px 0 10px;
 }
-.playbook-row-meta {
+.workflow-row-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 6px 16px;
   font-size: 11px;
   color: var(--muted-foreground);
 }
-.playbook-row-meta span {
+.workflow-row-meta span {
   overflow-wrap: anywhere;
 }
-.playbook-row-meta span:not(:first-child)::before {
+.workflow-row-meta span:not(:first-child)::before {
   content: '·';
   margin-right: 12px;
 }
-.playbook-row .playbook-row-blocker {
+.workflow-row .workflow-row-blocker {
   margin: 10px 0 0;
   color: var(--status-warning);
   font-size: 12px;
 }
-.playbook-row > [data-slot='badge'] {
+.workflow-row > [data-slot='badge'] {
   margin-top: 2px;
   white-space: nowrap;
 }
-.playbook-row-chevron {
+.workflow-row-chevron {
   color: var(--muted-foreground);
   margin-top: 4px;
 }
-.playbooks-page .playbook-count {
+.workflows-page .workflow-count {
   margin: 0;
   padding: 12px 20px;
   border-top: 1px solid var(--border);
   font-size: 11px;
   color: var(--muted-foreground);
 }
-.playbook-empty {
+.workflow-empty {
   padding: 56px 24px;
   border: 0;
   background: transparent;
   text-align: center;
 }
-.playbook-empty h2 {
+.workflow-empty h2 {
   margin: 8px 0 0;
 }
-.playbook-empty p {
+.workflow-empty p {
   max-width: 390px;
 }
-.playbook-collection > .playbook-notice {
+.workflow-collection > .workflow-notice {
   margin: 16px;
 }
-.playbook-action-bar {
+.workflow-action-bar {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
@@ -1414,7 +1414,7 @@ summary {
   padding-bottom: 16px;
   border-bottom: 1px solid var(--border);
 }
-.playbook-back {
+.workflow-back {
   display: inline-flex;
   gap: 6px;
   align-items: center;
@@ -1422,61 +1422,61 @@ summary {
   text-decoration: none;
   font-size: 12px;
 }
-.playbook-back:hover {
+.workflow-back:hover {
   color: var(--foreground);
 }
-.playbook-version-controls {
+.workflow-version-controls {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-left: auto;
 }
-.playbook-section {
+.workflow-section {
   min-width: 0;
   padding: 20px 24px;
 }
-.playbook-section h2 {
+.workflow-section h2 {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.playbook-section h2 svg {
+.workflow-section h2 svg {
   color: var(--muted-foreground);
 }
-.playbooks-page dl {
+.workflows-page dl {
   display: grid;
   gap: 12px;
   font-size: 12px;
   margin: 16px 0;
 }
-.playbooks-page dl > div {
+.workflows-page dl > div {
   display: grid;
   grid-template-columns: 120px minmax(0, 1fr);
   gap: 12px;
 }
-.playbooks-page dt {
+.workflows-page dt {
   color: var(--muted-foreground);
 }
-.playbooks-page dd {
+.workflows-page dd {
   margin: 0;
   overflow-wrap: anywhere;
 }
-.playbooks-page .playbook-caption {
+.workflows-page .workflow-caption {
   color: var(--muted-foreground);
   font-size: 12px;
 }
-.playbook-steps {
+.workflow-steps {
   list-style: none;
   padding: 0;
   margin: 20px 0 0;
 }
-.playbook-steps > li {
+.workflow-steps > li {
   display: flex;
   gap: 16px;
   position: relative;
   padding-bottom: 24px;
 }
-.playbook-steps > li:not(:last-child)::before {
+.workflow-steps > li:not(:last-child)::before {
   content: '';
   position: absolute;
   left: 13px;
@@ -1484,10 +1484,10 @@ summary {
   bottom: 4px;
   border-left: 1px solid var(--border);
 }
-.playbook-steps > li:last-child {
+.workflow-steps > li:last-child {
   padding-bottom: 0;
 }
-.playbook-step-number {
+.workflow-step-number {
   display: grid;
   place-items: center;
   width: 28px;
@@ -1499,116 +1499,116 @@ summary {
   color: var(--muted-foreground);
   font-variant-numeric: tabular-nums;
 }
-.playbook-steps p {
+.workflow-steps p {
   color: var(--muted-foreground);
 }
-.playbook-steps ul {
+.workflow-steps ul {
   padding-left: 18px;
   font-size: 12px;
   line-height: 1.6;
   color: var(--muted-foreground);
 }
-.playbook-steps ul:empty {
+.workflow-steps ul:empty {
   display: none;
 }
-.playbook-connection,
-.playbook-activation-record,
-.playbook-runs article {
+.workflow-connection,
+.workflow-activation-record,
+.workflow-runs article {
   padding: 16px 0;
   border-top: 1px solid var(--border);
   overflow-wrap: anywhere;
 }
-.playbook-connection:last-of-type,
-.playbook-activation-record:last-child,
-.playbook-runs article:last-child {
+.workflow-connection:last-of-type,
+.workflow-activation-record:last-child,
+.workflow-runs article:last-child {
   padding-bottom: 0;
 }
-.playbook-section a {
+.workflow-section a {
   color: var(--foreground);
   text-underline-offset: 4px;
 }
-.playbook-section-empty {
+.workflow-section-empty {
   border: 0;
   margin-top: 16px;
   padding: 28px 16px;
   background: var(--muted);
   text-align: center;
 }
-.playbooks-page details,
-.playbook-dialog details {
+.workflows-page details,
+.workflow-dialog details {
   margin-top: 12px;
 }
-.playbooks-page summary,
-.playbook-dialog summary {
+.workflows-page summary,
+.workflow-dialog summary {
   cursor: pointer;
   font-size: 12px;
   color: var(--muted-foreground);
 }
-.playbooks-page code,
-.playbook-dialog code {
+.workflows-page code,
+.workflow-dialog code {
   font-size: 11px;
   overflow-wrap: anywhere;
 }
-.playbooks-page pre {
+.workflows-page pre {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   padding: 16px;
   background: var(--muted);
 }
-.playbook-dialog {
+.workflow-dialog {
   gap: 16px;
   max-width: 640px;
   max-height: 90svh;
   overflow-y: auto;
 }
-.playbook-dialog label {
+.workflow-dialog label {
   display: grid;
   gap: 8px;
   font-size: 13px;
 }
-.playbook-dialog [data-slot='dialog-title'] {
+.workflow-dialog [data-slot='dialog-title'] {
   margin: 0;
   font-family: var(--font-sans);
   font-size: 20px;
   font-weight: 600;
   line-height: 1.4;
 }
-.playbook-dialog [data-slot='dialog-description'] {
+.workflow-dialog [data-slot='dialog-description'] {
   margin: 0;
   font-size: 13px;
 }
-.playbook-dialog-actions {
+.workflow-dialog-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
 }
-.playbook-activation {
+.workflow-activation {
   display: grid;
   gap: 16px;
   font-size: 13px;
 }
-.playbook-activation p {
+.workflow-activation p {
   margin: 0;
 }
-.playbook-activation-summary {
+.workflow-activation-summary {
   display: grid;
   gap: 8px;
   padding: 14px;
   border-radius: 8px;
   background: var(--muted);
 }
-.playbook-activation fieldset {
+.workflow-activation fieldset {
   border: 0;
   padding: 0;
   min-width: 0;
   margin: 0;
 }
-.playbook-activation legend {
+.workflow-activation legend {
   font-weight: 600;
   font-size: 13px;
   margin-bottom: 12px;
 }
-.playbook-activation .playbook-targets {
+.workflow-activation .workflow-targets {
   max-height: 220px;
   overflow-y: auto;
   margin-top: 20px;
@@ -1616,116 +1616,116 @@ summary {
   border-radius: 8px;
   padding: 12px;
 }
-.playbook-targets label,
-.playbook-activation .playbook-review {
+.workflow-targets label,
+.workflow-activation .workflow-review {
   display: flex;
   align-items: start;
   gap: 10px;
   padding: 10px 0;
   line-height: 1.5;
 }
-.playbook-targets label + label {
+.workflow-targets label + label {
   border-top: 1px solid var(--border);
 }
-.playbook-targets input,
-.playbook-review input {
+.workflow-targets input,
+.workflow-review input {
   margin-top: 3px;
   accent-color: var(--primary);
 }
-.playbook-activation .playbook-review {
+.workflow-activation .workflow-review {
   margin-top: 12px;
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--muted);
 }
-.playbook-targets small {
+.workflow-targets small {
   display: block;
   font-size: 10px;
   color: var(--muted-foreground);
   overflow-wrap: anywhere;
 }
-.playbook-scope-summary {
+.workflow-scope-summary {
   display: grid;
   gap: 6px;
   padding: 12px 0;
 }
-.playbook-scope-summary ul {
+.workflow-scope-summary ul {
   margin: 0;
   padding-left: 20px;
 }
-.playbook-loading {
+.workflow-loading {
   display: grid;
   gap: 1px;
 }
-.playbook-skeleton {
+.workflow-skeleton {
   display: grid;
   gap: 10px;
   padding: 24px;
 }
-.playbook-skeleton span {
+.workflow-skeleton span {
   display: block;
   width: 70%;
   height: 12px;
   border-radius: 4px;
   background: var(--muted);
-  animation: playbook-pulse 1.6s ease-in-out infinite alternate;
+  animation: workflow-pulse 1.6s ease-in-out infinite alternate;
 }
-.playbook-skeleton span:first-child {
+.workflow-skeleton span:first-child {
   width: 38%;
   height: 16px;
 }
-.playbook-skeleton span:last-child {
+.workflow-skeleton span:last-child {
   width: 50%;
 }
-@keyframes playbook-pulse {
+@keyframes workflow-pulse {
   to {
     opacity: 0.4;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .playbook-skeleton span {
+  .workflow-skeleton span {
     animation: none;
   }
-  .playbook-row {
+  .workflow-row {
     transition: none;
   }
 }
 @media (max-width: 760px) {
-  .playbook-row {
+  .workflow-row {
     grid-template-columns: 28px minmax(0, 1fr) 16px;
     gap: 10px;
     padding: 18px 14px;
   }
-  .playbook-row-icon {
+  .workflow-row-icon {
     width: 28px;
     height: 28px;
   }
-  .playbook-row > [data-slot='badge'] {
+  .workflow-row > [data-slot='badge'] {
     grid-column: 2;
     justify-self: start;
   }
-  .playbook-row-chevron {
+  .workflow-row-chevron {
     grid-column: 3;
     grid-row: 1;
   }
-  .playbook-row-meta {
+  .workflow-row-meta {
     gap: 4px 12px;
   }
-  .playbook-section {
+  .workflow-section {
     padding: 18px 16px;
   }
-  .playbook-version-controls {
+  .workflow-version-controls {
     width: 100%;
     margin: 0;
   }
-  .playbook-version-controls > * {
+  .workflow-version-controls > * {
     flex: 1;
   }
-  .playbook-action-bar > button {
+  .workflow-action-bar > button {
     margin-left: auto;
   }
-  .playbooks-page dl > div {
+  .workflows-page dl > div {
     grid-template-columns: 100px minmax(0, 1fr);
   }
 }
@@ -2045,8 +2045,8 @@ summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
-.playbooks-page .shadow-metrics > div,
-.playbooks-page .shadow-facts > div {
+.workflows-page .shadow-metrics > div,
+.workflows-page .shadow-facts > div {
   display: block;
 }
 .shadow-metrics .shadow-metric-description {
@@ -2625,7 +2625,7 @@ summary {
 }
 
 .case-notice,
-.playbook-notice,
+.workflow-notice,
 .connection-notice {
   margin-block: 12px;
 }
@@ -2847,23 +2847,23 @@ summary {
   white-space: nowrap;
 }
 
-.playbook-mobile-view {
+.workflow-mobile-view {
   display: none;
 }
 @media (max-width: 760px) {
-  .playbook-mobile-view {
+  .workflow-mobile-view {
     display: flex;
     flex: 1;
   }
-  .playbook-views {
+  .workflow-views {
     display: none;
   }
-  .playbook-collection
+  .workflow-collection
     .collection-toolbar-controls
     > [data-slot='select-trigger'] {
     width: 100%;
   }
-  .playbook-row-meta span:not(:first-child)::before {
+  .workflow-row-meta span:not(:first-child)::before {
     content: none;
   }
 }
@@ -3347,4 +3347,100 @@ summary {
   outline: 2px solid var(--ring);
   outline-offset: 3px;
   scroll-margin: 24px;
+}
+
+/* The workflow overview gives operators the trigger and verified outcome before technical detail. */
+.workflow-overview {
+  padding: 8px 0 24px;
+}
+.workflow-intent {
+  max-width: 680px;
+  margin-bottom: 24px;
+}
+.workflow-eyebrow {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.workflow-intent h2 {
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.03em;
+  margin: 0 0 10px;
+}
+.workflow-intent > p:last-child {
+  color: var(--muted-foreground);
+  font-size: 14px;
+  line-height: 1.65;
+}
+.workflow-contract-flow {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 24px;
+  align-items: center;
+  padding: 22px 24px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 24px;
+}
+.workflow-contract-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+.workflow-contract-flow strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+}
+.workflow-contract-flow p {
+  margin: 8px 0 0;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.workflow-contract-arrow {
+  color: var(--muted-foreground);
+}
+.workflow-approval-note {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  border-top: 1px solid var(--border);
+  padding-top: 18px;
+  margin: 18px 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.workflow-approval-note svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--muted-foreground);
+}
+.workflow-approval-note p {
+  margin: 0;
+}
+@media (max-width: 640px) {
+  .workflow-intent h2 {
+    font-size: 21px;
+  }
+  .workflow-contract-flow {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 18px;
+  }
+  .workflow-contract-arrow {
+    display: none;
+  }
+  .workflow-contract-flow > div + svg + div {
+    border-top: 1px solid var(--border);
+    padding-top: 16px;
+  }
 }

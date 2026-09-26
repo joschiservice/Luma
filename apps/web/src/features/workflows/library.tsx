@@ -1,4 +1,4 @@
-import type { PlaybookSummary } from '@luma/api-contract';
+import type { WorkflowSummary } from '@luma/api-contract';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -13,13 +13,14 @@ import {
   useParams,
   useSearch,
 } from '@tanstack/react-router';
-import { BookOpen, ChevronRight, Search, X } from 'lucide-react';
+import { ChevronRight, Search, Workflow, X } from 'lucide-react';
 import { useRef } from 'react';
 
 import { SignInRedirect } from '../identity/common';
 import { IdentityError } from '../identity/data';
-import { playbookError, playbooksOptions } from './data';
+import { workflowError, workflowsOptions } from './data';
 import { OfflineNotice } from './offline';
+import { workflowSystemLabel } from './presentation';
 
 export const statusNames = {
   active: 'Active',
@@ -28,16 +29,16 @@ export const statusNames = {
   unavailable: 'Prerequisites missing',
 };
 
-export interface PlaybookFilters {
+export interface WorkflowFilters {
   q?: string | undefined;
   system?: string | undefined;
   status?: string | undefined;
 }
 
 /** Validates shareable library filters and ignores unsupported filter values. */
-export function parsePlaybookFilters(
+export function parseWorkflowFilters(
   value: Record<string, unknown>,
-): PlaybookFilters {
+): WorkflowFilters {
   return {
     q: typeof value.q === 'string' ? value.q.slice(0, 200) : '',
     system:
@@ -52,17 +53,17 @@ export function parsePlaybookFilters(
   };
 }
 
-/** Lists searchable published playbooks in the active workspace. */
-export function PlaybooksPage() {
+/** Lists searchable published workflows in the active workspace. */
+export function WorkflowsPage() {
   const { organizationId } = useParams({ from: '/app/$organizationId' });
-  const filters = useSearch({ from: '/app/$organizationId/playbooks/' });
-  const navigate = useNavigate({ from: '/app/$organizationId/playbooks/' });
-  const query = useQuery(playbooksOptions(organizationId));
+  const filters = useSearch({ from: '/app/$organizationId/workflows/' });
+  const navigate = useNavigate({ from: '/app/$organizationId/workflows/' });
+  const query = useQuery(workflowsOptions(organizationId));
   if (query.error instanceof IdentityError && query.error.status === 401)
     return <SignInRedirect />;
 
   return (
-    <PlaybookLibraryView
+    <WorkflowLibraryView
       organizationId={organizationId}
       items={
         query.error instanceof IdentityError &&
@@ -74,14 +75,14 @@ export function PlaybooksPage() {
       change={(next) => void navigate({ search: next, replace: true })}
       loading={query.isPending}
       refreshing={query.isFetching}
-      error={query.error ? playbookError(query.error) : undefined}
+      error={query.error ? workflowError(query.error) : undefined}
       refresh={() => void query.refetch()}
     />
   );
 }
 
 /** Presents library loading, error, empty and filtered states with accessible controls. */
-export function PlaybookLibraryView({
+export function WorkflowLibraryView({
   organizationId,
   items,
   filters,
@@ -92,9 +93,9 @@ export function PlaybookLibraryView({
   refresh,
 }: {
   organizationId: string;
-  items?: PlaybookSummary[] | undefined;
-  filters: PlaybookFilters;
-  change: (filters: PlaybookFilters) => void;
+  items?: WorkflowSummary[] | undefined;
+  filters: WorkflowFilters;
+  change: (filters: WorkflowFilters) => void;
   loading?: boolean;
   refreshing?: boolean;
   error?: string | undefined;
@@ -108,7 +109,7 @@ export function PlaybookLibraryView({
       [
         item.name,
         item.purpose,
-        item.issueType.replaceAll('_', ' '),
+        item.category === 'resolution' ? 'Resolution workflow' : item.category,
         ...item.systems,
       ]
         .join(' ')
@@ -132,7 +133,7 @@ export function PlaybookLibraryView({
       ? [
           {
             key: 'system',
-            label: filters.system,
+            label: workflowSystemLabel(filters.system),
             onRemove: () => change({ ...filters, system: '' }),
           },
         ]
@@ -149,19 +150,19 @@ export function PlaybookLibraryView({
   ];
 
   return (
-    <div className="playbooks-page playbook-library-page">
-      <h1 className="sr-only">Playbooks</h1>
+    <div className="workflows-page workflow-library-page">
+      <h1 className="sr-only">Workflows</h1>
       <OfflineNotice />
-      <div className="playbook-collection">
+      <div className="workflow-collection">
         <CollectionToolbar
           views={
             <>
               <Select
-                className="playbook-mobile-view"
+                className="workflow-mobile-view"
                 aria-label="Activation status"
                 value={filters.status ?? ''}
                 options={[
-                  ['', 'All playbooks'],
+                  ['', 'All workflows'],
                   ...Object.entries(statusNames),
                 ].map(([value, label]) => ({
                   value: value!,
@@ -172,11 +173,11 @@ export function PlaybookLibraryView({
                 }
               />
               <div
-                className="playbook-views"
+                className="workflow-views"
                 role="group"
                 aria-label="Activation status"
               >
-                {[['', 'All playbooks'], ...Object.entries(statusNames)].map(
+                {[['', 'All workflows'], ...Object.entries(statusNames)].map(
                   ([value, label]) => (
                     <Button
                       key={value}
@@ -185,7 +186,7 @@ export function PlaybookLibraryView({
                       onClick={() => change({ ...filters, status: value })}
                     >
                       {label}
-                      <span className="playbook-view-count">
+                      <span className="workflow-view-count">
                         {items
                           ? value
                             ? matching?.filter((item) => item.status === value)
@@ -203,19 +204,19 @@ export function PlaybookLibraryView({
           onClear={() => change({})}
           onRefresh={refresh}
           refreshing={refreshing}
-          refreshLabel="Refresh playbooks"
+          refreshLabel="Refresh workflows"
         >
-          <div className="playbook-search">
+          <div className="workflow-search">
             <Search size={16} aria-hidden="true" />
             <Input
               ref={input}
               type="search"
-              aria-label="Search playbooks"
+              aria-label="Search workflows"
               value={filters.q ?? ''}
               onChange={(event) =>
                 change({ ...filters, q: event.target.value })
               }
-              placeholder="Search playbooks…"
+              placeholder="Search workflows…"
             />
             {filters.q ? (
               <Button
@@ -243,13 +244,13 @@ export function PlaybookLibraryView({
                 ...new Set((items ?? []).flatMap((item) => item.systems)),
               ].map((value) => ({
                 value,
-                label: value,
+                label: workflowSystemLabel(value),
               })),
             ]}
           />
         </CollectionToolbar>
         {error ? (
-          <Alert tone="danger" role="alert" className="playbook-notice">
+          <Alert tone="danger" role="alert" className="workflow-notice">
             <span>
               {error}
               {items ? ' The list below may be out of date.' : ''}
@@ -260,52 +261,56 @@ export function PlaybookLibraryView({
           </Alert>
         ) : null}
         {error && !items ? null : loading ? (
-          <PlaybookLoading />
+          <WorkflowLoading />
         ) : !items?.length ? (
-          <Empty className="playbook-empty">
-            <BookOpen size={28} aria-hidden="true" />
-            <h2>No published playbooks</h2>
+          <Empty className="workflow-empty">
+            <Workflow size={28} aria-hidden="true" />
+            <h2>No published workflows</h2>
             <p>
               A workspace administrator must publish a reviewed version before
               it can be activated.
             </p>
           </Empty>
         ) : !filtered?.length ? (
-          <Empty className="playbook-empty">
+          <Empty className="workflow-empty">
             <Search size={24} aria-hidden="true" />
-            <h2>No matching playbooks</h2>
+            <h2>No matching workflows</h2>
             <p>Try a different search, system, or activation status.</p>
           </Empty>
         ) : (
-          <ul className="playbook-rows" aria-label="Playbooks">
+          <ul className="workflow-rows" aria-label="Workflows">
             {filtered.map((item) => (
               <li key={item.id}>
                 <Link
-                  className="playbook-row"
+                  className="workflow-row"
                   aria-label={item.name}
-                  to="/app/$organizationId/playbooks/$definitionId"
+                  to="/app/$organizationId/workflows/$definitionId"
                   params={{ organizationId, definitionId: item.id }}
                   search={filters}
                 >
-                  <span className="playbook-row-icon">
-                    <BookOpen size={18} aria-hidden="true" />
+                  <span className="workflow-row-icon">
+                    <Workflow size={18} aria-hidden="true" />
                   </span>
-                  <div className="playbook-row-content">
+                  <div className="workflow-row-content">
                     <h2>{item.name}</h2>
                     <p>{item.purpose}</p>
-                    <div className="playbook-row-meta">
+                    <div className="workflow-row-meta">
                       <span>
-                        {item.systems.map((system) => system).join(' · ') ||
+                        {item.systems.map(workflowSystemLabel).join(' · ') ||
                           'Unsupported system'}
                       </span>
-                      <span>{item.issueType.replaceAll('_', ' ')}</span>
+                      <span>
+                        {item.category === 'resolution'
+                          ? 'Resolution workflow'
+                          : item.category}
+                      </span>
                       <span>v{item.availableVersion}</span>
                       {item.activeVersions.length ? (
                         <span>Active: {item.activeVersions.join(', ')}</span>
                       ) : null}
                     </div>
                     {item.blockers.length ? (
-                      <p className="playbook-row-blocker">
+                      <p className="workflow-row-blocker">
                         {item.blockers[0]}
                         {item.blockers.length > 1
                           ? ` (+${item.blockers.length - 1} more)`
@@ -325,7 +330,7 @@ export function PlaybookLibraryView({
                     {statusNames[item.status]}
                   </Badge>
                   <ChevronRight
-                    className="playbook-row-chevron"
+                    className="workflow-row-chevron"
                     size={16}
                     aria-hidden="true"
                   />
@@ -335,9 +340,9 @@ export function PlaybookLibraryView({
           </ul>
         )}
         {!loading && items ? (
-          <p role="status" className="playbook-count">
+          <p role="status" className="workflow-count">
             {filtered?.length ?? 0} of {items.length}{' '}
-            {items.length === 1 ? 'playbook' : 'playbooks'}
+            {items.length === 1 ? 'workflow' : 'workflows'}
           </p>
         ) : null}
       </div>
@@ -346,14 +351,14 @@ export function PlaybookLibraryView({
 }
 
 /** Reserves content space and announces loading without exposing decorative placeholders. */
-export function PlaybookLoading({ detail = false }: { detail?: boolean }) {
+export function WorkflowLoading({ detail = false }: { detail?: boolean }) {
   return (
-    <div className="playbook-loading" role="status">
+    <div className="workflow-loading" role="status">
       <span className="sr-only">
-        {detail ? 'Loading playbook…' : 'Loading playbooks…'}
+        {detail ? 'Loading workflow…' : 'Loading workflows…'}
       </span>
       {[0, 1, 2].map((row) => (
-        <div key={row} aria-hidden="true" className="playbook-skeleton">
+        <div key={row} aria-hidden="true" className="workflow-skeleton">
           <span />
           <span />
           <span />

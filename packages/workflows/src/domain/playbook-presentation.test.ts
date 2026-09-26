@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { playbookBlockers, presentPlaybook } from './playbook-presentation.js';
-import { shippingMethodPlaybook } from './shipping-method-playbook.js';
+import { shippingMethodPlaybook } from './shipping-method.fixture.js';
 
 const version = { ...shippingMethodPlaybook, digest: 'a'.repeat(64) };
 describe('playbook presentation', () => {
@@ -51,5 +51,23 @@ describe('playbook presentation', () => {
         },
       }),
     ).toHaveLength(1);
+  });
+  it('describes a non-order subject without inventing order permissions or outcomes', () => {
+    const view = presentPlaybook({
+      ...version,
+      ir: {
+        ...version.ir,
+        action: {
+          ...version.ir.action,
+          capability: 'supplier.update',
+          targetKind: 'supplier',
+        },
+      },
+    });
+    expect(view.steps[3]?.description).toContain('authoritative supplier');
+    expect(view.permissions).toEqual(['supplier.update']);
+    expect(view.steps[3]?.details.join(' ')).not.toContain(
+      'fulfillment resumed',
+    );
   });
 });

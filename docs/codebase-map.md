@@ -62,3 +62,18 @@ Tests: `packages/app-host/src/registry.test.ts`,
 `packages/application-runtime/src/apps.integration.test.ts`, app-owned adapter tests,
 `tooling/architecture/apps.test.mjs`, and `apps/api/e2e/connections.browser.mjs`.
 See [Workspace apps](apps.md) for adding and removing an app.
+
+## Workflows
+
+Start at `packages/workflows/src/domain/workflow.ts` for subject-based contracts,
+`application/catalog.ts` for authorized catalog operations, and
+`infrastructure/workflow-schema.ts` for typed authoring. Existing Resolution
+execution and persistence adapters are owned by the same package. Resolution
+retains diagnosis and case orchestration. The API contracts are in
+`packages/api-contract/src/workflows.ts`; the UI is in
+`apps/web/src/features/workflows`.
+
+Tests: Workflow compiler tests, `apps/api/e2e/workflows.e2e.mjs`,
+`playbooks.e2e.mjs` (both API paths), `playbooks.browser.mjs`, and existing execution
+integration tests. See [Workflow model](workflows.md) and
+[ADR-007](architecture/007-workflow-model.md).

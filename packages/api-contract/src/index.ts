@@ -14,6 +14,7 @@ import { connectorProvidersContract } from './contracts/providers.js';
 import { settingsContract } from './contracts/settings.js';
 import { shadowContract } from './contracts/shadow.js';
 import { systemContract } from './contracts/system.js';
+import { workflowsContract } from './contracts/workflows.js';
 
 const c = initContract();
 
@@ -22,6 +23,7 @@ export const apiContract = c.router(
     shadow: shadowContract,
     activity: activityContract,
     playbooks: playbooksContract,
+    workflows: workflowsContract,
     resolutionLearning: resolutionLearningContract,
     caseDesk: caseDeskContract,
     operations: operationsContract,
@@ -88,3 +90,5 @@ export * from './shadow.js';
 export * from './settings.js';
 
 export * from './apps.js';
+
+export * from './workflows.js';

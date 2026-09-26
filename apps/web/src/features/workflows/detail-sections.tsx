@@ -1,7 +1,7 @@
 import type {
-  PlaybookActivationView,
-  PlaybookDetail,
-  PlaybookVersionView,
+  WorkflowActivationView,
+  WorkflowDetail,
+  WorkflowVersionView,
 } from '@luma/api-contract';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -10,62 +10,130 @@ import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import { Empty } from '@luma/ui/components/primitives/empty';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { Link } from '@tanstack/react-router';
-import { ShieldCheck } from 'lucide-react';
+import { ArrowRight, ShieldCheck, Zap } from 'lucide-react';
+
+import { workflowSystemLabel } from './presentation';
 
 /** Summarizes the selected version, approval requirements, and currently active versions. */
-export function PlaybookOverview({
+export function WorkflowOverview({
   detail,
   version,
 }: {
-  detail: PlaybookDetail;
-  version: PlaybookVersionView;
+  detail: WorkflowDetail;
+  version: WorkflowVersionView;
 }) {
+  const trigger = version.applicability.trigger;
+  const triggerLabel =
+    trigger.kind === 'exception'
+      ? `${trigger.issueType.replaceAll('_', ' ')} detected`
+      : trigger.kind === 'event'
+        ? trigger.eventType
+        : 'Manual request';
+
   return (
-    <Card className="playbook-section">
-      <CardTitle>Overview</CardTitle>
-      <dl className="playbook-facts">
+    <section className="workflow-overview" aria-label="Workflow overview">
+      <div className="workflow-intent">
+        <p className="workflow-eyebrow">
+          {version.category === 'resolution'
+            ? 'Resolution workflow'
+            : version.category}
+        </p>
+        <h2>{detail.summary.name}</h2>
+        <p>{detail.summary.purpose}</p>
+      </div>
+      <div className="workflow-contract-flow">
         <div>
-          <dt>Systems</dt>
+          <span className="workflow-contract-label">
+            <Zap size={14} aria-hidden="true" /> When
+          </span>
+          <strong>{triggerLabel}</strong>
+          <p>Check fresh evidence before proposing a change.</p>
+        </div>
+        <ArrowRight
+          className="workflow-contract-arrow"
+          size={18}
+          aria-hidden="true"
+        />
+        <div>
+          <span className="workflow-contract-label">
+            <ShieldCheck size={14} aria-hidden="true" /> Success means
+          </span>
+          <strong>
+            {version.capability === 'orders.shipping-method.write'
+              ? 'The order uses the mapped shipping method'
+              : 'The expected change is verified'}
+          </strong>
+          <p>
+            Read the authoritative {version.applicability.subjectKind}. Escalate
+            if the result cannot be confirmed.
+          </p>
+        </div>
+      </div>
+      <dl className="workflow-facts">
+        <div>
+          <dt>Applies to</dt>
+          <dd>{version.applicability.subjectKind}</dd>
+        </div>
+        <div>
+          <dt>Connected systems</dt>
           <dd>
-            {version.systems.map((system) => system).join(' · ') ||
-              'Unsupported'}
+            {version.systems.map(workflowSystemLabel).join(' · ') ||
+              'None available'}
           </dd>
         </div>
         <div>
-          <dt>Issue type</dt>
-          <dd>{version.issueType.replaceAll('_', ' ')}</dd>
-        </div>
-        <div>
-          <dt>Approval</dt>
-          <dd>{version.approval}</dd>
+          <dt>Selected version</dt>
+          <dd>v{version.version}</dd>
         </div>
         <div>
           <dt>Active versions</dt>
           <dd>{detail.summary.activeVersions.join(', ') || 'None'}</dd>
         </div>
       </dl>
-      <p className="playbook-caption">
-        Activating a new version does not replace existing activations.
-      </p>
-    </Card>
+      <div className="workflow-approval-note">
+        <ShieldCheck size={17} aria-hidden="true" />
+        <p>{version.approval}</p>
+      </div>
+      <Disclosure>
+        <summary>Inputs and evidence</summary>
+        <dl className="workflow-facts">
+          {Object.entries(version.inputs).map(([name, type]) => (
+            <div key={name}>
+              <dt>{name.replace(/([a-z])([A-Z])/g, '$1 $2')}</dt>
+              <dd>{type} · required input</dd>
+            </div>
+          ))}
+          {Object.entries(version.context.fields).map(([name, type]) => (
+            <div key={name}>
+              <dt>{name.replace(/([a-z])([A-Z])/g, '$1 $2')}</dt>
+              <dd>{type} · observed evidence</dd>
+            </div>
+          ))}
+        </dl>
+        <p className="workflow-caption">
+          Evidence must be less than {version.context.maxAgeSeconds} seconds
+          old. Each run retains the exact inputs used.
+        </p>
+      </Disclosure>
+    </section>
   );
 }
 
 /** Explains the selected version as an ordered correction and verification flow. */
-export function PlaybookSteps({ version }: { version: PlaybookVersionView }) {
+export function WorkflowSteps({ version }: { version: WorkflowVersionView }) {
   return (
     <Card
       as="section"
-      className="playbook-section"
+      className="workflow-section"
       aria-labelledby="steps-title"
     >
       <CardTitle as="h2" id="steps-title">
-        How this playbook works
+        How this workflow works
       </CardTitle>
-      <ol className="playbook-steps">
+      <ol className="workflow-steps">
         {version.steps.map((step, i) => (
           <li key={step.id}>
-            <span className="playbook-step-number" aria-hidden="true">
+            <span className="workflow-step-number" aria-hidden="true">
               {String(i + 1).padStart(2, '0')}
             </span>
             <div>
@@ -85,17 +153,17 @@ export function PlaybookSteps({ version }: { version: PlaybookVersionView }) {
 }
 
 /** Shows version and connection prerequisites with links to resolve connection access. */
-export function PlaybookCompatibility({
+export function WorkflowCompatibility({
   detail,
   version,
   organizationId,
 }: {
-  detail: PlaybookDetail;
-  version: PlaybookVersionView;
+  detail: WorkflowDetail;
+  version: WorkflowVersionView;
   organizationId: string;
 }) {
   return (
-    <Card as="section" className="playbook-section">
+    <Card as="section" className="workflow-section">
       <CardTitle as="h2">
         <ShieldCheck size={18} aria-hidden="true" /> Compatibility and
         permissions
@@ -112,7 +180,7 @@ export function PlaybookCompatibility({
         </ul>
       </Disclosure>
       {version.blockers.map((reason) => (
-        <Alert key={reason} className="playbook-notice">
+        <Alert key={reason} className="workflow-notice">
           {reason}
         </Alert>
       ))}
@@ -120,7 +188,7 @@ export function PlaybookCompatibility({
         <p>No connections installed.</p>
       ) : (
         detail.connections.map((c) => (
-          <article className="playbook-connection" key={c.id}>
+          <article className="workflow-connection" key={c.id}>
             <h3>
               <Link
                 to="/app/$organizationId/connections"
@@ -150,35 +218,35 @@ export function PlaybookCompatibility({
 }
 
 /** Lists granted scopes and offers revocation only for active grants the viewer may manage. */
-export function PlaybookActivations({
+export function WorkflowActivations({
   detail,
   refreshing,
   onRevoke,
 }: {
-  detail: PlaybookDetail;
+  detail: WorkflowDetail;
   refreshing?: boolean | undefined;
-  onRevoke: (activation: PlaybookActivationView) => void;
+  onRevoke: (activation: WorkflowActivationView) => void;
 }) {
   return (
-    <Card as="section" className="playbook-section">
+    <Card as="section" className="workflow-section">
       <CardTitle as="h2">Activation history</CardTitle>
       <p>
         Revoking an activation stops future runs. Work already dispatched may
         still complete.
       </p>
       {!detail.activations.length ? (
-        <Empty className="playbook-section-empty">
+        <Empty className="workflow-section-empty">
           <ShieldCheck size={22} aria-hidden="true" />
           <h3>Not activated yet</h3>
           <p>
-            Review a version and choose its scope to permit this playbook to
+            Review a version and choose its scope to permit this workflow to
             run.
           </p>
         </Empty>
       ) : (
         detail.activations.map((a) => (
-          <article key={a.id} className="playbook-activation-record">
-            <div className="playbooks-heading">
+          <article key={a.id} className="workflow-activation-record">
+            <div className="workflows-heading">
               <h3>
                 Version {a.version} · {a.active ? 'Active' : 'Revoked'}
               </h3>
@@ -244,9 +312,9 @@ export function PlaybookActivations({
 }
 
 /** Keeps published version provenance and exact artifacts available for inspection. */
-export function PlaybookVersions({ detail }: { detail: PlaybookDetail }) {
+export function WorkflowVersions({ detail }: { detail: WorkflowDetail }) {
   return (
-    <Card as="section" className="playbook-section">
+    <Card as="section" className="workflow-section">
       <CardTitle as="h2">Provenance and version history</CardTitle>
       {detail.versions.map((v) => (
         <Disclosure key={v.version}>

@@ -1,4 +1,8 @@
-# Resolution Playbook V0
+# Resolution Workflow V0
+
+The product now calls these **Resolution Workflows**. This document describes the
+compatible Resolution interpreter and legacy storage format. See [Workflow model](workflows.md)
+for current ownership, native contracts and API migration.
 
 A playbook applies one reviewed capability action to an eligible incident and
 checks its stated outcome. Developers author typed data with `definePlaybook`.
@@ -136,7 +140,7 @@ regression suites.
 
 ## Playbook library and controls
 
-Open **Playbooks** after Issues in workspace navigation. Search by name and filter
+Open **Workflows** after Issues in workspace navigation. Search by name and filter
 by system or activation status. Each shareable detail page explains the five
 steps, required permissions, approval, verification and recovery. The version
 selector reads immutable published versions; publication and viewing never grant

@@ -34,6 +34,8 @@ import {
   registerDeskEvents,
   shadowRoutes,
 } from '@luma/resolution/http';
+import type { WorkflowCatalog } from '@luma/workflows';
+import { workflowRoutes } from '@luma/workflows/http';
 import { initServer } from '@ts-rest/fastify';
 import type { FastifyServerOptions } from 'fastify';
 import Fastify, { LogController } from 'fastify';
@@ -52,6 +54,7 @@ export interface AppDependencies {
   shadow?: ShadowService;
   activity?: ActivityService;
   playbooks?: PlaybookLibrary;
+  workflows?: WorkflowCatalog;
   learning?: LearningService;
   desk?: DeskService;
   eventSettings?: { intervalMs: number; lifetimeMs: number };
@@ -218,6 +221,7 @@ export function buildApp(
         shadow: shadowRoutes(dependencies.shadow),
         activity: activityRoutes(dependencies.activity),
         playbooks: playbookRoutes(dependencies.playbooks),
+        workflows: workflowRoutes(dependencies.workflows),
         exceptions: caseRoutes(dependencies.cases),
         caseDesk: deskRoutes(dependencies.desk),
         resolutionLearning: learningRoutes(dependencies.learning),

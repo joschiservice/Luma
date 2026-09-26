@@ -141,10 +141,10 @@ export function ActivityView({
     });
 
   return (
-    <div className="playbooks-page activity-page">
-      <div className="playbooks-heading">
+    <div className="workflows-page activity-page">
+      <div className="workflows-heading">
         <div>
-          <p className="playbooks-kicker">
+          <p className="workflows-kicker">
             <Activity size={15} aria-hidden="true" /> Workspace history
           </p>
           <h1>Activity</h1>
@@ -160,7 +160,7 @@ export function ActivityView({
           {refreshing ? 'Refreshing…' : 'Refresh activity'}
         </Button>
       </div>
-      <div className="playbook-filters activity-filters">
+      <div className="workflow-filters activity-filters">
         <label>
           Search activity
           <input
@@ -240,13 +240,13 @@ export function ActivityView({
         IDs. Dates use recorded time; select up to 366 days.
       </p>
       {offline ? (
-        <Alert role="status" className="playbook-notice">
+        <Alert role="status" className="workflow-notice">
           You are offline. Loaded activity may be outdated. Reconnect to
           refresh.
         </Alert>
       ) : null}
       {error ? (
-        <Alert tone="danger" role="alert" className="playbook-notice">
+        <Alert tone="danger" role="alert" className="workflow-notice">
           {error}{' '}
           <Button variant="outline" onClick={refresh}>
             Retry
@@ -273,7 +273,7 @@ export function ActivityView({
         <>
           <p className="activity-coverage">{page.coverage}</p>
           {!page.items.length ? (
-            <Empty className="playbook-empty">
+            <Empty className="workflow-empty">
               <h2>No matching recorded activity</h2>
               <p>
                 Try another date range or clear the filters. Unrecorded changes
@@ -465,10 +465,10 @@ function ActivityRow({
             ) : null}
             {item.playbookId ? (
               <Link
-                to="/app/$organizationId/playbooks/$definitionId"
+                to="/app/$organizationId/workflows/$definitionId"
                 params={{ organizationId, definitionId: item.playbookId }}
               >
-                Open playbook
+                Open workflow
               </Link>
             ) : null}
             {item.connectionId ? (

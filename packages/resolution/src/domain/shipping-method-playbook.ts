@@ -1,4 +1,4 @@
-import type { PlaybookVersion } from './playbook.js';
+import type { PlaybookVersion } from '@luma/workflows';
 
 /** The pilot correction verifies the selected method; fulfillment needs separate evidence. */
 export const shippingMethodPlaybook: Omit<PlaybookVersion, 'digest'> = {

@@ -1,6 +1,6 @@
 import type {
-  PlaybookActivationView,
-  PlaybookDetail,
+  WorkflowActivationView,
+  WorkflowDetail,
 } from '@luma/api-contract';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
@@ -19,7 +19,7 @@ import { SectionWorkspace } from '@luma/ui/components/workspace/section-workspac
 import { WorkspaceBreadcrumb } from '@luma/ui/components/workspace/workspace-breadcrumb';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams, useSearch } from '@tanstack/react-router';
-import { ArrowLeft, BookOpen, ChevronRight, RefreshCw } from 'lucide-react';
+import { ArrowLeft, ChevronRight, RefreshCw, Workflow } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 
 import { SignInRedirect } from '../identity/common';
@@ -27,33 +27,33 @@ import { contextOptions, IdentityError } from '../identity/data';
 import { ShadowReport } from '../shadow/report';
 import { ActivationForm } from './activation';
 import {
-  playbookError,
-  playbookOptions,
-  playbookRunsOptions,
-  playbooksKey,
-  revokePlaybook,
+  revokeWorkflow,
+  workflowError,
+  workflowOptions,
+  workflowRunsOptions,
+  workflowsKey,
 } from './data';
 import {
-  PlaybookActivations,
-  PlaybookCompatibility,
-  PlaybookOverview,
-  PlaybookSteps,
-  PlaybookVersions,
+  WorkflowActivations,
+  WorkflowCompatibility,
+  WorkflowOverview,
+  WorkflowSteps,
+  WorkflowVersions,
 } from './detail-sections';
-import { type PlaybookFilters, PlaybookLoading, statusNames } from './library';
+import { statusNames, type WorkflowFilters, WorkflowLoading } from './library';
 import { OfflineNotice } from './offline';
 
-/** Loads a shareable playbook, resetting private form state when the workspace or playbook changes. */
-export function PlaybookPage() {
+/** Loads a shareable workflow, resetting private form state when the workspace or workflow changes. */
+export function WorkflowPage() {
   const { organizationId, definitionId } = useParams({
-    from: '/app/$organizationId/playbooks/$definitionId',
+    from: '/app/$organizationId/workflows/$definitionId',
   });
   const filters = useSearch({
-    from: '/app/$organizationId/playbooks/$definitionId',
+    from: '/app/$organizationId/workflows/$definitionId',
   });
 
   return (
-    <PlaybookDetailPage
+    <WorkflowDetailPage
       key={`${organizationId}:${definitionId}`}
       organizationId={organizationId}
       definitionId={definitionId}
@@ -62,24 +62,24 @@ export function PlaybookPage() {
   );
 }
 
-/** Reads current playbook controls and history independently and hides private content after access loss. */
-export function PlaybookDetailPage({
+/** Reads current workflow controls and history independently and hides private content after access loss. */
+export function WorkflowDetailPage({
   organizationId,
   definitionId,
   filters = {},
 }: {
   organizationId: string;
   definitionId: string;
-  filters?: PlaybookFilters;
+  filters?: WorkflowFilters;
 }) {
-  const query = useQuery(playbookOptions(organizationId, definitionId));
-  const runs = useQuery(playbookRunsOptions(organizationId, definitionId));
+  const query = useQuery(workflowOptions(organizationId, definitionId));
+  const runs = useQuery(workflowRunsOptions(organizationId, definitionId));
   const client = useQueryClient();
   const refresh = async () => {
-    await client.invalidateQueries({ queryKey: playbooksKey(organizationId) });
+    await client.invalidateQueries({ queryKey: workflowsKey(organizationId) });
   };
   const accessLost = async () => {
-    client.removeQueries({ queryKey: playbooksKey(organizationId) });
+    client.removeQueries({ queryKey: workflowsKey(organizationId) });
     await client.invalidateQueries({
       queryKey: contextOptions(organizationId).queryKey,
     });
@@ -92,30 +92,30 @@ export function PlaybookDetailPage({
     return <SignInRedirect />;
 
   return (
-    <div className="playbooks-page">
+    <div className="workflows-page">
       <OfflineNotice />
       {!query.data || accessError ? (
         <Link
-          className="playbook-back"
-          to="/app/$organizationId/playbooks"
+          className="workflow-back"
+          to="/app/$organizationId/workflows"
           params={{ organizationId }}
           search={filters}
         >
-          <ArrowLeft size={15} aria-hidden="true" /> All playbooks
+          <ArrowLeft size={15} aria-hidden="true" /> All workflows
         </Link>
       ) : null}
       {query.error || accessError ? (
-        <Alert tone="danger" role="alert" className="playbook-notice">
-          {playbookError(query.error ?? accessError)}{' '}
+        <Alert tone="danger" role="alert" className="workflow-notice">
+          {workflowError(query.error ?? accessError)}{' '}
           <Button onClick={() => void refresh()} variant="outline">
             Retry
           </Button>
         </Alert>
       ) : null}
       {accessError ? null : query.isPending ? (
-        <PlaybookLoading detail />
+        <WorkflowLoading detail />
       ) : query.data ? (
-        <PlaybookDetailView
+        <WorkflowDetailView
           key={query.data.canManage ? 'manage' : 'read'}
           detail={query.data}
           organizationId={organizationId}
@@ -124,7 +124,8 @@ export function PlaybookDetailPage({
           refreshing={query.isFetching || !!query.error}
           accessLost={accessLost}
           evaluation={
-            query.data.canManage ? (
+            query.data.canManage &&
+            query.data.versions[0]?.format === 'resolution-playbook/0' ? (
               <ShadowReport
                 key={`${organizationId}:${definitionId}`}
                 organizationId={organizationId}
@@ -135,10 +136,10 @@ export function PlaybookDetailPage({
           runs={
             <Card
               as="section"
-              className="playbook-section"
+              className="workflow-section"
               aria-labelledby="runs-title"
             >
-              <CardHeader className="playbooks-heading">
+              <CardHeader className="workflows-heading">
                 <h2 id="runs-title">Recent runs</h2>
                 <Button
                   variant="outline"
@@ -155,26 +156,30 @@ export function PlaybookDetailPage({
               </p>
               {runs.error ? (
                 <p role="alert">
-                  Run history is unavailable. {playbookError(runs.error)}
+                  Run history is unavailable. {workflowError(runs.error)}
                 </p>
               ) : runs.isPending ? (
                 <p role="status">Loading runs…</p>
               ) : !runs.data?.length ? (
-                <p>No runs recorded for this playbook.</p>
+                <p>No runs recorded for this workflow.</p>
               ) : (
-                <div className="playbook-runs">
+                <div className="workflow-runs">
                   {runs.data.map((run) => (
                     <article key={run.id}>
-                      <div className="playbooks-heading">
-                        <Link
-                          to="/app/$organizationId/exceptions/$exceptionId"
-                          params={{
-                            organizationId,
-                            exceptionId: run.incidentId,
-                          }}
-                        >
-                          Open issue
-                        </Link>
+                      <div className="workflows-heading">
+                        {run.resolution ? (
+                          <Link
+                            to="/app/$organizationId/exceptions/$exceptionId"
+                            params={{
+                              organizationId,
+                              exceptionId: run.resolution.incidentId,
+                            }}
+                          >
+                            Open issue
+                          </Link>
+                        ) : (
+                          <span>{run.subject.kind}</span>
+                        )}
                         <time dateTime={run.createdAt}>
                           <WorkspaceDate value={run.createdAt} />
                         </time>
@@ -204,6 +209,34 @@ export function PlaybookDetailPage({
                         <summary>Run evidence references</summary>
                         <p>Run: {run.id}</p>
                         <p>Activation: {run.activationId}</p>
+                        <p>
+                          Started by: {run.actor.kind} · {run.actor.id}
+                        </p>
+                        <p>
+                          Subject: {run.subject.kind} · {run.subject.id}
+                        </p>
+                        <p>
+                          Trigger:{' '}
+                          {run.trigger.kind === 'exception'
+                            ? run.trigger.issueType.replaceAll('_', ' ')
+                            : run.trigger.kind}
+                        </p>
+                        <p>
+                          Input snapshot: <code>{run.contextDigest}</code>
+                        </p>
+                        {run.steps.length ? (
+                          <ol>
+                            {run.steps.map((step, index) => (
+                              <li key={`${step.stepId}:${index}`}>
+                                {step.stepId} ·{' '}
+                                {step.state.replaceAll('_', ' ')} ·{' '}
+                                {step.reason.replaceAll('_', ' ')}
+                              </li>
+                            ))}
+                          </ol>
+                        ) : (
+                          <p>No step outcome recorded.</p>
+                        )}
                         <code>{run.versionDigest}</code>
                       </Disclosure>
                     </article>
@@ -219,7 +252,7 @@ export function PlaybookDetailPage({
 }
 
 /** Presents readable steps, version history, prerequisites and exact activation grants. */
-export function PlaybookDetailView({
+export function WorkflowDetailView({
   detail,
   organizationId,
   refresh,
@@ -229,8 +262,8 @@ export function PlaybookDetailView({
   evaluation,
   runs,
 }: {
-  detail: PlaybookDetail;
-  filters?: PlaybookFilters;
+  detail: WorkflowDetail;
+  filters?: WorkflowFilters;
   evaluation?: ReactNode;
   runs?: ReactNode;
   organizationId: string;
@@ -240,7 +273,7 @@ export function PlaybookDetailView({
 }) {
   const [selected, setSelected] = useState(detail.versions[0]!.version);
   const [activate, setActivate] = useState(false);
-  const [revoke, setRevoke] = useState<PlaybookActivationView | null>(null);
+  const [revoke, setRevoke] = useState<WorkflowActivationView | null>(null);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -262,7 +295,7 @@ export function PlaybookDetailView({
     setPending(true);
     setError('');
     try {
-      await revokePlaybook(
+      await revokeWorkflow(
         organizationId,
         detail.summary.id,
         revoke.id,
@@ -274,7 +307,7 @@ export function PlaybookDetailView({
       );
       await refresh();
     } catch (error) {
-      setError(playbookError(error));
+      setError(workflowError(error));
       if (error instanceof IdentityError && [401, 403].includes(error.status))
         await accessLost();
     } finally {
@@ -285,13 +318,13 @@ export function PlaybookDetailView({
   return (
     <>
       <WorkspaceBreadcrumb>
-        <BookOpen size={16} aria-hidden="true" />
+        <Workflow size={16} aria-hidden="true" />
         <Link
-          to="/app/$organizationId/playbooks"
+          to="/app/$organizationId/workflows"
           params={{ organizationId }}
           search={filters}
         >
-          Playbooks
+          Workflows
         </Link>
         <ChevronRight size={14} aria-hidden="true" />
         <span aria-current="page" title={detail.summary.name}>
@@ -299,14 +332,14 @@ export function PlaybookDetailView({
         </span>
       </WorkspaceBreadcrumb>
       <h1 className="sr-only">{detail.summary.name}</h1>
-      <div className="playbook-action-bar">
+      <div className="workflow-action-bar">
         <Link
-          className="playbook-back"
-          to="/app/$organizationId/playbooks"
+          className="workflow-back"
+          to="/app/$organizationId/workflows"
           params={{ organizationId }}
           search={filters}
         >
-          <ArrowLeft size={15} aria-hidden="true" /> All playbooks
+          <ArrowLeft size={15} aria-hidden="true" /> All workflows
         </Link>
         <Badge
           tone={
@@ -321,13 +354,13 @@ export function PlaybookDetailView({
         </Badge>
         <Button
           variant="ghost"
-          aria-label="Refresh playbook"
+          aria-label="Refresh workflow"
           disabled={refreshing}
           onClick={() => void refresh()}
         >
           <RefreshCw size={14} aria-hidden="true" /> Refresh
         </Button>
-        <div className="playbook-version-controls">
+        <div className="workflow-version-controls">
           <Select
             aria-label="Version"
             value={version.version}
@@ -344,7 +377,7 @@ export function PlaybookDetailView({
           <Button
             disabled={!canActivate || refreshing}
             aria-describedby={
-              !canActivate ? 'playbook-activation-reason' : undefined
+              !canActivate ? 'workflow-activation-reason' : undefined
             }
             onClick={() => setActivate(true)}
           >
@@ -354,40 +387,40 @@ export function PlaybookDetailView({
       </div>
       {!canActivate ? (
         <Alert
-          id="playbook-activation-reason"
+          id="workflow-activation-reason"
           tone={detail.canManage ? 'warning' : 'neutral'}
-          className="playbook-notice"
+          className="workflow-notice"
         >
           {!detail.canManage
-            ? 'You can inspect playbooks. Only workspace owners and admins can activate or revoke them.'
+            ? 'You can inspect workflows. Only workspace owners and admins can activate or revoke them.'
             : !version.compatible
               ? 'This version cannot be activated. Review the compatibility requirements below.'
               : 'No eligible connections. Resolve the connection requirements below before activating.'}
         </Alert>
       ) : null}
       {message ? (
-        <Alert tone="success" role="status" className="playbook-notice">
+        <Alert tone="success" role="status" className="workflow-notice">
           {message}
         </Alert>
       ) : null}
       <SectionWorkspace
-        label="Playbook sections"
+        label="Workflow sections"
         sections={[
           {
             value: 'overview',
             label: 'Overview',
-            content: <PlaybookOverview detail={detail} version={version} />,
+            content: <WorkflowOverview detail={detail} version={version} />,
           },
           {
             value: 'steps',
             label: 'How it works',
-            content: <PlaybookSteps version={version} />,
+            content: <WorkflowSteps version={version} />,
           },
           {
             value: 'compatibility',
             label: 'Compatibility',
             content: (
-              <PlaybookCompatibility
+              <WorkflowCompatibility
                 detail={detail}
                 version={version}
                 organizationId={organizationId}
@@ -398,7 +431,7 @@ export function PlaybookDetailView({
             value: 'activations',
             label: 'Activations',
             content: (
-              <PlaybookActivations
+              <WorkflowActivations
                 detail={detail}
                 refreshing={refreshing}
                 onRevoke={(activation) => {
@@ -423,12 +456,12 @@ export function PlaybookDetailView({
           {
             value: 'versions',
             label: 'Version history',
-            content: <PlaybookVersions detail={detail} />,
+            content: <WorkflowVersions detail={detail} />,
           },
         ]}
       />
       <Dialog open={activate && detail.canManage} onOpenChange={setActivate}>
-        <DialogContent className="playbook-dialog">
+        <DialogContent className="workflow-dialog">
           <DialogTitle>Review activation</DialogTitle>
           <DialogDescription>
             Confirm the exact version, connection, orders and approval behavior
@@ -451,7 +484,7 @@ export function PlaybookDetailView({
           if (!open && !pending) setRevoke(null);
         }}
       >
-        <DialogContent className="playbook-dialog">
+        <DialogContent className="workflow-dialog">
           <DialogTitle>Revoke activation?</DialogTitle>
           <DialogDescription>
             This stops future runs under this activation. Work already
@@ -461,7 +494,7 @@ export function PlaybookDetailView({
             Version {revoke?.version} · {revoke?.grants.targetIds.length} orders
           </p>
           {error ? <p role="alert">{error}</p> : null}
-          <div className="playbook-dialog-actions">
+          <div className="workflow-dialog-actions">
             <Button
               variant="outline"
               disabled={pending}

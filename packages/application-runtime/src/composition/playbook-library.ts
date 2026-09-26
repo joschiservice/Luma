@@ -3,14 +3,14 @@ import { createAdmissionStore } from '@luma/execution/composition';
 import type { IdentityService } from '@luma/identity';
 import { requireTenant } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
-import type { PlaybookLibrary } from '@luma/resolution';
+import type { PlaybookLibrary } from '@luma/workflows';
 import {
   activationRequestSchema,
   createPlaybookActivations,
   createPlaybookLibrary,
   createPlaybookLibraryStore,
   createPlaybookStore,
-} from '@luma/resolution/composition';
+} from '@luma/workflows/composition';
 
 /** Composes atomic reviewed activations with the existing admission artifact store. */
 export function createPersistentPlaybookLibrary(
