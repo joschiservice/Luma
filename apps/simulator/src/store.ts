@@ -3,6 +3,7 @@ import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
 import type { JournalEntry } from '@luma/simulator-core';
+import { restoreTotalQuantities } from '@luma/simulator-shopify';
 
 import { type Measure, unmeasured } from './performance.js';
 import type { Run } from './run.js';
@@ -71,6 +72,12 @@ export async function openStore(path: string, measure: Measure = unmeasured) {
         persist(run);
       }
       database.exec('DROP TABLE simulator_state');
+    }
+    for (const row of database
+      .prepare('SELECT document FROM simulator_runs')
+      .all()) {
+      const run = JSON.parse(String(row.document)) as Run;
+      if (restoreTotalQuantities(run.shopify)) persist(run);
     }
     database.exec('COMMIT');
   } catch (error) {

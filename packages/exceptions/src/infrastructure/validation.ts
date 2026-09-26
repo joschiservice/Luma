@@ -63,6 +63,7 @@ export const factSchemas = {
       status: z.enum([
         'pending',
         'processing',
+        'completed',
         'shipped',
         'delivered',
         'cancelled',

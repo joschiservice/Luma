@@ -72,6 +72,7 @@ const fulfillment = z
     status: z.enum([
       'pending',
       'processing',
+      'completed',
       'shipped',
       'delivered',
       'cancelled',

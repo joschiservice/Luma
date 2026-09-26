@@ -101,6 +101,7 @@ export const outputs = {
         status: z.enum([
           'pending',
           'processing',
+          'completed',
           'shipped',
           'delivered',
           'cancelled',

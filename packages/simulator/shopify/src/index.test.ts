@@ -38,7 +38,7 @@ it('maintains independent Shopify resources and cursor pages', () => {
     updatedAt: new Date(2000).toISOString(),
   });
   expect(state.nodes['gid://shopify/FulfillmentOrderLineItem/1']).toMatchObject(
-    { remainingQuantity: 0 },
+    { remainingQuantity: 0, totalQuantity: 3 },
   );
   expect(other.roots.orders).toEqual([]);
 });

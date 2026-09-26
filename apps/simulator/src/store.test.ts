@@ -6,7 +6,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { journal } from '@luma/simulator-core';
 import { expect, test } from 'vitest';
 
-import { createRun } from './run.js';
+import { createRun, mutate } from './run.js';
 import { openStore } from './store.js';
 
 test('timed transactions preserve results and roll back failures', async () => {
@@ -216,6 +216,45 @@ test('read methods remain available while another connection holds the write loc
   } finally {
     writer.exec('ROLLBACK');
     writer.close();
+    await store.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('restores total quantities in saved shipped orders without resetting the run', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'luma-store-quantities-'));
+  const path = join(directory, 'runs.sqlite');
+  let store = await openStore(path);
+  try {
+    await store.transact((runs) => {
+      const run = createRun('saved');
+      mutate(run, 'shopify', { kind: 'order', id: '99', quantity: 3 });
+      mutate(run, 'shopify', { kind: 'ship', id: '99' });
+      delete run.shopify.nodes['gid://shopify/FulfillmentOrderLineItem/99']!
+        .totalQuantity;
+      runs.saved = run;
+    });
+    await store.close();
+    store = await openStore(path);
+    expect(
+      store.get('saved')?.shopify.nodes[
+        'gid://shopify/FulfillmentOrderLineItem/99'
+      ],
+    ).toMatchObject({
+      totalQuantity: 3,
+      remainingQuantity: 0,
+    });
+    await store.close();
+    store = await openStore(path);
+    expect(
+      store.get('saved')?.shopify.nodes[
+        'gid://shopify/FulfillmentOrderLineItem/99'
+      ],
+    ).toMatchObject({
+      totalQuantity: 3,
+      remainingQuantity: 0,
+    });
+  } finally {
     await store.close();
     await rm(directory, { recursive: true, force: true });
   }

@@ -218,6 +218,7 @@ type FulfillmentOrderLineItem implements Node {
   id: ID!
   lineItem: LineItem!
   remainingQuantity: Int!
+  totalQuantity: Int!
 }
 
 type LineItem implements Node {

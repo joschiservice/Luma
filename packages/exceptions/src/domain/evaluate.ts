@@ -71,7 +71,7 @@ export function evaluate(
       const stale = freshness(f.observedAt);
       if (stale) return stale;
       if (f.status === 'unknown') return result('defer', 'unknown_status');
-      if (['shipped', 'delivered', 'cancelled'].includes(f.status))
+      if (['completed', 'shipped', 'delivered', 'cancelled'].includes(f.status))
         return result('clear', 'terminal_operation');
       if (f.quantity === null) return result('defer', 'unknown_quantity');
       if (decimalUnits(f.quantity) < 0n)

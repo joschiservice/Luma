@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createCapabilityRuntime } from '../../application/capabilities.js';
 import type { ReadCapability } from '../../domain/capabilities.js';
 import { ConnectorError } from '../../domain/capabilities.js';
+import { commerceSchema } from '../source-validation.js';
 import type { ShopifyConnectorOptions } from './adapter.js';
 import { createShopifyConnector } from './adapter.js';
 import commerce from './fixtures/commerce.json' with { type: 'json' };
@@ -319,11 +320,59 @@ describe('Shopify read capabilities', () => {
       }),
     ).toMatchObject({ ok: true });
   });
+  it.each([
+    ['IN_PROGRESS', 1, 'processing'],
+    ['CLOSED', 0, 'completed'],
+  ])(
+    'retains total quantity for %s work and accepts it for ingestion',
+    async (status, remaining, expected) => {
+      const f = fixture();
+      f.data.work[0]!.status = status;
+      f.data.workLines[0]!.remainingQuantity = Number(remaining);
+      f.data.workLines[0]!.totalQuantity = 3;
+      const result = await f.read('fulfillment.read');
+      expect(result).toMatchObject({
+        ok: true,
+        value: {
+          items: [
+            {
+              data: {
+                status: expected,
+                lines: [{ quantity: { amount: '3' } }],
+              },
+            },
+            {
+              data: {
+                status: 'shipped',
+                lines: [{ quantity: { amount: '1' } }],
+              },
+            },
+          ],
+        },
+      });
+      if (!result.ok) throw new Error('Expected successful fulfillment read');
+      for (const observation of result.value.items) {
+        expect(() =>
+          commerceSchema.parse({
+            capability: 'fulfillment.read',
+            observation: {
+              ...observation,
+              source: {
+                ...observation.source,
+                tenantId: '00000000-0000-4000-8000-000000000001',
+                connectionId: '00000000-0000-4000-8000-000000000002',
+              },
+            },
+          }),
+        ).not.toThrow();
+      }
+    },
+  );
   it('preserves unknown statuses and untracked stock', async () => {
     const f = fixture();
     f.data.inventoryItem.tracked = false;
     f.data.order.displayFinancialStatus = 'constructor';
-    f.data.work[0]!.status = 'CLOSED';
+    f.data.work[0]!.status = 'UNRECOGNIZED';
     f.data.product.status = 'DRAFT';
     expect(await f.read('inventory.read')).toMatchObject({
       ok: true,

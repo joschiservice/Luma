@@ -72,7 +72,7 @@ export const fulfillmentOrder = z.object({
 
 export const fulfillmentOrderLine = z.object({
   id: gid('FulfillmentOrderLineItem'),
-  remainingQuantity: count,
+  totalQuantity: count,
   lineItem: z.object({ id: gid('LineItem') }),
 });
 

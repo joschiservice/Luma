@@ -86,6 +86,7 @@ export interface FulfillmentSnapshot {
   status:
     | 'pending'
     | 'processing'
+    | 'completed'
     | 'shipped'
     | 'delivered'
     | 'cancelled'

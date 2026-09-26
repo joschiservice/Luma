@@ -808,6 +808,7 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
     for (const [externalId, status, quantity] of [
       ['shipment-1', 'shipped', '1'],
       ['shipment-2', 'processing', '2'],
+      ['work-1', 'completed', '3'],
     ] as const) {
       const shipment: CommerceObservation & { capability: 'fulfillment.read' } =
         {
@@ -847,6 +848,13 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
       expect(
         current.data.type === 'fulfillment' && current.data.lines[0]!.quantity,
       ).toBe(quantity);
+      expect(current.data.status).toBe(status);
+      const zero = structuredClone(shipment);
+      zero.observation.id = randomUUID();
+      zero.observation.data.lines[0]!.quantity.amount = '0';
+      await expect(
+        services.ingestion.ingest(context(), externalId + '-zero', zero),
+      ).rejects.toThrow();
       const wrong = structuredClone(shipment);
       wrong.observation.id = randomUUID();
       wrong.observation.data.lines[0]!.quantity.unit = 'box';

@@ -51,6 +51,7 @@ interface FactMap {
     status:
       | 'pending'
       | 'processing'
+      | 'completed'
       | 'shipped'
       | 'delivered'
       | 'cancelled'

@@ -56,6 +56,7 @@ const workStatuses: Record<string, FulfillmentSnapshot['status']> = {
   SCHEDULED: 'pending',
   ON_HOLD: 'pending',
   IN_PROGRESS: 'processing',
+  CLOSED: 'completed',
   CANCELLED: 'cancelled',
   INCOMPLETE: 'failed',
 };
@@ -388,7 +389,7 @@ export function createShopifyConnector(
                 operation.id,
                 'FulfillmentOrder',
                 'lineItems',
-                'id remainingQuantity lineItem { id }',
+                'id totalQuantity lineItem { id }',
                 s.fulfillmentOrderLine,
               );
               emit('fulfillment', ref(operation.id), operation.updatedAt, {
@@ -396,7 +397,7 @@ export function createShopifyConnector(
                 status: statusFrom(workStatuses, operation.status),
                 lines: lines.map((line) => ({
                   orderLine: ref(line.lineItem.id, parent.id),
-                  quantity: quantity(line.remainingQuantity),
+                  quantity: quantity(line.totalQuantity),
                 })),
                 lastProgressAt: operation.updatedAt,
                 failureCode:

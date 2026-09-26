@@ -12,6 +12,29 @@ export interface ShopifyState {
   children: Record<string, Record<string, string[]>>;
 }
 
+/** Restores total quantities in saved simulator graphs created before this field was stored. */
+export function restoreTotalQuantities(state: ShopifyState): boolean {
+  let changed = false;
+  for (const node of Object.values(state.nodes)) {
+    if (
+      !node.id.startsWith('gid://shopify/FulfillmentOrderLineItem/') ||
+      node.totalQuantity !== undefined
+    )
+      continue;
+    // The simulator creates one fulfillment order per order, with the same line quantity.
+    const line = node.lineItem as { id: string };
+    const quantity = state.nodes[line.id]?.quantity;
+    if (typeof quantity !== 'number' || quantity <= 0)
+      throw new Error(
+        'Saved fulfillment order has no valid order line quantity',
+      );
+    node.totalQuantity = quantity;
+    changed = true;
+  }
+
+  return changed;
+}
+
 export type ShopifyCommand =
   | { kind: 'order'; id: string; quantity: number }
   | { kind: 'stock'; quantity: number; id?: string | undefined }
@@ -157,6 +180,7 @@ export function command(
       state.nodes[workLine] = {
         id: workLine,
         remainingQuantity: command.quantity,
+        totalQuantity: command.quantity,
         lineItem: { id: lineId },
       };
       state.children[id] = { lineItems: [lineId], fulfillmentOrders: [workId] };

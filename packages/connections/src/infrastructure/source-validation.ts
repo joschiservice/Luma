@@ -138,6 +138,7 @@ export const commerceSchema = z.discriminatedUnion('capability', [
             status: z.enum([
               'pending',
               'processing',
+              'completed',
               'shipped',
               'delivered',
               'cancelled',

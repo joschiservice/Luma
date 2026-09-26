@@ -58,6 +58,7 @@
     {
       "id": "gid://shopify/FulfillmentOrderLineItem/61",
       "remainingQuantity": 2,
+      "totalQuantity": 2,
       "lineItem": { "id": "gid://shopify/LineItem/11" }
     }
   ],

@@ -410,7 +410,7 @@ test('provider contracts preserve nested pagination beyond one hundred children'
   );
 });
 
-test('Shopify reads retain closed fulfillment work with zero remaining quantity after shipment', async () => {
+test('Shopify reads retain total quantity and completed work separately from shipment', async () => {
   const run = createRun('shopify-shipping', 44, 'manual');
   const connector = createShopifyConnector({
     tenantId,
@@ -448,7 +448,12 @@ test('Shopify reads retain closed fulfillment work with zero remaining quantity 
   const closed = after.find((item) => item.source.externalId === workId);
   assert.ok(closed);
   assert.ok(closed.sourceUpdatedAt > before.sourceUpdatedAt);
-  assert.notEqual(closed.data.status, 'pending');
-  assert.equal(closed.data.lines[0].quantity.amount, '0');
+  assert.equal(closed.data.status, 'completed');
+  assert.equal(closed.data.lines[0].quantity.amount, '2');
+  assert.equal(
+    run.shopify.nodes['gid://shopify/FulfillmentOrderLineItem/1']
+      .remainingQuantity,
+    0,
+  );
   assert.ok(after.some((item) => item.data.status === 'shipped'));
 });

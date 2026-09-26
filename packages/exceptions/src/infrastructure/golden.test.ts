@@ -89,6 +89,22 @@ describe('V0 exception acceptance corpus', () => {
     ).toEqual(testCase.expected);
   });
 
+  it('clears completed fulfillment work without treating it as stalled', () => {
+    expect(
+      evaluate(
+        parseInput('stuck_fulfillment', {
+          ...corpus.bases.stuck_fulfillment,
+          status: 'completed',
+        }),
+        corpus.now,
+        corpus.thresholds,
+      ),
+    ).toMatchObject({
+      decision: 'clear',
+      reason: 'terminal_operation',
+    });
+  });
+
   it('has unique case IDs and every decision outcome for every class', () => {
     expect(new Set(corpus.cases.map(({ id }) => id)).size).toBe(
       corpus.cases.length,
