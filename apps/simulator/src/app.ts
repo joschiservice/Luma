@@ -84,7 +84,31 @@ export async function createApp(
         ),
     );
   }
-  app.get('/api/runs', () => store.transact((runs) => Object.values(runs)));
+  app.get('/api/runs', () => store.list());
+  app.get('/api/runs/:id', (request) => {
+    const { id } = z.object({ id: runId }).parse(request.params);
+    const run = store.get(id);
+    if (!run) throw new Error('Run not found');
+
+    return run;
+  });
+  app.get('/api/runs/:id/journal', (request) => {
+    const { id } = z.object({ id: runId }).parse(request.params);
+    const { limit, before } = z
+      .object({
+        limit: z.coerce.number().int().min(1).max(100).default(100),
+        before: z.coerce
+          .number()
+          .int()
+          .positive()
+          .max(Number.MAX_SAFE_INTEGER)
+          .optional(),
+      })
+      .parse(request.query);
+    if (!store.exists(id)) throw new Error('Run not found');
+
+    return store.journal(id, limit, before);
+  });
   app.post('/api/runs', async (request) => {
     const input = z
       .object({
@@ -94,61 +118,69 @@ export async function createApp(
       })
       .parse(request.body);
 
-    return store.transact((runs) => {
-      if (runs[input.id]) throw new Error('Run already exists');
-      const run = createRun(input.id, input.seed, input.scenario);
-      runs[input.id] = run;
+    return store.transact(
+      (runs) => {
+        if (runs[input.id]) throw new Error('Run already exists');
+        const run = createRun(input.id, input.seed, input.scenario);
+        runs[input.id] = run;
 
-      return run;
-    });
+        return run;
+      },
+      { runIds: [input.id] },
+    );
   });
   app.post('/api/runs/:id/control', async (request) => {
     const { id } = z.object({ id: runId }).parse(request.params);
     const input = controlSchema.parse(request.body);
 
-    return store.transact((runs) => {
-      const run = runs[id];
-      if (!run) throw new Error('Run not found');
-      journal(run.clock, 'control', input);
-      if (input.action === 'pause') run.clock.running = false;
-      if (input.action === 'resume') run.clock.running = true;
-      if (input.action === 'reset')
-        runs[id] = createRun(
-          id,
-          run.seed,
-          run.scenario,
-          Math.max(
-            run.clock.now,
-            ...run.jtl.items.map((item) =>
-              item.modifiedTimestamp ? Date.parse(item.modifiedTimestamp) : 0,
-            ),
-          ) + 1,
-        );
-      if (input.action === 'advance')
-        measure('simulator.advance', () => advanceRun(run, input.milliseconds));
-      if (input.action === 'speed') run.clock.speed = input.speed;
-      if (input.action === 'command')
-        mutate(run, input.instance, input.command);
-      if (input.action === 'service-health')
-        run.serviceHealth[input.instance] = input.status;
-      if (input.action === 'fault') {
-        const { lifetimeMs, ...rule } = input.rule;
-        run.clock.faults.push({
-          ...rule,
-          id: `fault-${++run.clock.sequence}`,
-          matches: 0,
-          status: 'armed',
-          ...(lifetimeMs ? { expiresAt: run.clock.now + lifetimeMs } : {}),
-        });
-      }
-      if (input.action === 'disable') {
-        const fault = run.clock.faults.find((f) => f.id === input.id);
-        if (!fault) throw new Error('Fault not found');
-        fault.status = 'disabled';
-      }
+    return store.transact(
+      (runs) => {
+        const run = runs[id];
+        if (!run) throw new Error('Run not found');
+        journal(run.clock, 'control', input);
+        if (input.action === 'pause') run.clock.running = false;
+        if (input.action === 'resume') run.clock.running = true;
+        if (input.action === 'reset')
+          runs[id] = createRun(
+            id,
+            run.seed,
+            run.scenario,
+            Math.max(
+              run.clock.now,
+              ...run.jtl.items.map((item) =>
+                item.modifiedTimestamp ? Date.parse(item.modifiedTimestamp) : 0,
+              ),
+            ) + 1,
+          );
+        if (input.action === 'advance')
+          measure('simulator.advance', () =>
+            advanceRun(run, input.milliseconds),
+          );
+        if (input.action === 'speed') run.clock.speed = input.speed;
+        if (input.action === 'command')
+          mutate(run, input.instance, input.command);
+        if (input.action === 'service-health')
+          run.serviceHealth[input.instance] = input.status;
+        if (input.action === 'fault') {
+          const { lifetimeMs, ...rule } = input.rule;
+          run.clock.faults.push({
+            ...rule,
+            id: `fault-${++run.clock.sequence}`,
+            matches: 0,
+            status: 'armed',
+            ...(lifetimeMs ? { expiresAt: run.clock.now + lifetimeMs } : {}),
+          });
+        }
+        if (input.action === 'disable') {
+          const fault = run.clock.faults.find((f) => f.id === input.id);
+          if (!fault) throw new Error('Fault not found');
+          fault.status = 'disabled';
+        }
 
-      return runs[id];
-    });
+        return runs[id];
+      },
+      { runIds: [id], resetJournal: input.action === 'reset' },
+    );
   });
   app.post('/api/runs/:id/scenarios', async (request) => {
     const { id } = z.object({ id: runId }).parse(request.params);
@@ -157,24 +189,30 @@ export async function createApp(
       .strict()
       .parse(request.body);
 
-    return store.transact((runs) => {
-      const run = runs[id];
-      if (!run) throw new Error('Run not found');
+    return store.transact(
+      (runs) => {
+        const run = runs[id];
+        if (!run) throw new Error('Run not found');
 
-      return injectInventoryMismatch(run, input.id);
-    });
+        return injectInventoryMismatch(run, input.id);
+      },
+      { runIds: [id] },
+    );
   });
   app.post('/api/runs/:id/scenarios/:scenarioId/recover', async (request) => {
     const { id, scenarioId } = z
       .object({ id: runId, scenarioId: z.string().uuid() })
       .parse(request.params);
 
-    return store.transact((runs) => {
-      const run = runs[id];
-      if (!run) throw new Error('Run not found');
+    return store.transact(
+      (runs) => {
+        const run = runs[id];
+        if (!run) throw new Error('Run not found');
 
-      return recoverInventoryMismatch(run, scenarioId);
-    });
+        return recoverInventoryMismatch(run, scenarioId);
+      },
+      { runIds: [id] },
+    );
   });
   for (const action of ['status', 'check'] as const) {
     app.route({
@@ -182,7 +220,7 @@ export async function createApp(
       url: `/api/runs/:id/operations${action === 'check' ? '/check' : ''}`,
       async handler(request) {
         const { id } = z.object({ id: runId }).parse(request.params);
-        const exists = await store.transact((runs) => !!runs[id]);
+        const exists = store.exists(id);
         if (!exists) throw new Error('Run not found');
 
         return operations ? operations(id, action) : { connected: false };
@@ -193,41 +231,52 @@ export async function createApp(
     const target = z.object({ id: runId, instance }).parse(request.params);
     const input = requestSchema.parse(request.body);
 
-    return store.transact((runs) => {
-      const run = runs[target.id];
-      if (!run) throw new Error('Run not found');
+    return store.transact(
+      (runs) => {
+        const run = runs[target.id];
+        if (!run) throw new Error('Run not found');
 
-      return measure('simulator.dispatch', () =>
-        dispatch(run, target.instance, input),
-      );
-    });
+        return measure('simulator.dispatch', () =>
+          dispatch(run, target.instance, input),
+        );
+      },
+      { runIds: [target.id] },
+    );
   });
   let ticking = false;
   const timer = autonomous
     ? setInterval(() => {
         if (ticking) return;
+        const active = store
+          .list()
+          .filter((run) => run.clock.running)
+          .map((run) => run.id);
+        if (!active.length) return;
         ticking = true;
         void store
-          .transact((runs) => {
-            for (const run of Object.values(runs)) {
-              if (!run.clock.running) continue;
-              const before = structuredClone(run);
-              try {
-                measure('simulator.advance', () =>
-                  advanceRun(run, 250 * run.clock.speed),
-                );
-              } catch (error) {
-                before.clock.running = false;
-                journal(before.clock, 'scenario-error', {
-                  message:
-                    error instanceof Error
-                      ? error.message
-                      : 'Transition failed',
-                });
-                runs[run.id] = before;
+          .transact(
+            (runs) => {
+              for (const run of Object.values(runs)) {
+                if (!run.clock.running) continue;
+                const before = structuredClone(run);
+                try {
+                  measure('simulator.advance', () =>
+                    advanceRun(run, 250 * run.clock.speed),
+                  );
+                } catch (error) {
+                  before.clock.running = false;
+                  journal(before.clock, 'scenario-error', {
+                    message:
+                      error instanceof Error
+                        ? error.message
+                        : 'Transition failed',
+                  });
+                  runs[run.id] = before;
+                }
               }
-            }
-          })
+            },
+            { runIds: active },
+          )
           .catch((error) => app.log.error(error))
           .finally(() => {
             ticking = false;

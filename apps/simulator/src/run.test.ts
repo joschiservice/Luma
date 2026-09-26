@@ -65,12 +65,16 @@ it('persists a committed write and consumed fault across restart, with isolated 
     });
     await app.close();
     app = await createApp(path, token, false);
-    const runs = (
-      await app.inject({
-        url: '/api/runs',
-        headers: { authorization: `Bearer ${token}` },
-      })
-    ).json();
+    const runs = await Promise.all(
+      ['a', 'b'].map(async (id) =>
+        (
+          await app.inject({
+            url: `/api/runs/${id}`,
+            headers: { authorization: `Bearer ${token}` },
+          })
+        ).json(),
+      ),
+    );
     expect(runs[0].jtl.orders[0].shippingMethodId).toBe('8');
     expect(runs[1].jtl.orders[0].shippingMethodId).toBe('7');
     expect(runs[0].clock.faults[0].status).toBe('triggered');
@@ -81,11 +85,11 @@ it('persists a committed write and consumed fault across restart, with isolated 
     await post('/api/runs/a/control', { action: 'advance', milliseconds: 1 });
     const again = (
       await app.inject({
-        url: '/api/runs',
+        url: '/api/runs/a',
         headers: { authorization: `Bearer ${token}` },
       })
     ).json();
-    expect(again[0].jtl.notes).toHaveLength(1);
+    expect(again.jtl.notes).toHaveLength(1);
     expect((await app.inject({ url: '/api/runs' })).statusCode).toBe(401);
   } finally {
     await app.close();
@@ -254,9 +258,14 @@ it.each(['jtl', 'shopify'] as const)(
         remaining: 1,
       });
       expect(
-        run.clock.journal.filter(
-          (event: { kind: string }) => event.kind === 'response',
-        ),
+        (
+          await app.inject({
+            url: '/api/runs/a/journal',
+            headers: { authorization: `Bearer ${token}` },
+          })
+        )
+          .json()
+          .items.filter((event: { kind: string }) => event.kind === 'response'),
       ).toHaveLength(6);
       expect(
         await post(`/api/runs/a/providers/${instance}/request`, request),
@@ -308,19 +317,19 @@ it('loads older saved runs with healthy providers and an isolated scenario stock
   const app = await createApp(path, token, false);
   try {
     const response = await app.inject({
-      url: '/api/runs',
+      url: '/api/runs/legacy',
       headers: { authorization: `Bearer ${token}` },
     });
     expect(response.statusCode).toBe(200);
-    expect(response.json()[0].serviceHealth).toEqual({
+    expect(response.json().serviceHealth).toEqual({
       jtl: 'healthy',
       shopify: 'healthy',
     });
-    expect(response.json()[0].operationalScenarios).toEqual([]);
-    expect(response.json()[0].jtl.items).toContainEqual(
+    expect(response.json().operationalScenarios).toEqual([]);
+    expect(response.json().jtl.items).toContainEqual(
       expect.objectContaining({ id: '2', stockAvailable: '100' }),
     );
-    expect(response.json()[0].shopify.roots.inventoryItems).toContain(
+    expect(response.json().shopify.roots.inventoryItems).toContain(
       'gid://shopify/InventoryItem/2',
     );
   } finally {

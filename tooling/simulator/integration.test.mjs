@@ -267,9 +267,10 @@ test('real installed adapters read remote state, verify a lost write after resta
       binding,
     ).resolve(context, intent);
     assert.equal((await recreated.verify(intent)).outcome, 'passed');
-    const [run] = await call('runs');
+    const run = await call('runs/test');
+    const history = await call('runs/test/journal');
     assert.equal(
-      run.clock.journal.filter((e) => e.kind === 'provider-write').length,
+      history.items.filter((e) => e.kind === 'provider-write').length,
       1,
     );
     assert.equal(run.clock.faults[0].status, 'triggered');

@@ -1,10 +1,12 @@
 const $ = (selector) => document.querySelector(selector);
 let runs = [];
 let selected = '';
+let selectedRun;
+let journalEntries = [];
 let connected = false;
 let pending = 0;
 let queue = Promise.resolve();
-const current = () => runs.find((run) => run.id === selected);
+const current = () => (selectedRun?.id === selected ? selectedRun : undefined);
 const operationStatuses = new Map();
 const injectionRequests = new Map();
 let scenarioBusy = false;
@@ -75,27 +77,24 @@ function render() {
     }),
   );
   $('#journal').replaceChildren(
-    ...run.clock.journal
-      .slice(-100)
-      .reverse()
-      .map((event) => {
-        const row = element('div', '');
-        row.className = 'event';
-        row.append(
-          element('span', `#${event.sequence}`),
-          element('span', new Date(event.time).toISOString().slice(11)),
-          element(
-            'strong',
-            `${event.kind}${event.instance ? ` / ${event.instance}` : ''}`,
-          ),
-          element(
-            'code',
-            `${event.resource ? `[${event.resource}] ` : ''}${JSON.stringify(event.detail)}`,
-          ),
-        );
+    ...journalEntries.map((event) => {
+      const row = element('div', '');
+      row.className = 'event';
+      row.append(
+        element('span', `#${event.sequence}`),
+        element('span', new Date(event.time).toISOString().slice(11)),
+        element(
+          'strong',
+          `${event.kind}${event.instance ? ` / ${event.instance}` : ''}`,
+        ),
+        element(
+          'code',
+          `${event.resource ? `[${event.resource}] ` : ''}${JSON.stringify(event.detail)}`,
+        ),
+      );
 
-        return row;
-      }),
+      return row;
+    }),
   );
 }
 
@@ -103,11 +102,20 @@ async function refresh() {
   runs = await api('runs');
   selected ||= runs[0]?.id ?? '';
   if (selected) {
+    const id = selected;
+    const [detail, history] = await Promise.all([
+      api(`runs/${id}`),
+      api(`runs/${id}/journal?limit=100`),
+    ]);
+    if (selected !== id) return;
+    selectedRun = detail;
+    journalEntries = history.items;
+    render();
     try {
-      operationStatuses.set(selected, await api(`runs/${selected}/operations`));
+      operationStatuses.set(id, await api(`runs/${id}/operations`));
     } catch {
-      operationStatuses.set(selected, {
-        ...operationStatuses.get(selected),
+      operationStatuses.set(id, {
+        ...operationStatuses.get(id),
         unavailable: true,
       });
     }

@@ -44,7 +44,23 @@ export async function setupSimulator(t) {
         path,
         JSON.stringify(
           {
-            runs: await fixture.call('runs'),
+            runs: await Promise.all(
+              (await fixture.call('runs')).map(async ({ id }) => {
+                const run = await fixture.call(`runs/${id}`);
+                const entries = [];
+                let before;
+                do {
+                  const page = await fixture.call(
+                    `runs/${id}/journal${before ? `?before=${before}` : ''}`,
+                  );
+                  entries.push(...page.items);
+                  before = page.nextCursor;
+                } while (before);
+                run.clock.journal = entries.reverse();
+
+                return run;
+              }),
+            ),
             incidents,
             evidence: await Promise.all(
               incidents.map((incident) =>
