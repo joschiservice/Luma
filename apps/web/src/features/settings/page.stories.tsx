@@ -89,8 +89,11 @@ export const Workspace: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(
-      canvas.getByRole('heading', { name: 'Settings' }),
+      canvas.getByRole('navigation', { name: 'Settings sections' }),
     ).toBeVisible();
+    await expect(
+      canvas.queryByRole('heading', { name: 'Settings' }),
+    ).not.toBeInTheDocument();
     await expect(
       canvas.getByRole('button', { name: 'Save changes' }),
     ).toBeDisabled();

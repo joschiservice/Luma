@@ -2620,6 +2620,135 @@
 .ui-picker-positioner {
   z-index: 60;
 }
+.section-navigation {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+}
+.section-navigation-entry {
+  min-width: 0;
+}
+.section-navigation-heading {
+  margin: 0;
+  padding: 10px 10px 5px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 600;
+}
+.section-navigation-entry:not(:first-child) .section-navigation-heading {
+  margin-top: 12px;
+}
+.section-navigation-item {
+  display: flex;
+  width: 100%;
+  min-height: 34px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 9px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+  text-decoration: none;
+}
+.section-navigation-item:hover {
+  background: var(--muted);
+  color: var(--foreground);
+}
+.section-navigation-item[aria-current] {
+  background: var(--accent);
+  color: var(--primary);
+  font-weight: 600;
+}
+.section-navigation-icon {
+  display: inline-flex;
+  flex: none;
+}
+.section-navigation-icon svg {
+  width: 16px;
+  height: 16px;
+}
+.searchable-select {
+  position: relative;
+  width: 100%;
+}
+.searchable-select-input {
+  min-height: 36px;
+  width: 100%;
+  border: 1px solid var(--input);
+  border-radius: 6px;
+  background: var(--card);
+  padding: 7px 34px 7px 12px;
+  color: var(--card-foreground);
+  font: inherit;
+  font-size: 12px;
+  outline: none;
+}
+.searchable-select-input:focus-visible {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ring) 30%, transparent);
+}
+.searchable-select-input:disabled {
+  cursor: not-allowed;
+  background: var(--muted);
+  color: var(--muted-foreground);
+}
+.searchable-select > svg {
+  position: absolute;
+  top: 50%;
+  right: 11px;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--muted-foreground);
+}
+.searchable-select-positioner {
+  z-index: 60;
+}
+.searchable-select-popup {
+  width: var(--anchor-width);
+  max-width: calc(100vw - 24px);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--popover);
+  color: var(--popover-foreground);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 20%);
+  font-size: 12px;
+}
+.searchable-select-list {
+  max-height: min(280px, var(--available-height));
+  overflow-y: auto;
+  padding: 4px;
+}
+.searchable-select-option {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 9px;
+  border-radius: 5px;
+  cursor: default;
+  outline: none;
+}
+.searchable-select-option[data-highlighted] {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+.searchable-select-option [data-selected] {
+  color: var(--primary);
+}
+.searchable-select-empty {
+  color: var(--muted-foreground);
+}
+.searchable-select-empty:not(:empty) {
+  padding: 12px;
+}
 .ui-picker-popup {
   width: 260px;
   max-width: calc(100vw - 24px);

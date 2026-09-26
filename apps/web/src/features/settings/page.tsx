@@ -3,7 +3,8 @@ import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Input } from '@luma/ui/components/primitives/input';
-import { Select } from '@luma/ui/components/primitives/select';
+import { SearchableSelect } from '@luma/ui/components/primitives/searchable-select';
+import { SectionNavigation } from '@luma/ui/components/primitives/section-navigation';
 import { Switch } from '@luma/ui/components/primitives/switch';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from '@tanstack/react-router';
@@ -11,7 +12,6 @@ import {
   Bell,
   Building2,
   Check,
-  Globe2,
   LockKeyhole,
   Mail,
   ShieldCheck,
@@ -30,10 +30,20 @@ import { settingsApi, settingsOptions, settingsResult } from './data';
 import { TeamSettings } from './team';
 
 export const settingsSections = [
-  { id: 'workspace', label: 'Workspace', Icon: Building2 },
-  { id: 'team', label: 'Team', Icon: Users },
-  { id: 'notifications', label: 'Notifications', Icon: Bell },
-  { id: 'approvals', label: 'Approvals', Icon: ShieldCheck },
+  { id: 'workspace', label: 'Workspace', group: 'Workspace', Icon: Building2 },
+  { id: 'team', label: 'Team', group: 'Workspace', Icon: Users },
+  {
+    id: 'approvals',
+    label: 'Approvals',
+    group: 'Workspace',
+    Icon: ShieldCheck,
+  },
+  {
+    id: 'notifications',
+    label: 'Notifications',
+    group: 'Personal',
+    Icon: Bell,
+  },
 ] as const;
 
 export type SettingsSection = (typeof settingsSections)[number]['id'];
@@ -90,36 +100,34 @@ export function SettingsView({
 
   return (
     <div className="settings-page">
-      <header className="settings-heading">
-        <div>
-          <span className="settings-eyebrow">YOUR WORKSPACE</span>
-          <h1>Settings</h1>
-          <p>Manage your workspace, people, and preferences.</p>
-        </div>
-        <Badge>
-          <Globe2 size={13} /> {data?.workspace.dataRegion ?? 'Workspace'}
-        </Badge>
-      </header>
       <div className="settings-layout">
-        <nav className="settings-navigation" aria-label="Settings sections">
-          {settingsSections.map(({ id, label, Icon }) => (
+        <SectionNavigation
+          className="settings-navigation"
+          aria-label="Settings sections"
+          items={settingsSections.map(({ id, label, group, Icon }) => ({
+            value: id,
+            label,
+            group,
+            icon: <Icon size={16} />,
+          }))}
+          value={section}
+          renderItem={(item, className) => (
             <Link
-              key={id}
+              className={className}
               to="/app/$organizationId/settings/$section"
-              params={{ organizationId, section: id }}
-              aria-current={section === id ? 'page' : undefined}
+              params={{
+                organizationId,
+                section: item.value as SettingsSection,
+              }}
+              aria-current={section === item.value ? 'page' : undefined}
             >
-              <Icon size={16} aria-hidden="true" />
-              <span>{label}</span>
-              {id === 'notifications' ? <small>You</small> : null}
+              <span className="section-navigation-icon" aria-hidden="true">
+                {item.icon}
+              </span>
+              {item.label}
             </Link>
-          ))}
-          <p>
-            Changes apply to this workspace.
-            <br />
-            Email preferences are just for you.
-          </p>
-        </nav>
+          )}
+        />
         <div className="settings-content">
           {!online ? (
             <Alert tone="warning" role="status">
@@ -254,7 +262,7 @@ function WorkspaceForm({
           <div className="settings-field">
             <label id="timezone-label">Display timezone</label>
             <p>Dates throughout this workspace use this timezone.</p>
-            <Select
+            <SearchableSelect
               aria-labelledby="timezone-label"
               options={zones}
               value={value.timezone}

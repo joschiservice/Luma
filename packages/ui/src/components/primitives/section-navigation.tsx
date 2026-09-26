@@ -1,12 +1,12 @@
 import type { ReactNode } from 'react';
 
 import { cn } from '../../lib/utils';
-import { Button } from './button';
 
 export type SectionNavigationItem = {
   value: string;
   label: string;
   icon?: ReactNode;
+  group?: string;
 };
 
 /** Lists page sections and highlights the current location. The caller handles scrolling and focus. */
@@ -17,36 +17,53 @@ export function SectionNavigation({
   title = 'On this page',
   'aria-label': ariaLabel = title,
   className,
+  renderItem,
 }: {
   items: readonly SectionNavigationItem[];
   value: string;
-  onValueChange: (value: string) => void;
+  onValueChange?: (value: string) => void;
   title?: string;
   'aria-label'?: string;
   className?: string;
+  renderItem?: (item: SectionNavigationItem, className: string) => ReactNode;
 }) {
   return (
-    <nav aria-label={ariaLabel} className={cn('grid gap-1 py-2', className)}>
-      <p className="m-0 px-3 pb-2.5 text-[11px] font-normal text-muted-foreground">
-        {title}
-      </p>
-      {items.map((item) => (
-        <Button
-          key={item.value}
-          type="button"
-          variant="ghost"
-          aria-current={value === item.value ? 'location' : undefined}
-          className="justify-start font-medium text-muted-foreground aria-[current=location]:bg-accent aria-[current=location]:font-semibold aria-[current=location]:text-primary"
-          onClick={() => onValueChange(item.value)}
-        >
-          {item.icon ? (
-            <span aria-hidden="true" className="shrink-0 [&_svg]:size-4">
-              {item.icon}
-            </span>
-          ) : null}
-          {item.label}
-        </Button>
-      ))}
+    <nav aria-label={ariaLabel} className={cn('section-navigation', className)}>
+      {items.map((item, index) => {
+        const heading =
+          item.group && item.group !== items[index - 1]?.group
+            ? item.group
+            : null;
+        const itemClassName = 'section-navigation-item';
+
+        return (
+          <div className="section-navigation-entry" key={item.value}>
+            {heading ? (
+              <p className="section-navigation-heading">{heading}</p>
+            ) : null}
+            {!item.group && item === items[0] ? (
+              <p className="section-navigation-heading">{title}</p>
+            ) : null}
+            {renderItem ? (
+              renderItem(item, itemClassName)
+            ) : (
+              <button
+                type="button"
+                aria-current={value === item.value ? 'location' : undefined}
+                className={itemClassName}
+                onClick={() => onValueChange?.(item.value)}
+              >
+                {item.icon ? (
+                  <span aria-hidden="true" className="section-navigation-icon">
+                    {item.icon}
+                  </span>
+                ) : null}
+                {item.label}
+              </button>
+            )}
+          </div>
+        );
+      })}
     </nav>
   );
 }

@@ -36,8 +36,24 @@ it('manages workspace preferences and the complete invitation journey on desktop
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(`/app/${f.org.id}/settings/workspace`);
   await page.getByRole('heading', { name: 'Workspace', exact: true }).waitFor();
+  expect(await page.getByText('Personal', { exact: true }).count()).toBe(1);
+  expect(await page.getByRole('heading', { name: 'Settings' }).count()).toBe(0);
+  const nameHeight = await page
+    .getByLabel('Workspace name')
+    .evaluate((input) => input.getBoundingClientRect().height);
+  const timezone = page.getByRole('combobox', { name: 'Display timezone' });
+  const timezoneHeight = await timezone.evaluate(
+    (input) => input.getBoundingClientRect().height,
+  );
+  expect(nameHeight).toBe(timezoneHeight);
   await page.getByLabel('Workspace name').fill('Northstar Japan');
-  await page.getByRole('combobox', { name: 'Display timezone' }).click();
+  await timezone.click();
+  expect(
+    await page
+      .locator('.searchable-select-empty')
+      .evaluate((element) => element.getBoundingClientRect().height),
+  ).toBe(0);
+  await timezone.fill('Tokyo');
   await page.getByRole('option', { name: 'Asia/Tokyo', exact: true }).click();
   // Lose a committed response; the original command must reconcile without a second write.
   await page.route(

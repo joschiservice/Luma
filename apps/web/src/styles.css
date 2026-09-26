@@ -800,6 +800,7 @@ summary {
   background: linear-gradient(160deg, #1e1c48 0%, #090f1d 42%, #0e2731 100%);
   color: #e5eaf5;
   gap: 24px;
+  padding-bottom: 16px;
 }
 .desk-sidebar::before {
   content: '';
@@ -2609,10 +2610,6 @@ summary {
 .issue-content .issue-record-details[open] {
   padding: 0;
 }
-.issue-page-sections [aria-current='location'] {
-  box-shadow: inset 2px 0 0 var(--primary);
-}
-
 @media (max-width: 760px) {
   .issue-page-mobile-nav {
     box-shadow: 0 6px 10px -8px var(--overlay);
@@ -2883,28 +2880,9 @@ summary {
   max-width: 1120px;
   width: 100%;
   margin: 0 auto;
-  padding: 36px 40px 64px;
+  padding: 24px 32px 48px;
   font-family: var(--font-sans);
 }
-.settings-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 36px;
-}
-.settings-eyebrow {
-  font-size: 10px;
-  color: var(--muted-foreground);
-  letter-spacing: 0.12em;
-  font-weight: 600;
-}
-.settings-heading h1 {
-  margin: 10px 0;
-  font-size: 30px;
-  letter-spacing: -0.035em;
-  font-weight: 600;
-}
-.settings-heading p,
 .settings-section-heading p {
   margin: 0;
   color: var(--muted-foreground);
@@ -2913,46 +2891,13 @@ summary {
 }
 .settings-layout {
   display: grid;
-  grid-template-columns: 190px minmax(0, 1fr);
-  gap: 48px;
+  grid-template-columns: 170px minmax(0, 1fr);
+  gap: 24px;
   align-items: start;
 }
 .settings-navigation {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
   position: sticky;
-  top: 24px;
-}
-.settings-navigation a {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 6px;
-  text-decoration: none;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--muted-foreground);
-}
-.settings-navigation a:hover {
-  background: var(--muted);
-  color: var(--foreground);
-}
-.settings-navigation a[aria-current='page'] {
-  background: var(--accent);
-  color: var(--primary);
-}
-.settings-navigation small {
-  margin-left: auto;
-  font-size: 10px;
-  font-weight: 400;
-}
-.settings-navigation p {
-  padding: 14px 12px;
-  color: var(--muted-foreground);
-  font-size: 11px;
-  line-height: 1.8;
+  top: 16px;
 }
 .settings-content {
   min-width: 0;
@@ -2966,7 +2911,7 @@ summary {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin: 0 0 24px;
+  margin: 0 0 16px;
 }
 .settings-section-heading h2 {
   display: flex;
@@ -2984,7 +2929,7 @@ summary {
   overflow: hidden;
 }
 .settings-field {
-  padding: 24px;
+  padding: 16px 20px;
 }
 .settings-field + .settings-field {
   border-top: 1px solid var(--border);
@@ -2998,7 +2943,7 @@ summary {
 .settings-field p {
   color: var(--muted-foreground);
   font-size: 12px;
-  margin: 0 0 14px;
+  margin: 0 0 10px;
   line-height: 1.6;
 }
 .settings-field small {
@@ -3008,14 +2953,15 @@ summary {
   margin-top: 9px;
 }
 .settings-field input,
-.settings-field [data-slot='select-trigger'] {
+.settings-field [data-slot='select-trigger'],
+.settings-field .searchable-select {
   max-width: 390px;
 }
 .settings-readonly {
   display: flex;
   align-items: center;
   gap: 32px;
-  padding: 20px 24px;
+  padding: 16px 20px;
   background: var(--muted);
   border-top: 1px solid var(--border);
 }
@@ -3061,7 +3007,7 @@ summary {
   align-items: center;
   justify-content: space-between;
   gap: 28px;
-  padding: 24px;
+  padding: 16px 20px;
   cursor: pointer;
 }
 .settings-preference + .settings-preference {
@@ -3170,8 +3116,10 @@ summary {
 }
 .settings-search > svg {
   position: absolute;
-  top: 11px;
+  top: 50%;
   left: 12px;
+  transform: translateY(-50%);
+  pointer-events: none;
   color: var(--muted-foreground);
 }
 .settings-search input {
@@ -3354,24 +3302,8 @@ summary {
     grid-template-columns: 1fr;
     gap: 26px;
   }
-  .settings-heading {
-    margin-bottom: 22px;
-  }
   .settings-navigation {
-    flex-direction: row;
     position: static;
-    gap: 2px;
-    overflow-x: auto;
-    padding-bottom: 6px;
-    border-bottom: 1px solid var(--border);
-  }
-  .settings-navigation a {
-    white-space: nowrap;
-    padding: 10px;
-  }
-  .settings-navigation small,
-  .settings-navigation p {
-    display: none;
   }
   .settings-section-heading {
     flex-wrap: wrap;
@@ -3415,16 +3347,6 @@ summary {
   to {
     opacity: 1;
     transform: none;
-  }
-}
-
-@media (max-width: 500px) {
-  .settings-navigation {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .settings-navigation a {
-    white-space: normal;
   }
 }
 
