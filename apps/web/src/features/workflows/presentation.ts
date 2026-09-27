@@ -10,3 +10,21 @@ export function workflowSystemLabel(system: string): string {
     )[system] ?? system
   );
 }
+
+/** Gives each supported trigger an unambiguous human-readable description. */
+export function workflowTriggerLabel(
+  trigger: import('@luma/api-contract').WorkflowTrigger,
+): string {
+  switch (trigger.kind) {
+    case 'manual':
+      return 'Manual request';
+    case 'exception':
+      return `${trigger.issueType.replaceAll('_', ' ')} detected`;
+    case 'event':
+      return trigger.eventType;
+    case 'schedule':
+      return 'Scheduled start';
+    case 'condition':
+      return `${trigger.field} is ${String(trigger.equals)}`;
+  }
+}

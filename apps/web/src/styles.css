@@ -3495,3 +3495,19 @@ summary {
     gap: 14px;
   }
 }
+
+.workflow-trigger-form fieldset > label {
+  display: block;
+  margin-bottom: 16px;
+}
+.workflow-trigger-form fieldset > label:last-child {
+  margin-bottom: 0;
+}
+.workflow-trigger-form label > span {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.workflow-trigger-form label > [data-slot] {
+  margin-top: 6px;
+}

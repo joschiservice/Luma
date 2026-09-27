@@ -42,6 +42,8 @@ import {
 } from './detail-sections';
 import { statusNames, type WorkflowFilters, WorkflowLoading } from './library';
 import { OfflineNotice } from './offline';
+import { workflowTriggerLabel } from './presentation';
+import { CancelScheduledStart, WorkflowTriggers } from './triggers';
 
 /** Loads a shareable workflow, resetting private form state when the workspace or workflow changes. */
 export function WorkflowPage() {
@@ -196,12 +198,28 @@ export function WorkflowDetailPage({
                       </p>
                       <p className="workflow-run-trigger">
                         <strong>Triggered by: </strong>
-                        {run.trigger.kind === 'exception'
-                          ? `${run.trigger.issueType.replaceAll('_', ' ')} detected`
-                          : run.trigger.kind === 'event'
-                            ? run.trigger.eventType
-                            : 'Manual request'}
+                        {workflowTriggerLabel(run.trigger)}
                       </p>
+                      {run.triggerState ? (
+                        <Alert
+                          tone={
+                            run.triggerState === 'scheduled'
+                              ? 'neutral'
+                              : 'warning'
+                          }
+                        >
+                          {run.reason}
+                        </Alert>
+                      ) : null}
+                      {run.triggerState === 'scheduled' &&
+                      query.data.canManage ? (
+                        <CancelScheduledStart
+                          organizationId={organizationId}
+                          definitionId={definitionId}
+                          runId={run.id}
+                          refresh={refresh}
+                        />
+                      ) : null}
                       <dl className="workflow-run-story">
                         <div>
                           <dt>Investigation</dt>
@@ -232,7 +250,15 @@ export function WorkflowDetailPage({
                       <Disclosure>
                         <summary>Run evidence references</summary>
                         <p>Run: {run.id}</p>
-                        <p>Activation: {run.activationId}</p>
+                        <p>Activation: {run.activationId ?? 'Not granted'}</p>
+                        {run.triggerEvidence ? (
+                          <p>
+                            Source: {run.triggerEvidence.sourceId} ·{' '}
+                            <WorkspaceDate
+                              value={run.triggerEvidence.occurredAt}
+                            />
+                          </p>
+                        ) : null}
                         <p>
                           Started by: {run.actor.kind} · {run.actor.id}
                         </p>
@@ -434,6 +460,20 @@ export function WorkflowDetailView({
             value: 'overview',
             label: 'Overview',
             content: <WorkflowOverview detail={detail} version={version} />,
+          },
+          {
+            value: 'triggers',
+            label: 'Triggers',
+            content: (
+              <WorkflowTriggers
+                key={version.digest}
+                detail={detail}
+                version={version}
+                organizationId={organizationId}
+                refresh={refresh}
+                accessLost={accessLost}
+              />
+            ),
           },
           {
             value: 'steps',

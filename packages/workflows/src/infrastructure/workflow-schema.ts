@@ -22,6 +22,21 @@ const source = z
           z.object({ kind: z.literal('exception'), issueType: text }).strict(),
           z.object({ kind: z.literal('manual') }).strict(),
           z.object({ kind: z.literal('event'), eventType: text }).strict(),
+          z
+            .object({ kind: z.literal('schedule'), at: z.string().datetime() })
+            .strict(),
+          z
+            .object({
+              kind: z.literal('condition'),
+              field: text,
+              equals: z.union([
+                z.string(),
+                z.number().finite(),
+                z.boolean(),
+                z.null(),
+              ]),
+            })
+            .strict(),
         ]),
         subjectKind: text,
       })
@@ -101,6 +116,13 @@ export function compileWorkflow(input: unknown): WorkflowVersion {
       checked.ir.evidence.kind !== data.applicability.trigger.issueType)
   )
     throw new Error('Workflow contracts do not match its steps');
+  const trigger = data.applicability.trigger;
+  if (
+    trigger.kind === 'condition' &&
+    checked.ir.evidence.fields[trigger.field] !==
+      (trigger.equals === null ? 'null' : typeof trigger.equals)
+  )
+    throw new Error('Condition must match a declared context field');
   const contract: WorkflowSource = {
     ...data,
     inputs: checked.ir.inputs,

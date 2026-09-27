@@ -1,3 +1,5 @@
+import { setTimeout as delay } from 'node:timers/promises';
+
 import type { WorkflowConfig } from '@luma/config';
 import type { Diagnosis } from '@luma/exceptions';
 import type { IdentityService, TenantContext } from '@luma/identity';
@@ -223,9 +225,38 @@ export async function createDefaultExceptionWorker(
     const worker = await runtime.createWorker();
     resources.add(worker.close);
 
+    const stopSchedules = new AbortController();
+
+    async function advanceSchedules() {
+      while (!stopSchedules.signal.aborted) {
+        try {
+          await pool.query('SELECT advance_workflow_schedules()');
+        } catch (error) {
+          console.error(
+            'Scheduled workflow starts could not be advanced; retrying.',
+            error,
+          );
+        }
+        await delay(1000, undefined, { signal: stopSchedules.signal }).catch(
+          () => undefined,
+        );
+      }
+    }
+
     return {
-      run: worker.run,
-      shutdown: worker.shutdown,
+      run: async () => {
+        const schedules = advanceSchedules();
+        try {
+          await worker.run();
+        } finally {
+          stopSchedules.abort();
+          await schedules;
+        }
+      },
+      shutdown: () => {
+        stopSchedules.abort();
+        worker.shutdown();
+      },
       close: resources.close,
     };
   } catch (error) {

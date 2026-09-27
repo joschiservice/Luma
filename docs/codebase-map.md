@@ -77,3 +77,10 @@ Tests: Workflow compiler tests, `apps/api/e2e/workflows.e2e.mjs`,
 `playbooks.e2e.mjs` (both API paths), `playbooks.browser.mjs`, and existing execution
 integration tests. See [Workflow model](workflows.md) and
 [ADR-007](architecture/007-workflow-model.md).
+
+General workflow starts enter through `packages/workflows/src/application/triggers.ts`.
+Versioned signal checks live in `domain/trigger.ts`; tenant-isolated persistence
+lives in `infrastructure/triggers.ts`. Migration `0025_workflow_triggers.sql`
+owns durable scheduled starts, advanced by the workflow worker. The frontend
+controls are in `apps/web/src/features/workflows/triggers.tsx`. Validate with
+workflow unit tests and `apps/api/e2e/workflows.e2e.mjs`.

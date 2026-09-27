@@ -44,6 +44,26 @@ export function workflowRoutes(service?: WorkflowCatalog) {
         body: { items: await s.service.runs(s.context, params.definitionId) },
       };
     },
+    fire: async ({ request, params, body }) => {
+      const s = use(request);
+
+      return {
+        status: 200,
+        body: await s.service.fire(s.context, params.definitionId, body),
+      };
+    },
+    cancelStart: async ({ request, params }) => {
+      const s = use(request);
+
+      return {
+        status: 200,
+        body: await s.service.cancelStart(
+          s.context,
+          params.definitionId,
+          params.runId,
+        ),
+      };
+    },
     activate: async ({ request, params, body }) => {
       const s = use(request);
 

@@ -151,4 +151,185 @@ it('publishes native workflows without cases, retains immutable versions and exp
       },
     },
   );
+  const now = new Date().toISOString();
+  const start = {
+    version: native.version,
+    reviewedDigest: native.digest,
+    subject: { kind: 'order', id: legacy.targetId },
+    signal: { kind: 'manual', sourceId: 'manual-1', occurredAt: now },
+    context: {
+      inputs: { shippingMethodId: 'standard' },
+      evidence: {
+        kind: 'workflow_failure',
+        facts: { diagnosisReady: true, methodMapped: true },
+        observations: [{ id: randomUUID(), observedAt: now, source: 'test' }],
+      },
+      provenance: { reference: 'manual-1', capturedAt: now },
+    },
+  };
+  const starts = `${root}/workflows/${native.definition.id}/starts`;
+  const fire = (body, status = 200, cookie = user.cookie) =>
+    api.request(starts, { cookie, method: 'POST', status, body });
+  const [first, retry] = await Promise.all([fire(start), fire(start)]);
+  expect(first.body.id).toBe(retry.body.id);
+  expect(first.body).toMatchObject({
+    activationId: null,
+    triggerState: 'awaiting_admission',
+    versionDigest: native.digest,
+    subject: start.subject,
+    triggerEvidence: { sourceId: 'manual-1', occurredAt: now },
+    execution: 'not_recorded',
+  });
+  await fire(
+    {
+      ...start,
+      context: { ...start.context, inputs: { shippingMethodId: 'express' } },
+    },
+    409,
+  );
+  await fire(
+    {
+      ...start,
+      signal: { ...start.signal, sourceId: 'bad-type' },
+      context: { ...start.context, inputs: { shippingMethodId: 42 } },
+    },
+    409,
+  );
+  await fire(start, 404, outsider.cookie);
+  await fire({ ...start, actor: { kind: 'user', id: outsider.userId } }, 400);
+  const before = await db.owner.query(
+    'SELECT count(*) FROM playbook_activations WHERE tenant_id=$1',
+    [tenantId],
+  );
+  for (const [versionNumber, trigger] of [
+    ['0.2.0', { kind: 'event', eventType: 'workflow_failure' }],
+    ['0.3.0', { kind: 'condition', field: 'diagnosisReady', equals: true }],
+    [
+      '0.4.0',
+      { kind: 'schedule', at: new Date(Date.now() + 2000).toISOString() },
+    ],
+  ]) {
+    const version = await catalog.publish(context, {
+      ...source,
+      definition: native.definition,
+      version: versionNumber,
+      applicability: { subjectKind: 'order', trigger },
+    });
+    const body = {
+      ...start,
+      version: version.version,
+      reviewedDigest: version.digest,
+      signal: {
+        ...start.signal,
+        kind: trigger.kind,
+        sourceId: `source-${versionNumber}`,
+      },
+    };
+    if (trigger.kind === 'condition')
+      await fire(
+        {
+          ...body,
+          context: {
+            ...body.context,
+            evidence: {
+              ...body.context.evidence,
+              facts: { diagnosisReady: false, methodMapped: true },
+            },
+          },
+        },
+        409,
+      );
+    if (trigger.kind === 'event') {
+      await fire(
+        {
+          ...body,
+          signal: {
+            ...body.signal,
+            sourceId: 'old-event',
+            occurredAt: '2020-01-01T00:00:00Z',
+          },
+        },
+        409,
+      );
+    }
+    const result = await fire(body);
+    expect((await fire(body)).body.id).toBe(result.body.id);
+    if (trigger.kind === 'schedule') {
+      expect(result.body.triggerState).toBe('scheduled');
+      await pool.query('SELECT advance_workflow_schedules()');
+      expect((await fire(body)).body.triggerState).toBe('scheduled');
+      // A different resource is a separate scheduled start; cancellation is durable and idempotent.
+      const cancelled = await fire({
+        ...body,
+        subject: { ...body.subject, id: randomUUID() },
+      });
+      const cancel = `${starts}/${cancelled.body.id}/cancel`;
+      await api.request(cancel, {
+        cookie: user.cookie,
+        method: 'POST',
+        body: {},
+      });
+      await api.request(cancel, {
+        cookie: user.cookie,
+        method: 'POST',
+        body: {},
+      });
+      await new Promise((resolve) => setTimeout(resolve, 2100));
+      const restartingWorker = await pool.connect();
+      try {
+        await restartingWorker.query('BEGIN');
+        await restartingWorker.query('SELECT advance_workflow_schedules()');
+        await restartingWorker.query('ROLLBACK');
+      } finally {
+        restartingWorker.release();
+      }
+      expect((await fire(body)).body.triggerState).toBe('scheduled');
+      await Promise.all([
+        pool.query('SELECT advance_workflow_schedules()'),
+        pool.query('SELECT advance_workflow_schedules()'),
+      ]);
+      expect((await fire(body)).body.triggerState).toBe('awaiting_admission');
+      await api.request(`${starts}/${result.body.id}/cancel`, {
+        cookie: user.cookie,
+        method: 'POST',
+        body: {},
+        status: 409,
+      });
+      const history = (
+        await api.request(`${root}/workflows/${native.definition.id}/runs`, {
+          cookie: user.cookie,
+        })
+      ).body.items;
+      expect(history.find((r) => r.id === cancelled.body.id).triggerState).toBe(
+        'cancelled',
+      );
+      expect(
+        history.find((r) => r.id === result.body.id).triggeredAt,
+      ).toBeTruthy();
+    }
+  }
+  expect(
+    (
+      await db.owner.query(
+        'SELECT count(*) FROM playbook_activations WHERE tenant_id=$1',
+        [tenantId],
+      )
+    ).rows,
+  ).toEqual(before.rows);
+  const isolated = await tenantDb.transaction(randomUUID(), (tx) =>
+    tx.query('SELECT id FROM workflow_trigger_runs'),
+  );
+  expect(isolated.rows).toEqual([]);
+
+  await db.owner.query(
+    "UPDATE memberships SET role='member' WHERE tenant_id=$1 AND user_id=$2",
+    [tenantId, user.userId],
+  );
+  await fire(
+    { ...start, signal: { ...start.signal, sourceId: 'member-start' } },
+    403,
+  );
+  await api.request(`${root}/workflows/${native.definition.id}/runs`, {
+    cookie: user.cookie,
+  });
 });

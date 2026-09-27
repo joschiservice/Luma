@@ -108,4 +108,37 @@ describe('Workflow authoring and compatibility', () => {
       compileWorkflow({ ...input, agent: { id: 'untrusted' } }),
     ).toThrow();
   });
+  it('versions schedule times and checks condition field types', () => {
+    const input = source();
+    const schedule = defineWorkflow({
+      ...input,
+      applicability: {
+        subjectKind: 'order',
+        trigger: { kind: 'schedule', at: '2026-10-01T00:00:00Z' },
+      },
+    });
+    expect(compileWorkflow(schedule)).toEqual(schedule);
+    expect(
+      defineWorkflow({
+        ...input,
+        applicability: {
+          subjectKind: 'order',
+          trigger: { kind: 'schedule', at: '2026-10-02T00:00:00Z' },
+        },
+      }).digest,
+    ).not.toBe(schedule.digest);
+    expect(() =>
+      defineWorkflow({
+        ...input,
+        applicability: {
+          subjectKind: 'order',
+          trigger: {
+            kind: 'condition',
+            field: 'diagnosisReady',
+            equals: 'yes',
+          },
+        },
+      }),
+    ).toThrow('declared context field');
+  });
 });

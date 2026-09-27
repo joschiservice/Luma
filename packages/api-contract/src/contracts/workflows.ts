@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { apiErrorSchema, organizationParamsSchema } from '../common.js';
 import {
   activateWorkflowSchema,
+  fireWorkflowSchema,
   workflowActivationSchema,
   workflowDetailSchema,
   workflowRunViewSchema,
@@ -44,6 +45,24 @@ export const workflowsContract = c.router(
       summary: 'Read recent workflow runs',
       description:
         'Returns the 50 most recent runs with subject, actor, trigger and step references. Resolution runs include an issue link. Execution and verification results are separate. Pilot and unclassified evidence do not establish live success.',
+    },
+    fire: {
+      method: 'POST',
+      path: `${path}/:definitionId/starts`,
+      pathParams: params,
+      body: fireWorkflowSchema,
+      responses: { 200: workflowRunViewSchema },
+      summary: 'Start or schedule a workflow run',
+      description:
+        'Owners and admins submit typed signal evidence for an exact version and resource. Reuse the source ID and complete body on retry. Starts do not grant execution authority. Schedules start once at the time specified by the version.',
+    },
+    cancelStart: {
+      method: 'POST',
+      path: `${path}/:definitionId/starts/:runId/cancel`,
+      pathParams: params.extend({ runId: z.string().uuid() }),
+      body: z.object({}).strict(),
+      responses: { 200: workflowRunViewSchema },
+      summary: 'Cancel a pending scheduled start',
     },
     activate: {
       method: 'POST',

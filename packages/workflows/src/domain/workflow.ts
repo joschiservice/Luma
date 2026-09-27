@@ -16,7 +16,9 @@ export type WorkflowActor =
 export type WorkflowTrigger =
   | { kind: 'exception'; issueType: string }
   | { kind: 'manual' }
-  | { kind: 'event'; eventType: string };
+  | { kind: 'event'; eventType: string }
+  | { kind: 'schedule'; at: string }
+  | { kind: 'condition'; field: string; equals: PlaybookScalar };
 
 export interface WorkflowDefinition {
   id: string;
@@ -71,8 +73,8 @@ export interface WorkflowRun {
   definitionId: string;
   version: string;
   versionDigest: string;
-  activationId: string;
-  artifactDigest: string;
+  activationId: string | null;
+  artifactDigest: string | null;
   trigger: WorkflowTrigger;
   subject: { kind: string; id: string };
   actor: WorkflowActor;
@@ -126,4 +128,26 @@ export function resolutionWorkflow(version: PlaybookVersion): WorkflowVersion {
     },
     provenance: version.provenance,
   };
+}
+
+/** A trigger creates a run without granting permission to dispatch an action. */
+export interface WorkflowTriggerRun extends WorkflowRun {
+  evidence: { sourceId: string; occurredAt: string };
+  requestDigest: string;
+  createdAt: string;
+  state: 'scheduled' | 'awaiting_admission' | 'cancelled';
+  triggeredAt: string | null;
+}
+
+/** Supplies a version-bound signal and explicit resource; the caller identity comes from authentication. */
+export interface WorkflowTriggerRequest {
+  version: string;
+  reviewedDigest: string;
+  subject: { kind: string; id: string };
+  signal: {
+    kind: WorkflowTrigger['kind'];
+    sourceId: string;
+    occurredAt: string;
+  };
+  context: PlaybookSnapshot;
 }

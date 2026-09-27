@@ -147,3 +147,33 @@ export const resolutionWorkflowsOptions = (organizationId: string) =>
       );
     },
   });
+
+/** Starts a run; callers retain the exact body until a response is confirmed. */
+export async function fireWorkflow(
+  organizationId: string,
+  definitionId: string,
+  body: import('@luma/api-contract').FireWorkflow,
+) {
+  const result = await api.workflows.fire({
+    params: { organizationId, definitionId },
+    body,
+  });
+  if (result.status !== 200) return failure(result);
+
+  return workflowRunViewSchema.parse(result.body);
+}
+
+/** Cancels a scheduled start without changing its historical evidence. */
+export async function cancelWorkflowStart(
+  organizationId: string,
+  definitionId: string,
+  runId: string,
+) {
+  const result = await api.workflows.cancelStart({
+    params: { organizationId, definitionId, runId },
+    body: {},
+  });
+  if (result.status !== 200) return failure(result);
+
+  return workflowRunViewSchema.parse(result.body);
+}

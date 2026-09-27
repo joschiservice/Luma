@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import type { TenantContext } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
 
@@ -5,6 +7,7 @@ import { createWorkflowCatalog } from './application/catalog.js';
 import type { PlaybookDependencies } from './application/playbook.js';
 import { createPlaybookService } from './application/playbook.js';
 import type { PlaybookLibrary } from './application/playbook-library.js';
+import { createWorkflowTriggers } from './application/triggers.js';
 import { createWorkflowCatalogStore } from './infrastructure/catalog.js';
 import {
   activationRequestSchema,
@@ -13,6 +16,7 @@ import {
   playbookHash,
 } from './infrastructure/playbooks/schema.js';
 import { createPlaybookStore } from './infrastructure/playbooks/store.js';
+import { createWorkflowTriggerStore } from './infrastructure/triggers.js';
 import { compileWorkflow } from './infrastructure/workflow-schema.js';
 
 /**
@@ -71,6 +75,35 @@ export function createWorkflows(
   refreshContext: (context: TenantContext) => Promise<TenantContext>,
 ) {
   return createWorkflowCatalog({
+    triggers: createWorkflowTriggers({
+      store: createWorkflowTriggerStore(db),
+      refreshContext,
+      hash: playbookHash,
+      id: randomUUID,
+      now: () => new Date(),
+      parseSnapshot: (input, version) => {
+        const [eligibility, action, approval, verification, recovery] =
+          version.steps;
+
+        return parsePlaybookSnapshot(input, {
+          definition: version.definition,
+          version: version.version,
+          digest: version.digest,
+          compatibility: { interpreter: 'resolution-playbook/0', admission: 1 },
+          provenance: version.provenance,
+          ir: {
+            schemaVersion: 1,
+            inputs: version.inputs,
+            evidence: version.context,
+            eligibility,
+            action,
+            approval,
+            verification,
+            recovery,
+          },
+        });
+      },
+    }),
     store: createWorkflowCatalogStore(db),
     legacy,
     compile: compileWorkflow,

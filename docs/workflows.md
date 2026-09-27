@@ -114,3 +114,45 @@ in the rendered primary view. Screenshots are written to `/tmp/luma72-browser`.
 The suite seeds recorded runs in an isolated database and reads them through the
 real API. LUMA-37's broader simulator and execution acceptance remains a separate
 gate.
+
+## General triggers
+
+Each immutable version declares one trigger: `manual`, `schedule`, `event`,
+`condition`, or `exception`. A schedule specifies one UTC `at` timestamp. A
+condition matches one declared context field to a typed scalar; producers can
+supply a normalized `belowThreshold` fact for replenishment. Events use their
+context kind as the event type. These contracts introduce no event bus or
+expression language.
+
+Owners and admins submit signals to
+`POST /v1/organizations/:organizationId/workflows/:definitionId/starts`.
+The request includes the reviewed version digest, explicit subject kind and ID,
+source ID and occurrence time, and a typed input/evidence snapshot. The server
+binds tenant and actor from the refreshed authenticated context. A resource ID
+is an explicit scope reference, not evidence of ownership or execution access.
+Execution admission must independently resolve and authorize that resource.
+
+Deduplication covers tenant, exact version, subject, trigger kind and source ID.
+Schedules use their versioned timestamp instead of a caller-selected source ID.
+Retry the complete original request. Changed evidence for the same source returns 409. Event, condition and detection evidence must be fresh and match the
+version's context. Resolution's existing detection path and run projections
+remain supported.
+
+A start produces a `WorkflowRun` with immutable context and trigger evidence.
+It grants no activation, permission artifact or action approval. General runs
+wait at `awaiting_admission`; the native execution adapter remains a separate
+runtime concern. Run history distinguishes scheduled, cancelled and started runs
+from action execution and verification.
+
+Scheduled starts persist in PostgreSQL. The workflow worker advances due starts
+in atomic, locked batches; competing workers skip locked rows. A crash before
+commit leaves the start pending, and downtime does not drop overdue starts.
+The narrowly scoped `advance_workflow_schedules()` function returns only a count,
+never cross-tenant payloads, and cannot dispatch actions. The worker retries
+failures. Cancellation races with firing on the same row lock and succeeds only
+while pending. Run `pnpm dev:workflows` to process local schedules.
+
+The Triggers section displays the exact contract and offers typed submission,
+retry and resource controls. Recent runs shows evidence references and scheduled
+start cancellation. Schedule times display in the workspace timezone; observation
+entry explicitly uses the browser's local timezone.

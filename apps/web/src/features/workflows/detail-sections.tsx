@@ -12,7 +12,7 @@ import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { Link } from '@tanstack/react-router';
 import { ArrowRight, ShieldCheck, Zap } from 'lucide-react';
 
-import { workflowSystemLabel } from './presentation';
+import { workflowSystemLabel, workflowTriggerLabel } from './presentation';
 
 /** Summarizes the selected version, approval requirements, and currently active versions. */
 export function WorkflowOverview({
@@ -23,12 +23,7 @@ export function WorkflowOverview({
   version: WorkflowVersionView;
 }) {
   const trigger = version.applicability.trigger;
-  const triggerLabel =
-    trigger.kind === 'exception'
-      ? `${trigger.issueType.replaceAll('_', ' ')} detected`
-      : trigger.kind === 'event'
-        ? trigger.eventType
-        : 'Manual request';
+  const triggerLabel = workflowTriggerLabel(trigger);
 
   return (
     <section className="workflow-overview" aria-label="Workflow overview">

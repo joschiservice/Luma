@@ -3,7 +3,10 @@ import { IdentityError, requireRole, requireTenant } from '@luma/identity';
 
 import type { PlaybookVersion } from '../domain/playbook.js';
 import { presentPlaybook } from '../domain/playbook-presentation.js';
-import type { WorkflowVersion } from '../domain/workflow.js';
+import type {
+  WorkflowTriggerRequest,
+  WorkflowVersion,
+} from '../domain/workflow.js';
 import { resolutionWorkflow } from '../domain/workflow.js';
 import type { PlaybookOutcome, PlaybookRun } from './playbook.js';
 import type { PlaybookLibrary } from './playbook-library.js';
@@ -12,6 +15,8 @@ import {
   presentResolutionStory,
   resolutionWorkflowRun,
 } from './run-presentation.js';
+import { presentTriggerRun } from './trigger-presentation.js';
+import type { createWorkflowTriggers } from './triggers.js';
 
 export interface WorkflowCatalogStore {
   /** Reads native immutable contracts. Resolution adapters retain their original records. */
@@ -39,6 +44,7 @@ export interface WorkflowCatalogStore {
 /** Combines native definitions and existing resolution definitions under one authorized catalog. */
 export function createWorkflowCatalog(deps: {
   legacy: PlaybookLibrary;
+  triggers: ReturnType<typeof createWorkflowTriggers>;
   store: WorkflowCatalogStore;
   compile(input: unknown): WorkflowVersion;
   refreshContext(context: TenantContext): Promise<TenantContext>;
@@ -66,7 +72,7 @@ export function createWorkflowCatalog(deps: {
     format: version.format,
   });
   const nativeBlocker =
-    'Execution is not available for this workflow. You can review its definition, but cannot activate it.';
+    'Runs can collect trigger evidence. Action execution is not available for this workflow.';
 
   function nativeDetail(versions: WorkflowVersion[], context: TenantContext) {
     versions.sort((a, b) =>
@@ -127,6 +133,18 @@ export function createWorkflowCatalog(deps: {
   }
 
   return {
+    /** Starts a run using the exact version and supplied signal evidence. */
+    async fire(
+      context: TenantContext,
+      id: string,
+      request: WorkflowTriggerRequest,
+    ) {
+      return presentTriggerRun(await deps.triggers.fire(context, id, request));
+    },
+    /** Cancels a scheduled start while it is still pending. */
+    async cancelStart(context: TenantContext, id: string, runId: string) {
+      return presentTriggerRun(await deps.triggers.cancel(context, id, runId));
+    },
     /** Publishes a validated native definition; publication never grants execution authority. */
     async publish(context: TenantContext, input: unknown) {
       context = await authorize(context, true);
@@ -176,12 +194,15 @@ export function createWorkflowCatalog(deps: {
     },
     async runs(context: TenantContext, id: string) {
       context = await authorize(context);
-      if ((await deps.store.versions(context, id)).length) return [];
+      const triggered = (await deps.triggers.list(context, id)).map(
+        presentTriggerRun,
+      );
+      if ((await deps.store.versions(context, id)).length) return triggered;
       if (!(await deps.store.resolutionVersions(context, id)).length)
         throw new IdentityError(404, 'NOT_FOUND', 'Workflow not found');
       const records = await deps.store.runs(context, id);
 
-      return records.map(({ run, version, outcomes }) => {
+      const resolution = records.map(({ run, version, outcomes }) => {
         const projection = resolutionWorkflowRun(run, version);
         const view = presentResolutionRun(run, version, outcomes.at(-1));
 
@@ -202,6 +223,10 @@ export function createWorkflowCatalog(deps: {
           })),
         };
       });
+
+      return [...triggered, ...resolution]
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .slice(0, 50);
     },
     async activate(...args: Parameters<PlaybookLibrary['activate']>) {
       const [context, id, request] = args;
