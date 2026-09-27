@@ -90,6 +90,11 @@ export function WorkflowOverview({
           <dd>{detail.summary.activeVersions.join(', ') || 'None'}</dd>
         </div>
       </dl>
+      <p className="workflow-caption">
+        Each published version is fixed. Selecting a version only changes this
+        view. An activation permits that exact version to run within its
+        reviewed scope.
+      </p>
       <div className="workflow-approval-note">
         <ShieldCheck size={17} aria-hidden="true" />
         <p>{version.approval}</p>

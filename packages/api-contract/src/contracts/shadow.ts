@@ -23,7 +23,7 @@ export const shadowContract = initContract().router(
       pathParams: caseParams,
       query: z.object({ workflow: z.string().min(1).max(200) }).strict(),
       responses: { 200: z.object({ item: shadowComparisonSchema.nullable() }) },
-      summary: 'Read the latest Shadow evaluation for a case and Playbook',
+      summary: 'Read the latest Shadow evaluation for a case and Workflow',
       description:
         'Returns the retained prediction, operator review and compatible authoritative outcome. Returns null when no evaluation is recorded.',
     },
@@ -35,7 +35,7 @@ export const shadowContract = initContract().router(
       responses: { 200: shadowEvaluationSchema },
       summary: 'Evaluate a resolution in Shadow Mode',
       description:
-        'Evaluate the current diagnosis and bound Playbook proposal without executing it. Set workflow to the Playbook definition ID. Missing candidates are retained. Reuse the evaluation ID for exact retries.',
+        'Evaluate the current diagnosis and bound Workflow proposal without executing it. Set workflow to the Workflow definition ID. Missing candidates are retained. Reuse the evaluation ID for exact retries.',
     },
     review: {
       method: 'POST',
@@ -57,7 +57,7 @@ export const shadowContract = initContract().router(
       responses: { 200: shadowReportSchema },
       summary: 'Compare Shadow predictions with observed outcomes',
       description:
-        'Owners and admins can compare up to 500 incidents for one Playbook within a time window. The latest evaluation per incident is counted. Rates include denominators and exclude unknown observations. Predictions are conditional simulations, not executed or verified resolutions.',
+        'Owners and admins can compare up to 500 incidents for one Workflow within a time window. The latest evaluation per incident is counted. Rates include denominators and exclude unknown observations. Predictions are conditional simulations, not executed or verified resolutions.',
     },
   },
   {

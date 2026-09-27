@@ -4,7 +4,7 @@
     "/v1/organizations/{organizationId}/exceptions/{exceptionId}/shadow": {
       "get": {
         "description": "Returns the retained prediction, operator review and compatible authoritative outcome. Returns null when no evaluation is recorded.",
-        "summary": "Read the latest Shadow evaluation for a case and Playbook",
+        "summary": "Read the latest Shadow evaluation for a case and Workflow",
         "tags": ["shadow"],
         "parameters": [
           {
@@ -689,7 +689,7 @@
         }
       },
       "post": {
-        "description": "Evaluate the current diagnosis and bound Playbook proposal without executing it. Set workflow to the Playbook definition ID. Missing candidates are retained. Reuse the evaluation ID for exact retries.",
+        "description": "Evaluate the current diagnosis and bound Workflow proposal without executing it. Set workflow to the Workflow definition ID. Missing candidates are retained. Reuse the evaluation ID for exact retries.",
         "summary": "Evaluate a resolution in Shadow Mode",
         "tags": ["shadow"],
         "parameters": [
@@ -1715,7 +1715,7 @@
     },
     "/v1/organizations/{organizationId}/shadow": {
       "get": {
-        "description": "Owners and admins can compare up to 500 incidents for one Playbook within a time window. The latest evaluation per incident is counted. Rates include denominators and exclude unknown observations. Predictions are conditional simulations, not executed or verified resolutions.",
+        "description": "Owners and admins can compare up to 500 incidents for one Workflow within a time window. The latest evaluation per incident is counted. Rates include denominators and exclude unknown observations. Predictions are conditional simulations, not executed or verified resolutions.",
         "summary": "Compare Shadow predictions with observed outcomes",
         "tags": ["shadow"],
         "parameters": [
@@ -7169,6 +7169,33 @@
                             "type": "string",
                             "minLength": 1
                           },
+                          "story": {
+                            "type": "object",
+                            "properties": {
+                              "context": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "decision": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "action": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "verification": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": [
+                              "context",
+                              "decision",
+                              "action",
+                              "verification"
+                            ]
+                          },
                           "trigger": {
                             "discriminator": {
                               "propertyName": "kind"
@@ -7340,6 +7367,7 @@
                           "execution",
                           "verification",
                           "reason",
+                          "story",
                           "trigger",
                           "subject",
                           "actor",

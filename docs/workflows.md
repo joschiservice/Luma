@@ -98,3 +98,19 @@ rejection and cross-tenant access. Browser tests cover filtering, review,
 activation, uncertain-response retry, reload, revocation, old bookmarks, mobile
 navigation and member access. Existing execution and Resolution tests retain
 policy, approval, evidence freshness, restart and uncertain-write coverage.
+
+### Resolution journey acceptance (LUMA-72 / LUMA-37)
+
+Recent runs show the trigger, recorded investigation findings, decision and human
+input, proposed action, execution status, and verification result. The Workflow
+API supplies these readable summaries in `story`; raw references remain available
+for inspection. Missing findings fall back to the linked diagnosis revision.
+Provider success never establishes a verified correction by itself.
+
+Run `pnpm test:browser playbooks.browser.mjs` for the Workflow journey on desktop
+and narrow screens. It checks approval waiting, successful execution with
+inconclusive verification, activation controls, and absence of Playbook language
+in the rendered primary view. Screenshots are written to `/tmp/luma72-browser`.
+The suite seeds recorded runs in an isolated database and reads them through the
+real API. LUMA-37's broader simulator and execution acceptance remains a separate
+gate.

@@ -153,6 +153,11 @@ export function WorkflowLibraryView({
     <div className="workflows-page workflow-library-page">
       <h1 className="sr-only">Workflows</h1>
       <OfflineNotice />
+      <p className="workflow-library-intro">
+        Resolution workflows investigate issues, govern corrective actions, and
+        verify the result. Open a workflow to review its steps, active scope,
+        and run history.
+      </p>
       <div className="workflow-collection">
         <CollectionToolbar
           views={

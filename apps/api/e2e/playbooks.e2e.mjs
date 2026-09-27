@@ -216,6 +216,14 @@ for (const transport of ['playbooks', 'workflows']) {
               resolution: { incidentId, diagnosisRevision: 1 },
               actor: { kind: 'user', id: owner.userId },
               subject: { kind: 'order', id: targetId },
+              story: {
+                context:
+                  'Diagnosis revision 1. Open the issue to inspect the investigation evidence.',
+                decision:
+                  'The result could not be confirmed. Operator review is required.',
+                action: 'Set the order shipping method to the mapped method.',
+                verification: 'The expected correction could not be confirmed.',
+              },
             }
           : { incidentId }),
         activationId: replacement.body.id,

@@ -9,6 +9,7 @@ import type { PlaybookOutcome, PlaybookRun } from './playbook.js';
 import type { PlaybookLibrary } from './playbook-library.js';
 import {
   presentResolutionRun,
+  presentResolutionStory,
   resolutionWorkflowRun,
 } from './run-presentation.js';
 
@@ -186,6 +187,7 @@ export function createWorkflowCatalog(deps: {
 
         return {
           ...view,
+          story: presentResolutionStory(run, version, outcomes.at(-1)),
           trigger: projection.trigger,
           subject: projection.subject,
           actor: projection.actor,

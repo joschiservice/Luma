@@ -63,3 +63,66 @@ export function presentResolutionRun(
     reason: outcome?.reason ?? 'No outcome recorded',
   };
 }
+
+/** Describes recorded decisions without inferring approval or success from a dispatched action. */
+export function presentResolutionStory(
+  run: PlaybookRun,
+  version: PlaybookVersion,
+  outcome?: PlaybookOutcome | null,
+) {
+  const view = presentResolutionRun(run, version, outcome);
+  const decisions: Record<PlaybookOutcome['reason'], string> = {
+    approval_required:
+      'Waiting for an independent owner or administrator to approve the proposed change.',
+    verified: 'The expected correction was confirmed by verification.',
+    policy_denied: 'Policy denied the proposed change.',
+    ineligible: 'The evidence did not meet the workflow conditions.',
+    stale_evidence: 'The evidence expired. A fresh investigation is required.',
+    verification_failed:
+      'The observed result did not match the expected correction. Operator review is required.',
+    verification_inconclusive:
+      'The result could not be confirmed. Operator review is required.',
+    verification_window_exceeded:
+      'Verification did not finish within the allowed window. Operator review is required.',
+    activation_unavailable: 'The selected activation is no longer available.',
+    admission_rejected:
+      'The action did not pass the current authorization and safety checks.',
+    reconciliation_required:
+      'The action state is uncertain. Reconcile it before considering another change.',
+  };
+
+  const facts = run.snapshot?.evidence.facts;
+  const context = [
+    facts?.diagnosisReady === true
+      ? 'The diagnosis was ready for a proposed correction.'
+      : facts?.diagnosisReady === false
+        ? 'The diagnosis was not ready for a proposed correction.'
+        : null,
+    facts?.methodMapped === true
+      ? 'An approved shipping-method mapping was available.'
+      : facts?.methodMapped === false
+        ? 'No approved shipping-method mapping was available.'
+        : null,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  return {
+    context:
+      context ||
+      `Diagnosis revision ${run.diagnosisRevision}. Open the issue to inspect the investigation evidence.`,
+    decision: outcome ? decisions[outcome.reason] : 'No decision recorded yet.',
+    action:
+      version.ir.action.capability === 'orders.shipping-method.write'
+        ? 'Set the order shipping method to the mapped method.'
+        : `Apply ${version.ir.action.capability} to the selected ${version.ir.action.targetKind}.`,
+    verification:
+      view.verification === 'verified'
+        ? 'The expected correction was verified. This does not establish any later business outcome.'
+        : view.verification === 'failed'
+          ? 'The expected correction was not observed.'
+          : view.verification === 'inconclusive'
+            ? 'The expected correction could not be confirmed.'
+            : 'The expected correction has not been verified.',
+  };
+}

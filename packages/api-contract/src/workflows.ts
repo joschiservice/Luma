@@ -66,6 +66,12 @@ export const workflowDetailSchema = playbookDetailSchema.extend({
 export const workflowRunViewSchema = playbookRunViewSchema
   .omit({ incidentId: true })
   .extend({
+    story: z.object({
+      context: text,
+      decision: text,
+      action: text,
+      verification: text,
+    }),
     trigger: workflowTriggerSchema,
     subject: z.object({ kind: text, id: text }),
     actor: workflowActorSchema,

@@ -194,6 +194,28 @@ export function WorkflowDetailPage({
                               : `${run.evidenceKind} evidence`}
                         </strong>
                       </p>
+                      <p className="workflow-run-trigger">
+                        <strong>Triggered by: </strong>
+                        {run.trigger.kind === 'exception'
+                          ? `${run.trigger.issueType.replaceAll('_', ' ')} detected`
+                          : run.trigger.kind === 'event'
+                            ? run.trigger.eventType
+                            : 'Manual request'}
+                      </p>
+                      <dl className="workflow-run-story">
+                        <div>
+                          <dt>Investigation</dt>
+                          <dd>{run.story.context}</dd>
+                        </div>
+                        <div>
+                          <dt>Decision & human input</dt>
+                          <dd>{run.story.decision}</dd>
+                        </div>
+                        <div>
+                          <dt>Proposed action</dt>
+                          <dd>{run.story.action}</dd>
+                        </div>
+                      </dl>
                       <dl>
                         <div>
                           <dt>Execution</dt>
@@ -204,7 +226,9 @@ export function WorkflowDetailPage({
                           <dd>{run.verification.replaceAll('_', ' ')}</dd>
                         </div>
                       </dl>
-                      <p>{run.reason.replaceAll('_', ' ')}</p>
+                      <p className="workflow-run-result">
+                        {run.story.verification}
+                      </p>
                       <Disclosure>
                         <summary>Run evidence references</summary>
                         <p>Run: {run.id}</p>

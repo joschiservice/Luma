@@ -87,9 +87,9 @@ it('finds, reviews, activates, reloads and revokes a persisted workflow with wor
   await page
     .getByRole('heading', { name: 'How this workflow works' })
     .waitFor();
-  await mkdir('/tmp/luma66-browser', { recursive: true });
+  await mkdir('/tmp/luma72-browser', { recursive: true });
   await page.screenshot({
-    path: '/tmp/luma66-browser/overview-desktop.png',
+    path: '/tmp/luma72-browser/overview-desktop.png',
     fullPage: false,
   });
   await page
@@ -163,14 +163,105 @@ it('finds, reviews, activates, reloads and revokes a persisted workflow with wor
       )
     ).rows[0].n,
   ).toBe(1);
+  const activation = (
+    await db.owner.query('SELECT id FROM playbook_activations')
+  ).rows[0].id;
+  const runId = randomUUID();
+  const run = {
+    id: runId,
+    tenantId,
+    activationId: activation,
+    definitionId: version.definition.id,
+    version: version.version,
+    versionDigest: version.digest,
+    principalId: randomUUID(),
+    incidentId: randomUUID(),
+    diagnosisRevision: 1,
+    snapshotDigest: 'a'.repeat(64),
+    snapshot: {
+      evidence: { facts: { diagnosisReady: true, methodMapped: true } },
+    },
+    action: { id: runId, target: { kind: 'order', id: targetId } },
+    createdAt: new Date().toISOString(),
+  };
+  await db.owner.query(
+    'INSERT INTO playbook_runs(tenant_id,id,activation_id,definition_id,version,version_digest,document) VALUES($1,$2,$3,$4,$5,$6,$7)',
+    [
+      tenantId,
+      runId,
+      activation,
+      version.definition.id,
+      version.version,
+      version.digest,
+      run,
+    ],
+  );
+  const outcome = {
+    proposalId: runId,
+    state: 'awaiting_approval',
+    reason: 'approval_required',
+    stepId: 'approve',
+  };
+  await db.owner.query(
+    'INSERT INTO playbook_outcomes(tenant_id,run_id,digest,document) VALUES($1,$2,$3,$4)',
+    [tenantId, runId, 'b'.repeat(64), outcome],
+  );
   await page.reload();
   await page.getByText('Version 0.1.0 · Active', { exact: true }).waitFor();
+  await page
+    .getByText('workflow failure detected', { exact: true })
+    .last()
+    .waitFor();
+  await page
+    .getByText(
+      'Waiting for an independent owner or administrator to approve the proposed change.',
+    )
+    .waitFor();
+  await page
+    .getByText('The expected correction has not been verified.', {
+      exact: true,
+    })
+    .waitFor();
+  await db.owner.query(
+    'INSERT INTO playbook_outcomes(tenant_id,run_id,digest,document) VALUES($1,$2,$3,$4)',
+    [
+      tenantId,
+      runId,
+      'c'.repeat(64),
+      {
+        ...outcome,
+        state: 'escalated',
+        reason: 'verification_inconclusive',
+        stepId: 'verify-correction',
+        execution: { state: 'succeeded' },
+      },
+    ],
+  );
+  await page.getByRole('button', { name: 'Refresh runs', exact: true }).click();
+  await page
+    .getByText('The expected correction could not be confirmed.', {
+      exact: true,
+    })
+    .waitFor();
+  await page.getByText('succeeded', { exact: true }).waitFor();
+  await page
+    .getByText(
+      'The diagnosis was ready for a proposed correction. An approved shipping-method mapping was available.',
+      { exact: true },
+    )
+    .waitFor();
+  await page
+    .getByRole('heading', { name: 'Recent runs', exact: true })
+    .scrollIntoViewIfNeeded();
+  await page.screenshot({ path: '/tmp/luma72-browser/runs-desktop.png' });
+  expect(await page.locator('body').innerText()).not.toMatch(/playbook/i);
+
   await page.getByText('Orders: Order 1042', { exact: true }).waitFor();
   await page.getByText('Exact scope and review', { exact: true }).click();
   await page.getByText(`Orders: ${targetId}`, { exact: true }).waitFor();
-  await mkdir('/tmp/luma66-browser', { recursive: true });
+  await mkdir('/tmp/luma72-browser', { recursive: true });
   await page.screenshot({
-    path: '/tmp/luma66-browser/detail-desktop.png',
+    path: '/tmp/luma72-browser/detail-desktop.png',
     fullPage: true,
   });
   await page
@@ -198,9 +289,17 @@ it('finds, reviews, activates, reloads and revokes a persisted workflow with wor
     ),
   ).toBe(true);
   await page.screenshot({
-    path: '/tmp/luma66-browser/overview-mobile.png',
+    path: '/tmp/luma72-browser/overview-mobile.png',
     fullPage: false,
   });
+  await page.getByRole('combobox', { name: 'Workflow sections' }).click();
+  await page.getByRole('option', { name: 'Recent runs', exact: true }).click();
+  await page.screenshot({ path: '/tmp/luma72-browser/runs-mobile.png' });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
   await page.getByRole('combobox', { name: 'Workflow sections' }).click();
   await page
     .getByRole('option', { name: 'Compatibility', exact: true })
@@ -220,7 +319,7 @@ it('finds, reviews, activates, reloads and revokes a persisted workflow with wor
       .evaluate((node) => node === document.activeElement),
   ).toBe(true);
   await page.screenshot({
-    path: '/tmp/luma66-browser/detail-mobile.png',
+    path: '/tmp/luma72-browser/detail-mobile.png',
     fullPage: true,
   });
   await db.owner.query(

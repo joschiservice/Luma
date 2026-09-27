@@ -23,6 +23,12 @@ it('represents subject-based runs without an Exception root', () => {
     },
     contextDigest: 'b'.repeat(64),
     steps: [],
+    story: {
+      context: 'Manual request.',
+      decision: 'No decision recorded yet.',
+      action: 'Review order.',
+      verification: 'Not verified.',
+    },
   });
   expect(run).not.toHaveProperty('resolution');
   expect(run.actor.kind).toBe('agent');
