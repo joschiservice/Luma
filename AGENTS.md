@@ -26,3 +26,5 @@
 - Add a short doc comment to exported functions and callable contracts. Explain behavior and any input requirements, side effects, or failure modes callers need to know. Do not repeat TypeScript types or add empty documentation tags.
 - Keep imports together at the top. Separate declarations and logical steps with blank lines. Run `pnpm lint:fix` and `pnpm format` to apply automated style fixes.
 - Keep business rules in domain files, use cases and ports in application files, and database or provider access in infrastructure files. Name files for their responsibility and colocate focused unit tests.
+
+- Use existing components from the UI package, import a new one from shadcn or create a custom one when it makes sense.
