@@ -19,6 +19,7 @@
     "@luma/identity": "workspace:*",
     "@luma/platform": "workspace:*",
     "@luma/resolution": "workspace:*",
+    "@luma/workflows": "workspace:*",
     "@opentelemetry/api": "1.9.1",
     "@temporalio/activity": "1.24.0",
     "@temporalio/client": "1.24.0",

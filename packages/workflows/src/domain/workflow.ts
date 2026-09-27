@@ -6,6 +6,7 @@ import type {
   PlaybookSnapshot,
   PlaybookVersion,
 } from './playbook.js';
+import type { ProcessWorkflowVersion } from './process.js';
 
 /** Identifies the accountable caller; an agent also needs a verified delegation grant. */
 export type WorkflowActor =
@@ -63,6 +64,9 @@ export interface WorkflowVersion extends WorkflowSource {
   /** Identifies the representation covered by the digest; legacy hashes remain unchanged. */
   format: 'workflow/1' | 'resolution-playbook/0';
 }
+
+/** Native versions can use either the original Resolution-shaped contract or the process runtime. */
+export type PublishedWorkflowVersion = WorkflowVersion | ProcessWorkflowVersion;
 
 export type WorkflowActivation = PlaybookActivation;
 

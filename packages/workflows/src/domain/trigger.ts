@@ -1,9 +1,9 @@
 import type { PlaybookSnapshot } from './playbook.js';
-import type { WorkflowVersion } from './workflow.js';
+import type { PublishedWorkflowVersion } from './workflow.js';
 
 /** Validates the supported signals against versioned scope and typed evidence; grants no authority. */
 export function validateTriggerSignal(
-  version: WorkflowVersion,
+  version: PublishedWorkflowVersion,
   subject: { kind: string; id: string },
   signal: { kind: string; sourceId: string; occurredAt: string },
   snapshot: PlaybookSnapshot,

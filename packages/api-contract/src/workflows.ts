@@ -33,7 +33,7 @@ export const workflowActorSchema = z.discriminatedUnion('kind', [
 ]);
 const fields = z.record(text, z.enum(['string', 'number', 'boolean', 'null']));
 
-export const workflowVersionViewSchema = playbookVersionViewSchema
+const workflowVersionBaseSchema = playbookVersionViewSchema
   .omit({ issueType: true })
   .extend({
     category: text,
@@ -58,6 +58,14 @@ export const workflowVersionViewSchema = playbookVersionViewSchema
       onUnverified: z.literal('escalate'),
     }),
   });
+
+export const workflowVersionViewSchema = z.union([
+  workflowVersionBaseSchema,
+  workflowVersionBaseSchema.omit({ policy: true, outcome: true }).extend({
+    format: z.literal('workflow/2'),
+    finalOutcome: text.nullable(),
+  }),
+]);
 
 export const workflowSummarySchema = playbookSummarySchema
   .omit({ issueType: true })
@@ -105,6 +113,53 @@ export const workflowRunViewSchema = playbookRunViewSchema
         decisionId: z.string().nullable(),
       }),
     ),
+    processState: z
+      .enum([
+        'running',
+        'awaiting_decision',
+        'waiting',
+        'verified',
+        'ended',
+        'denied',
+        'failed_verification',
+        'inconclusive_verification',
+        'escalated',
+      ])
+      .optional(),
+    processSteps: z
+      .array(
+        z.object({
+          stepId: text,
+          kind: z.enum([
+            'read',
+            'condition',
+            'capability',
+            'approval',
+            'wait',
+            'verification',
+            'escalation',
+            'end',
+          ]),
+          state: z.enum([
+            'completed',
+            'waiting',
+            'denied',
+            'failed',
+            'inconclusive',
+            'ended',
+            'escalated',
+          ]),
+          values: z.record(
+            text,
+            z.union([z.string(), z.number().finite(), z.boolean(), z.null()]),
+          ),
+          evidenceRefs: z.array(text),
+          recordedAt: z.string().datetime(),
+          observedAt: z.string().datetime().optional(),
+          reason: z.string().optional(),
+        }),
+      )
+      .optional(),
   });
 
 export const workflowActivationSchema = playbookActivationSchema;

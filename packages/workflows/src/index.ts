@@ -10,6 +10,12 @@ export type * from './application/playbook-library.js';
 
 export type * from './domain/workflow.js';
 
+export type * from './domain/process.js';
+
+export type * from './application/process-runtime.js';
+
+export { runProcess } from './application/process-runtime.js';
+
 export { resolutionWorkflow } from './domain/workflow.js';
 
 export type { WorkflowCatalog } from './application/catalog.js';

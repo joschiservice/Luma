@@ -6,6 +6,8 @@ import { shippingMethodPlaybook } from '@luma/resolution';
 import { resolutionWorkflow } from '@luma/workflows';
 import {
   compilePlaybook,
+  compileProcessWorkflow,
+  createProcessStepStore,
   createWorkflows,
   defineWorkflow,
 } from '@luma/workflows/composition';
@@ -320,6 +322,140 @@ it('publishes native workflows without cases, retains immutable versions and exp
     tx.query('SELECT id FROM workflow_trigger_runs'),
   );
   expect(isolated.rows).toEqual([]);
+
+  const process = compileProcessWorkflow({
+    schemaVersion: 2,
+    definition: {
+      id: 'stock-review',
+      name: 'Stock review',
+      intent: 'Review current stock',
+      category: 'procurement',
+    },
+    version: '1.0.0',
+    applicability: { trigger: { kind: 'manual' }, subjectKind: 'order' },
+    inputs: {},
+    context: {
+      kind: 'stock',
+      fields: { ready: 'boolean' },
+      maxAgeSeconds: 300,
+    },
+    steps: [
+      {
+        id: 'refresh',
+        kind: 'read',
+        source: 'stock',
+        fields: { ready: 'boolean' },
+      },
+      {
+        id: 'check',
+        kind: 'condition',
+        field: 'ready',
+        equals: true,
+        onFalse: 'escalate',
+      },
+      { id: 'finish', kind: 'end', outcome: 'reviewed' },
+    ],
+    provenance: {
+      kind: 'resolution',
+      reference: 'fixture',
+      authoredBy: 'operator',
+      evidenceRefs: ['stock'],
+    },
+  });
+  await catalog.publish(context, process);
+  const processDetail = (
+    await api.request(`${root}/workflows/${process.definition.id}`, {
+      cookie: user.cookie,
+    })
+  ).body;
+  expect(processDetail.versions[0]).toMatchObject({
+    format: 'workflow/2',
+    digest: process.digest,
+    steps: [{ id: 'refresh' }, { id: 'check' }, { id: 'finish' }],
+  });
+  const started = (
+    await api.request(`${root}/workflows/${process.definition.id}/starts`, {
+      cookie: user.cookie,
+      method: 'POST',
+      body: {
+        version: process.version,
+        reviewedDigest: process.digest,
+        subject: { kind: 'order', id: legacy.targetId },
+        signal: { kind: 'manual', sourceId: 'stock-review', occurredAt: now },
+        context: {
+          inputs: {},
+          evidence: {
+            kind: 'stock',
+            facts: { ready: true },
+            observations: [
+              { id: randomUUID(), observedAt: now, source: 'stock' },
+            ],
+          },
+          provenance: { reference: 'stock-review', capturedAt: now },
+        },
+      },
+    })
+  ).body;
+  const stepStore = createProcessStepStore(tenantDb);
+  await expect(
+    stepStore.record(context, started.id, {
+      stepId: 'finish',
+      kind: 'end',
+      state: 'completed',
+      values: { outcome: 'reviewed' },
+      evidenceRefs: [`temporal:${started.id}:finish`],
+      recordedAt: now,
+    }),
+  ).rejects.toThrow('out of order');
+  await stepStore.record(context, started.id, {
+    stepId: 'refresh',
+    kind: 'read',
+    state: 'completed',
+    values: { ready: true },
+    evidenceRefs: ['stock-read'],
+    recordedAt: now,
+    observedAt: now,
+  });
+  await expect(
+    stepStore.record(context, started.id, {
+      stepId: 'refresh',
+      kind: 'read',
+      state: 'completed',
+      values: { ready: false },
+      evidenceRefs: ['stock-read'],
+      recordedAt: now,
+      observedAt: now,
+    }),
+  ).rejects.toThrow('replay conflicts');
+  await stepStore.record(context, started.id, {
+    stepId: 'check',
+    kind: 'condition',
+    state: 'completed',
+    values: { matched: true },
+    evidenceRefs: ['stock-read'],
+    recordedAt: now,
+  });
+  await stepStore.record(context, started.id, {
+    stepId: 'finish',
+    kind: 'end',
+    state: 'completed',
+    values: { outcome: 'reviewed' },
+    evidenceRefs: [`temporal:${started.id}:finish`],
+    recordedAt: now,
+  });
+  const processRuns = (
+    await api.request(`${root}/workflows/${process.definition.id}/runs`, {
+      cookie: user.cookie,
+    })
+  ).body.items;
+  expect(processRuns[0]).toMatchObject({
+    processState: 'ended',
+    processSteps: [
+      { stepId: 'refresh' },
+      { stepId: 'check' },
+      { stepId: 'finish' },
+    ],
+  });
 
   await db.owner.query(
     "UPDATE memberships SET role='member' WHERE tenant_id=$1 AND user_id=$2",

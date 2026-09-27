@@ -4,25 +4,39 @@ import type { WorkflowCatalogStore } from '../application/catalog.js';
 import type { PlaybookOutcome, PlaybookRun } from '../application/playbook.js';
 import type { PlaybookVersion } from '../domain/playbook.js';
 import { canonicalPlaybook, compilePlaybook } from './playbooks/schema.js';
+import { compileProcessWorkflow } from './process-schema.js';
+import { createProcessStepStore } from './process-store.js';
 import { compileWorkflow } from './workflow-schema.js';
+
+/** Rechecks the stored digest before a published native version can be used. */
+export const compilePublishedWorkflow = (input: unknown) =>
+  input &&
+  typeof input === 'object' &&
+  'format' in input &&
+  input.format === 'workflow/2'
+    ? compileProcessWorkflow(input)
+    : compileWorkflow(input);
 
 /** Stores native and legacy versions in the existing immutable, tenant-isolated catalog. */
 export function createWorkflowCatalogStore(
   db: TenantDatabase,
 ): WorkflowCatalogStore {
+  const steps = createProcessStepStore(db);
+
   return {
+    processSteps: steps.list,
     versions: (context, id) =>
       db.transaction(context.tenantId, async (tx) => {
         const result = await tx.query<{ document: unknown }>(
-          "SELECT document FROM playbook_versions WHERE tenant_id=$1 AND ($2::text IS NULL OR definition_id=$2) AND document->>'format'='workflow/1'",
+          "SELECT document FROM playbook_versions WHERE tenant_id=$1 AND ($2::text IS NULL OR definition_id=$2) AND document->>'format' IN ('workflow/1','workflow/2')",
           [context.tenantId, id ?? null],
         );
 
-        return result.rows.map((r) => compileWorkflow(r.document));
+        return result.rows.map((r) => compilePublishedWorkflow(r.document));
       }),
     publish: (context, version) =>
       db.transaction(context.tenantId, async (tx) => {
-        const checked = compileWorkflow(version);
+        const checked = compilePublishedWorkflow(version);
         await tx.query(
           'INSERT INTO playbook_definitions(tenant_id,id,document) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',
           [context.tenantId, checked.definition.id, checked.definition],

@@ -16,7 +16,7 @@ export const dependencies = {
   execution: ['platform', 'identity', 'policies', 'connectors', 'audit'],
   exceptions: ['platform', 'identity', 'orders', 'inventory'],
   commerce: ['connectors', 'identity', 'orders', 'inventory'],
-  temporal: ['resolution', 'identity', 'platform'],
+  temporal: ['resolution', 'workflows', 'identity', 'platform'],
   workflows: ['platform', 'identity', 'policies', 'execution', 'connectors'],
   resolution: [
     'workflows',

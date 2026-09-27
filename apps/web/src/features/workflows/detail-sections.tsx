@@ -54,13 +54,16 @@ export function WorkflowOverview({
             <ShieldCheck size={14} aria-hidden="true" /> Success means
           </span>
           <strong>
-            {version.capability === 'orders.shipping-method.write'
-              ? 'The order uses the mapped shipping method'
-              : 'The expected change is verified'}
+            {version.format === 'workflow/2'
+              ? (version.finalOutcome ?? 'The process escalates for review')
+              : version.capability === 'orders.shipping-method.write'
+                ? 'The order uses the mapped shipping method'
+                : 'The expected change is verified'}
           </strong>
           <p>
-            Read the authoritative {version.applicability.subjectKind}. Escalate
-            if the result cannot be confirmed.
+            {version.format === 'workflow/2'
+              ? 'Each action is reviewed and admitted independently. Verification failures remain visible for operator review.'
+              : `Read the authoritative ${version.applicability.subjectKind}. Escalate if the result cannot be confirmed.`}
           </p>
         </div>
       </div>
@@ -87,8 +90,10 @@ export function WorkflowOverview({
       </dl>
       <p className="workflow-caption">
         Each published version is fixed. Selecting a version only changes this
-        view. An activation permits that exact version to run within its
-        reviewed scope.
+        view.{' '}
+        {version.format === 'workflow/2'
+          ? 'Each action needs the required connection and access before it can run.'
+          : 'An activation permits that exact version to run within its reviewed scope.'}
       </p>
       <div className="workflow-approval-note">
         <ShieldCheck size={17} aria-hidden="true" />
@@ -227,6 +232,10 @@ export function WorkflowActivations({
   refreshing?: boolean | undefined;
   onRevoke: (activation: WorkflowActivationView) => void;
 }) {
+  const processOnly = detail.versions.every(
+    (version) => version.format === 'workflow/2',
+  );
+
   return (
     <Card as="section" className="workflow-section">
       <CardTitle as="h2">Activation history</CardTitle>
@@ -237,10 +246,11 @@ export function WorkflowActivations({
       {!detail.activations.length ? (
         <Empty className="workflow-section-empty">
           <ShieldCheck size={22} aria-hidden="true" />
-          <h3>Not activated yet</h3>
+          <h3>{processOnly ? 'No action grants' : 'Not activated yet'}</h3>
           <p>
-            Review a version and choose its scope to permit this workflow to
-            run.
+            {processOnly
+              ? 'Each action needs its own decision and access check before it runs.'
+              : 'Review a version and choose its scope to permit this workflow to run.'}
           </p>
         </Empty>
       ) : (

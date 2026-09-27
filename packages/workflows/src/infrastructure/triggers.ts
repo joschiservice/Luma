@@ -4,6 +4,7 @@ import type { WorkflowTriggerStore } from '../application/triggers.js';
 import type { WorkflowTriggerRun } from '../domain/workflow.js';
 import { resolutionWorkflow } from '../domain/workflow.js';
 import { compilePlaybook } from './playbooks/schema.js';
+import { compileProcessWorkflow } from './process-schema.js';
 import { compileWorkflow } from './workflow-schema.js';
 
 type Row = {
@@ -35,9 +36,11 @@ export function createWorkflowTriggerStore(
         ).rows[0];
 
         return row
-          ? row.document.format === 'workflow/1'
-            ? compileWorkflow(row.document)
-            : resolutionWorkflow(compilePlaybook(row.document))
+          ? row.document.format === 'workflow/2'
+            ? compileProcessWorkflow(row.document)
+            : row.document.format === 'workflow/1'
+              ? compileWorkflow(row.document)
+              : resolutionWorkflow(compilePlaybook(row.document))
           : null;
       }),
     find: (context, key) =>
@@ -46,6 +49,17 @@ export function createWorkflowTriggerStore(
           await tx.query<Row>(
             'SELECT document,state,triggered_at FROM workflow_trigger_runs WHERE tenant_id=$1 AND dedupe_key=$2',
             [context.tenantId, key],
+          )
+        ).rows[0];
+
+        return row ? present(row) : null;
+      }),
+    run: (context, id) =>
+      db.transaction(context.tenantId, async (tx) => {
+        const row = (
+          await tx.query<Row>(
+            'SELECT document,state,triggered_at FROM workflow_trigger_runs WHERE tenant_id=$1 AND id=$2',
+            [context.tenantId, id],
           )
         ).rows[0];
 

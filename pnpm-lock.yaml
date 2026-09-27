@@ -1249,6 +1249,9 @@ importers:
       '@luma/resolution':
         specifier: workspace:*
         version: link:../resolution
+      '@luma/workflows':
+        specifier: workspace:*
+        version: link:../workflows
       '@opentelemetry/api':
         specifier: 1.9.1
         version: 1.9.1

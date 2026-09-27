@@ -1,4 +1,9 @@
-export { IdentityError, requireRole, requireTenant } from './domain/context.js';
+export {
+  IdentityError,
+  makeTenantContext,
+  requireRole,
+  requireTenant,
+} from './domain/context.js';
 
 export type {
   Membership,

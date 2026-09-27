@@ -4,9 +4,9 @@ import { IdentityError, requireRole, requireTenant } from '@luma/identity';
 import type { PlaybookSnapshot } from '../domain/playbook.js';
 import { validateTriggerSignal } from '../domain/trigger.js';
 import type {
+  PublishedWorkflowVersion,
   WorkflowTriggerRequest,
   WorkflowTriggerRun,
-  WorkflowVersion,
 } from '../domain/workflow.js';
 
 /** Persists immutable trigger evidence with atomic deduplication per version, source and subject. */
@@ -15,8 +15,9 @@ export interface WorkflowTriggerStore {
     context: TenantContext,
     id: string,
     version: string,
-  ): Promise<WorkflowVersion | null>;
+  ): Promise<PublishedWorkflowVersion | null>;
   find(context: TenantContext, key: string): Promise<WorkflowTriggerRun | null>;
+  run(context: TenantContext, id: string): Promise<WorkflowTriggerRun | null>;
   insert(
     context: TenantContext,
     key: string,
@@ -34,7 +35,10 @@ export interface WorkflowTriggerStore {
 export function createWorkflowTriggers(deps: {
   store: WorkflowTriggerStore;
   refreshContext(context: TenantContext): Promise<TenantContext>;
-  parseSnapshot(input: unknown, version: WorkflowVersion): PlaybookSnapshot;
+  parseSnapshot(
+    input: unknown,
+    version: PublishedWorkflowVersion,
+  ): PlaybookSnapshot;
   hash(input: unknown): string;
   id(): string;
   now(): Date;

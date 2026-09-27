@@ -3,9 +3,11 @@ import { IdentityError, requireRole, requireTenant } from '@luma/identity';
 
 import type { PlaybookVersion } from '../domain/playbook.js';
 import { presentPlaybook } from '../domain/playbook-presentation.js';
+import type { ProcessStepOutput } from '../domain/process.js';
+import { presentProcessVersion } from '../domain/process-presentation.js';
 import type {
+  PublishedWorkflowVersion,
   WorkflowTriggerRequest,
-  WorkflowVersion,
 } from '../domain/workflow.js';
 import { resolutionWorkflow } from '../domain/workflow.js';
 import type { PlaybookOutcome, PlaybookRun } from './playbook.js';
@@ -20,9 +22,15 @@ import type { createWorkflowTriggers } from './triggers.js';
 
 export interface WorkflowCatalogStore {
   /** Reads native immutable contracts. Resolution adapters retain their original records. */
-  versions(context: TenantContext, id?: string): Promise<WorkflowVersion[]>;
+  versions(
+    context: TenantContext,
+    id?: string,
+  ): Promise<PublishedWorkflowVersion[]>;
   /** Persists an exact native version; conflicting definitions or versions fail. */
-  publish(context: TenantContext, version: WorkflowVersion): Promise<void>;
+  publish(
+    context: TenantContext,
+    version: PublishedWorkflowVersion,
+  ): Promise<void>;
   /** Reads validated resolution versions for projection into the common contract. */
   resolutionVersions(
     context: TenantContext,
@@ -39,6 +47,10 @@ export interface WorkflowCatalogStore {
       outcomes: PlaybookOutcome[];
     }[]
   >;
+  processSteps(
+    context: TenantContext,
+    runIds: string[],
+  ): Promise<Map<string, ProcessStepOutput[]>>;
 }
 
 /** Combines native definitions and existing resolution definitions under one authorized catalog. */
@@ -46,7 +58,7 @@ export function createWorkflowCatalog(deps: {
   legacy: PlaybookLibrary;
   triggers: ReturnType<typeof createWorkflowTriggers>;
   store: WorkflowCatalogStore;
-  compile(input: unknown): WorkflowVersion;
+  compile(input: unknown): PublishedWorkflowVersion;
   refreshContext(context: TenantContext): Promise<TenantContext>;
 }) {
   async function authorize(context: TenantContext, write = false) {
@@ -62,24 +74,34 @@ export function createWorkflowCatalog(deps: {
     return fresh;
   }
 
-  const metadata = (version: WorkflowVersion) => ({
+  const metadata = (version: PublishedWorkflowVersion) => ({
     category: version.definition.category,
     applicability: version.applicability,
     inputs: version.inputs,
     context: version.context,
-    policy: version.policy,
-    outcome: version.outcome,
+    ...(version.format === 'workflow/1'
+      ? { policy: version.policy, outcome: version.outcome }
+      : {}),
     format: version.format,
   });
   const nativeBlocker =
     'Runs can collect trigger evidence. Action execution is not available for this workflow.';
 
-  function nativeDetail(versions: WorkflowVersion[], context: TenantContext) {
+  function nativeDetail(
+    versions: PublishedWorkflowVersion[],
+    context: TenantContext,
+  ) {
     versions.sort((a, b) =>
       b.version.localeCompare(a.version, undefined, { numeric: true }),
     );
     const current = versions[0]!;
     const views = versions.map((v) => {
+      if (v.format === 'workflow/2')
+        return {
+          ...presentProcessVersion(v),
+          ...metadata(v),
+          format: 'workflow/2' as const,
+        };
       const [eligibility, action, approval, verification, recovery] = v.steps;
       const presentation = presentPlaybook({
         definition: v.definition,
@@ -102,6 +124,9 @@ export function createWorkflowCatalog(deps: {
       return {
         ...presentation,
         ...metadata(v),
+        policy: v.policy,
+        outcome: v.outcome,
+        format: v.format,
         compatible: false,
         blockers: [nativeBlocker],
         representation: JSON.stringify(v, null, 2),
@@ -159,7 +184,7 @@ export function createWorkflowCatalog(deps: {
         deps.legacy.list(context),
         deps.store.versions(context),
       ]);
-      const groups = new Map<string, WorkflowVersion[]>();
+      const groups = new Map<string, PublishedWorkflowVersion[]>();
       for (const v of native)
         groups.set(v.definition.id, [
           ...(groups.get(v.definition.id) ?? []),
@@ -182,20 +207,30 @@ export function createWorkflowCatalog(deps: {
       return {
         ...detail,
         summary: { ...detail.summary, category: 'resolution' },
-        versions: detail.versions.map((v) => ({
-          ...v,
-          ...metadata(
-            resolutionWorkflow(
-              versions.find((source) => source.version === v.version)!,
-            ),
-          ),
-        })),
+        versions: detail.versions.map((v) => {
+          const source = versions.find((item) => item.version === v.version);
+          if (!source) throw new Error('Published version is unavailable');
+          const workflow = resolutionWorkflow(source);
+
+          return {
+            ...v,
+            ...metadata(workflow),
+            policy: workflow.policy,
+            outcome: workflow.outcome,
+            format: 'resolution-playbook/0' as const,
+          };
+        }),
       };
     },
     async runs(context: TenantContext, id: string) {
       context = await authorize(context);
-      const triggered = (await deps.triggers.list(context, id)).map(
-        presentTriggerRun,
+      const starts = await deps.triggers.list(context, id);
+      const evidence = await deps.store.processSteps(
+        context,
+        starts.map((run) => run.id),
+      );
+      const triggered = starts.map((run) =>
+        presentTriggerRun(run, evidence.get(run.id)),
       );
       if ((await deps.store.versions(context, id)).length) return triggered;
       if (!(await deps.store.resolutionVersions(context, id)).length)

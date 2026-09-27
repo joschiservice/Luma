@@ -1,6 +1,7 @@
 import type {
   WorkflowActivationView,
   WorkflowDetail,
+  WorkflowRunView,
 } from '@luma/api-contract';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
@@ -44,6 +45,49 @@ import { statusNames, type WorkflowFilters, WorkflowLoading } from './library';
 import { OfflineNotice } from './offline';
 import { workflowTriggerLabel } from './presentation';
 import { CancelScheduledStart, WorkflowTriggers } from './triggers';
+
+function processStepDescription(
+  step: NonNullable<WorkflowRunView['processSteps']>[number],
+) {
+  if (
+    step.reason &&
+    !['condition_not_met', 'policy_approval_required'].includes(step.reason)
+  )
+    return step.reason.replaceAll('_', ' ');
+
+  switch (step.kind) {
+    case 'read':
+      return 'Current context refreshed.';
+    case 'condition':
+      return step.values.matched
+        ? 'The observed conditions matched.'
+        : 'The observed conditions did not match.';
+    case 'approval':
+      return step.state === 'waiting'
+        ? 'Waiting for a decision.'
+        : 'Decision recorded.';
+    case 'capability':
+      return step.state === 'waiting'
+        ? 'Waiting for policy approval.'
+        : 'Action accepted. Verification is still required.';
+    case 'wait':
+      return step.state === 'waiting'
+        ? 'Waiting before the next step.'
+        : 'Wait finished.';
+    case 'verification':
+      return step.state === 'completed'
+        ? 'Expected result confirmed.'
+        : step.state === 'failed'
+          ? 'The result differs from the expected outcome.'
+          : 'The result could not be confirmed.';
+    case 'escalation':
+      return 'This run needs attention.';
+    case 'end':
+      return typeof step.values.outcome === 'string'
+        ? step.values.outcome
+        : 'Process finished.';
+  }
+}
 
 /** Loads a shareable workflow, resetting private form state when the workspace or workflow changes. */
 export function WorkflowPage() {
@@ -152,9 +196,11 @@ export function WorkflowDetailPage({
                 </Button>
               </CardHeader>
               <p>
-                Execution acceptance and verified correction are separate
-                results. Pilot, simulation and shadow evidence are not live
-                verified success.
+                {query.data.versions.every(
+                  (version) => version.format === 'workflow/2',
+                )
+                  ? 'Follow each decision, action and check through the run. An accepted action still needs verification.'
+                  : 'Execution acceptance and verified correction are separate results. Pilot, simulation and shadow evidence are not live verified success.'}
               </p>
               {runs.error ? (
                 <p role="alert">
@@ -189,17 +235,40 @@ export function WorkflowDetailPage({
                       <p>
                         Version {run.version} ·{' '}
                         <strong>
-                          {run.evidenceKind === 'pilot'
-                            ? 'Pilot evidence'
-                            : run.evidenceKind === 'unclassified'
-                              ? 'Unclassified evidence — live success not established'
-                              : `${run.evidenceKind} evidence`}
+                          {run.processSteps?.length
+                            ? 'Process evidence'
+                            : run.evidenceKind === 'pilot'
+                              ? 'Pilot evidence'
+                              : run.evidenceKind === 'unclassified'
+                                ? 'Unclassified evidence — live success not established'
+                                : `${run.evidenceKind} evidence`}
                         </strong>
                       </p>
                       <p className="workflow-run-trigger">
                         <strong>Triggered by: </strong>
                         {workflowTriggerLabel(run.trigger)}
                       </p>
+                      {run.processState ? (
+                        <div className="workflow-process-status" role="status">
+                          <Badge
+                            tone={
+                              run.processState === 'verified'
+                                ? 'success'
+                                : [
+                                      'failed_verification',
+                                      'inconclusive_verification',
+                                      'escalated',
+                                      'denied',
+                                    ].includes(run.processState)
+                                  ? 'warning'
+                                  : 'neutral'
+                            }
+                          >
+                            {run.processState.replaceAll('_', ' ')}
+                          </Badge>
+                          <span>{run.reason}</span>
+                        </div>
+                      ) : null}
                       {run.triggerState ? (
                         <Alert
                           tone={
@@ -220,33 +289,70 @@ export function WorkflowDetailPage({
                           refresh={refresh}
                         />
                       ) : null}
-                      <dl className="workflow-run-story">
-                        <div>
-                          <dt>Investigation</dt>
-                          <dd>{run.story.context}</dd>
-                        </div>
-                        <div>
-                          <dt>Decision & human input</dt>
-                          <dd>{run.story.decision}</dd>
-                        </div>
-                        <div>
-                          <dt>Proposed action</dt>
-                          <dd>{run.story.action}</dd>
-                        </div>
-                      </dl>
-                      <dl>
-                        <div>
-                          <dt>Execution</dt>
-                          <dd>{run.execution.replaceAll('_', ' ')}</dd>
-                        </div>
-                        <div>
-                          <dt>Verification</dt>
-                          <dd>{run.verification.replaceAll('_', ' ')}</dd>
-                        </div>
-                      </dl>
-                      <p className="workflow-run-result">
-                        {run.story.verification}
-                      </p>
+                      {run.processSteps?.length ? (
+                        <ol
+                          className="workflow-process-timeline"
+                          aria-label="Step progress"
+                        >
+                          {run.processSteps.map((step) => (
+                            <li key={`${step.stepId}:${step.state}`}>
+                              <span
+                                className={`workflow-process-dot workflow-process-dot--${step.state}`}
+                                aria-hidden="true"
+                              />
+                              <div>
+                                <div className="workflow-process-step-heading">
+                                  <strong>
+                                    {step.stepId.replaceAll('_', ' ')}
+                                  </strong>
+                                  <span>{step.state.replaceAll('_', ' ')}</span>
+                                  <WorkspaceDate value={step.recordedAt} />
+                                </div>
+                                <p>{processStepDescription(step)}</p>
+                                {step.evidenceRefs.length ? (
+                                  <p>
+                                    {step.evidenceRefs.length} evidence{' '}
+                                    {step.evidenceRefs.length === 1
+                                      ? 'reference'
+                                      : 'references'}
+                                  </p>
+                                ) : null}
+                              </div>
+                            </li>
+                          ))}
+                        </ol>
+                      ) : null}
+                      {!run.processSteps?.length ? (
+                        <>
+                          <dl className="workflow-run-story">
+                            <div>
+                              <dt>Investigation</dt>
+                              <dd>{run.story.context}</dd>
+                            </div>
+                            <div>
+                              <dt>Decision & human input</dt>
+                              <dd>{run.story.decision}</dd>
+                            </div>
+                            <div>
+                              <dt>Proposed action</dt>
+                              <dd>{run.story.action}</dd>
+                            </div>
+                          </dl>
+                          <dl>
+                            <div>
+                              <dt>Execution</dt>
+                              <dd>{run.execution.replaceAll('_', ' ')}</dd>
+                            </div>
+                            <div>
+                              <dt>Verification</dt>
+                              <dd>{run.verification.replaceAll('_', ' ')}</dd>
+                            </div>
+                          </dl>
+                          <p className="workflow-run-result">
+                            {run.story.verification}
+                          </p>
+                        </>
+                      ) : null}
                       <Disclosure>
                         <summary>Run evidence references</summary>
                         <p>Run: {run.id}</p>
@@ -284,9 +390,21 @@ export function WorkflowDetailPage({
                               </li>
                             ))}
                           </ol>
-                        ) : (
+                        ) : !run.processSteps?.length ? (
                           <p>No step outcome recorded.</p>
-                        )}
+                        ) : null}
+                        {run.processSteps?.length ? (
+                          <ol>
+                            {run.processSteps.map((step) => (
+                              <li key={`${step.stepId}:${step.state}`}>
+                                {step.stepId} · {step.kind} · {step.state}
+                                {step.evidenceRefs.length
+                                  ? ` · ${step.evidenceRefs.join(', ')}`
+                                  : ''}
+                              </li>
+                            ))}
+                          </ol>
+                        ) : null}
                         <code>{run.versionDigest}</code>
                       </Disclosure>
                     </article>

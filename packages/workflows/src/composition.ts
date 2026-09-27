@@ -8,7 +8,10 @@ import type { PlaybookDependencies } from './application/playbook.js';
 import { createPlaybookService } from './application/playbook.js';
 import type { PlaybookLibrary } from './application/playbook-library.js';
 import { createWorkflowTriggers } from './application/triggers.js';
-import { createWorkflowCatalogStore } from './infrastructure/catalog.js';
+import {
+  compilePublishedWorkflow,
+  createWorkflowCatalogStore,
+} from './infrastructure/catalog.js';
 import {
   activationRequestSchema,
   compilePlaybook,
@@ -16,8 +19,8 @@ import {
   playbookHash,
 } from './infrastructure/playbooks/schema.js';
 import { createPlaybookStore } from './infrastructure/playbooks/store.js';
+import { parseProcessSnapshot } from './infrastructure/process-schema.js';
 import { createWorkflowTriggerStore } from './infrastructure/triggers.js';
-import { compileWorkflow } from './infrastructure/workflow-schema.js';
 
 /**
  * Creates persistent playbook services with compilation, snapshot validation, and action-
@@ -68,6 +71,27 @@ export {
   parseWorkflowCode,
 } from './infrastructure/workflow-schema.js';
 
+export { compileProcessWorkflow } from './infrastructure/process-schema.js';
+
+export { runProcess } from './application/process-runtime.js';
+
+export { createProcessActivities } from './application/process-activities.js';
+
+export { createProcessStepStore } from './infrastructure/process-store.js';
+
+export type {
+  ProcessActivities,
+  ProcessClock,
+  ProcessProgress,
+} from './application/process-runtime.js';
+
+export type {
+  ProcessRun,
+  ProcessStep,
+  ProcessStepOutput,
+  ProcessWorkflowVersion,
+} from './domain/process.js';
+
 /** Composes the catalog with refreshed membership and shared resolution admission controls. */
 export function createWorkflows(
   db: TenantDatabase,
@@ -82,6 +106,8 @@ export function createWorkflows(
       id: randomUUID,
       now: () => new Date(),
       parseSnapshot: (input, version) => {
+        if (version.format === 'workflow/2')
+          return parseProcessSnapshot(input, version);
         const [eligibility, action, approval, verification, recovery] =
           version.steps;
 
@@ -106,7 +132,7 @@ export function createWorkflows(
     }),
     store: createWorkflowCatalogStore(db),
     legacy,
-    compile: compileWorkflow,
+    compile: compilePublishedWorkflow,
     refreshContext,
   });
 }

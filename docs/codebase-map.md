@@ -84,3 +84,5 @@ lives in `infrastructure/triggers.ts`. Migration `0025_workflow_triggers.sql`
 owns durable scheduled starts, advanced by the workflow worker. The frontend
 controls are in `apps/web/src/features/workflows/triggers.tsx`. Validate with
 workflow unit tests and `apps/api/e2e/workflows.e2e.mjs`.
+
+Multi-step process versions compile in `packages/workflows/src/infrastructure/process-schema.ts` and run through `application/process-runtime.ts`. `application/process-activities.ts` enforces an independent Action Admission call for each capability step. Temporal replay and waits live in `packages/workflow-temporal/src/process-workflow.ts`; step records use migration `0026_workflow_process_steps.sql`. The Workflow detail page shows the evidence timeline. See [Multi-step Workflow runtime](workflow-process-runtime.md) for adapter wiring and state ownership.

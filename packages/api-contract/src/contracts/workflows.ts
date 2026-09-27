@@ -35,7 +35,7 @@ export const workflowsContract = c.router(
       responses: { 200: workflowDetailSchema },
       summary: 'Inspect a workflow',
       description:
-        'Read steps, versions, prerequisites and historical grants. Evaluation evidence is explicitly unavailable when no integrated evaluation source exists.',
+        'Read published steps, versions, prerequisites and historical grants. Process versions show the exact order of decisions, actions, waits and verification.',
     },
     runs: {
       method: 'GET',
@@ -44,7 +44,7 @@ export const workflowsContract = c.router(
       responses: { 200: z.object({ items: z.array(workflowRunViewSchema) }) },
       summary: 'Read recent workflow runs',
       description:
-        'Returns the 50 most recent runs with subject, actor, trigger and step references. Resolution runs include an issue link. Execution and verification results are separate. Pilot and unclassified evidence do not establish live success.',
+        'Returns the 50 most recent runs with subject, actor, trigger and step evidence. Process runs show their current state and recorded outputs. Execution and verification results are separate.',
     },
     fire: {
       method: 'POST',

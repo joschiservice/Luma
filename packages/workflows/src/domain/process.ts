@@ -1,0 +1,116 @@
+import type {
+  PlaybookFields,
+  PlaybookScalar,
+  PlaybookSnapshot,
+  PlaybookValue,
+} from './playbook.js';
+import type {
+  WorkflowActor,
+  WorkflowDefinition,
+  WorkflowTrigger,
+} from './workflow.js';
+
+/** A bounded, forward-only instruction. Every ID remains stable across a published version. */
+export type ProcessStep =
+  | { id: string; kind: 'read'; source: string; fields: PlaybookFields }
+  | {
+      id: string;
+      kind: 'condition';
+      field: string;
+      equals: PlaybookScalar;
+      onFalse: 'escalate' | 'end';
+    }
+  | {
+      id: string;
+      kind: 'capability';
+      capability: string;
+      capabilityVersion: string;
+      targetKind: string;
+      minimumRisk: 'low' | 'medium' | 'high';
+      parameters: Record<string, ProcessValue>;
+      expectedPostcondition: Record<string, ProcessValue>;
+    }
+  | {
+      id: string;
+      kind: 'approval';
+      forStep: string;
+      expiresAfterSeconds: number;
+    }
+  | { id: string; kind: 'wait'; seconds: number }
+  | {
+      id: string;
+      kind: 'verification';
+      forStep: string;
+      evaluatorVersion: string;
+      maxDurationSeconds: number;
+      fields: PlaybookFields;
+    }
+  | { id: string; kind: 'escalation'; reason: string }
+  | { id: string; kind: 'end'; outcome: string };
+
+/** Values may use an earlier typed read, immutable input, evidence, or a literal. */
+export type ProcessValue =
+  PlaybookValue | { source: 'step'; stepId: string; field: string };
+
+/** Published process versions are immutable and cannot execute arbitrary source code. */
+export interface ProcessWorkflowVersion {
+  schemaVersion: 2;
+  format: 'workflow/2';
+  definition: WorkflowDefinition;
+  version: string;
+  digest: string;
+  applicability: { trigger: WorkflowTrigger; subjectKind: string };
+  inputs: PlaybookFields;
+  context: { kind: string; fields: PlaybookFields; maxAgeSeconds: number };
+  steps: ProcessStep[];
+  provenance: {
+    kind: 'resolution' | 'pilot';
+    reference: string;
+    authoredBy: string;
+    evidenceRefs: string[];
+  };
+}
+
+/** A process run records progress independently from each action's dispatch and outcome. */
+export interface ProcessRun {
+  id: string;
+  tenantId: string;
+  definitionId: string;
+  version: string;
+  versionDigest: string;
+  subject: { kind: string; id: string };
+  actor: WorkflowActor;
+  context: PlaybookSnapshot;
+  contextDigest: string;
+  createdAt: string;
+}
+
+/** Typed evidence from one step; references point to the authoritative source or receipt. */
+export interface ProcessStepOutput {
+  stepId: string;
+  kind: ProcessStep['kind'];
+  state:
+    | 'completed'
+    | 'waiting'
+    | 'denied'
+    | 'failed'
+    | 'inconclusive'
+    | 'ended'
+    | 'escalated';
+  values: Record<string, PlaybookScalar>;
+  evidenceRefs: string[];
+  observedAt?: string;
+  recordedAt: string;
+  reason?: string;
+}
+
+export type ProcessRunState =
+  | 'running'
+  | 'awaiting_decision'
+  | 'waiting'
+  | 'verified'
+  | 'ended'
+  | 'denied'
+  | 'failed_verification'
+  | 'inconclusive_verification'
+  | 'escalated';

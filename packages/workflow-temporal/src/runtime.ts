@@ -42,7 +42,8 @@ export interface TemporalSettings {
   apiKey?: string;
 }
 
-function validateSettings(settings: TemporalSettings) {
+/** Checks Temporal connection settings before opening a client or worker. */
+export function validateSettings(settings: TemporalSettings) {
   z.object({
     address: z.string().min(1),
     namespace: z.string().min(1),
@@ -70,13 +71,11 @@ export function exceptionWorkflowId(tenantId: string, source: WorkflowSource) {
  * path.
  */
 export function workflowPath() {
-  const compiled = fileURLToPath(
-    new URL('./exception-workflow.js', import.meta.url),
-  );
+  const compiled = fileURLToPath(new URL('./workflows.js', import.meta.url));
 
   return existsSync(compiled)
     ? compiled
-    : fileURLToPath(new URL('./exception-workflow.ts', import.meta.url));
+    : fileURLToPath(new URL('./workflows.ts', import.meta.url));
 }
 
 /**
@@ -84,10 +83,10 @@ export function workflowPath() {
  * Reporting failures do not change activity retry behavior.
  * Wrapped activities must run within a Temporal activity context.
  */
-export function temporalActivities(
-  activities: ExceptionActivities,
+export function temporalActivities<T extends object>(
+  activities: T,
   captureActivityError?: Observability['captureActivityError'],
-): ExceptionActivities {
+): T {
   return Object.fromEntries(
     Object.entries(activities).map(([name, fn]) => [
       name,
@@ -128,7 +127,7 @@ export function temporalActivities(
         }
       },
     ]),
-  ) as unknown as ExceptionActivities;
+  ) as unknown as T;
 }
 
 /**
