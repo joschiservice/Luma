@@ -10,6 +10,7 @@ import { identityContract } from './contracts/identity.js';
 import { resolutionLearningContract } from './contracts/learning.js';
 import { operationsContract } from './contracts/overview.js';
 import { playbooksContract } from './contracts/playbooks.js';
+import { procurementContract } from './contracts/procurement.js';
 import { connectorProvidersContract } from './contracts/providers.js';
 import { settingsContract } from './contracts/settings.js';
 import { shadowContract } from './contracts/shadow.js';
@@ -24,6 +25,7 @@ export const apiContract = c.router(
     activity: activityContract,
     playbooks: playbooksContract,
     workflows: workflowsContract,
+    procurement: procurementContract,
     resolutionLearning: resolutionLearningContract,
     caseDesk: caseDeskContract,
     operations: operationsContract,
@@ -92,3 +94,5 @@ export * from './settings.js';
 export * from './apps.js';
 
 export * from './workflows.js';
+
+export * from './procurement.js';

@@ -1,0 +1,369 @@
+import './procurement.css';
+
+import { Alert } from '@luma/ui/components/primitives/alert';
+import { Badge } from '@luma/ui/components/primitives/badge';
+import { Button } from '@luma/ui/components/primitives/button';
+import { CollectionToolbar } from '@luma/ui/components/primitives/collection-toolbar';
+import { Empty } from '@luma/ui/components/primitives/empty';
+import { Input } from '@luma/ui/components/primitives/input';
+import { Select } from '@luma/ui/components/primitives/select';
+import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
+import { useQuery } from '@tanstack/react-query';
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useSearch,
+} from '@tanstack/react-router';
+import {
+  ArrowUpRight,
+  Building2,
+  ChevronRight,
+  FileText,
+  Plus,
+  Search,
+} from 'lucide-react';
+import { useState } from 'react';
+
+import { SignInRedirect } from '../identity/common';
+import { IdentityError } from '../identity/data';
+import { ordersOptions, procurementError, suppliersOptions } from './data';
+import { OrderDialog, SupplierDialog } from './forms';
+import { OrderStatus, statusLabels } from './presentation';
+
+/** Keeps procurement views and filters shareable without accepting unsupported statuses. */
+export function parseProcurementSearch(value: Record<string, unknown>): {
+  view: 'orders' | 'suppliers';
+  q: string;
+  status: string;
+} {
+  return {
+    view: value.view === 'suppliers' ? 'suppliers' : 'orders',
+    q: typeof value.q === 'string' ? value.q.slice(0, 200) : '',
+    status:
+      typeof value.status === 'string' &&
+      Object.hasOwn(statusLabels, value.status)
+        ? value.status
+        : '',
+  };
+}
+
+/** Lists authoritative purchase orders and the workspace supplier directory. */
+export function ProcurementPage() {
+  const { organizationId } = useParams({ from: '/app/$organizationId' });
+  const filters = useSearch({ from: '/app/$organizationId/procurement/' });
+  const navigate = useNavigate({ from: '/app/$organizationId/procurement/' });
+  const orders = useQuery(ordersOptions(organizationId));
+  const suppliers = useQuery(suppliersOptions(organizationId));
+  const [dialog, setDialog] = useState<'supplier' | 'order' | null>(null);
+  const selected = filters.view === 'orders' ? orders : suppliers;
+  const query = filters.q.trim().toLowerCase();
+  const visibleOrders = orders.data?.items.filter(
+    (o) =>
+      (!filters.status || o.status === filters.status) &&
+      [o.reference, o.supplierName, ...o.lines.map((line) => line.sku)]
+        .join(' ')
+        .toLowerCase()
+        .includes(query),
+  );
+  const visibleSuppliers = suppliers.data?.items.filter((s) =>
+    [
+      s.name,
+      ...s.externalReferences.flatMap((ref) => [ref.system, ref.externalId]),
+    ]
+      .join(' ')
+      .toLowerCase()
+      .includes(query),
+  );
+  const orderCounts = new Map<string, number>();
+  for (const order of orders.data?.items ?? [])
+    orderCounts.set(
+      order.supplierId,
+      (orderCounts.get(order.supplierId) ?? 0) + 1,
+    );
+  const canManage = selected.data?.canManage && !selected.error;
+  const change = (next: Partial<typeof filters>) =>
+    void navigate({ search: { ...filters, ...next }, replace: true });
+  if (selected.error instanceof IdentityError && selected.error.status === 401)
+    return <SignInRedirect />;
+
+  return (
+    <div className="procurement-page">
+      <h1 className="sr-only">Procurement</h1>
+      <div className="procurement-intro">
+        <div>
+          <p className="procurement-eyebrow">PROCUREMENT</p>
+          <h2>From supplier to purchase order.</h2>
+          <p>Keep orders, ownership, and lifecycle history in one place.</p>
+        </div>
+        {canManage && (
+          <Button
+            onClick={() =>
+              setDialog(
+                filters.view === 'suppliers' || !suppliers.data?.items.length
+                  ? 'supplier'
+                  : 'order',
+              )
+            }
+            disabled={suppliers.isPending || !!suppliers.error}
+          >
+            <Plus size={16} />
+            {filters.view === 'suppliers' || !suppliers.data?.items.length
+              ? 'Add supplier'
+              : 'New purchase order'}
+          </Button>
+        )}
+      </div>
+      <div className="procurement-collection">
+        <CollectionToolbar
+          views={
+            <div
+              className="procurement-views"
+              role="group"
+              aria-label="Procurement views"
+            >
+              {(['orders', 'suppliers'] as const).map((view) => (
+                <Button
+                  key={view}
+                  variant="ghost"
+                  aria-pressed={filters.view === view}
+                  onClick={() => change({ view, q: '', status: '' })}
+                >
+                  {view === 'orders' ? (
+                    <FileText size={15} />
+                  ) : (
+                    <Building2 size={15} />
+                  )}{' '}
+                  {view === 'orders' ? 'Purchase orders' : 'Suppliers'}
+                  <span>
+                    {(view === 'orders' ? orders.data : suppliers.data)?.items
+                      .length ?? '—'}
+                  </span>
+                </Button>
+              ))}
+            </div>
+          }
+          onRefresh={() => {
+            void orders.refetch();
+            void suppliers.refetch();
+          }}
+          refreshing={orders.isFetching || suppliers.isFetching}
+          children={
+            <div className="procurement-filters">
+              <div className="procurement-search">
+                <Search size={15} aria-hidden="true" />
+                <Input
+                  aria-label={
+                    filters.view === 'orders'
+                      ? 'Search purchase orders'
+                      : 'Search suppliers'
+                  }
+                  placeholder={
+                    filters.view === 'orders'
+                      ? 'Search orders, suppliers, or SKUs…'
+                      : 'Search suppliers…'
+                  }
+                  value={filters.q}
+                  onChange={(e) => change({ q: e.target.value })}
+                />
+              </div>
+              {filters.view === 'orders' && (
+                <Select
+                  aria-label="Order status"
+                  value={filters.status}
+                  options={[
+                    { value: '', label: 'All statuses' },
+                    ...Object.entries(statusLabels).map(([value, label]) => ({
+                      value,
+                      label,
+                    })),
+                  ]}
+                  onValueChange={(value) => change({ status: value ?? '' })}
+                />
+              )}
+            </div>
+          }
+        />
+        {selected.isPending ? (
+          <div className="procurement-loading" role="status">
+            Loading procurement records…
+          </div>
+        ) : selected.error ? (
+          <div className="procurement-notice">
+            <Alert role="alert" tone="danger">
+              {procurementError(selected.error)}
+              <Button variant="outline" onClick={() => void selected.refetch()}>
+                Retry
+              </Button>
+            </Alert>
+          </div>
+        ) : filters.view === 'orders' ? (
+          <>
+            {!visibleOrders?.length ? (
+              <Empty>
+                <FileText size={30} />
+                <h3>
+                  {orders.data?.items.length
+                    ? 'No matching purchase orders'
+                    : 'Your first order starts with a supplier'}
+                </h3>
+                <p>
+                  {orders.data?.items.length
+                    ? 'Try a different search or status.'
+                    : 'Add a supplier, create a draft, then track every status change here.'}
+                </p>
+                {filters.q || filters.status ? (
+                  <Button
+                    variant="outline"
+                    onClick={() => change({ q: '', status: '' })}
+                  >
+                    Clear filters
+                  </Button>
+                ) : canManage ? (
+                  <Button
+                    variant="outline"
+                    disabled={suppliers.isPending || !!suppliers.error}
+                    onClick={() =>
+                      setDialog(
+                        suppliers.data?.items.length ? 'order' : 'supplier',
+                      )
+                    }
+                  >
+                    {suppliers.data?.items.length
+                      ? 'Create purchase order'
+                      : 'Add your first supplier'}
+                  </Button>
+                ) : (
+                  <p>An owner or admin can create purchase orders.</p>
+                )}
+              </Empty>
+            ) : (
+              <ul className="procurement-rows" aria-label="Purchase orders">
+                {visibleOrders.map((order) => (
+                  <li key={order.id}>
+                    <Link
+                      to="/app/$organizationId/procurement/$purchaseOrderId"
+                      params={{ organizationId, purchaseOrderId: order.id }}
+                      className="procurement-row"
+                    >
+                      <span className="procurement-record-icon">
+                        <FileText size={19} />
+                      </span>
+                      <div className="procurement-row-main">
+                        <h3>{order.reference}</h3>
+                        <p>
+                          {order.supplierName}
+                          <span>·</span>
+                          {order.lines.length}{' '}
+                          {order.lines.length === 1 ? 'line' : 'lines'}
+                        </p>
+                      </div>
+                      <div className="procurement-row-meta">
+                        <OrderStatus status={order.status} />
+                        <span>
+                          {order.authority === 'luma'
+                            ? 'Luma-owned'
+                            : 'Externally owned'}
+                        </span>
+                      </div>
+                      <ChevronRight size={16} />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        ) : !visibleSuppliers?.length ? (
+          <Empty>
+            <Building2 size={30} />
+            <h3>
+              {suppliers.data?.items.length
+                ? 'No matching suppliers'
+                : 'Build your supplier directory'}
+            </h3>
+            <p>
+              {suppliers.data?.items.length
+                ? 'Try another name or external reference.'
+                : 'Start with a name. Add an external reference when the supplier also exists in another system.'}
+            </p>
+            {filters.q ? (
+              <Button variant="outline" onClick={() => change({ q: '' })}>
+                Clear search
+              </Button>
+            ) : (
+              canManage && (
+                <Button variant="outline" onClick={() => setDialog('supplier')}>
+                  Add your first supplier
+                </Button>
+              )
+            )}
+          </Empty>
+        ) : (
+          <ul className="procurement-rows" aria-label="Suppliers">
+            {visibleSuppliers.map((supplier) => (
+              <li key={supplier.id} className="procurement-supplier-row">
+                <span className="procurement-record-icon">
+                  <Building2 size={19} />
+                </span>
+                <div className="procurement-row-main">
+                  <h3>{supplier.name}</h3>
+                  <p>
+                    {supplier.externalReferences.length
+                      ? supplier.externalReferences
+                          .map((ref) => `${ref.system} · ${ref.externalId}`)
+                          .join(' / ')
+                      : 'No external references'}
+                  </p>
+                  <span className="procurement-created">
+                    Added <WorkspaceDate value={supplier.createdAt} />
+                  </span>
+                </div>
+                <Badge tone="neutral">
+                  {orders.data ? (orderCounts.get(supplier.id) ?? 0) : '—'}{' '}
+                  {orderCounts.get(supplier.id) === 1 ? 'order' : 'orders'}
+                </Badge>
+                <Button
+                  variant="ghost"
+                  aria-label={`View orders for ${supplier.name}`}
+                  onClick={() =>
+                    change({ view: 'orders', q: supplier.name, status: '' })
+                  }
+                >
+                  <ArrowUpRight size={16} />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      {suppliers.error && filters.view === 'orders' && (
+        <Alert tone="warning">
+          Suppliers could not be loaded.{' '}
+          <Button variant="ghost" onClick={() => void suppliers.refetch()}>
+            Retry suppliers
+          </Button>
+        </Alert>
+      )}
+      {dialog === 'supplier' && (
+        <SupplierDialog
+          organizationId={organizationId}
+          close={() => setDialog(null)}
+        />
+      )}
+      {dialog === 'order' && suppliers.data && (
+        <OrderDialog
+          organizationId={organizationId}
+          suppliers={suppliers.data.items}
+          close={() => setDialog(null)}
+          saved={(order) => {
+            setDialog(null);
+            void navigate({
+              to: '/app/$organizationId/procurement/$purchaseOrderId',
+              params: { organizationId, purchaseOrderId: order.id },
+            });
+          }}
+        />
+      )}
+    </div>
+  );
+}

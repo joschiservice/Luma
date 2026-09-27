@@ -41,7 +41,8 @@
     "pg": "8.20.0",
     "@luma/app-host": "workspace:*",
     "@luma/app-catalog": "workspace:*",
-    "@luma/workflows": "workspace:*"
+    "@luma/workflows": "workspace:*",
+    "@luma/procurement": "workspace:*"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",

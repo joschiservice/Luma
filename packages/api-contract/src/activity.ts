@@ -20,6 +20,7 @@ export const activityTypes = [
   'verification',
   'resolution',
   'connection',
+  'procurement',
 ] as const;
 
 export const activityQuerySchema = z

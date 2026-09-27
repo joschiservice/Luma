@@ -29,6 +29,8 @@ const labels: Record<string, string> = {
   provider_accepted: 'Provider accepted',
   manually_disposed: 'Manually disposed',
   uncertain: 'Uncertain',
+  'purchase_order.created': 'Purchase order created',
+  'purchase_order.status_changed': 'Purchase order status changed',
 };
 const label = (v: string) =>
   labels[v] ?? v.charAt(0).toUpperCase() + v.slice(1).replaceAll('_', ' ');
@@ -380,9 +382,12 @@ function ActivityRow({
           <WorkspaceDate value={item.recordedAt} />
         </time>
         <span>
-          <strong>{item.action}</strong>
+          <strong>{labels[item.action] ?? item.action}</strong>
           {!related && (item.attemptId || item.proposalId) ? (
-            <small>Attempt group · {item.attemptId ?? item.proposalId}</small>
+            <small>
+              {item.type === 'procurement' ? 'Purchase order' : 'Attempt group'}{' '}
+              · {item.attemptId ?? item.proposalId}
+            </small>
           ) : null}
           <small>
             {item.actorId ?? 'Actor not recorded'} ·{' '}
@@ -415,9 +420,15 @@ function ActivityRow({
             <dd>{item.occurredAt ?? 'Not recorded'}</dd>
             <dt>Recorded</dt>
             <dd>{item.recordedAt}</dd>
-            <dt>Proposed change</dt>
+            <dt>
+              {item.type === 'procurement' ? 'Reason' : 'Proposed change'}
+            </dt>
             <dd>{item.summary ?? 'Not recorded'}</dd>
-            <dt>Proposal / attempt</dt>
+            <dt>
+              {item.type === 'procurement'
+                ? 'Purchase order / attempt'
+                : 'Proposal / attempt'}
+            </dt>
             <dd>
               {item.proposalId ?? 'None'} / {item.attemptId ?? 'None'}
             </dd>
@@ -455,6 +466,14 @@ function ActivityRow({
             </dd>
           </dl>
           <div className="activity-links">
+            {item.type === 'procurement' && item.proposalId ? (
+              <Link
+                to="/app/$organizationId/procurement/$purchaseOrderId"
+                params={{ organizationId, purchaseOrderId: item.proposalId }}
+              >
+                Open purchase order
+              </Link>
+            ) : null}
             {item.exceptionId ? (
               <Link
                 to="/app/$organizationId/exceptions/$exceptionId"

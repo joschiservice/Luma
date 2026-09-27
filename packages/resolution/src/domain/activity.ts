@@ -16,7 +16,8 @@ export type ActivityType =
   | 'execution'
   | 'verification'
   | 'resolution'
-  | 'connection';
+  | 'connection'
+  | 'procurement';
 
 export interface ActivityQuery {
   from: string;

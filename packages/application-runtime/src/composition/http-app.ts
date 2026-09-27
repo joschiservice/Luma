@@ -17,6 +17,8 @@ import {
   settingsRoutes,
 } from '@luma/identity/http';
 import type { ModelGateway, Observability, Observation } from '@luma/platform';
+import type { ProcurementService } from '@luma/procurement';
+import { procurementRoutes } from '@luma/procurement/http';
 import type {
   ActivityService,
   DeskService,
@@ -55,6 +57,7 @@ export interface AppDependencies {
   activity?: ActivityService;
   playbooks?: PlaybookLibrary;
   workflows?: WorkflowCatalog;
+  procurement?: ProcurementService;
   learning?: LearningService;
   desk?: DeskService;
   eventSettings?: { intervalMs: number; lifetimeMs: number };
@@ -222,6 +225,7 @@ export function buildApp(
         activity: activityRoutes(dependencies.activity),
         playbooks: playbookRoutes(dependencies.playbooks),
         workflows: workflowRoutes(dependencies.workflows),
+        procurement: procurementRoutes(dependencies.procurement),
         exceptions: caseRoutes(dependencies.cases),
         caseDesk: deskRoutes(dependencies.desk),
         resolutionLearning: learningRoutes(dependencies.learning),

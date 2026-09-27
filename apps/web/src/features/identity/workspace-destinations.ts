@@ -3,6 +3,7 @@ import {
   Inbox,
   LayoutDashboard,
   Settings,
+  ShoppingBag,
   Unplug,
   Workflow,
 } from 'lucide-react';
@@ -26,6 +27,12 @@ export const workspaceDestinations = [
     label: 'Workflows',
     Icon: Workflow,
     description: 'Manage resolution workflows',
+  },
+  {
+    path: 'procurement',
+    label: 'Procurement',
+    Icon: ShoppingBag,
+    description: 'Manage suppliers and purchase orders',
   },
   {
     path: 'activity',

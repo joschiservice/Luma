@@ -8,7 +8,7 @@ import type { ActivityEvent } from '../../domain/activity.js';
 import { activityOutcomeRules } from '../../domain/activity-outcome.js';
 
 const coverage =
-  'Recorded decisions, execution, verification and issue resolutions. Owners and administrators also see connection changes. Older unrecorded changes and playbook activation/revocation history are unavailable. Execution mode is shown only when recorded.';
+  'Recorded decisions, execution, verification, issue resolutions and procurement changes. Owners and administrators also see connection changes. Older unrecorded changes and playbook activation/revocation history are unavailable. Execution mode is shown only when recorded.';
 
 // Only static domain rules enter this SQL expression; request values remain parameters.
 const literal = (value: string) => "'" + value.replaceAll("'", "''") + "'";
@@ -72,8 +72,8 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
       WITH enriched AS (
         SELECT s.*,COALESCE(s.exception_id,p.exception_id,(r.document->>'incidentId')::uuid) AS issue_id,
         COALESCE(s.connection_id,(s.doc->>'connectionId')::uuid,(p.document->>'connectionId')::uuid,(r.document->'action'->>'connectionId')::uuid) AS conn_id,
-        COALESCE(p.document->'target'->>'id',r.document->'action'->'target'->>'id',e.document->'subject'->>'subjectId') AS resource,
-        COALESCE(p.document->>'capability',r.document->'action'->>'capability') AS summary,
+        COALESCE(s.doc->'details'->>'purchaseOrderId',p.document->'target'->>'id',r.document->'action'->'target'->>'id',e.document->'subject'->>'subjectId') AS resource,
+        COALESCE(CASE WHEN s.doc->>'eventType' LIKE 'purchase_order.%' THEN s.doc->'details'->>'reason' END,p.document->>'capability',r.document->'action'->>'capability') AS summary,
         CASE WHEN e.document->'subject'->>'subjectKind'='connection' THEN e.document->'subject'->>'subjectId' END AS subject_connection,
         r.definition_id AS playbook_id,v.document->'provenance'->>'kind' AS mode,
         COALESCE(s.doc->>'eventType','case.updated') AS action,
@@ -89,7 +89,8 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
       ), classified AS (
         SELECT e.*,connections.items AS connections,
         connections.items->0->>'system' AS system,
-        CASE WHEN action LIKE 'connection.%' THEN 'connection'
+        CASE WHEN action LIKE 'purchase_order.%' THEN 'procurement'
+          WHEN action LIKE 'connection.%' THEN 'connection'
           WHEN details->>'resolution' IS NOT NULL THEN 'resolution'
           WHEN action LIKE '%verification%' OR details->>'verification' IS NOT NULL THEN 'verification'
           WHEN action LIKE 'execution.%' THEN 'execution'

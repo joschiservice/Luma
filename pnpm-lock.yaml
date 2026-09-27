@@ -216,6 +216,9 @@ importers:
       '@luma/policies':
         specifier: workspace:*
         version: link:packages/policies
+      '@luma/procurement':
+        specifier: workspace:*
+        version: link:packages/procurement
       '@luma/resolution':
         specifier: workspace:*
         version: link:packages/resolution
@@ -570,6 +573,9 @@ importers:
       '@luma/policies':
         specifier: workspace:*
         version: link:../policies
+      '@luma/procurement':
+        specifier: workspace:*
+        version: link:../procurement
       '@luma/resolution':
         specifier: workspace:*
         version: link:../resolution
@@ -1075,6 +1081,40 @@ importers:
       '@types/node':
         specifier: ^24.0.0
         version: 24.13.5
+
+  packages/procurement:
+    dependencies:
+      '@luma/api-contract':
+        specifier: workspace:*
+        version: link:../api-contract
+      '@luma/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@luma/identity':
+        specifier: workspace:*
+        version: link:../identity
+      '@luma/platform':
+        specifier: workspace:*
+        version: link:../platform
+      '@ts-rest/fastify':
+        specifier: 3.52.1
+        version: 3.52.1(@ts-rest/core@3.52.1(@types/node@24.13.5)(zod@3.25.76))(fastify@5.12.5)(zod@3.25.76)
+      fastify:
+        specifier: 5.12.5
+        version: 5.12.5
+      zod:
+        specifier: 3.25.76
+        version: 3.25.76
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.5
+      vitest:
+        specifier: 4.1.11
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(@vitest/browser-playwright@4.1.11)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))
 
   packages/resolution:
     dependencies:

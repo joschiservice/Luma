@@ -1,8 +1,10 @@
+import { createAuditLog } from '@luma/audit/composition';
 import type { EffectRegistry } from '@luma/connections';
 import { createConnectionCoverage } from '@luma/connections/composition';
 import type { VerificationEvaluator } from '@luma/exceptions';
 import type { IdentityService } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
+import { createProcurement } from '@luma/procurement/composition';
 import {
   createOperationsOverview,
   createResolutionLearning,
@@ -29,12 +31,14 @@ export interface ApplicationServices {
   desk: ReturnType<typeof createDeskServices>;
   playbooks: ReturnType<typeof createResolutionPlaybooks>;
   workflows: ReturnType<typeof createWorkflows>;
+  procurement: ReturnType<typeof createProcurement>;
   library: ReturnType<typeof createPersistentPlaybookLibrary>;
   http: {
     shadow: ReturnType<typeof createShadowEvaluations>;
     cases: ReturnType<typeof createDetectionServices>['cases'];
     desk: ReturnType<typeof createDeskServices>;
     workflows: ReturnType<typeof createWorkflows>;
+    procurement: ReturnType<typeof createProcurement>;
     playbooks: ReturnType<typeof createPersistentPlaybookLibrary>;
     activity: ReturnType<typeof createWorkspaceActivity>;
     learning: ReturnType<typeof createResolutionLearning>;
@@ -73,10 +77,16 @@ export function createApplicationServices(
   const desk = createDeskServices(database, identity, effects, options.desk);
   const library = createPersistentPlaybookLibrary(database, identity);
 
+  const procurement = createProcurement(
+    database,
+    identity.refreshContext,
+    createAuditLog,
+  );
   const workflows = createWorkflows(database, library, identity.refreshContext);
 
   return {
     workflows,
+    procurement,
     detection,
     safety,
     desk,
@@ -84,6 +94,7 @@ export function createApplicationServices(
     library,
     http: {
       workflows,
+      procurement,
       shadow: createShadowEvaluations(database, identity.refreshContext),
       cases: detection.cases,
       desk,

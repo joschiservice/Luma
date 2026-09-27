@@ -85,6 +85,7 @@
     "@luma/app-catalog": "workspace:*",
     "@luma/app-jtl": "workspace:*",
     "@luma/app-shopify": "workspace:*",
-    "@luma/workflows": "workspace:*"
+    "@luma/workflows": "workspace:*",
+    "@luma/procurement": "workspace:*"
   }
 }

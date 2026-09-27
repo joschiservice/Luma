@@ -86,3 +86,16 @@ controls are in `apps/web/src/features/workflows/triggers.tsx`. Validate with
 workflow unit tests and `apps/api/e2e/workflows.e2e.mjs`.
 
 Multi-step process versions compile in `packages/workflows/src/infrastructure/process-schema.ts` and run through `application/process-runtime.ts`. `application/process-activities.ts` enforces an independent Action Admission call for each capability step. Temporal replay and waits live in `packages/workflow-temporal/src/process-workflow.ts`; step records use migration `0026_workflow_process_steps.sql`. The Workflow detail page shows the evidence timeline. See [Multi-step Workflow runtime](workflow-process-runtime.md) for adapter wiring and state ownership.
+
+## Procurement
+
+Start at `packages/procurement/src/domain/procurement.ts` for Supplier,
+PurchaseOrder and line contracts and lifecycle rules.
+`application/procurement.ts` owns authorized commands;
+`infrastructure/store.ts` persists records and audit atomically. The API is in
+`packages/api-contract/src/contracts/procurement.ts`, and the UI is in
+`apps/web/src/features/procurement`. Migration `0027_procurement.sql` owns storage.
+
+Tests: procurement domain tests, `apps/api/e2e/procurement.e2e.mjs` and
+`procurement.browser.mjs`. See [Procurement records](procurement.md) for authority,
+provenance, transitions and retry semantics.

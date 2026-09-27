@@ -1,0 +1,186 @@
+/* global document */
+import { chromium } from 'playwright';
+import { expect, it } from 'vitest';
+
+import { availablePort, startProcess } from './helpers.mjs';
+import { procurementFixture } from './procurement-fixture.mjs';
+
+it('creates and reviews procurement records with safe retries on desktop and mobile', async (t) => {
+  const port = await availablePort();
+  const origin = `http://127.0.0.1:${port}`;
+  const f = await procurementFixture(t, origin);
+  const web = startProcess(
+    t,
+    'e2e/web-server.mjs',
+    { TEST_API_ORIGIN: f.api.origin, TEST_WEB_PORT: String(port) },
+    true,
+  );
+  await web.message('listening');
+  const browser = await chromium.launch();
+  t.onTestFinished(() => browser.close());
+  const context = await browser.newContext({
+    baseURL: origin,
+    viewport: { width: 1440, height: 1000 },
+  });
+  await context.addCookies(
+    f.owner.cookie.split('; ').map((value) => {
+      const [name, ...rest] = value.split('=');
+
+      return { name, value: rest.join('='), url: origin };
+    }),
+  );
+  const page = await context.newPage();
+  page.setDefaultTimeout(15000);
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto(`/app/${f.org.id}/procurement`);
+  await page
+    .getByRole('heading', { name: 'Your first order starts with a supplier' })
+    .waitFor();
+  await page
+    .getByRole('button', { name: 'Add your first supplier', exact: true })
+    .click();
+  await page.getByLabel('Supplier name').fill('Northstar Supply');
+  await page.getByText('External reference', { exact: false }).last().click();
+  await page.getByLabel('System', { exact: true }).fill('JTL');
+  await page.getByLabel('External ID', { exact: true }).fill('SUP-42');
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Add supplier', exact: true })
+    .click();
+  await page
+    .getByRole('button', { name: 'New purchase order', exact: true })
+    .waitFor();
+  await page
+    .getByRole('button', { name: 'New purchase order', exact: true })
+    .click();
+  await page.getByLabel('Order reference').fill('PO-2026-001');
+  await page.getByLabel('SKU 1', { exact: true }).fill('TOTE-NAT');
+  await page
+    .getByLabel('Description 1', { exact: true })
+    .fill('Organic cotton tote · Natural');
+  await page.getByLabel('Quantity 1', { exact: true }).fill('120');
+  await page.getByRole('button', { name: 'Add line', exact: true }).click();
+  await page.getByLabel('SKU 2', { exact: true }).fill('TOTE-BLK');
+  await page
+    .getByLabel('Description 2', { exact: true })
+    .fill('Organic cotton tote · Black');
+  await page.getByLabel('Quantity 2', { exact: true }).fill('80');
+  // Simulate a committed write whose response is lost. Retry must reuse the request.
+  await page.route(
+    '**/procurement/purchase-orders',
+    async (route) => {
+      if (route.request().method() === 'POST') {
+        await route.fetch();
+        await route.abort('failed');
+      } else await route.continue();
+    },
+    { times: 1 },
+  );
+  await page.getByRole('button', { name: 'Create draft', exact: true }).click();
+  await page.getByRole('button', { name: 'Retry save', exact: true }).waitFor();
+  expect(await page.getByLabel('Order reference').isDisabled()).toBe(true);
+  await page.getByRole('button', { name: 'Retry save', exact: true }).click();
+  await page
+    .getByRole('heading', { name: 'PO-2026-001', exact: true })
+    .waitFor();
+  expect(
+    (
+      await f.api.request(`${f.root}/purchase-orders`, {
+        cookie: f.owner.cookie,
+      })
+    ).body.items,
+  ).toHaveLength(1);
+  await page.getByRole('button', { name: 'Open order', exact: true }).click();
+  await page
+    .getByLabel('Reason', { exact: true })
+    .fill('Supplier and quantities reviewed for autumn replenishment.');
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Open order', exact: true })
+    .click();
+  await page
+    .getByRole('heading', { name: 'Draft → Open', exact: true })
+    .waitFor();
+  const detailUrl = page.url();
+  await page.screenshot({
+    path: '/tmp/luma69-order-desktop.png',
+    fullPage: true,
+  });
+  await page.reload();
+  await page
+    .getByRole('heading', { name: 'Draft → Open', exact: true })
+    .waitFor();
+  await page
+    .getByRole('link', { name: 'Purchase orders', exact: true })
+    .click();
+  await page.getByRole('link', { name: /PO-2026-001/ }).waitFor();
+  await page.screenshot({
+    path: '/tmp/luma69-list-desktop.png',
+    fullPage: true,
+  });
+  await page.getByLabel('Search purchase orders').fill('missing');
+  await page
+    .getByRole('heading', { name: 'No matching purchase orders' })
+    .waitFor();
+  await page
+    .getByRole('button', { name: 'Clear filters', exact: true })
+    .click();
+  await page.getByRole('button', { name: /Suppliers 1/ }).click();
+  await page
+    .getByRole('heading', { name: 'Northstar Supply', exact: true })
+    .waitFor();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({
+    path: '/tmp/luma69-suppliers-mobile.png',
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
+  await page.goto(detailUrl);
+  await page
+    .getByRole('heading', { name: 'PO-2026-001', exact: true })
+    .waitFor();
+  await page.screenshot({
+    path: '/tmp/luma69-order-mobile.png',
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
+  await page.getByRole('button', { name: 'Cancel order', exact: true }).click();
+  await page
+    .getByLabel('Reason', { exact: true })
+    .fill('Replenishment no longer required.');
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Cancel order', exact: true })
+    .click();
+  await page
+    .getByRole('heading', { name: 'Open → Cancelled', exact: true })
+    .waitFor();
+  expect(
+    await page.getByRole('button', { name: 'Open order', exact: true }).count(),
+  ).toBe(0);
+  await page.goto(`/app/${f.org.id}/activity?type=procurement`);
+  await page
+    .getByText('Purchase order status changed', { exact: true })
+    .first()
+    .click();
+  await page
+    .getByRole('link', { name: 'Open purchase order', exact: true })
+    .click();
+  await page
+    .getByRole('heading', { name: 'PO-2026-001', exact: true })
+    .waitFor();
+  expect(errors).toEqual([]);
+});
