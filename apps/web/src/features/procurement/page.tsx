@@ -20,6 +20,7 @@ import {
   Building2,
   ChevronRight,
   FileText,
+  PackageCheck,
   Plus,
   Search,
 } from 'lucide-react';
@@ -82,6 +83,12 @@ export function ProcurementPage() {
       (orderCounts.get(order.supplierId) ?? 0) + 1,
     );
   const canManage = selected.data?.canManage && !selected.error;
+  const openCount = orders.data?.items.filter(
+    (order) => order.status === 'open',
+  ).length;
+  const draftCount = orders.data?.items.filter(
+    (order) => order.status === 'draft',
+  ).length;
   const change = (next: Partial<typeof filters>) =>
     void navigate({ search: { ...filters, ...next }, replace: true });
   if (selected.error instanceof IdentityError && selected.error.status === 401)
@@ -114,6 +121,56 @@ export function ProcurementPage() {
           </Button>
         )}
       </div>
+      <section
+        className="procurement-overview"
+        aria-label="Replenishment context"
+      >
+        <div className="procurement-overview-heading">
+          <PackageCheck size={17} aria-hidden="true" />
+          <div>
+            <h2>Replenishment context</h2>
+            <p>
+              Find supplier and order state before creating another commitment.
+            </p>
+          </div>
+        </div>
+        <div className="procurement-overview-actions">
+          <Button
+            variant="ghost"
+            aria-label="Show open purchase orders"
+            aria-pressed={
+              filters.view === 'orders' && filters.status === 'open'
+            }
+            onClick={() => change({ view: 'orders', q: '', status: 'open' })}
+          >
+            <strong>{openCount ?? '—'}</strong>
+            <span>Open orders</span>
+            <ArrowUpRight size={14} aria-hidden="true" />
+          </Button>
+          <Button
+            variant="ghost"
+            aria-label="Show draft purchase orders"
+            aria-pressed={
+              filters.view === 'orders' && filters.status === 'draft'
+            }
+            onClick={() => change({ view: 'orders', q: '', status: 'draft' })}
+          >
+            <strong>{draftCount ?? '—'}</strong>
+            <span>Drafts to review</span>
+            <ArrowUpRight size={14} aria-hidden="true" />
+          </Button>
+          <Button
+            variant="ghost"
+            aria-label="Show suppliers"
+            aria-pressed={filters.view === 'suppliers'}
+            onClick={() => change({ view: 'suppliers', q: '', status: '' })}
+          >
+            <strong>{suppliers.data?.items.length ?? '—'}</strong>
+            <span>Suppliers</span>
+            <ArrowUpRight size={14} aria-hidden="true" />
+          </Button>
+        </div>
+      </section>
       <div className="procurement-collection">
         <CollectionToolbar
           views={

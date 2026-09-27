@@ -12,6 +12,13 @@ import {
   transitionInputSchema,
 } from './infrastructure/validation.js';
 
+export {
+  createProcurementCapabilities,
+  procurementCapabilityCatalog,
+} from './infrastructure/capabilities.js';
+
+export { createSimulatedProcurement } from './infrastructure/simulator.js';
+
 /** Composes authoritative procurement storage with refreshed membership and transactional audit. */
 export function createProcurement(
   db: TenantDatabase,

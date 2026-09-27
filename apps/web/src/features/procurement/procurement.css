@@ -36,6 +36,63 @@
   color: var(--muted-foreground);
   line-height: 1.6;
 }
+.procurement-overview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 22px;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+}
+.procurement-overview-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+.procurement-overview-heading > svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--muted-foreground);
+}
+.procurement-overview-heading h2 {
+  font-size: 13px;
+}
+.procurement-overview-heading p {
+  margin-top: 5px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.procurement-overview-actions {
+  display: flex;
+  gap: 5px;
+  flex: none;
+}
+.procurement-overview-actions button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  height: auto;
+  border-radius: 8px;
+  color: var(--muted-foreground);
+}
+.procurement-overview-actions button[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--foreground);
+}
+.procurement-overview-actions strong {
+  color: var(--foreground);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+.procurement-overview-actions span {
+  font-size: 11px;
+}
 .procurement-collection {
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -444,6 +501,14 @@
   margin-bottom: 1px;
 }
 @media (max-width: 900px) {
+  .procurement-overview {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .procurement-overview-actions {
+    flex-wrap: wrap;
+  }
   .procurement-page {
     padding: 24px 20px 48px;
   }
@@ -461,6 +526,22 @@
   }
 }
 @media (max-width: 640px) {
+  .procurement-overview {
+    padding: 16px;
+  }
+  .procurement-overview-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+  }
+  .procurement-overview-actions button {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    padding: 9px;
+  }
+  .procurement-overview-actions button svg {
+    display: none;
+  }
   .procurement-page {
     padding: 20px 14px 40px;
   }

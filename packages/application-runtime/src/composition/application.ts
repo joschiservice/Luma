@@ -15,6 +15,7 @@ import { createWorkflows } from '@luma/workflows/composition';
 
 import { createAdmissionEligibility } from './admission.js';
 import { createPersistentPlaybookLibrary } from './playbook-library.js';
+import { createProcurementEffects } from './procurement-effects.js';
 import {
   createDeskServices,
   createDetectionServices,
@@ -71,17 +72,31 @@ export function createApplicationServices(
     undefined,
     options.verifier,
   );
-  const safety = createSafetyServices(database, identity, effects, {
-    eligible: createAdmissionEligibility(detection.diagnoses),
-  });
-  const desk = createDeskServices(database, identity, effects, options.desk);
-  const library = createPersistentPlaybookLibrary(database, identity);
-
   const procurement = createProcurement(
     database,
     identity.refreshContext,
     createAuditLog,
   );
+  const procurementEffects =
+    options.execution.kind === 'enabled'
+      ? createProcurementEffects(procurement)
+      : { resolve: async () => null };
+  const combinedEffects: EffectRegistry = {
+    resolve: async (context, intent) =>
+      (await procurementEffects.resolve(context, intent)) ??
+      effects.resolve(context, intent),
+  };
+  const safety = createSafetyServices(database, identity, combinedEffects, {
+    eligible: createAdmissionEligibility(detection.diagnoses),
+  });
+  const desk = createDeskServices(
+    database,
+    identity,
+    combinedEffects,
+    options.desk,
+  );
+  const library = createPersistentPlaybookLibrary(database, identity);
+
   const workflows = createWorkflows(database, library, identity.refreshContext);
 
   return {

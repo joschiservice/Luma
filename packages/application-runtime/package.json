@@ -39,6 +39,7 @@
     "@ts-rest/fastify": "3.52.1",
     "fastify": "5.12.5",
     "pg": "8.20.0",
+    "zod": "3.25.76",
     "@luma/app-host": "workspace:*",
     "@luma/app-catalog": "workspace:*",
     "@luma/workflows": "workspace:*",

@@ -99,6 +99,7 @@ export function createProcurementStore(
               .filter((e) => e.eventType.startsWith('purchase_order.'))
               .map((e) => ({
                 id: e.id,
+                commandId: e.details.commandId,
                 occurredAt: e.occurredAt,
                 actorId: e.actor.id,
                 from: (e.details.from || null) as

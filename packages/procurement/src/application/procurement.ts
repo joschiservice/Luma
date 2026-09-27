@@ -13,6 +13,7 @@ import { nextStatuses, purchaseOrderProblem } from '../domain/procurement.js';
 
 export interface ProcurementEvent {
   id: string;
+  commandId?: string | undefined;
   occurredAt: string;
   actorId: string;
   from: PurchaseOrder['status'] | null;
@@ -148,6 +149,7 @@ export function createProcurementService(deps: {
       ],
       details: {
         purchaseOrderId: order.id,
+        commandId: eventId,
         from: from ?? '',
         to: order.status,
         revision: String(order.revision),
@@ -178,6 +180,26 @@ export function createProcurementService(deps: {
       );
 
       return { items, canManage: context.actor.role !== 'member' };
+    },
+    /** Looks up one tenant supplier without exposing another workspace's records. */
+    async supplier(context: TenantContext, id: string) {
+      context = await authorize(context);
+
+      return deps.store.transaction(context.tenantId, false, (tx) =>
+        tx.supplier(id),
+      );
+    },
+    /** Finds open orders, optionally for one supplier, from authoritative records. */
+    async openOrders(context: TenantContext, supplierId?: string) {
+      context = await authorize(context);
+
+      return deps.store.transaction(context.tenantId, false, async (tx) =>
+        (await tx.orders()).filter(
+          (order) =>
+            order.status === 'open' &&
+            (supplierId === undefined || order.supplierId === supplierId),
+        ),
+      );
     },
     /** Persists a supplier; exact retries return the original record. */
     async createSupplier(context: TenantContext, input: unknown) {

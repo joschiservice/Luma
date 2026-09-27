@@ -95,6 +95,7 @@ export type PurchaseOrderStatus = PurchaseOrder['status'];
 
 export const procurementEventSchema = z.object({
   id: z.string().uuid(),
+  commandId: z.string().uuid().optional(),
   occurredAt: z.string().datetime(),
   actorId: z.string(),
   from: purchaseOrderStatusSchema.nullable(),

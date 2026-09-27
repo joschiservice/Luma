@@ -19,6 +19,11 @@ export const supplierInputSchema = z
   })
   .strict();
 
+export const supplierOutputSchema = supplierInputSchema.extend({
+  tenantId: z.string().uuid(),
+  createdAt: z.string().datetime(),
+});
+
 export const purchaseOrderStatusSchema = z.enum([
   'draft',
   'open',
@@ -66,3 +71,12 @@ export const transitionInputSchema = z
     reason: z.string().trim().min(1).max(1000),
   })
   .strict();
+
+export const purchaseOrderOutputSchema = purchaseOrderInputSchema.extend({
+  tenantId: z.string().uuid(),
+  supplierName: text,
+  status: purchaseOrderStatusSchema,
+  revision: z.number().int().min(1),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});

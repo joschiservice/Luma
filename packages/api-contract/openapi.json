@@ -13139,6 +13139,10 @@
                             "type": "string",
                             "format": "uuid"
                           },
+                          "commandId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
                           "occurredAt": {
                             "type": "string",
                             "format": "date-time"

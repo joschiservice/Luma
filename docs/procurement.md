@@ -61,6 +61,34 @@ A retry of an older command never rolls back the current order state. Read the
 detail endpoint to obtain the current revision. The web dialogs retain uncertain
 requests, freeze their fields and offer retry.
 
+## Procurement capabilities
+
+`createProcurementCapabilities` exposes four versioned operations: supplier lookup,
+open purchase-order lookup, Luma-owned draft creation, and audited lifecycle
+transition. Each parses its input at runtime and uses the Procurement owner
+service, so membership and tenant checks apply to every call. Existing connector
+`inventory.read` remains the inventory context source; no broad procurement
+capability or supplier submission is declared.
+
+`createProcurementEffects` binds draft creation and transition to Action
+Admission. The target is a tenant-owned `purchase_order` UUID, and the
+connection ID is the tenant ID for this internal service. Create parameters
+carry `supplierId`, `reference`, and JSON-encoded immutable `lines`; optional
+workflow, action and outcome IDs become order origin references. Transition
+parameters carry a stable `commandId`, `status`, `expectedRevision`, and `reason`. The expected
+postcondition must name the resulting status. Risk floors are medium for draft
+creation and high for lifecycle transition. Workspace policy determines whether
+approval is required. The adapter exists only when execution is enabled.
+
+Creation reuses the order ID as its command key. A transition uses its supplied
+command UUID for exact retries. Both writes retain the
+owner service's atomic audit and conflict behavior. Verification performs an
+independent authoritative read, checking tenant, ownership, status, revision and the command audit record;
+creation also compares supplier, reference, lines and origin. An unavailable read
+is inconclusive. `createSimulatedProcurement` provides an isolated in-memory
+owner with the same validation, retry and audit behavior for deterministic
+scenario evaluation.
+
 ## Entry points and validation
 
 - `packages/procurement/src/domain/procurement.ts`: records and lifecycle rules.
