@@ -75,7 +75,7 @@ it('offers app-owned settings for revoked installations', () => {
     appId: 'shopify',
     status: 'revoked',
   });
-  expect(html).toContain('App settings');
+  expect(html).toContain('Connection settings');
   expect(html).not.toContain('Replace credentials');
   expect(html).not.toContain('Validate access');
 });

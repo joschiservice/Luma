@@ -42,7 +42,7 @@ export function registerShopifyRoutes(
       reply.header('referrer-policy', 'no-referrer');
 
       return reply.redirect(
-        `${oauth.config.webOrigin}/app/${tenant}/connections?appResult=${result}`,
+        `${oauth.config.webOrigin}/app/${tenant}/apps/shopify/settings?appResult=${result}`,
       );
     },
   );

@@ -38,7 +38,7 @@ JTL shipping-method correction requires both `orders.shipping-method.read` and `
 
 ## Operator interface and HTTP boundary
 
-The workspace Connections page lists installed connections separately from setup options. Owners and admins can submit Shopify tokens, JTL Cloud tokens, or JTL-Wawi registration tokens and challenge codes. Token acquisition remains with the installation host. Members can view connection summaries. Replacement clears permissions until validation succeeds; disconnected records require a new installation.
+The workspace Connections page lists apps with connection summaries. Each app management page lists its connections and offers Add connection for setup. Owners and admins can submit Shopify tokens, JTL Cloud tokens, or JTL-Wawi registration tokens and challenge codes. Token acquisition remains with the installation host. Members can view connection summaries. Replacement clears permissions until validation succeeds; disconnected records require a new installation.
 
 The shared `apiContract.connections` exposes list/install at `/v1/organizations/:organizationId/connections` and versioned `check`, `credentials`, and `disconnect` commands under `/:connectionId`. Handlers reuse `ConnectionManagement`, refresh membership through that service, and serialize only the public summary schema. Credential fields are never returned. Errors use controlled messages. The web form keeps secrets out of URL state, persistence and the Query mutation cache, clears them after requests, and requires a list refresh after an uncertain result before resubmission.
 

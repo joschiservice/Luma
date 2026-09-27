@@ -1,8 +1,16 @@
 import type { InstalledConnection } from '@luma/api-contract';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  RouterProvider,
+} from '@tanstack/react-router';
 import { type ReactNode, useState } from 'react';
 
 import appStyles from '../../styles.css?inline';
+import { AppSettings } from '../apps/settings';
 
 export const organizationId = '22222222-2222-4222-8222-222222222222';
 
@@ -66,11 +74,35 @@ export function ConnectionsPreview({ children }: { children: ReactNode }) {
     () => new QueryClient({ defaultOptions: { queries: { retry: false } } }),
   );
 
+  const [router] = useState(() => {
+    const root = createRootRoute();
+    const index = createRoute({
+      getParentRoute: () => root,
+      path: '/',
+      component: () => children,
+    });
+    const settings = createRoute({
+      getParentRoute: () => root,
+      path: '/app/$organizationId/apps/$appId/settings',
+      component: () => {
+        const { appId } = settings.useParams();
+
+        return <AppSettings organizationId={organizationId} appId={appId} />;
+      },
+    });
+
+    return createRouter({
+      routeTree: root.addChildren([index, settings]),
+      history: createMemoryHistory(),
+      context: { queryClient: client },
+    });
+  });
+
   return (
     <QueryClientProvider client={client}>
       <style>{appStyles}</style>
       <div style={{ padding: 24, maxWidth: 1200, margin: 'auto' }}>
-        {children}
+        <RouterProvider router={router} />
       </div>
     </QueryClientProvider>
   );

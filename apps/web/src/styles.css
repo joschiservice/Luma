@@ -3444,3 +3444,15 @@ summary {
     padding-top: 16px;
   }
 }
+
+.app-back {
+  display: inline-block;
+  margin-bottom: 20px;
+  color: var(--muted-foreground);
+}
+.app-attention {
+  display: block;
+  margin-bottom: 12px;
+  color: var(--foreground);
+  font-weight: 600;
+}

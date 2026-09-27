@@ -7,7 +7,8 @@ import type {
 /** Workspace-scoped services supplied to first-party UI contributions. */
 export interface AppUiProps {
   organizationId: string;
-  slot: 'connections' | 'settings' | 'page';
+  /** Setup uses connections; settings receives a connection; app-settings edits workspace-wide options. */
+  slot: 'connections' | 'settings' | 'app-settings' | 'page';
   connection?: InstalledConnection | undefined;
   /** Closes setup and refreshes workspace data after a successful mutation. */
   done(): Promise<void>;

@@ -53,7 +53,7 @@ async function fixture(t) {
   await page.getByRole('heading', { name: 'Operations overview' }).waitFor();
   const organizationId = new URL(page.url()).pathname.split('/')[2];
   await page.getByRole('link', { name: 'Connections', exact: true }).click();
-  await page.getByText('No connections yet.', { exact: false }).waitFor();
+  await page.getByText('No apps installed yet.', { exact: false }).waitFor();
   expect(appModules).toEqual([]);
 
   return { db, api, page, context, organizationId, errors, appModules };
@@ -65,12 +65,9 @@ async function setup(page, provider, label, token = 'valid-test-token') {
     exact: true,
   });
   if (await install.count()) await install.click();
-  else
-    await page
-      .getByRole('article')
-      .filter({ has: page.getByRole('heading', { name: 'JTL', exact: true }) })
-      .getByRole('button', { name: 'Configure', exact: true })
-      .click();
+  await page
+    .getByRole('button', { name: 'Add connection', exact: true })
+    .click();
   if (provider === 'JTL-Wawi on-premise')
     await page.getByLabel('Connection type').selectOption('jtl-onprem');
   await page.getByLabel('Connection name').fill(label);
@@ -103,7 +100,7 @@ it('connects JTL targets, validates, replaces invalid credentials and disconnect
   await shop.getByRole('button', { name: 'Validate access' }).click();
   await shop.getByText('Needs attention', { exact: true }).waitFor();
   expect(await shop.getByText('Permitted', { exact: true }).count()).toBe(0);
-  await shop.getByRole('button', { name: 'App settings' }).click();
+  await shop.getByRole('button', { name: 'Connection settings' }).click();
   expect(
     await page.getByLabel('Access token', { exact: true }).inputValue(),
   ).toBe('');
@@ -124,6 +121,31 @@ it('connects JTL targets, validates, replaces invalid credentials and disconnect
   const cloud = await save(page, 'Warehouse');
   await cloud.getByRole('button', { name: 'Validate access' }).click();
   await cloud.getByText('Read and write access', { exact: true }).waitFor();
+  await page.getByRole('link', { name: '← Apps & connections' }).click();
+  const jtlSummary = page
+    .getByRole('article')
+    .filter({ has: page.getByRole('heading', { name: 'JTL', exact: true }) });
+  await jtlSummary.getByText('2 connections', { exact: true }).waitFor();
+  await page.screenshot({
+    path: '/tmp/luma-apps-overview.png',
+    fullPage: true,
+    animations: 'disabled',
+  });
+  expect(
+    await page.getByRole('article', { name: 'Main shop', exact: true }).count(),
+  ).toBe(0);
+  await jtlSummary.getByRole('link', { name: 'Manage app' }).click();
+  await shop.waitFor();
+  const linkedConnections = await (
+    await context.request.get(
+      `/api/v1/organizations/${organizationId}/connections`,
+    )
+  ).json();
+  await page.goto(
+    `/app/${organizationId}/connections#connection-${linkedConnections.items[0].id}`,
+  );
+  await page.waitForURL('**/apps/jtl/settings#connection-*');
+  await shop.waitFor();
   await setup(page, 'JTL-Wawi on-premise', 'Local ERP');
   await page.getByLabel('HTTPS API URL').fill('https://erp.example.test/api/');
   await page.getByLabel('App ID', { exact: true }).fill('luma');
@@ -132,6 +154,15 @@ it('connects JTL targets, validates, replaces invalid credentials and disconnect
   const onprem = await save(page, 'Local ERP');
   await onprem.getByRole('button', { name: 'Validate access' }).click();
   await onprem.getByText('Validated', { exact: true }).waitFor();
+  await page.goto(`/app/${organizationId}/apps/jtl/settings`);
+  await page.getByRole('heading', { name: 'JTL', exact: true }).waitFor();
+  expect(
+    await page
+      .getByRole('navigation', { name: 'Workspace navigation' })
+      .getByRole('link', { name: 'Connections', exact: true })
+      .getAttribute('class'),
+  ).toContain('active');
+  await shop.getByText('Validated', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Refresh list' }).focus();
   await page.screenshot({
     path: '/tmp/luma-34-desktop.png',
@@ -184,7 +215,7 @@ it('connects JTL targets, validates, replaces invalid credentials and disconnect
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await shop.getByRole('button', { name: 'App settings' }).click();
+  await shop.getByRole('button', { name: 'Connection settings' }).click();
   await page
     .getByRole('dialog')
     .getByLabel('Connection name')
@@ -202,10 +233,7 @@ it('connects JTL targets, validates, replaces invalid credentials and disconnect
   await reconnected.getByRole('button', { name: 'Validate access' }).click();
   await reconnected.getByText('Validated', { exact: true }).waitFor();
   await shop.getByText('Disconnected', { exact: true }).waitFor();
-  const jtlApp = page
-    .getByRole('article')
-    .filter({ has: page.getByRole('heading', { name: 'JTL', exact: true }) });
-  await jtlApp.getByRole('button', { name: 'Uninstall', exact: true }).click();
+  await page.getByRole('button', { name: 'Uninstall', exact: true }).click();
   await page
     .getByRole('button', { name: 'Confirm uninstall', exact: true })
     .click();
@@ -245,7 +273,7 @@ it('connects JTL targets, validates, replaces invalid credentials and disconnect
   ).toBe(true);
   expect(
     await page
-      .getByRole('button', { name: 'App settings', exact: true })
+      .getByRole('button', { name: 'Connection settings', exact: true })
       .count(),
   ).toBe(0);
   const denied = await context.request.post(
@@ -348,6 +376,9 @@ it('starts Shopify authorization without token fields and reports callback outco
   await page
     .getByRole('button', { name: 'Install Shopify', exact: true })
     .click();
+  await page
+    .getByRole('button', { name: 'Add connection', exact: true })
+    .click();
   expect(await page.getByLabel('Access token', { exact: true }).count()).toBe(
     0,
   );
@@ -370,7 +401,7 @@ it('starts Shopify authorization without token fields and reports callback outco
   await page.waitForURL('https://dev-shop.myshopify.com/**');
   await page.goto(returnUrl + '?appResult=denied');
   await page
-    .getByText('Authorization needs attention. Open app settings to try again.')
+    .getByText('Authorization needs attention. Add a connection to try again.')
     .waitFor();
   expect(errors).toEqual([]);
 }, 120000);

@@ -35,15 +35,9 @@ export const Installed: Story = {
   play: async ({ canvasElement }) => {
     const c = within(canvasElement);
     await expect(
-      await c.findByRole('heading', { name: 'Main store' }),
+      await c.findByRole('heading', { name: 'Shopify' }),
     ).toBeVisible();
-    await expect(
-      c.getByRole('heading', { name: 'North warehouse' }),
-    ).toBeVisible();
-    await userEvent.click(c.getByRole('button', { name: 'Refresh list' }));
-    await expect(
-      await c.findByRole('button', { name: 'Refresh list' }),
-    ).toBeEnabled();
+    await expect(c.getByRole('heading', { name: 'JTL' })).toBeVisible();
   },
 };
 
@@ -62,20 +56,12 @@ export const ReadOnly: Story = {
   play: async ({ canvasElement }) => {
     const c = within(canvasElement);
     await expect(
-      (await c.findAllByRole('button', { name: 'Configure' }))[0]!,
-    ).toBeDisabled();
+      (await c.findAllByRole('link', { name: 'Manage app' }))[0]!,
+    ).toBeVisible();
     await expect(
       c.queryByRole('button', { name: 'Validate access' }),
     ).not.toBeInTheDocument();
   },
-};
-
-export const ShopifyConnected: Story = { args: { appResult: 'connected' } };
-
-export const ShopifyDenied: Story = { args: { appResult: 'denied' } };
-
-export const ShopifyPermissions: Story = {
-  args: { appResult: 'permissions' },
 };
 
 export const ShopifySetup: Story = {
@@ -84,6 +70,11 @@ export const ShopifySetup: Story = {
     await userEvent.click(
       await within(canvasElement).findByRole('button', {
         name: 'Install Shopify',
+      }),
+    );
+    await userEvent.click(
+      await within(canvasElement).findByRole('button', {
+        name: 'Add connection',
       }),
     );
     const dialog = await within(document.body).findByRole('dialog');
@@ -103,6 +94,11 @@ export const JtlCloudSetup: Story = {
         name: 'Install JTL',
       }),
     );
+    await userEvent.click(
+      await within(canvasElement).findByRole('button', {
+        name: 'Add connection',
+      }),
+    );
     const dialog = await within(document.body).findByRole('dialog');
     await waitFor(() =>
       expect(
@@ -120,6 +116,11 @@ export const JtlOnPremiseSetup: Story = {
         name: 'Install JTL',
       }),
     );
+    await userEvent.click(
+      await within(canvasElement).findByRole('button', {
+        name: 'Add connection',
+      }),
+    );
     const dialog = await within(document.body).findByRole('dialog');
     await userEvent.selectOptions(
       await within(dialog).findByLabelText('Connection type'),
@@ -128,25 +129,5 @@ export const JtlOnPremiseSetup: Story = {
     await expect(
       within(dialog).getByLabelText('Challenge code'),
     ).toHaveAttribute('type', 'password');
-  },
-};
-
-export const DisconnectFlow: Story = {
-  play: async ({ canvasElement }) => {
-    const c = within(canvasElement);
-    const card = await c.findByRole('article', { name: 'North warehouse' });
-    await userEvent.click(
-      within(card).getByRole('button', { name: 'Disconnect' }),
-    );
-    const dialog = await within(document.body).findByRole('dialog');
-    await userEvent.click(
-      within(dialog).getByRole('button', { name: 'Confirm disconnect' }),
-    );
-    await expect(
-      await within(card).findByText('Disconnected', { exact: true }),
-    ).toBeVisible();
-    await expect(
-      within(card).queryByRole('button', { name: 'Validate access' }),
-    ).not.toBeInTheDocument();
   },
 };

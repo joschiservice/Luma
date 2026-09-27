@@ -20,13 +20,25 @@ function Navigation({
   organizationId: string;
   close?: (() => void) | undefined;
 }) {
+  const appSettings = useLocation({
+    select: (location) =>
+      /^\/app\/[^/]+\/apps\/[^/]+\/settings\/?$/.test(location.pathname),
+  });
+
   return (
     <nav aria-label="Workspace navigation">
       {workspaceDestinations.map(({ path, label, Icon }) => (
         <Link
           key={path}
           className={
-            path === 'settings' ? 'workspace-settings-link' : undefined
+            path === 'settings'
+              ? 'workspace-settings-link'
+              : path === 'connections' && appSettings
+                ? 'active'
+                : undefined
+          }
+          aria-current={
+            path === 'connections' && appSettings ? 'page' : undefined
           }
           to={`/app/$organizationId/${path}`}
           params={{ organizationId }}
@@ -51,8 +63,11 @@ export function WorkspaceShell() {
 
 function TenantShell({ organizationId }: { organizationId: string }) {
   const pathname = useLocation({ select: (location) => location.pathname });
+  const section = /^\/app\/[^/]+\/apps\/[^/]+\/settings\/?$/.test(pathname)
+    ? 'connections'
+    : pathname.split('/')[3];
   const page =
-    workspaceDestinations.find(({ path }) => pathname.split('/')[3] === path) ??
+    workspaceDestinations.find(({ path }) => section === path) ??
     workspaceDestinations[0];
   const client = useQueryClient();
   const access = useQuery(contextOptions(organizationId));

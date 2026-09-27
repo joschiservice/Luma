@@ -117,10 +117,10 @@ export function ConnectionCard({
         {!appAvailable
           ? 'This app is unavailable in the workspace. Historical connection data remains accessible.'
           : terminal
-            ? 'Access stopped. Configure the app to reconnect.'
+            ? 'Access stopped. Add a connection to reconnect.'
             : connection.status === 'active'
               ? 'Credentials and requested permissions validated. Observation freshness is unknown.'
-              : 'Open app settings to validate or restore access.'}
+              : 'Validate access or open connection settings to restore access.'}
       </p>
       <div className="connection-access">
         <h4>
@@ -160,7 +160,7 @@ export function ConnectionCard({
             onOpenChange={(open) => setDialog(open ? 'settings' : null)}
           >
             <DialogTrigger render={<Button variant="outline" />}>
-              App settings
+              Connection settings
             </DialogTrigger>
             <DialogContent className="connection-dialog">
               <DialogTitle>Connection settings</DialogTitle>

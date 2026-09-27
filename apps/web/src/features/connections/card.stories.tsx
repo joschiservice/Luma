@@ -64,7 +64,7 @@ export const ReplaceCredentials: Story = {
   play: async ({ canvasElement }) => {
     await userEvent.click(
       within(canvasElement).getByRole('button', {
-        name: 'App settings',
+        name: 'Connection settings',
       }),
     );
     const d = within(await within(document.body).findByRole('dialog'));
@@ -92,7 +92,9 @@ export const ReconnectShopify: Story = {
   args: { connection: { ...shopify, status: 'revoked' } },
   play: async ({ canvasElement }) => {
     await userEvent.click(
-      within(canvasElement).getByRole('button', { name: 'App settings' }),
+      within(canvasElement).getByRole('button', {
+        name: 'Connection settings',
+      }),
     );
     const d = within(await within(document.body).findByRole('dialog'));
     await expect(

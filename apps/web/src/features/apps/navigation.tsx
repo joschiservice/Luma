@@ -27,6 +27,7 @@ export function AppNavigation({
         to="/app/$organizationId/apps/$appId"
         params={{ organizationId, appId: app.id }}
         preload={false}
+        activeOptions={{ exact: true }}
         onClick={close}
         activeProps={{ 'aria-current': 'page', className: 'active' }}
       >

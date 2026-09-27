@@ -9,7 +9,7 @@ export interface AppManifest {
   description: string;
   version: string;
   category: 'storefront' | 'erp' | 'utility';
-  ui: ('connections' | 'settings' | 'page')[];
+  ui: ('connections' | 'settings' | 'app-settings' | 'page')[];
   connectionTypes: { kind: string; name: string }[];
 }
 

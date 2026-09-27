@@ -37,7 +37,7 @@ it.each([401, 403, 404] as const)(
       });
       expect(response.statusCode).toBe(302);
       expect(response.headers.location).toBe(
-        `https://luma.test/app/${tenant}/connections?appResult=failed`,
+        `https://luma.test/app/${tenant}/apps/shopify/settings?appResult=failed`,
       );
       expect(response.headers['referrer-policy']).toBe('no-referrer');
       expect(response.body).not.toContain('private-code');
