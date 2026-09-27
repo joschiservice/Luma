@@ -4,7 +4,12 @@ import { seedPilot } from '../pilot/seed.mjs';
 import { createOperationsClient } from './platform-client.mjs';
 
 /** Starts an isolated healthy Luma workspace and simulator using the same provisioning and HTTP bridge as the local stack. */
-export async function createSimulatorEnvironment({ directory, env, saved }) {
+export async function createSimulatorEnvironment({
+  directory,
+  env,
+  saved,
+  temporal = null,
+}) {
   const token = 'operational-simulator-test-token';
   let operations;
   const simulator = await createApp(
@@ -41,7 +46,7 @@ export async function createSimulatorEnvironment({ directory, env, saved }) {
       token,
       runId: 'operations',
     });
-    pilot = await createPilot(env, directory, manifest, null);
+    pilot = await createPilot(env, directory, manifest, temporal);
     const apiOrigin = await pilot.app.listen({ host: '127.0.0.1', port: 0 });
     operations = createOperationsClient({
       apiOrigin,
@@ -53,6 +58,7 @@ export async function createSimulatorEnvironment({ directory, env, saved }) {
 
     return {
       pilot,
+      password: saved.seedPassword,
       simulator,
       manifest,
       call,

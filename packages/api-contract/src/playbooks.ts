@@ -40,7 +40,7 @@ export const playbookVersionViewSchema = z.object({
     }),
   ),
   provenance: z.object({
-    kind: z.enum(['pilot', 'resolution']),
+    kind: z.enum(['pilot', 'resolution', 'native']),
     reference: text,
     authoredBy: text,
     evidenceRefs: z.array(text),

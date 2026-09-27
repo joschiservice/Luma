@@ -143,8 +143,17 @@ export function createAdmissionStore(db: TenantDatabase) {
         runId: input.runId,
         stepId: input.stepId,
       });
-      z.string().uuid().parse(input.incidentId);
-      z.number().int().positive().parse(input.diagnosisRevision);
+      if (input.subject) {
+        z.object({ kind: text, id: text }).strict().parse(input.subject);
+        if (
+          input.incidentId !== undefined ||
+          input.diagnosisRevision !== undefined
+        )
+          throw new Error('Use one admission subject');
+      } else {
+        z.string().uuid().parse(input.incidentId);
+        z.number().int().positive().parse(input.diagnosisRevision);
+      }
       const { action, hash } = parseAction(input.action);
       requireTenant(context, action.tenantId);
       if (
@@ -176,8 +185,12 @@ export function createAdmissionStore(db: TenantDatabase) {
           artifactId: input.artifactId,
           artifactVersion: input.artifactVersion,
           artifactDigest: input.artifactDigest,
-          incidentId: input.incidentId,
-          diagnosisRevision: input.diagnosisRevision,
+          ...(input.subject
+            ? { subject: input.subject }
+            : {
+                incidentId: input.incidentId,
+                diagnosisRevision: input.diagnosisRevision,
+              }),
         };
         await tx.query(
           'INSERT INTO action_admission_runs(tenant_id,id,artifact_id,artifact_version,document) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING',

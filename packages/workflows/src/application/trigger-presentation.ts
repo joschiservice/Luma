@@ -32,7 +32,9 @@ export function presentTriggerRun(
     processState === 'verified'
       ? 'The expected result was verified.'
       : processState === 'ended'
-        ? 'The workflow finished without a verification step.'
+        ? latest?.kind === 'condition'
+          ? 'The current conditions do not require an action.'
+          : 'The workflow finished without a verification step.'
         : processState === 'failed_verification'
           ? 'Verification found a different result. Operator review is required.'
           : processState === 'inconclusive_verification'
@@ -58,7 +60,7 @@ export function presentTriggerRun(
     createdAt: run.createdAt,
     version: run.version,
     versionDigest: run.versionDigest,
-    activationId: null,
+    activationId: run.activationId,
     evidenceKind: 'unclassified' as const,
     execution: processSteps.some(
       (step) => step.kind === 'capability' && step.state === 'completed',

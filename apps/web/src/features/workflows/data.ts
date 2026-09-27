@@ -177,3 +177,94 @@ export async function cancelWorkflowStart(
 
   return workflowRunViewSchema.parse(result.body);
 }
+
+/** Loads replenishment stock choices and activation rules in one request. */
+export const replenishmentOptions = (organizationId: string) =>
+  queryOptions({
+    queryKey: [
+      ...workflowsKey(organizationId),
+      'inventory-replenishment',
+      'setup',
+    ],
+    ...privateQueryDefaults,
+    queryFn: async ({ signal }) => {
+      const result = await api.workflows.replenishmentSetup({
+        params: { organizationId, definitionId: 'inventory-replenishment' },
+        fetchOptions: { signal, cache: 'no-store' },
+      });
+      if (result.status !== 200) return failure(result);
+
+      return result.body;
+    },
+  });
+
+/** Activates an immutable rule. Reuse the full request when retrying. */
+export async function configureReplenishment(
+  organizationId: string,
+  body: import('@luma/api-contract').ReplenishmentRuleInput,
+) {
+  const result = await api.workflows.configureReplenishment({
+    params: { organizationId, definitionId: 'inventory-replenishment' },
+    body,
+  });
+  if (result.status !== 200) return failure(result);
+
+  return result.body;
+}
+
+/** Checks server-owned stock and recovers an uncertain start using its request ID. */
+export async function startReplenishment(
+  organizationId: string,
+  body: { id: string; activationId: string },
+) {
+  const result = await api.workflows.startReplenishment({
+    params: { organizationId, definitionId: 'inventory-replenishment' },
+    body,
+  });
+  if (result.status !== 200) return failure(result);
+
+  return result.body;
+}
+
+/** Reads the exact proposal and whether the current operator may decide. */
+export const replenishmentReviewOptions = (
+  organizationId: string,
+  runId: string,
+) =>
+  queryOptions({
+    queryKey: [
+      ...workflowsKey(organizationId),
+      'inventory-replenishment',
+      'review',
+      runId,
+    ],
+    ...privateQueryDefaults,
+    queryFn: async ({ signal }) => {
+      const result = await api.workflows.replenishmentReview({
+        params: {
+          organizationId,
+          definitionId: 'inventory-replenishment',
+          runId,
+        },
+        fetchOptions: { signal, cache: 'no-store' },
+      });
+      if (result.status !== 200) return failure(result);
+
+      return result.body;
+    },
+  });
+
+/** Records a decision against the reviewed proposal, without granting authority to later proposals. */
+export async function decideReplenishment(
+  organizationId: string,
+  runId: string,
+  body: { decisionId: string; outcome: 'approved' | 'rejected' },
+) {
+  const result = await api.workflows.decideReplenishment({
+    params: { organizationId, definitionId: 'inventory-replenishment', runId },
+    body,
+  });
+  if (result.status !== 200) return failure(result);
+
+  return result.body;
+}

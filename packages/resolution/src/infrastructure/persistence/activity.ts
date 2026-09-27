@@ -8,7 +8,7 @@ import type { ActivityEvent } from '../../domain/activity.js';
 import { activityOutcomeRules } from '../../domain/activity-outcome.js';
 
 const coverage =
-  'Recorded decisions, execution, verification, issue resolutions and procurement changes. Owners and administrators also see connection changes. Older unrecorded changes and playbook activation/revocation history are unavailable. Execution mode is shown only when recorded.';
+  'Recorded decisions, execution, verification, issue resolutions and procurement changes. Owners and administrators also see connection changes. Older unrecorded changes and legacy playbook activation history are unavailable. Execution mode is shown only when recorded.';
 
 // Only static domain rules enter this SQL expression; request values remain parameters.
 const literal = (value: string) => "'" + value.replaceAll("'", "''") + "'";
@@ -72,10 +72,10 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
       WITH enriched AS (
         SELECT s.*,COALESCE(s.exception_id,p.exception_id,(r.document->>'incidentId')::uuid) AS issue_id,
         COALESCE(s.connection_id,(s.doc->>'connectionId')::uuid,(p.document->>'connectionId')::uuid,(r.document->'action'->>'connectionId')::uuid) AS conn_id,
-        COALESCE(s.doc->'details'->>'purchaseOrderId',p.document->'target'->>'id',r.document->'action'->'target'->>'id',e.document->'subject'->>'subjectId') AS resource,
-        COALESCE(CASE WHEN s.doc->>'eventType' LIKE 'purchase_order.%' THEN s.doc->'details'->>'reason' END,p.document->>'capability',r.document->'action'->>'capability') AS summary,
+        COALESCE(s.doc->'details'->>'purchaseOrderId',p.document->'target'->>'id',r.document->'action'->'target'->>'id',a.document->'action'->'target'->>'id',e.document->'subject'->>'subjectId') AS resource,
+        COALESCE(CASE WHEN s.doc->>'eventType' LIKE 'purchase_order.%' THEN s.doc->'details'->>'reason' END,p.document->>'capability',r.document->'action'->>'capability',a.document->'action'->>'capability') AS summary,
         CASE WHEN e.document->'subject'->>'subjectKind'='connection' THEN e.document->'subject'->>'subjectId' END AS subject_connection,
-        r.definition_id AS playbook_id,v.document->'provenance'->>'kind' AS mode,
+        COALESCE(r.definition_id,w.definition_id,s.doc->'details'->>'definitionId') AS playbook_id,COALESCE(v.document->'provenance'->>'kind',wv.document->'provenance'->>'kind') AS mode,
         COALESCE(s.doc->>'eventType','case.updated') AS action,
         s.doc->'details' AS details
         FROM workspace_activity_sources s
@@ -83,6 +83,9 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
         LEFT JOIN exceptions e ON e.tenant_id=s.tenant_id AND e.id=COALESCE(s.exception_id,p.exception_id)
         LEFT JOIN playbook_runs r ON r.tenant_id=s.tenant_id AND r.id=s.proposal_id
         LEFT JOIN playbook_versions v ON v.tenant_id=r.tenant_id AND v.definition_id=r.definition_id AND v.version=r.version
+        LEFT JOIN action_admission_steps a ON a.tenant_id=s.tenant_id AND a.proposal_id=s.proposal_id
+        LEFT JOIN workflow_trigger_runs w ON w.tenant_id=s.tenant_id AND w.id::text=COALESCE(a.run_id::text,s.doc->>'correlationId')
+        LEFT JOIN playbook_versions wv ON wv.tenant_id=w.tenant_id AND wv.definition_id=w.definition_id AND wv.version=w.version
         WHERE s.tenant_id=$1 AND s.recorded_at >= $2::timestamptz AND s.recorded_at < $3::timestamptz
         AND (NOT s.restricted OR $4::boolean)
         AND ($5::timestamptz IS NULL OR (s.recorded_at,s.id)<($5::timestamptz,$6::text))
@@ -94,7 +97,7 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
           WHEN details->>'resolution' IS NOT NULL THEN 'resolution'
           WHEN action LIKE '%verification%' OR details->>'verification' IS NOT NULL THEN 'verification'
           WHEN action LIKE 'execution.%' THEN 'execution'
-          WHEN action LIKE 'policy.%' OR action IN ('case.approve','case.reject','case.escalate') THEN 'decision'
+          WHEN action LIKE 'workflow.%' OR action LIKE 'policy.%' OR action IN ('case.approve','case.reject','case.escalate') THEN 'decision'
           ELSE 'issue' END AS type,
         ${outcomeSql} AS outcome
         FROM enriched e

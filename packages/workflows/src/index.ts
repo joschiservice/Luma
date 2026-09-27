@@ -19,3 +19,15 @@ export { runProcess } from './application/process-runtime.js';
 export { resolutionWorkflow } from './domain/workflow.js';
 
 export type { WorkflowCatalog } from './application/catalog.js';
+
+export type { ReplenishmentWorkflow } from './application/replenishment-port.js';
+
+export type { WorkflowTriggerStore } from './application/triggers.js';
+
+export type { WorkflowCatalogStore } from './application/catalog.js';
+
+export { createProcessActivities } from './application/process-activities.js';
+
+export { presentProcessVersion } from './domain/process-presentation.js';
+
+export { presentTriggerRun } from './application/trigger-presentation.js';

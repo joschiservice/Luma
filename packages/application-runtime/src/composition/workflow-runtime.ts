@@ -18,10 +18,12 @@ import type { TemporalSettings } from '@luma/workflow-temporal';
 import {
   createExceptionClient,
   createExceptionWorker,
+  createProcessClient,
 } from '@luma/workflow-temporal';
 import { Pool } from 'pg';
 
 import { createApplicationServices } from './application.js';
+import { createReplenishmentWorker } from './replenishment-worker.js';
 import { createResourceScope } from './resources.js';
 import { createDetectionServices, createSafetyServices } from './services.js';
 
@@ -192,11 +194,21 @@ export async function createDefaultExceptionWorker(
     resources.add(identity.close);
     const pool = new Pool({ connectionString: settings.databaseUrl, max: 10 });
     resources.add(() => pool.end());
-    const { detection, safety, desk, http } = createApplicationServices({
-      database: createTenantDatabase(pool),
-      identity: identity.service,
-      execution: { kind: 'disabled' },
-    });
+    const processClient = await createProcessClient(
+      {
+        ...settings.temporal,
+        taskQueue: `${settings.temporal.taskQueue}-procurement`,
+      },
+      identity.service,
+    );
+    resources.add(processClient.close);
+    const { detection, safety, desk, http, replenishment } =
+      createApplicationServices({
+        database: createTenantDatabase(pool),
+        identity: identity.service,
+        execution: { kind: 'enabled', effects: { resolve: async () => null } },
+        replenishmentTransport: processClient,
+      });
     const runtime = createExceptionWorkflowRuntime(
       settings.temporal,
       identity.service,
@@ -224,6 +236,13 @@ export async function createDefaultExceptionWorker(
     );
     const worker = await runtime.createWorker();
     resources.add(worker.close);
+    const procurementWorker = await createReplenishmentWorker(
+      settings.temporal,
+      replenishment,
+      pool,
+      identity.service,
+    );
+    resources.add(procurementWorker.close);
 
     const stopSchedules = new AbortController();
 
@@ -247,7 +266,7 @@ export async function createDefaultExceptionWorker(
       run: async () => {
         const schedules = advanceSchedules();
         try {
-          await worker.run();
+          await Promise.all([worker.run(), procurementWorker.run()]);
         } finally {
           stopSchedules.abort();
           await schedules;
@@ -256,6 +275,7 @@ export async function createDefaultExceptionWorker(
       shutdown: () => {
         stopSchedules.abort();
         worker.shutdown();
+        procurementWorker.shutdown();
       },
       close: resources.close,
     };

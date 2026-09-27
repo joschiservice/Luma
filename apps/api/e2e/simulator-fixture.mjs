@@ -7,7 +7,10 @@ import { createSimulatorEnvironment } from '../../../tooling/simulator/e2e-envir
 import { database, secret } from './helpers.mjs';
 
 /** Provisions and cleans an isolated database-backed simulator workspace for platform tests. */
-export async function setupSimulator(t) {
+export async function setupSimulator(
+  t,
+  { temporal, origin = 'http://127.0.0.1:3000' } = {},
+) {
   const db = await database(t);
   await db.migrate();
   await db.grantRuntime();
@@ -19,11 +22,12 @@ export async function setupSimulator(t) {
   t.onTestFinished(() => rm(directory, { recursive: true, force: true }));
   const fixture = await createSimulatorEnvironment({
     directory,
+    temporal,
     env: {
       IDENTITY_DATABASE_URL: db.runtimeUrl,
       WORKFLOW_DATABASE_URL: db.runtimeUrl,
       BETTER_AUTH_SECRET: secret,
-      BETTER_AUTH_URL: 'http://127.0.0.1:3000',
+      BETTER_AUTH_URL: origin,
       CONNECTIONS_ACTIVE_KEY_ID: 'test',
       CONNECTIONS_KEYS: JSON.stringify({
         test: randomBytes(32).toString('base64'),

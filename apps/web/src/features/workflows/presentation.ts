@@ -6,6 +6,7 @@ export function workflowSystemLabel(system: string): string {
         'jtl-cloud': 'JTL Cloud',
         'jtl-onprem': 'JTL-Wawi',
         shopify: 'Shopify',
+        luma: 'Luma',
       } as Record<string, string>
     )[system] ?? system
   );
@@ -25,6 +26,8 @@ export function workflowTriggerLabel(
     case 'schedule':
       return 'Scheduled start';
     case 'condition':
-      return `${trigger.field} is ${String(trigger.equals)}`;
+      return trigger.field === 'belowMinimum' && trigger.equals === true
+        ? 'Stock falls below the configured minimum'
+        : `${trigger.field} is ${String(trigger.equals)}`;
   }
 }

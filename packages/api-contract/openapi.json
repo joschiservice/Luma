@@ -3849,7 +3849,7 @@
                             "properties": {
                               "kind": {
                                 "type": "string",
-                                "enum": ["pilot", "resolution"]
+                                "enum": ["pilot", "resolution", "native"]
                               },
                               "reference": {
                                 "type": "string",
@@ -5783,6 +5783,2638 @@
         }
       }
     },
+    "/v1/organizations/{organizationId}/workflows/{definitionId}/replenishment": {
+      "get": {
+        "summary": "Read replenishment scopes and current stock",
+        "tags": ["workflows"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "definitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-zA-Z0-9_-]{0,79}$"
+            }
+          }
+        ],
+        "operationId": "workflows.replenishmentSetup",
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "available": {
+                      "type": "boolean"
+                    },
+                    "canManage": {
+                      "type": "boolean"
+                    },
+                    "positions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "positionId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "connectionId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "sku": {
+                            "type": "string"
+                          },
+                          "unit": {
+                            "type": "string"
+                          },
+                          "available": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "observedAt": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "positionId",
+                          "connectionId",
+                          "sku",
+                          "unit",
+                          "available",
+                          "observedAt"
+                        ]
+                      }
+                    },
+                    "suppliers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["id", "name"]
+                      }
+                    },
+                    "rules": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "positionId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "connectionId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "supplierId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "minimum": {
+                            "type": "number"
+                          },
+                          "target": {
+                            "type": "number"
+                          },
+                          "approvalQuantity": {
+                            "type": "number"
+                          },
+                          "active": {
+                            "type": "boolean"
+                          },
+                          "principalId": {
+                            "type": "string"
+                          },
+                          "sku": {
+                            "type": "string"
+                          },
+                          "supplier": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "positionId",
+                          "connectionId",
+                          "supplierId",
+                          "minimum",
+                          "target",
+                          "approvalQuantity",
+                          "active",
+                          "principalId",
+                          "sku",
+                          "supplier"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "available",
+                    "canManage",
+                    "positions",
+                    "suppliers",
+                    "rules"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/workflows/{definitionId}/replenishment/activations": {
+      "post": {
+        "description": "Owners and admins review a stock position, supplier and quantity limits. Target stock must exceed the minimum. Reuse the exact ID and body when retrying.",
+        "summary": "Activate a replenishment rule",
+        "tags": ["workflows"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "definitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-zA-Z0-9_-]{0,79}$"
+            }
+          }
+        ],
+        "operationId": "workflows.configureReplenishment",
+        "requestBody": {
+          "description": "Body",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "positionId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "connectionId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "supplierId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "minimum": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 999999
+                  },
+                  "target": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": 0,
+                    "maximum": 1000000
+                  },
+                  "approvalQuantity": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000000
+                  },
+                  "reviewedDigest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                },
+                "required": [
+                  "id",
+                  "positionId",
+                  "connectionId",
+                  "supplierId",
+                  "minimum",
+                  "target",
+                  "approvalQuantity",
+                  "reviewedDigest"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "version": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "versionDigest": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "artifactDigest": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "policyVersion": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "active": {
+                      "type": "boolean"
+                    },
+                    "grants": {
+                      "type": "object",
+                      "properties": {
+                        "principalIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "connectionIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "format": "uuid"
+                          }
+                        },
+                        "targetIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "format": "uuid"
+                          }
+                        }
+                      },
+                      "required": ["principalIds", "connectionIds", "targetIds"]
+                    },
+                    "reviewedBy": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "reviewedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "version",
+                    "versionDigest",
+                    "artifactDigest",
+                    "policyVersion",
+                    "active",
+                    "grants",
+                    "reviewedBy",
+                    "reviewedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/workflows/{definitionId}/replenishment/starts": {
+      "post": {
+        "description": "Reads current stock on the server and starts the activated version when stock is below its minimum. Reuse the request ID after an uncertain response.",
+        "summary": "Check low stock and start replenishment",
+        "tags": ["workflows"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "definitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-zA-Z0-9_-]{0,79}$"
+            }
+          }
+        ],
+        "operationId": "workflows.startReplenishment",
+        "requestBody": {
+          "description": "Body",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "activationId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": ["id", "activationId"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "version": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "versionDigest": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "activationId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    },
+                    "evidenceKind": {
+                      "type": "string",
+                      "enum": [
+                        "pilot",
+                        "live",
+                        "simulation",
+                        "shadow",
+                        "unclassified"
+                      ]
+                    },
+                    "execution": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "verification": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "reason": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "triggerState": {
+                      "type": "string",
+                      "enum": ["scheduled", "awaiting_admission", "cancelled"]
+                    },
+                    "triggerEvidence": {
+                      "type": "object",
+                      "properties": {
+                        "sourceId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "occurredAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": ["sourceId", "occurredAt"]
+                    },
+                    "triggeredAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
+                    "story": {
+                      "type": "object",
+                      "properties": {
+                        "context": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "decision": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "action": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "verification": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "context",
+                        "decision",
+                        "action",
+                        "verification"
+                      ]
+                    },
+                    "trigger": {
+                      "discriminator": {
+                        "propertyName": "kind"
+                      },
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["exception"]
+                            },
+                            "issueType": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": ["kind", "issueType"]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["manual"]
+                            }
+                          },
+                          "required": ["kind"]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["event"]
+                            },
+                            "eventType": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": ["kind", "eventType"]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["schedule"]
+                            },
+                            "at": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          },
+                          "required": ["kind", "at"]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["condition"]
+                            },
+                            "field": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "equals": {
+                              "oneOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "string",
+                                  "format": "null",
+                                  "nullable": true
+                                }
+                              ],
+                              "nullable": true
+                            }
+                          },
+                          "required": ["kind", "field", "equals"]
+                        }
+                      ]
+                    },
+                    "subject": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["kind", "id"]
+                    },
+                    "actor": {
+                      "discriminator": {
+                        "propertyName": "kind"
+                      },
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["user"]
+                            },
+                            "id": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": ["kind", "id"]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["agent"]
+                            },
+                            "id": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "operatorId": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "grantId": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": ["kind", "id", "operatorId", "grantId"]
+                        }
+                      ]
+                    },
+                    "resolution": {
+                      "type": "object",
+                      "properties": {
+                        "incidentId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "diagnosisRevision": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["incidentId", "diagnosisRevision"]
+                    },
+                    "contextDigest": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "steps": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "stepId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "state": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "reason": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "proposalId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "decisionId": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "stepId",
+                          "state",
+                          "reason",
+                          "proposalId",
+                          "decisionId"
+                        ]
+                      }
+                    },
+                    "processState": {
+                      "type": "string",
+                      "enum": [
+                        "running",
+                        "awaiting_decision",
+                        "waiting",
+                        "verified",
+                        "ended",
+                        "denied",
+                        "failed_verification",
+                        "inconclusive_verification",
+                        "escalated"
+                      ]
+                    },
+                    "processSteps": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "stepId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "read",
+                              "condition",
+                              "capability",
+                              "approval",
+                              "wait",
+                              "verification",
+                              "escalation",
+                              "end"
+                            ]
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "completed",
+                              "waiting",
+                              "denied",
+                              "failed",
+                              "inconclusive",
+                              "ended",
+                              "escalated"
+                            ]
+                          },
+                          "values": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "oneOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "string",
+                                  "format": "null",
+                                  "nullable": true
+                                }
+                              ],
+                              "nullable": true
+                            }
+                          },
+                          "evidenceRefs": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "recordedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "observedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "reason": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "stepId",
+                          "kind",
+                          "state",
+                          "values",
+                          "evidenceRefs",
+                          "recordedAt"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "createdAt",
+                    "version",
+                    "versionDigest",
+                    "activationId",
+                    "evidenceKind",
+                    "execution",
+                    "verification",
+                    "reason",
+                    "story",
+                    "trigger",
+                    "subject",
+                    "actor",
+                    "contextDigest",
+                    "steps"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/workflows/{definitionId}/replenishment/runs/{runId}": {
+      "get": {
+        "summary": "Review a replenishment proposal",
+        "tags": ["workflows"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "definitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-zA-Z0-9_-]{0,79}$"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "operationId": "workflows.replenishmentReview",
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "runId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "proposalId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    },
+                    "decisionId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "quantity": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "sku": {
+                      "type": "string"
+                    },
+                    "supplier": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    },
+                    "canRespond": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "runId",
+                    "proposalId",
+                    "decisionId",
+                    "quantity",
+                    "sku",
+                    "supplier",
+                    "state",
+                    "canRespond"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/workflows/{definitionId}/replenishment/runs/{runId}/decision": {
+      "post": {
+        "description": "A different owner or admin decides on the exact proposal. Current stock, activation and policy are checked again before creating the order.",
+        "summary": "Approve or reject a replenishment proposal",
+        "tags": ["workflows"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "definitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-zA-Z0-9_-]{0,79}$"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "operationId": "workflows.decideReplenishment",
+        "requestBody": {
+          "description": "Body",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "decisionId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "outcome": {
+                    "type": "string",
+                    "enum": ["approved", "rejected"]
+                  }
+                },
+                "required": ["decisionId", "outcome"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "runId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "proposalId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    },
+                    "decisionId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "quantity": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "sku": {
+                      "type": "string"
+                    },
+                    "supplier": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    },
+                    "canRespond": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "runId",
+                    "proposalId",
+                    "decisionId",
+                    "quantity",
+                    "sku",
+                    "supplier",
+                    "state",
+                    "canRespond"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/organizations/{organizationId}/workflows": {
       "get": {
         "description": "Members can inspect published versions and activation status. Viewing a workflow never activates it.",
@@ -6413,7 +9045,7 @@
                                 "properties": {
                                   "kind": {
                                     "type": "string",
-                                    "enum": ["pilot", "resolution"]
+                                    "enum": ["pilot", "resolution", "native"]
                                   },
                                   "reference": {
                                     "type": "string",
@@ -6739,7 +9371,7 @@
                                 "properties": {
                                   "kind": {
                                     "type": "string",
-                                    "enum": ["pilot", "resolution"]
+                                    "enum": ["pilot", "resolution", "native"]
                                   },
                                   "reference": {
                                     "type": "string",

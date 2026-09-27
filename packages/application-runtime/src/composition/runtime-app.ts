@@ -13,7 +13,10 @@ import {
   createModelGateway,
   createTenantDatabase,
 } from '@luma/platform/composition';
-import { createDeskWorkflowReader } from '@luma/workflow-temporal';
+import {
+  createDeskWorkflowReader,
+  createProcessClient,
+} from '@luma/workflow-temporal';
 import type { FastifyServerOptions } from 'fastify';
 import { Pool } from 'pg';
 
@@ -78,10 +81,23 @@ export async function buildRuntimeApp(
       ? createDeskWorkflowReader(workflowSettings.temporal, identity.service)
       : undefined;
     if (workflowReader) resources.add(workflowReader.close);
+    const processClient = workflowSettings
+      ? await createProcessClient(
+          {
+            ...workflowSettings.temporal,
+            taskQueue: `${workflowSettings.temporal.taskQueue}-procurement`,
+          },
+          identity.service,
+        )
+      : undefined;
+    if (processClient) resources.add(processClient.close);
     const application = createApplicationServices({
       database: createTenantDatabase(casePool),
       identity: identity.service,
-      execution: { kind: 'disabled' },
+      execution: processClient
+        ? { kind: 'enabled', effects: { resolve: async () => null } }
+        : { kind: 'disabled' },
+      ...(processClient ? { replenishmentTransport: processClient } : {}),
       desk: workflowReader ? { workflow: workflowReader.get } : {},
     });
     const app = buildApp(options, {

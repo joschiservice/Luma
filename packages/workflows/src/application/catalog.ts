@@ -12,6 +12,7 @@ import type {
 import { resolutionWorkflow } from '../domain/workflow.js';
 import type { PlaybookOutcome, PlaybookRun } from './playbook.js';
 import type { PlaybookLibrary } from './playbook-library.js';
+import type { ReplenishmentWorkflow } from './replenishment-port.js';
 import {
   presentResolutionRun,
   presentResolutionStory,
@@ -55,6 +56,7 @@ export interface WorkflowCatalogStore {
 
 /** Combines native definitions and existing resolution definitions under one authorized catalog. */
 export function createWorkflowCatalog(deps: {
+  replenishment?: ReplenishmentWorkflow;
   legacy: PlaybookLibrary;
   triggers: ReturnType<typeof createWorkflowTriggers>;
   store: WorkflowCatalogStore;
@@ -157,13 +159,56 @@ export function createWorkflowCatalog(deps: {
     };
   }
 
+  function replenishment(id: string) {
+    if (!deps.replenishment || id !== deps.replenishment.definitionId)
+      throw new IdentityError(
+        404,
+        'NOT_FOUND',
+        'Replenishment workflow not found.',
+      );
+
+    return deps.replenishment;
+  }
+
   return {
+    /** Reads available stock and replenishment rules. */
+    replenishmentSetup: (context: TenantContext, id: string) =>
+      replenishment(id).setup(context),
+    /** Activates an exact replenishment scope. */
+    configureReplenishment: (
+      context: TenantContext,
+      id: string,
+      input: Parameters<ReplenishmentWorkflow['configure']>[1],
+    ) => replenishment(id).configure(context, input),
+    /** Checks authoritative stock before starting the configured process. */
+    startReplenishment: (
+      context: TenantContext,
+      id: string,
+      input: Parameters<ReplenishmentWorkflow['start']>[1],
+    ) => replenishment(id).start(context, input),
+    /** Reads the current policy proposal for a run. */
+    replenishmentReview: (context: TenantContext, id: string, runId: string) =>
+      replenishment(id).review(context, runId),
+    /** Persists an independent human decision for the bound proposal. */
+    decideReplenishment: (
+      context: TenantContext,
+      id: string,
+      runId: string,
+      input: Parameters<ReplenishmentWorkflow['decide']>[2],
+    ) => replenishment(id).decide(context, runId, input),
     /** Starts a run using the exact version and supplied signal evidence. */
     async fire(
       context: TenantContext,
       id: string,
       request: WorkflowTriggerRequest,
     ) {
+      if (id === deps.replenishment?.definitionId)
+        throw new IdentityError(
+          409,
+          'CONFLICT',
+          'Use the replenishment stock check to start this workflow.',
+        );
+
       return presentTriggerRun(await deps.triggers.fire(context, id, request));
     },
     /** Cancels a scheduled start while it is still pending. */
@@ -191,13 +236,22 @@ export function createWorkflowCatalog(deps: {
           v,
         ]);
 
+      const replenishmentDetail = await deps.replenishment?.detail(context);
+
       return [
+        ...(replenishmentDetail ? [replenishmentDetail.summary] : []),
         ...legacy.map((v) => ({ ...v, category: 'resolution' })),
-        ...[...groups.values()].map((v) => nativeDetail(v, context).summary),
+        ...[...groups.values()]
+          .filter(
+            (v) => v[0]!.definition.id !== deps.replenishment?.definitionId,
+          )
+          .map((v) => nativeDetail(v, context).summary),
       ];
     },
     async detail(context: TenantContext, id: string) {
       context = await authorize(context);
+      if (id === deps.replenishment?.definitionId)
+        return deps.replenishment.detail(context);
       const native = await deps.store.versions(context, id);
       if (native.length) return nativeDetail(native, context);
       const detail = await deps.legacy.detail(context, id);
@@ -232,7 +286,11 @@ export function createWorkflowCatalog(deps: {
       const triggered = starts.map((run) =>
         presentTriggerRun(run, evidence.get(run.id)),
       );
-      if ((await deps.store.versions(context, id)).length) return triggered;
+      if (
+        id === deps.replenishment?.definitionId ||
+        (await deps.store.versions(context, id)).length
+      )
+        return triggered;
       if (!(await deps.store.resolutionVersions(context, id)).length)
         throw new IdentityError(404, 'NOT_FOUND', 'Workflow not found');
       const records = await deps.store.runs(context, id);
@@ -271,7 +329,16 @@ export function createWorkflowCatalog(deps: {
 
       return deps.legacy.activate(fresh, id, request);
     },
-    revoke: deps.legacy.revoke,
+    /** Revokes the exact reviewed activation. */
+    revoke: (
+      context: TenantContext,
+      id: string,
+      activationId: string,
+      digest: string,
+    ) =>
+      id === deps.replenishment?.definitionId
+        ? deps.replenishment.revoke(context, activationId, digest)
+        : deps.legacy.revoke(context, id, activationId, digest),
   };
 }
 

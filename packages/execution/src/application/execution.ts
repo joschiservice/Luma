@@ -30,8 +30,9 @@ export interface ExecutionAdmission {
   artifactId: string;
   artifactVersion: string;
   artifactDigest: string;
-  incidentId: string;
-  diagnosisRevision: number;
+  incidentId?: string;
+  diagnosisRevision?: number;
+  subject?: { kind: string; id: string };
   generation: { kind: 'manual' | 'generated'; reference: string };
 }
 
@@ -338,8 +339,15 @@ export function createExecutionService(deps: ExecutionDependencies) {
                 artifactId: admission.artifactId,
                 artifactVersion: admission.artifactVersion,
                 artifactDigest: admission.artifactDigest,
-                incidentId: admission.incidentId,
-                diagnosisRevision: String(admission.diagnosisRevision),
+                ...(admission.incidentId
+                  ? {
+                      incidentId: admission.incidentId,
+                      diagnosisRevision: String(admission.diagnosisRevision),
+                    }
+                  : {
+                      subjectKind: admission.subject!.kind,
+                      subjectId: admission.subject!.id,
+                    }),
                 generationKind: admission.generation.kind,
                 generationReference: admission.generation.reference,
               }

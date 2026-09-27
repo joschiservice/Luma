@@ -3,6 +3,11 @@ import { z } from 'zod';
 
 import { apiErrorSchema, organizationParamsSchema } from '../common.js';
 import {
+  replenishmentReviewSchema,
+  replenishmentRuleSchema,
+  replenishmentSetupSchema,
+} from '../replenishment.js';
+import {
   activateWorkflowSchema,
   fireWorkflowSchema,
   workflowActivationSchema,
@@ -19,6 +24,57 @@ const path = '/v1/organizations/:organizationId/workflows';
 
 export const workflowsContract = c.router(
   {
+    replenishmentSetup: {
+      method: 'GET',
+      path: `${path}/:definitionId/replenishment`,
+      pathParams: params,
+      responses: { 200: replenishmentSetupSchema },
+      summary: 'Read replenishment scopes and current stock',
+    },
+    configureReplenishment: {
+      method: 'POST',
+      path: `${path}/:definitionId/replenishment/activations`,
+      pathParams: params,
+      body: replenishmentRuleSchema,
+      responses: { 200: workflowActivationSchema },
+      summary: 'Activate a replenishment rule',
+      description:
+        'Owners and admins review a stock position, supplier and quantity limits. Target stock must exceed the minimum. Reuse the exact ID and body when retrying.',
+    },
+    startReplenishment: {
+      method: 'POST',
+      path: `${path}/:definitionId/replenishment/starts`,
+      pathParams: params,
+      body: z
+        .object({ id: z.string().uuid(), activationId: z.string().uuid() })
+        .strict(),
+      responses: { 200: workflowRunViewSchema },
+      summary: 'Check low stock and start replenishment',
+      description:
+        'Reads current stock on the server and starts the activated version when stock is below its minimum. Reuse the request ID after an uncertain response.',
+    },
+    replenishmentReview: {
+      method: 'GET',
+      path: `${path}/:definitionId/replenishment/runs/:runId`,
+      pathParams: params.extend({ runId: z.string().uuid() }),
+      responses: { 200: replenishmentReviewSchema },
+      summary: 'Review a replenishment proposal',
+    },
+    decideReplenishment: {
+      method: 'POST',
+      path: `${path}/:definitionId/replenishment/runs/:runId/decision`,
+      pathParams: params.extend({ runId: z.string().uuid() }),
+      body: z
+        .object({
+          decisionId: z.string().uuid(),
+          outcome: z.enum(['approved', 'rejected']),
+        })
+        .strict(),
+      responses: { 200: replenishmentReviewSchema },
+      summary: 'Approve or reject a replenishment proposal',
+      description:
+        'A different owner or admin decides on the exact proposal. Current stock, activation and policy are checked again before creating the order.',
+    },
     list: {
       method: 'GET',
       path,

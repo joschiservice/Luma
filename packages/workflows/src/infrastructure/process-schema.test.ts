@@ -17,14 +17,14 @@ describe('process workflow compiler', () => {
       }),
     ).toThrow('digest mismatch');
   });
-  it('requires a separate approval and verification for each action', () => {
+  it('allows policy decisions and requires independent verification for each action', () => {
     const steps = processSource.steps;
     expect(() =>
       compileProcessWorkflow({
         ...processSource,
         steps: [...steps.slice(0, 2), ...steps.slice(3)],
       }),
-    ).toThrow('own approval');
+    ).not.toThrow();
     expect(() =>
       compileProcessWorkflow({
         ...processSource,

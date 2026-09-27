@@ -1,3 +1,4 @@
+import type { TenantContext } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
 
 import type { WorkflowTriggerStore } from '../application/triggers.js';
@@ -24,8 +25,23 @@ function present(row: Row): WorkflowTriggerRun {
 /** Stores starts under tenant isolation. Unique source keys make concurrent retries safe. */
 export function createWorkflowTriggerStore(
   db: TenantDatabase,
-): WorkflowTriggerStore {
+): WorkflowTriggerStore & {
+  pending(context: TenantContext, id: string): Promise<WorkflowTriggerRun[]>;
+} {
   return {
+    pending: (context, id) =>
+      db.transaction(context.tenantId, async (tx) => {
+        const rows = await tx.query<Row>(
+          `SELECT r.document,r.state,r.triggered_at FROM workflow_trigger_runs r
+        LEFT JOIN LATERAL (SELECT document FROM workflow_process_steps s WHERE s.tenant_id=r.tenant_id AND s.run_id=r.id ORDER BY sequence DESC LIMIT 1) last ON true
+        WHERE r.tenant_id=$1 AND r.definition_id=$2 AND r.state='awaiting_admission'
+        AND (last.document IS NULL OR (last.document->>'state' IN ('waiting','completed') AND last.document->>'kind'<>'end'))
+        ORDER BY r.document->>'createdAt',r.id`,
+          [context.tenantId, id],
+        );
+
+        return rows.rows.map(present);
+      }),
     version: (context, id, version) =>
       db.transaction(context.tenantId, async (tx) => {
         const row = (

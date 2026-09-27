@@ -97,8 +97,10 @@ export function createWorkflows(
   db: TenantDatabase,
   legacy: PlaybookLibrary,
   refreshContext: (context: TenantContext) => Promise<TenantContext>,
+  replenishment?: import('./application/replenishment-port.js').ReplenishmentWorkflow,
 ) {
   return createWorkflowCatalog({
+    ...(replenishment ? { replenishment } : {}),
     triggers: createWorkflowTriggers({
       store: createWorkflowTriggerStore(db),
       refreshContext,
@@ -136,3 +138,15 @@ export function createWorkflows(
     refreshContext,
   });
 }
+
+export { createWorkflowTriggerStore } from './infrastructure/triggers.js';
+
+export { createWorkflowCatalogStore } from './infrastructure/catalog.js';
+
+export { createWorkflowTriggers } from './application/triggers.js';
+
+export { parseProcessSnapshot } from './infrastructure/process-schema.js';
+
+export { presentProcessVersion } from './domain/process-presentation.js';
+
+export { presentTriggerRun } from './application/trigger-presentation.js';

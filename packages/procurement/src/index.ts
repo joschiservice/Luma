@@ -8,3 +8,20 @@ export type {
   SupplierInput,
   TransitionInput,
 } from './domain/procurement.js';
+
+export {
+  planReplenishment,
+  replenishmentSource,
+} from './domain/replenishment.js';
+
+export type { ReplenishmentRule } from './domain/replenishment.js';
+
+export type {
+  ReplenishmentActivation,
+  ReplenishmentStock,
+  ReplenishmentStore,
+} from './application/replenishment.js';
+
+export { createReplenishmentService } from './application/replenishment-workflow.js';
+
+export type { ReplenishmentTransport } from './application/replenishment-workflow.js';

@@ -96,4 +96,21 @@ it('evaluates supplier lookup, open orders, creation, transition, retries and ve
   expect(
     (await service.detail(context, orderId)).history.map((event) => event.to),
   ).toEqual(['draft', 'open']);
+  const competing = await Promise.allSettled(
+    [1, 2].map(() =>
+      capabilities.createOrder(context, {
+        ...request,
+        id: randomUUID(),
+        origin: { workflowRunId: randomUUID() },
+        lines: [{ ...request.lines[0], id: randomUUID(), sku: 'SKU-2' }],
+      }),
+    ),
+  );
+  expect(
+    competing.filter((result) => result.status === 'fulfilled'),
+  ).toHaveLength(1);
+  expect(
+    competing.filter((result) => result.status === 'rejected'),
+  ).toHaveLength(1);
+  expect((await service.orders(context)).items).toHaveLength(2);
 });

@@ -85,7 +85,11 @@ it('publishes native workflows without cases, retains immutable versions and exp
     await api.request(`${root}/workflows`, { cookie: user.cookie })
   ).body.items;
   expect(items.map((v) => v.id).sort()).toEqual(
-    [native.definition.id, legacy.version.definition.id].sort(),
+    [
+      'inventory-replenishment',
+      native.definition.id,
+      legacy.version.definition.id,
+    ].sort(),
   );
   const detail = (
     await api.request(`${root}/workflows/${native.definition.id}`, {

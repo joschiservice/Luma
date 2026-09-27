@@ -1,6 +1,7 @@
 import type { ActionAdmission } from '@luma/execution';
+import { AdmissionRejected } from '@luma/execution';
 import type { TenantContext } from '@luma/identity';
-import { requireRole, requireTenant } from '@luma/identity';
+import { IdentityError, requireRole, requireTenant } from '@luma/identity';
 import { canonicalJson } from '@luma/platform';
 
 import type {
@@ -55,7 +56,10 @@ export function createProcessActivities(deps: {
       stored.versionDigest !== run.versionDigest ||
       stored.contextDigest !== run.contextDigest ||
       stored.definitionId !== run.definitionId ||
-      stored.actor.id !== run.actor.id
+      stored.actor.id !== run.actor.id ||
+      stored.version !== run.version ||
+      canonicalJson(stored.subject) !== canonicalJson(run.subject) ||
+      canonicalJson(stored.context) !== canonicalJson(run.context)
     )
       throw new Error('Workflow run binding changed');
 
@@ -100,13 +104,20 @@ export function createProcessActivities(deps: {
         )
       )
         throw new Error('Action does not belong to this run version');
-      const { proposalId } = await deps.bindAction(
-        context,
-        run,
-        version,
-        step,
-        outputs,
-      );
+      let proposalId: string;
+      try {
+        ({ proposalId } = await deps.bindAction(
+          context,
+          run,
+          version,
+          step,
+          outputs,
+        ));
+      } catch (error) {
+        if (error instanceof IdentityError && error.statusCode === 409)
+          return { state: 'denied', proposalId: run.id, reason: error.message };
+        throw error;
+      }
       let result = await deps.admission.get(context, proposalId);
       if (!result || !('record' in result)) {
         try {
@@ -116,7 +127,11 @@ export function createProcessActivities(deps: {
           });
         } catch (error) {
           result = await deps.admission.get(context, proposalId);
-          if (!result || !('record' in result)) throw error;
+          if (!result || !('record' in result)) {
+            if (error instanceof AdmissionRejected)
+              return { state: 'denied', proposalId, reason: error.message };
+            throw error;
+          }
         }
       }
       if (result.state === 'approval_required')

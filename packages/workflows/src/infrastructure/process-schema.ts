@@ -102,7 +102,7 @@ const source = z
     steps: z.array(steps).min(2).max(32),
     provenance: z
       .object({
-        kind: z.enum(['resolution', 'pilot']),
+        kind: z.enum(['resolution', 'pilot', 'native']),
         reference: text,
         authoredBy: text,
         evidenceRefs: z.array(text).min(1).max(100),
@@ -161,13 +161,10 @@ export function compileProcessWorkflow(input: unknown): ProcessWorkflowVersion {
     }
     if (step.kind === 'approval') pendingApproval = step.forStep;
     if (step.kind === 'capability') {
-      if (
-        pendingApproval !== step.id ||
-        step.targetKind !== contract.applicability.subjectKind
-      )
-        throw new Error(
-          'Every action needs its own approval and matching subject',
-        );
+      // Policy approval is enforced by Action Admission; an explicit decision is optional.
+      // A business process may create a resource different from its triggering subject.
+      if (pendingApproval !== null && pendingApproval !== step.id)
+        throw new Error('Approval must name its own action');
       pendingApproval = null;
       pendingVerification = step.id;
       for (const item of [

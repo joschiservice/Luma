@@ -70,7 +70,11 @@ export function WorkflowOverview({
       <dl className="workflow-facts">
         <div>
           <dt>Applies to</dt>
-          <dd>{version.applicability.subjectKind}</dd>
+          <dd>
+            {version.applicability.subjectKind === 'inventory_position'
+              ? 'Inventory position'
+              : version.applicability.subjectKind}
+          </dd>
         </div>
         <div>
           <dt>Connected systems</dt>
@@ -167,6 +171,26 @@ export function WorkflowCompatibility({
   version: WorkflowVersionView;
   organizationId: string;
 }) {
+  if (detail.summary.id === 'inventory-replenishment')
+    return (
+      <Card as="section" className="workflow-section">
+        <CardTitle as="h2">Access and evidence</CardTitle>
+        <p>
+          Owners and admins activate a specific inventory position and supplier.
+          Stock must be less than five minutes old, and a different owner or
+          admin approves the purchase-order draft.
+        </p>
+        <p>
+          Revoked rules, changed quantities and existing draft or open orders
+          stop new orders. Each completed run links to an independently verified
+          purchase order.
+        </p>
+        {version.blockers.map((reason) => (
+          <Alert key={reason}>{reason}</Alert>
+        ))}
+      </Card>
+    );
+
   return (
     <Card as="section" className="workflow-section">
       <CardTitle as="h2">
@@ -232,6 +256,7 @@ export function WorkflowActivations({
   refreshing?: boolean | undefined;
   onRevoke: (activation: WorkflowActivationView) => void;
 }) {
+  const replenishment = detail.summary.id === 'inventory-replenishment';
   const processOnly = detail.versions.every(
     (version) => version.format === 'workflow/2',
   );
@@ -280,7 +305,7 @@ export function WorkflowActivations({
                 .join(', ')}
             </p>
             <p>
-              Orders:{' '}
+              {replenishment ? 'Stock positions' : 'Orders'}:{' '}
               {a.grants.targetIds
                 .map(
                   (id) =>
@@ -293,7 +318,10 @@ export function WorkflowActivations({
 
             <Disclosure>
               <summary>Exact scope and review</summary>
-              <p>Orders: {a.grants.targetIds.join(', ')}</p>
+              <p>
+                {replenishment ? 'Stock positions' : 'Orders'}:{' '}
+                {a.grants.targetIds.join(', ')}
+              </p>
               <p>Principals: {a.grants.principalIds.join(', ')}</p>
               <p>Activation: {a.id}</p>
               <p>Policy: {a.policyVersion}</p>

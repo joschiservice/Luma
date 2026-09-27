@@ -118,6 +118,7 @@ describe('procurement effects', () => {
         authority: 'luma',
         lines: [line],
       }),
+      { preventDuplicateSku: false },
     );
     expect(await adapter?.verify(action)).toMatchObject({ outcome: 'passed' });
     expect(

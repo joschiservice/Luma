@@ -1093,12 +1093,24 @@ importers:
       '@luma/audit':
         specifier: workspace:*
         version: link:../audit
+      '@luma/connections':
+        specifier: workspace:*
+        version: link:../connections
+      '@luma/execution':
+        specifier: workspace:*
+        version: link:../execution
       '@luma/identity':
         specifier: workspace:*
         version: link:../identity
       '@luma/platform':
         specifier: workspace:*
         version: link:../platform
+      '@luma/policies':
+        specifier: workspace:*
+        version: link:../policies
+      '@luma/workflows':
+        specifier: workspace:*
+        version: link:../workflows
       '@ts-rest/fastify':
         specifier: 3.52.1
         version: 3.52.1(@ts-rest/core@3.52.1(@types/node@24.13.5)(zod@3.25.76))(fastify@5.12.5)(zod@3.25.76)

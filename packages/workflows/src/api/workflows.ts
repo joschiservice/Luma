@@ -23,6 +23,66 @@ export function workflowRoutes(service?: WorkflowCatalog) {
   }
 
   return initServer().router(apiContract.workflows, {
+    replenishmentSetup: async ({ request, params }) => {
+      const s = use(request);
+
+      return {
+        status: 200,
+        body: await s.service.replenishmentSetup(
+          s.context,
+          params.definitionId,
+        ),
+      };
+    },
+    configureReplenishment: async ({ request, params, body }) => {
+      const s = use(request);
+
+      return {
+        status: 200,
+        body: await s.service.configureReplenishment(
+          s.context,
+          params.definitionId,
+          body,
+        ),
+      };
+    },
+    startReplenishment: async ({ request, params, body }) => {
+      const s = use(request);
+
+      return {
+        status: 200,
+        body: await s.service.startReplenishment(
+          s.context,
+          params.definitionId,
+          body,
+        ),
+      };
+    },
+    replenishmentReview: async ({ request, params }) => {
+      const s = use(request);
+
+      return {
+        status: 200,
+        body: await s.service.replenishmentReview(
+          s.context,
+          params.definitionId,
+          params.runId,
+        ),
+      };
+    },
+    decideReplenishment: async ({ request, params, body }) => {
+      const s = use(request);
+
+      return {
+        status: 200,
+        body: await s.service.decideReplenishment(
+          s.context,
+          params.definitionId,
+          params.runId,
+          body,
+        ),
+      };
+    },
     list: async ({ request }) => {
       const s = use(request);
 

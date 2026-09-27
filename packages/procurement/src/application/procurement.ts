@@ -222,8 +222,12 @@ export function createProcurementService(deps: {
         },
       );
     },
-    /** Creates a draft with immutable lines, ownership and origin references. */
-    async createOrder(context: TenantContext, input: unknown) {
+    /** Creates a draft with immutable provenance; workflow callers can atomically exclude existing SKU commitments. */
+    async createOrder(
+      context: TenantContext,
+      input: unknown,
+      options: { preventDuplicateSku?: boolean } = {},
+    ) {
       context = await authorize(context, true);
       const request = deps.parseOrder(input);
       const problem = purchaseOrderProblem(request);
@@ -237,6 +241,20 @@ export function createProcurementService(deps: {
           const supplier = await tx.supplier(request.supplierId);
           if (!supplier)
             throw new IdentityError(404, 'NOT_FOUND', 'Supplier not found');
+          // Serialize the final duplicate check with creation, including other stock positions.
+          if (
+            options.preventDuplicateSku &&
+            (await tx.orders()).some(
+              (order) =>
+                ['draft', 'open'].includes(order.status) &&
+                order.lines.some((line) =>
+                  request.lines.some((proposed) => proposed.sku === line.sku),
+                ),
+            )
+          )
+            conflict(
+              'An existing draft or open purchase order already covers this SKU.',
+            );
           const now = deps.now().toISOString();
           const order: PurchaseOrder = {
             ...request,

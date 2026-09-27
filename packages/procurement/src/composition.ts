@@ -37,3 +37,10 @@ export function createProcurement(
       createHash('sha256').update(JSON.stringify(value)).digest('hex'),
   });
 }
+
+export { createReplenishmentStore } from './infrastructure/replenishment-store.js';
+
+export type {
+  ReplenishmentActivation,
+  ReplenishmentStock,
+} from './application/replenishment.js';

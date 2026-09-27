@@ -56,6 +56,16 @@ export function createPolicyService(deps: PolicyDependencies) {
   }
 
   return {
+    /** Reads a tenant policy decision after refreshing membership. */
+    async decision(context: TenantContext, id: string) {
+      const fresh = await deps.refreshContext(context);
+      requireTenant(fresh, context.tenantId);
+      requireRole(fresh, ['owner', 'admin', 'member']);
+      if (fresh.actor.id !== context.actor.id)
+        throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+
+      return deps.repository.findDecision(context.tenantId, id);
+    },
     /** Reads the effective policy version for a fresh admission check. */
     currentVersion: version,
     async evaluate(

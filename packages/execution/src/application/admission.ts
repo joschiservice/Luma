@@ -40,8 +40,9 @@ export interface BoundActionStep {
   artifactId: string;
   artifactVersion: string;
   artifactDigest: string;
-  incidentId: string;
-  diagnosisRevision: number;
+  incidentId?: string;
+  diagnosisRevision?: number;
+  subject?: { kind: string; id: string };
   /** Immutable deadline derived from the playbook snapshot and evidence-age limit. */
   eligibilityValidUntil?: string;
   actionHash: string;
@@ -140,8 +141,12 @@ export function createActionAdmission(deps: AdmissionDependencies) {
         artifactId: artifact.id,
         artifactVersion: artifact.version,
         artifactDigest: artifact.digest,
-        incidentId: step.incidentId,
-        diagnosisRevision: step.diagnosisRevision,
+        ...(step.incidentId
+          ? {
+              incidentId: step.incidentId,
+              diagnosisRevision: step.diagnosisRevision!,
+            }
+          : { subject: step.subject! }),
         generation: artifact.generation,
       };
       // Replays may recover an already reserved effect even after evidence expires.

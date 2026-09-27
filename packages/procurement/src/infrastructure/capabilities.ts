@@ -87,7 +87,9 @@ export function createProcurementCapabilities(service: ProcurementService) {
         throw new Error('The capability creates Luma-owned orders only.');
 
       return purchaseOrderOutputSchema.parse(
-        await service.createOrder(context, request),
+        await service.createOrder(context, request, {
+          preventDuplicateSku: !!request.origin.workflowRunId,
+        }),
       );
     },
     /** Applies a revision-checked lifecycle change with an audited command ID. */

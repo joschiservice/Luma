@@ -17,6 +17,10 @@ import { createAdmissionEligibility } from './admission.js';
 import { createPersistentPlaybookLibrary } from './playbook-library.js';
 import { createProcurementEffects } from './procurement-effects.js';
 import {
+  createReplenishmentRuntime,
+  type ReplenishmentTransport,
+} from './replenishment.js';
+import {
   createDeskServices,
   createDetectionServices,
   createResolutionPlaybooks,
@@ -32,6 +36,7 @@ export interface ApplicationServices {
   desk: ReturnType<typeof createDeskServices>;
   playbooks: ReturnType<typeof createResolutionPlaybooks>;
   workflows: ReturnType<typeof createWorkflows>;
+  replenishment: ReturnType<typeof createReplenishmentRuntime>;
   procurement: ReturnType<typeof createProcurement>;
   library: ReturnType<typeof createPersistentPlaybookLibrary>;
   http: {
@@ -51,6 +56,7 @@ export interface ApplicationOptions {
   database: TenantDatabase;
   identity: IdentityService;
   execution: ExecutionConfiguration;
+  replenishmentTransport?: ReplenishmentTransport;
   verifier?: VerificationEvaluator;
   desk?: Parameters<typeof createDeskServices>[3];
 }
@@ -86,8 +92,12 @@ export function createApplicationServices(
       (await procurementEffects.resolve(context, intent)) ??
       effects.resolve(context, intent),
   };
+  const resolutionEligible = createAdmissionEligibility(detection.diagnoses);
   const safety = createSafetyServices(database, identity, combinedEffects, {
-    eligible: createAdmissionEligibility(detection.diagnoses),
+    eligible: (context, step) =>
+      step.subject
+        ? replenishment.eligible(context, step)
+        : resolutionEligible(context, step),
   });
   const desk = createDeskServices(
     database,
@@ -97,9 +107,25 @@ export function createApplicationServices(
   );
   const library = createPersistentPlaybookLibrary(database, identity);
 
-  const workflows = createWorkflows(database, library, identity.refreshContext);
+  const replenishment = createReplenishmentRuntime({
+    db: database,
+    identity,
+    procurement,
+    safety,
+    enabled: options.execution.kind === 'enabled',
+    ...(options.replenishmentTransport
+      ? { transport: options.replenishmentTransport }
+      : {}),
+  });
+  const workflows = createWorkflows(
+    database,
+    library,
+    identity.refreshContext,
+    replenishment.api,
+  );
 
   return {
+    replenishment,
     workflows,
     procurement,
     detection,

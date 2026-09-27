@@ -99,3 +99,16 @@ PurchaseOrder and line contracts and lifecycle rules.
 Tests: procurement domain tests, `apps/api/e2e/procurement.e2e.mjs` and
 `procurement.browser.mjs`. See [Procurement records](procurement.md) for authority,
 provenance, transitions and retry semantics.
+
+## Replenishment workflow
+
+Start at `packages/procurement/src/domain/replenishment.ts` for the bounded stock
+rule and published process. Use cases are in
+`packages/procurement/src/application/replenishment-workflow.ts`; composition and
+worker recovery are in `composition/replenishment.ts` and
+`replenishment-worker.ts`. Procurement owns rule persistence. Workflow detail
+controls live in `apps/web/src/features/workflows/replenishment.tsx`.
+
+Tests: `replenishment.e2e.mjs`, `replenishment.browser.mjs`, procurement rule tests
+and Workflow compiler tests. See [Replenishment workflow](replenishment.md) for
+scope, policy, recovery and the six simulator scenarios.

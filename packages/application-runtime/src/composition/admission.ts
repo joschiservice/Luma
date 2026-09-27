@@ -11,6 +11,7 @@ export function createAdmissionEligibility(
     throw new Error('Evidence freshness window must be positive');
 
   return async (context: TenantContext, step: BoundActionStep) => {
+    if (!step.incidentId || step.subject) return false;
     const diagnosis = await diagnoses.get(context, step.incidentId);
     const now = Date.now();
 

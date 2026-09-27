@@ -64,7 +64,7 @@ export interface ProcessWorkflowVersion {
   context: { kind: string; fields: PlaybookFields; maxAgeSeconds: number };
   steps: ProcessStep[];
   provenance: {
-    kind: 'resolution' | 'pilot';
+    kind: 'resolution' | 'pilot' | 'native';
     reference: string;
     authoredBy: string;
     evidenceRefs: string[];

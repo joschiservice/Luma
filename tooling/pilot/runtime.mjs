@@ -9,6 +9,7 @@ import {
   createCommerceServices,
   createExceptionWorkflowRuntime,
   createReadinessCheck,
+  createReplenishmentWorker,
   createResourceScope,
 } from '@luma/application-runtime';
 import { ConnectorError } from '@luma/connections';
@@ -28,7 +29,10 @@ import {
   shippingMethodPlaybook,
 } from '@luma/resolution';
 import { createPlaybookStore } from '@luma/resolution/composition';
-import { createDeskWorkflowReader } from '@luma/workflow-temporal';
+import {
+  createDeskWorkflowReader,
+  createProcessClient,
+} from '@luma/workflow-temporal';
 import { Pool } from 'pg';
 
 import {
@@ -354,7 +358,15 @@ export async function createPilot(
       ? createDeskWorkflowReader(temporal, identity.service)
       : null;
     if (reader) resources.add(reader.close);
+    const processClient = temporal
+      ? await createProcessClient(
+          { ...temporal, taskQueue: `${temporal.taskQueue}-procurement` },
+          identity.service,
+        )
+      : undefined;
+    if (processClient) resources.add(processClient.close);
     const application = createApplicationServices({
+      ...(processClient ? { replenishmentTransport: processClient } : {}),
       database: db,
       identity: identity.service,
       execution: { kind: 'enabled', effects },
@@ -628,9 +640,37 @@ export async function createPilot(
       })(await context(), exceptionId);
     }
 
+    const replenishmentWorker =
+      temporal && role === 'worker'
+        ? await createReplenishmentWorker(
+            temporal,
+            application.replenishment,
+            pool,
+            identity.service,
+          )
+        : undefined;
+    if (replenishmentWorker) resources.add(replenishmentWorker.close);
+    if (runtime && replenishmentWorker) {
+      const createWorker = runtime.createWorker;
+      runtime.createWorker = async () => {
+        const worker = await createWorker();
+
+        return {
+          run: () => Promise.all([worker.run(), replenishmentWorker.run()]),
+          shutdown: () => {
+            worker.shutdown();
+            replenishmentWorker.shutdown();
+          },
+          close: worker.close,
+        };
+      };
+    }
+
     return {
       app,
       runtime,
+      replenishment: application.replenishment,
+      procurement: application.procurement,
       context,
       operator,
       detection,

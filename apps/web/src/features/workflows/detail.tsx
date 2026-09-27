@@ -44,6 +44,7 @@ import {
 import { statusNames, type WorkflowFilters, WorkflowLoading } from './library';
 import { OfflineNotice } from './offline';
 import { workflowTriggerLabel } from './presentation';
+import { ReplenishmentPanel, ReplenishmentRunReview } from './replenishment';
 import { CancelScheduledStart, WorkflowTriggers } from './triggers';
 
 function processStepDescription(
@@ -69,7 +70,9 @@ function processStepDescription(
     case 'capability':
       return step.state === 'waiting'
         ? 'Waiting for policy approval.'
-        : 'Action accepted. Verification is still required.';
+        : step.state === 'completed'
+          ? 'Action accepted. Verification is still required.'
+          : 'The action did not proceed. Review the recorded reason.';
     case 'wait':
       return step.state === 'waiting'
         ? 'Waiting before the next step.'
@@ -119,7 +122,10 @@ export function WorkflowDetailPage({
   filters?: WorkflowFilters;
 }) {
   const query = useQuery(workflowOptions(organizationId, definitionId));
-  const runs = useQuery(workflowRunsOptions(organizationId, definitionId));
+  const runs = useQuery({
+    ...workflowRunsOptions(organizationId, definitionId),
+    refetchInterval: definitionId === 'inventory-replenishment' ? 5000 : false,
+  });
   const client = useQueryClient();
   const refresh = async () => {
     await client.invalidateQueries({ queryKey: workflowsKey(organizationId) });
@@ -287,6 +293,12 @@ export function WorkflowDetailPage({
                           definitionId={definitionId}
                           runId={run.id}
                           refresh={refresh}
+                        />
+                      ) : null}
+                      {definitionId === 'inventory-replenishment' ? (
+                        <ReplenishmentRunReview
+                          organizationId={organizationId}
+                          run={run}
                         />
                       ) : null}
                       {run.processSteps?.length ? (
@@ -542,18 +554,20 @@ export function WorkflowDetailView({
               label: `v${v.version}${v.version === detail.summary.availableVersion ? ' · Latest' : ''}`,
             }))}
           />
-          <Button
-            disabled={!canActivate || refreshing}
-            aria-describedby={
-              !canActivate ? 'workflow-activation-reason' : undefined
-            }
-            onClick={() => setActivate(true)}
-          >
-            Review activation
-          </Button>
+          {detail.summary.id !== 'inventory-replenishment' ? (
+            <Button
+              disabled={!canActivate || refreshing}
+              aria-describedby={
+                !canActivate ? 'workflow-activation-reason' : undefined
+              }
+              onClick={() => setActivate(true)}
+            >
+              Review activation
+            </Button>
+          ) : null}
         </div>
       </div>
-      {!canActivate ? (
+      {!canActivate && detail.summary.id !== 'inventory-replenishment' ? (
         <Alert
           id="workflow-activation-reason"
           tone={detail.canManage ? 'warning' : 'neutral'}
@@ -581,17 +595,26 @@ export function WorkflowDetailView({
           },
           {
             value: 'triggers',
-            label: 'Triggers',
-            content: (
-              <WorkflowTriggers
-                key={version.digest}
-                detail={detail}
-                version={version}
-                organizationId={organizationId}
-                refresh={refresh}
-                accessLost={accessLost}
-              />
-            ),
+            label:
+              detail.summary.id === 'inventory-replenishment'
+                ? 'Stock rules'
+                : 'Triggers',
+            content:
+              detail.summary.id === 'inventory-replenishment' ? (
+                <ReplenishmentPanel
+                  organizationId={organizationId}
+                  detail={detail}
+                />
+              ) : (
+                <WorkflowTriggers
+                  key={version.digest}
+                  detail={detail}
+                  version={version}
+                  organizationId={organizationId}
+                  refresh={refresh}
+                  accessLost={accessLost}
+                />
+              ),
           },
           {
             value: 'steps',
@@ -673,7 +696,10 @@ export function WorkflowDetailView({
             dispatched may still complete. Existing changes are not undone.
           </DialogDescription>
           <p>
-            Version {revoke?.version} · {revoke?.grants.targetIds.length} orders
+            Version {revoke?.version} · {revoke?.grants.targetIds.length}{' '}
+            {detail.summary.id === 'inventory-replenishment'
+              ? 'stock positions'
+              : 'orders'}
           </p>
           {error ? <p role="alert">{error}</p> : null}
           <div className="workflow-dialog-actions">

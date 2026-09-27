@@ -32,7 +32,11 @@
     "@ts-rest/fastify": "3.52.1",
     "fastify": "5.12.5",
     "zod": "3.25.76",
-    "@luma/audit": "workspace:*"
+    "@luma/audit": "workspace:*",
+    "@luma/connections": "workspace:*",
+    "@luma/execution": "workspace:*",
+    "@luma/policies": "workspace:*",
+    "@luma/workflows": "workspace:*"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",
