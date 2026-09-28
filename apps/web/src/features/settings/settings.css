@@ -22,7 +22,7 @@
   gap: 14px;
   min-width: 0;
   max-width: 720px;
-  animation: lu-enter var(--duration-base) var(--ease-standard);
+  animation: lu-fade var(--duration-base) var(--ease-standard);
 }
 
 .settings-content section {
