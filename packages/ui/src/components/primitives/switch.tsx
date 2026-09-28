@@ -8,11 +8,11 @@ export function Switch({ className, ...props }: SwitchPrimitive.Root.Props) {
     <SwitchPrimitive.Root
       {...props}
       className={cn(
-        'inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border border-input bg-muted p-0.5 outline-none transition-colors data-[checked]:border-primary data-[checked]:bg-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50',
+        'inline-flex h-[18px] w-8 shrink-0 cursor-pointer items-center rounded-full bg-[color-mix(in_srgb,var(--foreground)_16%,transparent)] p-0.5 outline-none transition-colors duration-150 data-[checked]:bg-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50',
         className,
       )}
     >
-      <SwitchPrimitive.Thumb className="size-3.5 rounded-full bg-background shadow-sm transition-transform data-[checked]:translate-x-4 motion-reduce:transition-none" />
+      <SwitchPrimitive.Thumb className="size-3.5 rounded-full bg-white shadow-[0_1px_2px_rgb(0_0_0/0.2)] transition-transform duration-150 ease-[var(--ease-standard)] data-[checked]:translate-x-3.5 motion-reduce:transition-none" />
     </SwitchPrimitive.Root>
   );
 }

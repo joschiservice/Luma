@@ -1,3 +1,7 @@
+import '../apps/apps.css';
+
+import { Alert } from '@luma/ui/components/primitives/alert';
+import { PageHeader } from '@luma/ui/components/workspace/page-header';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   useLocation,
@@ -14,7 +18,7 @@ import { connectionsOptions } from './data';
 /** Lists apps and forwards existing connection links to their app management page. */
 export function ConnectionsPage() {
   const { organizationId } = useParams({ from: '/app/$organizationId' });
-  const { appResult } = useSearch({ from: '/app/$organizationId/connections' });
+  const { appResult } = useSearch({ from: '/app/$organizationId/apps/' });
   const connections = useQuery(connectionsOptions(organizationId));
   const navigate = useNavigate();
   const hash = useLocation({ select: (location) => location.hash });
@@ -56,17 +60,20 @@ export function Connections({
     access.data?.actor.role === 'owner' || access.data?.actor.role === 'admin';
 
   return (
-    <div className="connections-page">
-      <h1>Apps & connections</h1>
-      <p className="desk-intro">
-        Manage your apps and the accounts connected to your workspace.
-      </p>
+    <div className="connections-page apps-page">
+      <PageHeader
+        title="Apps"
+        description="Connect the systems Luma works across. Install an app, then connect accounts and choose what Luma may read and change."
+      />
       {appResult ? (
-        <p role="status">
+        <Alert
+          role="status"
+          tone={appResult === 'connected' ? 'success' : 'warning'}
+        >
           {appResult === 'connected'
             ? 'Connection ready.'
             : 'Authorization needs attention. Open the app to try again.'}
-        </p>
+        </Alert>
       ) : null}
       <AppStore
         organizationId={organizationId}

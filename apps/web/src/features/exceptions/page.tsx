@@ -144,9 +144,9 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
   };
 
   return (
-    <div className={`inbox ${exceptionId ? 'inbox-selected' : ''}`}>
+    <div className={`inbox page-full ${exceptionId ? 'inbox-selected' : ''}`}>
       <header className="inbox-heading">
-        <h1 className="sr-only">Issues</h1>
+        <h1>Issues</h1>
         <IssueSummary
           review={
             overview.isError || overview.isPaused
@@ -166,6 +166,24 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
           loading={overview.isPending}
         />
       </header>
+      <IssueListToolbar
+        filters={search}
+        onFiltersChange={update}
+        onRefresh={refresh}
+        refreshing={list.isFetching || detail.isFetching}
+        views={
+          <IssueViewTabs
+            value={search.view}
+            renderLink={(view) => (
+              <Link
+                {...destination}
+                search={{ ...search, view, cursor: undefined }}
+                resetScroll={false}
+              />
+            )}
+          />
+        }
+      />
       {overview.isError && (
         <CaseNotice title="Summary unavailable">
           Refresh to check the latest totals. Your issue list is still
@@ -181,24 +199,6 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
             tabIndex={-1}
             aria-label="Issue inbox"
           >
-            <IssueListToolbar
-              filters={search}
-              onFiltersChange={update}
-              onRefresh={refresh}
-              refreshing={list.isFetching || detail.isFetching}
-              views={
-                <IssueViewTabs
-                  value={search.view}
-                  renderLink={(view) => (
-                    <Link
-                      {...destination}
-                      search={{ ...search, view, cursor: undefined }}
-                      resetScroll={false}
-                    />
-                  )}
-                />
-              }
-            />
             {connections.isError ? (
               <CaseNotice title="Connection coverage unavailable">
                 Your issues may still be available. Refresh to check
@@ -209,7 +209,7 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
               <CaseNotice title="No active connections">
                 Connect a commerce system to start monitoring operations.{' '}
                 <Link
-                  to="/app/$organizationId/connections"
+                  to="/app/$organizationId/apps"
                   params={{ organizationId }}
                 >
                   Open connections

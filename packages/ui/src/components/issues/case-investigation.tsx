@@ -11,13 +11,9 @@ import {
   Clock3,
   Database,
   FileText,
-  GitBranch,
   ListChecks,
-  Package,
   RefreshCw,
   ShieldQuestion,
-  Truck,
-  Unplug,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 
@@ -25,7 +21,15 @@ import { Alert, AlertDescription, AlertTitle } from '../primitives/alert';
 import { Badge } from '../primitives/badge';
 import { Button } from '../primitives/button';
 import { Disclosure } from '../primitives/disclosure';
+import { DomainIcon } from '../primitives/domain-icon';
+import { StatePill } from '../primitives/state';
 import { WorkspaceDate } from '../primitives/workspace-date';
+import {
+  elapsed,
+  issueKind,
+  issueStatus,
+  sourceLabel,
+} from './case-presentation';
 import { IssueCollection } from './issue-collection';
 import { IssueContext } from './issue-context';
 import { IssueFindings } from './issue-findings';
@@ -72,73 +76,43 @@ export function CaseStatus({ item }: { item: CaseSummary }) {
   );
 }
 
-/** Renders a compact case summary for an inbox entry. */
+/** Renders a compact case summary for an inbox entry: what it is, where it stands and how long it has waited. */
 export function CaseRow({ item }: { item: CaseSummary }) {
-  const Icon =
-    item.class === 'inventory_mismatch'
-      ? Package
-      : item.class === 'sync_failure'
-        ? Unplug
-        : item.class === 'stuck_fulfillment'
-          ? Truck
-          : GitBranch;
+  const kind = issueKind(item);
+  const status = issueStatus(item);
+  const subject =
+    item.subject.id.length > 24
+      ? `…${item.subject.id.slice(-8)}`
+      : item.subject.id;
 
   return (
-    <div className="issue-row">
-      <Icon size={16} aria-hidden="true" className="issue-row-icon" />
+    <div className="issue-row" data-state={status.state}>
+      <DomainIcon domain={kind.domain} size="sm" className="issue-row-icon" />
       <div className="issue-row-copy">
         <strong className="case-row-summary">
           {item.summary.replace(/\.+$/, '')}
         </strong>
         <span className="case-row-subject">
+          <span>{kind.label}</span>
           <span>
-            {item.sources
-              .map(
-                (source) =>
-                  ({
-                    shopify: 'Shopify',
-                    jtl: 'JTL',
-                    'jtl-onprem': 'JTL-Wawi',
-                    'jtl-cloud': 'JTL Cloud',
-                  })[source] ?? caseLabel(source),
-              )
-              .join(' · ') || 'Source unknown'}
+            {item.sources.map(sourceLabel).join(' · ') || 'Source unknown'}
           </span>
           <span title={item.subject.id}>
             {item.subject.kind === 'sku' ? 'SKU' : caseLabel(item.subject.kind)}{' '}
-            ID:{' '}
-            {item.subject.id.length > 24
-              ? `…${item.subject.id.slice(-8)}`
-              : item.subject.id}
+            {subject}
           </span>
         </span>
       </div>
       <div className="issue-row-meta">
-        <Badge tone={item.severity === 'high' ? 'warning' : 'neutral'}>
-          {caseLabel(item.severity)} severity
-        </Badge>
-        <span
-          className={
-            item.attention.required
-              ? 'status-warning'
-              : item.resolution === 'verified'
-                ? 'status-success'
-                : 'case-caption'
-          }
-        >
-          {item.attention.required
-            ? 'Needs review'
-            : item.resolution === 'verified'
-              ? 'Verified'
-              : (issueStateLabel(item) ??
-                (item.diagnosisStatus === 'pending'
-                  ? 'Investigation pending'
-                  : item.diagnosisStatus === 'failed'
-                    ? 'Investigation failed'
-                    : 'Open'))}
+        <span className="issue-severity" data-severity={item.severity}>
+          {item.severity === 'high' ? 'High' : 'Medium'}
+          <span className="sr-only"> severity</span>
         </span>
-        <span className="case-row-time">
-          <CaseTime value={item.lastActivityAt} />
+        <StatePill state={status.state}>{status.label}</StatePill>
+        <span className="case-row-time" title={item.lastActivityAt}>
+          <time dateTime={item.lastActivityAt}>
+            {elapsed(item.lastActivityAt)}
+          </time>
         </span>
       </div>
     </div>

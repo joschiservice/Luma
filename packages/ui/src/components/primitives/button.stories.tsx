@@ -1,4 +1,3 @@
-import { figmaDesign } from '@luma/ui/lib/figma';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { X } from 'lucide-react';
 import { expect, fn, userEvent, within } from 'storybook/test';
@@ -9,7 +8,6 @@ import { Spinner } from './spinner';
 const meta = {
   title: 'UI/Button',
   component: Button,
-  parameters: { design: figmaDesign('button') },
   args: { children: 'Save changes', onClick: fn() },
 } satisfies Meta<typeof Button>;
 
@@ -55,7 +53,6 @@ export const Disabled: Story = {
 };
 
 export const Pending: Story = {
-  parameters: { design: figmaDesign('buttonPending') },
   args: {
     disabled: true,
     'aria-busy': true,

@@ -1,0 +1,225 @@
+/* Shadow evaluation: compare what a workflow would do with what operators did. */
+.shadow-panel {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.shadow-panel h3,
+.shadow-report h2 {
+  margin: 0;
+}
+
+.shadow-panel > p,
+.shadow-meta {
+  color: var(--foreground-subtle);
+  font-size: 12.5px;
+}
+
+.shadow-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--signal-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.shadow-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.shadow-actions a {
+  color: var(--signal-text);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.shadow-actions a:hover {
+  text-decoration: underline;
+}
+
+.shadow-result {
+  display: grid;
+  gap: 8px;
+  margin-block: 12px;
+  overflow-wrap: anywhere;
+}
+
+.shadow-result h4,
+.shadow-review h4 {
+  margin: 12px 0 4px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.shadow-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.shadow-facts > div {
+  display: block;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface-sunken);
+}
+
+.shadow-facts dt {
+  color: var(--foreground-subtle);
+  font-size: 12px;
+}
+
+.shadow-facts dd {
+  margin: 2px 0 0;
+  font-size: 13.5px;
+}
+
+.shadow-result ul {
+  margin: 0;
+  padding-left: 18px;
+  list-style: disc;
+}
+
+.shadow-result pre {
+  max-height: 320px;
+  margin: 8px 0 0;
+  padding: 12px 14px;
+  overflow: auto;
+  border-radius: 10px;
+  background: var(--surface-sunken);
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+.shadow-review,
+.shadow-recorded {
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.shadow-fields {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.shadow-fields legend {
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.shadow-fields > [data-slot='button'] {
+  margin-top: 10px;
+}
+
+.shadow-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.shadow-field-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 110px minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+}
+
+.shadow-review .shadow-evidence {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding-block: 6px;
+  font-size: 12.5px;
+}
+
+.shadow-evidence span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.shadow-evidence input {
+  flex: none;
+  width: auto;
+  margin-top: 3px;
+  accent-color: var(--primary);
+}
+
+.shadow-evidence code {
+  display: block;
+  color: var(--foreground-subtle);
+  overflow-wrap: anywhere;
+}
+
+.shadow-date-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+  max-width: 640px;
+  margin-block: 12px;
+}
+
+.shadow-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.workflows-page .shadow-metrics > div,
+.shadow-metrics > div {
+  display: block;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--surface-sunken);
+}
+
+.shadow-metrics dt {
+  color: var(--foreground-subtle);
+  font-size: 12px;
+}
+
+.shadow-metrics dd {
+  margin: 4px 0;
+  font-size: 22px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.025em;
+}
+
+.shadow-metrics p,
+.shadow-metrics .shadow-metric-description {
+  margin: 0;
+  color: var(--foreground-subtle);
+  font-size: 12px;
+  letter-spacing: normal;
+}
+
+.shadow-comparisons > article {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+@media (max-width: 700px) {
+  .shadow-metrics,
+  .shadow-form-grid,
+  .shadow-date-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .shadow-field-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

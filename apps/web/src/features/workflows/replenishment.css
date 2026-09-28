@@ -1,154 +1,180 @@
+/* Replenishment: stock rules that create verified purchase-order drafts. */
 .replenishment-panel {
   display: grid;
-  gap: 1.25rem;
+  gap: 14px;
 }
+
 .replenishment-panel > p,
 .replenishment-rule p,
 .replenishment-preview p,
 .replenishment-review p {
-  color: var(--muted-foreground);
-  font-size: 0.875rem;
-  line-height: 1.6;
+  color: var(--foreground-muted);
+  font-size: 13px;
 }
+
 .replenishment-rules {
   display: grid;
-  gap: 1rem;
+  gap: 10px;
 }
+
 .replenishment-rule {
-  border: 1px solid var(--border);
-  border-radius: 0.625rem;
-  padding: 1.25rem;
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: var(--radius-panel);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-panel);
+  scroll-margin-top: 20px;
 }
+
+.replenishment-rule:target {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
 .replenishment-rule h3,
 .replenishment-review h3 {
-  font-size: 1rem;
+  font-size: 14px;
   font-weight: 600;
   overflow-wrap: anywhere;
 }
+
 .replenishment-metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1rem;
-  padding: 1.25rem 0;
-}
-.replenishment-metrics dt {
-  font-size: 0.75rem;
-  color: var(--muted-foreground);
-  margin-bottom: 0.375rem;
-}
-.replenishment-metrics dd {
-  font-size: 1.5rem;
-  font-variant-numeric: tabular-nums;
-}
-.replenishment-metrics small {
-  font-size: 0.75rem;
-  color: var(--muted-foreground);
-}
-.replenishment-rule-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  border-top: 1px solid var(--border);
-  padding-top: 1rem;
-  font-size: 0.75rem;
-  color: var(--muted-foreground);
-}
-.replenishment-form {
-  display: grid;
-  gap: 1.125rem;
-  margin-top: 1.25rem;
-}
-.replenishment-form label {
-  display: grid;
-  gap: 0.5rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-.replenishment-form-pair {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-}
-.replenishment-preview {
-  padding: 1rem;
-  background: var(--muted);
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
-}
-.replenishment-review {
-  display: grid;
-  gap: 0.75rem;
-  padding: 1.25rem;
-  border: 1px solid var(--border);
-  border-radius: 0.5rem;
-  margin: 1rem 0;
-}
-.replenishment-review a {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.875rem;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-@media (max-width: 640px) {
-  .replenishment-metrics {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .replenishment-form-pair {
-    grid-template-columns: 1fr;
-  }
-  .replenishment-rule {
-    padding: 1rem;
-  }
+  gap: 8px;
+  margin: 10px 0;
 }
 
 .workflows-page .replenishment-metrics > div {
   display: block;
   min-width: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface-sunken);
 }
+
+.replenishment-metrics dt {
+  margin-bottom: 2px;
+  color: var(--foreground-subtle);
+  font-size: 12px;
+}
+
 .workflows-page .replenishment-metrics dd {
-  overflow-wrap: normal;
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.015em;
   white-space: nowrap;
+}
+
+.replenishment-metrics small {
+  color: var(--foreground-subtle);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.replenishment-rule-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  color: var(--foreground-subtle);
+  font-size: 12px;
+}
+
+.replenishment-form {
+  display: grid;
+  gap: 14px;
+  margin-top: 4px;
+}
+
+.replenishment-form label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.replenishment-form-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.replenishment-preview {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--surface-sunken);
+  font-size: 13px;
+}
+
+.replenishment-review {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 14px 16px;
+  border-radius: var(--radius-panel);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-panel);
+}
+
+.replenishment-review a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--signal-text);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.replenishment-review a:hover {
+  text-decoration: underline;
+}
+
+.workflows-page .replenishment-review .replenishment-metrics {
+  margin: 4px 0;
 }
 
 .procurement-run-objects {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1rem;
+  gap: 8px;
 }
+
 .workflows-page .procurement-run-objects > div {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 0.375rem;
+  gap: 2px;
   min-width: 0;
 }
+
 .procurement-run-objects dt {
-  color: var(--muted-foreground);
-  font-size: 0.75rem;
+  color: var(--foreground-subtle);
+  font-size: 12px;
 }
+
 .procurement-run-objects dd {
   margin: 0;
-  font-size: 0.875rem;
+  font-size: 13px;
   overflow-wrap: anywhere;
 }
+
+.workflows-page .replenishment-review .procurement-run-objects {
+  margin: 4px 0;
+}
+
 @media (max-width: 640px) {
+  .replenishment-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .replenishment-form-pair,
   .procurement-run-objects {
     grid-template-columns: 1fr;
   }
-}
-
-.workflows-page .replenishment-review .replenishment-metrics {
-  margin: 0;
-  padding: 0.75rem 0;
-}
-.workflows-page .replenishment-review .procurement-run-objects {
-  margin: 0.5rem 0;
-}
-
-.replenishment-rule:target {
-  outline: 2px solid var(--ring);
-  outline-offset: 3px;
 }

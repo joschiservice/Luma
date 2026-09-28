@@ -1,55 +1,126 @@
+import type { Domain } from '@luma/ui/components/primitives/domain-icon';
 import {
   Activity,
+  Blocks,
+  ChartNoAxesColumn,
+  House,
   Inbox,
-  LayoutDashboard,
+  type LucideIcon,
   Settings,
-  ShoppingBag,
-  Unplug,
+  ShoppingCart,
   Workflow,
 } from 'lucide-react';
 
-/** Pages available through workspace navigation and search. */
-export const workspaceDestinations = [
+/** Where a destination appears in the sidebar. */
+export type DestinationGroup = 'core' | 'operations' | 'workspace';
+
+/** Workspace route segments that appear in navigation. */
+export type DestinationPath =
+  | 'home'
+  | 'exceptions'
+  | 'activity'
+  | 'insights'
+  | 'workflows'
+  | 'procurement'
+  | 'apps'
+  | 'settings';
+
+export type WorkspaceDestination = {
+  path: DestinationPath;
+  label: string;
+  Icon: LucideIcon;
+  description: string;
+  group: DestinationGroup;
+  /** Domain landmark shown instead of a functional icon. */
+  domain?: Domain;
+  /** Second key of the `G` navigation shortcut, such as `h` for G then H. */
+  shortcut: string;
+};
+
+/** Pages available through workspace navigation, search and `G` shortcuts. */
+export const workspaceDestinations: readonly WorkspaceDestination[] = [
   {
-    path: 'overview',
-    label: 'Overview',
-    Icon: LayoutDashboard,
-    description: 'Your operations at a glance',
+    path: 'home',
+    label: 'Home',
+    Icon: House,
+    description: 'What needs your attention and what Luma is handling',
+    group: 'core',
+    shortcut: 'h',
   },
   {
     path: 'exceptions',
     label: 'Issues',
     Icon: Inbox,
     description: 'Investigate and resolve issues',
-  },
-  {
-    path: 'workflows',
-    label: 'Workflows',
-    Icon: Workflow,
-    description: 'Manage resolution workflows',
-  },
-  {
-    path: 'procurement',
-    label: 'Procurement',
-    Icon: ShoppingBag,
-    description: 'Manage suppliers and purchase orders',
+    group: 'core',
+    shortcut: 'i',
   },
   {
     path: 'activity',
     label: 'Activity',
     Icon: Activity,
     description: 'Follow workspace activity',
+    group: 'core',
+    shortcut: 'a',
   },
   {
-    path: 'connections',
-    label: 'Connections',
-    Icon: Unplug,
-    description: 'Manage connected systems',
+    path: 'insights',
+    label: 'Insights',
+    Icon: ChartNoAxesColumn,
+    description: 'Live operational metrics and order flow',
+    group: 'core',
+    shortcut: 'm',
+  },
+  {
+    path: 'workflows',
+    label: 'Workflows',
+    Icon: Workflow,
+    description: 'Review and run the workflows behind your operations',
+    group: 'operations',
+    domain: 'workflows',
+    shortcut: 'w',
+  },
+  {
+    path: 'procurement',
+    label: 'Procurement',
+    Icon: ShoppingCart,
+    description: 'Manage suppliers and purchase orders',
+    group: 'operations',
+    domain: 'procurement',
+    shortcut: 'p',
+  },
+  {
+    path: 'apps',
+    label: 'Apps',
+    Icon: Blocks,
+    description: 'Install apps and manage connected systems',
+    group: 'workspace',
+    shortcut: 'c',
   },
   {
     path: 'settings',
     label: 'Settings',
     Icon: Settings,
     description: 'Workspace, team, notifications, and approvals',
+    group: 'workspace',
+    shortcut: 's',
   },
-] as const;
+];
+
+/** Finds the destination that owns a workspace URL, defaulting to Home. */
+export function destinationFor(pathname: string) {
+  const section = pathname.split(/[?#]/)[0]?.split('/')[3];
+  const normalized =
+    section === 'overview'
+      ? 'home'
+      : section === 'connections'
+        ? 'apps'
+        : section === 'playbooks'
+          ? 'workflows'
+          : section;
+
+  return (
+    workspaceDestinations.find(({ path }) => path === normalized) ??
+    workspaceDestinations[0]!
+  );
+}

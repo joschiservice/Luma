@@ -10,7 +10,7 @@ import {
 import { MailCheck } from 'lucide-react';
 import { useState } from 'react';
 
-import { Brand } from '../identity/common';
+import { EntryFrame } from '../identity/common';
 import { organizationsOptions } from '../identity/data';
 import {
   forgetInvitationToken,
@@ -63,7 +63,7 @@ export function AcceptInvitation() {
         queryKey: ['private', 'organizations'],
       });
       await navigate({
-        to: '/app/$organizationId/overview',
+        to: '/app/$organizationId/home',
         params: { organizationId },
         replace: true,
         hash: '',
@@ -73,7 +73,7 @@ export function AcceptInvitation() {
         const organizations = await client.fetchQuery(organizationsOptions());
         if (organizations.some((item) => item.id === organizationId)) {
           await navigate({
-            to: '/app/$organizationId/overview',
+            to: '/app/$organizationId/home',
             params: { organizationId },
             replace: true,
             hash: '',
@@ -95,10 +95,11 @@ export function AcceptInvitation() {
   }
 
   return (
-    <main className="invitation-page">
-      <Brand />
-      <div className="invitation-card">
-        <MailCheck size={30} />
+    <EntryFrame actions={<a href="/sign-out">Use a different account</a>}>
+      <section className="entry-panel invitation-card">
+        <span className="entry-panel-icon" aria-hidden="true">
+          <MailCheck size={18} />
+        </span>
         <h1>
           {invitation.data
             ? `Join ${invitation.data.name}`
@@ -125,9 +126,10 @@ export function AcceptInvitation() {
             {error}
           </Alert>
         ) : null}
-        <Link to="/app">Back to your workspaces</Link>
-        <a href="/sign-out">Use a different account</a>
-      </div>
-    </main>
+        <Link className="entry-back" to="/app">
+          Back to your workspaces
+        </Link>
+      </section>
+    </EntryFrame>
   );
 }

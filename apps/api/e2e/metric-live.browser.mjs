@@ -48,7 +48,7 @@ it('updates visible totals and cohorts, crosses deadlines, and measures delivery
     }),
   );
   const page = await context.newPage();
-  await page.goto(`/app/${f.org.id}/overview`);
+  await page.goto(`/app/${f.org.id}/insights`);
   const section = page.getByRole('region', {
     name: 'The work behind the numbers',
   });

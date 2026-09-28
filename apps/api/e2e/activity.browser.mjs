@@ -45,7 +45,7 @@ it('filters, expands, returns, paginates and recovers workspace activity on desk
   await page
     .getByRole('button', { name: 'Create workspace', exact: true })
     .click();
-  await page.getByRole('heading', { name: 'Operations overview' }).waitFor();
+  await page.getByRole('heading', { name: 'Needs your attention' }).waitFor();
   const tenantId = new URL(page.url()).pathname.split('/')[2];
   const actor = (
     await db.owner.query('SELECT user_id FROM memberships WHERE tenant_id=$1', [

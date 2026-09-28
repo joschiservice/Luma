@@ -1,14 +1,16 @@
-import { createFileRoute } from '@tanstack/react-router';
-import { z } from 'zod';
+import { createFileRoute, redirect } from '@tanstack/react-router';
 
-import { ConnectionsPage } from '../features/connections/page';
+import { appResultSearch } from '../features/apps/data';
 
 export const Route = createFileRoute('/app/$organizationId/connections')({
-  validateSearch: z.object({
-    appResult: z
-      .enum(['connected', 'denied', 'permissions', 'failed'])
-      .optional()
-      .catch(undefined),
-  }),
-  component: ConnectionsPage,
+  validateSearch: appResultSearch,
+  beforeLoad: ({ params, search, location }) => {
+    throw redirect({
+      to: '/app/$organizationId/apps',
+      params,
+      search,
+      hash: location.hash,
+      replace: true,
+    });
+  },
 });

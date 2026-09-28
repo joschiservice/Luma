@@ -9,7 +9,7 @@ import type {
 } from '../application/settings.js';
 import type { Role } from '../domain/context.js';
 import { IdentityError } from '../domain/context.js';
-import type { SettingsSnapshot } from '../domain/settings.js';
+import type { SettingsSnapshot, WorkspaceLayout } from '../domain/settings.js';
 
 /** Runs a serialized workspace transaction, installing only transaction-local identity context. */
 export async function workspaceTransaction<T>(
@@ -150,6 +150,37 @@ function transaction(
       await tx.query(
         "UPDATE workspace_mail SET state='cancelled' WHERE tenant_id=$1 AND user_id=$2 AND state='queued' AND ((kind='issues' AND NOT $3) OR (kind='connections' AND NOT $4))",
         [tenantId, userId, value.issues, value.connections],
+      );
+    },
+    async layout(userId) {
+      const row = (
+        await tx.query<{
+          document: Omit<WorkspaceLayout, 'revision'>;
+          revision: number;
+        }>(
+          'SELECT document,revision FROM workspace_layouts WHERE tenant_id=$1 AND user_id=$2 FOR UPDATE',
+          [tenantId, userId],
+        )
+      ).rows[0];
+
+      return row
+        ? {
+            home: row.document.home ?? null,
+            pinned: row.document.pinned ?? [],
+            revision: row.revision,
+          }
+        : { home: null, pinned: [], revision: 0 };
+    },
+    async saveLayout(userId, value) {
+      await tx.query(
+        `INSERT INTO workspace_layouts(tenant_id,user_id,document,revision) VALUES($1,$2,$3,$4)
+        ON CONFLICT(tenant_id,user_id) DO UPDATE SET document=$3,revision=$4,updated_at=now()`,
+        [
+          tenantId,
+          userId,
+          JSON.stringify({ home: value.home, pinned: value.pinned }),
+          value.revision,
+        ],
       );
     },
     async audit(actorId, type, target, before, after) {

@@ -1,3 +1,5 @@
+import './shadow.css';
+
 import { caseLabel } from '@luma/ui/components/issues/case-investigation';
 import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';

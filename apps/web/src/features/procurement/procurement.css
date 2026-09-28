@@ -1,7 +1,12 @@
 .procurement-page {
+  display: grid;
+  gap: 16px;
   max-width: 1240px;
-  padding: 30px 36px 64px;
   margin: 0 auto;
+}
+
+.procurement-page > .page-header {
+  margin-bottom: 0;
 }
 .procurement-page h1,
 .procurement-page h2,
@@ -13,39 +18,32 @@
 .procurement-page p {
   margin: 0;
 }
-.procurement-intro {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  padding: 4px 0 30px;
-}
 .procurement-eyebrow {
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  font-weight: 600;
-  color: var(--muted-foreground);
-  margin-bottom: 9px !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px !important;
+  color: var(--foreground-subtle);
+  font-size: 12px;
+  font-weight: 500;
 }
-.procurement-intro h2 {
-  font-size: 22px;
-  margin-bottom: 8px;
-}
-.procurement-intro > div > p:last-child {
-  font-size: 13px;
-  color: var(--muted-foreground);
-  line-height: 1.6;
+
+.procurement-eyebrow::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 1.5px;
+  background: var(--domain-procurement);
 }
 .procurement-overview {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  margin-bottom: 22px;
-  padding: 18px 20px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--card);
+  padding: 14px 16px;
+  border-radius: var(--radius-panel);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-panel);
 }
 .procurement-overview-heading {
   display: flex;
@@ -91,13 +89,13 @@
   font-variant-numeric: tabular-nums;
 }
 .procurement-overview-actions span {
-  font-size: 11px;
+  font-size: 12px;
 }
 .procurement-collection {
-  border: 1px solid var(--border);
-  border-radius: 10px;
   overflow: hidden;
-  background: var(--card);
+  border-radius: var(--radius-panel);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-panel);
 }
 .procurement-views,
 .procurement-filters {
@@ -113,7 +111,7 @@
   color: var(--foreground);
 }
 .procurement-views button span {
-  font-size: 11px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
   opacity: 0.65;
 }
@@ -198,7 +196,7 @@
 .procurement-created {
   display: block;
   margin-top: 8px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted-foreground);
 }
 .procurement-row-meta {
@@ -208,7 +206,7 @@
 }
 .procurement-row-meta > span:last-child {
   color: var(--muted-foreground);
-  font-size: 11px;
+  font-size: 12px;
   min-width: 88px;
 }
 .procurement-row > svg {
@@ -295,7 +293,7 @@
 }
 .procurement-panel-heading > span {
   color: var(--muted-foreground);
-  font-size: 11px;
+  font-size: 12px;
 }
 .procurement-panel-body {
   padding: 20px;
@@ -319,7 +317,7 @@
   margin-top: 0;
 }
 .procurement-panel dt {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted-foreground);
 }
 .procurement-panel dd {
@@ -327,7 +325,7 @@
   overflow-wrap: anywhere;
 }
 .procurement-panel code {
-  font-size: 11px;
+  font-size: 12px;
   overflow-wrap: anywhere;
 }
 .procurement-table-wrap {
@@ -340,10 +338,8 @@
   font-size: 13px;
 }
 .procurement-panel th {
-  padding: 12px 20px;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
+  padding: 10px 20px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--muted-foreground);
   background: var(--muted);
@@ -360,7 +356,7 @@
 }
 .procurement-number span {
   color: var(--muted-foreground);
-  font-size: 11px;
+  font-size: 12px;
 }
 .procurement-timeline {
   list-style: none;
@@ -411,12 +407,12 @@
 .procurement-timeline time {
   display: block;
   margin-top: 8px;
-  font-size: 10px;
+  font-size: 11.5px;
   color: var(--muted-foreground);
 }
 .procurement-timeline details {
   margin-top: 8px;
-  font-size: 10px;
+  font-size: 11.5px;
   color: var(--muted-foreground);
 }
 .procurement-timeline summary {
@@ -460,7 +456,7 @@
 }
 .procurement-external-fields summary span {
   color: var(--muted-foreground);
-  font-size: 11px;
+  font-size: 12px;
   margin-left: 6px;
 }
 .procurement-external-fields p {
@@ -481,7 +477,7 @@
   margin: 0;
 }
 .procurement-lines-heading span {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted-foreground);
 }
 .procurement-line-inputs {
@@ -544,14 +540,6 @@
   }
   .procurement-page {
     padding: 20px 14px 40px;
-  }
-  .procurement-intro {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 18px;
-  }
-  .procurement-intro h2 {
-    font-size: 20px;
   }
   .procurement-detail-grid {
     grid-template-columns: 1fr;

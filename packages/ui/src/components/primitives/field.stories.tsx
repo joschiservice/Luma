@@ -1,4 +1,3 @@
-import { figmaDesign } from '@luma/ui/lib/figma';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { Field, FieldDescription, FieldError, FieldLabel } from './field';
@@ -34,7 +33,6 @@ function FieldExample({
 const meta = {
   title: 'UI/Field',
   component: FieldExample,
-  parameters: { design: figmaDesign('field') },
 } satisfies Meta<typeof FieldExample>;
 
 export default meta;

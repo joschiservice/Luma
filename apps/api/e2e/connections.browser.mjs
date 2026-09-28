@@ -50,9 +50,9 @@ async function fixture(t) {
   await page
     .getByRole('button', { name: 'Create workspace', exact: true })
     .click();
-  await page.getByRole('heading', { name: 'Operations overview' }).waitFor();
+  await page.getByRole('heading', { name: 'Needs your attention' }).waitFor();
   const organizationId = new URL(page.url()).pathname.split('/')[2];
-  await page.getByRole('link', { name: 'Connections', exact: true }).click();
+  await page.getByRole('link', { name: 'Apps', exact: true }).click();
   await page.getByText('No apps installed yet.', { exact: false }).waitFor();
   expect(appModules).toEqual([]);
 
@@ -121,7 +121,7 @@ it('connects JTL targets, validates, replaces invalid credentials and disconnect
   const cloud = await save(page, 'Warehouse');
   await cloud.getByRole('button', { name: 'Validate access' }).click();
   await cloud.getByText('Read and write access', { exact: true }).waitFor();
-  await page.getByRole('link', { name: '← Apps & connections' }).click();
+  await page.getByRole('link', { name: 'All apps' }).click();
   const jtlSummary = page
     .getByRole('article')
     .filter({ has: page.getByRole('heading', { name: 'JTL', exact: true }) });
@@ -159,9 +159,9 @@ it('connects JTL targets, validates, replaces invalid credentials and disconnect
   expect(
     await page
       .getByRole('navigation', { name: 'Workspace navigation' })
-      .getByRole('link', { name: 'Connections', exact: true })
-      .getAttribute('class'),
-  ).toContain('active');
+      .getByRole('link', { name: 'Apps', exact: true })
+      .getAttribute('aria-current'),
+  ).toBe('page');
   await shop.getByText('Validated', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Refresh list' }).focus();
   await page.screenshot({

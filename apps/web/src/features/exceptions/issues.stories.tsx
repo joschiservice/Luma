@@ -21,23 +21,13 @@ import {
 import { ResolutionReview } from '@luma/ui/components/issues/resolution-review';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Pagination } from '@luma/ui/components/primitives/pagination';
-import { WorkspaceAccountMenu } from '@luma/ui/components/workspace/workspace-account-menu';
-import { figmaScreen } from '@luma/ui/lib/figma';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import {
-  Inbox,
-  LayoutDashboard,
-  Maximize2,
-  RefreshCw,
-  Unplug,
-} from 'lucide-react';
+import { Maximize2, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { expect, userEvent, within } from 'storybook/test';
 import { MINIMAL_VIEWPORTS } from 'storybook/viewport';
 
-import appStyles from '../../styles.css?inline';
-import { Brand } from '../identity/common';
-import { WorkspaceLayout } from '../identity/workspace-layout';
+import { StoryShell } from '../identity/storybook-shell';
 
 const issues = [
   inventoryCase,
@@ -95,50 +85,7 @@ function IssuesExample({
 
   return (
     <>
-      <style>{appStyles}</style>
-      <WorkspaceLayout
-        brand={<Brand />}
-        context={
-          <>
-            <Inbox size={16} aria-hidden="true" />
-            <span>Issues</span>
-          </>
-        }
-        navigation={() => (
-          <nav aria-label="Workspace navigation">
-            {[
-              { name: 'Overview', Icon: LayoutDashboard },
-              { name: 'Issues', Icon: Inbox },
-              { name: 'Connections', Icon: Unplug },
-            ].map(({ name, Icon }) => (
-              <a
-                key={name}
-                href={`#${name}`}
-                className={name === 'Issues' ? 'active' : undefined}
-                aria-current={name === 'Issues' ? 'page' : undefined}
-              >
-                <Icon size={18} />
-                {name}
-              </a>
-            ))}
-          </nav>
-        )}
-        accountMenu={
-          <WorkspaceAccountMenu
-            name="Alex Morgan"
-            workspace="Northstar Commerce"
-            workspaceId="northstar"
-            workspaces={[
-              {
-                id: 'northstar',
-                name: 'Northstar Commerce',
-                link: <a href="#workspace" />,
-              },
-            ]}
-            createLink={<a href="#new" />}
-          />
-        }
-      >
+      <StoryShell page="Issues">
         <div
           className={`inbox ${selected !== undefined ? 'inbox-selected' : ''}`}
         >
@@ -256,7 +203,7 @@ function IssuesExample({
             }
           />
         </div>
-      </WorkspaceLayout>
+      </StoryShell>
     </>
   );
 }
@@ -267,7 +214,6 @@ const meta = {
   parameters: {
     layout: 'fullscreen',
     viewport: { options: MINIMAL_VIEWPORTS },
-    design: figmaScreen('issuesLight'),
   },
 } satisfies Meta<typeof IssuesExample>;
 
@@ -279,7 +225,6 @@ export const Light: Story = {};
 
 export const Dark: Story = {
   globals: { theme: 'dark' },
-  parameters: { design: figmaScreen('issuesDark') },
 };
 
 export const InboxOnly: Story = {

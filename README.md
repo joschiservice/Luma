@@ -163,9 +163,9 @@ Link the Linear issue, describe behavior and validation, and keep PRs scoped. Ru
 
 Implementation ADRs live in [docs/architecture](docs/architecture/README.md), the authoritative source reviewed and versioned with code. The [Linear decision register](https://linear.app/auren-labs/document/architecture-decision-register-305db9bed1de) contains summaries, issue links and repository references only; do not maintain full ADR copies there. Strategic product and business decisions remain in Notion. The web bootstrap follows [TanStack Start's setup guide](https://tanstack.com/start/latest/docs/framework/react/build-from-scratch). The [HTTP API guide](docs/api.md) covers contracts, clients, errors and OpenAPI. The [identity guide](docs/identity.md) covers authentication, tenant guards, database roles and migrations. The [observability guide](docs/observability.md) covers Sentry, Langfuse, PostHog, correlation and data redaction.
 
-## Operations overview
+## Home and operations overview
 
-The [operations overview guide](docs/operations-overview.md) defines summary windows, connection freshness, metric availability and refresh behavior.
+Home is each member's attention workspace: what needs them and what Luma is handling, arranged from modules they can add, remove, reorder and resize. The [operations overview guide](docs/operations-overview.md) defines the summary windows, connection freshness, metric availability and refresh behavior behind it. Live metrics also appear on the Insights page.
 
 ## Case inbox
 
@@ -202,7 +202,7 @@ pnpm build:storybook  # static workshop in packages/ui/storybook-static
 
 `pnpm test` includes component tests; `pnpm build` includes the workshop. Install Chromium once using the setup command above (CI installs it with system dependencies). Storybook uses the React/Vite renderer without the TanStack Start server plugin, so no API, secrets or running application are needed. Only the Vitest and accessibility addons are installed; accessibility violations fail tests.
 
-Reusable components and their `*.stories.tsx` files live together in `packages/ui/src/components`, grouped into `primitives`, `issues`, `overview`, and `workspace`. Import components in the web app through explicit package exports, for example `import { Button } from '@luma/ui/components/primitives/button'`. This internal package exports React/TypeScript source for Vite to bundle and typecheck; its build also emits declarations. Import `@luma/ui/styles.css` once in each host and enable the Tailwind Vite plugin. The app and workshop share the same Luma tokens and component styles.
+Reusable components and their `*.stories.tsx` files live together in `packages/ui/src/components`, grouped into `primitives`, `issues`, and `workspace`. Import components in the web app through explicit package exports, for example `import { Button } from '@luma/ui/components/primitives/button'`. This internal package exports React/TypeScript source for Vite to bundle and typecheck; its build also emits declarations. Import `@luma/ui/styles.css` once in each host and enable the Tailwind Vite plugin. The app and workshop share the same Luma tokens and component styles; see the [design workflow](docs/design-workflow.md) for the Living Systems direction and how to change tokens.
 
 Use `button.stories.tsx` as the example: default, keyboard, disabled and composed pending states share the real Base UI component. Input, dialog and spinner stories cover the other starter primitives. Add named stories for meaningful UI states and `play` assertions for important interactions. Keep fixtures deterministic and pass state through props. Keep data fetching, auth, mutations and business decisions in the application; stories must not reimplement them. Add a local decorator only when a component needs a provider (for example an in-memory TanStack router). Do not wrap every story in the application root.
 

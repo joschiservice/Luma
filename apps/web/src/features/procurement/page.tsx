@@ -4,10 +4,12 @@ import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
 import { CollectionToolbar } from '@luma/ui/components/primitives/collection-toolbar';
+import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { Empty } from '@luma/ui/components/primitives/empty';
 import { Input } from '@luma/ui/components/primitives/input';
 import { Select } from '@luma/ui/components/primitives/select';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
+import { PageHeader } from '@luma/ui/components/workspace/page-header';
 import { useQuery } from '@tanstack/react-query';
 import {
   Link,
@@ -96,31 +98,30 @@ export function ProcurementPage() {
 
   return (
     <div className="procurement-page">
-      <h1 className="sr-only">Procurement</h1>
-      <div className="procurement-intro">
-        <div>
-          <p className="procurement-eyebrow">PROCUREMENT</p>
-          <h2>From supplier to purchase order.</h2>
-          <p>Keep orders, ownership, and lifecycle history in one place.</p>
-        </div>
-        {canManage && (
-          <Button
-            onClick={() =>
-              setDialog(
-                filters.view === 'suppliers' || !suppliers.data?.items.length
-                  ? 'supplier'
-                  : 'order',
-              )
-            }
-            disabled={suppliers.isPending || !!suppliers.error}
-          >
-            <Plus size={16} />
-            {filters.view === 'suppliers' || !suppliers.data?.items.length
-              ? 'Add supplier'
-              : 'New purchase order'}
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        icon={<DomainIcon domain="procurement" size="lg" />}
+        title="Procurement"
+        description="Suppliers and purchase orders, with ownership and status history in one place."
+        actions={
+          canManage ? (
+            <Button
+              onClick={() =>
+                setDialog(
+                  filters.view === 'suppliers' || !suppliers.data?.items.length
+                    ? 'supplier'
+                    : 'order',
+                )
+              }
+              disabled={suppliers.isPending || !!suppliers.error}
+            >
+              <Plus size={16} />
+              {filters.view === 'suppliers' || !suppliers.data?.items.length
+                ? 'Add supplier'
+                : 'New purchase order'}
+            </Button>
+          ) : null
+        }
+      />
       <section
         className="procurement-overview"
         aria-label="Replenishment context"

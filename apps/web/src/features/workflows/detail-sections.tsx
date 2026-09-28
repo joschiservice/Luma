@@ -234,7 +234,7 @@ export function WorkflowCompatibility({
           <article className="workflow-connection" key={c.id}>
             <h3>
               <Link
-                to="/app/$organizationId/connections"
+                to="/app/$organizationId/apps"
                 params={{ organizationId }}
                 hash={`connection-${c.id}`}
               >
@@ -253,7 +253,7 @@ export function WorkflowCompatibility({
           </article>
         ))
       )}
-      <Link to="/app/$organizationId/connections" params={{ organizationId }}>
+      <Link to="/app/$organizationId/apps" params={{ organizationId }}>
         Manage connections
       </Link>
     </Card>

@@ -1,0 +1,225 @@
+/*
+ * Luma design tokens.
+ *
+ * Brand values follow Auren's Living Systems identity (Canvas, Graphite, Deep
+ * Surface, Midnight, Cobalt, Azure) and its operational state colors. They are
+ * working tokens: components read semantic names only, so the palette can be
+ * finalized here without touching feature code.
+ *
+ * Light and dark are calibrated separately. Brand blue marks focus and active
+ * work and never replaces a state color.
+ */
+:root {
+  color-scheme: light;
+
+  /* Brand foundation */
+  --brand-canvas: #f7f8fa;
+  --brand-graphite: #15171c;
+  --brand-deep: #0b1020;
+  --brand-midnight: #102553;
+  --brand-cobalt: #316bff;
+  --brand-azure: #54a3ff;
+
+  /* Surfaces */
+  --background: #f4f5f8;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-sunken: #f1f3f6;
+  --surface-hover: #15171c0a;
+  --surface-selected: #316bff14;
+  --foreground: #15171c;
+  --foreground-muted: #4a5163;
+  --foreground-subtle: #5f6779;
+  --foreground-faint: #9aa1b1;
+  --line: #15171c14;
+  --line-strong: #15171c26;
+
+  /* Activity */
+  --signal: #316bff;
+  --signal-text: #2454cc;
+  --signal-soft: #316bff14;
+  --signal-strong: #2b63f6;
+  --signal-strong-hover: #2456db;
+
+  /* Operational states: fill for dots and bars, text for labels. */
+  --state-success: #16a36a;
+  --state-success-text: #0e7a4f;
+  --state-approval: #e39b17;
+  --state-approval-text: #8f5b00;
+  --state-warning: #f0712c;
+  --state-warning-text: #a2461a;
+  --state-error: #e5484d;
+  --state-error-text: #c62f35;
+  --state-neutral: #8a92a3;
+
+  /* Domain wayfinding. Never used for full surfaces or states. */
+  --domain-orders: #316bff;
+  --domain-inventory: #0ea5a0;
+  --domain-procurement: #5457e8;
+  --domain-suppliers: #e8930c;
+  --domain-fulfillment: #3b8ff0;
+  --domain-workflows: #7b61ff;
+  --domain-issues: #e5484d;
+  --domain-activity: #677084;
+  --domain-apps: #15171c;
+
+  /* shadcn semantic roles consumed by primitives and utilities */
+  --card: var(--surface-raised);
+  --card-foreground: var(--foreground);
+  --popover: #ffffff;
+  --popover-foreground: var(--foreground);
+  --primary: var(--signal-strong);
+  --primary-foreground: #ffffff;
+  --primary-hover: var(--signal-strong-hover);
+  --secondary: var(--surface-sunken);
+  --secondary-foreground: var(--foreground);
+  --muted: var(--surface-sunken);
+  --muted-foreground: var(--foreground-subtle);
+  --accent: var(--surface-hover);
+  --accent-foreground: var(--foreground);
+  --brand: var(--signal);
+  --destructive: #c4353a;
+  --destructive-foreground: #ffffff;
+  --border: var(--line);
+  --input: var(--line-strong);
+  --ring: var(--signal);
+  --overlay: #0b102066;
+  --transparent: #00000000;
+
+  /* Depth: hairlines first, shadows only for layering. */
+  --shadow-panel: 0 1px 2px #1025530a, 0 0 0 1px var(--line);
+  --shadow-control: 0 1px 1px #15171c0d;
+  --shadow-popover:
+    0 16px 40px -16px #10255340, 0 4px 12px -4px #1025531a,
+    0 0 0 1px var(--line);
+  --shadow-dialog:
+    0 32px 80px -32px #10255359, 0 8px 24px -12px #1025531f,
+    0 0 0 1px var(--line);
+
+  /* Geometry */
+  --radius: 8px;
+  --radius-control: 8px;
+  --radius-row: 6px;
+  --radius-panel: 12px;
+  --radius-surface: 16px;
+
+  /* Motion: transition, convergence and confirmation only. */
+  --ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+
+  /* Layout */
+  --sidebar-width: 248px;
+  --sidebar-rail-width: 60px;
+  --topbar-height: 48px;
+  --inspector-width: 440px;
+}
+
+.dark {
+  color-scheme: dark;
+
+  --background: #0b1020;
+  --surface: #0f1526;
+  --surface-raised: #141b2f;
+  --surface-sunken: #0c1222;
+  --surface-hover: #ffffff0d;
+  --surface-selected: #54a3ff1f;
+  --foreground: #f2f4f9;
+  --foreground-muted: #b3bcce;
+  --foreground-subtle: #8a95ab;
+  --foreground-faint: #5d6880;
+  --line: #ffffff12;
+  --line-strong: #ffffff24;
+
+  --signal: #54a3ff;
+  --signal-text: #7db8ff;
+  --signal-soft: #54a3ff1f;
+  --signal-strong: #2b63f6;
+  --signal-strong-hover: #3a72ff;
+
+  --state-success: #2ebd85;
+  --state-success-text: #4fd49d;
+  --state-approval: #f0b232;
+  --state-approval-text: #f5c35e;
+  --state-warning: #ff8a4c;
+  --state-warning-text: #ffa270;
+  --state-error: #ff5c61;
+  --state-error-text: #ff8286;
+  --state-neutral: #6f7a91;
+
+  --domain-orders: #4a80ff;
+  --domain-inventory: #14b8b2;
+  --domain-procurement: #6b6ef0;
+  --domain-suppliers: #eb9d24;
+  --domain-fulfillment: #54a3ff;
+  --domain-workflows: #8b74ff;
+  --domain-issues: #ff5c61;
+  --domain-activity: #8a95ab;
+  --domain-apps: #f2f4f9;
+
+  --popover: #161e33;
+  --destructive: #ff6b70;
+  --destructive-foreground: #1a0a0b;
+  --overlay: #03060ea6;
+
+  --shadow-panel: 0 0 0 1px var(--line);
+  --shadow-control: 0 1px 1px #0000004d;
+  --shadow-popover:
+    0 16px 40px -12px #000000a6, 0 4px 12px -4px #00000066,
+    0 0 0 1px var(--line-strong);
+  --shadow-dialog:
+    0 32px 80px -24px #000000b3, 0 8px 24px -12px #00000080,
+    0 0 0 1px var(--line-strong);
+}
+
+@theme inline {
+  --font-sans:
+    'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system,
+    'Segoe UI', sans-serif;
+  --font-heading: var(--font-sans);
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', monospace;
+
+  --color-transparent: var(--transparent);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-fg: var(--foreground);
+  --color-fg-muted: var(--foreground-muted);
+  --color-fg-subtle: var(--foreground-subtle);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-signal: var(--signal);
+  --color-signal-soft: var(--signal-soft);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-brand: var(--brand);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-overlay: var(--overlay);
+  --color-state-success: var(--state-success);
+  --color-state-approval: var(--state-approval);
+  --color-state-warning: var(--state-warning);
+  --color-state-error: var(--state-error);
+
+  --radius-sm: 6px;
+  --radius-md: var(--radius-control);
+  --radius-lg: 10px;
+  --radius-xl: var(--radius-panel);
+}

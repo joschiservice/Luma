@@ -2,7 +2,7 @@ import { Button } from '@luma/ui/components/primitives/button';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 
-import { Brand } from './common';
+import { EntryFrame } from './common';
 import { auth, clearPrivate } from './data';
 
 /** Ends the session, clears private query data, and returns the user to sign-in. */
@@ -36,19 +36,20 @@ export function SignOut() {
   }, []);
 
   return (
-    <main className="status-page">
-      <Brand />
-      <h1>{failed ? 'Sign-out not confirmed' : 'Signing out…'}</h1>
-      <p role="status">
-        {failed
-          ? 'Your session may still be active. Check your connection and retry sign-out.'
-          : 'Revoking your session.'}
-      </p>
-      {failed ? (
-        <Button disabled={pending} onClick={() => void signOut()}>
-          Retry sign-out
-        </Button>
-      ) : null}
-    </main>
+    <EntryFrame>
+      <section className="status-panel">
+        <h1>{failed ? 'Sign-out not confirmed' : 'Signing out…'}</h1>
+        <p role="status">
+          {failed
+            ? 'Your session may still be active. Check your connection and retry sign-out.'
+            : 'Revoking your session.'}
+        </p>
+        {failed ? (
+          <Button disabled={pending} onClick={() => void signOut()}>
+            Retry sign-out
+          </Button>
+        ) : null}
+      </section>
+    </EntryFrame>
   );
 }

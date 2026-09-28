@@ -49,13 +49,13 @@ export const Open: Story = {
     const input = await body.findByRole('textbox', { name: 'Search pages' });
     await waitFor(() => expect(input).toHaveFocus());
     await userEvent.keyboard('{ArrowDown}');
-    await expect(body.getByRole('link', { name: /Overview/ })).toHaveFocus();
+    await expect(body.getByRole('link', { name: /^Home/ })).toHaveFocus();
     await userEvent.keyboard('{ArrowUp}');
     await expect(input).toHaveFocus();
     await userEvent.type(input, 'workflow');
     await expect(body.getByRole('link', { name: /Workflows/ })).toBeVisible();
     await expect(
-      body.queryByRole('link', { name: /Overview/ }),
+      body.queryByRole('link', { name: /^Home/ }),
     ).not.toBeInTheDocument();
     await userEvent.clear(input);
     await userEvent.type(input, 'zzzz');

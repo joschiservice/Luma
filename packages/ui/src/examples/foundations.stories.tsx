@@ -1,36 +1,53 @@
-import { figmaDesign } from '@luma/ui/lib/figma';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
-const surfaces = [
-  ['background', 'foreground'],
-  ['card', 'card-foreground'],
-  ['popover', 'popover-foreground'],
-  ['primary', 'primary-foreground'],
-  ['secondary', 'secondary-foreground'],
-  ['muted', 'muted-foreground'],
-  ['accent', 'accent-foreground'],
-  ['destructive', 'destructive-foreground'],
-  ['status-warning-surface', 'status-warning'],
-  ['status-success-surface', 'status-success'],
-  ['status-info-surface', 'status-info'],
-  ['sidebar', 'sidebar-foreground'],
+import { AurenMark, LumaLockup } from '../components/primitives/brand';
+import { type Domain, DomainIcon } from '../components/primitives/domain-icon';
+import {
+  type OperationalState,
+  StatePill,
+} from '../components/primitives/state';
+
+const brand = [
+  ['brand-canvas', 'Canvas'],
+  ['brand-graphite', 'Graphite'],
+  ['brand-deep', 'Deep Surface'],
+  ['brand-midnight', 'Midnight'],
+  ['brand-cobalt', 'Cobalt'],
+  ['brand-azure', 'Azure'],
 ] as const;
-const accents = [
-  'primary-hover',
-  'brand',
-  'sidebar-brand',
-  'border',
-  'input',
-  'ring',
-  'overlay',
+
+const surfaces = [
+  ['background', 'foreground', 'App background'],
+  ['surface', 'foreground', 'Page surface'],
+  ['surface-raised', 'foreground', 'Raised panel'],
+  ['surface-sunken', 'foreground-muted', 'Sunken detail'],
+  ['signal-soft', 'signal-text', 'Selection and activity'],
+] as const;
+
+const states: [OperationalState, string][] = [
+  ['running', 'Applying fix'],
+  ['approval', 'Needs approval'],
+  ['attention', 'Needs review'],
+  ['error', 'Action failed'],
+  ['verified', 'Verified'],
+  ['waiting', 'Fix proposed'],
+  ['idle', 'Closed'],
 ];
 
-const radii = [
-  ['sm', 'rounded-sm'],
-  ['md', 'rounded-md'],
-  ['lg', 'rounded-lg'],
-  ['xl', 'rounded-xl'],
-] as const;
+const domains: Domain[] = [
+  'orders',
+  'inventory',
+  'procurement',
+  'suppliers',
+  'fulfillment',
+  'workflows',
+  'issues',
+  'activity',
+  'apps',
+];
+
+const section = { marginTop: 32 } as const;
+const heading = { fontSize: 15, fontWeight: 600, marginBottom: 12 } as const;
 
 function Foundations() {
   return (
@@ -43,105 +60,163 @@ function Foundations() {
         background: 'var(--background)',
       }}
     >
-      <h1 style={{ font: '36px/1.2 var(--font-heading)', marginBottom: 16 }}>
+      <LumaLockup byAuren size="lg" />
+      <h1
+        style={{
+          margin: '24px 0 8px',
+          fontSize: 32,
+          fontWeight: 500,
+          letterSpacing: '-0.035em',
+        }}
+      >
         Luma foundations
       </h1>
-      <p style={{ marginBottom: 32 }}>
-        Cool neutrals, spectral accents, and glass surfaces. Switch the theme to
-        compare light and dark appearances.
+      <p style={{ color: 'var(--foreground-muted)' }}>
+        Living Systems: precise geometry, visible states, subtle depth and
+        productivity first. Switch the theme to compare light and dark.
       </p>
-      <section aria-labelledby="surfaces-heading">
-        <h2 id="surfaces-heading" style={{ fontSize: 24, marginBottom: 16 }}>
-          Surfaces and text
-        </h2>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-            gap: 16,
-          }}
-        >
-          {surfaces.map(([surface, foreground]) => (
-            <div
-              key={surface}
-              style={{
-                padding: 20,
-                minHeight: 116,
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius)',
-                background: `var(--${surface})`,
-                color: `var(--${foreground})`,
-              }}
-            >
-              <h3 style={{ fontWeight: 600, marginBottom: 12 }}>{surface}</h3>
-              <p style={{ fontSize: 14 }}>{foreground}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-      <section aria-labelledby="accents-heading" style={{ marginTop: 32 }}>
-        <h2 id="accents-heading" style={{ fontSize: 24, marginBottom: 16 }}>
-          Accents and boundaries
+      <section aria-labelledby="brand-heading" style={section}>
+        <h2 id="brand-heading" style={heading}>
+          Brand foundation
         </h2>
         <div
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-            gap: 16,
+            gap: 8,
           }}
         >
-          {accents.map((token) => (
+          {brand.map(([token, name]) => (
             <div key={token}>
               <div
                 aria-hidden="true"
                 style={{
-                  height: 56,
+                  height: 64,
+                  borderRadius: 12,
                   background: `var(--${token})`,
-                  borderRadius: 'var(--radius)',
-                  border: '1px solid var(--border)',
-                  marginBottom: 8,
+                  boxShadow: 'inset 0 0 0 1px var(--line)',
                 }}
               />
-              <p>{token}</p>
+              <p style={{ marginTop: 6, fontSize: 13, fontWeight: 500 }}>
+                {name}
+              </p>
             </div>
           ))}
         </div>
       </section>
-      <section aria-labelledby="type-heading" style={{ marginTop: 32 }}>
-        <h2 id="type-heading" style={{ fontSize: 24, marginBottom: 16 }}>
-          Typography
+      <section aria-labelledby="surfaces-heading" style={section}>
+        <h2 id="surfaces-heading" style={heading}>
+          Surfaces and text
         </h2>
-        <p style={{ font: '32px/1.2 var(--font-heading)', marginBottom: 12 }}>
-          Room for a clearer working day.
-        </p>
-        <p style={{ font: '16px/1.6 var(--font-sans)' }}>
-          Review the evidence. Understand the proposed action. Follow the
-          outcome.
-        </p>
-        <p style={{ marginTop: 12, fontSize: 14 }}>
-          Interface: Inter. Numbers: IBM Plex Mono. Fonts are served locally
-          with the application.
-        </p>
-      </section>
-      <section aria-labelledby="radii-heading" style={{ marginTop: 32 }}>
-        <h2 id="radii-heading" style={{ fontSize: 24, marginBottom: 16 }}>
-          Corner radii
-        </h2>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
-          {radii.map(([size, className]) => (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+            gap: 8,
+          }}
+        >
+          {surfaces.map(([surface, foreground, label]) => (
             <div
-              key={size}
-              className={className}
+              key={surface}
               style={{
-                padding: 24,
-                border: '1px solid var(--border)',
-                background: 'var(--card)',
-                color: 'var(--card-foreground)',
+                minHeight: 88,
+                padding: 14,
+                borderRadius: 12,
+                background: `var(--${surface})`,
+                color: `var(--${foreground})`,
+                boxShadow: 'var(--shadow-panel)',
               }}
             >
-              radius-{size}
+              <strong style={{ fontSize: 13 }}>{label}</strong>
+              <p style={{ marginTop: 4, fontSize: 12 }}>--{surface}</p>
             </div>
           ))}
+        </div>
+      </section>
+      <section aria-labelledby="states-heading" style={section}>
+        <h2 id="states-heading" style={heading}>
+          Operational states
+        </h2>
+        <p style={{ marginBottom: 12, color: 'var(--foreground-muted)' }}>
+          Brand blue marks active work; it never replaces a state color. Every
+          state is paired with a label.
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {states.map(([state, label]) => (
+            <StatePill key={state} state={state}>
+              {label}
+            </StatePill>
+          ))}
+        </div>
+      </section>
+      <section aria-labelledby="domains-heading" style={section}>
+        <h2 id="domains-heading" style={heading}>
+          Domain landmarks
+        </h2>
+        <ul
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 16,
+            padding: 0,
+            listStyle: 'none',
+          }}
+        >
+          {domains.map((domain) => (
+            <li
+              key={domain}
+              style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+            >
+              <DomainIcon domain={domain} />
+              <span style={{ fontSize: 13, textTransform: 'capitalize' }}>
+                {domain}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
+      <section aria-labelledby="type-heading" style={section}>
+        <h2 id="type-heading" style={heading}>
+          Typography
+        </h2>
+        <p
+          style={{
+            fontSize: 40,
+            fontWeight: 500,
+            lineHeight: 1.05,
+            letterSpacing: '-0.04em',
+          }}
+        >
+          Spend less time fixing the same order problems
+        </p>
+        <p style={{ marginTop: 12, fontSize: 14 }}>
+          Instrument Sans carries every role. Personality comes from scale,
+          rhythm and space rather than a second display face.
+        </p>
+        <p
+          style={{
+            marginTop: 8,
+            color: 'var(--foreground-subtle)',
+            fontSize: 12,
+            fontVariantNumeric: 'tabular-nums',
+          }}
+        >
+          Tabular figures: 1,248 · 36m · 99.2%
+        </p>
+      </section>
+      <section aria-labelledby="marks-heading" style={section}>
+        <h2 id="marks-heading" style={heading}>
+          Marks
+        </h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+          <LumaLockup />
+          <span
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+          >
+            <AurenMark />
+            <strong>Auren</strong>
+            <span style={{ color: 'var(--foreground-subtle)' }}>Labs</span>
+          </span>
         </div>
       </section>
     </main>
@@ -158,12 +233,6 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const Light: Story = {
-  globals: { theme: 'light' },
-  parameters: { design: figmaDesign('foundationsLight') },
-};
+export const Light: Story = {};
 
-export const Dark: Story = {
-  globals: { theme: 'dark' },
-  parameters: { design: figmaDesign('foundationsDark') },
-};
+export const Dark: Story = { globals: { theme: 'dark' } };

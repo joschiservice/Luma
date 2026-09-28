@@ -8,6 +8,7 @@ import type {
   NotificationPreferences,
   SettingsSnapshot,
   WorkspaceInvitation,
+  WorkspaceLayout,
   WorkspaceSettings,
 } from '../domain/settings.js';
 import type { Credentials, IdentityService } from './identity.js';
@@ -35,6 +36,9 @@ export interface SettingsTransaction {
     userId: string,
     value: NotificationPreferences,
   ): Promise<void>;
+  /** Reads and locks the member's layout, returning the default when none is saved. */
+  layout(userId: string): Promise<WorkspaceLayout>;
+  saveLayout(userId: string, value: WorkspaceLayout): Promise<void>;
   audit(
     actorId: string,
     type: string,
@@ -303,6 +307,30 @@ export function createSettingsService(deps: SettingsDependencies) {
         });
 
         return tx.snapshot(context.actor.id);
+      });
+    },
+    /** Reads the caller's personal Home layout and pinned pages for this workspace. */
+    layout: (context: TenantContext) =>
+      authorized(context, false, (tx) => tx.layout(context.actor.id)),
+    /** Saves the caller's layout only if the revision they last read is still current. */
+    saveLayout(
+      context: TenantContext,
+      input: Omit<WorkspaceLayout, 'revision'> & { revision: number },
+    ) {
+      return authorized(context, false, async (tx) => {
+        const before = await tx.layout(context.actor.id);
+        if (before.revision !== input.revision)
+          conflict(
+            'Your layout changed in another session. Refresh before saving.',
+          );
+        const after: WorkspaceLayout = {
+          home: input.home,
+          pinned: input.pinned,
+          revision: before.revision + 1,
+        };
+        await tx.saveLayout(context.actor.id, after);
+
+        return after;
       });
     },
     /** Queues one test message per command; current membership is rechecked before sending. */

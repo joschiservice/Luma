@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-router';
 import { useEffect } from 'react';
 
+import { themeBootScript, watchTheme } from '../lib/theme';
 import stylesheet from '../styles.css?url';
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
@@ -15,35 +16,26 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       meta: [
         { charSet: 'utf-8' },
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+        { name: 'color-scheme', content: 'light dark' },
         { title: 'Luma' },
       ],
-      links: [{ rel: 'stylesheet', href: stylesheet }],
+      links: [
+        { rel: 'stylesheet', href: stylesheet },
+        { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' },
+      ],
     }),
     component: Root,
   },
 );
 
 function Root() {
-  useEffect(() => {
-    const preference = window.matchMedia('(prefers-color-scheme: dark)');
-    const apply = () =>
-      document.documentElement.classList.toggle('dark', preference.matches);
-    apply();
-    preference.addEventListener('change', apply);
-
-    return () => preference.removeEventListener('change', apply);
-  }, []);
+  useEffect(() => watchTheme(), []);
 
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
-        <script
-          dangerouslySetInnerHTML={{
-            __html:
-              "document.documentElement.classList.toggle('dark',window.matchMedia('(prefers-color-scheme: dark)').matches)",
-          }}
-        />
+        <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
       </head>
       <body>
         <Outlet />

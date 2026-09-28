@@ -1,9 +1,16 @@
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, redirect } from '@tanstack/react-router';
 
-import { overviewSearch } from '../features/overview/data';
-import { OverviewPage } from '../features/overview/page';
+import { homeSearch } from '../features/home/preferences';
 
 export const Route = createFileRoute('/app/$organizationId/overview')({
-  validateSearch: overviewSearch,
-  component: OverviewPage,
+  validateSearch: homeSearch,
+  beforeLoad: ({ params, search, location }) => {
+    throw redirect({
+      to: '/app/$organizationId/home',
+      params,
+      search,
+      hash: location.hash,
+      replace: true,
+    });
+  },
 });

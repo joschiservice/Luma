@@ -1,3 +1,5 @@
+import './activity.css';
+
 import {
   type ActivityEvent,
   activityOutcomes,
@@ -7,10 +9,12 @@ import {
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Empty } from '@luma/ui/components/primitives/empty';
+import { StateDot, StatePill } from '@luma/ui/components/primitives/state';
 import {
   WorkspaceDate,
   WorkspaceTimezone,
 } from '@luma/ui/components/primitives/workspace-date';
+import { PageHeader } from '@luma/ui/components/workspace/page-header';
 import { onlineManager, useQuery } from '@tanstack/react-query';
 import {
   Link,
@@ -18,22 +22,15 @@ import {
   useParams,
   useSearch,
 } from '@tanstack/react-router';
-import { Activity } from 'lucide-react';
+import { ChevronDown, RefreshCw } from 'lucide-react';
 import { useContext, useEffect, useState, useSyncExternalStore } from 'react';
 
 import { SignInRedirect } from '../identity/common';
 import { IdentityError } from '../identity/data';
 import { type ActivityFilters, activityOptions, activityRange } from './data';
+import { activityLabel, activityState } from './presentation';
 
-const labels: Record<string, string> = {
-  provider_accepted: 'Provider accepted',
-  manually_disposed: 'Manually disposed',
-  uncertain: 'Uncertain',
-  'purchase_order.created': 'Purchase order created',
-  'purchase_order.status_changed': 'Purchase order status changed',
-};
-const label = (v: string) =>
-  labels[v] ?? v.charAt(0).toUpperCase() + v.slice(1).replaceAll('_', ' ');
+const label = activityLabel;
 const subscribe = (changed: () => void) => onlineManager.subscribe(changed);
 const snapshot = () => onlineManager.isOnline();
 const serverSnapshot = () => true;
@@ -143,26 +140,26 @@ export function ActivityView({
     });
 
   return (
-    <div className="workflows-page activity-page">
-      <div className="workflows-heading">
-        <div>
-          <p className="workflows-kicker">
-            <Activity size={15} aria-hidden="true" /> Workspace history
-          </p>
-          <h1>Activity</h1>
-          <p className="desk-intro">
-            Actions, decisions and results, newest recorded first.
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          disabled={refreshing || offline}
-          onClick={refresh}
-        >
-          {refreshing ? 'Refreshing…' : 'Refresh activity'}
-        </Button>
-      </div>
-      <div className="workflow-filters activity-filters">
+    <div className="activity-page">
+      <PageHeader
+        title="Activity"
+        description="Actions, decisions and results recorded in this workspace, newest first."
+        actions={
+          <Button
+            variant="outline"
+            aria-label="Refresh activity"
+            disabled={refreshing || offline}
+            onClick={refresh}
+          >
+            <RefreshCw
+              aria-hidden="true"
+              className={refreshing ? 'activity-spin' : undefined}
+            />
+            {refreshing ? 'Refreshing…' : 'Refresh'}
+          </Button>
+        }
+      />
+      <div className="activity-filters">
         <label>
           Search activity
           <input
@@ -237,19 +234,19 @@ export function ActivityView({
           </select>
         </label>
       </div>
-      <p id="activity-search-help" className="desk-intro">
+      <p id="activity-search-help" className="activity-help">
         Search issue IDs, persisted resource references, action labels, actor
         IDs and workflow run IDs. Dates use recorded time; select up to 366
         days.
       </p>
       {offline ? (
-        <Alert role="status" className="workflow-notice">
+        <Alert role="status" className="activity-notice">
           You are offline. Loaded activity may be outdated. Reconnect to
           refresh.
         </Alert>
       ) : null}
       {error ? (
-        <Alert tone="danger" role="alert" className="workflow-notice">
+        <Alert tone="danger" role="alert" className="activity-notice">
           {error}{' '}
           <Button variant="outline" onClick={refresh}>
             Retry
@@ -276,7 +273,7 @@ export function ActivityView({
         <>
           <p className="activity-coverage">{page.coverage}</p>
           {!page.items.length ? (
-            <Empty className="workflow-empty">
+            <Empty className="activity-empty">
               <h2>No matching recorded activity</h2>
               <p>
                 Try another date range or clear the filters. Unrecorded changes
@@ -382,8 +379,9 @@ function ActivityRow({
         <time dateTime={item.recordedAt}>
           <WorkspaceDate value={item.recordedAt} />
         </time>
-        <span>
-          <strong>{labels[item.action] ?? item.action}</strong>
+        <StateDot state={activityState(item.outcome)} />
+        <span className="activity-event-copy">
+          <strong>{activityLabel(item.action)}</strong>
           {!related && (item.attemptId || item.proposalId) ? (
             <small>
               {item.type === 'procurement' ? 'Purchase order' : 'Attempt group'}{' '}
@@ -402,11 +400,18 @@ function ActivityRow({
           </small>
         </span>
         <span className="activity-outcome">
-          {label(item.outcome)}
+          <StatePill state={activityState(item.outcome)}>
+            {label(item.outcome)}
+          </StatePill>
           {item.mode !== 'unrecorded' ? (
             <small>{label(item.mode)}</small>
           ) : null}
         </span>
+        <ChevronDown
+          className="activity-event-chevron"
+          size={15}
+          aria-hidden="true"
+        />
       </button>
       {expanded ? (
         <div id={`event-${item.id}`} className="activity-evidence">
@@ -492,10 +497,7 @@ function ActivityRow({
               </Link>
             ) : null}
             {item.connectionId ? (
-              <Link
-                to="/app/$organizationId/connections"
-                params={{ organizationId }}
-              >
+              <Link to="/app/$organizationId/apps" params={{ organizationId }}>
                 Open connections
               </Link>
             ) : null}

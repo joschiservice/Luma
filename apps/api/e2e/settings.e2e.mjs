@@ -477,3 +477,58 @@ it('keeps workspace reads and opt-out available while a provider call is pending
   }
   expect(f.messages.size).toBe(1);
 });
+
+it('keeps Home layouts and pins personal, versioned and tenant scoped', async (t) => {
+  const { request, owner, member, outsider, base } = await settingsFixture(t);
+  expect(await request(owner, `${base}/settings/layout`)).toEqual({
+    home: null,
+    pinned: [],
+    revision: 0,
+  });
+  const layout = {
+    revision: 0,
+    home: [
+      { id: 'outcomes', size: 'full' },
+      { id: 'attention', size: 'half' },
+    ],
+    pinned: [{ path: 'exceptions?view=active', label: 'Open issues' }],
+  };
+  const saved = await request(owner, `${base}/settings/layout`, 'PUT', layout);
+  expect(saved).toEqual({ ...layout, revision: 1 });
+  expect(await request(owner, `${base}/settings/layout`)).toEqual(saved);
+  expect(await request(member, `${base}/settings/layout`)).toEqual({
+    home: null,
+    pinned: [],
+    revision: 0,
+  });
+  await request(owner, `${base}/settings/layout`, 'PUT', layout, 409);
+  await request(
+    owner,
+    `${base}/settings/layout`,
+    'PUT',
+    {
+      ...layout,
+      revision: 1,
+      home: [
+        { id: 'attention', size: 'full' },
+        { id: 'attention', size: 'half' },
+      ],
+    },
+    400,
+  );
+  await request(
+    owner,
+    `${base}/settings/layout`,
+    'PUT',
+    { ...layout, revision: 1, pinned: [{ path: '../admin', label: 'Escape' }] },
+    400,
+  );
+  await request(outsider, `${base}/settings/layout`, 'GET', undefined, 404);
+  expect(
+    await request(owner, `${base}/settings/layout`, 'PUT', {
+      revision: 1,
+      home: null,
+      pinned: [],
+    }),
+  ).toEqual({ home: null, pinned: [], revision: 2 });
+});

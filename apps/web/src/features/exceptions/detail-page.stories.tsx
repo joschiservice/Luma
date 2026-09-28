@@ -17,15 +17,12 @@ import {
 } from '@luma/ui/components/issues/resolution-fixtures';
 import { ResolutionReview } from '@luma/ui/components/issues/resolution-review';
 import { Button } from '@luma/ui/components/primitives/button';
-import { WorkspaceAccountMenu } from '@luma/ui/components/workspace/workspace-account-menu';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { ArrowLeft, Inbox, Maximize2, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Maximize2, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
-import appStyles from '../../styles.css?inline';
-import { Brand } from '../identity/common';
-import { WorkspaceLayout } from '../identity/workspace-layout';
+import { StoryShell } from '../identity/storybook-shell';
 
 const evidence = Array.from({ length: 48 }, (_, index) => ({
   ...inventoryCase.diagnosis!.provenance.evidence[0]!,
@@ -84,38 +81,7 @@ function IssuePagePreview({
 
   return (
     <>
-      <style>{appStyles}</style>
-      <WorkspaceLayout
-        brand={<Brand />}
-        navigation={() => (
-          <nav aria-label="Workspace navigation">
-            <a href="#issues" className="active" aria-current="page">
-              <Inbox size={18} /> Issues
-            </a>
-          </nav>
-        )}
-        context={
-          <>
-            <Inbox size={16} aria-hidden="true" />
-            <span aria-current="page">Issues</span>
-          </>
-        }
-        accountMenu={
-          <WorkspaceAccountMenu
-            name="Alex Morgan"
-            workspace="Northstar Commerce"
-            workspaceId="northstar"
-            workspaces={[
-              {
-                id: 'northstar',
-                name: 'Northstar Commerce',
-                link: <a href="#workspace" />,
-              },
-            ]}
-            createLink={<a href="#new" />}
-          />
-        }
-      >
+      <StoryShell page="Issues">
         {full ? (
           <IssuePageLayout
             item={unavailable ? undefined : item}
@@ -204,7 +170,7 @@ function IssuePagePreview({
             </div>
           </div>
         )}
-      </WorkspaceLayout>
+      </StoryShell>
     </>
   );
 }

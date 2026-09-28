@@ -45,7 +45,7 @@ it('reviews and evaluates a code example on desktop and mobile', async (t) => {
   await page
     .getByRole('button', { name: 'Create workspace', exact: true })
     .click();
-  await page.getByRole('heading', { name: 'Operations overview' }).waitFor();
+  await page.getByRole('heading', { name: 'Needs your attention' }).waitFor();
   const tenantId = new URL(page.url()).pathname.split('/')[2];
   const { version } = await seedCodeSteps(db, tenantId);
   await page.goto(`/app/${tenantId}/workflows/${version.definition.id}`);

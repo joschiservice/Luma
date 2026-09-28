@@ -1,17 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { z } from 'zod';
 
+import { appResultSearch } from '../features/apps/data';
 import { AppSettings } from '../features/apps/settings';
 
 export const Route = createFileRoute(
   '/app/$organizationId/apps/$appId_/settings',
 )({
-  validateSearch: z.object({
-    appResult: z
-      .enum(['connected', 'denied', 'permissions', 'failed'])
-      .optional()
-      .catch(undefined),
-  }),
+  validateSearch: appResultSearch,
   component: AppSettingsPage,
 });
 
