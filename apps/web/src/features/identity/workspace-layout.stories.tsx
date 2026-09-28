@@ -40,12 +40,14 @@ type Story = StoryObj<typeof meta>;
 export const Desktop: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByRole('link', { name: /^Issues/ }));
-    await expect(canvas.getByRole('heading', { name: 'Issues' })).toBeVisible();
-    await expect(canvas.getByRole('link', { name: /^Issues/ })).toHaveAttribute(
-      'aria-current',
-      'page',
+    const navigation = within(
+      canvas.getByRole('navigation', { name: 'Workspace navigation' }),
     );
+    await userEvent.click(navigation.getByRole('link', { name: /^Issues/ }));
+    await expect(canvas.getByRole('heading', { name: 'Issues' })).toBeVisible();
+    await expect(
+      navigation.getByRole('link', { name: /^Issues/ }),
+    ).toHaveAttribute('aria-current', 'page');
     await userEvent.click(
       canvas.getByRole('button', { name: /Switch workspace/ }),
     );
@@ -138,8 +140,11 @@ export const MobileDrawer: Story = {
     const dialog = await within(canvasElement.ownerDocument.body).findByRole(
       'dialog',
     );
+    // The drawer slides in from the left; measure once it has settled.
+    await waitFor(() =>
+      expect(dialog.getBoundingClientRect().x).toBeGreaterThanOrEqual(0),
+    );
     const bounds = dialog.getBoundingClientRect();
-    await expect(bounds.x).toBeGreaterThanOrEqual(0);
     await expect(bounds.y).toBeGreaterThanOrEqual(0);
     await expect(bounds.right).toBeLessThanOrEqual(window.innerWidth);
   },

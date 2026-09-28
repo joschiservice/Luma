@@ -50,7 +50,7 @@ it('finds, reviews, activates, reloads and revokes a persisted workflow with wor
   await page
     .getByRole('button', { name: 'Create workspace', exact: true })
     .click();
-  await page.getByRole('heading', { name: 'Operations overview' }).waitFor();
+  await page.getByRole('heading', { name: 'Needs your attention' }).waitFor();
   const tenantId = new URL(page.url()).pathname.split('/')[2];
   const { version, connectionId, targetId } = await seedPlaybooks(db, tenantId);
   const url = `/app/${tenantId}/workflows`,

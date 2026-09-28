@@ -56,7 +56,7 @@ it('reviews decisions, recovers ambiguous commands and escalates through the con
   await page
     .getByRole('button', { name: 'Create workspace', exact: true })
     .click();
-  await page.getByRole('heading', { name: 'Operations overview' }).waitFor();
+  await page.getByRole('heading', { name: 'Needs your attention' }).waitFor();
   const organizationId = new URL(page.url()).pathname.split('/')[2];
   const inbox = `/app/${organizationId}/exceptions`;
   const services = createDetectionServices(db.runtimeUrl);

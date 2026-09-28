@@ -45,7 +45,7 @@ it('explains unknown order totals, opens accessible cohorts and recovers from er
   page.setDefaultTimeout(12000);
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto(`/app/${f.org.id}/overview`);
+  await page.goto(`/app/${f.org.id}/insights`);
   const section = page.getByRole('region', {
     name: 'The work behind the numbers',
   });

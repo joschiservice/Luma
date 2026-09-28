@@ -14,16 +14,17 @@
   background: var(--popover);
   color: var(--popover-foreground);
   box-shadow: var(--shadow-popover);
-  transform-origin: var(--transform-origin);
-  transition:
-    opacity var(--duration-fast) var(--ease-standard),
-    scale var(--duration-fast) var(--ease-standard);
+  transition: opacity var(--duration-fast) var(--ease-standard);
 }
 
-.lu-popover[data-starting-style],
+/* Menus fade in but close at once, so a choice never lingers on screen. */
+.lu-popover[data-starting-style] {
+  opacity: 0;
+}
+
 .lu-popover[data-ending-style] {
   opacity: 0;
-  scale: 0.98;
+  transition-duration: 0s;
 }
 
 .lu-menu-item {

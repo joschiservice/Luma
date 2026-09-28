@@ -87,7 +87,7 @@ const commands: Command[] = [
     id: 'docs',
     kind: 'link',
     label: 'Open documentation',
-    description: 'Guides for investigating issues and running workflows',
+    description: 'Guides for working in Luma, opened in a new tab',
     Icon: BookOpen,
     keywords: 'help docs documentation guide',
     render: (children) => (

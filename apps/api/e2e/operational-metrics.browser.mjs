@@ -63,7 +63,7 @@ it('keeps cross-domain cohorts live, recovers races and measures committed chang
   page.setDefaultTimeout(15000);
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  await page.goto(`/app/${f.org.id}/overview`);
+  await page.goto(`/app/${f.org.id}/insights`);
   const section = page.getByRole('region', { name: 'Your operational pulse' });
   const value = (id) =>
     section.locator(`[data-metric="${id}"] .operational-value`);

@@ -29,7 +29,7 @@
   --surface-selected: #316bff14;
   --foreground: #15171c;
   --foreground-muted: #4a5163;
-  --foreground-subtle: #677084;
+  --foreground-subtle: #5f6779;
   --foreground-faint: #9aa1b1;
   --line: #15171c14;
   --line-strong: #15171c26;
@@ -47,7 +47,7 @@
   --state-approval: #e39b17;
   --state-approval-text: #8f5b00;
   --state-warning: #f0712c;
-  --state-warning-text: #b4501a;
+  --state-warning-text: #a2461a;
   --state-error: #e5484d;
   --state-error-text: #c62f35;
   --state-neutral: #8a92a3;
@@ -78,7 +78,7 @@
   --accent: var(--surface-hover);
   --accent-foreground: var(--foreground);
   --brand: var(--signal);
-  --destructive: #d33b40;
+  --destructive: #c4353a;
   --destructive-foreground: #ffffff;
   --border: var(--line);
   --input: var(--line-strong);

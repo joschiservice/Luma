@@ -4,11 +4,12 @@ import { appResultSearch } from '../features/apps/data';
 
 export const Route = createFileRoute('/app/$organizationId/connections')({
   validateSearch: appResultSearch,
-  beforeLoad: ({ params, search }) => {
+  beforeLoad: ({ params, search, location }) => {
     throw redirect({
       to: '/app/$organizationId/apps',
       params,
       search,
+      hash: location.hash,
       replace: true,
     });
   },

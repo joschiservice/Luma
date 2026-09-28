@@ -92,8 +92,8 @@ export const Workspace: Story = {
       canvas.getByRole('navigation', { name: 'Settings sections' }),
     ).toBeVisible();
     await expect(
-      canvas.queryByRole('heading', { name: 'Settings' }),
-    ).not.toBeInTheDocument();
+      canvas.getByRole('heading', { name: 'Settings', level: 1 }),
+    ).toBeVisible();
     await expect(
       canvas.getByRole('button', { name: 'Save changes' }),
     ).toBeDisabled();

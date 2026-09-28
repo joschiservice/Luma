@@ -37,7 +37,11 @@ it('manages workspace preferences and the complete invitation journey on desktop
   await page.goto(`/app/${f.org.id}/settings/workspace`);
   await page.getByRole('heading', { name: 'Workspace', exact: true }).waitFor();
   expect(await page.getByText('Personal', { exact: true }).count()).toBe(1);
-  expect(await page.getByRole('heading', { name: 'Settings' }).count()).toBe(0);
+  expect(
+    await page
+      .getByRole('heading', { name: 'Settings', exact: true, level: 1 })
+      .count(),
+  ).toBe(1);
   const nameHeight = await page
     .getByLabel('Workspace name')
     .evaluate((input) => input.getBoundingClientRect().height);
@@ -78,7 +82,7 @@ it('manages workspace preferences and the complete invitation journey on desktop
     fullPage: true,
   });
   const overview = await context.newPage();
-  await overview.goto(`/app/${f.org.id}/overview`);
+  await overview.goto(`/app/${f.org.id}/home`);
   await overview
     .getByText(/Asia\/Tokyo/)
     .first()
@@ -161,7 +165,7 @@ it('manages workspace preferences and the complete invitation journey on desktop
     .fill('settings-test-password-123');
   await recipient.getByRole('button', { name: 'Sign in', exact: true }).click();
   await recipient.getByRole('button', { name: 'Accept invitation' }).click();
-  await recipient.waitForURL(`**/app/${f.org.id}/overview*`);
+  await recipient.waitForURL(`**/app/${f.org.id}/home*`);
   await page.reload();
   await page.getByRole('button', { name: 'Manage Outsider' }).click();
   await page.getByRole('combobox', { name: 'Member role' }).click();

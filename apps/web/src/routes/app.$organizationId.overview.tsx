@@ -4,11 +4,12 @@ import { homeSearch } from '../features/home/preferences';
 
 export const Route = createFileRoute('/app/$organizationId/overview')({
   validateSearch: homeSearch,
-  beforeLoad: ({ params, search }) => {
+  beforeLoad: ({ params, search, location }) => {
     throw redirect({
       to: '/app/$organizationId/home',
       params,
       search,
+      hash: location.hash,
       replace: true,
     });
   },

@@ -39,6 +39,13 @@
   font-size: 14px;
 }
 
+.home-asof {
+  margin-top: 6px;
+  color: var(--foreground-subtle);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
 .home-header-actions {
   display: flex;
   align-items: center;

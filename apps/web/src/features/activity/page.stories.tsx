@@ -120,7 +120,7 @@ export const History: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(
-      await canvas.findByRole('button', { name: /execution.completed/ }),
+      await canvas.findByRole('button', { name: /Execution completed/ }),
     );
     await expect(
       canvas.getByText('inconclusive', { exact: true }),

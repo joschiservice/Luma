@@ -62,7 +62,7 @@ function DialogContent({
         data-slot="dialog-content"
         className={(state) =>
           cn(
-            'fixed top-1/2 left-1/2 z-50 grid w-[calc(100%-2rem)] max-w-md max-h-[calc(100dvh-2rem)] -translate-x-1/2 -translate-y-1/2 gap-5 overflow-y-auto rounded-[14px] bg-popover p-5 font-sans text-[13px] text-popover-foreground shadow-[var(--shadow-dialog)] outline-none transition-[opacity,scale] duration-200 ease-[var(--ease-standard)] data-[starting-style]:scale-[0.98] data-[starting-style]:opacity-0 data-[ending-style]:scale-[0.98] data-[ending-style]:opacity-0 motion-reduce:transition-none',
+            'fixed top-1/2 left-1/2 z-50 grid w-[calc(100%-2rem)] max-w-md max-h-[calc(100dvh-2rem)] -translate-x-1/2 -translate-y-1/2 gap-5 overflow-y-auto rounded-[14px] bg-popover p-5 font-sans text-[13px] text-popover-foreground shadow-[var(--shadow-dialog)] outline-none transition-opacity duration-200 ease-[var(--ease-standard)] data-[starting-style]:opacity-0 data-[ending-style]:opacity-0 motion-reduce:transition-none',
             typeof className === 'function' ? className(state) : className,
           )
         }

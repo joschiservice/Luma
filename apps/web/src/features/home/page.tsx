@@ -18,7 +18,10 @@ import {
   DropdownMenuTrigger,
 } from '@luma/ui/components/primitives/dropdown-menu';
 import { Select } from '@luma/ui/components/primitives/select';
-import { WorkspaceTimezone } from '@luma/ui/components/primitives/workspace-date';
+import {
+  WorkspaceDate,
+  WorkspaceTimezone,
+} from '@luma/ui/components/primitives/workspace-date';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Link,
@@ -331,6 +334,12 @@ export function HomePage() {
                 : 'Nothing needs your decision right now. Here’s what Luma is handling.'
               : 'Here’s what needs you and what Luma is handling.'}
           </p>
+          {data ? (
+            <p className="home-asof">
+              Updated <WorkspaceDate value={data.generatedAt} /> · refreshes
+              every 30 seconds
+            </p>
+          ) : null}
         </div>
         <div className="home-header-actions">
           <Select<HomeWindow>

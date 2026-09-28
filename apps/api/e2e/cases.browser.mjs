@@ -49,15 +49,15 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
   await page
     .getByRole('button', { name: 'Create workspace', exact: true })
     .click();
-  await page.getByRole('heading', { name: 'Operations overview' }).waitFor();
+  await page.getByRole('heading', { name: 'Needs your attention' }).waitFor();
   const organizationId = new URL(page.url()).pathname.split('/')[2];
   await page
     .getByRole('heading', { name: 'Connect your first system.' })
     .waitFor();
-  expect(await page.getByText('Unavailable', { exact: true }).count()).toBe(2);
+  await page.getByRole('heading', { name: 'Luma is handling' }).waitFor();
   await page.getByRole('combobox', { name: 'Resolution window' }).click();
   await page.getByRole('option', { name: 'Last 7 days', exact: true }).click();
-  await page.waitForURL('**/overview?window=7d');
+  await page.waitForURL('**/home?window=7d');
   await page.reload();
   await page
     .getByRole('combobox', { name: 'Resolution window' })
@@ -159,7 +159,7 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
     });
     ids.push(result.incident.id);
   }
-  await page.getByRole('link', { name: 'All open', exact: true }).click();
+  await page.getByRole('tab', { name: 'All open', exact: true }).click();
   await page.locator('.inbox-rows li').first().waitFor();
   expect(await page.locator('.inbox-rows li').count()).toBe(25);
   await page.getByText('Page 1 of 2', { exact: true }).waitFor();
@@ -496,7 +496,7 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
       exact: true,
     })
     .waitFor();
-  await page.getByRole('link', { name: 'Needs review', exact: true }).click();
+  await page.getByRole('tab', { name: 'Needs review', exact: true }).click();
   await page
     .getByRole('heading', {
       name: 'The connection read needs investigation',
@@ -574,16 +574,16 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
     .getByText('Inbox could not be refreshed', { exact: true })
     .waitFor();
   await services.diagnoses.run(tenant, ids[1]);
-  await page.goto(`/app/${organizationId}/overview`);
+  await page.goto(`/app/${organizationId}/home`);
   await page.locator('.operations-decisions a').first().waitFor();
   const authoritative = await context.request.get(
     `/api/v1/organizations/${organizationId}/operations/overview`,
   );
   expect(authoritative.status()).toBe(200);
   const summary = await authoritative.json();
-  expect(
-    await page.locator('.operations-metrics strong').first().textContent(),
-  ).toBe(String(summary.attentionCount));
+  expect(await page.locator('.home-lead').textContent()).toContain(
+    `${summary.attentionCount} decision`,
+  );
   expect(
     await page.locator('.operations-decisions a').first().getAttribute('href'),
   ).toContain(summary.prioritizedDecisions[0].id);
@@ -591,7 +591,7 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
   await page.locator('.operations-decisions a').first().click();
   await page.getByRole('article', { name: 'Issue investigation' }).waitFor();
   expect(new URL(page.url()).searchParams.get('view')).toBe('needs_you');
-  await page.goto(`/app/${organizationId}/overview`);
+  await page.goto(`/app/${organizationId}/home`);
   await page.locator('.operations-decisions a').first().waitFor();
   await page.route(
     '**/api/v1/organizations/*/operations/overview?**',

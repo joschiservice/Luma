@@ -56,7 +56,7 @@ it('starts a scoped native workflow, preserves uncertain retries and cancels a s
   await page
     .getByRole('button', { name: 'Create workspace', exact: true })
     .click();
-  await page.getByRole('heading', { name: 'Operations overview' }).waitFor();
+  await page.getByRole('heading', { name: 'Needs your attention' }).waitFor();
   const tenantId = new URL(page.url()).pathname.split('/')[2];
 
   const { digest, format, ...source } = resolutionWorkflow(

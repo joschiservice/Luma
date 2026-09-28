@@ -236,8 +236,8 @@ it('opens contextual issue guides and preserves the investigation across help na
   expect(page.url()).toBe(fullUrl);
   await page.getByRole('link', { name: 'Back to issues' }).click();
   expect(page.url()).toBe(selectedUrl);
-  await page.goto(`/app/${organizationId}/overview`);
-  await page.getByRole('heading', { name: 'Operations overview' }).waitFor();
+  await page.goto(`/app/${organizationId}/home`);
+  await page.getByRole('heading', { name: 'Needs your attention' }).waitFor();
   expect(await helpButton.count()).toBe(0);
   expect(await page.locator('vite-error-overlay').count()).toBe(0);
   expect(errors).toEqual([]);
