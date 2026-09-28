@@ -14,6 +14,21 @@ Start with the row closest to the change. Follow imports from these entry points
 | Local simulator wiring                   | `tooling/simulator/cli.mjs`, `platform-client.mjs`, `tooling/pilot/runtime.mjs`                                                                                                           | `apps/api/e2e/simulator.e2e.mjs`                                                                |
 | Isolated platform tests                  | `apps/api/e2e/simulator-fixture.mjs`, `tooling/simulator/e2e-environment.mjs`; database runner in `tooling/dev/test.mjs`                                                                  | Reuse `setupSimulator(t)` in API E2E and browser tests                                          |
 
+## Workspace shell, Home and personal layouts
+
+The design system lives in `packages/ui/src/styles` (tokens, base, primitives,
+workspace and issues) with brand primitives in
+`packages/ui/src/components/primitives` (`brand`, `state`, `domain-icon`, `kbd`).
+The shell is `apps/web/src/features/identity/shell.tsx` and `workspace-layout.tsx`;
+destinations, `G` shortcuts and the command menu are in `workspace-destinations.ts`
+and `workspace-search.tsx`. Home is `apps/web/src/features/home` (module catalog in
+`preferences.ts`, modules in `modules.tsx`). Personal layouts and pins use
+`apps/web/src/features/layout`, the `layout`/`saveLayout` settings routes in
+`packages/identity/src/api/settings.ts` and migration `0033_workspace_layouts.sql`.
+Tests are the Home and presentation unit tests, `settings.e2e.mjs`, the shell stories
+and the browser journeys. See [shared frontend components](frontend-ui.md) and the
+[design workflow](design-workflow.md).
+
 ## Documentation and contextual help
 
 Start at `apps/web/src/features/help/context-help.tsx` for the navbar drawer,
@@ -30,6 +45,7 @@ Start at `packages/identity/src/application/settings.ts` for authorized edits an
 `apps/web/src/features/settings/page.tsx` for Settings UI. Approval preferences feed
 `packages/policies/src/application/policies.ts` and execution admission. Tests are
 `apps/api/e2e/settings.e2e.mjs`, `settings.browser.mjs` and the Settings stories.
+Personal Appearance and Home & sidebar sections are in `apps/web/src/features/settings/personal.tsx`.
 See [workspace settings](workspace-settings.md) for configuration and retry semantics.
 
 ## Operational issue flow
@@ -122,7 +138,8 @@ Start with `packages/orders/src/domain/metrics.ts` for versioned definitions and
 coverage and inbox attention inside a shared read transaction in
 `packages/resolution/src/infrastructure/metrics.ts`. API contracts live in
 `packages/api-contract/src/metrics.ts`; the UI is
-`apps/web/src/features/overview/order-metrics.tsx`.
+`apps/web/src/features/overview/order-metrics.tsx`, shown on the Insights page
+(`insights.tsx`) and as an optional Home module.
 
 Tests: `packages/application-runtime/src/commerce.integration.test.ts` and
 `apps/api/e2e/metrics.browser.mjs`. See [Shared metrics](operational-metrics.md)

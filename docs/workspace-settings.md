@@ -114,6 +114,23 @@ notice; old approvals do not carry forward. Admission re-evaluates policy, the
 reservation fence checks the current revision, and dispatch checks it again after
 audit persistence. Previously rejected intent stays rejected across revisions.
 
+## Personal layouts and appearance
+
+`GET /v1/organizations/:organizationId/settings/layout` returns the signed-in
+member's Home modules and sidebar pins for that workspace. A `home` of `null`
+means the default Home. `PUT` on the same path saves the whole layout with the
+revision last read; a stale revision returns 409 and the client reloads the
+latest layout. Any member can save their own layout; layouts are never shared
+with teammates. Each module appears at most once, pins are limited to 12, and a
+pin's path is relative to the workspace root, such as `exceptions?view=active`.
+Unknown module IDs from older layouts are dropped when read. Migration
+`0033_workspace_layouts.sql` stores layouts per tenant and member under row-level
+security.
+
+**Settings → Appearance** stores the theme (system, light or dark) and the
+default sidebar width in the browser, so they apply to the current device.
+**Settings → Home & sidebar** manages the stored layout.
+
 ## Validation
 
 ```sh
@@ -124,7 +141,8 @@ pnpm check
 
 The backend suite covers permissions, tenant isolation, revision conflicts, command
 replay, last-owner concurrency, invitation acceptance/reuse/expiry, mail failures,
-notification deduplication, opt-out, removal, retry windows and effective policy.
+notification deduplication, opt-out, removal, retry windows, effective policy and
+personal layout revisions, validation and isolation.
 Browser acceptance covers timeout recovery, preferences after refresh, keyboard
 approval controls, email invitation and acceptance, role changes, removal and narrow
 screens. Settings Storybook stories cover workspace, personal preferences, member

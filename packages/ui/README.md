@@ -1,9 +1,9 @@
 # Luma UI
 
-The [design workflow](../../docs/design-workflow.md) describes the Figma library,
-token checks, story links, and AI-assisted iteration. `Foundations/Theme`
-shows the current tokens in Storybook; the Designs addon displays linked Figma
-frames alongside their stories.
+The [design workflow](../../docs/design-workflow.md) describes Luma's Living
+Systems direction, where the brand rules live and how to change tokens.
+`Foundations/Theme` shows the current tokens, operational states, domain
+landmarks, typography and marks in Storybook.
 
 `App/Workspace shell` shows the production sidebar, header, workspace switcher,
 account menu, and mobile drawer. These stories live in `apps/web` and use local
@@ -11,24 +11,26 @@ navigation fixtures. Their app stylesheet is mounted only for the app stories.
 
 Owned React source, initialized with shadcn's Base UI registry. `components.json` retains `base-nova` to select upstream source; Luma's tokens and variants define the appearance. No router, server, auth or desktop bridge belongs here.
 
-## Starter surface
+## Surface
 
-- **Button:** primary, outline, ghost and destructive actions; native keyboard behavior.
-- **Input:** text entry with native/Base UI props; consumers supply accessible labels and validation state.
-- **Dialog:** composable trigger, popup, title, description and close controls; Base UI owns focus and dismissal.
+- **Button:** default (Cobalt), outline, ghost and destructive actions; native keyboard behavior.
+- **Input, Textarea, Select, SearchableSelect:** text entry and choices with native/Base UI props; consumers supply accessible labels and validation state.
+- **Dialog, DropdownMenu, ResponsivePopover:** composable overlays; Base UI owns focus and dismissal.
 - **Field:** composable labels, descriptions and associated validation errors.
-- **Spinner:** composable loading feedback with reduced-motion support.
+- **StateDot, StatePill:** operational state with a required text label.
+- **DomainIcon:** domain landmarks for navigation and record identity.
+- **LumaMark, LumaLockup, AurenMark, Kbd:** brand marks and keyboard hints.
+- **PageHeader, WorkspaceSwitcher, WorkspaceAccountMenu:** workspace chrome in `components/workspace`.
 
 Components, stories and fixtures are grouped by responsibility under `src/components`:
 
 - `primitives/`: general UI components such as Card, Alert, Badge, Button and Disclosure. These do not import feature components.
 - `issues/`: issue investigation, evidence, execution, resolution and timeline compositions.
-- `overview/`: operations overview components.
 - `workspace/`: workspace header and account menu components.
 
 Import from the matching public path, such as `@luma/ui/components/primitives/card` or `@luma/ui/components/issues/case-timeline`. Keep stories and fixtures beside the components they support. Both shadcn configurations place new primitives in `primitives/`.
 
-`src/styles/globals.css` owns Tailwind v4, semantic colors, typography and radii. Warm paper, forest green and terracotta replace the neutral preset. The `.dark` token set uses the same component classes. Apply `.dark` to the document element so portals inherit the theme; each host owns the theme preference.
+`src/styles/globals.css` imports Tailwind v4 and the stylesheet layers: `tokens.css` (brand, semantic, state and domain values for light and dark), `base.css`, `primitives.css`, `workspace.css` and `issues.css`. Instrument Sans is bundled through Fontsource. The `.dark` token set uses the same component classes. Apply `.dark` to the document element so portals inherit the theme; each host owns the theme preference.
 
 ## Consume from React
 
@@ -71,10 +73,10 @@ Reuse the small Field primitives, not an application-wide form abstraction. Conn
 
 ### Button sizing
 
-Buttons default to the compact 36px size with 12px horizontal padding. Use
-`size="lg"` for 44px primary sign-in and onboarding actions. Use `size="icon"`
-for 44px icon-only controls and supply an accessible label. The `sm` size remains
-an alias for compact buttons; ordinary actions do not need an explicit size.
+Buttons default to a compact 32px height. Use `sm` (28px) inside dense rows and
+toolbars, `lg` (40px) for sign-in and onboarding actions, and `icon` (32px) for
+icon-only controls with an accessible label. Coarse pointers and narrow screens
+receive 44px targets automatically.
 
 ## Workspace checks
 

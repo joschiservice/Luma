@@ -1,6 +1,8 @@
 # Operations overview
 
-The authenticated workspace overview reads
+Home reads the operations overview to show what needs attention, what Luma is
+handling and connection health. The same data backs the optional resolution
+outcomes module. The authenticated workspace overview reads
 `GET /v1/organizations/:organizationId/operations/overview?window=24h|7d`.
 The default window is 24 hours. The server returns its exact UTC start, end and
 snapshot time. Verified resolutions use `[start, end)`; active cases, attention
@@ -27,8 +29,8 @@ queries show a paused notice and hide health and totals, including before the
 first load. Reconnection resumes the query automatically.
 
 Automation eligibility and human-work attribution are not persisted yet. Both
-`automaticallyResolved` and `automation` therefore return null. The UI displays
-“Unavailable”; verified resolutions remain a separate count and are never
+`automaticallyResolved` and `automation` therefore return null. Home shows “—” in
+the handling module and “Unavailable” in the resolution outcomes module; verified resolutions remain a separate count and are never
 relabelled as automatic. The contract supports an authoritative numerator and
 denominator when those records become available. A zero denominator displays no
 percentage. Synthetic automation values exist only in Storybook.
@@ -47,7 +49,7 @@ per-capability freshness, future timestamps, credential denial, response validat
 Storybook accessibility and keyboard interactions, and connected browser navigation,
 retry and mobile layout.
 
-The order operations section uses the [shared metric registry](operational-metrics.md)
+The order operations section on Insights, also available as a Home module, uses the [shared metric registry](operational-metrics.md)
 for open, overdue and attention orders. Its observed counts and drill-down records
 share a consistent database snapshot. Incomplete coverage remains visible; missing
 deadlines and complete totals are never replaced with fabricated zeros.
