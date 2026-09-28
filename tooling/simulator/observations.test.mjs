@@ -18,6 +18,7 @@ test('only observes permitted simulated reads and continues after a persistence 
     granted: ['orders.read', 'products.read', 'orders.shipping-method.write'],
   };
   await observeProviders({
+    cursors: new Map(),
     context: async () => ({}),
     installations: {
       list: async () => [
@@ -31,7 +32,7 @@ test('only observes permitted simulated reads and continues after a persistence 
       read: async (_actor, request) => {
         reads.push(request);
 
-        return { ok: true };
+        return { ok: true, value: { nextCursor: null } };
       },
     },
     recordRead: async (_actor, _id, capability) => {
@@ -44,6 +45,58 @@ test('only observes permitted simulated reads and continues after a persistence 
     ['orders.read', 'products.read'],
   );
   assert.equal(errors.length, 1);
+});
+
+test('collects later order and fulfillment pages and stops repeated cursors', async () => {
+  const reads = [];
+  const errors = [];
+  const options = {
+    cursors: new Map(),
+    context: async () => ({}),
+    installations: {
+      list: async () => [
+        {
+          id: 'jtl',
+          status: 'active',
+          permissions: ['orders.read', 'fulfillment.read', 'products.read'],
+          granted: ['orders.read', 'fulfillment.read', 'products.read'],
+        },
+      ],
+    },
+    manifest: { connections: { jtl: 'jtl' } },
+    capabilities: {
+      read: async (_actor, request) => {
+        reads.push([request.capability, request.input.cursor]);
+
+        return {
+          ok: true,
+          value: {
+            nextCursor:
+              request.capability === 'orders.read' && request.input.cursor
+                ? null
+                : 'next-page',
+          },
+        };
+      },
+    },
+    recordRead: async () => {},
+    onError: (error) => errors.push(error.message),
+  };
+  await observeProviders(options);
+  await observeProviders(options);
+  await observeProviders(options);
+  assert.deepEqual(reads, [
+    ['orders.read', undefined],
+    ['fulfillment.read', undefined],
+    ['products.read', undefined],
+    ['orders.read', 'next-page'],
+    ['fulfillment.read', 'next-page'],
+    ['products.read', undefined],
+    ['orders.read', undefined],
+    ['fulfillment.read', undefined],
+    ['products.read', undefined],
+  ]);
+  assert.deepEqual(errors, ['Simulator observation pagination did not finish']);
 });
 
 test('collector starts immediately, serializes passes, and drains before shutdown', async (t) => {

@@ -110,4 +110,6 @@ boundary reuse existing readers. A maximum 60-second age refresh advances case a
 PO ages without writes. The shared browser hook subscribes before reading, serializes
 invalidations, resets pagination, hides inaccessible/offline results, and retains the
 existing reconnect and polling recovery. The operational summary and order v1 panel
-use separate family requests and subscriptions.
+use separate family requests and share one tenant subscription per browser page.
+The subscription closes after its last consumer unmounts. Online recovery and
+stream retries reopen that single connection for all consumers.

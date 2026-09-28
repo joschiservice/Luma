@@ -8,6 +8,7 @@ import {
   createApplicationServices,
   createCommerceServices,
   createExceptionWorkflowRuntime,
+  createMetricListener,
   createReadinessCheck,
   createReplenishmentWorker,
   createResourceScope,
@@ -41,6 +42,7 @@ import {
   createInstalledRuntime,
   createInstalledShippingMethodEffects,
 } from '../apps/providers.mjs';
+import { recordSimulatorCommerce } from '../simulator/commerce.mjs';
 import { createInventoryScenario } from '../simulator/inventory.mjs';
 import { observeProviders } from '../simulator/observations.mjs';
 import { detectionRequest, readJson } from './fixtures.mjs';
@@ -212,6 +214,7 @@ export async function createPilot(
       },
     });
     const commerce = simulation ? createCommerceServices(db) : undefined;
+    const observationCursors = new Map();
     const recordRead = createReadChecks(db);
     const installedOptions = {
       installations,
@@ -233,12 +236,13 @@ export async function createPilot(
           )
         ) {
           const actor = await context();
-          for (const observation of observations)
-            await commerce.ingestion.ingest(
-              actor,
-              `simulator:${observation.id}`,
-              { capability, observation },
-            );
+          await recordSimulatorCommerce({
+            commerce,
+            context: actor,
+            manifest,
+            capability,
+            observations,
+          });
         }
         await mutate((state) => {
           state.observations.push(...observations);
@@ -427,6 +431,9 @@ export async function createPilot(
         return review;
       },
     };
+    const metricEvents =
+      role === 'api' ? createMetricListener(settings.databaseUrl) : undefined;
+    if (metricEvents) resources.add(metricEvents.close);
     const app =
       role === 'api'
         ? buildApp(
@@ -437,6 +444,7 @@ export async function createPilot(
               settings: identity.settings,
               trustedOrigins: settings.trustedOrigins,
               ...application.http,
+              metricEvents,
               desk,
               playbooks: library,
               connections,
@@ -687,6 +695,7 @@ export async function createPilot(
             capabilities,
             recordRead,
             manifest,
+            cursors: observationCursors,
             onError: (error) =>
               app ? app.log.error(error) : console.error(error),
           });

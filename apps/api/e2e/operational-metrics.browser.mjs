@@ -251,7 +251,7 @@ it('keeps cross-domain cohorts live, recovers races and measures committed chang
       purchaseOrders: 61,
       connections: 1,
     },
-    subscribers: 7,
+    subscribers: 6,
     crossDomainReaders: 6,
     changes: durations.length,
     p50Ms: ordered[Math.floor(ordered.length * 0.5)],

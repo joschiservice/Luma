@@ -2,7 +2,131 @@ import { randomUUID } from 'node:crypto';
 
 import { expect, test } from 'vitest';
 
+import { until } from './helpers.mjs';
+import { metricStream } from './metric-stream-fixture.mjs';
 import { setupSimulator } from './simulator-fixture.mjs';
+
+test('pilot projects observed orders, serves live metrics and releases its listener on shutdown', async (t) => {
+  const f = await setupSimulator(t);
+  const base = `/v1/organizations/${f.manifest.organizationId}`;
+  const signIn = await f.pilot.app.inject({
+    method: 'POST',
+    url: '/auth/sign-in/email',
+    headers: { origin: 'http://127.0.0.1:3000' },
+    payload: {
+      email: 'pilot-operator@example.test',
+      password: f.password,
+    },
+  });
+  expect(signIn.statusCode).toBe(200);
+  const cookie = signIn.cookies
+    .map(({ name, value }) => `${name}=${value}`)
+    .join('; ');
+  const streams = await Promise.all(
+    Array.from({ length: 2 }, () =>
+      metricStream(t, f.apiOrigin, {
+        base,
+        org: { id: f.manifest.organizationId },
+        owner: { cookie },
+      }),
+    ),
+  );
+  await until(
+    () => streams.every((stream) => stream.events.at(-1)?.connected),
+    'pilot metric listener connected',
+  );
+  const before = streams.map((stream) => stream.events.length);
+  await f.pilot.observe();
+  const metrics = async () => {
+    const response = await f.pilot.app.inject({
+      method: 'POST',
+      url: `${base}/metrics/query`,
+      headers: { cookie, origin: 'http://127.0.0.1:3000' },
+      payload: {},
+    });
+    expect(response.statusCode).toBe(200);
+
+    return response.json();
+  };
+  const initial = await metrics();
+  expect(initial.coverage).toBe('partial');
+  expect(initial.observedAt).not.toBeNull();
+  // The two explicitly mirrored provider orders share canonical identities.
+  // Adapter cancellation quantities remain unknown, so open classification stays unknown.
+  expect(initial.metrics[0].unknownCount).toBe(2);
+  const canonicalOrders = async () =>
+    (
+      await f.db.owner.query(
+        "SELECT p.entity_id,count(DISTINCT p.connection_id)::int AS sources FROM orders_projections p JOIN orders_snapshots s ON s.id=p.snapshot_id WHERE s.kind='order' GROUP BY p.entity_id",
+      )
+    ).rows;
+  expect(await canonicalOrders()).toEqual([
+    { entity_id: expect.any(String), sources: 2 },
+    { entity_id: expect.any(String), sources: 2 },
+  ]);
+  await f.pilot.observe();
+  expect((await metrics()).metrics[0].unknownCount).toBe(2);
+  // Matching display numbers on manual orders do not establish a cross-provider mapping.
+  for (const instance of ['jtl', 'shopify'])
+    await f.call('runs/operations/control', {
+      action: 'command',
+      instance,
+      command: { kind: 'order', id: '100', quantity: 5 },
+    });
+  await f.pilot.observe();
+  expect(await canonicalOrders()).toHaveLength(4);
+  expect((await metrics()).metrics[0].unknownCount).toBe(4);
+  for (const instance of ['jtl', 'shopify'])
+    await f.call('runs/operations/control', {
+      action: 'command',
+      instance,
+      command: { kind: 'ship', id: '100' },
+    });
+  await f.pilot.observe();
+  expect((await metrics()).metrics[0].unknownCount).toBe(2);
+  await until(
+    () =>
+      streams.every((stream, index) =>
+        stream.events.slice(before[index]).some((event) => event.refetch),
+      ),
+    'provider observations invalidate both Insights subscriptions',
+  );
+  const listeners = async () =>
+    (
+      await f.db.owner.query(
+        "SELECT pid FROM pg_stat_activity WHERE datname=current_database() AND application_name='luma-metric-listener'",
+      )
+    ).rows.length;
+  expect(await listeners()).toBe(1);
+  await f.pilot.close();
+  await until(() => streams.every((stream) => stream.ended), 'streams closed');
+  await expect.poll(listeners).toBe(0);
+});
+
+test('projects orders and fulfillments beyond the first provider page', async (t) => {
+  const f = await setupSimulator(t);
+  for (let index = 0; index < 101; index++) {
+    const id = String(100 + index);
+    for (const kind of ['order', 'ship'])
+      await f.call('runs/operations/control', {
+        action: 'command',
+        instance: 'jtl',
+        command: { kind, id, ...(kind === 'order' ? { quantity: 1 } : {}) },
+      });
+  }
+  // Each pass advances one page; another pass retries fulfillments whose parents arrived later.
+  await f.pilot.observe();
+  await f.pilot.observe();
+  await f.pilot.observe();
+  const projected = await f.db.owner.query(
+    'SELECT s.kind,count(*)::int AS count FROM orders_projections p JOIN orders_snapshots s ON s.id=p.snapshot_id WHERE p.connection_id=$1 GROUP BY s.kind ORDER BY s.kind',
+    [f.manifest.connections.jtl],
+  );
+  expect(projected.rows).toEqual([
+    { kind: 'fulfillment', count: 101 },
+    { kind: 'order', count: 103 },
+  ]);
+});
 
 test('inventory scenario detects, verifies and recurs through the same HTTP APIs used by the panel', async (t) => {
   const f = await setupSimulator(t);

@@ -48,6 +48,14 @@ it('updates visible totals and cohorts, crosses deadlines, and measures delivery
     }),
   );
   const page = await context.newPage();
+  const streamResponses = [];
+  context.on('response', (response) => {
+    if (response.url().endsWith('/metrics/events'))
+      streamResponses.push({
+        page: response.frame().page(),
+        status: response.status(),
+      });
+  });
   await page.goto(`/app/${f.org.id}/insights`);
   const section = page.getByRole('region', {
     name: 'The work behind the numbers',
@@ -62,6 +70,23 @@ it('updates visible totals and cohorts, crosses deadlines, and measures delivery
       .toMatch(new RegExp(`^${count}observed`));
   await hasCount(0, 200);
   await section.getByText('Live updates', { exact: true }).waitFor();
+  await page
+    .getByRole('region', { name: 'Your operational pulse' })
+    .getByText('Live updates', { exact: true })
+    .waitFor();
+  expect(streamResponses.map(({ status }) => status)).toEqual([200]);
+  const extraPages = await Promise.all([context.newPage(), context.newPage()]);
+  for (const extra of extraPages) {
+    await extra.goto(`/app/${f.org.id}/insights`);
+    await extra.getByText('Live updates', { exact: true }).nth(1).waitFor();
+  }
+  expect(streamResponses.map(({ status }) => status)).toEqual([200, 200, 200]);
+  for (const extra of extraPages) {
+    expect(
+      streamResponses.filter((response) => response.page === extra),
+    ).toHaveLength(1);
+    await extra.close();
+  }
   const rows = await f.db.owner.query(
     "SELECT id,entity_id FROM orders_snapshots WHERE tenant_id=$1 AND kind='order' ORDER BY entity_id",
     [f.org.id],
@@ -211,4 +236,5 @@ it('updates visible totals and cohorts, crosses deadlines, and measures delivery
   // Session loss clears the visible private result and stops further live reads.
   await f.db.owner.query('DELETE FROM sessions WHERE user_id=$1', [f.owner.id]);
   await expect.poll(() => values.count(), { timeout: 10000 }).toBe(0);
+  await expect.poll(() => page.locator('.operational-value').count()).toBe(0);
 });

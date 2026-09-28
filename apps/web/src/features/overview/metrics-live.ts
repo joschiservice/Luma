@@ -1,5 +1,4 @@
 import type { MetricRequest, MetricResponse } from '@luma/api-contract';
-import { subscribeToMetrics } from '@luma/api-contract/client';
 import {
   useQuery,
   useQueryClient,
@@ -8,6 +7,7 @@ import {
 import { useEffect, useState } from 'react';
 
 import { IdentityError } from '../identity/data';
+import { subscribeToWorkspaceMetrics } from './metric-subscription';
 import { metricsOptions } from './metrics-data';
 
 /** Subscribes before loading, serializes refreshes, and replaces paginated snapshots on changes. */
@@ -32,7 +32,6 @@ export function useLiveMetricQuery<
   const [request, setRequest] = useState<Request>(config.initial);
   const [ready, setReady] = useState(false);
   const [connection, setConnection] = useState('connecting');
-  const [attempt, setAttempt] = useState(0);
   const query = useQuery({
     ...config.options(organizationId, request),
     enabled: ready && connection !== 'denied',
@@ -44,8 +43,6 @@ export function useLiveMetricQuery<
     let dirty = false;
     let connected = false;
     let denied = false;
-    let lastEventAt = Date.now();
-    let lastFallbackAt = Date.now();
     let stop = () => {
       /* Assigned when the stream opens below. */
     };
@@ -90,12 +87,9 @@ export function useLiveMetricQuery<
       }
       busy = false;
     };
-    stop = subscribeToMetrics({
-      baseUrl: '/api',
-      organizationId,
+    stop = subscribeToWorkspaceMetrics(organizationId, {
       onResync: (event) => {
         if (!active) return;
-        lastEventAt = Date.now();
         connected = event.connected;
         if (event.refetch) void refresh();
         else if (!connected) setConnection('reconnecting');
@@ -107,35 +101,13 @@ export function useLiveMetricQuery<
         void refresh();
       },
     });
-    const recover = () => setAttempt((value) => value + 1);
-    const offline = () => {
-      connected = false;
-      setConnection('offline');
-    };
-    window.addEventListener('online', recover);
-    window.addEventListener('offline', offline);
-    // Covers a proxy silently dropping the stream, and failures before the first event.
-    const fallback = setInterval(() => {
-      if (denied) return;
-      if (Date.now() - lastEventAt > 12000) {
-        connected = false;
-        setConnection(navigator.onLine ? 'reconnecting' : 'offline');
-      }
-      if (!connected && Date.now() - lastFallbackAt >= 30000) {
-        lastFallbackAt = Date.now();
-        void refresh();
-      }
-    }, 5000);
 
     return () => {
       active = false;
       stop();
-      clearInterval(fallback);
-      window.removeEventListener('online', recover);
-      window.removeEventListener('offline', offline);
       void client.cancelQueries({ queryKey: key });
     };
-  }, [client, organizationId, attempt, config]);
+  }, [client, organizationId, config]);
 
   useEffect(() => {
     if (

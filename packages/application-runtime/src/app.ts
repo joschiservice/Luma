@@ -33,3 +33,5 @@ export { createResourceScope } from './composition/resources.js';
 export { createReadinessCheck } from './composition/readiness.js';
 
 export { createReplenishmentWorker } from './composition/replenishment-worker.js';
+
+export { createMetricListener } from './infrastructure/metric-listener.js';
