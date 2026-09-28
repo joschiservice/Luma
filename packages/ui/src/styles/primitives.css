@@ -450,8 +450,13 @@
 }
 
 .ui-alert a {
-  color: var(--foreground);
+  color: var(--signal-text);
   font-weight: 500;
+  text-decoration: none;
+}
+
+.ui-alert a:hover {
+  text-decoration: underline;
 }
 
 .ui-alert[data-tone='info'] {

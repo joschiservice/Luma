@@ -1,10 +1,26 @@
-import { apiContract } from '@luma/api-contract';
+import { apiContract, homeModuleIds } from '@luma/api-contract';
 import { initServer } from '@ts-rest/fastify';
 import type { FastifyRequest } from 'fastify';
 
 import type { SettingsService } from '../application/settings.js';
 import { IdentityError } from '../domain/context.js';
+import type { WorkspaceLayout } from '../domain/settings.js';
 import { credentials } from './routes.js';
+
+const knownModules = new Set<string>(homeModuleIds);
+
+/** Drops Home modules that are no longer offered so older saved layouts still load. */
+function currentLayout(layout: WorkspaceLayout) {
+  return {
+    ...layout,
+    home:
+      layout.home?.flatMap((module) =>
+        knownModules.has(module.id)
+          ? [{ ...module, id: module.id as (typeof homeModuleIds)[number] }]
+          : [],
+      ) ?? null,
+  };
+}
 
 /** Routes workspace controls through fresh membership checks; invitations require a matching session. */
 export function settingsRoutes(service?: SettingsService) {
@@ -45,6 +61,14 @@ export function settingsRoutes(service?: SettingsService) {
     updateNotifications: async ({ request, body }) => ({
       status: 200,
       body: await use().updateNotifications(context(request), body),
+    }),
+    layout: async ({ request }) => ({
+      status: 200,
+      body: currentLayout(await use().layout(context(request))),
+    }),
+    saveLayout: async ({ request, body }) => ({
+      status: 200,
+      body: currentLayout(await use().saveLayout(context(request), body)),
     }),
     testEmail: async ({ request, body }) => ({
       status: 200,

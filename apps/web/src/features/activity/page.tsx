@@ -24,16 +24,9 @@ import { useContext, useEffect, useState, useSyncExternalStore } from 'react';
 import { SignInRedirect } from '../identity/common';
 import { IdentityError } from '../identity/data';
 import { type ActivityFilters, activityOptions, activityRange } from './data';
+import { activityLabel, activityLabels } from './presentation';
 
-const labels: Record<string, string> = {
-  provider_accepted: 'Provider accepted',
-  manually_disposed: 'Manually disposed',
-  uncertain: 'Uncertain',
-  'purchase_order.created': 'Purchase order created',
-  'purchase_order.status_changed': 'Purchase order status changed',
-};
-const label = (v: string) =>
-  labels[v] ?? v.charAt(0).toUpperCase() + v.slice(1).replaceAll('_', ' ');
+const label = activityLabel;
 const subscribe = (changed: () => void) => onlineManager.subscribe(changed);
 const snapshot = () => onlineManager.isOnline();
 const serverSnapshot = () => true;
@@ -383,7 +376,7 @@ function ActivityRow({
           <WorkspaceDate value={item.recordedAt} />
         </time>
         <span>
-          <strong>{labels[item.action] ?? item.action}</strong>
+          <strong>{activityLabels[item.action] ?? item.action}</strong>
           {!related && (item.attemptId || item.proposalId) ? (
             <small>
               {item.type === 'procurement' ? 'Purchase order' : 'Attempt group'}{' '}

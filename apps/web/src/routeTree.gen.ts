@@ -23,6 +23,7 @@ import { Route as AppOrganizationIdActivityRouteImport } from './routes/app.$org
 import { Route as AppOrganizationIdConnectionsRouteImport } from './routes/app.$organizationId.connections'
 import { Route as AppOrganizationIdExceptionsRouteImport } from './routes/app.$organizationId.exceptions'
 import { Route as AppOrganizationIdHomeRouteImport } from './routes/app.$organizationId.home'
+import { Route as AppOrganizationIdInsightsRouteImport } from './routes/app.$organizationId.insights'
 import { Route as AppOrganizationIdOverviewRouteImport } from './routes/app.$organizationId.overview'
 import { Route as AppWorkspacesIndexRouteImport } from './routes/app.workspaces.index'
 import { Route as AppWorkspacesNewRouteImport } from './routes/app.workspaces.new'
@@ -114,6 +115,12 @@ const AppOrganizationIdHomeRoute = AppOrganizationIdHomeRouteImport.update({
   path: '/home',
   getParentRoute: () => AppOrganizationIdRoute,
 } as any)
+const AppOrganizationIdInsightsRoute =
+  AppOrganizationIdInsightsRouteImport.update({
+    id: '/insights',
+    path: '/insights',
+    getParentRoute: () => AppOrganizationIdRoute,
+  } as any)
 const AppOrganizationIdOverviewRoute =
   AppOrganizationIdOverviewRouteImport.update({
     id: '/overview',
@@ -230,6 +237,7 @@ export interface FileRoutesByFullPath {
   '/app/$organizationId/connections': typeof AppOrganizationIdConnectionsRoute
   '/app/$organizationId/exceptions': typeof AppOrganizationIdExceptionsRouteWithChildren
   '/app/$organizationId/home': typeof AppOrganizationIdHomeRoute
+  '/app/$organizationId/insights': typeof AppOrganizationIdInsightsRoute
   '/app/$organizationId/overview': typeof AppOrganizationIdOverviewRoute
   '/app/workspaces/new': typeof AppWorkspacesNewRoute
   '/app/workspaces/': typeof AppWorkspacesIndexRoute
@@ -262,6 +270,7 @@ export interface FileRoutesByTo {
   '/app/$organizationId/connections': typeof AppOrganizationIdConnectionsRoute
   '/app/$organizationId/exceptions': typeof AppOrganizationIdExceptionsRouteWithChildren
   '/app/$organizationId/home': typeof AppOrganizationIdHomeRoute
+  '/app/$organizationId/insights': typeof AppOrganizationIdInsightsRoute
   '/app/$organizationId/overview': typeof AppOrganizationIdOverviewRoute
   '/app/workspaces/new': typeof AppWorkspacesNewRoute
   '/app/workspaces': typeof AppWorkspacesIndexRoute
@@ -296,6 +305,7 @@ export interface FileRoutesById {
   '/app/$organizationId/connections': typeof AppOrganizationIdConnectionsRoute
   '/app/$organizationId/exceptions': typeof AppOrganizationIdExceptionsRouteWithChildren
   '/app/$organizationId/home': typeof AppOrganizationIdHomeRoute
+  '/app/$organizationId/insights': typeof AppOrganizationIdInsightsRoute
   '/app/$organizationId/overview': typeof AppOrganizationIdOverviewRoute
   '/app/workspaces/new': typeof AppWorkspacesNewRoute
   '/app/workspaces/': typeof AppWorkspacesIndexRoute
@@ -331,6 +341,7 @@ export interface FileRouteTypes {
     | '/app/$organizationId/connections'
     | '/app/$organizationId/exceptions'
     | '/app/$organizationId/home'
+    | '/app/$organizationId/insights'
     | '/app/$organizationId/overview'
     | '/app/workspaces/new'
     | '/app/workspaces/'
@@ -363,6 +374,7 @@ export interface FileRouteTypes {
     | '/app/$organizationId/connections'
     | '/app/$organizationId/exceptions'
     | '/app/$organizationId/home'
+    | '/app/$organizationId/insights'
     | '/app/$organizationId/overview'
     | '/app/workspaces/new'
     | '/app/workspaces'
@@ -396,6 +408,7 @@ export interface FileRouteTypes {
     | '/app/$organizationId/connections'
     | '/app/$organizationId/exceptions'
     | '/app/$organizationId/home'
+    | '/app/$organizationId/insights'
     | '/app/$organizationId/overview'
     | '/app/workspaces/new'
     | '/app/workspaces/'
@@ -524,6 +537,13 @@ declare module '@tanstack/react-router' {
       path: '/home'
       fullPath: '/app/$organizationId/home'
       preLoaderRoute: typeof AppOrganizationIdHomeRouteImport
+      parentRoute: typeof AppOrganizationIdRoute
+    }
+    '/app/$organizationId/insights': {
+      id: '/app/$organizationId/insights'
+      path: '/insights'
+      fullPath: '/app/$organizationId/insights'
+      preLoaderRoute: typeof AppOrganizationIdInsightsRouteImport
       parentRoute: typeof AppOrganizationIdRoute
     }
     '/app/$organizationId/overview': {
@@ -668,6 +688,7 @@ interface AppOrganizationIdRouteChildren {
   AppOrganizationIdConnectionsRoute: typeof AppOrganizationIdConnectionsRoute
   AppOrganizationIdExceptionsRoute: typeof AppOrganizationIdExceptionsRouteWithChildren
   AppOrganizationIdHomeRoute: typeof AppOrganizationIdHomeRoute
+  AppOrganizationIdInsightsRoute: typeof AppOrganizationIdInsightsRoute
   AppOrganizationIdOverviewRoute: typeof AppOrganizationIdOverviewRoute
   AppOrganizationIdAppsAppIdRoute: typeof AppOrganizationIdAppsAppIdRoute
   AppOrganizationIdPlaybooksDefinitionIdRoute: typeof AppOrganizationIdPlaybooksDefinitionIdRoute
@@ -689,6 +710,7 @@ const AppOrganizationIdRouteChildren: AppOrganizationIdRouteChildren = {
   AppOrganizationIdExceptionsRoute:
     AppOrganizationIdExceptionsRouteWithChildren,
   AppOrganizationIdHomeRoute: AppOrganizationIdHomeRoute,
+  AppOrganizationIdInsightsRoute: AppOrganizationIdInsightsRoute,
   AppOrganizationIdOverviewRoute: AppOrganizationIdOverviewRoute,
   AppOrganizationIdAppsAppIdRoute: AppOrganizationIdAppsAppIdRoute,
   AppOrganizationIdPlaybooksDefinitionIdRoute:

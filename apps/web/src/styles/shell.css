@@ -235,6 +235,44 @@
   line-height: 1;
 }
 
+.sidebar-pin {
+  position: relative;
+}
+
+.sidebar-pin .sidebar-link {
+  padding-right: 28px;
+}
+
+.sidebar-unpin {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: var(--foreground-subtle);
+  opacity: 0;
+  translate: 0 -50%;
+  cursor: pointer;
+  transition: opacity var(--duration-fast);
+}
+
+.sidebar-pin:hover .sidebar-unpin,
+.sidebar-unpin:focus-visible {
+  opacity: 1;
+}
+
+.sidebar-unpin:hover {
+  background: var(--surface-hover);
+  color: var(--foreground);
+}
+
+.desk[data-sidebar='collapsed'] .sidebar-unpin {
+  display: none;
+}
+
 .sidebar-app-icon {
   display: inline-grid;
   place-items: center;

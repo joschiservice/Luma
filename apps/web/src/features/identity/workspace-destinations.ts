@@ -2,6 +2,7 @@ import type { Domain } from '@luma/ui/components/primitives/domain-icon';
 import {
   Activity,
   Blocks,
+  ChartNoAxesColumn,
   House,
   Inbox,
   type LucideIcon,
@@ -18,6 +19,7 @@ export type DestinationPath =
   | 'home'
   | 'exceptions'
   | 'activity'
+  | 'insights'
   | 'workflows'
   | 'procurement'
   | 'apps'
@@ -60,6 +62,14 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
     description: 'Follow workspace activity',
     group: 'core',
     shortcut: 'a',
+  },
+  {
+    path: 'insights',
+    label: 'Insights',
+    Icon: ChartNoAxesColumn,
+    description: 'Live operational metrics and order flow',
+    group: 'core',
+    shortcut: 'm',
   },
   {
     path: 'workflows',

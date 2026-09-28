@@ -14,6 +14,26 @@ export interface NotificationPreferences {
   revision: number;
 }
 
+/** One module on a member's Home, in display order. */
+export interface HomeModule {
+  id: string;
+  size: 'half' | 'full';
+}
+
+/** A workspace page pinned to a member's sidebar. */
+export interface PinnedPage {
+  path: string;
+  label: string;
+}
+
+/** A member's personal arrangement of one workspace. */
+export interface WorkspaceLayout {
+  /** Null means the member uses the default Home. */
+  home: HomeModule[] | null;
+  pinned: PinnedPage[];
+  revision: number;
+}
+
 export type DeliveryState = 'queued' | 'sent' | 'failed' | 'cancelled';
 
 export interface WorkspaceInvitation {

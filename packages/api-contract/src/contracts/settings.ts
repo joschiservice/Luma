@@ -2,6 +2,7 @@ import { initContract } from '@ts-rest/core';
 import { z } from 'zod';
 
 import { apiErrorSchema, organizationParamsSchema } from '../common.js';
+import { saveWorkspaceLayoutSchema, workspaceLayoutSchema } from '../layout.js';
 import { invitationSchema, settingsSnapshotSchema } from '../settings.js';
 
 const c = initContract();
@@ -90,6 +91,25 @@ export const settingsContract = c.router(
         .strict(),
       responses: { 200: settingsSnapshotSchema },
       summary: 'Save your workspace email preferences',
+    },
+    layout: {
+      method: 'GET',
+      path: `${path}/layout`,
+      pathParams: organizationParamsSchema,
+      responses: { 200: workspaceLayoutSchema },
+      summary: 'Read your Home layout and pinned pages',
+      description:
+        'Layouts are personal: each member arranges their own Home and sidebar pins in each workspace. A null Home uses the default modules.',
+    },
+    saveLayout: {
+      method: 'PUT',
+      path: `${path}/layout`,
+      pathParams: organizationParamsSchema,
+      body: saveWorkspaceLayoutSchema,
+      responses: { 200: workspaceLayoutSchema },
+      summary: 'Save your Home layout and pinned pages',
+      description:
+        'Send the revision you last read. The save is rejected with 409 when another session saved a newer layout; read it again before retrying.',
     },
     testEmail: {
       method: 'POST',

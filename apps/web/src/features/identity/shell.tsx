@@ -17,6 +17,7 @@ import { isTypingTarget } from '../../lib/keyboard';
 import { setThemePreference, useThemePreference } from '../../lib/theme';
 import { AppNavigation } from '../apps/navigation';
 import { ContextHelp } from '../help/context-help';
+import { PinCurrentPage, PinnedNavigation } from '../layout/pins';
 import { overviewOptions } from '../overview/data';
 import { settingsOptions } from '../settings/data';
 import { Failure, Pending } from './common';
@@ -103,6 +104,7 @@ function Navigation({
   return (
     <nav aria-label="Workspace navigation" className="sidebar-nav">
       <ul className="sidebar-list">{group('core').map(link)}</ul>
+      <PinnedNavigation organizationId={organizationId} close={close} />
       <section className="sidebar-section" aria-labelledby="nav-operations">
         <h2 className="sidebar-section-label" id="nav-operations">
           Operations
@@ -227,7 +229,12 @@ function TenantShell({ organizationId }: { organizationId: string }) {
           <span>{page.label}</span>
         </Link>
       }
-      help={<ContextHelp />}
+      help={
+        <>
+          <PinCurrentPage organizationId={organizationId} />
+          <ContextHelp />
+        </>
+      }
       accountMenu={
         <WorkspaceAccountMenu
           name={session?.user.name ?? 'Account'}

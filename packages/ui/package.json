@@ -7,8 +7,8 @@
     "./components/primitives/*": "./src/components/primitives/*.tsx",
     "./components/issues/case-fixtures": "./src/components/issues/case-fixtures.ts",
     "./components/issues/resolution-fixtures": "./src/components/issues/resolution-fixtures.ts",
+    "./components/issues/case-presentation": "./src/components/issues/case-presentation.ts",
     "./components/issues/*": "./src/components/issues/*.tsx",
-    "./components/overview/*": "./src/components/overview/*.tsx",
     "./components/workspace/*": "./src/components/workspace/*.tsx",
     "./lib/*": "./src/lib/*.ts",
     "./styles.css": "./src/styles/globals.css"
