@@ -1,5 +1,4 @@
 @import '@luma/ui/styles.css';
-@import './styles/legacy-app.css';
 @import './styles/shell.css';
 @import './styles/page.css';
 @import './styles/entry.css';

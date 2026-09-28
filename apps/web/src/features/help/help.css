@@ -98,8 +98,8 @@
 }
 .docs-article [data-article-title] {
   margin: 0;
-  font: 600 clamp(28px, 3vw, 40px)/1.15 var(--font-heading);
-  letter-spacing: -0.04em;
+  font: 500 clamp(28px, 3vw, 40px)/1.1 var(--font-heading);
+  letter-spacing: -0.035em;
   scroll-margin-top: 28px;
   outline: none;
 }
@@ -114,11 +114,11 @@
 .docs-toc {
   display: grid;
   gap: 6px;
-  padding: 16px 20px;
   margin-bottom: 28px;
-  border-left: 2px solid var(--primary);
-  background: var(--muted);
-  font-size: 12px;
+  padding: 14px 18px;
+  border-radius: var(--radius-panel);
+  background: var(--surface-sunken);
+  font-size: 13px;
 }
 .docs-toc > span {
   font-weight: 600;
@@ -129,7 +129,7 @@
   text-decoration: none;
 }
 .docs-toc a:hover {
-  color: var(--primary);
+  color: var(--signal-text);
   text-decoration: underline;
 }
 .docs-prose > :first-child {

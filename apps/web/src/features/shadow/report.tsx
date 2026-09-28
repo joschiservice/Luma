@@ -1,3 +1,5 @@
+import './shadow.css';
+
 import { CaseNotice } from '@luma/ui/components/issues/case-investigation';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Card, CardHeader } from '@luma/ui/components/primitives/card';

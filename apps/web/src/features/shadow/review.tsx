@@ -1,3 +1,5 @@
+import './shadow.css';
+
 import { shadowReviewSchema } from '@luma/api-contract';
 import { CaseNotice } from '@luma/ui/components/issues/case-investigation';
 import { IssueCollection } from '@luma/ui/components/issues/issue-collection';

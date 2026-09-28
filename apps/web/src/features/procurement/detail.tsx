@@ -68,7 +68,7 @@ export function PurchaseOrderPage() {
             <FileText size={22} />
           </span>
           <div>
-            <p className="procurement-eyebrow">PURCHASE ORDER</p>
+            <p className="procurement-eyebrow">Purchase order</p>
             <h1>{order.reference}</h1>
             <p>{order.supplierName}</p>
           </div>
