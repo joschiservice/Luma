@@ -9,14 +9,14 @@ import {
 import { WorkspaceBreadcrumbSlot } from '@luma/ui/components/workspace/workspace-breadcrumb';
 import { WorkspaceHeaderSlot } from '@luma/ui/components/workspace/workspace-header-slot';
 import { Menu, PanelLeft } from 'lucide-react';
-import {
-  type ReactNode,
-  useEffect,
-  useState,
-  useSyncExternalStore,
-} from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 
 import { isTypingTarget } from '../../lib/keyboard';
+import {
+  readSidebarCollapsed,
+  setSidebarCollapsed,
+  useSidebarCollapsed,
+} from '../../lib/sidebar';
 
 type WorkspaceLayoutProps = {
   workspaceSwitcher: ReactNode;
@@ -27,33 +27,6 @@ type WorkspaceLayoutProps = {
   help?: ReactNode;
   children: ReactNode;
 };
-
-const sidebarKey = 'luma-sidebar';
-const sidebarEvent = 'luma-sidebar-change';
-
-function readCollapsed() {
-  try {
-    return localStorage.getItem(sidebarKey) === 'collapsed';
-  } catch {
-    return false;
-  }
-}
-
-function subscribeCollapsed(callback: () => void) {
-  window.addEventListener(sidebarEvent, callback);
-
-  return () => window.removeEventListener(sidebarEvent, callback);
-}
-
-function setCollapsed(collapsed: boolean) {
-  try {
-    if (collapsed) localStorage.setItem(sidebarKey, 'collapsed');
-    else localStorage.removeItem(sidebarKey);
-  } catch {
-    // The layout still changes for this page when storage is unavailable.
-  }
-  window.dispatchEvent(new Event(sidebarEvent));
-}
 
 /**
  * Renders the workspace frame: a persistent sidebar that collapses to an icon rail,
@@ -72,11 +45,7 @@ export function WorkspaceLayout({
   const [open, setOpen] = useState(false);
   const [pageHeader, setPageHeader] = useState<HTMLDivElement | null>(null);
   const [breadcrumb, setBreadcrumb] = useState<HTMLSpanElement | null>(null);
-  const collapsed = useSyncExternalStore(
-    subscribeCollapsed,
-    readCollapsed,
-    () => false,
-  );
+  const collapsed = useSidebarCollapsed();
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -89,7 +58,7 @@ export function WorkspaceLayout({
       )
         return;
       event.preventDefault();
-      setCollapsed(!readCollapsed());
+      setSidebarCollapsed(!readSidebarCollapsed());
     };
     window.addEventListener('keydown', onKey);
 
@@ -116,7 +85,7 @@ export function WorkspaceLayout({
                 aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                 aria-pressed={collapsed}
                 title={`${collapsed ? 'Expand' : 'Collapse'} sidebar ( [ )`}
-                onClick={() => setCollapsed(!collapsed)}
+                onClick={() => setSidebarCollapsed(!collapsed)}
               >
                 <PanelLeft aria-hidden="true" />
               </Button>

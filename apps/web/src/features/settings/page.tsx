@@ -1,19 +1,23 @@
+import './settings.css';
+
 import type { SettingsSnapshot } from '@luma/api-contract';
 import { Alert } from '@luma/ui/components/primitives/alert';
-import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Input } from '@luma/ui/components/primitives/input';
 import { SearchableSelect } from '@luma/ui/components/primitives/searchable-select';
 import { SectionNavigation } from '@luma/ui/components/primitives/section-navigation';
 import { Switch } from '@luma/ui/components/primitives/switch';
+import { PageHeader } from '@luma/ui/components/workspace/page-header';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from '@tanstack/react-router';
 import {
   Bell,
   Building2,
   Check,
+  LayoutDashboard,
   LockKeyhole,
   Mail,
+  Palette,
   ShieldCheck,
   Users,
 } from 'lucide-react';
@@ -27,6 +31,8 @@ import {
   useSettingsOnline,
 } from './command';
 import { settingsApi, settingsOptions, settingsResult } from './data';
+import { AppearanceSettings, HomeSidebarSettings } from './personal';
+import { SectionHeading } from './section-heading';
 import { TeamSettings } from './team';
 
 export const settingsSections = [
@@ -43,6 +49,18 @@ export const settingsSections = [
     label: 'Notifications',
     group: 'Personal',
     Icon: Bell,
+  },
+  {
+    id: 'appearance',
+    label: 'Appearance',
+    group: 'Personal',
+    Icon: Palette,
+  },
+  {
+    id: 'home',
+    label: 'Home & sidebar',
+    group: 'Personal',
+    Icon: LayoutDashboard,
   },
 ] as const;
 
@@ -100,6 +118,10 @@ export function SettingsView({
 
   return (
     <div className="settings-page">
+      <PageHeader
+        title="Settings"
+        description="Workspace details, your team and approvals, and the preferences that only affect you."
+      />
       <div className="settings-layout">
         <SectionNavigation
           className="settings-navigation"
@@ -152,7 +174,8 @@ export function SettingsView({
           ) : null}
           {data ? (
             <>
-              {!admin && section !== 'notifications' ? (
+              {!admin &&
+              !['notifications', 'appearance', 'home'].includes(section) ? (
                 <Alert tone="neutral">
                   <LockKeyhole size={14} /> You have member access. An owner or
                   admin can change workspace settings.
@@ -181,6 +204,10 @@ export function SettingsView({
                   organizationId={organizationId}
                   disabled={!admin || !online}
                 />
+              ) : null}
+              {section === 'appearance' ? <AppearanceSettings /> : null}
+              {section === 'home' ? (
+                <HomeSidebarSettings organizationId={organizationId} />
               ) : null}
               {section === 'team' ? (
                 <TeamSettings
@@ -529,28 +556,6 @@ function ApprovalsForm({
         <CommandFeedback command={command} />
       </form>
     </section>
-  );
-}
-
-/** Provides consistent headings for Settings sections. */
-export function SectionHeading({
-  title,
-  description,
-  badge,
-}: {
-  title: string;
-  description: string;
-  badge?: string;
-}) {
-  return (
-    <header className="settings-section-heading">
-      <div>
-        <h2>
-          {title} {badge ? <Badge>{badge}</Badge> : null}
-        </h2>
-        <p>{description}</p>
-      </div>
-    </header>
   );
 }
 
