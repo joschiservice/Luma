@@ -70,7 +70,7 @@
 }
 .help-navigation a:hover,
 .docs-header > a:last-child:hover {
-  color: var(--primary);
+  color: var(--signal-text);
 }
 .help-scroll {
   overflow-y: auto;
@@ -90,11 +90,20 @@
   overflow-wrap: anywhere;
 }
 .docs-article .docs-eyebrow {
-  margin: 0 0 14px;
-  color: var(--brand);
-  font: 600 11px/1.5 var(--font-sans);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  color: var(--foreground-subtle);
+  font: 500 12.5px/1.5 var(--font-sans);
+}
+
+.docs-article .docs-eyebrow::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 1.5px;
+  background: var(--signal);
 }
 .docs-article [data-article-title] {
   margin: 0;
@@ -163,7 +172,7 @@
   padding-left: 3px;
 }
 .docs-prose a {
-  color: var(--primary);
+  color: var(--signal-text);
   text-decoration: underline;
 }
 .help-guides {
@@ -190,7 +199,7 @@
 }
 .help-guides a:hover,
 .help-guides a[aria-current] {
-  color: var(--primary);
+  color: var(--signal-text);
 }
 .docs-search-input {
   position: relative;
@@ -250,10 +259,6 @@
   gap: 20px;
   padding: 18px max(24px, calc((100vw - 1160px) / 2));
   border-bottom: 1px solid var(--border);
-}
-.docs-header .wordmark {
-  font-size: 25px;
-  letter-spacing: -1.2px;
 }
 .docs-header > span {
   border-left: 1px solid var(--border);
