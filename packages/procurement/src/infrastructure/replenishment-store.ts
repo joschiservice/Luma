@@ -40,7 +40,7 @@ export function createReplenishmentStore(
           sku: r.sku,
           unit: r.document.data.unit,
           available:
-            r.document.data.available !== null &&
+            typeof r.document.data.available === 'string' &&
             r.document.data.available.trim() !== '' &&
             Number.isFinite(Number(r.document.data.available))
               ? Number(r.document.data.available)

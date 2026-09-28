@@ -147,3 +147,8 @@
 .workflows-page .replenishment-review .procurement-run-objects {
   margin: 0.5rem 0;
 }
+
+.replenishment-rule:target {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}

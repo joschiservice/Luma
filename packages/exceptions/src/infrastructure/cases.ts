@@ -12,6 +12,10 @@ import type {
 import type { Incident } from '../application/detection.js';
 import type { Diagnosis, DiagnosisInput } from '../domain/diagnosis.js';
 import { inventorySources } from '../domain/inventory-sources.js';
+import {
+  type CaseMetricItem,
+  summarizeCaseMetrics,
+} from '../domain/metrics.js';
 
 type Row = {
   document: Incident;
@@ -451,7 +455,8 @@ export function createOrderAttentionBoundaryReader(db: TenantDatabase) {
     db.transaction(tenantId, async (tx) => {
       const result = await tx.query<{ boundary: string | null }>(
         `SELECT min(at)::text AS boundary FROM (
-      SELECT (document->'provenance'->>'validUntil')::timestamptz + interval '1 millisecond' AS at FROM exception_diagnoses WHERE tenant_id=$1
+      SELECT (document->'provenance'->>'validUntil')::timestamptz AS at FROM exception_diagnoses WHERE tenant_id=$1
+      UNION ALL SELECT (document->'provenance'->>'validUntil')::timestamptz + interval '1 millisecond' FROM exception_diagnoses WHERE tenant_id=$1
       UNION ALL SELECT (document->>'expiresAt')::timestamptz FROM case_proposals WHERE tenant_id=$1
       UNION ALL SELECT (document->'preconditions'->>'validUntil')::timestamptz FROM case_proposals WHERE tenant_id=$1
     ) boundaries WHERE at > $2::timestamptz`,
@@ -460,5 +465,31 @@ export function createOrderAttentionBoundaryReader(db: TenantDatabase) {
       const boundary = result.rows[0]?.boundary;
 
       return boundary ? new Date(boundary).toISOString() : null;
+    });
+}
+
+/** Reads all subject kinds from the inbox's authoritative attention projection. */
+export function createCaseMetricReader(db: TenantDatabase) {
+  return async (tenantId: string, asOf: string) =>
+    db.transaction(tenantId, async (tx) => {
+      const result = await tx.query<{ item: CaseMetricItem }>(
+        `${projection}
+      SELECT DISTINCT ON (document->>'id') jsonb_build_object(
+        'kind','case','id',document->>'id','subjectKind',document->'subject'->>'subjectKind',
+        'subjectId',document->'subject'->>'subjectId','state',document->>'state',
+        'title',document->>'exceptionClass','detectedAt',document->>'firstDetectedAt',
+        'ageSeconds',NULL,'reason',attention_reason) AS item
+      FROM ordered WHERE document->>'state'<>'resolved' ORDER BY document->>'id'`,
+        [tenantId, asOf],
+      );
+      const boundary = await createOrderAttentionBoundaryReader({
+        transaction: async (_tenantId, operation) => operation(tx),
+      })(tenantId, asOf);
+
+      return summarizeCaseMetrics(
+        result.rows.map((row) => row.item),
+        asOf,
+        boundary,
+      );
     });
 }

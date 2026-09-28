@@ -134,3 +134,14 @@ bounded SSE route in `packages/resolution/src/api/metric-events.ts`. The browser
 subscription and recovery hook is `apps/web/src/features/overview/metrics-live.ts`.
 See [Live operational metrics](live-operational-metrics.md); validation is
 `metric-stream.e2e.mjs`, `metric-live.browser.mjs` and the stream unit tests.
+
+Cross-domain metrics: domain definitions and summaries live in
+`packages/exceptions/src/domain/metrics.ts`, `packages/procurement/src/domain/metrics.ts`
+and `packages/connections/src/domain/metrics.ts`. Exceptions reuses the inbox SQL;
+Procurement reads configured-source stocks and recorded POs. Snapshot composition is
+`packages/resolution/src/infrastructure/operational-summary.ts`; typed v2 transport is
+`packages/api-contract/src/operational-metrics.ts`. The grouped frontend is
+`apps/web/src/features/overview/operational-metrics.tsx` and shares the live hook with
+order v1. Migration 0032 extends invalidations. Tests: domain metric tests,
+`operational-summary.test.ts`, `operational-metrics.e2e.mjs` and
+`operational-metrics.browser.mjs`. See the shared metric and live metric guides.

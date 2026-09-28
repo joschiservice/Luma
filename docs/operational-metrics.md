@@ -122,3 +122,53 @@ deadline boundaries, unknown dates, filters, tenant isolation and snapshot chang
 Set `LUMA_METRIC_BENCHMARK=1` when running that PostgreSQL suite to generate
 `/tmp/luma84-query-plans.json` with EXPLAIN ANALYZE/BUFFERS plans and five samples.
 See [query measurements](operational-metrics-performance.md).
+
+## Current operational registry (v2)
+
+`GET /v2/organizations/:organizationId/metrics` lists the order v1 definitions
+and eight domain-owned v2 definitions. Order v1 request/results remain unchanged.
+`POST /v2/organizations/:organizationId/metrics/query` requires
+`definitionVersion: 2` and explicit `metrics`. It reads only selected families.
+The v2 cohort is discriminated by `kind`: `case`, `stock_position`,
+`purchase_order`, or `connection`.
+
+| Metric                              | Unit           | Scope and predicate                                                                                             |
+| ----------------------------------- | -------------- | --------------------------------------------------------------------------------------------------------------- |
+| `cases.active`                      | case           | Distinct unresolved incidents, across all subjects                                                              |
+| `cases.attention`                   | case           | The inbox projection, with exclusive approval/manual intervention/uncertainty reasons                           |
+| `cases.oldest_unresolved_age`       | second         | Maximum age since first detection; retains first detection after reopening                                      |
+| `inventory.below_minimum`           | stock position | Active-rule positions whose configured-source stock passes `planReplenishment` and is strictly below minimum    |
+| `inventory.replenishment_unknown`   | stock position | Active-rule positions with absent, deleted, nonnumeric, invalid-time, future or expired configured-source stock |
+| `procurement.purchase_orders.draft` | purchase order | Exact current draft status, distinct persisted IDs                                                              |
+| `procurement.purchase_orders.open`  | purchase order | Exact current open status, distinct persisted IDs                                                               |
+| `connections.needing_attention`     | connection     | Pending/degraded/revoked, or active with stale/unobserved permitted granted reads; excludes disconnected        |
+
+Cases and procurement have complete coverage within their recorded workspace scope.
+An empty case cohort has age `null`; missing/future detection times make the maximum
+unknown (`value: null`, `unknownCount > 0`), while the oldest valid incident remains
+inspectable. Count metrics use `value` for known matches. Stock below minimum has
+`total: null` when unusable positions prevent a complete total. The unknown-stock
+metric counts the unusable cohort exactly. No active rules means unavailable
+inventory coverage, not healthy inventory. `population` counts active-rule positions,
+never quantities or all warehouse SKUs.
+
+Stock commitments share the workflow predicate: any draft/open PO with the exact
+rule SKU, across suppliers and inventory sources. Each position links distinct PO
+IDs. Commitments do not establish acceptance, sufficient incoming quantity, or
+receipt. PO status and authority do not establish a complete external supplier sync.
+Connection coverage measures permitted read freshness, not provider record completeness.
+`dataThrough` stays null; a latest observation never becomes a scan watermark.
+
+Inventory and connection metrics accept `connectionId`. Procurement accepts
+`supplierId` and `authority`. Cases accept no filters. Every selected metric must
+support every supplied filter; unsupported fields and historical windows are rejected.
+Use separate requests when families need different scopes.
+
+Composition injects public Exceptions, Procurement and Connections readers into a
+single authorized repeatable-read transaction. Definitions and business predicates
+stay with those owners. Full compact cohorts determine counts and the SHA-256
+snapshot before transport pagination (20 default, 100 maximum). Snapshot hashes bind
+the tenant, metric selection, filters, evaluation time and results. Reuse `snapshot`
+and `asOf` for pages; changes or snapshots older than 15 minutes return 409.
+The readers materialize scoped cohorts in server memory; query plans and the measured
+load boundary are recorded in [cross-domain measurements](operational-metrics-cross-domain-performance.md).

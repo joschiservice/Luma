@@ -90,7 +90,7 @@ it('explains unknown order totals, opens accessible cohorts and recovers from er
     ),
   ).toBe(true);
   await page.route(
-    '**/metrics/query',
+    '**/v1/organizations/*/metrics/query',
     (route) =>
       route.fulfill({
         status: 503,

@@ -83,3 +83,5 @@ export {
 } from '@luma/workflows/composition';
 
 export { createOperationalMetrics } from './infrastructure/metrics.js';
+
+export { createOperationalSummary } from './infrastructure/operational-summary.js';

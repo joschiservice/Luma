@@ -1157,6 +1157,9 @@ importers:
       '@luma/policies':
         specifier: workspace:*
         version: link:../policies
+      '@luma/procurement':
+        specifier: workspace:*
+        version: link:../procurement
       '@luma/workflows':
         specifier: workspace:*
         version: link:../workflows

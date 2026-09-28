@@ -33,3 +33,8 @@ export type {
 } from './application/model-gateway.js';
 
 export { measure, measureSync } from './application/performance.js';
+
+export type {
+  OperationalMetricDefinition,
+  OperationalMetricRead,
+} from './domain/metric.js';

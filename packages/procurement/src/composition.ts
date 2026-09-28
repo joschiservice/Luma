@@ -44,3 +44,5 @@ export type {
   ReplenishmentActivation,
   ReplenishmentStock,
 } from './application/replenishment.js';
+
+export { createProcurementMetricReader } from './infrastructure/metrics.js';

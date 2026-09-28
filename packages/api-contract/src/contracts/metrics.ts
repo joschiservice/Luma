@@ -7,10 +7,47 @@ import {
   metricRequestSchema,
   metricResponseSchema,
 } from '../metrics.js';
+import {
+  operationalMetricDefinitionSchema,
+  operationalMetricRequestSchema,
+  operationalMetricResponseSchema,
+} from '../operational-metrics.js';
 
 const c = initContract();
 
 export const metricsContract = c.router({
+  operationalDefinitions: {
+    method: 'GET',
+    path: '/v2/organizations/:organizationId/metrics',
+    pathParams: organizationParamsSchema,
+    responses: {
+      200: z.array(
+        z.union([metricDefinitionSchema, operationalMetricDefinitionSchema]),
+      ),
+      401: apiErrorSchema,
+      404: apiErrorSchema,
+    },
+    summary: 'Read the operational metric registry',
+    description:
+      'Lists domain-owned definitions. Order definitions use v1 query semantics; other families use v2 with coverage and typed cohorts per metric.',
+  },
+  operationalQuery: {
+    method: 'POST',
+    path: '/v2/organizations/:organizationId/metrics/query',
+    pathParams: organizationParamsSchema,
+    body: operationalMetricRequestSchema,
+    responses: {
+      200: operationalMetricResponseSchema,
+      400: apiErrorSchema,
+      401: apiErrorSchema,
+      404: apiErrorSchema,
+      409: apiErrorSchema,
+      503: apiErrorSchema,
+    },
+    summary: 'Read selected operational metrics and matching records',
+    description:
+      'Counts cases, monitored stock positions, recorded purchase orders and connection problems in one authorized snapshot. Select metric IDs explicitly. Filters must be supported by every selected metric. Reuse snapshot and asOf for pagination; refresh on 409. Current-state filters do not select historical reporting windows. Null values, unknown classification and unavailable coverage are distinct from zero.',
+  },
   definitions: {
     method: 'GET',
     path: '/v1/organizations/:organizationId/metrics',

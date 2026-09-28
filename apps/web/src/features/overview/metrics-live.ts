@@ -1,21 +1,42 @@
-import type { MetricRequest } from '@luma/api-contract';
+import type { MetricRequest, MetricResponse } from '@luma/api-contract';
 import { subscribeToMetrics } from '@luma/api-contract/client';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useQuery,
+  useQueryClient,
+  type UseQueryOptions,
+} from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 
 import { IdentityError } from '../identity/data';
 import { metricsOptions } from './metrics-data';
 
 /** Subscribes before loading, serializes refreshes, and replaces paginated snapshots on changes. */
-export function useLiveMetrics(organizationId: string) {
+export function useLiveMetricQuery<
+  Request,
+  Response extends {
+    nextRefreshAt?: string | null | undefined;
+    readAt: string;
+  },
+>(
+  organizationId: string,
+  config: {
+    initial: Request;
+    key: string;
+    options: (
+      organizationId: string,
+      request: Request,
+    ) => UseQueryOptions<Response, Error, Response, (string | Request)[]>;
+  },
+) {
   const client = useQueryClient();
-  const [request, setRequest] = useState<MetricRequest>({});
+  const [request, setRequest] = useState<Request>(config.initial);
   const [ready, setReady] = useState(false);
   const [connection, setConnection] = useState('connecting');
   const [attempt, setAttempt] = useState(0);
   const query = useQuery({
-    ...metricsOptions(organizationId, request),
+    ...config.options(organizationId, request),
     enabled: ready && connection !== 'denied',
+    placeholderData: (previous) => previous,
   });
   useEffect(() => {
     let active = true;
@@ -28,7 +49,7 @@ export function useLiveMetrics(organizationId: string) {
     let stop = () => {
       /* Assigned when the stream opens below. */
     };
-    const key = ['private', 'organization', organizationId, 'order-metrics'];
+    const key = ['private', 'organization', organizationId, config.key];
     const refresh = async () => {
       dirty = true;
       if (busy || denied) return;
@@ -40,14 +61,16 @@ export function useLiveMetrics(organizationId: string) {
           break;
         }
         setConnection(connected ? 'syncing' : 'reconnecting');
-        setRequest({});
+        setRequest(config.initial);
         try {
           await client.cancelQueries({ queryKey: key });
           await client.invalidateQueries({
             queryKey: key,
             refetchType: 'none',
           });
-          await client.fetchQuery(metricsOptions(organizationId));
+          await client.fetchQuery(
+            config.options(organizationId, config.initial),
+          );
           if (active) {
             setReady(true);
             setConnection(connected ? 'live' : 'reconnecting');
@@ -112,10 +135,15 @@ export function useLiveMetrics(organizationId: string) {
       window.removeEventListener('offline', offline);
       void client.cancelQueries({ queryKey: key });
     };
-  }, [client, organizationId, attempt]);
+  }, [client, organizationId, attempt, config]);
 
   useEffect(() => {
-    if (!query.data?.nextRefreshAt || connection === 'denied') return;
+    if (
+      query.isPlaceholderData ||
+      !query.data?.nextRefreshAt ||
+      connection === 'denied'
+    )
+      return;
     const delay = Math.max(
       1,
       Date.parse(query.data.nextRefreshAt) -
@@ -124,9 +152,9 @@ export function useLiveMetrics(organizationId: string) {
     );
     const timer = setTimeout(
       () => {
-        setRequest({});
+        setRequest(config.initial);
         void client.invalidateQueries({
-          queryKey: metricsOptions(organizationId).queryKey,
+          queryKey: config.options(organizationId, config.initial).queryKey,
           exact: true,
         });
       },
@@ -136,12 +164,28 @@ export function useLiveMetrics(organizationId: string) {
     return () => clearTimeout(timer);
   }, [
     client,
+    config,
     organizationId,
     query.data?.nextRefreshAt,
     query.data?.readAt,
     query.dataUpdatedAt,
+    query.isPlaceholderData,
     connection,
   ]);
 
   return { query, request, setRequest, connection };
+}
+
+const orderConfig = {
+  initial: {} as MetricRequest,
+  key: 'order-metrics',
+  options: metricsOptions,
+};
+
+/** Keeps order v1 counts and cohorts current through the shared metric stream. */
+export function useLiveMetrics(organizationId: string) {
+  return useLiveMetricQuery<MetricRequest, MetricResponse>(
+    organizationId,
+    orderConfig,
+  );
 }

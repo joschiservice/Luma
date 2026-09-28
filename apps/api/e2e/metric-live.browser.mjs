@@ -79,7 +79,7 @@ it('updates visible totals and cohorts, crosses deadlines, and measures delivery
     release = resolve;
   });
   await page.route(
-    '**/metrics/query',
+    '**/v1/organizations/*/metrics/query',
     async (route) => {
       const response = await route.fetch();
       held = true;

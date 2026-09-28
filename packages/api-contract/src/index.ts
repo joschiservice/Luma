@@ -18,37 +18,56 @@ import { shadowContract } from './contracts/shadow.js';
 import { systemContract } from './contracts/system.js';
 import { workflowsContract } from './contracts/workflows.js';
 
-const c = initContract();
+const c: ReturnType<typeof initContract> = initContract();
 
-export const apiContract = c.router(
-  {
-    shadow: shadowContract,
-    activity: activityContract,
-    playbooks: playbooksContract,
-    workflows: workflowsContract,
-    procurement: procurementContract,
-    resolutionLearning: resolutionLearningContract,
-    caseDesk: caseDeskContract,
-    operations: operationsContract,
-    metrics: metricsContract,
-    exceptions: exceptionsContract,
-    identity: identityContract,
-    settings: settingsContract,
-    connections: connectionsContract,
-    apps: appsContract,
-    system: systemContract,
-    connectorProviders: connectorProvidersContract,
+const routes: {
+  shadow: typeof shadowContract;
+  activity: typeof activityContract;
+  playbooks: typeof playbooksContract;
+  workflows: typeof workflowsContract;
+  procurement: typeof procurementContract;
+  resolutionLearning: typeof resolutionLearningContract;
+  caseDesk: typeof caseDeskContract;
+  operations: typeof operationsContract;
+  metrics: typeof metricsContract;
+  exceptions: typeof exceptionsContract;
+  identity: typeof identityContract;
+  settings: typeof settingsContract;
+  connections: typeof connectionsContract;
+  apps: typeof appsContract;
+  system: typeof systemContract;
+  connectorProviders: typeof connectorProvidersContract;
+} = {
+  shadow: shadowContract,
+  activity: activityContract,
+  playbooks: playbooksContract,
+  workflows: workflowsContract,
+  procurement: procurementContract,
+  resolutionLearning: resolutionLearningContract,
+  caseDesk: caseDeskContract,
+  operations: operationsContract,
+  metrics: metricsContract,
+  exceptions: exceptionsContract,
+  identity: identityContract,
+  settings: settingsContract,
+  connections: connectionsContract,
+  apps: appsContract,
+  system: systemContract,
+  connectorProviders: connectorProvidersContract,
+};
+const options = {
+  strictStatusCodes: true as const,
+  commonResponses: {
+    400: apiErrorSchema,
+    413: apiErrorSchema,
+    415: apiErrorSchema,
+    500: apiErrorSchema,
   },
-  {
-    strictStatusCodes: true,
-    commonResponses: {
-      400: apiErrorSchema,
-      413: apiErrorSchema,
-      415: apiErrorSchema,
-      500: apiErrorSchema,
-    },
-  },
-);
+};
+
+export const apiContract: ReturnType<
+  typeof c.router<typeof routes, string, typeof options>
+> = c.router(routes, options);
 
 export * from './activity.js';
 
@@ -108,3 +127,5 @@ export * from './procurement.js';
 export * from './replenishment.js';
 
 export * from './metrics.js';
+
+export * from './operational-metrics.js';

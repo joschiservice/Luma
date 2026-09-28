@@ -25,3 +25,13 @@ export type {
 export { createReplenishmentService } from './application/replenishment-workflow.js';
 
 export type { ReplenishmentTransport } from './application/replenishment-workflow.js';
+
+export {
+  procurementMetricDefinitions,
+  stockMetricDefinitions,
+} from './domain/metrics.js';
+
+export type {
+  StockMetricItem,
+  PurchaseOrderMetricItem,
+} from './domain/metrics.js';

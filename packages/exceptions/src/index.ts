@@ -40,3 +40,7 @@ export type { Diagnosis, DiagnosisInput } from './domain/diagnosis.js';
 export type { CaseService } from './application/cases.js';
 
 export { evaluate as evaluateException } from './domain/evaluate.js';
+
+export { caseMetricDefinitions } from './domain/metrics.js';
+
+export type { CaseMetricItem } from './domain/metrics.js';

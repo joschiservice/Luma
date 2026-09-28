@@ -26,9 +26,9 @@ import {
 } from '@luma/ui/components/primitives/workspace-date';
 import { workspaceDateValue } from '@luma/ui/lib/timezone';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from '@tanstack/react-router';
+import { Link, useLocation } from '@tanstack/react-router';
 import { ArrowRight, PackageCheck, Plus, ShieldCheck } from 'lucide-react';
-import { useContext, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 
 import { IdentityError } from '../identity/data';
 import {
@@ -73,6 +73,16 @@ export function ReplenishmentPanel({
     start.isError &&
     (!(start.error instanceof IdentityError) || start.error.status >= 500);
   const data = query.data;
+  const hash = useLocation({ select: (location) => location.hash });
+  const linkedRuleId = data?.rules.find(
+    (rule) => hash === `rule-${rule.id}`,
+  )?.id;
+  useEffect(() => {
+    if (!linkedRuleId) return;
+    const target = document.getElementById(`rule-${linkedRuleId}`);
+    target?.focus({ preventScroll: true });
+    target?.scrollIntoView({ block: 'center' });
+  }, [linkedRuleId]);
 
   return (
     <Card as="section" className="workflow-section replenishment-panel">
@@ -163,7 +173,12 @@ export function ReplenishmentPanel({
             stock.available !== null;
 
           return (
-            <article key={rule.id} className="replenishment-rule">
+            <article
+              key={rule.id}
+              id={`rule-${rule.id}`}
+              tabIndex={-1}
+              className="replenishment-rule"
+            >
               <div className="workflows-heading">
                 <div>
                   <h3>{rule.sku}</h3>

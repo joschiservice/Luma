@@ -25,6 +25,7 @@ import {
   presentTriggerRun,
 } from '@luma/workflows';
 
+import { replenishmentCommitments } from '../domain/metrics.js';
 import { planReplenishment } from '../domain/replenishment.js';
 import type { ProcurementService } from './procurement.js';
 import type {
@@ -158,11 +159,10 @@ export function createReplenishmentService(deps: {
     excludeOrder?: string,
   ) {
     const orders = await deps.procurement.orders(context);
-    const commitments = orders.items.filter(
-      (o) =>
-        o.id !== excludeOrder &&
-        ['draft', 'open'].includes(o.status) &&
-        o.lines.some((l) => l.sku === rule.sku),
+    const commitments = replenishmentCommitments(
+      orders.items,
+      rule.sku,
+      excludeOrder,
     );
 
     return {

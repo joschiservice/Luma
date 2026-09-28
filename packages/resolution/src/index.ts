@@ -70,3 +70,5 @@ export type {
   MetricEvents,
   MetricWakeup,
 } from './application/metric-events.js';
+
+export type { OperationalSummary } from './application/operational-summary.js';

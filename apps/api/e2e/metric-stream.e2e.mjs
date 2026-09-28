@@ -36,7 +36,7 @@ it('fans out committed changes, coalesces bursts and recovers listeners, subscri
   const coverage = await f.db.owner.query(
     "SELECT event_object_table, array_agg(event_manipulation::text ORDER BY event_manipulation) AS operations FROM information_schema.triggers WHERE trigger_name='metric_change' GROUP BY event_object_table",
   );
-  expect(coverage.rows).toHaveLength(15);
+  expect(coverage.rows).toHaveLength(20);
   expect(
     coverage.rows.every(
       (row) =>

@@ -77,3 +77,5 @@ export function createCaseEscalation(db: TenantDatabase) {
 export { createOrderAttentionReader } from './infrastructure/cases.js';
 
 export { createOrderAttentionBoundaryReader } from './infrastructure/cases.js';
+
+export { createCaseMetricReader } from './infrastructure/cases.js';

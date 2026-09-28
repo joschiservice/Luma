@@ -8,6 +8,7 @@ import {
 } from '@tanstack/react-router';
 
 import { overviewOptions } from './data';
+import { OperationalMetrics } from './operational-metrics';
 import { OrderMetrics } from './order-metrics';
 
 /**
@@ -59,6 +60,10 @@ export function OverviewPage() {
             {item.summary.replace(/\.+$/, '')}
           </Link>
         )}
+      />
+      <OperationalMetrics
+        key={`summary-${organizationId}`}
+        organizationId={organizationId}
       />
       <OrderMetrics key={organizationId} organizationId={organizationId} />
     </>

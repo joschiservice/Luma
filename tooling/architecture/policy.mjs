@@ -28,6 +28,7 @@ export const dependencies = {
   temporal: ['resolution', 'workflows', 'identity', 'platform'],
   workflows: ['platform', 'identity', 'policies', 'execution', 'connectors'],
   resolution: [
+    'procurement',
     'workflows',
     'platform',
     'identity',

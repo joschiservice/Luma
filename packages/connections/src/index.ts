@@ -89,3 +89,10 @@ export type {
   ConnectorEvidence,
   ProviderRuntimeOptions,
 } from './application/provider.js';
+
+export {
+  connectionMetricDefinitions,
+  summarizeConnectionMetrics,
+} from './domain/metrics.js';
+
+export type { ConnectionMetricItem } from './domain/metrics.js';

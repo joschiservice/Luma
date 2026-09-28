@@ -9,6 +9,7 @@ export async function metricStream(
   f,
   user = f.owner,
   readOnChange = false,
+  queryRequest = { path: `${f.base}/metrics/query`, body: {} },
 ) {
   const abort = new AbortController();
   t.onTestFinished(() => abort.abort());
@@ -30,14 +31,14 @@ export async function metricStream(
     while (dirty && !abort.signal.aborted) {
       dirty = false;
       const start = performance.now();
-      const result = await fetch(`${origin}${f.base}/metrics/query`, {
+      const result = await fetch(`${origin}${queryRequest.path}`, {
         method: 'POST',
         headers: {
           cookie: user.cookie,
           origin: f.config.baseURL,
           'content-type': 'application/json',
         },
-        body: '{}',
+        body: JSON.stringify(queryRequest.body),
         signal: abort.signal,
       });
       expect(result.status).toBe(200);

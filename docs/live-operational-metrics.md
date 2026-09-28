@@ -92,3 +92,22 @@ Measurements and tradeoffs are recorded in
 References: [PostgreSQL LISTEN ordering](https://www.postgresql.org/docs/current/sql-listen.html),
 [transactional NOTIFY](https://www.postgresql.org/docs/current/sql-notify.html),
 [pg client notifications](https://node-postgres.com/apis/client).
+
+## Cross-domain metrics
+
+Migration `0032_operational_metric_notifications.sql` adds the same transactional
+wake-up trigger to inventory entities, snapshots and projections, replenishment
+activations and purchase orders. Inserts, corrections, deletes, revocations and PO
+transitions invalidate both versions through the existing tenant SSE stream. Mapping,
+case, diagnosis, policy and connection tables remain covered by migration 0031.
+Rollback sends no notification. Supplier names shown on POs are their persisted
+recorded names, so the supplier table is not a metric dependency.
+
+V2 supplies per-metric and response-wide `nextRefreshAt`. Stock expires exactly at
+five minutes; future stock becomes eligible for reassessment at its observation time.
+Case diagnosis/proposal boundaries and the connection 24-hour-plus-one-millisecond
+boundary reuse existing readers. A maximum 60-second age refresh advances case and
+PO ages without writes. The shared browser hook subscribes before reading, serializes
+invalidations, resets pagination, hides inaccessible/offline results, and retains the
+existing reconnect and polling recovery. The operational summary and order v1 panel
+use separate family requests and subscriptions.
