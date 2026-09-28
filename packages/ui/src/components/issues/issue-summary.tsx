@@ -1,6 +1,6 @@
-import { Check, Inbox, Search } from 'lucide-react';
+import { StateDot } from '../primitives/state';
 
-/** Summarizes issues needing review, open issues, and verified resolutions. */
+/** Summarizes issues needing review, open issues, and verified resolutions in one line. */
 export function IssueSummary({
   review,
   open,
@@ -18,22 +18,15 @@ export function IssueSummary({
       aria-label="Issue summary"
       aria-busy={loading}
     >
-      {[
-        { label: 'Needs review', value: review, Icon: Inbox, tone: 'warning' },
-        { label: 'Open', value: open, Icon: Search, tone: 'info' },
-        {
-          label: 'Verified in 24h',
-          value: verified,
-          Icon: Check,
-          tone: 'success',
-        },
-      ].map(({ label, value, Icon, tone }) => (
+      {(
+        [
+          { label: 'Needs review', value: review, state: 'approval' },
+          { label: 'Open', value: open, state: 'running' },
+          { label: 'Verified in 24h', value: verified, state: 'verified' },
+        ] as const
+      ).map(({ label, value, state }) => (
         <div className="issue-stat" key={label}>
-          <Icon
-            aria-hidden="true"
-            strokeWidth={1.5}
-            className={`issue-stat-icon status-${tone}`}
-          />
+          <StateDot state={state} className="issue-stat-icon" />
           <strong>{value === undefined ? '—' : value.toLocaleString()}</strong>
           <span>{label}</span>
         </div>

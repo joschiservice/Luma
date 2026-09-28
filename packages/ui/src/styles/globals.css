@@ -6,6 +6,7 @@
 @import './legacy.css';
 @import './primitives.css';
 @import './workspace.css';
+@import './issues.css';
 @source "../components";
 
 @custom-variant dark (&:where(.dark, .dark *));

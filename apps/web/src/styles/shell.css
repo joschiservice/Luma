@@ -629,6 +629,15 @@
   display: none;
 }
 
+/* A page that supplies its own header takes over the breadcrumb area. */
+.desk-header:has(.workspace-page-header:not(:empty)) .header-context {
+  display: none;
+}
+
+.workspace-page-header:not(:empty) {
+  flex: 1;
+}
+
 .desk-header-tools {
   display: flex;
   align-items: center;
@@ -879,6 +888,13 @@
 
   .desk-header {
     padding-inline: 8px 8px;
+  }
+
+  .desk-header:has(.workspace-page-header:not(:empty)) {
+    align-items: flex-start;
+    height: auto;
+    min-height: var(--topbar-height);
+    padding-block: 6px;
   }
 
   .mobile-nav {
