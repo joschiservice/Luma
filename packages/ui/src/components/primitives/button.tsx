@@ -3,18 +3,18 @@ import { cn } from '@luma/ui/lib/utils';
 import { cva, type VariantProps } from 'class-variance-authority';
 
 const buttonVariants = cva(
-  "relative inline-flex shrink-0 items-center justify-center gap-1.5 rounded-[var(--radius-control)] border border-transparent font-sans font-medium whitespace-nowrap outline-none select-none transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-[var(--ease-standard)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring enabled:active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive motion-reduce:transition-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "relative inline-flex shrink-0 items-center justify-center gap-1.5 rounded-[var(--radius-control)] border font-sans font-medium whitespace-nowrap outline-none select-none transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-[var(--ease-standard)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring not-disabled:active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive motion-reduce:transition-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
         default:
-          'bg-primary text-primary-foreground shadow-[inset_0_1px_0_rgb(255_255_255/0.14),var(--shadow-control)] enabled:hover:bg-primary-hover',
+          'border-transparent bg-primary text-primary-foreground shadow-[inset_0_1px_0_rgb(255_255_255/0.14),var(--shadow-control)] not-disabled:hover:bg-primary-hover',
         outline:
-          'border-line-strong bg-surface-raised text-foreground shadow-[var(--shadow-control)] enabled:hover:border-[color-mix(in_srgb,var(--foreground)_24%,transparent)] enabled:hover:bg-[color-mix(in_srgb,var(--surface-raised)_92%,var(--foreground))]',
+          'border-line-strong bg-surface-raised text-foreground shadow-[var(--shadow-control)] not-disabled:hover:border-[color-mix(in_srgb,var(--foreground)_24%,transparent)] not-disabled:hover:bg-[color-mix(in_srgb,var(--surface-raised)_92%,var(--foreground))]',
         ghost:
-          'text-fg-muted enabled:hover:bg-accent enabled:hover:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground',
+          'border-transparent text-fg-muted not-disabled:hover:bg-accent not-disabled:hover:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground',
         destructive:
-          'bg-destructive text-destructive-foreground shadow-[var(--shadow-control)] enabled:hover:bg-[color-mix(in_srgb,var(--destructive)_88%,black)]',
+          'border-transparent bg-destructive text-destructive-foreground shadow-[var(--shadow-control)] not-disabled:hover:bg-[color-mix(in_srgb,var(--destructive)_88%,black)]',
       },
       size: {
         default: 'h-8 px-3 text-[13px] leading-5',

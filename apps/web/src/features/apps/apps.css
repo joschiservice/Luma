@@ -1,0 +1,349 @@
+/* Apps: installed apps, the catalog and each app's connections. */
+.apps-page {
+  display: grid;
+  gap: 16px;
+  max-width: 1120px;
+  margin: 0 auto;
+  font-size: 13px;
+}
+
+.apps-page > .page-header {
+  margin-bottom: 0;
+}
+
+.apps-note {
+  color: var(--foreground-subtle);
+  font-size: 13px;
+}
+
+.app-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-self: start;
+  color: var(--foreground-subtle);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.app-back:hover {
+  color: var(--foreground);
+}
+
+.connections-section {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.connections-section > h2,
+.connections-heading h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.connections-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+/* App tiles */
+.connection-providers {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
+  gap: 12px;
+}
+
+.app-tile[data-slot='card'] {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.app-tile .ui-card-header[data-slot='card-header'] {
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+  gap: 10px;
+  margin: 0;
+}
+
+.app-tile-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 9px;
+  background: linear-gradient(
+    180deg,
+    var(--surface-raised) 0%,
+    var(--surface-sunken) 100%
+  );
+  box-shadow:
+    inset 0 0 0 1px var(--line-strong),
+    var(--shadow-control);
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.app-tile-icon[data-size='lg'] {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  font-size: 17px;
+}
+
+.app-tile-description {
+  flex: 1;
+  color: var(--foreground-muted);
+}
+
+.app-tile-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--foreground-subtle);
+  font-size: 12.5px;
+}
+
+.app-attention {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--state-warning-text);
+  font-size: 12.5px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.app-attention:hover {
+  text-decoration: underline;
+}
+
+.app-tile
+  > :is([data-slot='button'], a[data-slot='button'], a[class*='inline-flex']) {
+  margin-top: 4px;
+}
+
+.apps-history {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.apps-history a {
+  color: var(--signal-text);
+  text-decoration: none;
+}
+
+/* Connections of one app */
+.connection-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.connection-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
+  align-items: start;
+  gap: 12px;
+}
+
+.connection-card[data-slot='card'] {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  scroll-margin: 24px;
+}
+
+.connection-card:target {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.connection-card .ui-card-header[data-slot='card-header'] {
+  align-items: flex-start;
+  margin: 0;
+}
+
+.connection-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.connection-identity > svg {
+  box-sizing: content-box;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  padding: 8px;
+  border-radius: 9px;
+  background: var(--surface-sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--foreground-muted);
+}
+
+.connection-identity .eyebrow {
+  color: var(--foreground-subtle);
+  font-size: 12px;
+  text-transform: capitalize;
+}
+
+.connection-target {
+  padding: 6px 10px;
+  border-radius: 7px;
+  background: var(--surface-sunken);
+  color: var(--foreground-muted);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+
+.connection-description {
+  color: var(--foreground-subtle);
+  font-size: 12.5px;
+}
+
+.connection-access {
+  overflow: hidden;
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.connection-card h4 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-sunken);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.connection-capabilities {
+  margin: 0;
+  padding: 0 12px;
+  list-style: none;
+}
+
+.connection-capabilities li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  font-size: 12.5px;
+}
+
+.connection-capabilities li + li {
+  border-top: 1px solid var(--line);
+}
+
+.connection-capabilities li > span:last-child {
+  color: var(--foreground-subtle);
+  font-size: 12px;
+  text-align: right;
+}
+
+.connection-capability-name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.connection-capability-name svg {
+  flex-shrink: 0;
+  color: var(--foreground-faint);
+}
+
+.connection-capabilities [data-enabled='true'] svg {
+  color: var(--state-success);
+}
+
+.connection-management {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.connection-management > .connection-actions {
+  display: contents;
+}
+
+.connection-management:empty,
+.connection-card > [role='status']:empty,
+.apps-page > [role='status']:empty {
+  display: none;
+}
+
+.connection-empty {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 32px 16px;
+  border-radius: var(--radius-panel);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  color: var(--foreground-muted);
+  text-align: center;
+}
+
+.connection-empty > svg {
+  margin-bottom: 4px;
+  color: var(--foreground-subtle);
+}
+
+.connection-empty h3 {
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.connection-dialog[data-slot='dialog-content'] {
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+}
+
+.connection-setup-form {
+  display: grid;
+  gap: 14px;
+}
+
+.connection-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface-sunken);
+  font-size: 12.5px;
+}
+
+.connection-checkbox input {
+  flex-shrink: 0;
+  margin-top: 3px;
+  accent-color: var(--primary);
+}
+
+.connection-setup-form > button[type='submit'] {
+  width: 100%;
+  margin-top: 4px;
+}

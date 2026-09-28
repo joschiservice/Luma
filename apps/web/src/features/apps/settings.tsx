@@ -1,12 +1,18 @@
-import { Button } from '@luma/ui/components/primitives/button';
+import './apps.css';
+
+import { Alert } from '@luma/ui/components/primitives/alert';
+import { Button, buttonVariants } from '@luma/ui/components/primitives/button';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogTitle,
 } from '@luma/ui/components/primitives/dialog';
+import { PageHeader } from '@luma/ui/components/workspace/page-header';
+import { WorkspaceBreadcrumb } from '@luma/ui/components/workspace/workspace-breadcrumb';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
+import { ArrowLeft, ArrowRight, ChevronRight, Plug } from 'lucide-react';
 import { useRef, useState } from 'react';
 
 import { ConnectionCard } from '../connections/connection-card';
@@ -75,13 +81,21 @@ export function AppSettings({
   }
 
   return (
-    <div className="connections-page">
+    <div className="connections-page apps-page">
+      <WorkspaceBreadcrumb>
+        <Link to="/app/$organizationId/apps" params={{ organizationId }}>
+          Apps
+        </Link>
+        <ChevronRight size={14} aria-hidden="true" />
+        <span aria-current="page">{app?.name ?? appId}</span>
+      </WorkspaceBreadcrumb>
       <Link
         to="/app/$organizationId/apps"
         params={{ organizationId }}
         className="app-back"
       >
-        ← Apps & connections
+        <ArrowLeft size={15} aria-hidden="true" />
+        All apps
       </Link>
       {apps.isPending ? (
         <p role="status">Loading app…</p>
@@ -89,33 +103,46 @@ export function AppSettings({
         <p role="alert">{connectionError(apps.error)}</p>
       ) : (
         <>
-          <div className="connections-heading">
-            <h1>{app?.name ?? appId}</h1>
-            {installed && canManage ? (
-              <Button variant="ghost" onClick={() => setDialog('uninstall')}>
-                Uninstall
-              </Button>
-            ) : null}
-          </div>
-          <p className="desk-intro">
-            {app?.description ??
-              'This app is unavailable. Historical connections remain accessible.'}
-          </p>
+          <PageHeader
+            icon={
+              <span className="app-tile-icon" data-size="lg" aria-hidden="true">
+                {(app?.name ?? appId).slice(0, 1)}
+              </span>
+            }
+            title={app?.name ?? appId}
+            description={
+              app?.description ??
+              'This app is unavailable. Historical connections remain accessible.'
+            }
+            actions={
+              installed && canManage ? (
+                <Button
+                  variant="outline"
+                  onClick={() => setDialog('uninstall')}
+                >
+                  Uninstall
+                </Button>
+              ) : null
+            }
+          />
           {!installed ? (
-            <p>
-              This app is not installed. Install it from Apps & connections to
-              connect an account.
+            <p className="apps-note">
+              This app is not installed. Install it from Apps to connect an
+              account.
             </p>
           ) : null}
           {appResult ? (
-            <p role="status">
+            <Alert
+              role="status"
+              tone={appResult === 'connected' ? 'success' : 'warning'}
+            >
               {appResult === 'connected'
                 ? 'Connection ready.'
                 : 'Authorization needs attention. Add a connection to try again.'}
-            </p>
+            </Alert>
           ) : null}
           {!canManage ? (
-            <p>
+            <p className="apps-note">
               An owner or admin can add connections and change app settings.
             </p>
           ) : null}
@@ -160,6 +187,7 @@ export function AppSettings({
                 </div>
               ) : (
                 <div className="connection-empty">
+                  <Plug size={18} aria-hidden="true" />
                   <h3>No connections yet</h3>
                   <p>
                     {canManage && available
@@ -184,10 +212,12 @@ export function AppSettings({
           {available && app.ui.includes('page') ? (
             <section className="connections-section">
               <Link
+                className={buttonVariants({ variant: 'outline' })}
                 to="/app/$organizationId/apps/$appId"
                 params={{ organizationId, appId }}
               >
                 Open {app.name}
+                <ArrowRight aria-hidden="true" />
               </Link>
             </section>
           ) : null}

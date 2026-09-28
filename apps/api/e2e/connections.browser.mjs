@@ -121,7 +121,7 @@ it('connects JTL targets, validates, replaces invalid credentials and disconnect
   const cloud = await save(page, 'Warehouse');
   await cloud.getByRole('button', { name: 'Validate access' }).click();
   await cloud.getByText('Read and write access', { exact: true }).waitFor();
-  await page.getByRole('link', { name: '← Apps & connections' }).click();
+  await page.getByRole('link', { name: 'All apps' }).click();
   const jtlSummary = page
     .getByRole('article')
     .filter({ has: page.getByRole('heading', { name: 'JTL', exact: true }) });

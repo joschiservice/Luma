@@ -4,6 +4,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@luma/ui/components/primitives/card';
+import { StateDot } from '@luma/ui/components/primitives/state';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useRef, useState } from 'react';
@@ -77,12 +78,16 @@ export function AppStore({
   return (
     <>
       {!canManage ? (
-        <p>An owner or admin can install and configure apps.</p>
+        <p className="apps-note">
+          An owner or admin can install and configure apps.
+        </p>
       ) : null}
       <section className="connections-section" aria-labelledby="installed-apps">
         <h2 id="installed-apps">Installed apps</h2>
         {!installed.length ? (
-          <p>No apps installed yet. Choose an app below to get started.</p>
+          <p className="apps-note">
+            No apps installed yet. Choose an app below to get started.
+          </p>
         ) : null}
         <div className="connection-providers">
           {installed.map((installation) => {
@@ -102,18 +107,32 @@ export function AppStore({
             const params = { organizationId, appId: installation.appId };
 
             return (
-              <Card as="article" key={installation.appId}>
+              <Card as="article" key={installation.appId} className="app-tile">
                 <CardHeader>
+                  <span className="app-tile-icon" aria-hidden="true">
+                    {(app?.name ?? installation.appId).slice(0, 1)}
+                  </span>
                   <CardTitle as="h3">
                     {app?.name ?? installation.appId}
                   </CardTitle>
                 </CardHeader>
-                <p>
+                <p className="app-tile-description">
                   {app?.description ??
                     'App unavailable. Historical records remain accessible.'}
                 </p>
                 {app?.connectionTypes.length ? (
-                  <p>
+                  <p className="app-tile-status">
+                    <StateDot
+                      state={
+                        connections.error
+                          ? 'idle'
+                          : attention.length
+                            ? 'attention'
+                            : live.length
+                              ? 'verified'
+                              : 'waiting'
+                      }
+                    />
                     {connections.isPending
                       ? 'Loading connections…'
                       : connections.error
@@ -153,11 +172,14 @@ export function AppStore({
         <h2 id="available-apps">Available apps</h2>
         <div className="connection-providers">
           {available.map((app) => (
-            <Card as="article" key={app.id}>
+            <Card as="article" key={app.id} className="app-tile">
               <CardHeader>
+                <span className="app-tile-icon" aria-hidden="true">
+                  {app.name.slice(0, 1)}
+                </span>
                 <CardTitle as="h3">{app.name}</CardTitle>
               </CardHeader>
-              <p>{app.description}</p>
+              <p className="app-tile-description">{app.description}</p>
               <Button
                 disabled={!canManage || pending}
                 onClick={() => void install(app.id)}
@@ -167,12 +189,14 @@ export function AppStore({
             </Card>
           ))}
         </div>
-        {!available.length ? <p>No additional apps available.</p> : null}
+        {!available.length ? (
+          <p className="apps-note">No additional apps available.</p>
+        ) : null}
       </section>
       {historical.length ? (
         <section className="connections-section">
           <h2>Connection history</h2>
-          <ul>
+          <ul className="apps-history">
             {historical.map((appId) => (
               <li key={appId}>
                 <Link
