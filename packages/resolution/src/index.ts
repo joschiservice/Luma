@@ -63,3 +63,5 @@ export { createProposalRefresher } from './application/refresh-proposal.js';
 export type { ProposalRefreshDependencies } from './application/refresh-proposal.js';
 
 export type { ShadowService } from './application/shadow.js';
+
+export type { OperationalMetrics } from './application/metrics.js';

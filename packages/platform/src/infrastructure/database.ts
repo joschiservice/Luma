@@ -9,11 +9,15 @@ import { measure } from '../application/performance.js';
  */
 export function createTenantDatabase(pool: Pool): TenantDatabase {
   return {
-    async transaction(tenantId, operation) {
+    async transaction(tenantId, operation, options) {
       return measure('db.transaction', async () => {
         const client = await pool.connect();
         try {
-          await client.query('BEGIN');
+          await client.query(
+            options?.readOnlySnapshot
+              ? 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY'
+              : 'BEGIN',
+          );
           await client.query("SELECT set_config('app.tenant_id', $1, true)", [
             tenantId,
           ]);

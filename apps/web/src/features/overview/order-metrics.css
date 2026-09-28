@@ -1,0 +1,218 @@
+.order-metrics {
+  margin: 28px 0 32px;
+  color: var(--foreground);
+}
+.order-metrics-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+.order-metrics-heading h2 {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+.order-metrics-heading p:not(.order-metrics-eyebrow) {
+  margin-top: 5px;
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+.order-metrics-eyebrow {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted-foreground);
+  margin-bottom: 6px;
+}
+.order-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.order-metric-card {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.order-metric-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.order-metric-label h3 {
+  font-size: 13px;
+  font-weight: 600;
+  flex: 1;
+}
+.order-metric-label svg {
+  color: var(--muted-foreground);
+}
+.order-metric-value {
+  font-size: 38px;
+  line-height: 1.1;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+}
+.order-metric-value span {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: normal;
+}
+.order-metric-card > p {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.6;
+  flex: 1;
+}
+.order-metric-card > button {
+  justify-content: space-between;
+  width: 100%;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+  border-radius: 0;
+  height: auto;
+  font-size: 12px;
+}
+.order-metrics-provenance {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+.order-cohort-dialog {
+  max-width: 760px;
+  gap: 18px;
+}
+.order-cohort-definition {
+  padding: 16px;
+  background: var(--muted);
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.order-cohort-definition p {
+  margin-top: 8px;
+}
+.order-cohort-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.order-cohort-facts dt {
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.order-cohort-facts dd {
+  margin-top: 5px;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+  text-transform: capitalize;
+}
+.order-cohort-note,
+.order-cohort-timestamps {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  line-height: 1.6;
+}
+.order-cohort-timestamps {
+  display: flex;
+  flex-direction: column;
+}
+.order-cohort-list {
+  border-top: 1px solid var(--border);
+}
+.order-cohort-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  border-bottom: 1px solid var(--border);
+  padding: 12px 0;
+}
+.order-cohort-list li > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.order-cohort-list strong {
+  font-size: 13px;
+}
+.order-cohort-list code {
+  color: var(--muted-foreground);
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+.order-cohort-list span {
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.order-cohort-list a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+.order-cohort-empty {
+  padding: 28px 12px;
+  text-align: center;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.order-cohort-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.order-cohort-pagination > div {
+  display: flex;
+  gap: 8px;
+}
+@media (max-width: 800px) {
+  .order-metrics-grid {
+    grid-template-columns: 1fr;
+  }
+  .order-metrics {
+    margin: 24px 0;
+  }
+  .order-metrics-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+@media (max-width: 480px) {
+  .order-cohort-list li,
+  .order-cohort-pagination {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .order-cohort-facts {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.order-cohort-dialog [data-slot='dialog-title'] {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.order-cohort-list {
+  max-height: 32vh;
+  overflow-y: auto;
+}

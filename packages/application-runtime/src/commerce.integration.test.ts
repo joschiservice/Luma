@@ -1,15 +1,19 @@
 import { randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 
-import { createCommerceServices } from '@luma/application-runtime';
+import { buildApp, createCommerceServices } from '@luma/application-runtime';
 import type { CommerceObservation, SourceIdentity } from '@luma/connections';
 import {
   createConnectionCoverage,
   createProductIdentityReader,
   createReadChecks,
 } from '@luma/connections/composition';
+import { createOrderAttentionReader } from '@luma/exceptions/composition';
+import type { IdentityService } from '@luma/identity';
 import { makeTenantContext } from '@luma/identity/composition';
+import { createOrderMetricReader } from '@luma/orders/composition';
 import { createTenantDatabase } from '@luma/platform/composition';
+import { createOperationalMetrics } from '@luma/resolution/composition';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -26,7 +30,7 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
     connection = randomUUID(),
     secondConnection = randomUUID();
 
-  function context(tenantId = tenant) {
+  function context(tenantId: string = tenant) {
     return makeTenantContext(
       { userId: 'operator', sessionId: 'session' },
       {
@@ -893,4 +897,416 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
       services.ingestion.replay(context(), connection, 'other-order'),
     ).rejects.toThrow('another order');
   });
+  it('reconciles metric cohorts across lifecycle changes, source identity, filters and snapshot conflicts', async () => {
+    let clock = new Date('2026-09-20T00:00:00Z');
+    const db = createTenantDatabase(runtime);
+    const metrics = createOperationalMetrics(
+      db,
+      {
+        orders: createOrderMetricReader,
+        attention: createOrderAttentionReader,
+        coverage: createConnectionCoverage,
+      },
+      () => clock,
+    );
+    const counts = async () =>
+      (await metrics(context(), {})).metrics.map((m) => m.observedCount);
+    expect(await metrics(context(), {})).toMatchObject({
+      coverage: 'unavailable',
+      dataThrough: null,
+      metrics: [{ total: null }, { total: null }, { total: null }],
+    });
+    let revision = 0;
+    const order: CommerceObservation & { capability: 'orders.read' } = {
+      capability: 'orders.read',
+      observation: {
+        ...stock().observation,
+        id: randomUUID(),
+        source: {
+          ...stock().observation.source,
+          resource: 'order',
+          externalId: 'metric-order',
+        },
+        data: {
+          displayNumber: '#METRIC',
+          status: 'open',
+          paymentStatus: 'paid',
+          dueAt: '2026-09-20T00:00:00Z',
+          lines: [
+            {
+              id: { externalId: 'metric-line', scopeKey: 'metric-order' },
+              sku: null,
+              quantity: { amount: '3', unit: 'each' },
+              cancelledQuantity: { amount: '0', unit: 'each' },
+            },
+          ],
+        },
+      },
+    };
+    await services.ingestion.ingest(context(), 'metric-order', order);
+    const orderId = await services.ingestion.bind(
+      context(),
+      order.observation.source,
+      'metric-order',
+      order.observation.id,
+      'manual',
+    );
+    await services.ingestion.bind(
+      context(),
+      {
+        ...order.observation.source,
+        ...order.observation.data.lines[0]!.id,
+        resource: 'order_line',
+      },
+      'metric-line',
+      order.observation.id,
+      'manual',
+    );
+    await services.ingestion.replay(context(), connection, 'metric-order');
+    expect(await counts()).toEqual([1, 0, 0]);
+    clock = new Date('2026-09-20T00:00:01Z');
+    expect(await counts()).toEqual([1, 1, 0]);
+    const first = await metrics(context(), { limit: 1 });
+    expect(first.metrics[0]!.items.map((o) => o.id)).toEqual([orderId]);
+    expect(first.metrics[0]!.observedCount).toBe(
+      first.metrics[0]!.items.length,
+    );
+    expect(
+      (
+        await metrics(context(), {
+          asOf: first.asOf,
+          snapshot: first.snapshot,
+          offset: 1,
+        })
+      ).metrics[0]!.items,
+    ).toEqual([]);
+    const update = async (change: (v: typeof order) => void, time?: string) => {
+      const next = structuredClone(order);
+      next.observation.id = randomUUID();
+      next.observation.sourceUpdatedAt =
+        time ??
+        new Date(
+          Date.parse('2026-09-18T00:00:00Z') + ++revision * 1000,
+        ).toISOString();
+      change(next);
+      const key = next.observation.id;
+
+      return services.ingestion.ingest(context(), key, next);
+    };
+    const shipment: CommerceObservation & { capability: 'fulfillment.read' } = {
+      capability: 'fulfillment.read',
+      observation: {
+        ...order.observation,
+        id: randomUUID(),
+        source: {
+          ...order.observation.source,
+          resource: 'fulfillment',
+          externalId: 'metric-shipment',
+        },
+        data: {
+          order: { externalId: 'metric-order', scopeKey: '' },
+          status: 'shipped',
+          lastProgressAt: null,
+          failureCode: null,
+          lines: [
+            {
+              orderLine: {
+                externalId: 'metric-line',
+                scopeKey: 'metric-order',
+              },
+              quantity: { amount: '1', unit: 'each' },
+            },
+          ],
+        },
+      },
+    };
+    await services.ingestion.ingest(context(), 'metric-shipment', shipment);
+    await services.ingestion.bind(
+      context(),
+      shipment.observation.source,
+      'metric-shipment',
+      shipment.observation.id,
+      'manual',
+    );
+    await services.ingestion.replay(context(), connection, 'metric-shipment');
+    expect(await counts()).toEqual([1, 1, 0]);
+    shipment.observation.id = randomUUID();
+    shipment.observation.sourceUpdatedAt = '2026-09-18T01:00:00Z';
+    shipment.observation.data.lines[0]!.quantity.amount = '3';
+    await services.ingestion.ingest(context(), 'metric-full', shipment);
+    await services.ingestion.replay(context(), connection, 'metric-full');
+    expect(await counts()).toEqual([0, 0, 0]);
+    await expect(
+      metrics(context(), { asOf: first.asOf, snapshot: first.snapshot }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    await update((v) => {
+      v.observation.data.status = 'cancelled';
+    });
+    expect(await counts()).toEqual([0, 0, 0]);
+    await update((v) => {
+      v.observation.data.lines[0]!.quantity.amount = '5';
+    });
+    expect(await counts()).toEqual([1, 1, 0]);
+    const retained = await update((v) => {
+      v.observation.data.status = 'completed';
+    }, '2026-09-17T00:00:00Z');
+    expect(retained.status).toBe('retained');
+    expect(await counts()).toEqual([1, 1, 0]);
+    expect(
+      (await services.ingestion.replay(context(), connection, 'metric-full'))
+        .status,
+    ).toBe('duplicate');
+    await update((v) => {
+      v.observation.data.dueAt = null;
+      v.observation.data.lines[0]!.quantity.amount = '5';
+    });
+    expect((await metrics(context(), {})).metrics[1]).toMatchObject({
+      observedCount: 0,
+      unknownCount: 1,
+    });
+    // A second source maps to the same canonical order and line, never a second count.
+    const mirror = structuredClone(order);
+    mirror.observation.id = randomUUID();
+    mirror.observation.source.connectionId = secondConnection;
+    mirror.observation.sourceUpdatedAt = '2026-09-19T00:00:00Z';
+    await services.ingestion.ingest(context(), 'metric-mirror', mirror);
+    await services.ingestion.bind(
+      context(),
+      mirror.observation.source,
+      'metric-order',
+      mirror.observation.id,
+      'manual',
+    );
+    await services.ingestion.bind(
+      context(),
+      {
+        ...mirror.observation.source,
+        ...mirror.observation.data.lines[0]!.id,
+        resource: 'order_line',
+      },
+      'metric-line',
+      mirror.observation.id,
+      'manual',
+    );
+    await services.ingestion.replay(
+      context(),
+      secondConnection,
+      'metric-mirror',
+    );
+    expect(await counts()).toEqual([1, 1, 0]);
+    expect(
+      (await metrics(context(), { scope: { connectionId: connection } }))
+        .metrics[1]!.unknownCount,
+    ).toBe(1);
+    expect(
+      (
+        await metrics(context(), {
+          scope: {
+            updatedFrom: '2026-09-19T00:00:00Z',
+            updatedBefore: '2026-09-20T00:00:00Z',
+          },
+        })
+      ).metrics[0]!.observedCount,
+    ).toBe(1);
+    expect(
+      (
+        await metrics(context(), {
+          scope: { updatedBefore: '2026-09-19T00:00:00Z' },
+        })
+      ).metrics[0]!.observedCount,
+    ).toBe(0);
+    expect(
+      (await metrics(context(otherTenant), {})).metrics.every(
+        (m) => m.observedCount === 0,
+      ),
+    ).toBe(true);
+    await expect(
+      metrics(context(otherTenant), {
+        scope: { connectionId: secondConnection },
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    const issueId = randomUUID();
+    await owner.query(
+      `INSERT INTO exceptions(id,tenant_id,fingerprint,state,document) VALUES($1,$2,$3,'escalated',$4)`,
+      [
+        issueId,
+        tenant,
+        'e'.repeat(64),
+        {
+          id: issueId,
+          tenantId: tenant,
+          fingerprint: 'e'.repeat(64),
+          state: 'escalated',
+          exceptionClass: 'stuck_fulfillment',
+          severity: 'high',
+          occurrenceCount: 1,
+          subject: {
+            ruleIdentity: 'fulfillment-progress',
+            subjectKind: 'fulfillment',
+            subjectId: 'metric-shipment',
+            scope: [connection],
+          },
+          firstDetectedAt: clock.toISOString(),
+          lastDetectedAt: clock.toISOString(),
+        },
+      ],
+    );
+    const attention = await metrics(context(), {});
+    expect(attention.metrics[2]!.observedCount).toBe(1);
+    expect(attention.metrics[2]!.items[0]!.issueIds).toEqual([issueId]);
+    const app = buildApp(
+      {},
+      {
+        metrics,
+        trustedOrigins: ['http://localhost:3000'],
+        identity: {
+          resolveTenant: async (_credentials: unknown, id: string) =>
+            context(id),
+        } as unknown as IdentityService,
+      },
+    );
+    try {
+      const url = `/v1/organizations/${tenant}/metrics/query`;
+      expect(
+        (
+          await app.inject({
+            method: 'POST',
+            url,
+            headers: { origin: 'http://localhost:3000' },
+            payload: {},
+          })
+        ).statusCode,
+      ).toBe(200);
+      expect(
+        (
+          await app.inject({
+            method: 'POST',
+            url,
+            headers: { origin: 'http://localhost:3000' },
+            payload: { sql: 'SELECT *' },
+          })
+        ).statusCode,
+      ).toBe(400);
+      expect(
+        (
+          await app.inject({
+            method: 'POST',
+            url,
+            headers: { origin: 'http://localhost:3000' },
+            payload: { limit: 101 },
+          })
+        ).statusCode,
+      ).toBe(400);
+      expect(
+        (
+          await app.inject({
+            method: 'POST',
+            url,
+            headers: { origin: 'http://localhost:3000' },
+            payload: { definitionVersion: 2 },
+          })
+        ).statusCode,
+      ).toBe(400);
+      expect(
+        (
+          await app.inject({
+            method: 'POST',
+            url,
+            headers: { origin: 'http://localhost:3000' },
+            payload: { offset: 1 },
+          })
+        ).statusCode,
+      ).toBe(400);
+      expect(
+        (await app.inject(`/v1/organizations/${tenant}/metrics`)).json(),
+      ).toHaveLength(3);
+    } finally {
+      await app.close();
+    }
+    if (process.env.LUMA_METRIC_BENCHMARK) {
+      await owner.query(
+        `WITH entities AS (
+        INSERT INTO orders_entities(id,tenant_id,kind,reconciliation_key)
+        SELECT gen_random_uuid(),$1,'order','bench-' || n FROM generate_series(1,10000) n RETURNING id
+      ), snapshots AS (
+        INSERT INTO orders_snapshots(id,tenant_id,entity_id,kind,connection_id,observation_id,normalizer_version,mapping_version,source_updated_at,observed_at,document)
+        SELECT gen_random_uuid(),$1,e.id,'order',$2,$3,'bench/1',$4,'2026-09-19','2026-09-19',
+          jsonb_set(jsonb_set($5::jsonb,'{entityId}',to_jsonb(e.id::text)),'{data,displayNumber}',to_jsonb('BENCH-' || e.id::text))
+        FROM entities e RETURNING entity_id,id
+      ) INSERT INTO orders_projections(tenant_id,entity_id,connection_id,snapshot_id) SELECT $1,entity_id,$2,id FROM snapshots`,
+        [
+          tenant,
+          secondConnection,
+          mirror.observation.id,
+          (await services.orders.current(context(), orderId))[1]!.snapshot
+            .mappingVersion,
+          (await services.orders.current(context(), orderId)).find(
+            (p) => p.snapshot.connectionId === secondConnection,
+          )!.snapshot,
+        ],
+      );
+      await owner.query('ANALYZE orders_projections');
+      await owner.query('ANALYZE orders_snapshots');
+      const plans: unknown[] = [];
+      const measuredDb: typeof db = {
+        transaction: (tenantId, operation, options) =>
+          db.transaction(
+            tenantId,
+            async (tx) =>
+              operation({
+                query: async (sql, values) => {
+                  if (sql.startsWith('WITH selected'))
+                    plans.push(
+                      (
+                        await tx.query(
+                          'EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) ' + sql,
+                          values,
+                        )
+                      ).rows,
+                    );
+
+                  return tx.query(sql, values);
+                },
+              }),
+            options,
+          ),
+      };
+      const measured = createOperationalMetrics(
+        measuredDb,
+        {
+          orders: createOrderMetricReader,
+          attention: createOrderAttentionReader,
+          coverage: createConnectionCoverage,
+        },
+        () => clock,
+      );
+      const durations = [];
+      for (let i = 0; i < 5; i++) {
+        const start = performance.now();
+        await measured(context(), {});
+        durations.push(performance.now() - start);
+      }
+      const concurrentDurations: number[] = [];
+      const loadStart = performance.now();
+      for (let batch = 0; batch < 5; batch++) {
+        await Promise.all(
+          Array.from({ length: 5 }, async () => {
+            const start = performance.now();
+            await metrics(context(), {});
+            concurrentDurations.push(performance.now() - start);
+          }),
+        );
+      }
+      const loadElapsed = performance.now() - loadStart;
+      const { writeFile } = await import('node:fs/promises');
+      await writeFile(
+        '/tmp/luma84-query-plans.json',
+        JSON.stringify(
+          { rows: 10001, durations, plans, concurrentDurations, loadElapsed },
+          null,
+          2,
+        ),
+      );
+    }
+  }, 60000);
 });

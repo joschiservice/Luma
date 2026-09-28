@@ -49,6 +49,7 @@ const order = z
   .object({
     type: z.literal('order'),
     displayNumber: z.string().nullable(),
+    dueAt: timestamp.nullable().optional(),
     status: z.enum(['open', 'completed', 'cancelled', 'unknown']),
     paymentStatus: z.enum([
       'pending',

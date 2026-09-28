@@ -9,3 +9,5 @@ export { playbookRoutes } from '@luma/workflows/http';
 export { activityRoutes } from './api/activity.js';
 
 export { shadowRoutes } from './api/shadow.js';
+
+export { metricRoutes } from './api/metrics.js';

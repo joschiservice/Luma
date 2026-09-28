@@ -6,6 +6,8 @@ export type CommerceData =
   | {
       type: 'order';
       displayNumber: string | null;
+      /** Source-provided fulfillment deadline; absent means unknown. */
+      dueAt?: string | null;
       status: string;
       paymentStatus: string;
       lines: {

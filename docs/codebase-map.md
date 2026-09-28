@@ -114,3 +114,16 @@ and Workflow compiler tests. See [Replenishment workflow](replenishment.md) for
 scope, policy, recovery and the six simulator scenarios.
 
 Sandboxed Code Steps: `packages/workflows/src/domain/code-step.ts`, `application/code-activity.ts`, and `infrastructure/code/`; native computation wiring in `infrastructure/code-processes.ts`. UI: `apps/web/src/features/workflows/code-steps.tsx`. Replay gate: `tooling/evaluation/code.mjs`. Runtime setup and contract: [Code Steps](code-steps.md). API/browser coverage: `apps/api/e2e/code-steps.*.mjs`.
+
+## Operational metrics
+
+Start with `packages/orders/src/domain/metrics.ts` for versioned definitions and
+`orders/src/infrastructure/metrics.ts` for canonical SQL. Resolution composes
+coverage and inbox attention inside a shared read transaction in
+`packages/resolution/src/infrastructure/metrics.ts`. API contracts live in
+`packages/api-contract/src/metrics.ts`; the UI is
+`apps/web/src/features/overview/order-metrics.tsx`.
+
+Tests: `packages/application-runtime/src/commerce.integration.test.ts` and
+`apps/api/e2e/metrics.browser.mjs`. See [Shared metrics](operational-metrics.md)
+and [query measurements](operational-metrics-performance.md).

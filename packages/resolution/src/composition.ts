@@ -81,3 +81,5 @@ export {
   parsePlaybookSnapshot,
   playbookHash,
 } from '@luma/workflows/composition';
+
+export { createOperationalMetrics } from './infrastructure/metrics.js';

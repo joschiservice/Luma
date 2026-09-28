@@ -111,6 +111,7 @@ export function createCommerceIngestion(
         data: {
           type: 'order',
           displayNumber: data.displayNumber,
+          ...(data.dueAt === undefined ? {} : { dueAt: data.dueAt }),
           status: data.status,
           paymentStatus: data.paymentStatus,
           lines,

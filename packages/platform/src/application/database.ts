@@ -7,9 +7,10 @@ export interface SqlTransaction {
 }
 
 export interface TenantDatabase {
-  /** Runs with tenant isolation and commits on success. A rejected operation rolls back all its writes. */
+  /** Runs with tenant isolation and commits on success. A rejected operation rolls back all its writes. readOnlySnapshot uses a repeatable-read snapshot established before tenant queries. */
   transaction<T>(
     tenantId: string,
     operation: (tx: SqlTransaction) => Promise<T>,
+    options?: { readOnlySnapshot: true },
   ): Promise<T>;
 }

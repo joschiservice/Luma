@@ -23,6 +23,7 @@ import type {
   ActivityService,
   DeskService,
   LearningService,
+  OperationalMetrics,
   OperationsOverviewService,
   PlaybookLibrary,
   ShadowService,
@@ -31,6 +32,7 @@ import {
   activityRoutes,
   deskRoutes,
   learningRoutes,
+  metricRoutes,
   operationsRoutes,
   playbookRoutes,
   registerDeskEvents,
@@ -62,6 +64,7 @@ export interface AppDependencies {
   desk?: DeskService;
   eventSettings?: { intervalMs: number; lifetimeMs: number };
   operations?: OperationsOverviewService;
+  metrics?: OperationalMetrics;
   apps?: AppService;
   appRegistry?: AppRegistry;
   cases?: CaseService;
@@ -230,6 +233,7 @@ export function buildApp(
         caseDesk: deskRoutes(dependencies.desk),
         resolutionLearning: learningRoutes(dependencies.learning),
         operations: operationsRoutes(dependencies.operations),
+        metrics: metricRoutes(dependencies.metrics),
         identity: identityRoutes(dependencies.identity),
         settings: settingsRoutes(dependencies.settings),
         apps: appRoutes(dependencies.apps),

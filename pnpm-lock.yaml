@@ -1148,6 +1148,9 @@ importers:
       '@luma/identity':
         specifier: workspace:*
         version: link:../identity
+      '@luma/orders':
+        specifier: workspace:*
+        version: link:../orders
       '@luma/platform':
         specifier: workspace:*
         version: link:../platform

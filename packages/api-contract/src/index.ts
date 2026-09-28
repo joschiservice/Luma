@@ -8,6 +8,7 @@ import { connectionsContract } from './contracts/connections.js';
 import { caseDeskContract } from './contracts/desk.js';
 import { identityContract } from './contracts/identity.js';
 import { resolutionLearningContract } from './contracts/learning.js';
+import { metricsContract } from './contracts/metrics.js';
 import { operationsContract } from './contracts/overview.js';
 import { playbooksContract } from './contracts/playbooks.js';
 import { procurementContract } from './contracts/procurement.js';
@@ -29,6 +30,7 @@ export const apiContract = c.router(
     resolutionLearning: resolutionLearningContract,
     caseDesk: caseDeskContract,
     operations: operationsContract,
+    metrics: metricsContract,
     exceptions: exceptionsContract,
     identity: identityContract,
     settings: settingsContract,
@@ -100,3 +102,5 @@ export * from './code-steps.js';
 export * from './procurement.js';
 
 export * from './replenishment.js';
+
+export * from './metrics.js';

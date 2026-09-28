@@ -2,10 +2,13 @@ import { createAuditLog } from '@luma/audit/composition';
 import type { EffectRegistry } from '@luma/connections';
 import { createConnectionCoverage } from '@luma/connections/composition';
 import type { VerificationEvaluator } from '@luma/exceptions';
+import { createOrderAttentionReader } from '@luma/exceptions/composition';
 import type { IdentityService } from '@luma/identity';
+import { createOrderMetricReader } from '@luma/orders/composition';
 import type { TenantDatabase } from '@luma/platform';
 import { createProcurement } from '@luma/procurement/composition';
 import {
+  createOperationalMetrics,
   createOperationsOverview,
   createResolutionLearning,
   createShadowEvaluations,
@@ -53,6 +56,7 @@ export interface ApplicationServices {
     activity: ReturnType<typeof createWorkspaceActivity>;
     learning: ReturnType<typeof createResolutionLearning>;
     operations: ReturnType<typeof createOperationsOverview>;
+    metrics: ReturnType<typeof createOperationalMetrics>;
   };
 }
 
@@ -153,6 +157,11 @@ export function createApplicationServices(
       playbooks: library,
       activity: createWorkspaceActivity(database, identity.refreshContext),
       learning: createResolutionLearning(database, identity.refreshContext),
+      metrics: createOperationalMetrics(database, {
+        orders: createOrderMetricReader,
+        attention: createOrderAttentionReader,
+        coverage: createConnectionCoverage,
+      }),
       operations: createOperationsOverview(
         detection.cases,
         createConnectionCoverage(database),

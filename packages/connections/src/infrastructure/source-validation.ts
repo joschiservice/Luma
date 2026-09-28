@@ -68,6 +68,7 @@ export const commerceSchema = z.discriminatedUnion('capability', [
         z
           .object({
             displayNumber: z.string().nullable(),
+            dueAt: z.string().datetime({ offset: true }).nullable().optional(),
             status: z.enum(['open', 'completed', 'cancelled', 'unknown']),
             paymentStatus: z.enum([
               'pending',

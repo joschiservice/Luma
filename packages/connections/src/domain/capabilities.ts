@@ -53,6 +53,8 @@ export interface Quantity {
 
 export interface OrderSnapshot {
   displayNumber: string | null;
+  /** Source-provided fulfillment deadline; omit when the source does not provide one. */
+  dueAt?: string | null;
   status: 'open' | 'completed' | 'cancelled' | 'unknown';
   paymentStatus:
     | 'pending'

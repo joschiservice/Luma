@@ -46,3 +46,8 @@ Validation covers summary windows, tenant isolation, bounded priority ordering,
 per-capability freshness, future timestamps, credential denial, response validation,
 Storybook accessibility and keyboard interactions, and connected browser navigation,
 retry and mobile layout.
+
+The order operations section uses the [shared metric registry](operational-metrics.md)
+for open, overdue and attention orders. Its observed counts and drill-down records
+share a consistent database snapshot. Incomplete coverage remains visible; missing
+deadlines and complete totals are never replaced with fabricated zeros.
