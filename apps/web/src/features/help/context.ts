@@ -1,4 +1,9 @@
-export type HelpTopic = 'issues' | 'issues/investigate' | 'issues/resolve';
+export type HelpTopic =
+  | 'issues'
+  | 'issues/investigate'
+  | 'issues/resolve'
+  | 'workflows'
+  | 'workflows/create';
 
 declare module '@tanstack/react-router' {
   interface StaticDataRouteOption {

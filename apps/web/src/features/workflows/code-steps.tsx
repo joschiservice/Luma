@@ -60,7 +60,7 @@ const reasons: Record<string, string> = {
   capability_denied:
     'A capability was not granted or its example reply is missing.',
   unavailable:
-    'The code runtime is unavailable. Ask an administrator to check its configuration.',
+    'The code runtime is unavailable on this Luma server. Whoever runs the server needs to check its configuration.',
   cancelled: 'Evaluation cancelled.',
 };
 

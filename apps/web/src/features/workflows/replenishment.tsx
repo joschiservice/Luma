@@ -263,7 +263,7 @@ export function ReplenishmentPanel({
             after activation.
           </DialogDescription>
           {data ? (
-            <RuleForm
+            <ReplenishmentRuleForm
               key={String(open)}
               organizationId={organizationId}
               detail={detail}
@@ -281,7 +281,8 @@ export function ReplenishmentPanel({
   );
 }
 
-function RuleForm({
+/** Reviews one stock position, supplier and quantity limits, then activates a retry-safe rule. */
+export function ReplenishmentRuleForm({
   organizationId,
   detail,
   setup,

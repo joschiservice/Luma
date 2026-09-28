@@ -22,6 +22,7 @@ class WorkflowError extends IdentityError {
   }
 }
 
+/** Throws a workflow error carrying the server's message for a non-200 result. */
 function failure(result: { status: number; body: unknown }): never {
   const message =
     typeof result.body === 'object' &&
@@ -268,3 +269,6 @@ export async function decideReplenishment(
 
   return result.body;
 }
+
+/** Converts a non-200 API result into a workflow error with the server's message. */
+export const workflowFailure = failure;

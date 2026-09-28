@@ -29,6 +29,7 @@ import { SignInRedirect } from '../identity/common';
 import { contextOptions, IdentityError } from '../identity/data';
 import { ShadowReport } from '../shadow/report';
 import { ActivationForm } from './activation';
+import { EditWorkflowButton } from './authoring/edit-workflow';
 import { CodeRunDetails } from './code-run';
 import { WorkflowCodeSteps } from './code-steps';
 import {
@@ -562,6 +563,15 @@ export function WorkflowDetailView({
           <RefreshCw size={14} aria-hidden="true" /> Refresh
         </Button>
         <div className="workflow-version-controls">
+          {detail.canManage &&
+          !DomainControls &&
+          version.format === 'workflow/2' ? (
+            <EditWorkflowButton
+              organizationId={organizationId}
+              detail={detail}
+              version={version.version}
+            />
+          ) : null}
           <Select
             aria-label="Version"
             value={version.version}

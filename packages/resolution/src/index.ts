@@ -44,6 +44,11 @@ export type {
 
 export { shippingMethodPlaybook } from './domain/shipping-method-playbook.js';
 
+export {
+  createShippingMethodTemplate,
+  shippingMethodVocabulary,
+} from './application/shipping-method-authoring.js';
+
 export type {
   LearningService,
   LearningStore,

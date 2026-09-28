@@ -76,6 +76,11 @@ export function createWorkflowCatalog(deps: {
   store: WorkflowCatalogStore;
   compile(input: unknown): PublishedWorkflowVersion;
   refreshContext(context: TenantContext): Promise<TenantContext>;
+  /** Explains why no installed adapter can run a version. */
+  explain?(
+    context: TenantContext,
+    version: PublishedWorkflowVersion,
+  ): Promise<string[]>;
 }) {
   async function authorize(context: TenantContext, write = false) {
     const fresh = await deps.refreshContext(context);
@@ -102,16 +107,50 @@ export function createWorkflowCatalog(deps: {
   });
   const nativeBlocker =
     'Runs can collect trigger evidence. Action execution is not available for this workflow.';
+  const computationBlocker =
+    'No installed adapter runs this workflow. Custom workflows run when they contain a Code Step and only computation steps.';
+
+  /** Lists why each version cannot run, keyed by version. Runnable versions have no reasons. */
+  async function explain(
+    context: TenantContext,
+    versions: PublishedWorkflowVersion[],
+  ) {
+    const reasons = new Map<string, string[]>();
+    for (const version of versions) {
+      if (deps.codeProcesses?.supported(version)) {
+        reasons.set(version.version, []);
+        continue;
+      }
+      const explained =
+        version.format === 'workflow/2'
+          ? ((await deps.explain?.(context, version)) ?? [])
+          : [];
+      reasons.set(
+        version.version,
+        explained.length
+          ? explained
+          : [
+              version.format === 'workflow/2'
+                ? computationBlocker
+                : nativeBlocker,
+            ],
+      );
+    }
+
+    return reasons;
+  }
 
   function nativeDetail(
     versions: PublishedWorkflowVersion[],
     context: TenantContext,
+    reasons: Map<string, string[]>,
   ) {
     versions.sort((a, b) =>
       b.version.localeCompare(a.version, undefined, { numeric: true }),
     );
     const current = versions[0]!;
     const codeAvailable = deps.codeProcesses?.supported(current) ?? false;
+    const currentBlockers = reasons.get(current.version) ?? [nativeBlocker];
     const views = versions.map((v) => {
       if (v.format === 'workflow/2')
         return {
@@ -124,7 +163,7 @@ export function createWorkflowCatalog(deps: {
                 compatible: true,
                 blockers: [],
               }
-            : {}),
+            : { blockers: reasons.get(v.version) ?? [computationBlocker] }),
         };
       const [eligibility, action, approval, verification, recovery] = v.steps;
       const presentation = presentPlaybook({
@@ -170,7 +209,7 @@ export function createWorkflowCatalog(deps: {
         status: codeAvailable
           ? ('inactive' as const)
           : ('unavailable' as const),
-        blockers: codeAvailable ? [] : [nativeBlocker],
+        blockers: codeAvailable ? [] : currentBlockers,
         activeVersions: [] as string[],
       },
       versions: views,
@@ -205,7 +244,7 @@ export function createWorkflowCatalog(deps: {
         throw new IdentityError(
           503,
           'SERVICE_UNAVAILABLE',
-          'Code evaluation is unavailable. Ask an administrator to configure the runtime.',
+          'Code evaluation is unavailable on this Luma server. Whoever runs the server needs to install the Code Step runtime.',
         );
 
       return deps.codeEvaluations.start(context, id, request);
@@ -331,11 +370,16 @@ export function createWorkflowCatalog(deps: {
       return [
         ...(replenishmentDetail ? [replenishmentDetail.summary] : []),
         ...legacy.map((v) => ({ ...v, category: 'resolution' })),
-        ...[...groups.values()]
-          .filter(
-            (v) => v[0]!.definition.id !== deps.replenishment?.definitionId,
-          )
-          .map((v) => nativeDetail(v, context).summary),
+        ...(await Promise.all(
+          [...groups.values()]
+            .filter(
+              (v) => v[0]!.definition.id !== deps.replenishment?.definitionId,
+            )
+            .map(
+              async (v) =>
+                nativeDetail(v, context, await explain(context, v)).summary,
+            ),
+        )),
       ];
     },
     async detail(context: TenantContext, id: string) {
@@ -343,7 +387,8 @@ export function createWorkflowCatalog(deps: {
       if (id === deps.replenishment?.definitionId)
         return deps.replenishment.detail(context);
       const native = await deps.store.versions(context, id);
-      if (native.length) return nativeDetail(native, context);
+      if (native.length)
+        return nativeDetail(native, context, await explain(context, native));
       const detail = await deps.legacy.detail(context, id);
       // Versions are append-only; read after the view to include any concurrently published version.
       const versions = await deps.store.resolutionVersions(context, id);

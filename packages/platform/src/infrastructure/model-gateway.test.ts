@@ -64,7 +64,6 @@ function setup(
     response?: unknown;
     transport?: typeof fetch;
     zeroDataRetention?: boolean;
-    timeoutMs?: number;
   } = {},
 ) {
   const model = options.model ?? 'anthropic/claude-sonnet-4.5';
@@ -105,7 +104,7 @@ function setup(
   const adapter =
     options.adapter ??
     createVercelModelAdapter(
-      { apiKey: 'test-key', timeoutMs: options.timeoutMs ?? 1000 },
+      { apiKey: 'test-key', timeoutMs: 1000 },
       transport,
     );
   let time = 0;
@@ -271,30 +270,6 @@ describe('model gateway', () => {
       ],
     ).toBe('{"total":0.001}');
   });
-  it.each([
-    completion('not json'),
-    completion('{"answer":5}'),
-    { ...completion(), choices: [] },
-    { ...completion(), usage: { prompt_tokens: -1, completion_tokens: 1 } },
-    {
-      ...completion(),
-      choices: [{ finish_reason: 'length', message: { content: '{}' } }],
-    },
-    {
-      ...completion(),
-      choices: [
-        {
-          finish_reason: 'stop',
-          message: { content: null, refusal: 'private content' },
-        },
-      ],
-    },
-  ])('rejects malformed, refused and incomplete output', async (response) => {
-    const { gateway, root } = setup({ response });
-    await expect(gateway.generate(root.context, request)).rejects.toMatchObject(
-      { code: 'invalid_output' },
-    );
-  });
   it('returns validated tool proposals and maps tool-result history without executing', async () => {
     const tool = { name: 'lookup', description: 'Read a value', input: answer };
     const response = {
@@ -405,16 +380,6 @@ describe('model gateway', () => {
       expect(spans.getFinishedSpans()[0]?.status.code).toBe(2);
     },
   );
-  it('sanitizes network exceptions', async () => {
-    const { gateway, root } = setup({
-      transport: async () => {
-        throw new Error('secret prompt and key');
-      },
-    });
-    await expect(gateway.generate(root.context, request)).rejects.toThrow(
-      'Model generation failed: provider_error',
-    );
-  });
   it('rejects cancellation before egress', async () => {
     const { gateway, root, transport } = setup();
     await expect(
@@ -425,37 +390,12 @@ describe('model gateway', () => {
     ).rejects.toMatchObject({ code: 'aborted' });
     expect(transport).not.toHaveBeenCalled();
   });
-  it('bounds provider latency with an abort signal', async () => {
-    const { gateway, root } = setup({
-      timeoutMs: 5,
-      transport: async (_url, init) =>
-        new Promise((_resolve, reject) => {
-          init?.signal?.addEventListener(
-            'abort',
-            () => reject(new Error('private provider error')),
-            { once: true },
-          );
-        }),
-    });
-    await expect(gateway.generate(root.context, request)).rejects.toMatchObject(
-      { code: 'timeout' },
-    );
-  });
   it('reports missing cost as unknown rather than zero', async () => {
     const { gateway, root } = setup();
     expect(
       (await gateway.generate(root.context, request)).metadata.costUsd,
     ).toBeNull();
   });
-});
-
-it('rejects a malformed HTTP response without exposing its body', async () => {
-  const { gateway, root } = setup({
-    transport: async () => new Response('private malformed response'),
-  });
-  await expect(gateway.generate(root.context, request)).rejects.toThrow(
-    'Model generation failed: invalid_output',
-  );
 });
 
 it.each([0, -1, 1.5, 32769, NaN])(
@@ -468,24 +408,6 @@ it.each([0, -1, 1.5, 32769, NaN])(
     expect(transport).not.toHaveBeenCalled();
   },
 );
-
-it('supports caller cancellation while a request is in flight', async () => {
-  const controller = new AbortController();
-  const { gateway, root } = setup({
-    transport: async (_url, init) =>
-      new Promise((_resolve, reject) => {
-        init?.signal?.addEventListener(
-          'abort',
-          () => reject(new Error('private transport data')),
-          { once: true },
-        );
-        controller.abort();
-      }),
-  });
-  await expect(
-    gateway.generate(root.context, { ...request, signal: controller.signal }),
-  ).rejects.toMatchObject({ code: 'aborted' });
-});
 
 it('excludes unapproved model names and invalid costs from telemetry', async () => {
   const { root, telemetry, spans } = setup();

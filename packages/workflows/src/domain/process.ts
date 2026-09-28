@@ -70,6 +70,15 @@ export interface ProcessWorkflowVersion {
     reference: string;
     authoredBy: string;
     evidenceRefs: string[];
+    /** Present on versions published from a draft: the mode, draft revision and version notes. */
+    authoring?:
+      | {
+          mode: 'template' | 'visual' | 'code' | 'language';
+          draftId: string;
+          revision: number;
+          notes?: string | undefined;
+        }
+      | undefined;
   };
 }
 

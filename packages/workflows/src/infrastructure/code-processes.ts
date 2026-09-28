@@ -3,6 +3,7 @@ import type { TenantDatabase } from '@luma/platform';
 
 import { createProcessActivities } from '../application/process-activities.js';
 import type { ProcessRun, ProcessWorkflowVersion } from '../domain/process.js';
+import type { VocabularyContribution } from '../domain/vocabulary.js';
 import type {
   PublishedWorkflowVersion,
   WorkflowTriggerRun,
@@ -85,10 +86,42 @@ export function createCodeProcesses(
     await transport!.start(context, run, version);
   }
 
+  const reason = !directory
+    ? 'Code Steps aren’t installed on this Luma server. Whoever runs the server needs to install the Code Step runtime.'
+    : !transport
+      ? 'The workflow worker isn’t running on this Luma server, so custom workflows can’t run. Whoever runs the server needs to start it.'
+      : undefined;
+
   return {
     activities,
     supported,
     start,
+    /** Describes the computation steps this adapter runs in workflows that contain a Code Step. */
+    async vocabulary(): Promise<VocabularyContribution> {
+      const executable = !reason;
+
+      return {
+        triggers: [
+          ...(['manual', 'event', 'condition', 'exception'] as const).map(
+            (kind) => ({ kind, executable, ...(reason ? { reason } : {}) }),
+          ),
+          {
+            kind: 'schedule',
+            executable: false,
+            reason:
+              'Scheduled starts are recorded but do not run custom workflows yet.',
+          },
+        ],
+        stepKinds: (
+          ['code', 'condition', 'wait', 'escalation', 'end'] as const
+        ).map((kind) => ({ kind, executable, ...(reason ? { reason } : {}) })),
+        codeSteps: {
+          executable,
+          reason: reason ?? null,
+          evaluation: !!directory,
+        },
+      };
+    },
     /** Recovers committed starts using the transport's stable workflow ID. */
     async tick(context: TenantContext, definitionId: string) {
       for (const run of await runs.pending(context, definitionId))

@@ -6,6 +6,7 @@ import { appsContract } from './contracts/apps.js';
 import { exceptionsContract } from './contracts/cases.js';
 import { connectionsContract } from './contracts/connections.js';
 import { caseDeskContract } from './contracts/desk.js';
+import { draftTestsContract } from './contracts/draft-tests.js';
 import { identityContract } from './contracts/identity.js';
 import { resolutionLearningContract } from './contracts/learning.js';
 import { metricsContract } from './contracts/metrics.js';
@@ -16,6 +17,8 @@ import { connectorProvidersContract } from './contracts/providers.js';
 import { settingsContract } from './contracts/settings.js';
 import { shadowContract } from './contracts/shadow.js';
 import { systemContract } from './contracts/system.js';
+import { workflowDraftsContract } from './contracts/workflow-drafts.js';
+import { workflowGenerationContract } from './contracts/workflow-generation.js';
 import { workflowsContract } from './contracts/workflows.js';
 
 const c: ReturnType<typeof initContract> = initContract();
@@ -25,6 +28,9 @@ const routes: {
   activity: typeof activityContract;
   playbooks: typeof playbooksContract;
   workflows: typeof workflowsContract;
+  workflowDrafts: typeof workflowDraftsContract;
+  workflowGeneration: typeof workflowGenerationContract;
+  draftTests: typeof draftTestsContract;
   procurement: typeof procurementContract;
   resolutionLearning: typeof resolutionLearningContract;
   caseDesk: typeof caseDeskContract;
@@ -42,6 +48,9 @@ const routes: {
   activity: activityContract,
   playbooks: playbooksContract,
   workflows: workflowsContract,
+  workflowDrafts: workflowDraftsContract,
+  workflowGeneration: workflowGenerationContract,
+  draftTests: draftTestsContract,
   procurement: procurementContract,
   resolutionLearning: resolutionLearningContract,
   caseDesk: caseDeskContract,
@@ -121,6 +130,12 @@ export * from './settings.js';
 export * from './apps.js';
 
 export * from './workflows.js';
+
+export * from './workflow-drafts.js';
+
+export * from './workflow-generation.js';
+
+export * from './draft-tests.js';
 
 export * from './code-steps.js';
 

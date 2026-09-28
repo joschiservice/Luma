@@ -1,0 +1,42 @@
+---
+title: Create a workflow
+description: Start from a template, or build, write and test your own workflow before publishing it.
+---
+
+Every way of creating a workflow produces the same kind of workflow. Nothing runs until an owner or admin publishes it and then activates it.
+
+## Use a template
+
+Templates are reviewed workflows you configure and activate. Each card lists what the workflow needs, such as a supplier or a connection that can change orders. Fix anything marked missing first; the card links to the right place.
+
+1. Choose **Use template**.
+2. Check the requirements, then choose where it applies and its limits.
+3. Review the scope and activate it.
+
+To change how a template works, choose **Customize**. Luma copies it into a new draft; the original template is not changed.
+
+## Build it step by step
+
+Choose **Build a workflow** to add steps in order: read current data, check a condition, take an action, ask for approval, wait, check the result, escalate or finish. Adding an action also adds the check that confirms its result.
+
+Drag a step from the **Add steps** panel to where it belongs in the list. You can also select **+** between two steps and then choose a step from the panel. On a phone, **+** opens the list of steps. Each step type has its own colour and icon, so you can scan the workflow at a glance.
+
+To change the order, drag a step by its handle, or open the step's **…** menu and choose **Move up** or **Move down**. With a keyboard, focus the handle, press Space, move with the arrow keys and press Space again.
+
+The panel and the step fields only offer what this workspace has installed and values that exist at that point in the workflow. Steps that can't run in this workspace yet are marked, and the step explains why once you add it. Problems appear on the step and field to fix, and **Show what to fix** lists everything that blocks publishing.
+
+Your changes save automatically. If someone else saves the same draft first, Luma keeps your changes from overwriting theirs and asks you to reload.
+
+## Write code
+
+The **Code** view shows the whole workflow as TypeScript. Luma reads it as data and never runs it; problems appear on their line. Use a **Code Step** for calculations the builder can't express. Code Steps run in a sandbox with no network access or packages, and can only request the reads or actions granted to them.
+
+## Test with example data
+
+The **Test** view runs the workflow's real steps with example replies instead of connected systems. Fill in examples from each field, from a recent run, or from a scenario. Each result shows what every step used and produced, which way the workflow went, and where it would wait for a person. Saved tests run again whenever the draft changes. Passing tests don't activate or approve anything.
+
+## Publish and activate
+
+Choose **Publish** and describe what changed. Publishing creates a version that can't be changed. It doesn't switch the workflow on or give it access to anything. Open the published workflow to activate it; each action still passes policy and approval when it runs.
+
+To change a published workflow later, choose **Edit as new draft**. Publishing that draft creates a new version; runs already using the old version keep it.

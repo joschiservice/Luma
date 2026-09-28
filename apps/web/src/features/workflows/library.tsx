@@ -1,14 +1,15 @@
 import './workflows.css';
 
-import type { WorkflowSummary } from '@luma/api-contract';
+import type { WorkflowDraft, WorkflowSummary } from '@luma/api-contract';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
-import { Button } from '@luma/ui/components/primitives/button';
+import { Button, buttonVariants } from '@luma/ui/components/primitives/button';
 import { CollectionToolbar } from '@luma/ui/components/primitives/collection-toolbar';
 import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { Empty } from '@luma/ui/components/primitives/empty';
 import { Input } from '@luma/ui/components/primitives/input';
 import { Select } from '@luma/ui/components/primitives/select';
+import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { PageHeader } from '@luma/ui/components/workspace/page-header';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -17,11 +18,19 @@ import {
   useParams,
   useSearch,
 } from '@tanstack/react-router';
-import { ChevronRight, Search, Workflow, X } from 'lucide-react';
+import {
+  ChevronRight,
+  FilePenLine,
+  Plus,
+  Search,
+  Workflow,
+  X,
+} from 'lucide-react';
 import { useRef } from 'react';
 
 import { SignInRedirect } from '../identity/common';
-import { IdentityError } from '../identity/data';
+import { contextOptions, IdentityError } from '../identity/data';
+import { draftsOptions } from './authoring/data';
 import { workflowError, workflowsOptions } from './data';
 import { OfflineNotice } from './offline';
 import { workflowSystemLabel } from './presentation';
@@ -63,12 +72,16 @@ export function WorkflowsPage() {
   const filters = useSearch({ from: '/app/$organizationId/workflows/' });
   const navigate = useNavigate({ from: '/app/$organizationId/workflows/' });
   const query = useQuery(workflowsOptions(organizationId));
+  const drafts = useQuery(draftsOptions(organizationId));
+  const context = useQuery(contextOptions(organizationId));
   if (query.error instanceof IdentityError && query.error.status === 401)
     return <SignInRedirect />;
 
   return (
     <WorkflowLibraryView
       organizationId={organizationId}
+      drafts={drafts.data}
+      canCreate={!!context.data && context.data.actor.role !== 'member'}
       items={
         query.error instanceof IdentityError &&
         [401, 403, 404].includes(query.error.status)
@@ -89,6 +102,8 @@ export function WorkflowsPage() {
 export function WorkflowLibraryView({
   organizationId,
   items,
+  drafts,
+  canCreate = false,
   filters,
   change,
   loading,
@@ -98,6 +113,8 @@ export function WorkflowLibraryView({
 }: {
   organizationId: string;
   items?: WorkflowSummary[] | undefined;
+  drafts?: WorkflowDraft[] | undefined;
+  canCreate?: boolean;
   filters: WorkflowFilters;
   change: (filters: WorkflowFilters) => void;
   loading?: boolean;
@@ -159,8 +176,25 @@ export function WorkflowLibraryView({
         icon={<DomainIcon domain="workflows" size="lg" />}
         title="Workflows"
         description="Workflows investigate issues, carry out the changes you’ve agreed on, and check the result. Open one to review its steps, where it runs and its history."
+        actions={
+          <Link
+            className={buttonVariants()}
+            to="/app/$organizationId/workflows/new"
+            params={{ organizationId }}
+            search={{}}
+          >
+            <Plus aria-hidden="true" /> New workflow
+          </Link>
+        }
       />
       <OfflineNotice />
+      {drafts?.length ? (
+        <DraftList
+          organizationId={organizationId}
+          drafts={drafts}
+          canEdit={canCreate}
+        />
+      ) : null}
       <div className="workflow-collection">
         <CollectionToolbar
           views={
@@ -275,9 +309,16 @@ export function WorkflowLibraryView({
             <Workflow size={28} aria-hidden="true" />
             <h2>No published workflows</h2>
             <p>
-              A workspace administrator must publish a reviewed version before
-              it can be activated.
+              Start from a template or build your own. An owner or admin
+              publishes a reviewed version before it can be activated.
             </p>
+            <Link
+              to="/app/$organizationId/workflows/new"
+              params={{ organizationId }}
+              search={{}}
+            >
+              New workflow
+            </Link>
           </Empty>
         ) : !filtered?.length ? (
           <Empty className="workflow-empty">
@@ -361,6 +402,72 @@ export function WorkflowLibraryView({
         ) : null}
       </div>
     </div>
+  );
+}
+
+/** Lists open drafts with how and when they were last edited. Drafts never run. */
+export function DraftList({
+  organizationId,
+  drafts,
+  canEdit,
+}: {
+  organizationId: string;
+  drafts: WorkflowDraft[];
+  canEdit: boolean;
+}) {
+  const modes = {
+    template: 'From a template',
+    visual: 'Built visually',
+    code: 'Written in code',
+    language: 'Described in words',
+  } as const;
+
+  return (
+    <section
+      className="workflow-drafts"
+      aria-labelledby="workflow-drafts-title"
+    >
+      <h2 id="workflow-drafts-title">Drafts</h2>
+      <ul>
+        {drafts.map((draft) => (
+          <li key={draft.id}>
+            <Link
+              className="workflow-row"
+              to="/app/$organizationId/workflows/drafts/$draftId"
+              params={{ organizationId, draftId: draft.id }}
+              search={{ view: 'build' }}
+            >
+              <FilePenLine
+                size={18}
+                aria-hidden="true"
+                className="workflow-row-icon"
+              />
+              <div className="workflow-row-content">
+                <h3>{draft.content.definition.name || 'Untitled workflow'}</h3>
+                <div className="workflow-row-meta">
+                  <span>{modes[draft.mode]}</span>
+                  <span>Version {draft.content.version}</span>
+                  <span>
+                    Edited <WorkspaceDate value={draft.updatedAt} />
+                  </span>
+                  {draft.basedOn ? (
+                    <span>Edits {draft.basedOn.definitionId}</span>
+                  ) : null}
+                </div>
+              </div>
+              <Badge tone="neutral">
+                {canEdit ? 'Draft' : 'Draft · read only'}
+              </Badge>
+              <ChevronRight
+                className="workflow-row-chevron"
+                size={16}
+                aria-hidden="true"
+              />
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

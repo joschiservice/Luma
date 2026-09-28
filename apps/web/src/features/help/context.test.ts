@@ -9,6 +9,12 @@ describe('contextual help', () => {
     expect(contextualTopic([inbox, issue])).toBe('issues/investigate');
     expect(contextualTopic([inbox, { staticData: {} }])).toBe('issues');
     expect(contextualTopic([{ staticData: {} }])).toBeUndefined();
+    expect(
+      contextualTopic([
+        { staticData: {} },
+        { staticData: { help: 'workflows/create' as const } },
+      ]),
+    ).toBe('workflows/create');
   });
 
   it('preserves article anchors without treating external or app links as documentation', () => {

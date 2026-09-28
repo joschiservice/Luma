@@ -28,4 +28,5 @@ Use `pnpm test` for cross-package integration coverage, including the applicatio
 ## Further reading
 
 - [Engineering guide](../../docs/architecture/003-tenant-isolation-and-data-residency.md)
+- [Model gateway and Bedrock EU route](../../docs/model-gateway.md)
 - [Package boundaries and runtime composition](../../docs/architecture/005-domain-packages-and-runtimes.md)

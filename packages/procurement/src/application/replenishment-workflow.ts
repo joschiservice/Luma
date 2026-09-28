@@ -14,6 +14,9 @@ import type {
   ProcessStepOutput,
   ProcessWorkflowVersion,
   ReplenishmentWorkflow,
+  TemplateRequirement,
+  TemplateSource,
+  VocabularyContribution,
   WorkflowCatalogStore,
   WorkflowTriggerRequest,
   WorkflowTriggerRun,
@@ -21,8 +24,10 @@ import type {
 } from '@luma/workflows';
 import {
   createProcessActivities,
+  draftFromVersion,
   presentProcessVersion,
   presentTriggerRun,
+  templateReadiness,
 } from '@luma/workflows';
 
 import { replenishmentCommitments } from '../domain/metrics.js';
@@ -810,11 +815,191 @@ export function createReplenishmentService(deps: {
     },
   });
 
+  const outsideBuiltIn =
+    'Purchase-order steps run only in the built-in Replenish low stock workflow. Use that template to create orders.';
+  const readLabels: Record<string, [string, string]> = {
+    inventory: [
+      'Current stock',
+      'Fresh available quantity, SKU and unit for the configured stock position.',
+    ],
+    'procurement.replenishment': [
+      'Replenishment proposal',
+      'Whether an order is needed, its quantity and supplier, checked against open orders.',
+    ],
+  };
+  const reads = version.steps.filter((step) => step.kind === 'read');
+
+  /** Describes the reads, action and result check this adapter owns, derived from its version. */
+  async function vocabulary(): Promise<VocabularyContribution> {
+    const typeOf = (
+      value: Extract<
+        ProcessWorkflowVersion['steps'][number],
+        { kind: 'capability' }
+      >['parameters'][string],
+    ) =>
+      value.source === 'literal'
+        ? value.value === null
+          ? ('null' as const)
+          : (typeof value.value as 'string' | 'number' | 'boolean')
+        : value.source === 'step'
+          ? reads.find((step) => step.id === value.stepId)?.fields[value.field]
+          : (value.source === 'input'
+              ? version.inputs
+              : version.context.fields)[value.field];
+    const types = (items: Record<string, Parameters<typeof typeOf>[0]>) =>
+      Object.fromEntries(
+        Object.entries(items).flatMap(([name, value]) => {
+          const type = typeOf(value);
+
+          return type ? [[name, type]] : [];
+        }),
+      );
+    const unavailable = { executable: false, reason: outsideBuiltIn };
+
+    return {
+      subjects: [
+        {
+          kind: 'inventory_position',
+          label: 'Stock position',
+          description: 'A mapped SKU at one inventory location.',
+          ...unavailable,
+        },
+        {
+          kind: 'purchase_order',
+          label: 'Purchase order',
+          description: 'A purchase order recorded in Procurement.',
+          ...unavailable,
+        },
+      ],
+      reads: reads.map((step) => ({
+        source: step.source,
+        label: readLabels[step.source]?.[0] ?? step.source,
+        description: readLabels[step.source]?.[1] ?? '',
+        fields: step.fields,
+        ...unavailable,
+      })),
+      capabilities: version.steps.flatMap((step) =>
+        step.kind === 'capability'
+          ? [
+              {
+                capability: step.capability,
+                version: step.capabilityVersion,
+                label: 'Create a purchase-order draft',
+                description:
+                  'Records a draft purchase order for the supplier. It is not sent to the supplier.',
+                targetKind: step.targetKind,
+                minimumRisk: step.minimumRisk,
+                approval:
+                  'Workspace policy decides whether a different owner or admin must approve each order.',
+                parameters: types(step.parameters),
+                postcondition: types(step.expectedPostcondition),
+                evaluators: version.steps.flatMap((item) =>
+                  item.kind === 'verification' && item.forStep === step.id
+                    ? [item.evaluatorVersion]
+                    : [],
+                ),
+                ...unavailable,
+              },
+            ]
+          : [],
+      ),
+      evaluators: version.steps.flatMap((step) =>
+        step.kind === 'verification'
+          ? [
+              {
+                version: step.evaluatorVersion,
+                label: 'Check the purchase-order draft',
+                description:
+                  'Reads the order independently to confirm ownership, draft status, supplier and lines.',
+                fields: step.fields,
+                ...unavailable,
+              },
+            ]
+          : [],
+      ),
+    };
+  }
+
+  /** Offers replenishment in the template gallery with the setup it still needs here. */
+  const template: TemplateSource = {
+    id: definitionId,
+    async template(context) {
+      const [setup, detail] = await Promise.all([
+        api.setup(context),
+        api.detail(context),
+      ]);
+      const requirements: TemplateRequirement[] = [
+        {
+          label: 'Workflow worker connected',
+          met: available,
+          detail: available
+            ? 'Replenishment runs on the workflow worker.'
+            : 'The workflow worker isn’t running on this Luma server. Whoever runs the server needs to start it; Luma can’t check stock or create orders without it.',
+          fix: null,
+        },
+        {
+          label: 'A supplier',
+          met: setup.suppliers.length > 0,
+          detail: setup.suppliers.length
+            ? `${setup.suppliers.length} supplier(s) in Procurement.`
+            : 'Add the supplier you reorder from in Procurement.',
+          fix: setup.suppliers.length
+            ? null
+            : { label: 'Add a supplier', destination: 'procurement' },
+        },
+        {
+          label: 'Mapped stock positions',
+          met: setup.positions.length > 0,
+          detail: setup.positions.length
+            ? `${setup.positions.length} stock position(s) with current stock.`
+            : 'Connect an inventory source and let Luma read its stock.',
+          fix: setup.positions.length
+            ? null
+            : { label: 'Open Connections', destination: 'connections' },
+        },
+      ];
+
+      return {
+        id: definitionId,
+        name: version.definition.name,
+        purpose: version.definition.intent,
+        category: 'procurement',
+        trigger: 'When available stock falls below the minimum you set',
+        steps: [
+          'Read current stock for the position you choose',
+          'Stop when stock is stale or an order is already open',
+          'Create a purchase-order draft for your supplier',
+          'Ask a different owner or admin to approve it when policy requires',
+          'Check the draft independently',
+        ],
+        success:
+          'A purchase-order draft exists for your supplier and is independently verified. It is not sent to the supplier.',
+        requirements,
+        readiness: templateReadiness(requirements),
+        status: detail.summary.status,
+        configure: 'replenishment',
+        installed: !!(await runs.version(
+          context,
+          definitionId,
+          version.version,
+        )),
+        version: version.version,
+        digest: version.digest,
+      };
+    },
+    content: () => draftFromVersion(version),
+    async install(context) {
+      await catalog.publish(await authorize(context, true), version);
+    },
+  };
+
   return {
     api,
     activities,
     eligible,
     version,
+    vocabulary,
+    template,
     /** Recovers committed starts and evaluates active stock conditions with observation deduplication. */
     async tick(context: TenantContext) {
       context = await authorize(context, true);
