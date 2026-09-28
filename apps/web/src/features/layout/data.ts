@@ -57,6 +57,7 @@ export function useWorkspaceLayout(organizationId: string) {
   const key = layoutKey(organizationId);
   const query = useQuery(layoutOptions(organizationId));
   const queued = useRef<LayoutChange | null>(null);
+  const inFlight = useRef(false);
   const mutation = useMutation({
     mutationFn: async ({
       base,
@@ -93,6 +94,7 @@ export function useWorkspaceLayout(organizationId: string) {
       const change = queued.current;
       queued.current = null;
       if (change && saved) mutation.mutate({ base: saved, change });
+      else inFlight.current = false;
     },
   });
 
@@ -100,11 +102,13 @@ export function useWorkspaceLayout(organizationId: string) {
     const current = client.getQueryData<WorkspaceLayout>(key) ?? query.data;
     if (!current) return;
     client.setQueryData(key, apply(current, change));
-    if (mutation.isPending) {
+    // Saves run one at a time so each uses the revision returned by the last.
+    if (inFlight.current) {
       queued.current = { ...queued.current, ...change };
 
       return;
     }
+    inFlight.current = true;
     mutation.mutate({ base: current, change });
   }
 

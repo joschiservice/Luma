@@ -109,7 +109,7 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
 
 /** Finds the destination that owns a workspace URL, defaulting to Home. */
 export function destinationFor(pathname: string) {
-  const section = pathname.split('/')[3];
+  const section = pathname.split(/[?#]/)[0]?.split('/')[3];
   const normalized =
     section === 'overview'
       ? 'home'
