@@ -43,10 +43,10 @@ import {
   WorkflowSteps,
   WorkflowVersions,
 } from './detail-sections';
+import { workflowDomainView } from './domain-views';
 import { statusNames, type WorkflowFilters, WorkflowLoading } from './library';
 import { OfflineNotice } from './offline';
 import { workflowTriggerLabel } from './presentation';
-import { ReplenishmentPanel, ReplenishmentRunReview } from './replenishment';
 import { CancelScheduledStart, WorkflowTriggers } from './triggers';
 
 function processStepDescription(
@@ -134,6 +134,8 @@ export function WorkflowDetailPage({
     ...workflowRunsOptions(organizationId, definitionId),
     refetchInterval: 5000,
   });
+  const domainView = query.data ? workflowDomainView(query.data) : undefined;
+  const RunContext = domainView?.RunContext;
   const client = useQueryClient();
   const refresh = async () => {
     await client.invalidateQueries({ queryKey: workflowsKey(organizationId) });
@@ -240,7 +242,7 @@ export function WorkflowDetailPage({
                             Open issue
                           </Link>
                         ) : (
-                          <span>{run.subject.kind}</span>
+                          <span>{run.subject.kind.replaceAll('_', ' ')}</span>
                         )}
                         <time dateTime={run.createdAt}>
                           <WorkspaceDate value={run.createdAt} />
@@ -303,11 +305,8 @@ export function WorkflowDetailPage({
                           refresh={refresh}
                         />
                       ) : null}
-                      {definitionId === 'inventory-replenishment' ? (
-                        <ReplenishmentRunReview
-                          organizationId={organizationId}
-                          run={run}
-                        />
+                      {RunContext ? (
+                        <RunContext organizationId={organizationId} run={run} />
                       ) : null}
                       <CodeRunDetails
                         run={run}
@@ -469,6 +468,8 @@ export function WorkflowDetailView({
   refreshing?: boolean;
   accessLost: () => Promise<void>;
 }) {
+  const domainView = workflowDomainView(detail);
+  const DomainControls = domainView?.Controls;
   const [selected, setSelected] = useState(detail.versions[0]!.version);
   const [activate, setActivate] = useState(false);
   const [revoke, setRevoke] = useState<WorkflowActivationView | null>(null);
@@ -572,7 +573,7 @@ export function WorkflowDetailView({
               label: `v${v.version}${v.version === detail.summary.availableVersion ? ' · Latest' : ''}`,
             }))}
           />
-          {detail.summary.id !== 'inventory-replenishment' &&
+          {!DomainControls &&
           !(
             version.format === 'workflow/2' &&
             version.executionMode === 'computation'
@@ -590,7 +591,7 @@ export function WorkflowDetailView({
         </div>
       </div>
       {!canActivate &&
-      detail.summary.id !== 'inventory-replenishment' &&
+      !DomainControls &&
       !(
         version.format === 'workflow/2' &&
         version.executionMode === 'computation'
@@ -622,26 +623,19 @@ export function WorkflowDetailView({
           },
           {
             value: 'triggers',
-            label:
-              detail.summary.id === 'inventory-replenishment'
-                ? 'Stock rules'
-                : 'Triggers',
-            content:
-              detail.summary.id === 'inventory-replenishment' ? (
-                <ReplenishmentPanel
-                  organizationId={organizationId}
-                  detail={detail}
-                />
-              ) : (
-                <WorkflowTriggers
-                  key={version.digest}
-                  detail={detail}
-                  version={version}
-                  organizationId={organizationId}
-                  refresh={refresh}
-                  accessLost={accessLost}
-                />
-              ),
+            label: domainView?.triggerLabel ?? 'Triggers',
+            content: DomainControls ? (
+              <DomainControls organizationId={organizationId} detail={detail} />
+            ) : (
+              <WorkflowTriggers
+                key={version.digest}
+                detail={detail}
+                version={version}
+                organizationId={organizationId}
+                refresh={refresh}
+                accessLost={accessLost}
+              />
+            ),
           },
           {
             value: 'steps',
@@ -741,10 +735,8 @@ export function WorkflowDetailView({
             dispatched may still complete. Existing changes are not undone.
           </DialogDescription>
           <p>
-            Version {revoke?.version} · {revoke?.grants.targetIds.length}{' '}
-            {detail.summary.id === 'inventory-replenishment'
-              ? 'stock positions'
-              : 'orders'}
+            Version {revoke?.version} · {revoke?.grants.targetIds.length} scoped
+            targets
           </p>
           {error ? <p role="alert">{error}</p> : null}
           <div className="workflow-dialog-actions">

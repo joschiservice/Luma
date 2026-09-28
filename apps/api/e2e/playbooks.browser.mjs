@@ -357,7 +357,7 @@ it('finds, reviews, activates, reloads and revokes a persisted workflow with wor
     [randomUUID(), other, user],
   );
   await page.goto(`/app/${other}/workflows`);
-  await page.getByRole('heading', { name: 'No published workflows' }).waitFor();
+  await page.getByRole('link', { name: /Replenish low stock/ }).waitFor();
   expect(await page.getByText(name, { exact: true }).count()).toBe(0);
   await page.goto(`/app/${other}/workflows/${version.definition.id}`);
   await page.getByText('Workflow not found', { exact: false }).waitFor();

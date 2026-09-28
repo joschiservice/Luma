@@ -30,7 +30,7 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
         const key = createHash('sha256')
           .update(
             JSON.stringify([
-              'activity-v2',
+              'activity-v3',
               context.tenantId,
               context.actor.role,
               query.from,
@@ -77,6 +77,7 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
         CASE WHEN e.document->'subject'->>'subjectKind'='connection' THEN e.document->'subject'->>'subjectId' END AS subject_connection,
         COALESCE(r.definition_id,w.definition_id,s.doc->'details'->>'definitionId') AS playbook_id,COALESCE(v.document->'provenance'->>'kind',wv.document->'provenance'->>'kind') AS mode,
         COALESCE(s.doc->>'eventType','case.updated') AS action,
+        w.id::text AS workflow_run_id,
         s.doc->'details' AS details
         FROM workspace_activity_sources s
         LEFT JOIN case_proposals p ON p.tenant_id=s.tenant_id AND p.id=s.proposal_id
@@ -127,7 +128,7 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
       'evidenceRefs',COALESCE((SELECT jsonb_agg(left(ref,500)) FROM (SELECT value #>> '{}' AS ref FROM jsonb_array_elements(CASE WHEN jsonb_typeof(doc->'evidenceRefs')='array' THEN doc->'evidenceRefs' ELSE '[]'::jsonb END) WHERE jsonb_typeof(value)='string' LIMIT 100) refs),'[]'::jsonb)) AS item
       FROM classified WHERE ($7::text IS NULL OR EXISTS(SELECT 1 FROM jsonb_array_elements(connections) c WHERE c->>'system'=$7)) AND ($8::uuid IS NULL OR EXISTS(SELECT 1 FROM jsonb_array_elements(connections) c WHERE c->>'id'=$8::text))
       AND ($9::text IS NULL OR type=$9) AND ($10::text IS NULL OR outcome=$10)
-      AND ($11::text='' OR position(lower($11) in lower(concat_ws(' ',issue_id::text,resource,action,doc->'actor'->>'id')))>0)
+      AND ($11::text='' OR position(lower($11) in lower(concat_ws(' ',issue_id::text,resource,action,doc->'actor'->>'id',workflow_run_id)))>0)
       ORDER BY recorded_at DESC,id DESC LIMIT $12`,
           [
             context.tenantId,

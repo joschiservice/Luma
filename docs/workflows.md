@@ -156,3 +156,19 @@ The Triggers section displays the exact contract and offers typed submission,
 retry and resource controls. Recent runs shows evidence references and scheduled
 start cancellation. Schedule times display in the workspace timezone; observation
 entry explicitly uses the browser's local timezone.
+
+## Domain views
+
+The Workflow detail API can return a `presentation` key. The web registry in
+`apps/web/src/features/workflows/domain-views.ts` maps known keys to domain
+controls and run context. Missing or unknown keys retain the standard view.
+Shared library, versions, activation history and step evidence remain unchanged.
+Register domain renderers here instead of checking definition IDs in the shared
+Workflow page.
+
+`procurement.replenishment` uses the authorized replenishment review API for
+recorded stock, immutable rule thresholds, supplier, policy decision, current
+purchase order and verification evidence. The order must match both the bound
+action target and run provenance. Current order status is separate from the
+historical verification result. Activity search accepts the run ID and includes
+policy and execution events associated through action admission.

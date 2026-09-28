@@ -51,6 +51,26 @@ export const replenishmentSetupSchema = z.object({
 
 export const replenishmentReviewSchema = z.object({
   runId: z.string().uuid(),
+  supplierId: z.string().uuid(),
+  stock: z.object({
+    available: z.number().nullable(),
+    unit: z.string().nullable(),
+    minimum: z.number(),
+    target: z.number(),
+    checkedAt: z.string().datetime().nullable(),
+  }),
+  decision: z.object({ id: z.string(), outcome: z.string() }).nullable(),
+  purchaseOrder: z
+    .object({
+      id: z.string().uuid(),
+      reference: z.string(),
+      status: z.string(),
+    })
+    .nullable(),
+  verification: z.object({
+    state: z.enum(['verified', 'failed', 'inconclusive', 'not_verified']),
+    recordedAt: z.string().datetime().nullable(),
+  }),
   proposalId: z.string().uuid().nullable(),
   decisionId: z.string().nullable(),
   quantity: z.number().nullable(),

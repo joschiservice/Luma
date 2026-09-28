@@ -97,7 +97,9 @@ export const workflowsContract = c.router(
       path: `${path}/:definitionId/replenishment/runs/:runId`,
       pathParams: params.extend({ runId: z.string().uuid() }),
       responses: { 200: replenishmentReviewSchema },
-      summary: 'Review a replenishment proposal',
+      summary: 'Review a replenishment run',
+      description:
+        'Returns recorded stock, supplier, policy decision, current purchase-order status and independent verification. Only a different authorized owner or admin can respond to a pending proposal.',
     },
     decideReplenishment: {
       method: 'POST',

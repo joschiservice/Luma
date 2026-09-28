@@ -113,3 +113,37 @@
   overflow-wrap: normal;
   white-space: nowrap;
 }
+
+.procurement-run-objects {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+.workflows-page .procurement-run-objects > div {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.375rem;
+  min-width: 0;
+}
+.procurement-run-objects dt {
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+}
+.procurement-run-objects dd {
+  margin: 0;
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  .procurement-run-objects {
+    grid-template-columns: 1fr;
+  }
+}
+
+.workflows-page .replenishment-review .replenishment-metrics {
+  margin: 0;
+  padding: 0.75rem 0;
+}
+.workflows-page .replenishment-review .procurement-run-objects {
+  margin: 0.5rem 0;
+}

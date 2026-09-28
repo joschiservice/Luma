@@ -75,6 +75,8 @@ export const workflowSummarySchema = playbookSummarySchema
   .extend({ category: text });
 
 export const workflowDetailSchema = playbookDetailSchema.extend({
+  /** Selects an optional domain view; unknown keys use the standard workflow view. */
+  presentation: z.string().min(1).optional(),
   summary: workflowSummarySchema,
   versions: z.array(workflowVersionViewSchema),
   policyVersion: z.string(),

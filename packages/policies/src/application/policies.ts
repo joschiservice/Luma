@@ -56,7 +56,7 @@ export function createPolicyService(deps: PolicyDependencies) {
   }
 
   return {
-    /** Reads a tenant policy decision after refreshing membership. */
+    /** Reads a tenant policy decision and its recorded human response after refreshing membership. */
     async decision(context: TenantContext, id: string) {
       const fresh = await deps.refreshContext(context);
       requireTenant(fresh, context.tenantId);
@@ -64,7 +64,16 @@ export function createPolicyService(deps: PolicyDependencies) {
       if (fresh.actor.id !== context.actor.id)
         throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
 
-      return deps.repository.findDecision(context.tenantId, id);
+      const decision = await deps.repository.findDecision(context.tenantId, id);
+      if (!decision) return null;
+      const approval = await deps.repository.findApproval(
+        context.tenantId,
+        decision.proposalId,
+        decision.actionHash,
+        decision.policyVersion,
+      );
+
+      return { ...decision, approval };
     },
     /** Reads the effective policy version for a fresh admission check. */
     currentVersion: version,

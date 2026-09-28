@@ -168,7 +168,7 @@ export function ActivityView({
           <input
             type="search"
             value={filters.q ?? ''}
-            placeholder="Issue, resource, action or actor ID"
+            placeholder="Issue, resource, action, actor or run ID"
             onChange={(e) => update('q', e.target.value)}
             aria-describedby="activity-search-help"
           />
@@ -238,8 +238,9 @@ export function ActivityView({
         </label>
       </div>
       <p id="activity-search-help" className="desk-intro">
-        Search issue IDs, persisted resource references, action labels and actor
-        IDs. Dates use recorded time; select up to 366 days.
+        Search issue IDs, persisted resource references, action labels, actor
+        IDs and workflow run IDs. Dates use recorded time; select up to 366
+        days.
       </p>
       {offline ? (
         <Alert role="status" className="workflow-notice">

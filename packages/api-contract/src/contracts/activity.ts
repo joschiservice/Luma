@@ -18,6 +18,6 @@ export const activityContract = initContract().router({
     },
     summary: 'Search workspace activity',
     description:
-      'Returns recorded events newest first by recorded timestamp and immutable ID. Date bounds apply to recorded time, including from and excluding to, for at most 366 days. Search matches issue ID, persisted target reference, action label and actor ID (literal, case-insensitive substring). Raw payloads are not searched. Cursors are bound to workspace, role, filters and page size. Connection administration events are visible only to owners and administrators. Approval and provider acceptance do not establish verified resolution.',
+      'Returns recorded events newest first by recorded timestamp and immutable ID. Date bounds apply to recorded time, including from and excluding to, for at most 366 days. Search matches issue ID, persisted target reference, action label, actor ID and workflow run ID (literal, case-insensitive substring). Raw payloads are not searched. Cursors are bound to workspace, role, filters and page size. Connection administration events are visible only to owners and administrators. Approval and provider acceptance do not establish verified resolution.',
   },
 });

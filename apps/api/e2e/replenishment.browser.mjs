@@ -100,6 +100,40 @@ it('reviews replenishment scope, recovers a lost response, approves and opens th
     .getHandle(processWorkflowId(f.manifest.organizationId, run.id))
     .signal('processDecisionChanged');
   await f.waitFor(run.id, 'verified');
+  await review
+    .getByRole('button', { name: 'Refresh runs', exact: true })
+    .click();
+  await review
+    .getByText('The expected result was verified.', { exact: true })
+    .waitFor();
+  await review.getByText('Draft verified', { exact: true }).waitFor();
+  await review.getByText('approved', { exact: true }).waitFor();
+  await review.getByLabel('Recorded stock context').waitFor();
+  await review.screenshot({
+    path: '/tmp/luma74-run-desktop.png',
+    fullPage: true,
+  });
+  await review.setViewportSize({ width: 375, height: 812 });
+  await review
+    .getByText('Draft verified', { exact: true })
+    .scrollIntoViewIfNeeded();
+  await review.screenshot({
+    path: '/tmp/luma74-run-mobile.png',
+    fullPage: true,
+  });
+  expect(
+    await review.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
+  await review.getByRole('link', { name: 'View run activity' }).click();
+  await review
+    .getByText('Purchase order created', { exact: true })
+    .first()
+    .waitFor();
+  await review.goBack();
   await review.getByRole('link', { name: 'Inspect purchase order' }).click();
   await review.getByText('Northstar Supply', { exact: true }).first().waitFor();
   await page.setViewportSize({ width: 375, height: 812 });

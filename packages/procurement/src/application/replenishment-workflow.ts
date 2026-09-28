@@ -255,6 +255,7 @@ export function createReplenishmentService(deps: {
           ];
 
       return {
+        presentation: 'procurement.replenishment',
         summary: {
           id: definitionId,
           name: version.definition.name,
@@ -478,13 +479,57 @@ export function createReplenishmentService(deps: {
         : null;
       const waiting =
         decision?.outcome === 'approval_required' &&
+        !decision.approval &&
         decision.proposalId === binding?.action.id;
       const state = presentTriggerRun(run, outputs).processState;
       const terminal =
         state && !['running', 'awaiting_decision', 'waiting'].includes(state);
 
+      const inventory = outputs.find((step) => step.stepId === 'inventory');
+      const verification = outputs.find((step) => step.kind === 'verification');
+      const orders = await deps.procurement.orders(context);
+      const order = orders.items.find(
+        (item) =>
+          item.id === binding?.action.target.id &&
+          item.origin.workflowRunId === id,
+      );
+
       return {
         runId: id,
+        supplierId: rule.supplierId,
+        stock: {
+          available:
+            typeof inventory?.values.available === 'number'
+              ? inventory.values.available
+              : null,
+          unit:
+            typeof inventory?.values.unit === 'string'
+              ? inventory.values.unit
+              : null,
+          minimum: rule.minimum,
+          target: rule.target,
+          checkedAt: inventory?.observedAt ?? null,
+        },
+        decision: decision
+          ? {
+              id: decision.id,
+              outcome: decision.approval?.outcome ?? decision.outcome,
+            }
+          : null,
+        purchaseOrder: order
+          ? { id: order.id, reference: order.reference, status: order.status }
+          : null,
+        verification: {
+          state:
+            verification?.state === 'completed'
+              ? 'verified'
+              : verification?.state === 'failed'
+                ? 'failed'
+                : verification?.state === 'inconclusive'
+                  ? 'inconclusive'
+                  : 'not_verified',
+          recordedAt: verification?.recordedAt ?? null,
+        },
         proposalId: binding?.action.id ?? null,
         decisionId: waiting ? decision.id : null,
         quantity: binding

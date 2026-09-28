@@ -6,6 +6,7 @@ import { replenishmentFixture } from './replenishment-fixture.mjs';
 
 it('replenishes through Temporal, policy, procurement and verification without an exception', async (t) => {
   const f = await replenishmentFixture(t);
+  expect((await f.request('')).presentation).toBe('procurement.replenishment');
   const initialExceptions = (await f.pilot.detection.exceptions.list(f.actor))
     .length;
   const rule = await f.configure();
@@ -15,7 +16,19 @@ it('replenishes through Temporal, policy, procurement and verification without a
   expect((await f.request('/replenishment/starts', start)).id).toBe(run.id);
   await f.waitFor(run.id, 'awaiting_decision');
   const ownReview = await f.request(`/replenishment/runs/${run.id}`);
-  expect(ownReview).toMatchObject({ quantity: 50, canRespond: false });
+  expect(ownReview).toMatchObject({
+    quantity: 50,
+    canRespond: false,
+    supplierId: f.supplier.id,
+    stock: {
+      available: f.position.available,
+      minimum: f.position.available + 10,
+      target: f.position.available + 50,
+    },
+    decision: { outcome: 'approval_required' },
+    purchaseOrder: null,
+    verification: { state: 'not_verified', recordedAt: null },
+  });
   await f.request(
     `/replenishment/runs/${run.id}/decision`,
     { decisionId: ownReview.decisionId, outcome: 'approved' },
@@ -38,6 +51,37 @@ it('replenishes through Temporal, policy, procurement and verification without a
     origin: { workflowRunId: run.id },
     lines: [{ quantity: 50 }],
   });
+  expect(await f.request(`/replenishment/runs/${run.id}`)).toMatchObject({
+    purchaseOrder: {
+      id: order.id,
+      reference: order.reference,
+      status: 'draft',
+    },
+    verification: { state: 'verified' },
+    decision: { outcome: 'approved' },
+    canRespond: false,
+  });
+  const activity = await f.pilot.app.inject({
+    method: 'GET',
+    url: `/v1/organizations/${f.manifest.organizationId}/activity?from=${new Date(Date.now() - 86400000).toISOString()}&to=${new Date(Date.now() + 86400000).toISOString()}&q=${run.id}`,
+    headers: { cookie: f.ownerCookie },
+  });
+  expect(activity.statusCode, activity.body).toBe(200);
+  expect(
+    activity
+      .json()
+      .items.some((event) => event.action === 'approval.responded'),
+  ).toBe(true);
+  expect(
+    activity
+      .json()
+      .items.some((event) => event.action === 'purchase_order.created'),
+  ).toBe(true);
+  expect(
+    activity
+      .json()
+      .items.some((event) => event.action === 'workflow.verification'),
+  ).toBe(true);
   expect(
     (await f.pilot.procurement.detail(f.actor, order.id)).history,
   ).toHaveLength(1);
@@ -140,6 +184,11 @@ it('replenishes through Temporal, policy, procurement and verification without a
   expect((await f.waitFor(failed.id, 'failed_verification')).verification).toBe(
     'failed',
   );
+  expect(await f.request(`/replenishment/runs/${failed.id}`)).toMatchObject({
+    purchaseOrder: { status: 'cancelled' },
+    verification: { state: 'failed' },
+    canRespond: false,
+  });
   await f.request(`/activations/${rule.id}/revoke`, {
     artifactDigest: rule.artifactDigest,
   });

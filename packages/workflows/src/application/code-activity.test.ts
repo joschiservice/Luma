@@ -238,6 +238,7 @@ it('does not persist cancellation when its status lookup fails', async () => {
         once: true,
       }),
     );
+
     return original(code, input, controls);
   };
   await expect(f.execute(run, processVersion, step, [])).rejects.toThrow(

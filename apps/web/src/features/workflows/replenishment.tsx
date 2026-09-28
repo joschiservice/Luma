@@ -20,11 +20,15 @@ import {
 import { Empty } from '@luma/ui/components/primitives/empty';
 import { Input } from '@luma/ui/components/primitives/input';
 import { Select } from '@luma/ui/components/primitives/select';
-import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
+import {
+  WorkspaceDate,
+  WorkspaceTimezone,
+} from '@luma/ui/components/primitives/workspace-date';
+import { workspaceDateValue } from '@luma/ui/lib/timezone';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { ArrowRight, PackageCheck, Plus, ShieldCheck } from 'lucide-react';
-import { useState } from 'react';
+import { useContext, useState } from 'react';
 
 import { IdentityError } from '../identity/data';
 import {
@@ -440,12 +444,9 @@ export function ReplenishmentRunReview({
   organizationId: string;
   run: WorkflowRunView;
 }) {
-  const terminal =
-    !!run.processState &&
-    !['running', 'awaiting_decision', 'waiting'].includes(run.processState);
   const query = useQuery({
     ...replenishmentReviewOptions(organizationId, run.id),
-    refetchInterval: terminal ? false : 5000,
+    refetchInterval: 5000,
   });
   const client = useQueryClient();
   const mutation = useMutation({
@@ -456,29 +457,142 @@ export function ReplenishmentRunReview({
     onSuccess: () =>
       client.invalidateQueries({ queryKey: workflowsKey(organizationId) }),
   });
-  const review = query.data;
-  const orderId = run.processSteps?.find((s) => s.kind === 'verification')
-    ?.values.purchaseOrderId;
+  const accessLost =
+    query.error instanceof IdentityError &&
+    [401, 403, 404].includes(query.error.status);
+  const review = accessLost ? undefined : query.data;
+  const orderId = review?.purchaseOrder?.id;
+  const timeZone = useContext(WorkspaceTimezone);
+  const lastRecordedAt = Math.max(
+    Date.parse(run.createdAt),
+    ...(run.processSteps ?? []).map((step) => Date.parse(step.recordedAt)),
+    review?.verification.recordedAt
+      ? Date.parse(review.verification.recordedAt)
+      : 0,
+  );
 
   const committed = run.processSteps?.find((step) => step.stepId === 'proposal')
     ?.values.committed;
 
   return (
-    <div className="replenishment-review">
+    <div className="replenishment-review" aria-label="Procurement run context">
+      {query.isPending ? (
+        <p role="status">Loading procurement context…</p>
+      ) : null}
+      {review ? (
+        <>
+          <div className="workflows-heading">
+            <div>
+              <span className="workflow-eyebrow">REPLENISHMENT CONTEXT</span>
+              <h3>
+                {review.quantity === null
+                  ? review.sku
+                  : `${review.quantity} × ${review.sku}`}
+              </h3>
+            </div>
+            <Badge
+              tone={
+                review.verification.state === 'verified' ? 'success' : 'neutral'
+              }
+            >
+              {review.verification.state === 'verified'
+                ? 'Draft verified'
+                : 'Not verified'}
+            </Badge>
+          </div>
+          <dl
+            className="replenishment-metrics"
+            aria-label="Recorded stock context"
+          >
+            <div>
+              <dt>Stock at check</dt>
+              <dd>
+                {review.stock.available ?? '—'}{' '}
+                <small>{review.stock.unit}</small>
+              </dd>
+            </div>
+            <div>
+              <dt>Below minimum</dt>
+              <dd>{review.stock.minimum}</dd>
+            </div>
+            <div>
+              <dt>Replenish to</dt>
+              <dd>{review.stock.target}</dd>
+            </div>
+            <div>
+              <dt>Proposed quantity</dt>
+              <dd>{review.quantity ?? '—'}</dd>
+            </div>
+          </dl>
+          {review.stock.checkedAt ? (
+            <p>
+              Stock checked <WorkspaceDate value={review.stock.checkedAt} />
+            </p>
+          ) : (
+            <p>Stock evidence has not been recorded.</p>
+          )}
+          <dl className="procurement-run-objects">
+            <div>
+              <dt>Supplier</dt>
+              <dd>
+                <Link
+                  to="/app/$organizationId/procurement"
+                  params={{ organizationId }}
+                  search={{ view: 'suppliers', q: review.supplier, status: '' }}
+                >
+                  {review.supplier}
+                </Link>
+              </dd>
+            </div>
+            <div>
+              <dt>Decision</dt>
+              <dd>
+                {review.decision?.outcome.replaceAll('_', ' ') ??
+                  'No decision recorded'}
+              </dd>
+            </div>
+            <div>
+              <dt>Purchase order</dt>
+              <dd>
+                {review.purchaseOrder
+                  ? `${review.purchaseOrder.reference} · ${review.purchaseOrder.status}`
+                  : 'No order created'}
+              </dd>
+            </div>
+          </dl>
+          <Alert
+            tone={
+              review.verification.state === 'verified'
+                ? 'success'
+                : ['failed', 'inconclusive'].includes(review.verification.state)
+                  ? 'warning'
+                  : 'neutral'
+            }
+          >
+            {review.verification.state === 'verified'
+              ? 'The draft, supplier and quantity were independently verified. Stock receipt is not part of this outcome.'
+              : review.verification.state === 'failed'
+                ? 'The purchase order differs from the expected draft. Review the order before continuing.'
+                : review.verification.state === 'inconclusive'
+                  ? 'The purchase-order result could not be confirmed. Review the recorded evidence.'
+                  : review.purchaseOrder
+                    ? 'The purchase order exists. Independent verification is still pending.'
+                    : 'No verified purchase-order outcome recorded.'}
+            {review.verification.recordedAt ? (
+              <span>
+                {' '}
+                Checked <WorkspaceDate value={review.verification.recordedAt} />
+                .
+              </span>
+            ) : null}
+          </Alert>
+        </>
+      ) : null}
       {run.processState === 'ended' && committed ? (
         <Alert tone="neutral">
           An existing draft or open purchase order covers this SKU. No new order
           was created.
         </Alert>
-      ) : null}
-      {review?.quantity !== null && review?.quantity !== undefined ? (
-        <div>
-          <span className="workflow-eyebrow">PURCHASE-ORDER PROPOSAL</span>
-          <h3>
-            {review.quantity} × {review.sku}
-          </h3>
-          <p>{review.supplier}</p>
-        </div>
       ) : null}
       {query.error ? (
         <Alert tone="danger">
@@ -524,7 +638,7 @@ export function ReplenishmentRunReview({
           ) : null}
         </>
       ) : null}
-      {mutation.isSuccess ? (
+      {mutation.isSuccess && review?.verification.state === 'not_verified' ? (
         <Alert tone="success" role="status">
           Decision recorded. The workflow will check current stock and policy
           before continuing.
@@ -538,6 +652,17 @@ export function ReplenishmentRunReview({
           </Button>
         </Alert>
       ) : null}
+      <Link
+        to="/app/$organizationId/activity"
+        params={{ organizationId }}
+        search={{
+          q: run.id,
+          from: workspaceDateValue(new Date(run.createdAt), timeZone),
+          to: workspaceDateValue(new Date(lastRecordedAt), timeZone),
+        }}
+      >
+        View run activity <ArrowRight size={14} aria-hidden="true" />
+      </Link>
       {typeof orderId === 'string' ? (
         <Link
           to="/app/$organizationId/procurement/$purchaseOrderId"

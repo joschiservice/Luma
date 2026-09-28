@@ -19,6 +19,7 @@ export type WorkflowDetail = Omit<
   PlaybookDetail,
   'summary' | 'versions' | 'activations'
 > & {
+  presentation: string;
   summary: Omit<PlaybookDetail['summary'], 'issueType'> & { category: string };
   versions: (ReturnType<typeof presentProcessVersion> &
     Pick<ProcessWorkflowVersion, 'inputs' | 'context' | 'applicability'> & {
@@ -82,6 +83,20 @@ export interface ReplenishmentWorkflow {
     runId: string,
   ): Promise<{
     runId: string;
+    supplierId: string;
+    stock: {
+      available: number | null;
+      unit: string | null;
+      minimum: number;
+      target: number;
+      checkedAt: string | null;
+    };
+    decision: { id: string; outcome: string } | null;
+    purchaseOrder: { id: string; reference: string; status: string } | null;
+    verification: {
+      state: 'verified' | 'failed' | 'inconclusive' | 'not_verified';
+      recordedAt: string | null;
+    };
     proposalId: string | null;
     decisionId: string | null;
     quantity: number | null;

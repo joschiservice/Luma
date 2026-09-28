@@ -4,7 +4,7 @@
 
 ## Filters and browsing
 
-Search is a case-insensitive literal substring over issue ID, persisted target reference, action label and actor ID. It does not search raw payloads or free-form audit details. Filter by UTC recorded dates, system, connection UUID, event type and outcome. Dates cover at most 366 days; the initial view covers 30 UTC calendar days. Edit both endpoints, then select Apply dates. Invalid draft ranges leave the current results intact.
+Search is a case-insensitive literal substring over issue ID, persisted target reference, action label, actor ID and workflow run ID. It does not search raw payloads or free-form audit details. Filter by UTC recorded dates, system, connection UUID, event type and outcome. Dates cover at most 366 days; the initial view covers 30 UTC calendar days. Edit both endpoints, then select Apply dates. Invalid draft ranges leave the current results intact.
 
 Filters, cursor, expanded event and the latest-seen event ID are validated URL state. Back navigation restores the page and expansion; the router restores scroll position. Each page contains 30 events. The API permits 1–100. A separate first-page read checks for new records every 30 seconds without inserting rows into the page being read. Refresh on older pages checks the head; Retry also reloads a failed historical page; Latest events returns to the first page. Offline and failed reads retain visible history with an explicit stale notice. Access errors hide private events.
 
