@@ -5,4 +5,8 @@ import { parseWorkflowFilters } from '../features/workflows/library';
 
 export const Route = createFileRoute(
   '/app/$organizationId/workflows/$definitionId',
-)({ validateSearch: parseWorkflowFilters, component: WorkflowPage });
+)({
+  validateSearch: parseWorkflowFilters,
+  staticData: { help: 'workflows' },
+  component: WorkflowPage,
+});

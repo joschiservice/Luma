@@ -1,0 +1,484 @@
+{
+  "corpusVersion": "authoring/1",
+  "vocabulary": {
+    "triggers": [
+      {
+        "kind": "manual",
+        "label": "Started by a person",
+        "description": "An owner or admin starts a run.",
+        "executable": true,
+        "reason": null
+      },
+      {
+        "kind": "event",
+        "label": "When an event arrives",
+        "description": "A system reports an event.",
+        "executable": true,
+        "reason": null
+      },
+      {
+        "kind": "schedule",
+        "label": "At a scheduled time",
+        "description": "The run starts once at a fixed time.",
+        "executable": false,
+        "reason": "Scheduled starts are recorded but do not run custom workflows yet."
+      },
+      {
+        "kind": "condition",
+        "label": "When a condition is true",
+        "description": "A monitored fact matches a value, such as stock below its minimum.",
+        "executable": true,
+        "reason": null
+      },
+      {
+        "kind": "exception",
+        "label": "When an issue is detected",
+        "description": "An operational issue is opened.",
+        "executable": true,
+        "reason": null
+      }
+    ],
+    "stepKinds": [
+      {
+        "kind": "read",
+        "label": "Read current data",
+        "description": "Fetch fresh facts from a connected source.",
+        "executable": false,
+        "reason": "No installed adapter runs this in custom workflows in this workspace."
+      },
+      {
+        "kind": "condition",
+        "label": "Check a condition",
+        "description": "Continue only when a field has a specific value.",
+        "executable": true,
+        "reason": null
+      },
+      {
+        "kind": "capability",
+        "label": "Take an action",
+        "description": "Ask a connected system to make a change. Action Admission checks policy first.",
+        "executable": false,
+        "reason": "No installed adapter runs this in custom workflows in this workspace."
+      },
+      {
+        "kind": "approval",
+        "label": "Ask for approval",
+        "description": "Wait for an owner or admin to approve the next action.",
+        "executable": false,
+        "reason": "No installed adapter runs this in custom workflows in this workspace."
+      },
+      {
+        "kind": "wait",
+        "label": "Wait",
+        "description": "Pause for a fixed time before continuing.",
+        "executable": true,
+        "reason": null
+      },
+      {
+        "kind": "verification",
+        "label": "Check the result",
+        "description": "Read the result independently to confirm the action worked.",
+        "executable": false,
+        "reason": "No installed adapter runs this in custom workflows in this workspace."
+      },
+      {
+        "kind": "escalation",
+        "label": "Escalate",
+        "description": "Stop and hand the run to a person.",
+        "executable": true,
+        "reason": null
+      },
+      {
+        "kind": "end",
+        "label": "Finish",
+        "description": "Finish the run with a named outcome.",
+        "executable": true,
+        "reason": null
+      },
+      {
+        "kind": "code",
+        "label": "Run a Code Step",
+        "description": "Compute values with sandboxed TypeScript when the builder is not enough.",
+        "executable": true,
+        "reason": null
+      }
+    ],
+    "subjects": [
+      {
+        "kind": "inventory_position",
+        "label": "Stock position",
+        "description": "A mapped SKU at one inventory location.",
+        "executable": false,
+        "reason": "Purchase-order steps run only in the built-in Replenish low stock workflow. Use that template to create orders."
+      },
+      {
+        "kind": "order",
+        "label": "Order",
+        "description": "A sales order in a connected shop or ERP.",
+        "executable": false,
+        "reason": "Shipping-method corrections run only in the built-in Resolution workflow for detected issues."
+      },
+      {
+        "kind": "purchase_order",
+        "label": "Purchase order",
+        "description": "A purchase order recorded in Procurement.",
+        "executable": false,
+        "reason": "Purchase-order steps run only in the built-in Replenish low stock workflow. Use that template to create orders."
+      }
+    ],
+    "reads": [
+      {
+        "source": "inventory",
+        "label": "Current stock",
+        "description": "Fresh available quantity, SKU and unit for the configured stock position.",
+        "fields": {
+          "fresh": "boolean",
+          "available": "number",
+          "sku": "string",
+          "unit": "string"
+        },
+        "executable": false,
+        "reason": "Purchase-order steps run only in the built-in Replenish low stock workflow. Use that template to create orders."
+      },
+      {
+        "source": "procurement.replenishment",
+        "label": "Replenishment proposal",
+        "description": "Whether an order is needed, its quantity and supplier, checked against open orders.",
+        "fields": {
+          "eligible": "boolean",
+          "committed": "boolean",
+          "quantity": "number",
+          "approvalRequired": "boolean",
+          "supplier": "string"
+        },
+        "executable": false,
+        "reason": "Purchase-order steps run only in the built-in Replenish low stock workflow. Use that template to create orders."
+      }
+    ],
+    "capabilities": [
+      {
+        "capability": "orders.shipping-method.write",
+        "version": "0",
+        "label": "Correct the order’s shipping method",
+        "description": "Changes the order’s shipping method in the connected system to the mapped method.",
+        "targetKind": "order",
+        "minimumRisk": "high",
+        "approval": "An independent owner or admin must approve each change.",
+        "parameters": {},
+        "postcondition": {
+          "shippingMethodId": "string"
+        },
+        "evaluators": ["shipping-method/1"],
+        "executable": false,
+        "reason": "Shipping-method corrections run only in the built-in Resolution workflow for detected issues."
+      },
+      {
+        "capability": "procurement.purchase-order.create",
+        "version": "1",
+        "label": "Create a purchase-order draft",
+        "description": "Records a draft purchase order for the supplier. It is not sent to the supplier.",
+        "targetKind": "purchase_order",
+        "minimumRisk": "medium",
+        "approval": "Workspace policy decides whether a different owner or admin must approve each order.",
+        "parameters": {
+          "quantity": "number"
+        },
+        "postcondition": {
+          "status": "string"
+        },
+        "evaluators": ["procurement/1"],
+        "executable": false,
+        "reason": "Purchase-order steps run only in the built-in Replenish low stock workflow. Use that template to create orders."
+      }
+    ],
+    "evaluators": [
+      {
+        "version": "procurement/1",
+        "label": "Check the purchase-order draft",
+        "description": "Reads the order independently to confirm ownership, draft status, supplier and lines.",
+        "fields": {
+          "purchaseOrderId": "string",
+          "quantity": "number",
+          "status": "string"
+        },
+        "executable": false,
+        "reason": "Purchase-order steps run only in the built-in Replenish low stock workflow. Use that template to create orders."
+      },
+      {
+        "version": "shipping-method/1",
+        "label": "Check the shipping method",
+        "description": "Reads the order again to confirm the selected shipping method.",
+        "fields": {
+          "shippingMethodId": "string"
+        },
+        "executable": false,
+        "reason": "Shipping-method corrections run only in the built-in Resolution workflow for detected issues."
+      }
+    ],
+    "codeSteps": {
+      "executable": true,
+      "reason": null,
+      "evaluation": true,
+      "runtime": "wasmtime-49.0.1/javy-9.1.0/typescript-5.9.3/1",
+      "limits": {
+        "fuel": 100000000,
+        "memoryBytes": 67108864,
+        "wallTimeMs": 5000,
+        "maxRequests": 0
+      }
+    }
+  },
+  "cases": [
+    {
+      "id": "replenishment",
+      "prompt": "When available stock for a stock position drops below its minimum (evidence field `belowMinimum`), read the current stock and escalate if it isn't fresh. Then read the replenishment proposal and finish if no order is needed. Otherwise draft a purchase order for the proposed quantity with the usual supplier and check the draft independently.",
+      "reference": {
+        "kind": "replenishment"
+      }
+    },
+    {
+      "id": "shipping-method-correction",
+      "prompt": "When an issue is detected for an order with the wrong shipping method, continue only if the diagnosis is ready (`diagnosisReady`) and the correct method is mapped (`methodMapped`); otherwise escalate. Ask an owner or admin to approve, change the order's shipping method to the mapped method (input `shippingMethodId`), and read the order again to confirm the new method.",
+      "reference": {
+        "kind": "shipping-method"
+      }
+    },
+    {
+      "id": "reorder-quantity",
+      "prompt": "When someone starts it for a stock position, compute the reorder quantity as the target stock (input `target`) minus the available stock (evidence `available`), never below zero, and whether it is more than 500 units (`tooLarge`). Escalate to a person when it is too large; otherwise finish.",
+      "reference": {
+        "kind": "content",
+        "content": {
+          "schemaVersion": 2,
+          "definition": {
+            "id": "reorder-quantity",
+            "name": "Compute a reorder quantity",
+            "intent": "Work out how many units to reorder.",
+            "category": "custom"
+          },
+          "version": "1.0.0",
+          "applicability": {
+            "trigger": {
+              "kind": "manual"
+            },
+            "subjectKind": "inventory_position"
+          },
+          "inputs": {
+            "target": "number"
+          },
+          "context": {
+            "kind": "manual",
+            "fields": {
+              "available": "number"
+            },
+            "maxAgeSeconds": 300
+          },
+          "steps": [
+            {
+              "id": "calculate",
+              "kind": "code",
+              "source": "function main(input) {\n  const quantity = Math.max(0, input.inputs.target - input.evidence.available);\n  return { quantity, tooLarge: quantity > 500 };\n}",
+              "fields": {
+                "quantity": "number",
+                "tooLarge": "boolean"
+              },
+              "grants": [],
+              "limits": {
+                "fuel": 100000000,
+                "memoryBytes": 67108864,
+                "wallTimeMs": 5000,
+                "maxRequests": 0
+              }
+            },
+            {
+              "id": "within-limit",
+              "kind": "condition",
+              "field": "tooLarge",
+              "equals": false,
+              "onFalse": "escalate"
+            },
+            {
+              "id": "done",
+              "kind": "end",
+              "outcome": "Quantity calculated"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "late-order",
+      "prompt": "When an order event arrives, compute how many days late the order is from its promised date (evidence `promisedAt`, an ISO date) and the run's start time, and whether it is late (`late`). Finish when it isn't late; otherwise escalate it to a person.",
+      "reference": {
+        "kind": "content",
+        "content": {
+          "schemaVersion": 2,
+          "definition": {
+            "id": "late-order",
+            "name": "Escalate late orders",
+            "intent": "Hand late orders to a person.",
+            "category": "custom"
+          },
+          "version": "1.0.0",
+          "applicability": {
+            "trigger": {
+              "kind": "event",
+              "eventType": "order.updated"
+            },
+            "subjectKind": "order"
+          },
+          "inputs": {},
+          "context": {
+            "kind": "order.updated",
+            "fields": {
+              "promisedAt": "string"
+            },
+            "maxAgeSeconds": 300
+          },
+          "steps": [
+            {
+              "id": "lateness",
+              "kind": "code",
+              "source": "function main(input, luma) {\n  const days = Math.floor((Date.parse(luma.now) - Date.parse(input.evidence.promisedAt)) / 86400000);\n  return { daysLate: Math.max(0, days), late: days > 0 };\n}",
+              "fields": {
+                "daysLate": "number",
+                "late": "boolean"
+              },
+              "grants": [],
+              "limits": {
+                "fuel": 100000000,
+                "memoryBytes": 67108864,
+                "wallTimeMs": 5000,
+                "maxRequests": 0
+              }
+            },
+            {
+              "id": "is-late",
+              "kind": "condition",
+              "field": "late",
+              "equals": true,
+              "onFalse": "end"
+            },
+            {
+              "id": "hand-over",
+              "kind": "escalation",
+              "reason": "Order is late"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "margin-check",
+      "prompt": "When someone starts it for an order, compute the margin percentage from the input `price` and input `cost`, and whether it is below 15 percent (`belowFloor`). Finish when the margin is fine; escalate to a person when it is below the floor.",
+      "reference": {
+        "kind": "content",
+        "content": {
+          "schemaVersion": 2,
+          "definition": {
+            "id": "margin-check",
+            "name": "Check order margin",
+            "intent": "Flag orders with a low margin.",
+            "category": "custom"
+          },
+          "version": "1.0.0",
+          "applicability": {
+            "trigger": {
+              "kind": "manual"
+            },
+            "subjectKind": "order"
+          },
+          "inputs": {
+            "price": "number",
+            "cost": "number"
+          },
+          "context": {
+            "kind": "manual",
+            "fields": {},
+            "maxAgeSeconds": 300
+          },
+          "steps": [
+            {
+              "id": "margin",
+              "kind": "code",
+              "source": "function main(input) {\n  const margin = input.inputs.price > 0 ? ((input.inputs.price - input.inputs.cost) / input.inputs.price) * 100 : 0;\n  return { margin, belowFloor: margin < 15 };\n}",
+              "fields": {
+                "margin": "number",
+                "belowFloor": "boolean"
+              },
+              "grants": [],
+              "limits": {
+                "fuel": 100000000,
+                "memoryBytes": 67108864,
+                "wallTimeMs": 5000,
+                "maxRequests": 0
+              }
+            },
+            {
+              "id": "margin-ok",
+              "kind": "condition",
+              "field": "belowFloor",
+              "equals": false,
+              "onFalse": "escalate"
+            },
+            {
+              "id": "done",
+              "kind": "end",
+              "outcome": "Margin checked"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "held-order-follow-up",
+      "prompt": "When someone starts it for an order that is on hold (evidence `held`), finish if it isn't held. Otherwise wait one hour and then escalate it to a person.",
+      "reference": {
+        "kind": "content",
+        "content": {
+          "schemaVersion": 2,
+          "definition": {
+            "id": "held-order-follow-up",
+            "name": "Follow up on held orders",
+            "intent": "Escalate orders that stay on hold.",
+            "category": "custom"
+          },
+          "version": "1.0.0",
+          "applicability": {
+            "trigger": {
+              "kind": "manual"
+            },
+            "subjectKind": "order"
+          },
+          "inputs": {},
+          "context": {
+            "kind": "manual",
+            "fields": {
+              "held": "boolean"
+            },
+            "maxAgeSeconds": 300
+          },
+          "steps": [
+            {
+              "id": "still-held",
+              "kind": "condition",
+              "field": "held",
+              "equals": true,
+              "onFalse": "end"
+            },
+            {
+              "id": "pause",
+              "kind": "wait",
+              "seconds": 3600
+            },
+            {
+              "id": "hand-over",
+              "kind": "escalation",
+              "reason": "Order is still on hold"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

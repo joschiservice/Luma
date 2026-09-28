@@ -13,6 +13,8 @@ This directory is the source of truth for implementation ADRs. Review and versio
 
 [ADR-005](005-domain-packages-and-runtimes.md) defines the accepted domain package layout, API/worker processes, shared composition and persistence ownership. It supersedes ADR-001’s source placement.
 
+[The model processing-path review](003-model-processing-path-review.md) applies ADR-003 to the Bedrock EU route for tenant authoring prompts. It is pending operator sign-off.
+
 ## Baseline
 
 Carried forward from the [Linear architecture register](https://linear.app/auren-labs/document/architecture-decision-register-305db9bed1de):

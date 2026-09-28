@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
 import { parseEnv } from 'node:util';
@@ -39,6 +39,25 @@ export async function connectionKey(path = connectionKeyPath) {
 }
 
 export const project = `luma-${createHash('sha256').update(root).digest('hex').slice(0, 12)}`;
+
+/**
+ * Finds the Code Step runtime for local processes: an explicit `LUMA_CODE_RUNTIME_DIR` from
+ * apps/api/.env wins, otherwise the directory `pnpm setup:code` installs into when it exists.
+ * Returns null when no runtime is installed, so Code Steps stay unavailable.
+ */
+export async function codeRuntimeDirectory(
+  apiEnv = {},
+  installed = join(stateDirectory, 'code-runtime'),
+) {
+  if (apiEnv.LUMA_CODE_RUNTIME_DIR) return apiEnv.LUMA_CODE_RUNTIME_DIR;
+  try {
+    await access(join(installed, 'manifest.json'));
+
+    return installed;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Returns a currently available loopback port; the port is released before returning and is
@@ -161,6 +180,9 @@ export async function environment(saved, workflows = false, observing = false) {
     TEMPORAL_TLS: 'false',
     TEMPORAL_API_KEY: '',
   };
+  const codeRuntime = await codeRuntimeDirectory(apiEnv);
+  // The API and the workflow worker both run Code Steps, so both need the same runtime.
+  if (codeRuntime) generated.LUMA_CODE_RUNTIME_DIR = codeRuntime;
   if (workflows) {
     generated.TEMPORAL_ADDRESS = await compose(
       saved,

@@ -1,4 +1,7 @@
-import type { PlaybookGrantReader } from '@luma/connections';
+import type {
+  PlaybookGrantReader,
+  PlaybookGrantSource,
+} from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
 import { IdentityError, requireRole, requireTenant } from '@luma/identity';
 import { currentPolicyVersion } from '@luma/policies';
@@ -77,6 +80,29 @@ const equalRequest = (left: ActivatePlaybook, right: ActivatePlaybook) =>
   left.scopeReviewed === right.scopeReviewed &&
   [...left.targetIds].sort().join() === [...right.targetIds].sort().join();
 
+/** Lists what a connection needs before an order correction can use it. Empty when eligible. */
+export function connectionBlockers({
+  connection,
+  targets,
+}: PlaybookGrantSource): string[] {
+  const blockers: string[] = [];
+  if (connection.status !== 'active')
+    blockers.push('Validate or reconnect this connection before activation.');
+  for (const permission of [
+    'orders.shipping-method.write',
+    'orders.read',
+  ] as const)
+    if (
+      !connection.permissions.includes(permission) ||
+      !connection.granted.includes(permission)
+    )
+      blockers.push(`Grant ${permission} in Connections and validate access.`);
+  if (!targets.length)
+    blockers.push('Ingest and map at least one order on this connection.');
+
+  return blockers;
+}
+
 /** Provides member-readable playbooks and atomic administrator activation commands. */
 export function createPlaybookLibrary(deps: PlaybookLibraryDependencies) {
   async function authorize(context: TenantContext, write = false) {
@@ -130,35 +156,14 @@ export function createPlaybookLibrary(deps: PlaybookLibraryDependencies) {
         ),
       ];
     const latest = versions[0]!;
-    const connections = sources.map(({ connection, targets }) => {
-      const blockers: string[] = [];
-      if (connection.status !== 'active')
-        blockers.push(
-          'Validate or reconnect this connection before activation.',
-        );
-      for (const permission of [
-        'orders.shipping-method.write',
-        'orders.read',
-      ] as const)
-        if (
-          !connection.permissions.includes(permission) ||
-          !connection.granted.includes(permission)
-        )
-          blockers.push(
-            `Grant ${permission} in Connections and validate access.`,
-          );
-      if (!targets.length)
-        blockers.push('Ingest and map at least one order on this connection.');
-
-      return {
-        id: connection.id,
-        label: connection.label,
-        version: connection.version,
-        system: connection.target.kind,
-        blockers,
-        targets,
-      };
-    });
+    const connections = sources.map(({ connection, targets }) => ({
+      id: connection.id,
+      label: connection.label,
+      version: connection.version,
+      system: connection.target.kind,
+      blockers: connectionBlockers({ connection, targets }),
+      targets,
+    }));
     const blockers = [...latest.blockers];
     if (!connections.some((c) => c.blockers.length === 0))
       blockers.push(

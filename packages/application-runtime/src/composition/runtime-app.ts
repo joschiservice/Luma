@@ -22,6 +22,7 @@ import { Pool } from 'pg';
 
 import { createMetricListener } from '../infrastructure/metric-listener.js';
 import { createApplicationServices } from './application.js';
+import { authoringAvailability } from './authoring.js';
 import { buildApp } from './http-app.js';
 import { createReadinessCheck } from './readiness.js';
 import { createResourceScope } from './resources.js';
@@ -100,6 +101,8 @@ export async function buildRuntimeApp(
         : { kind: 'disabled' },
       ...(processClient ? { replenishmentTransport: processClient } : {}),
       desk: workflowReader ? { workflow: workflowReader.get } : {},
+      ...(modelGateway ? { modelGateway } : {}),
+      authoring: authoringAvailability(modelSettings, !!modelGateway),
     });
     const metricEvents = createMetricListener(settings.databaseUrl);
     resources.add(metricEvents.close);

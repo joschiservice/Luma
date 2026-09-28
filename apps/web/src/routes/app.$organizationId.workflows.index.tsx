@@ -7,5 +7,6 @@ import {
 
 export const Route = createFileRoute('/app/$organizationId/workflows/')({
   validateSearch: parseWorkflowFilters,
+  staticData: { help: 'workflows' },
   component: WorkflowsPage,
 });

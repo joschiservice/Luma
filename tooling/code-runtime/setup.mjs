@@ -125,7 +125,7 @@ try {
     { mode: 0o600 },
   );
   console.log(
-    `Code runtime installed. Set LUMA_CODE_RUNTIME_DIR=${destination}`,
+    `Code runtime installed in ${destination}. pnpm dev and pnpm dev:workflows use it automatically; elsewhere, set LUMA_CODE_RUNTIME_DIR=${destination} for the API and the workflow worker.`,
   );
 } finally {
   await rm(staging, { recursive: true, force: true });

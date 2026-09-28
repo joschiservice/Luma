@@ -12,7 +12,10 @@ export type {
 
 export type { SqlTransaction, TenantDatabase } from './application/database.js';
 
-export { ModelGatewayError } from './application/model-gateway.js';
+export {
+  authoringModelProfile,
+  ModelGatewayError,
+} from './application/model-gateway.js';
 
 export type {
   JsonValue,

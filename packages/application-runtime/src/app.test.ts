@@ -589,6 +589,122 @@ it('composes model-backed work with routes selected by startup configuration', a
   }
 });
 
+it('composes the EU authoring route from startup configuration', async () => {
+  const { readModelGatewayConfig } = await import('@luma/config');
+  const { authoringModelProfile } = await import('@luma/platform');
+  const { createModelGateway } = await import('@luma/platform/composition');
+  const model = 'eu.anthropic.claude-sonnet-4-5-20250929-v1:0';
+  const env = {
+    MODEL_GATEWAY_ROUTES: JSON.stringify({
+      [authoringModelProfile]: {
+        adapter: 'bedrock-eu',
+        model,
+        providers: ['bedrock'],
+        zeroDataRetention: true,
+      },
+    }),
+    MODEL_GATEWAY_BEDROCK_REGION: 'eu-central-1',
+    MODEL_GATEWAY_BEDROCK_ACCESS_KEY_ID: 'AKIAEXAMPLERUNTIME01',
+    MODEL_GATEWAY_BEDROCK_SECRET_ACCESS_KEY: 'runtime-secret-access-key',
+  };
+  const observability = createObservability({
+    environment: 'test',
+    release: 'test',
+    sampleRate: 1,
+    approvedModels: [model],
+  });
+  const destinations: string[] = [];
+  const gateway = createModelGateway(
+    readModelGatewayConfig(env),
+    observability,
+    {
+      transport: async (url) => {
+        const target = new URL(String(url));
+        destinations.push(`${target.host}${target.pathname}`);
+        if (target.pathname === '/data-retention')
+          return Response.json({ mode: 'none' });
+        if (target.pathname === '/logging/modelinvocations')
+          return Response.json({});
+        if (target.pathname.startsWith('/inference-profiles/'))
+          return Response.json({
+            models: [
+              {
+                modelArn:
+                  'arn:aws:bedrock:eu-central-1::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0',
+              },
+            ],
+          });
+
+        return Response.json({
+          output: {
+            message: { role: 'assistant', content: [{ text: 'draft' }] },
+          },
+          stopReason: 'end_turn',
+          usage: { inputTokens: 2, outputTokens: 1 },
+        });
+      },
+    },
+  );
+  const root = observability.request(randomUUID());
+  const result = await gateway.generate(root.context, {
+    profile: authoringModelProfile,
+    dataPolicy: {
+      classification: 'sensitive',
+      region: 'EU',
+      zeroDataRetention: true,
+    },
+    messages: [{ role: 'user', content: 'Describe a synthetic workflow.' }],
+    maxOutputTokens: 64,
+  });
+  root.end();
+  expect(result.output).toBe('draft');
+  expect(destinations).toEqual([
+    'bedrock.eu-central-1.amazonaws.com/data-retention',
+    'bedrock.eu-central-1.amazonaws.com/logging/modelinvocations',
+    'bedrock.eu-central-1.amazonaws.com/inference-profiles/eu.anthropic.claude-sonnet-4-5-20250929-v1%3A0',
+    'bedrock-runtime.eu-central-1.amazonaws.com/model/eu.anthropic.claude-sonnet-4-5-20250929-v1%3A0/converse',
+  ]);
+
+  const unconfigured = createModelGateway(
+    readModelGatewayConfig({}),
+    observability,
+  );
+  await expect(
+    unconfigured.generate(root.context, {
+      profile: authoringModelProfile,
+      dataPolicy: {
+        classification: 'sensitive',
+        region: 'EU',
+        zeroDataRetention: true,
+      },
+      messages: [{ role: 'user', content: 'Describe a synthetic workflow.' }],
+      maxOutputTokens: 64,
+    }),
+  ).rejects.toMatchObject({ code: 'route_denied' });
+  expect(() =>
+    createModelGateway(
+      {
+        ...readModelGatewayConfig(env),
+        bedrock: {
+          region: 'eu-west-2',
+          credentials: {
+            accessKeyId: 'AKIAEXAMPLERUNTIME01',
+            secretAccessKey: 'runtime-secret-access-key',
+          },
+        },
+      },
+      observability,
+    ),
+  ).toThrow('Bedrock region must be an AWS region in the EU');
+  expect(() =>
+    readModelGatewayConfig({
+      ...env,
+      MODEL_GATEWAY_BEDROCK_SECRET_ACCESS_KEY: undefined,
+    }),
+  ).toThrow();
+  await observability.shutdown();
+});
+
 it('closes unused TCP preconnections during shutdown', async () => {
   const app = buildApp();
   const address = new URL(await app.listen({ host: '127.0.0.1', port: 0 }));

@@ -79,6 +79,13 @@ export interface ModelGateway {
 
 export type ModelAdapterId = 'vercel' | 'bedrock-eu';
 
+/**
+ * Profile for natural-language workflow authoring. Authoring prompts contain tenant data, so
+ * send them as `sensitive` with `region: 'EU'` and route this profile to an EU zero-retention
+ * route such as `bedrock-eu`.
+ */
+export const authoringModelProfile = 'authoring';
+
 export interface ModelRoute {
   readonly adapter: ModelAdapterId;
   readonly model: string;

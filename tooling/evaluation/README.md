@@ -66,3 +66,7 @@ A restart serializes the complete provider/persistence/ID checkpoint to JSON and
 ## Code Step replay
 
 Run `pnpm setup:code`, then `pnpm evaluate:code [corpus.json] [report.json]` to evaluate a pinned Code Step with ordered fixture replies. The default corpus is `fixtures/code-corpus.json`. Every scenario runs twice; outputs, request order and input digests must agree. Reports exclude wall-time and memory measurements. See [Code Steps](../../docs/code-steps.md) for runtime installation, capability grants and deployment limits.
+
+## Authoring evaluation
+
+Configure the EU `authoring` model route, then run `pnpm evaluate:authoring [corpus.json] [report.json]` to describe each workflow in `fixtures/authoring-corpus.json` through the production authoring path. The report (default `.luma/evaluations/authoring.json`) gives the valid-draft rate and the structural equivalence rate against each reference. `pnpm test:evaluation` runs the evaluator against a deterministic fake model. See [Describe a workflow](../../docs/workflows.md#authoring-evaluation) for the corpus, the equivalence rules and where to record results.

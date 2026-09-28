@@ -42,8 +42,19 @@ import {
   registerMetricEvents,
   shadowRoutes,
 } from '@luma/resolution/http';
-import type { WorkflowCatalog } from '@luma/workflows';
-import { workflowRoutes } from '@luma/workflows/http';
+import type {
+  DraftGeneration,
+  DraftTests,
+  WorkflowCatalog,
+  WorkflowDrafts,
+  WorkflowTemplates,
+} from '@luma/workflows';
+import {
+  draftTestRoutes,
+  workflowDraftRoutes,
+  workflowGenerationRoutes,
+  workflowRoutes,
+} from '@luma/workflows/http';
 import { initServer } from '@ts-rest/fastify';
 import type { FastifyServerOptions } from 'fastify';
 import Fastify, { LogController } from 'fastify';
@@ -63,6 +74,10 @@ export interface AppDependencies {
   activity?: ActivityService;
   playbooks?: PlaybookLibrary;
   workflows?: WorkflowCatalog;
+  workflowDrafts?: WorkflowDrafts;
+  workflowTemplates?: WorkflowTemplates;
+  draftTests?: DraftTests;
+  workflowGeneration?: DraftGeneration;
   procurement?: ProcurementService;
   learning?: LearningService;
   desk?: DeskService;
@@ -245,6 +260,14 @@ export function buildApp(
         activity: activityRoutes(dependencies.activity),
         playbooks: playbookRoutes(dependencies.playbooks),
         workflows: workflowRoutes(dependencies.workflows),
+        workflowDrafts: workflowDraftRoutes(
+          dependencies.workflowDrafts,
+          dependencies.workflowTemplates,
+        ),
+        draftTests: draftTestRoutes(dependencies.draftTests),
+        workflowGeneration: workflowGenerationRoutes(
+          dependencies.workflowGeneration,
+        ),
         procurement: procurementRoutes(dependencies.procurement),
         exceptions: caseRoutes(dependencies.cases),
         caseDesk: deskRoutes(dependencies.desk),

@@ -26,6 +26,8 @@ export { createReplenishmentService } from './application/replenishment-workflow
 
 export type { ReplenishmentTransport } from './application/replenishment-workflow.js';
 
+export { createReplenishmentScenarios } from './application/replenishment-scenarios.js';
+
 export {
   procurementMetricDefinitions,
   stockMetricDefinitions,

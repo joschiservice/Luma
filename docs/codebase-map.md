@@ -103,6 +103,49 @@ workflow unit tests and `apps/api/e2e/workflows.e2e.mjs`.
 
 Multi-step process versions compile in `packages/workflows/src/infrastructure/process-schema.ts` and run through `application/process-runtime.ts`. `application/process-activities.ts` enforces an independent Action Admission call for each capability step. Temporal replay and waits live in `packages/workflow-temporal/src/process-workflow.ts`; step records use migration `0026_workflow_process_steps.sql`. The Workflow detail page shows the evidence timeline. See [Multi-step Workflow runtime](workflow-process-runtime.md) for adapter wiring and state ownership.
 
+## Workflow authoring
+
+Drafts, validation and publication start at
+`packages/workflows/src/application/drafts.ts`; the rules live in
+`infrastructure/process-schema.ts` (`checkProcessWorkflow`, `checkDraftContent`,
+`parseDraftShape`) and `domain/vocabulary.ts` (vocabulary checks and step scopes).
+The code view printer and parser are `domain/workflow-code.ts`; step summaries are
+`domain/draft-presentation.ts`. Persistence is `infrastructure/drafts.ts` with
+migration `0034_workflow_drafts.sql`. Templates are `application/templates.ts`
+with sources in `packages/procurement/src/application/replenishment-workflow.ts`
+and `packages/resolution/src/application/shipping-method-authoring.ts`, which also
+contribute vocabulary. Contracts are `packages/api-contract/src/workflow-drafts.ts`;
+routes are `packages/workflows/src/api/drafts.ts`, composed by `createDrafts` and
+wired in `packages/application-runtime/src/composition/application.ts`.
+
+The web gallery and editor are in `apps/web/src/features/workflows/authoring`
+(`gallery.tsx`, `use-template.tsx`, `editor.tsx`, `builder.tsx`,
+`step-forms.tsx`, `code-view.tsx`, `code-step-editor.tsx`, `publish.tsx`); the
+code editor primitive is `packages/ui/src/components/primitives/code-editor.tsx`.
+
+Tests: `process-schema.test.ts`, `vocabulary.test.ts`, `workflow-code.test.ts`,
+`infrastructure/drafts.test.ts`, `draft-model.test.ts`, the
+`Workflows/Authoring` and `UI/Code editor` stories,
+`apps/api/e2e/workflow-drafts.e2e.mjs` and `workflow-authoring.browser.mjs`. See
+[Workflow model](workflows.md#authoring-and-runtime-support).
+
+Describing and refining drafts in natural language starts at
+`packages/workflows/src/application/draft-generation.ts` (`createDraftGeneration`,
+`generateDraft`). The vocabulary-limited output schema is
+`domain/generation-schema.ts`; prompts, draft identity, removal of uninstalled
+entries and Code Step checks are `domain/draft-generation.ts`; the step-level
+diff is `domain/draft-diff.ts`. Output parsers are
+`infrastructure/generation-output.ts`; records are `infrastructure/generations.ts`
+with migration `0036_workflow_generations.sql`. Contracts are
+`packages/api-contract/src/workflow-generation.ts`; routes are
+`packages/workflows/src/api/generation.ts`, composed by `createDraftGenerations`.
+`packages/application-runtime/src/composition/authoring.ts` decides availability
+from the model routes. Tests: `domain/draft-generation.test.ts`,
+`infrastructure/draft-generation.test.ts`, `composition/authoring.test.ts` and
+`apps/api/e2e/workflow-generation.e2e.mjs`; the evaluation set is
+`tooling/evaluation/authoring.mjs` (`pnpm evaluate:authoring`). See
+[Describe a workflow](workflows.md#describe-a-workflow).
+
 ## Procurement
 
 Start at `packages/procurement/src/domain/procurement.ts` for Supplier,
@@ -130,6 +173,8 @@ and Workflow compiler tests. See [Replenishment workflow](replenishment.md) for
 scope, policy, recovery and the six simulator scenarios.
 
 Sandboxed Code Steps: `packages/workflows/src/domain/code-step.ts`, `application/code-activity.ts`, and `infrastructure/code/`; native computation wiring in `infrastructure/code-processes.ts`. UI: `apps/web/src/features/workflows/code-steps.tsx`. Replay gate: `tooling/evaluation/code.mjs`. Runtime setup and contract: [Code Steps](code-steps.md). API/browser coverage: `apps/api/e2e/code-steps.*.mjs`.
+
+Draft tests: cases, validation and prefill live in `packages/workflows/src/domain/draft-test.ts`; step results in `domain/draft-test-presentation.ts`. `application/draft-tests.ts` runs the real `runProcess` with example activities and optional sandboxed Code Steps. Storage is `infrastructure/draft-tests.ts` with migration `0035_workflow_draft_tests.sql`; routes are `api/draft-tests.ts` and `packages/api-contract/src/contracts/draft-tests.ts`. Adapters add scenarios through `TestScenarioSource`; replenishment's are in `packages/procurement/src/application/replenishment-scenarios.ts`. Tests: `draft-test.test.ts`, `infrastructure/draft-tests.test.ts`, `draft-test-code.test.ts`, `packages/application-runtime/src/composition/draft-tests.test.ts` and `apps/api/e2e/workflow-draft-tests.e2e.mjs`. See [Test a draft](workflows.md#test-a-draft).
 
 ## Operational metrics
 
