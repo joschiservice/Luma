@@ -20,6 +20,7 @@ import {
 import type { FastifyServerOptions } from 'fastify';
 import { Pool } from 'pg';
 
+import { createMetricListener } from '../infrastructure/metric-listener.js';
 import { createApplicationServices } from './application.js';
 import { buildApp } from './http-app.js';
 import { createReadinessCheck } from './readiness.js';
@@ -100,7 +101,10 @@ export async function buildRuntimeApp(
       ...(processClient ? { replenishmentTransport: processClient } : {}),
       desk: workflowReader ? { workflow: workflowReader.get } : {},
     });
+    const metricEvents = createMetricListener(settings.databaseUrl);
+    resources.add(metricEvents.close);
     const app = buildApp(options, {
+      metricEvents,
       ...application.http,
       ...(observability ? { observability } : {}),
       ...(modelGateway ? { modelGateway } : {}),

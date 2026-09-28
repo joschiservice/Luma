@@ -1,9 +1,17 @@
 import { generateOpenApi } from '@ts-rest/open-api';
 
-import { apiContract, caseEventsContract } from './index.js';
+import {
+  apiContract,
+  caseEventsContract,
+  metricEventsContract,
+} from './index.js';
 
 export const openApiDocument = generateOpenApi(
-  { ...apiContract, caseEvents: caseEventsContract },
+  {
+    ...apiContract,
+    caseEvents: caseEventsContract,
+    metricEvents: metricEventsContract,
+  },
   {
     info: {
       title: 'Luma API',
@@ -15,7 +23,8 @@ export const openApiDocument = generateOpenApi(
   {
     setOperationId: 'concatenated-path',
     operationMapper: (operation, route) =>
-      route.path === caseEventsContract.events.path
+      route.path === caseEventsContract.events.path ||
+      route.path === metricEventsContract.events.path
         ? {
             ...operation,
             parameters: [
@@ -33,7 +42,7 @@ export const openApiDocument = generateOpenApi(
               ...operation.responses,
               200: {
                 description:
-                  'SSE resync events carrying a CaseProgress snapshot and refetch: true.',
+                  'SSE resync events. Refetch the subscribed resource when refetch is true.',
                 content: {
                   'text/event-stream': { schema: { type: 'string' } },
                 },

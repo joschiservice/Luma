@@ -143,13 +143,6 @@ it('explains unknown order totals, opens accessible cohorts and recovers from er
     fullPage: true,
   });
   await seed(26);
-  await dialog.getByRole('button', { name: 'Previous', exact: true }).click();
-  await dialog
-    .getByText('The matching orders changed', { exact: true })
-    .waitFor();
-  await dialog
-    .getByRole('button', { name: 'Refresh orders', exact: true })
-    .click();
   await dialog.getByText('1–20 of 26 known matches').waitFor();
   await page.keyboard.press('Escape');
   await dialog.waitFor({ state: 'hidden' });

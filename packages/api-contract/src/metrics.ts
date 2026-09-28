@@ -56,6 +56,12 @@ export const metricDefinitionSchema = z.object({
 });
 
 export const metricResponseSchema = z.object({
+  nextRefreshAt: timestamp
+    .nullable()
+    .optional()
+    .describe(
+      'Next deadline or freshness boundary. Refresh current metrics at this time, even if no change event arrives.',
+    ),
   definitionVersion: z.literal(1),
   scope: metricScopeSchema,
   asOf: timestamp,

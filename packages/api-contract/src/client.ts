@@ -1,6 +1,7 @@
 import type { ClientArgs, InitClientReturn } from '@ts-rest/core';
 import { initClient } from '@ts-rest/core';
 
+import { metricStreamEventSchema } from './contracts/events.js';
 import { caseStreamEventSchema } from './desk.js';
 import { apiContract } from './index.js';
 
@@ -43,6 +44,38 @@ export function subscribeToCaseProgress(options: {
       options.onError();
     }
   });
+  source.addEventListener('error', options.onError);
+
+  return () => source.close();
+}
+
+/** Opens scoped invalidations; reconnects request current state rather than replaying deltas. */
+export function subscribeToMetrics(options: {
+  baseUrl: string;
+  organizationId: string;
+  onResync: (
+    event: import('zod').infer<typeof metricStreamEventSchema>,
+  ) => void;
+  onError: () => void;
+}) {
+  const source = new EventSource(
+    `${options.baseUrl.replace(/\/$/, '')}/v1/organizations/${encodeURIComponent(options.organizationId)}/metrics/events`,
+    { withCredentials: true },
+  );
+  source.addEventListener('resync', (event) => {
+    try {
+      const parsed = metricStreamEventSchema.parse(
+        JSON.parse((event as MessageEvent).data),
+      );
+      if (parsed.organizationId !== options.organizationId)
+        throw new Error('Scope mismatch');
+      options.onResync(parsed);
+    } catch {
+      source.close();
+      options.onError();
+    }
+  });
+  source.addEventListener('access-check', options.onError);
   source.addEventListener('error', options.onError);
 
   return () => source.close();

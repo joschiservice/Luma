@@ -51,3 +51,9 @@ The order operations section uses the [shared metric registry](operational-metri
 for open, overdue and attention orders. Its observed counts and drill-down records
 share a consistent database snapshot. Incomplete coverage remains visible; missing
 deadlines and complete totals are never replaced with fabricated zeros.
+
+Order metrics and their matching records now follow committed changes through a
+scoped SSE subscription. Delivery health is separate from source freshness and
+coverage. Deadline changes refresh without a database write. See
+[Live operational metrics](live-operational-metrics.md) for recovery, limits and
+operational checks.

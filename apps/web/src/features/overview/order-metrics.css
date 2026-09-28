@@ -216,3 +216,7 @@
   max-height: 32vh;
   overflow-y: auto;
 }
+
+.order-metrics-heading + .order-metrics-provenance {
+  margin-bottom: 12px;
+}

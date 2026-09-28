@@ -26,6 +26,7 @@ describe('connection coverage', () => {
       label: connection.label,
       status: 'degraded',
       lastObservedAt: null,
+      nextRefreshAt: null,
       freshness: 'unobserved',
     });
   });

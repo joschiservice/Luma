@@ -85,7 +85,11 @@ export { connectorProviderSchema } from './contracts/providers.js';
 
 export type { ConnectorProvider } from './contracts/providers.js';
 
-export { caseEventsContract } from './contracts/events.js';
+export {
+  caseEventsContract,
+  metricEventsContract,
+  metricStreamEventSchema,
+} from './contracts/events.js';
 
 export * from './playbooks.js';
 

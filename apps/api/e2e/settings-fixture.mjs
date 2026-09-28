@@ -87,6 +87,7 @@ export async function settingsFixture(t, origin = 'http://localhost:3000') {
   const command = (body) => ({ commandId: randomUUID(), ...body });
 
   return {
+    config,
     db,
     app,
     identity,

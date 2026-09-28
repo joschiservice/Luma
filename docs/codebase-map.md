@@ -127,3 +127,10 @@ coverage and inbox attention inside a shared read transaction in
 Tests: `packages/application-runtime/src/commerce.integration.test.ts` and
 `apps/api/e2e/metrics.browser.mjs`. See [Shared metrics](operational-metrics.md)
 and [query measurements](operational-metrics-performance.md).
+
+Live metrics use `0031_metric_notifications.sql`, the process listener in
+`packages/application-runtime/src/infrastructure/metric-listener.ts`, and the
+bounded SSE route in `packages/resolution/src/api/metric-events.ts`. The browser
+subscription and recovery hook is `apps/web/src/features/overview/metrics-live.ts`.
+See [Live operational metrics](live-operational-metrics.md); validation is
+`metric-stream.e2e.mjs`, `metric-live.browser.mjs` and the stream unit tests.

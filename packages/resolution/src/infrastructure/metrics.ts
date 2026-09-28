@@ -12,6 +12,9 @@ import {
 import { metricRequestSchema } from './metric-validation.js';
 
 interface Readers {
+  attentionBoundary?: (
+    db: TenantDatabase,
+  ) => (tenantId: string, asOf: string) => Promise<string | null>;
   orders: (db: TenantDatabase) => OrderMetricReader;
   attention: (
     db: TenantDatabase,
@@ -55,6 +58,16 @@ export function createOperationalMetrics(
             asOf,
             attention,
           });
+          const boundary = await readers.attentionBoundary?.(scoped)(
+            context.tenantId,
+            asOf,
+          );
+          if (
+            boundary &&
+            (!result.nextRefreshAt ||
+              Date.parse(boundary) < Date.parse(result.nextRefreshAt))
+          )
+            result.nextRefreshAt = boundary;
           const snapshot = createHash('sha256')
             .update(
               JSON.stringify([

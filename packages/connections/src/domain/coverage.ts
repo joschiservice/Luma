@@ -1,6 +1,8 @@
 import type { InstalledConnection } from './installation.js';
 
 export interface ConnectionCoverage {
+  /** Next freshness boundary for the observed capabilities, when available. */
+  nextRefreshAt?: string | null;
   id: string;
   label: string;
   status: InstalledConnection['status'];
@@ -54,6 +56,17 @@ export function summarizeConnectionCoverage(
   }
 
   return {
+    nextRefreshAt: times.some(
+      (time) => time + freshnessWindowMs + 1 > Date.parse(asOf),
+    )
+      ? new Date(
+          Math.min(
+            ...times
+              .map((time) => time + freshnessWindowMs + 1)
+              .filter((time) => time > Date.parse(asOf)),
+          ),
+        ).toISOString()
+      : null,
     id: connection.id,
     label: connection.label,
     status: connection.status,

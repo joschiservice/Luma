@@ -444,3 +444,21 @@ export function createOrderAttentionReader(db: TenantDatabase) {
       return result.rows;
     });
 }
+
+/** Returns the next diagnosis or approval expiry that can change order attention without a write. */
+export function createOrderAttentionBoundaryReader(db: TenantDatabase) {
+  return (tenantId: string, asOf: string): Promise<string | null> =>
+    db.transaction(tenantId, async (tx) => {
+      const result = await tx.query<{ boundary: string | null }>(
+        `SELECT min(at)::text AS boundary FROM (
+      SELECT (document->'provenance'->>'validUntil')::timestamptz + interval '1 millisecond' AS at FROM exception_diagnoses WHERE tenant_id=$1
+      UNION ALL SELECT (document->>'expiresAt')::timestamptz FROM case_proposals WHERE tenant_id=$1
+      UNION ALL SELECT (document->'preconditions'->>'validUntil')::timestamptz FROM case_proposals WHERE tenant_id=$1
+    ) boundaries WHERE at > $2::timestamptz`,
+        [tenantId, asOf],
+      );
+      const boundary = result.rows[0]?.boundary;
+
+      return boundary ? new Date(boundary).toISOString() : null;
+    });
+}

@@ -14,6 +14,7 @@ export interface MetricRequest {
 }
 
 export interface MetricResponse {
+  nextRefreshAt?: string | null;
   definitionVersion: 1;
   scope: OrderMetricScope;
   asOf: string;
@@ -92,7 +93,15 @@ export function createMetricService(dependencies: {
         c.status !== 'disconnected',
     );
 
+    const boundaries = [
+      result.nextRefreshAt,
+      ...monitored.map((c) => c.nextRefreshAt),
+    ].filter((value): value is string => !!value);
+
     return {
+      nextRefreshAt: boundaries.length
+        ? new Date(Math.min(...boundaries.map(Date.parse))).toISOString()
+        : null,
       definitionVersion: 1,
       scope: request.scope,
       asOf,

@@ -2,7 +2,11 @@ import { readFile } from 'node:fs/promises';
 
 import { expect, it, vi } from 'vitest';
 
-import { createApiClient, subscribeToCaseProgress } from './client.js';
+import {
+  createApiClient,
+  subscribeToCaseProgress,
+  subscribeToMetrics,
+} from './client.js';
 import { dataRegionSchema, organizationParamsSchema } from './index.js';
 import { openApiDocument } from './openapi.js';
 
@@ -163,6 +167,55 @@ it('validates SSE snapshots and closes malformed streams while allowing transpor
     expect(onError).toHaveBeenCalledTimes(1);
     stop();
     expect(close).toHaveBeenCalledTimes(2);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+it('validates metric scope and leaves network errors reconnectable', () => {
+  const listeners = new Map<string, (event: unknown) => void>();
+  const close = vi.fn();
+  vi.stubGlobal(
+    'EventSource',
+    class {
+      addEventListener(name: string, callback: (event: unknown) => void) {
+        listeners.set(name, callback);
+      }
+      close = close;
+    },
+  );
+  try {
+    const onResync = vi.fn();
+    const onError = vi.fn();
+    const organizationId = '11111111-1111-4111-8111-111111111111';
+    const stop = subscribeToMetrics({
+      baseUrl: '/api',
+      organizationId,
+      onResync,
+      onError,
+    });
+    const event = {
+      schemaVersion: 1,
+      organizationId,
+      scope: 'order-metrics',
+      connected: true,
+      refetch: true,
+      sentAt: '2026-09-28T00:00:00.000Z',
+    };
+    listeners.get('resync')!({ data: JSON.stringify(event) });
+    expect(onResync).toHaveBeenCalledWith(event);
+    listeners.get('error')!({});
+    expect(close).not.toHaveBeenCalled();
+    listeners.get('resync')!({
+      data: JSON.stringify({
+        ...event,
+        organizationId: '22222222-2222-4222-8222-222222222222',
+      }),
+    });
+    expect(onResync).toHaveBeenCalledTimes(1);
+    expect(close).toHaveBeenCalledOnce();
+    expect(onError).toHaveBeenCalledTimes(2);
+    stop();
   } finally {
     vi.unstubAllGlobals();
   }

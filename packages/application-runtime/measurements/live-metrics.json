@@ -1,0 +1,24 @@
+{
+  "datasetOrders": 200,
+  "subscriptions": 6,
+  "apiInstances": 2,
+  "mutations": 20,
+  "writesPerSecond": 4.034518262652687,
+  "commitToVisibleP95Ms": 221.9130839999998,
+  "metricHttpReadP95Ms": 42.29658300000119,
+  "subscriberReadP95Ms": 124.00487500000054,
+  "browserRecoveryMs": 93.76883400000224,
+  "latestSourceObservationAgeMs": 11625,
+  "durations": [
+    221.9130839999998, 204.0126249999994, 201.714750000001, 199.36420800000087,
+    225.832042, 202.71974999999838, 202.96437499999956, 201.79308299999866,
+    199.12962499999958, 200.2631249999995, 201.48433300000033,
+    221.83387499999844, 210.37195799999972, 207.37908400000015,
+    210.7327089999999, 204.9942919999994, 208.86583400000018,
+    204.52116699999897, 205.82908399999906, 210.6464160000014
+  ],
+  "listenerRecoveryMs": 217,
+  "burstInvalidations": [1, 1],
+  "recordedAt": "2026-09-28",
+  "environment": "Local macOS, Node 24, PostgreSQL 17 Testcontainers, Playwright Chromium"
+}

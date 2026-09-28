@@ -25,6 +25,7 @@ export interface AttentionOrder {
 }
 
 export interface OrderMetricRead {
+  nextRefreshAt?: string | null;
   revision: string;
   observedAt: string | null;
   oldestObservedAt: string | null;

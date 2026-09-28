@@ -1,6 +1,6 @@
 import './order-metrics.css';
 
-import type { MetricRequest, MetricResponse } from '@luma/api-contract';
+import type { MetricResponse } from '@luma/api-contract';
 import {
   CaseLoading,
   CaseNotice,
@@ -16,7 +16,6 @@ import {
   DialogTitle,
 } from '@luma/ui/components/primitives/dialog';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
-import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import {
   ArrowRight,
@@ -28,7 +27,7 @@ import {
 import { useRef, useState } from 'react';
 
 import { IdentityError } from '../identity/data';
-import { metricsOptions } from './metrics-data';
+import { useLiveMetrics } from './metrics-live';
 
 type Metric = MetricResponse['metrics'][number];
 
@@ -36,12 +35,24 @@ const icons = [PackageOpen, Clock3, ListChecks];
 
 /** Presents source-aware order counts and lets operators inspect their exact matching records. */
 export function OrderMetrics({ organizationId }: { organizationId: string }) {
+  return (
+    <LiveOrderMetrics key={organizationId} organizationId={organizationId} />
+  );
+}
+
+function LiveOrderMetrics({ organizationId }: { organizationId: string }) {
   const trigger = useRef<HTMLButtonElement>(null);
-  const [request, setRequest] = useState<MetricRequest>({});
+  const { query, request, setRequest, connection } =
+    useLiveMetrics(organizationId);
   const [selected, setSelected] = useState('orders.open');
   const [open, setOpen] = useState(false);
-  const query = useQuery(metricsOptions(organizationId, request));
-  const data = query.isError || query.isPaused ? undefined : query.data;
+  const data =
+    query.isError ||
+    query.isPaused ||
+    connection === 'denied' ||
+    connection === 'offline'
+      ? undefined
+      : query.data;
   const metric = data?.metrics.find((m) => m.definition.id === selected);
   const conflict =
     query.error instanceof IdentityError && query.error.status === 409;
@@ -61,13 +72,56 @@ export function OrderMetrics({ organizationId }: { organizationId: string }) {
         <Button
           variant="outline"
           onClick={refresh}
-          disabled={query.isFetching || query.isPaused}
+          disabled={
+            query.isFetching ||
+            query.isPaused ||
+            connection === 'offline' ||
+            connection === 'denied'
+          }
         >
           <RefreshCw size={14} />
           Refresh orders
         </Button>
       </header>
-      {query.isPaused ? (
+      <div
+        className="order-metrics-provenance"
+        role="status"
+        aria-live="polite"
+      >
+        <Badge
+          tone={
+            (connection === 'live' || connection === 'syncing') &&
+            !query.isError
+              ? 'neutral'
+              : 'warning'
+          }
+        >
+          {connection === 'denied'
+            ? 'Access changed'
+            : query.isPaused || connection === 'offline'
+              ? 'Offline'
+              : query.isError
+                ? 'Updates unavailable'
+                : connection === 'live'
+                  ? query.isFetching
+                    ? 'Updating'
+                    : 'Live updates'
+                  : connection === 'syncing'
+                    ? 'Updating'
+                    : connection === 'connecting'
+                      ? 'Connecting'
+                      : 'Reconnecting'}
+        </Badge>
+        <span>
+          {connection === 'denied'
+            ? 'Your workspace access changed. Sign in again to continue.'
+            : connection === 'reconnecting'
+              ? 'Live updates interrupted. Rechecking current counts.'
+              : 'Counts and matching orders update together.'}
+        </span>
+      </div>
+      {connection === 'denied' ? null : query.isPaused ||
+        connection === 'offline' ? (
         <CaseNotice title="Order updates paused">
           Reconnect to load current order counts.
         </CaseNotice>
@@ -142,7 +196,17 @@ export function OrderMetrics({ organizationId }: { organizationId: string }) {
                   : 'No observations'}
             </Badge>
             <span>
-              Evaluated <WorkspaceDate value={data.asOf} /> · Complete totals
+              Source observation age:{' '}
+              {data.observedAt
+                ? observationAge(data.readAt, data.observedAt)
+                : 'unknown'}{' '}
+              · Latest source observation{' '}
+              {data.observedAt ? (
+                <WorkspaceDate value={data.observedAt} />
+              ) : (
+                'unavailable'
+              )}{' '}
+              · Evaluated <WorkspaceDate value={data.asOf} /> · Complete totals
               unavailable.
             </span>
           </div>
@@ -156,7 +220,7 @@ export function OrderMetrics({ organizationId }: { organizationId: string }) {
             </DialogTitle>
             <DialogDescription>
               Inspect the counting rule and matching orders from one consistent
-              snapshot.
+              snapshot. Live updates return this list to the first page.
             </DialogDescription>
           </DialogHeader>
           {metric && data ? (
@@ -317,4 +381,15 @@ function Cohort({
       ))}
     </ul>
   );
+}
+
+function observationAge(readAt: string, observedAt: string) {
+  const seconds = Math.max(
+    0,
+    Math.floor((Date.parse(readAt) - Date.parse(observedAt)) / 1000),
+  );
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+
+  return `${Math.floor(seconds / 3600)}h`;
 }

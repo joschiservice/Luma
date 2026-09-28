@@ -2,7 +2,10 @@ import { createAuditLog } from '@luma/audit/composition';
 import type { EffectRegistry } from '@luma/connections';
 import { createConnectionCoverage } from '@luma/connections/composition';
 import type { VerificationEvaluator } from '@luma/exceptions';
-import { createOrderAttentionReader } from '@luma/exceptions/composition';
+import {
+  createOrderAttentionBoundaryReader,
+  createOrderAttentionReader,
+} from '@luma/exceptions/composition';
 import type { IdentityService } from '@luma/identity';
 import { createOrderMetricReader } from '@luma/orders/composition';
 import type { TenantDatabase } from '@luma/platform';
@@ -160,6 +163,7 @@ export function createApplicationServices(
       metrics: createOperationalMetrics(database, {
         orders: createOrderMetricReader,
         attention: createOrderAttentionReader,
+        attentionBoundary: createOrderAttentionBoundaryReader,
         coverage: createConnectionCoverage,
       }),
       operations: createOperationsOverview(

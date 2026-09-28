@@ -48,6 +48,12 @@ const facts = `WITH selected AS MATERIALIZED (
  FROM classified
 ), metrics AS (SELECT unnest(ARRAY['orders.open','orders.overdue','orders.attention']) AS id)
 SELECT jsonb_build_object(
+ 'nextRefreshAt',(SELECT min(boundary) FROM (
+ SELECT CASE WHEN open THEN "dueAt" + interval '1 millisecond' END AS boundary FROM rows
+ UNION ALL SELECT "observedAt" FROM rows
+ UNION ALL SELECT "observedAt" + interval '24 hours 1 millisecond' FROM rows
+ UNION ALL SELECT s.observed_at FROM orders_projections p JOIN orders_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id WHERE p.tenant_id=$1 AND s.kind='fulfillment' AND ($3::uuid IS NULL OR p.connection_id=$3)
+ ) boundaries WHERE boundary > $2),
  'revision', md5(COALESCE((SELECT string_agg(row_to_json(r)::text,',' ORDER BY r.id) FROM rows r),'')),
  'population',(SELECT count(*) FROM rows),
  'oldestObservedAt',(SELECT CASE WHEN max("observedAt") <= $2 THEN min("observedAt") END FROM rows),

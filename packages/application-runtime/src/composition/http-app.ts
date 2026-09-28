@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import type { Socket } from 'node:net';
 
 import type { ApiError } from '@luma/api-contract';
 import { apiContract } from '@luma/api-contract';
@@ -23,6 +24,7 @@ import type {
   ActivityService,
   DeskService,
   LearningService,
+  MetricEvents,
   OperationalMetrics,
   OperationsOverviewService,
   PlaybookLibrary,
@@ -36,6 +38,7 @@ import {
   operationsRoutes,
   playbookRoutes,
   registerDeskEvents,
+  registerMetricEvents,
   shadowRoutes,
 } from '@luma/resolution/http';
 import type { WorkflowCatalog } from '@luma/workflows';
@@ -65,6 +68,7 @@ export interface AppDependencies {
   eventSettings?: { intervalMs: number; lifetimeMs: number };
   operations?: OperationsOverviewService;
   metrics?: OperationalMetrics;
+  metricEvents?: MetricEvents;
   apps?: AppService;
   appRegistry?: AppRegistry;
   cases?: CaseService;
@@ -93,6 +97,17 @@ export function buildApp(
     requestIdHeader: false,
     genReqId: () => randomUUID(),
     logController: new LogController({ disableRequestLogging: true }),
+  });
+  // Node's idle-connection cleanup excludes TCP preconnections that never sent HTTP.
+  const preconnections = new Set<Socket>();
+  app.server.on('connection', (socket) => {
+    preconnections.add(socket);
+    socket.once('close', () => preconnections.delete(socket));
+  });
+  app.server.on('request', (request) => preconnections.delete(request.socket));
+  app.addHook('preClose', async () => {
+    for (const socket of preconnections) socket.destroy();
+    preconnections.clear();
   });
   app.decorate('modelGateway', dependencies.modelGateway ?? null);
   app.decorateRequest('observation', null);
@@ -300,6 +315,7 @@ export function buildApp(
     dependencies.identity,
     dependencies.eventSettings,
   );
+  registerMetricEvents(app, dependencies.metricEvents, dependencies.identity);
   app.get('/openapi.json', async () => openApiDocument);
 
   return app;

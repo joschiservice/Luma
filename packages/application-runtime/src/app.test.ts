@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { createConnection } from 'node:net';
 import { Writable } from 'node:stream';
 
 import { apiErrorSchema } from '@luma/api-contract';
@@ -587,3 +588,21 @@ it('composes model-backed work with routes selected by startup configuration', a
     }
   }
 });
+
+it('closes unused TCP preconnections during shutdown', async () => {
+  const app = buildApp();
+  const address = new URL(await app.listen({ host: '127.0.0.1', port: 0 }));
+  const socket = createConnection({
+    host: address.hostname,
+    port: Number(address.port),
+  });
+  await new Promise<void>((resolve, reject) => {
+    socket.once('connect', resolve);
+    socket.once('error', reject);
+  });
+  try {
+    await app.close();
+  } finally {
+    socket.destroy();
+  }
+}, 2000);
