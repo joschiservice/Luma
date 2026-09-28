@@ -112,3 +112,5 @@ controls live in `apps/web/src/features/workflows/replenishment.tsx`.
 Tests: `replenishment.e2e.mjs`, `replenishment.browser.mjs`, procurement rule tests
 and Workflow compiler tests. See [Replenishment workflow](replenishment.md) for
 scope, policy, recovery and the six simulator scenarios.
+
+Sandboxed Code Steps: `packages/workflows/src/domain/code-step.ts`, `application/code-activity.ts`, and `infrastructure/code/`; native computation wiring in `infrastructure/code-processes.ts`. UI: `apps/web/src/features/workflows/code-steps.tsx`. Replay gate: `tooling/evaluation/code.mjs`. Runtime setup and contract: [Code Steps](code-steps.md). API/browser coverage: `apps/api/e2e/code-steps.*.mjs`.

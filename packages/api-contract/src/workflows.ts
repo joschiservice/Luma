@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { codeStepViewSchema, codeTelemetrySchema } from './code-steps.js';
 import {
   playbookActivationSchema,
   playbookDetailSchema,
@@ -64,6 +65,8 @@ export const workflowVersionViewSchema = z.union([
   workflowVersionBaseSchema.omit({ policy: true, outcome: true }).extend({
     format: z.literal('workflow/2'),
     finalOutcome: text.nullable(),
+    codeSteps: z.array(codeStepViewSchema).optional(),
+    executionMode: z.literal('computation').optional(),
   }),
 ]);
 
@@ -131,6 +134,7 @@ export const workflowRunViewSchema = playbookRunViewSchema
         z.object({
           stepId: text,
           kind: z.enum([
+            'code',
             'read',
             'condition',
             'capability',
@@ -157,6 +161,7 @@ export const workflowRunViewSchema = playbookRunViewSchema
           recordedAt: z.string().datetime(),
           observedAt: z.string().datetime().optional(),
           reason: z.string().optional(),
+          code: codeTelemetrySchema.optional(),
         }),
       )
       .optional(),

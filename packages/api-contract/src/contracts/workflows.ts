@@ -1,6 +1,7 @@
 import { initContract } from '@ts-rest/core';
 import { z } from 'zod';
 
+import { codeEvaluationSchema, evaluateCodeSchema } from '../code-steps.js';
 import { apiErrorSchema, organizationParamsSchema } from '../common.js';
 import {
   replenishmentReviewSchema,
@@ -24,6 +25,44 @@ const path = '/v1/organizations/:organizationId/workflows';
 
 export const workflowsContract = c.router(
   {
+    evaluateCode: {
+      method: 'POST',
+      path: `${path}/:definitionId/code-evaluations`,
+      pathParams: params,
+      body: evaluateCodeSchema,
+      responses: { 200: codeEvaluationSchema },
+      summary: 'Evaluate a published Code Step',
+      description:
+        'Owners and admins test an exact version with example inputs, capability replies and expected outputs. Evaluation does not call connected systems. Reuse the same ID and body after an uncertain response.',
+    },
+    codeEvaluation: {
+      method: 'GET',
+      path: `${path}/:definitionId/code-evaluations/:evaluationId`,
+      pathParams: params.extend({ evaluationId: z.string().uuid() }),
+      responses: { 200: codeEvaluationSchema },
+      summary: 'Read a Code Step evaluation',
+    },
+    cancelCodeEvaluation: {
+      method: 'POST',
+      path: `${path}/:definitionId/code-evaluations/:evaluationId/cancel`,
+      pathParams: params.extend({ evaluationId: z.string().uuid() }),
+      body: z.object({}).strict(),
+      responses: { 200: codeEvaluationSchema },
+      summary: 'Cancel a running Code Step evaluation',
+    },
+    cancelCodeStep: {
+      method: 'POST',
+      path: `${path}/:definitionId/runs/:runId/code/:stepId/cancel`,
+      pathParams: params.extend({
+        runId: z.string().uuid(),
+        stepId: z.string().max(80),
+      }),
+      body: z.object({}).strict(),
+      responses: { 200: z.object({ cancelled: z.literal(true) }) },
+      summary: 'Stop a Code Step',
+      description:
+        'Stops computation and prevents new capability requests. Actions already admitted may still complete and require reconciliation.',
+    },
     replenishmentSetup: {
       method: 'GET',
       path: `${path}/:definitionId/replenishment`,

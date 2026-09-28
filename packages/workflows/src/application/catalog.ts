@@ -1,6 +1,7 @@
 import type { TenantContext } from '@luma/identity';
 import { IdentityError, requireRole, requireTenant } from '@luma/identity';
 
+import type { EvaluateCode } from '../domain/code-evaluation.js';
 import type { PlaybookVersion } from '../domain/playbook.js';
 import { presentPlaybook } from '../domain/playbook-presentation.js';
 import type { ProcessStepOutput } from '../domain/process.js';
@@ -8,8 +9,10 @@ import { presentProcessVersion } from '../domain/process-presentation.js';
 import type {
   PublishedWorkflowVersion,
   WorkflowTriggerRequest,
+  WorkflowTriggerRun,
 } from '../domain/workflow.js';
 import { resolutionWorkflow } from '../domain/workflow.js';
+import type { createCodeEvaluations } from './code-evaluations.js';
 import type { PlaybookOutcome, PlaybookRun } from './playbook.js';
 import type { PlaybookLibrary } from './playbook-library.js';
 import type { ReplenishmentWorkflow } from './replenishment-port.js';
@@ -22,6 +25,12 @@ import { presentTriggerRun } from './trigger-presentation.js';
 import type { createWorkflowTriggers } from './triggers.js';
 
 export interface WorkflowCatalogStore {
+  cancelCode?(
+    context: TenantContext,
+    definitionId: string,
+    runId: string,
+    stepId: string,
+  ): Promise<void>;
   /** Reads native immutable contracts. Resolution adapters retain their original records. */
   versions(
     context: TenantContext,
@@ -56,6 +65,11 @@ export interface WorkflowCatalogStore {
 
 /** Combines native definitions and existing resolution definitions under one authorized catalog. */
 export function createWorkflowCatalog(deps: {
+  codeProcesses?: {
+    supported(version: PublishedWorkflowVersion): boolean;
+    start(context: TenantContext, run: WorkflowTriggerRun): Promise<void>;
+  };
+  codeEvaluations?: ReturnType<typeof createCodeEvaluations>;
   replenishment?: ReplenishmentWorkflow;
   legacy: PlaybookLibrary;
   triggers: ReturnType<typeof createWorkflowTriggers>;
@@ -97,12 +111,20 @@ export function createWorkflowCatalog(deps: {
       b.version.localeCompare(a.version, undefined, { numeric: true }),
     );
     const current = versions[0]!;
+    const codeAvailable = deps.codeProcesses?.supported(current) ?? false;
     const views = versions.map((v) => {
       if (v.format === 'workflow/2')
         return {
           ...presentProcessVersion(v),
           ...metadata(v),
           format: 'workflow/2' as const,
+          ...(deps.codeProcesses?.supported(v)
+            ? {
+                executionMode: 'computation' as const,
+                compatible: true,
+                blockers: [],
+              }
+            : {}),
         };
       const [eligibility, action, approval, verification, recovery] = v.steps;
       const presentation = presentPlaybook({
@@ -145,8 +167,10 @@ export function createWorkflowCatalog(deps: {
         issueType: current.context.kind,
         systems: [] as string[],
         availableVersion: current.version,
-        status: 'unavailable' as const,
-        blockers: [nativeBlocker],
+        status: codeAvailable
+          ? ('inactive' as const)
+          : ('unavailable' as const),
+        blockers: codeAvailable ? [] : [nativeBlocker],
         activeVersions: [] as string[],
       },
       versions: views,
@@ -171,6 +195,69 @@ export function createWorkflowCatalog(deps: {
   }
 
   return {
+    /** Runs a fixture evaluation without access to production capabilities. */
+    async evaluateCode(
+      context: TenantContext,
+      id: string,
+      request: EvaluateCode,
+    ) {
+      if (!deps.codeEvaluations)
+        throw new IdentityError(
+          503,
+          'SERVICE_UNAVAILABLE',
+          'Code evaluation is unavailable. Ask an administrator to configure the runtime.',
+        );
+
+      return deps.codeEvaluations.start(context, id, request);
+    },
+    /** Reads a private evaluation and its resource diagnostics. */
+    async codeEvaluation(
+      context: TenantContext,
+      id: string,
+      evaluationId: string,
+    ) {
+      if (!deps.codeEvaluations)
+        throw new IdentityError(
+          503,
+          'SERVICE_UNAVAILABLE',
+          'Code evaluation is unavailable.',
+        );
+
+      return deps.codeEvaluations.get(context, id, evaluationId);
+    },
+    /** Cancels a fixture evaluation across API instances. */
+    async cancelCodeEvaluation(
+      context: TenantContext,
+      id: string,
+      evaluationId: string,
+    ) {
+      if (!deps.codeEvaluations)
+        throw new IdentityError(
+          503,
+          'SERVICE_UNAVAILABLE',
+          'Code evaluation is unavailable.',
+        );
+
+      return deps.codeEvaluations.cancel(context, id, evaluationId);
+    },
+    /** Stops a sandbox and blocks subsequent capability requests without undoing admitted actions. */
+    async cancelCodeStep(
+      context: TenantContext,
+      id: string,
+      runId: string,
+      stepId: string,
+    ) {
+      context = await authorize(context, true);
+      if (!deps.store.cancelCode)
+        throw new IdentityError(
+          503,
+          'SERVICE_UNAVAILABLE',
+          'Code execution is unavailable.',
+        );
+      await deps.store.cancelCode(context, id, runId, stepId);
+
+      return { cancelled: true as const };
+    },
     /** Reads available stock and replenishment rules. */
     replenishmentSetup: (context: TenantContext, id: string) =>
       replenishment(id).setup(context),
@@ -209,7 +296,10 @@ export function createWorkflowCatalog(deps: {
           'Use the replenishment stock check to start this workflow.',
         );
 
-      return presentTriggerRun(await deps.triggers.fire(context, id, request));
+      const run = await deps.triggers.fire(context, id, request);
+      await deps.codeProcesses?.start(context, run);
+
+      return presentTriggerRun(run);
     },
     /** Cancels a scheduled start while it is still pending. */
     async cancelStart(context: TenantContext, id: string, runId: string) {

@@ -62,3 +62,7 @@ Capture validates the original Playbook hash, snapshot, action tenant and member
 The harness calls production Playbook, admission, policy/approval, execution, shipping-effect, capability-runtime and JTL/Shopify connector code. Only persistence, identity refresh and incident eligibility data use isolated fixture adapters. Both providers use the existing stateful simulators through an injected transport; no credentials or live endpoints are used.
 
 A restart serializes the complete provider/persistence/ID checkpoint to JSON and constructs fresh services. This tests recovery of durable reservations and read-only reconciliation. Database transactions and Temporal event-history replay remain covered by their integration suites. The checked-in corpus is synthetic; historical cases enter through the capture command.
+
+## Code Step replay
+
+Run `pnpm setup:code`, then `pnpm evaluate:code [corpus.json] [report.json]` to evaluate a pinned Code Step with ordered fixture replies. The default corpus is `fixtures/code-corpus.json`. Every scenario runs twice; outputs, request order and input digests must agree. Reports exclude wall-time and memory measurements. See [Code Steps](../../docs/code-steps.md) for runtime installation, capability grants and deployment limits.

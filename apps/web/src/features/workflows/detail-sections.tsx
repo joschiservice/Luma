@@ -171,6 +171,20 @@ export function WorkflowCompatibility({
   version: WorkflowVersionView;
   organizationId: string;
 }) {
+  if (
+    version.format === 'workflow/2' &&
+    version.executionMode === 'computation'
+  )
+    return (
+      <Card as="section" className="workflow-section">
+        <CardTitle as="h2">Ready to compute</CardTitle>
+        <p>
+          Owners and admins can start this version from Triggers. It computes
+          values from the supplied evidence and does not need connection access
+          or action grants.
+        </p>
+      </Card>
+    );
   if (detail.summary.id === 'inventory-replenishment')
     return (
       <Card as="section" className="workflow-section">

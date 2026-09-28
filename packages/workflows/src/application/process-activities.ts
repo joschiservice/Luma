@@ -4,6 +4,7 @@ import type { TenantContext } from '@luma/identity';
 import { IdentityError, requireRole, requireTenant } from '@luma/identity';
 import { canonicalJson } from '@luma/platform';
 
+import type { CodeRunner } from '../domain/code-step.js';
 import type {
   ProcessRun,
   ProcessStep,
@@ -11,10 +12,12 @@ import type {
   ProcessWorkflowVersion,
 } from '../domain/process.js';
 import type { WorkflowTriggerRun } from '../domain/workflow.js';
+import { type CodeJournal, createCodeActivity } from './code-activity.js';
 import type { ProcessActivities } from './process-runtime.js';
 
 /** Connects capability-specific binding and verification to shared Action Admission. */
 export function createProcessActivities(deps: {
+  code?: { runner: CodeRunner; journal: CodeJournal };
   resolveContext(run: ProcessRun): Promise<TenantContext>;
   loadRun(
     context: TenantContext,
@@ -66,7 +69,7 @@ export function createProcessActivities(deps: {
     return context;
   }
 
-  return {
+  const activities: ProcessActivities = {
     read: async (run, step) => {
       await authorize(run);
 
@@ -168,4 +171,30 @@ export function createProcessActivities(deps: {
       };
     },
   };
+  if (deps.code)
+    activities.code = createCodeActivity({
+      ...deps.code,
+      activities,
+      async authorize(run, version, step) {
+        const context = await authorize(run);
+        const published = await deps.loadVersion(
+          context,
+          run.definitionId,
+          run.version,
+        );
+        if (
+          !published ||
+          canonicalJson(published) !== canonicalJson(version) ||
+          published.digest !== run.versionDigest ||
+          !published.steps.some(
+            (item) =>
+              item.kind === 'code' &&
+              canonicalJson(item) === canonicalJson(step),
+          )
+        )
+          throw new Error('Code does not belong to this run version');
+      },
+    });
+
+  return activities;
 }

@@ -1,6 +1,7 @@
 import type { TenantContext } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
 
+import { processInstructions } from '../domain/code-grants.js';
 import type { ProcessStepOutput } from '../domain/process.js';
 import { canonicalPlaybook } from './playbooks/schema.js';
 import { compileProcessWorkflow } from './process-schema.js';
@@ -15,6 +16,7 @@ function validateOutput(
     ProcessStepOutput['kind'],
     ProcessStepOutput['state'][]
   > = {
+    code: ['waiting', 'completed', 'escalated'],
     read: ['completed'],
     condition: ['completed', 'ended', 'escalated'],
     capability: ['waiting', 'completed', 'escalated'],
@@ -31,7 +33,11 @@ function validateOutput(
     !Number.isFinite(Date.parse(output.recordedAt))
   )
     throw new Error('Step evidence does not match the published version');
-  if (step.kind === 'read' || step.kind === 'verification') {
+  if (
+    step.kind === 'read' ||
+    step.kind === 'verification' ||
+    (step.kind === 'code' && output.state === 'completed')
+  ) {
     if (
       Object.keys(output.values).length !== Object.keys(step.fields).length ||
       Object.entries(step.fields).some(
@@ -124,11 +130,16 @@ export function createProcessStepStore(db: TenantDatabase) {
 
           return;
         }
-        const index = version.steps.findIndex(
+        const instructions = processInstructions(version);
+        const index = instructions.findIndex(
           (item) => item.id === output.stepId,
         );
+        if (index < 0)
+          throw new Error(
+            'Capability-owned nodes must execute through their Code Step',
+          );
         const previous = records.rows.at(-1)?.document;
-        const previousIndex = version.steps.findIndex(
+        const previousIndex = instructions.findIndex(
           (item) => item.id === previous?.stepId,
         );
         if (

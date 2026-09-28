@@ -50,7 +50,9 @@
     "test:evaluation": "pnpm exec turbo run build --filter=@luma/resolution... --filter=@luma/simulator... && node --test tooling/evaluation/*.test.mjs",
     "capture:incident": "pnpm exec turbo run build --filter=@luma/resolution... && node tooling/evaluation/capture-cli.mjs",
     "apps:sync": "node tooling/apps/generate.mjs && prettier --write packages/app-catalog/src/generated.ts",
-    "simulator:replenishment": "pnpm test:e2e replenishment.e2e.mjs"
+    "simulator:replenishment": "pnpm test:e2e replenishment.e2e.mjs",
+    "setup:code": "node tooling/code-runtime/setup.mjs",
+    "evaluate:code": "pnpm --filter @luma/workflows build && node tooling/evaluation/code-cli.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

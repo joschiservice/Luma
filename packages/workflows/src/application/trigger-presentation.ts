@@ -24,7 +24,12 @@ export function presentTriggerRun(
               : latest.state === 'escalated'
                 ? 'escalated'
                 : latest.kind === 'end'
-                  ? processSteps.some((step) => step.kind === 'verification')
+                  ? processSteps.some(
+                      (step) =>
+                        step.state === 'completed' &&
+                        (step.kind === 'verification' ||
+                          (step.code?.verifiedActions ?? 0) > 0),
+                    )
                     ? 'verified'
                     : 'ended'
                   : 'running';
@@ -63,7 +68,9 @@ export function presentTriggerRun(
     activationId: run.activationId,
     evidenceKind: 'unclassified' as const,
     execution: processSteps.some(
-      (step) => step.kind === 'capability' && step.state === 'completed',
+      (step) =>
+        (step.state === 'completed' && step.kind === 'capability') ||
+        (step.code?.verifiedActions ?? 0) > 0,
     )
       ? 'accepted'
       : 'not_recorded',
@@ -90,7 +97,9 @@ export function presentTriggerRun(
       context: `${run.subject.kind} ${run.subject.id}`,
       decision: reason,
       action: processSteps.some(
-        (step) => step.kind === 'capability' && step.state === 'completed',
+        (step) =>
+          (step.state === 'completed' && step.kind === 'capability') ||
+          (step.code?.verifiedActions ?? 0) > 0,
       )
         ? 'The admitted action has a recorded receipt.'
         : 'No action has been admitted.',

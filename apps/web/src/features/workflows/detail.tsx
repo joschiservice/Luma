@@ -27,6 +27,8 @@ import { SignInRedirect } from '../identity/common';
 import { contextOptions, IdentityError } from '../identity/data';
 import { ShadowReport } from '../shadow/report';
 import { ActivationForm } from './activation';
+import { CodeRunDetails } from './code-run';
+import { WorkflowCodeSteps } from './code-steps';
 import {
   revokeWorkflow,
   workflowError,
@@ -57,6 +59,12 @@ function processStepDescription(
     return step.reason.replaceAll('_', ' ');
 
   switch (step.kind) {
+    case 'code':
+      return step.state === 'completed'
+        ? 'The code returned its declared outputs.'
+        : step.state === 'waiting'
+          ? 'A requested capability needs approval.'
+          : 'The code stopped. Review its execution details.';
     case 'read':
       return 'Current context refreshed.';
     case 'condition':
@@ -124,7 +132,7 @@ export function WorkflowDetailPage({
   const query = useQuery(workflowOptions(organizationId, definitionId));
   const runs = useQuery({
     ...workflowRunsOptions(organizationId, definitionId),
-    refetchInterval: definitionId === 'inventory-replenishment' ? 5000 : false,
+    refetchInterval: 5000,
   });
   const client = useQueryClient();
   const refresh = async () => {
@@ -301,6 +309,16 @@ export function WorkflowDetailPage({
                           run={run}
                         />
                       ) : null}
+                      <CodeRunDetails
+                        run={run}
+                        version={query.data.versions.find(
+                          (version) => version.digest === run.versionDigest,
+                        )}
+                        organizationId={organizationId}
+                        definitionId={definitionId}
+                        canManage={query.data.canManage}
+                        refresh={refresh}
+                      />
                       {run.processSteps?.length ? (
                         <ol
                           className="workflow-process-timeline"
@@ -554,7 +572,11 @@ export function WorkflowDetailView({
               label: `v${v.version}${v.version === detail.summary.availableVersion ? ' · Latest' : ''}`,
             }))}
           />
-          {detail.summary.id !== 'inventory-replenishment' ? (
+          {detail.summary.id !== 'inventory-replenishment' &&
+          !(
+            version.format === 'workflow/2' &&
+            version.executionMode === 'computation'
+          ) ? (
             <Button
               disabled={!canActivate || refreshing}
               aria-describedby={
@@ -567,7 +589,12 @@ export function WorkflowDetailView({
           ) : null}
         </div>
       </div>
-      {!canActivate && detail.summary.id !== 'inventory-replenishment' ? (
+      {!canActivate &&
+      detail.summary.id !== 'inventory-replenishment' &&
+      !(
+        version.format === 'workflow/2' &&
+        version.executionMode === 'computation'
+      ) ? (
         <Alert
           id="workflow-activation-reason"
           tone={detail.canManage ? 'warning' : 'neutral'}
@@ -621,6 +648,24 @@ export function WorkflowDetailView({
             label: 'How it works',
             content: <WorkflowSteps version={version} />,
           },
+          ...(version.format === 'workflow/2' && version.codeSteps?.length
+            ? [
+                {
+                  value: 'code',
+                  label: 'Code Steps',
+                  content: (
+                    <WorkflowCodeSteps
+                      key={version.digest}
+                      version={version}
+                      organizationId={organizationId}
+                      definitionId={detail.summary.id}
+                      canManage={detail.canManage}
+                      accessLost={accessLost}
+                    />
+                  ),
+                },
+              ]
+            : []),
           {
             value: 'compatibility',
             label: 'Compatibility',

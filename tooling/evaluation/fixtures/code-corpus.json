@@ -1,0 +1,57 @@
+{
+  "step": {
+    "id": "calculate",
+    "kind": "code",
+    "source": "function main(input, luma) { const stock = luma.request(\"stock\"); return { quantity: Math.max(0, input.target - stock.available) }; }",
+    "runtime": "wasmtime-49.0.1/javy-9.1.0/typescript-5.9.3/1",
+    "artifactDigest": "b3c8399d839adc35cc9994ba6d38f19eae7ffa091820b8a6e82ff9c585ca3748",
+    "fields": {
+      "quantity": "number"
+    },
+    "grants": ["stock"],
+    "limits": {
+      "fuel": 100000000,
+      "memoryBytes": 67108864,
+      "wallTimeMs": 5000,
+      "maxRequests": 1
+    }
+  },
+  "cases": [
+    {
+      "id": "replenish",
+      "input": {
+        "target": 10
+      },
+      "now": "2026-01-01T00:00:00.000Z",
+      "replies": [
+        {
+          "grant": "stock",
+          "value": {
+            "available": 4
+          }
+        }
+      ],
+      "expected": {
+        "quantity": 6
+      }
+    },
+    {
+      "id": "already-stocked",
+      "input": {
+        "target": 10
+      },
+      "now": "2026-01-01T00:00:00.000Z",
+      "replies": [
+        {
+          "grant": "stock",
+          "value": {
+            "available": 14
+          }
+        }
+      ],
+      "expected": {
+        "quantity": 0
+      }
+    }
+  ]
+}

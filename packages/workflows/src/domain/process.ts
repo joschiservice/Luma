@@ -1,3 +1,4 @@
+import type { CodeStep, CodeTelemetry } from './code-step.js';
 import type {
   PlaybookFields,
   PlaybookScalar,
@@ -12,6 +13,7 @@ import type {
 
 /** A bounded, forward-only instruction. Every ID remains stable across a published version. */
 export type ProcessStep =
+  | CodeStep
   | { id: string; kind: 'read'; source: string; fields: PlaybookFields }
   | {
       id: string;
@@ -102,6 +104,7 @@ export interface ProcessStepOutput {
   observedAt?: string;
   recordedAt: string;
   reason?: string;
+  code?: CodeTelemetry;
 }
 
 export type ProcessRunState =

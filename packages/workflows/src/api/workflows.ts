@@ -23,6 +23,55 @@ export function workflowRoutes(service?: WorkflowCatalog) {
   }
 
   return initServer().router(apiContract.workflows, {
+    evaluateCode: async ({ request, params, body }) => {
+      const s = use(request);
+
+      return {
+        status: 200,
+        body: await s.service.evaluateCode(
+          s.context,
+          params.definitionId,
+          body,
+        ),
+      };
+    },
+    codeEvaluation: async ({ request, params }) => {
+      const s = use(request);
+
+      return {
+        status: 200,
+        body: await s.service.codeEvaluation(
+          s.context,
+          params.definitionId,
+          params.evaluationId,
+        ),
+      };
+    },
+    cancelCodeEvaluation: async ({ request, params }) => {
+      const s = use(request);
+
+      return {
+        status: 200,
+        body: await s.service.cancelCodeEvaluation(
+          s.context,
+          params.definitionId,
+          params.evaluationId,
+        ),
+      };
+    },
+    cancelCodeStep: async ({ request, params }) => {
+      const s = use(request);
+
+      return {
+        status: 200,
+        body: await s.service.cancelCodeStep(
+          s.context,
+          params.definitionId,
+          params.runId,
+          params.stepId,
+        ),
+      };
+    },
     replenishmentSetup: async ({ request, params }) => {
       const s = use(request);
 

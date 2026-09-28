@@ -1,3 +1,4 @@
+import { IdentityError } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
 
 import type { WorkflowCatalogStore } from '../application/catalog.js';
@@ -24,6 +25,33 @@ export function createWorkflowCatalogStore(
   const steps = createProcessStepStore(db);
 
   return {
+    cancelCode: (context, definitionId, runId, stepId) =>
+      db.transaction(context.tenantId, async (tx) => {
+        const row = (
+          await tx.query<{ document: unknown }>(
+            'SELECT v.document FROM workflow_trigger_runs r JOIN playbook_versions v ON v.tenant_id=r.tenant_id AND v.definition_id=r.definition_id AND v.version=r.version WHERE r.tenant_id=$1 AND r.id=$2 AND r.definition_id=$3',
+            [context.tenantId, runId, definitionId],
+          )
+        ).rows[0];
+        const version = row ? compilePublishedWorkflow(row.document) : null;
+        const step =
+          version?.format === 'workflow/2'
+            ? version.steps.find(
+                (item) => item.id === stepId && item.kind === 'code',
+              )
+            : null;
+        if (!step || step.kind !== 'code')
+          throw new IdentityError(404, 'NOT_FOUND', 'Code Step not found.');
+        await tx.query(
+          "INSERT INTO workflow_code_records(tenant_id,run_id,step_id,record_key,document) VALUES($1,$2,$3,'cancelled',$4) ON CONFLICT DO NOTHING",
+          [
+            context.tenantId,
+            runId,
+            stepId,
+            { artifactDigest: step.artifactDigest, value: true },
+          ],
+        );
+      }),
     processSteps: steps.list,
     versions: (context, id) =>
       db.transaction(context.tenantId, async (tx) => {

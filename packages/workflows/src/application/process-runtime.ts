@@ -1,3 +1,9 @@
+import { processInstructions } from '../domain/code-grants.js';
+import type {
+  CodeActivityResult,
+  CodeStep,
+  CodeTelemetry,
+} from '../domain/code-step.js';
 import type {
   ProcessRun,
   ProcessRunState,
@@ -17,6 +23,13 @@ export type ProcessActionResult =
 
 /** Every external read, decision, action, and verification crosses an activity boundary. */
 export interface ProcessActivities {
+  /** Executes a sandboxed instruction using only its published capability grants. */
+  code?(
+    run: ProcessRun,
+    version: ProcessWorkflowVersion,
+    step: CodeStep,
+    outputs: ProcessStepOutput[],
+  ): Promise<CodeActivityResult>;
   read(
     run: ProcessRun,
     step: Extract<ProcessStep, { kind: 'read' }>,
@@ -92,6 +105,7 @@ export async function runProcess(
     evidenceRefs: string[] = [],
     reason?: string,
     observedAt?: string,
+    code?: CodeTelemetry,
   ) => {
     const output = {
       stepId: step.id,
@@ -102,14 +116,76 @@ export async function runProcess(
       ...(observedAt ? { observedAt } : {}),
       recordedAt: clock.now(),
       ...(reason ? { reason } : {}),
+      ...(code ? { code } : {}),
     };
     await activities.record(run, output);
     outputs.push(output);
   };
 
-  for (const step of version.steps) {
+  for (const step of processInstructions(version)) {
     set({ state: 'running', stepId: step.id });
     switch (step.kind) {
+      case 'code': {
+        if (!activities.code) throw new Error('Code execution is unavailable');
+        const deadline = Date.parse(clock.now()) + 86_400_000;
+        let result = await activities.code(run, version, step, outputs);
+        let waiting = false;
+        while (result.state === 'awaiting_approval') {
+          set({
+            state: 'awaiting_decision',
+            stepId: step.id,
+            reason: 'policy_approval_required',
+          });
+          if (!waiting) {
+            await record(
+              step,
+              'waiting',
+              {},
+              result.evidenceRefs,
+              'policy_approval_required',
+            );
+            waiting = true;
+          }
+          if (Date.parse(clock.now()) >= deadline) {
+            await record(
+              step,
+              'escalated',
+              {},
+              result.evidenceRefs,
+              'policy_decision_expired',
+            );
+
+            return set({
+              state: 'escalated',
+              stepId: step.id,
+              reason: 'policy_decision_expired',
+            });
+          }
+          await clock.decisionChanged(30_000);
+          result = await activities.code(
+            run,
+            version,
+            step,
+            outputs.filter((output) => output.stepId !== step.id),
+          );
+        }
+        await record(
+          step,
+          result.state === 'completed' ? 'completed' : 'escalated',
+          result.values,
+          result.evidenceRefs,
+          result.state === 'completed' ? undefined : result.telemetry.outcome,
+          undefined,
+          result.telemetry,
+        );
+        if (result.state !== 'completed')
+          return set({
+            state: 'escalated',
+            stepId: step.id,
+            reason: result.telemetry.outcome,
+          });
+        break;
+      }
       case 'read': {
         const result = await activities.read(run, step);
         const age = Date.parse(clock.now()) - Date.parse(result.observedAt);
@@ -146,7 +222,8 @@ export async function runProcess(
           .reverse()
           .find(
             (item) =>
-              item.kind === 'read' && Object.hasOwn(item.values, step.field),
+              (item.kind === 'read' || item.kind === 'code') &&
+              Object.hasOwn(item.values, step.field),
           );
         const passes =
           (observed
@@ -342,7 +419,12 @@ export async function runProcess(
         ]);
 
         return set({
-          state: version.steps.some((item) => item.kind === 'verification')
+          state: outputs.some(
+            (item) =>
+              item.state === 'completed' &&
+              (item.kind === 'verification' ||
+                (item.code?.verifiedActions ?? 0) > 0),
+          )
             ? 'verified'
             : 'ended',
           stepId: step.id,

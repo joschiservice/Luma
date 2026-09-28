@@ -50,6 +50,7 @@ type WorkflowActivationView = Awaited<
 
 /** Composes procurement reads, scoped grants, policy decisions and verified Temporal processes. */
 export function createReplenishmentService(deps: {
+  code?: Parameters<typeof createProcessActivities>[0]['code'];
   hash(value: unknown): string;
   id(value: string): string;
   version: ProcessWorkflowVersion;
@@ -568,6 +569,7 @@ export function createReplenishmentService(deps: {
   }
 
   const activities = createProcessActivities({
+    ...(deps.code ? { code: deps.code } : {}),
     resolveContext,
     loadRun: runs.run,
     loadVersion: async (context, id, v) => {

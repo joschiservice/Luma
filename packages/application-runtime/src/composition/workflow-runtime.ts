@@ -202,7 +202,7 @@ export async function createDefaultExceptionWorker(
       identity.service,
     );
     resources.add(processClient.close);
-    const { detection, safety, desk, http, replenishment } =
+    const { detection, safety, desk, http, replenishment, codeProcesses } =
       createApplicationServices({
         database: createTenantDatabase(pool),
         identity: identity.service,
@@ -241,6 +241,7 @@ export async function createDefaultExceptionWorker(
       replenishment,
       pool,
       identity.service,
+      codeProcesses,
     );
     resources.add(procurementWorker.close);
 

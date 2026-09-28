@@ -5,6 +5,8 @@ import {
   createProcessWorker,
   type TemporalSettings,
 } from '@luma/workflow-temporal';
+import type { ProcessActivities, ProcessRun } from '@luma/workflows';
+import type { createCodeProcesses } from '@luma/workflows/composition';
 import type { Pool } from 'pg';
 
 import type { createReplenishmentRuntime } from './replenishment.js';
@@ -15,10 +17,25 @@ export async function createReplenishmentWorker(
   runtime: ReturnType<typeof createReplenishmentRuntime>,
   pool: Pool,
   identity: Pick<IdentityService, 'resolveWorkflowContext'>,
+  codeProcesses?: ReturnType<typeof createCodeProcesses>,
 ) {
+  const select = (run: ProcessRun) =>
+    run.definitionId === 'inventory-replenishment'
+      ? runtime.activities
+      : codeProcesses?.activities;
+  const activities: ProcessActivities = {
+    read: (run, step) => select(run)!.read(run, step),
+    decision: (run, step) => select(run)!.decision(run, step),
+    action: (run, version, step, outputs) =>
+      select(run)!.action(run, version, step, outputs),
+    verify: (run, step, outputs) => select(run)!.verify(run, step, outputs),
+    record: (run, output) => select(run)!.record(run, output),
+    code: (run, version, step, outputs) =>
+      select(run)!.code!(run, version, step, outputs),
+  };
   const worker = await createProcessWorker(
     { ...settings, taskQueue: `${settings.taskQueue}-procurement` },
-    runtime.activities,
+    activities,
   );
   const stop = new AbortController();
 
@@ -44,6 +61,30 @@ export async function createReplenishmentWorker(
               'Replenishment check could not complete; retrying.',
               error,
             );
+          }
+        }
+        if (codeProcesses) {
+          const codeScopes = await pool.query<{
+            tenant_id: string;
+            principal_id: string;
+            definition_id: string;
+          }>('SELECT * FROM code_process_worker_scopes()');
+          for (const scope of codeScopes.rows) {
+            if (stop.signal.aborted) break;
+            try {
+              await codeProcesses.tick(
+                await identity.resolveWorkflowContext(
+                  scope.principal_id,
+                  scope.tenant_id,
+                  'code-process-monitor',
+                ),
+                scope.definition_id,
+              );
+            } catch {
+              console.error(
+                'Code workflow start could not complete; retrying.',
+              );
+            }
           }
         }
       } catch (error) {

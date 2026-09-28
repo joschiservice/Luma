@@ -33,6 +33,21 @@ it('replays a multi-step process without redispatching its capability action', a
     },
     steps: [
       {
+        kind: 'code',
+        runtime: 'wasmtime-49.0.1/javy-9.1.0/typescript-5.9.3/1',
+        artifactDigest: 'b'.repeat(64),
+        id: 'calculate',
+        source: 'function main() { return { quantity: 2 }; }',
+        fields: { quantity: 'number' },
+        grants: [],
+        limits: {
+          fuel: 100000000,
+          memoryBytes: 67108864,
+          wallTimeMs: 5000,
+          maxRequests: 0,
+        },
+      },
+      {
         id: 'read',
         kind: 'read',
         source: 'stock',
@@ -106,6 +121,19 @@ it('replays a multi-step process without redispatching its capability action', a
   };
   const recorded: string[] = [];
   const activities: ProcessActivities = {
+    code: vi.fn(async (_run, _version, step) => ({
+      state: 'completed' as const,
+      values: { quantity: 2 },
+      evidenceRefs: [step.artifactDigest],
+      telemetry: {
+        runtime: step.runtime,
+        artifactDigest: step.artifactDigest,
+        inputDigest: 'b'.repeat(64),
+        requests: 0,
+        wallTimeMs: 1,
+        outcome: 'completed' as const,
+      },
+    })),
     read: async () => ({
       values: { ready: true },
       evidenceRefs: ['stock-read'],
@@ -151,6 +179,7 @@ it('replays a multi-step process without redispatching its capability action', a
       );
     });
     expect(activities.action).toHaveBeenCalledTimes(1);
+    expect(activities.code).toHaveBeenCalledTimes(1);
     expect(recorded).toEqual(version.steps.map((step) => step.id));
   } finally {
     await env.teardown();

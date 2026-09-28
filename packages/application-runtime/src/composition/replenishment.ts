@@ -14,7 +14,9 @@ import {
 import { createReplenishmentStore } from '@luma/procurement/composition';
 import {
   compileProcessWorkflow,
+  createCodeJournal,
   createProcessStepStore,
+  createWasmtimeRunner,
   createWorkflowCatalogStore,
   createWorkflowTriggers,
   createWorkflowTriggerStore,
@@ -68,6 +70,22 @@ export function createReplenishmentRuntime(deps: {
   });
 
   return createReplenishmentService({
+    ...(process.env.LUMA_CODE_RUNTIME_DIR
+      ? {
+          code: {
+            runner: createWasmtimeRunner({
+              directory: process.env.LUMA_CODE_RUNTIME_DIR,
+            }),
+            journal: createCodeJournal(deps.db, (run) =>
+              deps.identity.resolveWorkflowContext(
+                run.actor.id,
+                run.tenantId,
+                run.id,
+              ),
+            ),
+          },
+        }
+      : {}),
     hash: playbookHash,
     id: (value) => {
       const hex = createHash('sha256').update(value).digest('hex');

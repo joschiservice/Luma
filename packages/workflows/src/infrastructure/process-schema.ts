@@ -1,7 +1,10 @@
 import { z } from 'zod';
 
+import { codeOwnedSteps } from '../domain/code-grants.js';
 import type { PlaybookSnapshot } from '../domain/playbook.js';
 import type { ProcessWorkflowVersion } from '../domain/process.js';
+import { compileCodeSource } from './code/compiler.js';
+import { checkCodeStep, codeStepSchema } from './code/schema.js';
 import { playbookHash, snapshotSchema } from './playbooks/schema.js';
 
 const key = z.string().regex(/^[a-z][a-zA-Z0-9_-]{0,79}$/);
@@ -22,6 +25,7 @@ const value = z.discriminatedUnion('source', [
 const values = z.record(key, value);
 const base = z.object({ id: key });
 const steps = z.discriminatedUnion('kind', [
+  codeStepSchema,
   base.extend({ kind: z.literal('read'), source: text, fields }).strict(),
   base
     .extend({
@@ -135,6 +139,7 @@ export function compileProcessWorkflow(input: unknown): ProcessWorkflowVersion {
   let pendingVerification: string | null = null;
   let totalWait = 0;
   const available = new Map<string, Record<string, string>>();
+  const internal = codeOwnedSteps(contract);
   for (const [index, step] of contract.steps.entries()) {
     if (ids.has(step.id)) throw new Error('Step IDs must be unique');
     ids.add(step.id);
@@ -147,7 +152,13 @@ export function compileProcessWorkflow(input: unknown): ProcessWorkflowVersion {
       throw new Error('Every action needs immediate verification');
     if (pendingApproval && step.kind !== 'capability')
       throw new Error('Approval must immediately precede its action');
-    if (step.kind === 'read') available.set(step.id, step.fields);
+    if (step.kind === 'read' && !internal.has(step.id))
+      available.set(step.id, step.fields);
+    if (step.kind === 'code') {
+      checkCodeStep(step);
+      compileCodeSource(step.source);
+      available.set(step.id, step.fields);
+    }
     if (step.kind === 'condition') {
       const expected = step.equals === null ? 'null' : typeof step.equals;
       const observed = [...available.values()]
@@ -171,7 +182,26 @@ export function compileProcessWorkflow(input: unknown): ProcessWorkflowVersion {
         ...Object.values(step.parameters),
         ...Object.values(step.expectedPostcondition),
       ]) {
-        if (item.source === 'step' && !available.get(item.stepId)?.[item.field])
+        const owner = contract.steps.find(
+          (candidate) =>
+            candidate.kind === 'code' && candidate.grants.includes(step.id),
+        );
+        const grantedRead =
+          item.source === 'step' &&
+          owner?.kind === 'code' &&
+          owner.grants.includes(item.stepId)
+            ? contract.steps
+                .slice(0, index)
+                .find(
+                  (candidate) =>
+                    candidate.id === item.stepId && candidate.kind === 'read',
+                )
+            : undefined;
+        if (
+          item.source === 'step' &&
+          !available.get(item.stepId)?.[item.field] &&
+          !(grantedRead?.kind === 'read' && grantedRead.fields[item.field])
+        )
           throw new Error('Action references an undeclared step output');
         if (
           item.source !== 'literal' &&
@@ -195,6 +225,35 @@ export function compileProcessWorkflow(input: unknown): ProcessWorkflowVersion {
   }
   if (pendingApproval || pendingVerification || totalWait > 604_800)
     throw new Error('Process has an incomplete or unbounded step');
+  const owned = new Set<string>();
+  for (const [index, step] of contract.steps.entries()) {
+    if (step.kind !== 'code') continue;
+    let next = index + 1;
+    for (const grant of step.grants) {
+      const node = contract.steps[next];
+      if (
+        !node ||
+        node.id !== grant ||
+        !['read', 'capability'].includes(node.kind) ||
+        owned.has(grant)
+      )
+        throw new Error(
+          'Code grants must name the immediately following read or action nodes',
+        );
+      owned.add(grant);
+      next += node.kind === 'capability' ? 2 : 1;
+      if (
+        node.kind === 'capability' &&
+        [
+          ...Object.values(node.parameters),
+          ...Object.values(node.expectedPostcondition),
+        ].some((value) => value.source === 'step' && value.stepId === step.id)
+      )
+        throw new Error(
+          'A code capability cannot depend on the unfinished code output',
+        );
+    }
+  }
   if (contract.applicability.trigger.kind === 'condition') {
     const check = contract.applicability.trigger;
     if (

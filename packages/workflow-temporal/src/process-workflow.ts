@@ -40,6 +40,13 @@ const action = proxyActivities<Pick<ProcessActivities, 'action'>>({
   cancellationType: ActivityCancellationType.WAIT_CANCELLATION_COMPLETED,
 });
 
+const code = proxyActivities<Required<Pick<ProcessActivities, 'code'>>>({
+  startToCloseTimeout: '1 minute',
+  scheduleToCloseTimeout: '5 minutes',
+  retry: { maximumAttempts: 5 },
+  cancellationType: ActivityCancellationType.WAIT_CANCELLATION_COMPLETED,
+});
+
 /** Replays a version-bound process with durable waits and activity-backed effects. */
 export async function processWorkflow(
   run: ProcessRun,
@@ -56,6 +63,7 @@ export async function processWorkflow(
     run,
     version,
     {
+      code: code.code,
       read: activities.read,
       decision: activities.decision,
       action: action.action,

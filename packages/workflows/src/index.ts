@@ -31,3 +31,11 @@ export { createProcessActivities } from './application/process-activities.js';
 export { presentProcessVersion } from './domain/process-presentation.js';
 
 export { presentTriggerRun } from './application/trigger-presentation.js';
+
+export type * from './domain/code-step.js';
+
+export type { CodeJournal } from './application/code-activity.js';
+
+export { createCodeActivity } from './application/code-activity.js';
+
+export { CodeRequestStopped } from './domain/code-step.js';

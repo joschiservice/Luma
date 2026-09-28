@@ -647,6 +647,7 @@ export async function createPilot(
             application.replenishment,
             pool,
             identity.service,
+            application.codeProcesses,
           )
         : undefined;
     if (replenishmentWorker) resources.add(replenishmentWorker.close);

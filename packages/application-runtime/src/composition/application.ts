@@ -11,7 +11,10 @@ import {
   createShadowEvaluations,
   createWorkspaceActivity,
 } from '@luma/resolution/composition';
-import { createWorkflows } from '@luma/workflows/composition';
+import {
+  createCodeProcesses,
+  createWorkflows,
+} from '@luma/workflows/composition';
 
 import { createAdmissionEligibility } from './admission.js';
 import { createPersistentPlaybookLibrary } from './playbook-library.js';
@@ -37,6 +40,7 @@ export interface ApplicationServices {
   playbooks: ReturnType<typeof createResolutionPlaybooks>;
   workflows: ReturnType<typeof createWorkflows>;
   replenishment: ReturnType<typeof createReplenishmentRuntime>;
+  codeProcesses: ReturnType<typeof createCodeProcesses>;
   procurement: ReturnType<typeof createProcurement>;
   library: ReturnType<typeof createPersistentPlaybookLibrary>;
   http: {
@@ -117,14 +121,21 @@ export function createApplicationServices(
       ? { transport: options.replenishmentTransport }
       : {}),
   });
+  const codeProcesses = createCodeProcesses(
+    database,
+    identity,
+    options.replenishmentTransport,
+  );
   const workflows = createWorkflows(
     database,
     library,
     identity.refreshContext,
     replenishment.api,
+    codeProcesses,
   );
 
   return {
+    codeProcesses,
     replenishment,
     workflows,
     procurement,

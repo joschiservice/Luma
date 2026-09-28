@@ -31,7 +31,7 @@ jobs:
             command: pnpm test:simulator
           - name: Playbook release evaluation
             cache: evaluation
-            command: pnpm test:evaluation && pnpm evaluate:playbook
+            command: pnpm test:evaluation && pnpm evaluate:playbook && pnpm evaluate:code
           - name: Backend E2E
             cache: e2e
             command: pnpm test:e2e
@@ -58,6 +58,8 @@ jobs:
           restore-keys: turbo-${{ runner.os }}-node24-${{ matrix.cache }}-
       - if: matrix.browser
         run: pnpm --filter '${{ matrix.browser }}' exec playwright install --with-deps chromium
+      - if: matrix.cache != 'builds'
+        run: pnpm setup:code
       - run: ${{ matrix.command }}
       - uses: actions/upload-artifact@v4
         if: always() && matrix.cache == 'evaluation'

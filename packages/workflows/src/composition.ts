@@ -4,6 +4,7 @@ import type { TenantContext } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
 
 import { createWorkflowCatalog } from './application/catalog.js';
+import { createCodeEvaluations } from './application/code-evaluations.js';
 import type { PlaybookDependencies } from './application/playbook.js';
 import { createPlaybookService } from './application/playbook.js';
 import type { PlaybookLibrary } from './application/playbook-library.js';
@@ -12,6 +13,9 @@ import {
   compilePublishedWorkflow,
   createWorkflowCatalogStore,
 } from './infrastructure/catalog.js';
+import { createCodeEvaluationStore } from './infrastructure/code/evaluations.js';
+import { createWasmtimeRunner } from './infrastructure/code/runner.js';
+import type { createCodeProcesses } from './infrastructure/code-processes.js';
 import {
   activationRequestSchema,
   compilePlaybook,
@@ -98,8 +102,26 @@ export function createWorkflows(
   legacy: PlaybookLibrary,
   refreshContext: (context: TenantContext) => Promise<TenantContext>,
   replenishment?: import('./application/replenishment-port.js').ReplenishmentWorkflow,
+  codeProcesses?: Pick<
+    ReturnType<typeof createCodeProcesses>,
+    'supported' | 'start'
+  >,
 ) {
   return createWorkflowCatalog({
+    ...(codeProcesses ? { codeProcesses } : {}),
+    ...(process.env.LUMA_CODE_RUNTIME_DIR
+      ? {
+          codeEvaluations: createCodeEvaluations({
+            store: createCodeEvaluationStore(db),
+            runner: createWasmtimeRunner({
+              directory: process.env.LUMA_CODE_RUNTIME_DIR,
+            }),
+            version: createWorkflowTriggerStore(db).version,
+            refreshContext,
+            hash: playbookHash,
+          }),
+        }
+      : {}),
     ...(replenishment ? { replenishment } : {}),
     triggers: createWorkflowTriggers({
       store: createWorkflowTriggerStore(db),
@@ -150,3 +172,11 @@ export { parseProcessSnapshot } from './infrastructure/process-schema.js';
 export { presentProcessVersion } from './domain/process-presentation.js';
 
 export { presentTriggerRun } from './application/trigger-presentation.js';
+
+export { defineCodeStep, checkCodeStep } from './infrastructure/code/schema.js';
+
+export { createWasmtimeRunner } from './infrastructure/code/runner.js';
+
+export { createCodeJournal } from './infrastructure/code/journal.js';
+
+export { createCodeProcesses } from './infrastructure/code-processes.js';
