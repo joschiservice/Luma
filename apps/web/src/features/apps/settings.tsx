@@ -63,7 +63,7 @@ export function AppSettings({
         refresh(),
       ]);
       await navigate({
-        to: '/app/$organizationId/connections',
+        to: '/app/$organizationId/apps',
         params: { organizationId },
       });
     } catch (error) {
@@ -77,7 +77,7 @@ export function AppSettings({
   return (
     <div className="connections-page">
       <Link
-        to="/app/$organizationId/connections"
+        to="/app/$organizationId/apps"
         params={{ organizationId }}
         className="app-back"
       >

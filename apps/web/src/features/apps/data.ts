@@ -1,10 +1,19 @@
 import { queryOptions } from '@tanstack/react-query';
+import { z } from 'zod';
 
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
 import { IdentityError } from '../identity/data';
 
 const api = createWebApiClient();
+
+/** Search state for returning from an app's authorization flow. */
+export const appResultSearch = z.object({
+  appResult: z
+    .enum(['connected', 'denied', 'permissions', 'failed'])
+    .optional()
+    .catch(undefined),
+});
 
 /** Loads current app availability and installations for one workspace. */
 export function appsOptions(organizationId: string) {

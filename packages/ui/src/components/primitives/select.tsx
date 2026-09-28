@@ -3,6 +3,8 @@ import { cn } from '@luma/ui/lib/utils';
 import { Check, ChevronDown } from 'lucide-react';
 import { useId } from 'react';
 
+import { controlClassName } from './input';
+
 export interface SelectOption<Value extends string = string> {
   value: Value;
   label: string;
@@ -48,7 +50,8 @@ export function Select<Value extends string>({
         aria-describedby={ariaDescribedBy}
         aria-invalid={ariaInvalid}
         className={cn(
-          'group flex min-h-9 w-full min-w-0 items-center justify-between gap-2 rounded-md border border-input bg-card px-3 py-1.5 text-left font-sans text-xs text-card-foreground outline-none transition-colors hover:border-ring focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 data-[popup-open]:border-ring data-[disabled]:cursor-not-allowed data-[disabled]:border-border data-[disabled]:bg-muted data-[disabled]:text-muted-foreground data-[placeholder]:text-muted-foreground aria-invalid:border-destructive aria-invalid:focus-visible:ring-destructive/30 motion-reduce:transition-none',
+          controlClassName,
+          'group flex h-8 items-center justify-between gap-2 py-1 text-left data-[popup-open]:border-signal data-[popup-open]:ring-3 data-[popup-open]:ring-signal/20 data-[disabled]:cursor-not-allowed data-[disabled]:bg-muted data-[disabled]:text-muted-foreground data-[placeholder]:text-fg-subtle',
           className,
         )}
       >
@@ -58,8 +61,8 @@ export function Select<Value extends string>({
             placeholder
           }
         </SelectPrimitive.Value>
-        <SelectPrimitive.Icon className="shrink-0 text-muted-foreground transition-transform group-data-[popup-open]:rotate-180 motion-reduce:transition-none">
-          <ChevronDown size={16} aria-hidden="true" />
+        <SelectPrimitive.Icon className="shrink-0 text-fg-subtle transition-transform duration-150 group-data-[popup-open]:rotate-180 motion-reduce:transition-none">
+          <ChevronDown size={15} aria-hidden="true" />
         </SelectPrimitive.Icon>
       </SelectPrimitive.Trigger>
       <SelectPrimitive.Portal>
@@ -69,7 +72,7 @@ export function Select<Value extends string>({
           alignItemWithTrigger={false}
           className="z-50 outline-none"
         >
-          <SelectPrimitive.Popup className="max-w-[var(--available-width)] min-w-[var(--anchor-width)] overflow-hidden rounded-lg border border-border bg-popover font-sans text-xs text-popover-foreground shadow-lg outline-none transition-opacity duration-150 data-[starting-style]:opacity-0 data-[ending-style]:opacity-0 motion-reduce:transition-none">
+          <SelectPrimitive.Popup className="lu-popover max-w-[var(--available-width)] min-w-[var(--anchor-width)] overflow-hidden font-sans text-[13px]">
             <SelectPrimitive.List
               aria-label={ariaLabel}
               aria-labelledby={ariaLabel ? undefined : (ariaLabelledBy ?? id)}
@@ -80,13 +83,13 @@ export function Select<Value extends string>({
                   key={option.value}
                   value={option.value}
                   disabled={option.disabled}
-                  className="relative flex min-h-9 cursor-default items-center rounded-md py-1.5 pr-9 pl-3 outline-none select-none data-[selected]:font-medium data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[disabled]:text-muted-foreground data-[disabled]:opacity-50"
+                  className="lu-menu-item relative pr-8 data-[selected]:font-medium"
                 >
                   <SelectPrimitive.ItemText className="break-words">
                     {option.label}
                   </SelectPrimitive.ItemText>
-                  <SelectPrimitive.ItemIndicator className="absolute right-3 text-primary">
-                    <Check size={15} aria-hidden="true" />
+                  <SelectPrimitive.ItemIndicator className="absolute right-2.5 text-signal">
+                    <Check size={14} aria-hidden="true" />
                   </SelectPrimitive.ItemIndicator>
                 </SelectPrimitive.Item>
               ))}

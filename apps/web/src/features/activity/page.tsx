@@ -492,10 +492,7 @@ function ActivityRow({
               </Link>
             ) : null}
             {item.connectionId ? (
-              <Link
-                to="/app/$organizationId/connections"
-                params={{ organizationId }}
-              >
+              <Link to="/app/$organizationId/apps" params={{ organizationId }}>
                 Open connections
               </Link>
             ) : null}

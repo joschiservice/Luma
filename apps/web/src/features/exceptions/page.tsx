@@ -209,7 +209,7 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
               <CaseNotice title="No active connections">
                 Connect a commerce system to start monitoring operations.{' '}
                 <Link
-                  to="/app/$organizationId/connections"
+                  to="/app/$organizationId/apps"
                   params={{ organizationId }}
                 >
                   Open connections

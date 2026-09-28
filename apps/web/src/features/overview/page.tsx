@@ -17,10 +17,10 @@ import { OrderMetrics } from './order-metrics';
  */
 export function OverviewPage() {
   const { organizationId } = useParams({
-    from: '/app/$organizationId/overview',
+    from: '/app/$organizationId/home',
   });
-  const { window } = useSearch({ from: '/app/$organizationId/overview' });
-  const navigate = useNavigate({ from: '/app/$organizationId/overview' });
+  const { window } = useSearch({ from: '/app/$organizationId/home' });
+  const navigate = useNavigate({ from: '/app/$organizationId/home' });
   const result = useQuery(overviewOptions(organizationId, window));
 
   return (
@@ -35,10 +35,7 @@ export function OverviewPage() {
         onWindowChange={(value) => void navigate({ search: { window: value } })}
         onRefresh={() => void result.refetch()}
         connectionsLink={
-          <Link
-            to="/app/$organizationId/connections"
-            params={{ organizationId }}
-          >
+          <Link to="/app/$organizationId/apps" params={{ organizationId }}>
             Manage connections →
           </Link>
         }

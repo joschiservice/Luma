@@ -34,7 +34,7 @@ function DialogOverlay({
       data-slot="dialog-overlay"
       className={(state) =>
         cn(
-          'fixed inset-0 z-50 bg-overlay transition-opacity duration-150 data-[starting-style]:opacity-0 data-[ending-style]:opacity-0 motion-reduce:transition-none',
+          'fixed inset-0 z-50 bg-overlay backdrop-blur-[2px] transition-opacity duration-200 data-[starting-style]:opacity-0 data-[ending-style]:opacity-0 motion-reduce:transition-none',
           typeof className === 'function' ? className(state) : className,
         )
       }
@@ -62,7 +62,7 @@ function DialogContent({
         data-slot="dialog-content"
         className={(state) =>
           cn(
-            'fixed top-1/2 left-1/2 z-50 grid w-[calc(100%-2rem)] max-w-md max-h-[calc(100dvh-2rem)] -translate-x-1/2 -translate-y-1/2 gap-6 overflow-y-auto rounded-xl border border-border bg-popover p-6 font-sans text-sm text-popover-foreground shadow-xl outline-none transition-opacity duration-150 data-[starting-style]:opacity-0 data-[ending-style]:opacity-0 motion-reduce:transition-none',
+            'fixed top-1/2 left-1/2 z-50 grid w-[calc(100%-2rem)] max-w-md max-h-[calc(100dvh-2rem)] -translate-x-1/2 -translate-y-1/2 gap-5 overflow-y-auto rounded-[14px] bg-popover p-5 font-sans text-[13px] text-popover-foreground shadow-[var(--shadow-dialog)] outline-none transition-[opacity,scale] duration-200 ease-[var(--ease-standard)] data-[starting-style]:scale-[0.98] data-[starting-style]:opacity-0 data-[ending-style]:scale-[0.98] data-[ending-style]:opacity-0 motion-reduce:transition-none',
             typeof className === 'function' ? className(state) : className,
           )
         }
@@ -75,7 +75,7 @@ function DialogContent({
             render={
               <Button
                 variant="ghost"
-                className="absolute top-2 right-2"
+                className="absolute top-3 right-3 size-7"
                 size="icon"
               />
             }
@@ -94,7 +94,7 @@ function DialogHeader({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="dialog-header"
-      className={cn('flex flex-col gap-2 pr-10', className)}
+      className={cn('flex flex-col gap-1 pr-10', className)}
       {...props}
     />
   );
@@ -113,7 +113,7 @@ function DialogFooter({
     <div
       data-slot="dialog-footer"
       className={cn(
-        'flex flex-col-reverse gap-3 border-t border-border pt-4 sm:flex-row sm:justify-end',
+        'flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:justify-end',
         className,
       )}
       {...props}
@@ -135,7 +135,7 @@ function DialogTitle({ className, ...props }: DialogPrimitive.Title.Props) {
       data-slot="dialog-title"
       className={(state) =>
         cn(
-          'font-heading text-3xl leading-tight font-normal',
+          'font-heading text-[17px] leading-6 font-semibold tracking-[-0.015em]',
           typeof className === 'function' ? className(state) : className,
         )
       }
@@ -154,7 +154,7 @@ function DialogDescription({
       data-slot="dialog-description"
       className={(state) =>
         cn(
-          'text-sm text-muted-foreground *:[a]:underline *:[a]:underline-offset-3 *:[a]:hover:text-foreground',
+          'text-[13px] leading-5 text-fg-muted *:[a]:underline *:[a]:underline-offset-3 *:[a]:hover:text-foreground',
           typeof className === 'function' ? className(state) : className,
         )
       }

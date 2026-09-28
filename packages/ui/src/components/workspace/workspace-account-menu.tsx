@@ -1,126 +1,107 @@
 import { Menu } from '@base-ui/react/menu';
 import {
-  Building2,
+  BookOpen,
   Check,
-  ChevronDown,
-  ChevronRight,
   LogOut,
-  Plus,
+  Monitor,
+  Moon,
+  Settings,
+  Sun,
 } from 'lucide-react';
 import type { ReactElement } from 'react';
 
-export type WorkspaceChoice = { id: string; name: string; link: ReactElement };
+import { initialsOf } from './workspace-switcher';
 
-/** Groups account and workspace navigation in an accessible dropdown. */
+export type ThemeChoice = 'system' | 'light' | 'dark';
+
+const themes = [
+  { value: 'system', label: 'System', Icon: Monitor },
+  { value: 'light', label: 'Light', Icon: Sun },
+  { value: 'dark', label: 'Dark', Icon: Moon },
+] as const;
+
+/**
+ * Shows the signed-in person with their appearance, settings, documentation and
+ * sign-out actions. The host stores the theme and supplies the navigation links.
+ */
 export function WorkspaceAccountMenu({
   name,
-  workspace,
-  workspaceId,
-  workspaces,
-  createLink,
+  email,
+  theme,
+  onThemeChange,
+  settingsLink,
+  docsLink,
 }: {
   name: string;
-  workspace: string;
-  workspaceId: string;
-  workspaces: WorkspaceChoice[];
-  createLink: ReactElement;
+  email?: string | undefined;
+  theme: ThemeChoice;
+  onThemeChange: (theme: ThemeChoice) => void;
+  settingsLink: ReactElement;
+  docsLink: ReactElement;
 }) {
-  const initials =
-    name
-      .trim()
-      .split(/\s+/)
-      .slice(0, 2)
-      .map((word) => word[0])
-      .join('')
-      .toUpperCase() || 'U';
-
   return (
     <Menu.Root>
       <Menu.Trigger
-        className="workspace-account-trigger"
-        aria-label={`${name}, ${workspace}. Open account menu`}
+        className="account-trigger"
+        aria-label={`${name}. Open account menu`}
       >
         <span className="account-avatar" aria-hidden="true">
-          {initials}
+          {initialsOf(name, 'U')}
         </span>
         <span className="account-identity">
           <strong title={name}>{name}</strong>
-          <span title={workspace}>{workspace}</span>
+          {email ? <span title={email}>{email}</span> : null}
         </span>
-        <ChevronDown size={16} aria-hidden="true" />
       </Menu.Trigger>
       <Menu.Portal>
         <Menu.Positioner
-          sideOffset={8}
-          align="end"
-          className="account-positioner"
+          side="top"
+          align="start"
+          sideOffset={6}
+          className="z-50"
         >
-          <Menu.Popup className="workspace-account-popup">
+          <Menu.Popup className="lu-popover account-menu">
+            <div className="account-menu-person">
+              <strong>{name}</strong>
+              {email ? <span>{email}</span> : null}
+            </div>
+            <Menu.Separator className="workspace-menu-separator" />
             <Menu.Group>
-              <Menu.GroupLabel className="account-menu-name">
-                {name}
+              <Menu.GroupLabel className="workspace-menu-label">
+                Appearance
               </Menu.GroupLabel>
-              <Menu.SubmenuRoot>
-                <Menu.SubmenuTrigger
-                  className="account-menu-item account-workspace-row"
-                  openOnHover={false}
-                >
-                  <Building2 size={16} aria-hidden="true" />
-                  <span title={workspace}>{workspace}</span>
-                  <ChevronRight size={14} aria-hidden="true" />
-                </Menu.SubmenuTrigger>
-                <Menu.Portal>
-                  <Menu.Positioner
-                    side="left"
-                    align="start"
-                    sideOffset={8}
-                    className="account-positioner"
+              <Menu.RadioGroup
+                value={theme}
+                onValueChange={(value) => onThemeChange(value as ThemeChoice)}
+              >
+                {themes.map(({ value, label, Icon }) => (
+                  <Menu.RadioItem
+                    key={value}
+                    value={value}
+                    className="lu-menu-item"
+                    closeOnClick={false}
                   >
-                    <Menu.Popup className="workspace-account-popup">
-                      <Menu.Group>
-                        <Menu.GroupLabel className="account-menu-name">
-                          Workspaces
-                        </Menu.GroupLabel>
-                        <div className="account-workspace-list">
-                          {workspaces.map((org) => (
-                            <Menu.Item
-                              key={org.id}
-                              render={org.link}
-                              className="account-menu-item"
-                              aria-current={
-                                org.id === workspaceId ? 'true' : undefined
-                              }
-                            >
-                              <Building2 size={16} aria-hidden="true" />
-                              <span className="account-workspace-label">
-                                {org.name}
-                              </span>
-                              {org.id === workspaceId ? (
-                                <Check size={16} aria-hidden="true" />
-                              ) : null}
-                            </Menu.Item>
-                          ))}
-                        </div>
-                      </Menu.Group>
-                      <Menu.Separator className="account-menu-separator" />
-                      <Menu.Item
-                        render={createLink}
-                        className="account-menu-item"
-                      >
-                        <Plus size={16} aria-hidden="true" />
-                        Create workspace
-                      </Menu.Item>
-                    </Menu.Popup>
-                  </Menu.Positioner>
-                </Menu.Portal>
-              </Menu.SubmenuRoot>
+                    <Icon size={15} aria-hidden="true" />
+                    <span className="account-menu-grow">{label}</span>
+                    <Menu.RadioItemIndicator className="account-menu-check">
+                      <Check size={14} aria-hidden="true" />
+                    </Menu.RadioItemIndicator>
+                  </Menu.RadioItem>
+                ))}
+              </Menu.RadioGroup>
             </Menu.Group>
-            <Menu.Separator className="account-menu-separator" />
-            <Menu.Item
-              render={<a href="/sign-out" />}
-              className="account-menu-item"
-            >
-              <LogOut size={16} aria-hidden="true" />
+            <Menu.Separator className="workspace-menu-separator" />
+            <Menu.Item render={settingsLink} className="lu-menu-item">
+              <Settings size={15} aria-hidden="true" />
+              Settings
+            </Menu.Item>
+            <Menu.Item render={docsLink} className="lu-menu-item">
+              <BookOpen size={15} aria-hidden="true" />
+              Documentation
+            </Menu.Item>
+            <Menu.Separator className="workspace-menu-separator" />
+            <Menu.Item render={<a href="/sign-out" />} className="lu-menu-item">
+              <LogOut size={15} aria-hidden="true" />
               Sign out
             </Menu.Item>
           </Menu.Popup>

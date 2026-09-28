@@ -1,5 +1,4 @@
 import type { WorkflowDetail, WorkflowSummary } from '@luma/api-contract';
-import { WorkspaceAccountMenu } from '@luma/ui/components/workspace/workspace-account-menu';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import {
   createMemoryHistory,
@@ -7,13 +6,10 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router';
-import { BookOpen } from 'lucide-react';
 import { useState } from 'react';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 
-import appStyles from '../../styles.css?inline';
-import { Brand } from '../identity/common';
-import { WorkspaceLayout } from '../identity/workspace-layout';
+import { StoryShell } from '../identity/storybook-shell';
 import { WorkflowDetailView } from './detail';
 import { type WorkflowFilters, WorkflowLibraryView } from './library';
 
@@ -138,38 +134,7 @@ function Preview({
 
   return (
     <>
-      <style>{appStyles}</style>
-      <WorkspaceLayout
-        brand={<Brand />}
-        navigation={() => (
-          <nav aria-label="Main navigation">
-            <a className="active" href="#">
-              <BookOpen size={16} /> Workflows
-            </a>
-          </nav>
-        )}
-        context={
-          <>
-            <BookOpen size={16} aria-hidden="true" />
-            <span>Workflows</span>
-          </>
-        }
-        accountMenu={
-          <WorkspaceAccountMenu
-            name="Alex Morgan"
-            workspace="Northstar Commerce"
-            workspaceId="northstar"
-            workspaces={[
-              {
-                id: 'northstar',
-                name: 'Northstar Commerce',
-                link: <a href="#workspace" />,
-              },
-            ]}
-            createLink={<a href="#new-workspace" />}
-          />
-        }
-      >
+      <StoryShell page="Workflows">
         {['member', 'admin', 'blocked'].includes(state) ? (
           <div className="workflows-page">
             <WorkflowDetailView
@@ -283,7 +248,7 @@ function Preview({
             refresh={() => {}}
           />
         )}
-      </WorkspaceLayout>
+      </StoryShell>
     </>
   );
 }

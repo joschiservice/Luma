@@ -1,12 +1,12 @@
-import { Button } from '@luma/ui/components/primitives/button';
-import { Card } from '@luma/ui/components/primitives/card';
+import { Button, buttonVariants } from '@luma/ui/components/primitives/button';
 import { Input } from '@luma/ui/components/primitives/input';
 import { useForm } from '@tanstack/react-form';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, Navigate, useNavigate } from '@tanstack/react-router';
+import { ChevronRight, Plus } from 'lucide-react';
 import { useRef, useState } from 'react';
 
-import { Brand, Failure, Pending } from './common';
+import { EntryFrame, Failure, Pending } from './common';
 import {
   createOrganization,
   IdentityError,
@@ -28,38 +28,46 @@ export function WorkspaceList({ entry = false }: { entry?: boolean }) {
   if (entry && query.data.length === 1)
     return (
       <Navigate
-        to="/app/$organizationId/overview"
+        to="/app/$organizationId/home"
         params={{ organizationId: query.data[0]!.id }}
         replace
       />
     );
 
   return (
-    <main className="workspace-page">
-      <header>
-        <Brand />
-        <a href="/sign-out">Sign out</a>
-      </header>
-      <h1>Choose your workspace.</h1>
-      <p>Open a workspace to pick up where you left off.</p>
-      <ul className="workspace-list">
-        {query.data.map((org) => (
-          <li key={org.id}>
-            <Link
-              to="/app/$organizationId/overview"
-              params={{ organizationId: org.id }}
-            >
-              <span>{org.name}</span>
-              <span aria-hidden="true">↗</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-      {query.data.length === 0 ? <p>You don’t have a workspace yet.</p> : null}
-      <Link className="action-link" to="/app/workspaces/new">
-        Create workspace <span aria-hidden="true">↗</span>
-      </Link>
-    </main>
+    <EntryFrame actions={<a href="/sign-out">Sign out</a>}>
+      <section className="entry-panel" aria-labelledby="workspaces-title">
+        <h1 id="workspaces-title">Choose a workspace</h1>
+        <p>Open a workspace to pick up where you left off.</p>
+        {query.data.length ? (
+          <ul className="workspace-list">
+            {query.data.map((org) => (
+              <li key={org.id}>
+                <Link
+                  to="/app/$organizationId/home"
+                  params={{ organizationId: org.id }}
+                >
+                  <span className="workspace-avatar" aria-hidden="true">
+                    {org.name.trim().slice(0, 1).toUpperCase()}
+                  </span>
+                  <span className="workspace-list-name">{org.name}</span>
+                  <ChevronRight size={16} aria-hidden="true" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="entry-empty">You don’t have a workspace yet.</p>
+        )}
+        <Link
+          className={buttonVariants({ variant: 'outline' })}
+          to="/app/workspaces/new"
+        >
+          <Plus aria-hidden="true" />
+          Create workspace
+        </Link>
+      </section>
+    </EntryFrame>
   );
 }
 
@@ -98,7 +106,7 @@ export function NewWorkspace() {
           queryKey: ['private', 'organizations'],
         });
         await navigate({
-          to: '/app/$organizationId/overview',
+          to: '/app/$organizationId/home',
           params: { organizationId: org.id },
         });
       } catch (error) {
@@ -146,15 +154,13 @@ export function NewWorkspace() {
     );
 
   return (
-    <main className="workspace-page">
-      <header>
-        <Brand />
-        <a href="/sign-out">Sign out</a>
-      </header>
-      <Card as="section" className="creation-panel">
-        <p className="eyebrow">A place for your team</p>
-        <h1>Create a workspace.</h1>
-        <p>Your workspace data is hosted in the European Union.</p>
+    <EntryFrame actions={<a href="/sign-out">Sign out</a>}>
+      <section className="entry-panel" aria-labelledby="new-workspace-title">
+        <h1 id="new-workspace-title">Create a workspace</h1>
+        <p>
+          A workspace holds one business’s connected systems, issues and
+          workflows. Its data is hosted in the European Union.
+        </p>
         <form
           ref={formElement}
           noValidate
@@ -186,17 +192,17 @@ export function NewWorkspace() {
               </div>
             )}
           </form.Field>
-          <p role="status" ref={result} tabIndex={-1}>
+          <p role="status" ref={result} tabIndex={-1} className="form-message">
             {pending ? 'Creating your workspace…' : message}
           </p>
           <Button size="lg" type="submit" disabled={pending || uncertain}>
             {pending ? 'Creating…' : 'Create workspace'}
           </Button>
         </form>
-        <Link to="/app/workspaces">
+        <Link className="entry-back" to="/app/workspaces">
           {uncertain ? 'Check workspace list' : 'Back to workspaces'}
         </Link>
-      </Card>
-    </main>
+      </section>
+    </EntryFrame>
   );
 }

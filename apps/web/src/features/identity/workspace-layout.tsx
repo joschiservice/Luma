@@ -8,45 +8,122 @@ import {
 } from '@luma/ui/components/primitives/dialog';
 import { WorkspaceBreadcrumbSlot } from '@luma/ui/components/workspace/workspace-breadcrumb';
 import { WorkspaceHeaderSlot } from '@luma/ui/components/workspace/workspace-header-slot';
-import { Menu } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { Menu, PanelLeft } from 'lucide-react';
+import {
+  type ReactNode,
+  useEffect,
+  useState,
+  useSyncExternalStore,
+} from 'react';
+
+import { isTypingTarget } from '../../lib/keyboard';
 
 type WorkspaceLayoutProps = {
-  brand: ReactNode;
+  workspaceSwitcher: ReactNode;
   navigation: (close?: () => void) => ReactNode;
-  workspaceSwitcher?: ReactNode;
-  context?: ReactNode;
-  search?: ReactNode;
   accountMenu: ReactNode;
+  search?: ReactNode;
+  context?: ReactNode;
   help?: ReactNode;
   children: ReactNode;
 };
 
-/** Renders responsive workspace navigation, account controls, and page content. */
+const sidebarKey = 'luma-sidebar';
+const sidebarEvent = 'luma-sidebar-change';
+
+function readCollapsed() {
+  try {
+    return localStorage.getItem(sidebarKey) === 'collapsed';
+  } catch {
+    return false;
+  }
+}
+
+function subscribeCollapsed(callback: () => void) {
+  window.addEventListener(sidebarEvent, callback);
+
+  return () => window.removeEventListener(sidebarEvent, callback);
+}
+
+function setCollapsed(collapsed: boolean) {
+  try {
+    if (collapsed) localStorage.setItem(sidebarKey, 'collapsed');
+    else localStorage.removeItem(sidebarKey);
+  } catch {
+    // The layout still changes for this page when storage is unavailable.
+  }
+  window.dispatchEvent(new Event(sidebarEvent));
+}
+
+/**
+ * Renders the workspace frame: a persistent sidebar that collapses to an icon rail,
+ * a compact top bar with breadcrumbs and page controls, and the scrollable page.
+ * Small screens move the sidebar into a navigation drawer. Press `[` to collapse.
+ */
 export function WorkspaceLayout({
-  brand,
-  navigation,
   workspaceSwitcher,
-  context,
-  search,
+  navigation,
   accountMenu,
+  search,
+  context,
   help,
   children,
 }: WorkspaceLayoutProps) {
   const [open, setOpen] = useState(false);
   const [pageHeader, setPageHeader] = useState<HTMLDivElement | null>(null);
   const [breadcrumb, setBreadcrumb] = useState<HTMLSpanElement | null>(null);
+  const collapsed = useSyncExternalStore(
+    subscribeCollapsed,
+    readCollapsed,
+    () => false,
+  );
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (
+        event.key !== '[' ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        isTypingTarget(event.target)
+      )
+        return;
+      event.preventDefault();
+      setCollapsed(!readCollapsed());
+    };
+    window.addEventListener('keydown', onKey);
+
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   return (
     <WorkspaceHeaderSlot.Provider value={pageHeader}>
       <WorkspaceBreadcrumbSlot.Provider value={breadcrumb}>
-        <div className="desk">
+        <div
+          className="desk"
+          data-sidebar={collapsed ? 'collapsed' : 'expanded'}
+        >
           <a className="skip-link" href="#workspace-content">
             Skip to content
           </a>
-          <aside className="desk-sidebar">
-            {brand}
-            {navigation()}
+          <aside className="desk-sidebar" aria-label="Workspace">
+            <div className="sidebar-top">
+              {workspaceSwitcher}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="sidebar-collapse"
+                aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                aria-pressed={collapsed}
+                title={`${collapsed ? 'Expand' : 'Collapse'} sidebar ( [ )`}
+                onClick={() => setCollapsed(!collapsed)}
+              >
+                <PanelLeft aria-hidden="true" />
+              </Button>
+            </div>
+            {search}
+            <div className="sidebar-scroll">{navigation()}</div>
+            <div className="sidebar-bottom">{accountMenu}</div>
           </aside>
           <div className="desk-body">
             <header className="desk-header">
@@ -57,33 +134,33 @@ export function WorkspaceLayout({
                       <Button variant="ghost" size="icon" aria-label="Menu" />
                     }
                   >
-                    <Menu size={20} aria-hidden="true" />
+                    <Menu aria-hidden="true" />
                   </DialogTrigger>
-                  <DialogContent className="navigation-drawer translate-x-0 translate-y-0">
-                    <DialogTitle>Navigation</DialogTitle>
-                    <DialogDescription>
+                  <DialogContent
+                    className="navigation-drawer"
+                    showCloseButton={false}
+                  >
+                    <DialogTitle className="sr-only">Navigation</DialogTitle>
+                    <DialogDescription className="sr-only">
                       Choose a destination in this workspace.
                     </DialogDescription>
-                    {navigation(() => setOpen(false))}
+                    <div className="sidebar-top">{workspaceSwitcher}</div>
+                    <div className="sidebar-scroll">
+                      {navigation(() => setOpen(false))}
+                    </div>
+                    <div className="sidebar-bottom">{accountMenu}</div>
                   </DialogContent>
                 </Dialog>
               </div>
-              <div className="workspace-default-header">
-                <nav className="header-context" aria-label="Breadcrumb">
-                  <span className="workspace-default-breadcrumb">
-                    {context}
-                  </span>
-                  <span
-                    className="workspace-route-breadcrumb"
-                    ref={setBreadcrumb}
-                  />
-                </nav>
-                {search}
-                {workspaceSwitcher}
-              </div>
+              <nav className="header-context" aria-label="Breadcrumb">
+                <span className="workspace-default-breadcrumb">{context}</span>
+                <span
+                  className="workspace-route-breadcrumb"
+                  ref={setBreadcrumb}
+                />
+              </nav>
               <div className="workspace-page-header" ref={setPageHeader} />
-              {help}
-              {accountMenu}
+              <div className="desk-header-tools">{help}</div>
             </header>
             <main id="workspace-content" tabIndex={-1} className="desk-content">
               {children}

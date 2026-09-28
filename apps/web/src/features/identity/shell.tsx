@@ -1,17 +1,76 @@
 import { Alert } from '@luma/ui/components/primitives/alert';
+import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { WorkspaceTimezone } from '@luma/ui/components/primitives/workspace-date';
 import { WorkspaceAccountMenu } from '@luma/ui/components/workspace/workspace-account-menu';
+import { WorkspaceSwitcher } from '@luma/ui/components/workspace/workspace-switcher';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, Outlet, useLocation, useParams } from '@tanstack/react-router';
+import {
+  Link,
+  Outlet,
+  useLocation,
+  useNavigate,
+  useParams,
+} from '@tanstack/react-router';
+import { useEffect } from 'react';
 
+import { isTypingTarget } from '../../lib/keyboard';
+import { setThemePreference, useThemePreference } from '../../lib/theme';
 import { AppNavigation } from '../apps/navigation';
 import { ContextHelp } from '../help/context-help';
+import { overviewOptions } from '../overview/data';
 import { settingsOptions } from '../settings/data';
-import { Brand, Failure, Pending } from './common';
+import { Failure, Pending } from './common';
 import { contextOptions, organizationsOptions, sessionOptions } from './data';
-import { workspaceDestinations } from './workspace-destinations';
+import {
+  destinationFor,
+  type WorkspaceDestination,
+  workspaceDestinations,
+} from './workspace-destinations';
 import { WorkspaceLayout } from './workspace-layout';
 import { WorkspaceSearch } from './workspace-search';
+
+const appPagePattern = /^\/app\/[^/]+\/apps\/[^/]+\/?$/;
+
+function NavigationLink({
+  destination,
+  organizationId,
+  close,
+  count,
+  exact = false,
+}: {
+  destination: WorkspaceDestination;
+  organizationId: string;
+  close?: (() => void) | undefined;
+  count?: number | undefined;
+  exact?: boolean;
+}) {
+  const { path, label, Icon, domain } = destination;
+
+  return (
+    <Link
+      className="sidebar-link"
+      data-label={label}
+      to={`/app/$organizationId/${path}`}
+      params={{ organizationId }}
+      activeOptions={{ exact, includeSearch: false }}
+      activeProps={{ 'aria-current': 'page' }}
+      onClick={close}
+    >
+      {domain ? (
+        <DomainIcon domain={domain} size="xs" className="sidebar-link-icon" />
+      ) : (
+        <Icon className="sidebar-link-icon" size={16} aria-hidden="true" />
+      )}
+      <span className="sidebar-link-label">{label}</span>
+      {count ? (
+        <span className="sidebar-link-count">
+          {count}
+          <span className="sr-only"> need you</span>
+        </span>
+      ) : null}
+    </Link>
+  );
+}
 
 function Navigation({
   organizationId,
@@ -20,38 +79,80 @@ function Navigation({
   organizationId: string;
   close?: (() => void) | undefined;
 }) {
-  const appSettings = useLocation({
-    select: (location) =>
-      /^\/app\/[^/]+\/apps\/[^/]+\/settings\/?$/.test(location.pathname),
+  const onAppPage = useLocation({
+    select: (location) => appPagePattern.test(location.pathname),
   });
+  const attention = useQuery({
+    ...overviewOptions(organizationId, '24h'),
+    select: (overview) => overview.attentionCount,
+  });
+  const group = (name: WorkspaceDestination['group']) =>
+    workspaceDestinations.filter((item) => item.group === name);
+  const link = (destination: WorkspaceDestination) => (
+    <li key={destination.path}>
+      <NavigationLink
+        destination={destination}
+        organizationId={organizationId}
+        close={close}
+        count={destination.path === 'exceptions' ? attention.data : undefined}
+        exact={destination.path === 'apps' && onAppPage}
+      />
+    </li>
+  );
 
   return (
-    <nav aria-label="Workspace navigation">
-      {workspaceDestinations.map(({ path, label, Icon }) => (
-        <Link
-          key={path}
-          className={
-            path === 'settings'
-              ? 'workspace-settings-link'
-              : path === 'connections' && appSettings
-                ? 'active'
-                : undefined
-          }
-          aria-current={
-            path === 'connections' && appSettings ? 'page' : undefined
-          }
-          to={`/app/$organizationId/${path}`}
-          params={{ organizationId }}
-          activeProps={{ 'aria-current': 'page', className: 'active' }}
-          onClick={close}
-        >
-          <Icon size={18} aria-hidden="true" />
-          {label}
-        </Link>
-      ))}
+    <nav aria-label="Workspace navigation" className="sidebar-nav">
+      <ul className="sidebar-list">{group('core').map(link)}</ul>
+      <section className="sidebar-section" aria-labelledby="nav-operations">
+        <h2 className="sidebar-section-label" id="nav-operations">
+          Operations
+        </h2>
+        <ul className="sidebar-list">{group('operations').map(link)}</ul>
+      </section>
       <AppNavigation organizationId={organizationId} close={close} />
+      <ul className="sidebar-list sidebar-list-end">
+        {group('workspace').map(link)}
+      </ul>
     </nav>
   );
+}
+
+/** Navigates with `G` followed by a destination key, as in G then I for Issues. */
+function useGoShortcuts(organizationId: string) {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    let armedAt = 0;
+    const onKey = (event: KeyboardEvent) => {
+      if (
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        isTypingTarget(event.target) ||
+        document.querySelector('[role="dialog"]')
+      )
+        return;
+      const key = event.key.toLowerCase();
+      if (armedAt && Date.now() - armedAt < 1200) {
+        armedAt = 0;
+        const destination = workspaceDestinations.find(
+          (item) => item.shortcut === key,
+        );
+        if (!destination) return;
+        event.preventDefault();
+        void navigate({
+          to: `/app/$organizationId/${destination.path}`,
+          params: { organizationId },
+        });
+
+        return;
+      }
+      armedAt = key === 'g' ? Date.now() : 0;
+    };
+    window.addEventListener('keydown', onKey);
+
+    return () => window.removeEventListener('keydown', onKey);
+  }, [navigate, organizationId]);
 }
 
 /** Provides workspace navigation and tenant context for nested application routes. */
@@ -63,13 +164,9 @@ export function WorkspaceShell() {
 
 function TenantShell({ organizationId }: { organizationId: string }) {
   const pathname = useLocation({ select: (location) => location.pathname });
-  const section = /^\/app\/[^/]+\/apps\/[^/]+\/settings\/?$/.test(pathname)
-    ? 'connections'
-    : pathname.split('/')[3];
-  const page =
-    workspaceDestinations.find(({ path }) => section === path) ??
-    workspaceDestinations[0];
+  const page = destinationFor(pathname);
   const client = useQueryClient();
+  const theme = useThemePreference();
   const access = useQuery(contextOptions(organizationId));
   const organizations = useQuery(organizationsOptions());
   const settings = useQuery({
@@ -77,6 +174,7 @@ function TenantShell({ organizationId }: { organizationId: string }) {
     refetchInterval: false,
   });
   const session = client.getQueryData(sessionOptions().queryKey);
+  useGoShortcuts(organizationId);
   if (access.isError)
     return <Failure error={access.error} retry={() => void access.refetch()} />;
   if (organizations.isError)
@@ -94,21 +192,8 @@ function TenantShell({ organizationId }: { organizationId: string }) {
 
   return (
     <WorkspaceLayout
-      brand={<Brand />}
-      navigation={(close) => (
-        <Navigation organizationId={organizationId} close={close} />
-      )}
-      context={
-        <>
-          <page.Icon size={16} aria-hidden="true" />
-          <span aria-current="page">{page.label}</span>
-        </>
-      }
-      search={<WorkspaceSearch organizationId={organizationId} />}
-      help={<ContextHelp />}
-      accountMenu={
-        <WorkspaceAccountMenu
-          name={session?.user.name ?? 'Account'}
+      workspaceSwitcher={
+        <WorkspaceSwitcher
           workspace={organization?.name ?? 'Workspace'}
           workspaceId={organizationId}
           workspaces={organizations.data.map((org) => ({
@@ -116,7 +201,7 @@ function TenantShell({ organizationId }: { organizationId: string }) {
             name: org.name,
             link: (
               <Link
-                to="/app/$organizationId/overview"
+                to="/app/$organizationId/home"
                 params={{ organizationId: org.id }}
               />
             ),
@@ -124,10 +209,44 @@ function TenantShell({ organizationId }: { organizationId: string }) {
           createLink={<Link to="/app/workspaces/new" />}
         />
       }
+      search={<WorkspaceSearch organizationId={organizationId} />}
+      navigation={(close) => (
+        <Navigation organizationId={organizationId} close={close} />
+      )}
+      context={
+        <Link
+          to={`/app/$organizationId/${page.path}`}
+          params={{ organizationId }}
+          className="breadcrumb-root"
+        >
+          {page.domain ? (
+            <DomainIcon domain={page.domain} size="xs" />
+          ) : (
+            <page.Icon size={15} aria-hidden="true" />
+          )}
+          <span>{page.label}</span>
+        </Link>
+      }
+      help={<ContextHelp />}
+      accountMenu={
+        <WorkspaceAccountMenu
+          name={session?.user.name ?? 'Account'}
+          email={session?.user.email}
+          theme={theme}
+          onThemeChange={setThemePreference}
+          settingsLink={
+            <Link
+              to="/app/$organizationId/settings"
+              params={{ organizationId }}
+            />
+          }
+          docsLink={<a href="/docs" target="_blank" rel="noreferrer" />}
+        />
+      }
     >
       <WorkspaceTimezone value={settings.data?.workspace.timezone ?? 'UTC'}>
         {settings.isError ? (
-          <Alert tone="warning" role="status">
+          <Alert tone="warning" role="status" className="desk-alert">
             {settings.data
               ? 'Workspace settings could not refresh. Dates use the last known timezone.'
               : 'Display timezone unavailable. Dates are shown in UTC.'}

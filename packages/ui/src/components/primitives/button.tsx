@@ -3,23 +3,24 @@ import { cn } from '@luma/ui/lib/utils';
 import { cva, type VariantProps } from 'class-variance-authority';
 
 const buttonVariants = cva(
-  'inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-transparent font-sans text-sm font-semibold transition-colors outline-none select-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground aria-invalid:border-destructive motion-reduce:transition-none [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
+  "relative inline-flex shrink-0 items-center justify-center gap-1.5 rounded-[var(--radius-control)] border border-transparent font-sans font-medium whitespace-nowrap outline-none select-none transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-[var(--ease-standard)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring enabled:active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive motion-reduce:transition-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
         default:
-          'bg-primary text-primary-foreground enabled:hover:bg-primary-hover',
+          'bg-primary text-primary-foreground shadow-[inset_0_1px_0_rgb(255_255_255/0.14),var(--shadow-control)] enabled:hover:bg-primary-hover',
         outline:
-          'border-input bg-card text-card-foreground enabled:hover:bg-secondary',
-        ghost: 'text-foreground enabled:hover:bg-secondary',
+          'border-line-strong bg-surface-raised text-foreground shadow-[var(--shadow-control)] enabled:hover:border-[color-mix(in_srgb,var(--foreground)_24%,transparent)] enabled:hover:bg-[color-mix(in_srgb,var(--surface-raised)_92%,var(--foreground))]',
+        ghost:
+          'text-fg-muted enabled:hover:bg-accent enabled:hover:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground',
         destructive:
-          'bg-destructive text-destructive-foreground enabled:hover:bg-destructive/90',
+          'bg-destructive text-destructive-foreground shadow-[var(--shadow-control)] enabled:hover:bg-[color-mix(in_srgb,var(--destructive)_88%,black)]',
       },
       size: {
-        default: 'min-h-9 px-3 py-1.5 text-xs',
-        lg: 'min-h-11 px-4 py-2 text-sm',
-        sm: 'min-h-9 px-3 py-1.5 text-xs',
-        icon: 'size-9',
+        default: 'h-8 px-3 text-[13px] leading-5',
+        sm: "h-7 px-2.5 text-[13px] leading-5 [&_svg:not([class*='size-'])]:size-3.5",
+        lg: 'h-10 px-4 text-sm',
+        icon: 'size-8 px-0',
       },
     },
     defaultVariants: { variant: 'default', size: 'default' },
@@ -29,11 +30,16 @@ const buttonVariants = cva(
 export type ButtonProps = ButtonPrimitive.Props &
   VariantProps<typeof buttonVariants>;
 
-/** Renders a styled button with shared variants and sizes, forwarding Base UI button props. */
+/**
+ * Renders a styled button with shared variants and sizes, forwarding Base UI button props.
+ * Coarse pointers receive 44px targets through the shared stylesheet.
+ */
 function Button({ className, variant, size, ...props }: ButtonProps) {
   return (
     <ButtonPrimitive
       data-slot="button"
+      data-variant={variant ?? 'default'}
+      data-size={size ?? 'default'}
       className={(state) =>
         cn(
           buttonVariants({ variant, size }),

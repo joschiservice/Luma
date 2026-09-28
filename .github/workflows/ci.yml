@@ -20,7 +20,7 @@ jobs:
         include:
           - name: Static checks and builds
             cache: builds
-            command: pnpm format:check && pnpm design:check && pnpm lint && pnpm typecheck && pnpm build
+            command: pnpm format:check && pnpm lint && pnpm typecheck && pnpm build
           - name: Main tests
             cache: tests
             browser: '@luma/ui'

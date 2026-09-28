@@ -592,7 +592,7 @@ function ConnectionLink({
 }) {
   return (
     <Link
-      to="/app/$organizationId/connections"
+      to="/app/$organizationId/apps"
       params={{ organizationId }}
       hash={`connection-${id}`}
     >

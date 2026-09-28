@@ -1,4 +1,3 @@
-import { figmaDesign } from '@luma/ui/lib/figma';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 
@@ -20,7 +19,6 @@ const meta = {
   // The popup is portaled outside the story root; include it in axe checks.
   parameters: {
     a11y: { context: { include: ['body'] } },
-    design: figmaDesign('dialog'),
   },
   render: (args) => (
     <Dialog {...args}>

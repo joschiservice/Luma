@@ -14,7 +14,7 @@ import { connectionsOptions } from './data';
 /** Lists apps and forwards existing connection links to their app management page. */
 export function ConnectionsPage() {
   const { organizationId } = useParams({ from: '/app/$organizationId' });
-  const { appResult } = useSearch({ from: '/app/$organizationId/connections' });
+  const { appResult } = useSearch({ from: '/app/$organizationId/apps/' });
   const connections = useQuery(connectionsOptions(organizationId));
   const navigate = useNavigate();
   const hash = useLocation({ select: (location) => location.hash });

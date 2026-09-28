@@ -1,0 +1,68 @@
+/* Section workspace: long records with a sticky in-page index. */
+.section-workspace {
+  display: grid;
+  grid-template-columns: 168px minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+
+.section-workspace-navigation {
+  position: sticky;
+  top: 0;
+  padding-top: 2px;
+}
+
+.section-workspace-main {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.section-workspace-section {
+  min-width: 0;
+  scroll-margin-top: 20px;
+  outline: none;
+}
+
+.section-workspace-section:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 4px;
+  border-radius: var(--radius-panel);
+}
+
+.section-workspace-mobile {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .section-workspace {
+    display: block;
+  }
+
+  .section-workspace-navigation {
+    display: none;
+  }
+
+  .section-workspace-mobile {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+    padding: 8px 0 10px;
+    background: var(--surface);
+    color: var(--foreground-subtle);
+    font-size: 12px;
+  }
+
+  .section-workspace-mobile > span {
+    white-space: nowrap;
+  }
+
+  .section-workspace-section {
+    scroll-margin-top: calc(var(--section-navigation-height, 56px) + 12px);
+  }
+}

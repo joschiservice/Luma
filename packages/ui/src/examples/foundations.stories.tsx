@@ -1,4 +1,3 @@
-import { figmaDesign } from '@luma/ui/lib/figma';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
 const surfaces = [
@@ -160,10 +159,8 @@ type Story = StoryObj<typeof meta>;
 
 export const Light: Story = {
   globals: { theme: 'light' },
-  parameters: { design: figmaDesign('foundationsLight') },
 };
 
 export const Dark: Story = {
   globals: { theme: 'dark' },
-  parameters: { design: figmaDesign('foundationsDark') },
 };

@@ -98,7 +98,13 @@ export const sessionOptions = () =>
       if (result.error) throw new IdentityError(result.error.status);
 
       return result.data
-        ? { user: { id: result.data.user.id, name: result.data.user.name } }
+        ? {
+            user: {
+              id: result.data.user.id,
+              name: result.data.user.name,
+              email: result.data.user.email,
+            },
+          }
         : null;
     },
   });
