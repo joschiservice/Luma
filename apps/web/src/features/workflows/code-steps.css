@@ -1,170 +1,204 @@
+/* Code Steps: sandboxed TypeScript with a visible contract, limits and test runs. */
 .code-step-list,
 .code-step-panel,
 .code-step-content {
   display: grid;
-  gap: 1.25rem;
+  gap: 14px;
   min-width: 0;
 }
+
 .code-step-panel {
-  padding: 1.25rem;
+  padding: 16px 18px;
+  border-radius: var(--radius-panel);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-panel);
 }
+
 .code-step-heading,
 .code-source-toolbar,
 .code-step-actions {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
   flex-wrap: wrap;
+  gap: 8px;
 }
-.code-step-identity {
+
+.code-step-panel .code-step-identity {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 10px;
 }
-.code-step-identity h2 {
-  font-size: 0.9375rem;
+
+.code-step-panel .code-step-identity h2 {
+  margin: 0;
+  font-size: 14px;
   font-weight: 600;
 }
+
+.code-step-panel .code-step-identity p {
+  margin: 2px 0 0;
+}
+
 .code-step-identity p,
 .code-step-help,
 .code-step-contract p,
 .code-step-actions > span,
 .code-step-result p {
-  color: var(--muted-foreground);
-  font-size: 0.8125rem;
-  line-height: 1.6;
+  color: var(--foreground-subtle);
+  font-size: 12.5px;
 }
+
 .code-step-limits {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  padding: 1rem 0;
-  border-block: 1px solid var(--border);
-  gap: 1rem;
+  gap: 8px;
+  margin: 0;
 }
+
+.workflows-page .code-step-panel .code-step-limits > div {
+  display: block;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface-sunken);
+}
+
 .code-step-limits dt {
-  font-size: 0.75rem;
-  color: var(--muted-foreground);
-  margin-bottom: 0.35rem;
+  margin-bottom: 2px;
+  color: var(--foreground-subtle);
+  font-size: 12px;
 }
-.code-step-limits dd {
-  font-size: 1rem;
-  font-weight: 500;
+
+.workflows-page .code-step-panel .code-step-limits dd {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
+  overflow-wrap: normal;
 }
-.code-step-content {
-  padding-top: 0.75rem;
+
+.code-step-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
 }
+
+.code-step-tabs [data-slot='tabs-list'] {
+  align-self: stretch;
+  justify-content: flex-start;
+  gap: 16px;
+  height: auto;
+  padding: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: none;
+}
+
+.code-step-tabs [data-slot='tabs-trigger'] {
+  flex: none;
+  height: 34px;
+  padding: 0 2px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.code-step-tabs [data-slot='tabs-trigger'][data-active] {
+  border-bottom-color: var(--signal);
+  background: none;
+  box-shadow: none;
+  color: var(--foreground);
+}
+
 .code-source-toolbar {
-  font-size: 0.75rem;
-  color: var(--muted-foreground);
+  color: var(--foreground-subtle);
+  font-size: 12px;
 }
+
 .code-step-source,
 .code-step-result pre {
-  overflow: auto;
   max-height: 28rem;
-  border: 1px solid var(--border);
-  border-radius: 0.5rem;
-  background: var(--muted);
-  padding: 1rem;
-  font: 0.75rem/1.8 var(--font-mono, monospace);
+  margin: 0;
+  padding: 14px 16px;
+  overflow: auto;
+  border-radius: 10px;
+  background: #0b1020;
+  color: #dbe3f2;
+  font: 12px/1.75 var(--font-mono);
   tab-size: 2;
 }
+
 .code-step-contract,
 .code-step-editor-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1.5rem;
+  gap: 20px;
 }
+
 .code-step-contract h3 {
-  font-size: 0.8125rem;
+  margin-bottom: 8px;
+  font-size: 13px;
   font-weight: 600;
-  margin-bottom: 0.75rem;
 }
+
 .code-step-contract dl > div {
   display: flex;
   justify-content: space-between;
-  gap: 1rem;
-  font-size: 0.75rem;
-  padding: 0.375rem 0;
-  border-bottom: 1px solid var(--border);
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 12.5px;
 }
+
 .code-step-contract dd {
-  color: var(--muted-foreground);
+  color: var(--foreground-subtle);
 }
+
 .code-step-contract li,
 .code-step-digest {
-  font-size: 0.75rem;
+  font-size: 12px;
   overflow-wrap: anywhere;
 }
+
 .code-step-panel textarea {
-  font-family: var(--font-mono, monospace);
-  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 12px;
   line-height: 1.7;
   resize: vertical;
 }
+
 .code-step-result {
   display: grid;
-  gap: 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: 0.5rem;
-  padding: 1rem;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--surface-sunken);
 }
+
 .code-step-result strong {
-  font-size: 0.875rem;
+  font-size: 13.5px;
 }
+
 .code-step-result .code-step-heading > span {
-  font-size: 0.75rem;
-  color: var(--muted-foreground);
+  color: var(--foreground-subtle);
+  font-size: 12px;
 }
+
 @media (max-width: 640px) {
   .code-step-contract,
   .code-step-editor-grid {
     grid-template-columns: 1fr;
   }
-  .code-step-panel {
-    padding: 1rem;
-  }
-  .code-step-limits {
-    gap: 0.5rem;
-  }
-  .code-step-limits dd {
-    font-size: 0.875rem;
-  }
-}
 
-/* Keep the embedded contract independent of the workflow summary's definition-list layout. */
-.workflows-page .code-step-panel .code-step-limits > div {
-  display: block;
-  min-width: 0;
-}
-.workflows-page .code-step-panel .code-step-limits dd {
-  margin: 0;
-  overflow-wrap: normal;
-}
-.code-step-tabs {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  gap: 1rem;
-}
-.code-step-tabs [data-slot='tabs-list'] {
-  align-self: flex-start;
-  border-bottom: 1px solid var(--border);
-}
-.code-step-tabs [data-slot='tabs-trigger'][data-active] {
-  color: var(--primary);
-  border-bottom: 2px solid var(--primary);
-  border-radius: 0;
-}
-.code-step-panel .code-step-identity {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-.code-step-panel .code-step-identity p {
-  margin: 0.25rem 0 0;
-}
-.code-step-panel .code-step-identity h2 {
-  margin: 0;
+  .code-step-panel {
+    padding: 14px;
+  }
+
+  .code-step-limits {
+    grid-template-columns: 1fr 1fr;
+  }
 }

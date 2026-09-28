@@ -1,11 +1,15 @@
+import './workflows.css';
+
 import type { WorkflowSummary } from '@luma/api-contract';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
 import { CollectionToolbar } from '@luma/ui/components/primitives/collection-toolbar';
+import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { Empty } from '@luma/ui/components/primitives/empty';
 import { Input } from '@luma/ui/components/primitives/input';
 import { Select } from '@luma/ui/components/primitives/select';
+import { PageHeader } from '@luma/ui/components/workspace/page-header';
 import { useQuery } from '@tanstack/react-query';
 import {
   Link,
@@ -151,13 +155,12 @@ export function WorkflowLibraryView({
 
   return (
     <div className="workflows-page workflow-library-page">
-      <h1 className="sr-only">Workflows</h1>
+      <PageHeader
+        icon={<DomainIcon domain="workflows" size="lg" />}
+        title="Workflows"
+        description="Workflows investigate issues, carry out the changes you’ve agreed on, and check the result. Open one to review its steps, where it runs and its history."
+      />
       <OfflineNotice />
-      <p className="workflow-library-intro">
-        Resolution workflows investigate issues, govern corrective actions, and
-        verify the result. Open a workflow to review its steps, active scope,
-        and run history.
-      </p>
       <div className="workflow-collection">
         <CollectionToolbar
           views={
@@ -293,9 +296,15 @@ export function WorkflowLibraryView({
                   params={{ organizationId, definitionId: item.id }}
                   search={filters}
                 >
-                  <span className="workflow-row-icon">
-                    <Workflow size={18} aria-hidden="true" />
-                  </span>
+                  <DomainIcon
+                    domain={
+                      item.category === 'resolution'
+                        ? 'workflows'
+                        : 'procurement'
+                    }
+                    size="md"
+                    className="workflow-row-icon"
+                  />
                   <div className="workflow-row-content">
                     <h2>{item.name}</h2>
                     <p>{item.purpose}</p>

@@ -1,3 +1,5 @@
+import './workflows.css';
+
 import type {
   WorkflowActivationView,
   WorkflowDetail,
