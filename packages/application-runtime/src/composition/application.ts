@@ -8,6 +8,7 @@ import type { VerificationEvaluator } from '@luma/exceptions';
 import {
   createCaseMetricReader,
   createOrderAttentionBoundaryReader,
+  orderAttentionForOrders,
   orderAttentionQuery,
 } from '@luma/exceptions/composition';
 import type { IdentityService } from '@luma/identity';
@@ -276,7 +277,11 @@ export function createApplicationServices(
       records: createRecordExplorer(database),
       orders: createOrderWorkspace(
         database,
-        { state: orderStateQueries, attention: orderAttentionQuery },
+        {
+          state: orderStateQueries,
+          attention: orderAttentionQuery,
+          attentionFor: orderAttentionForOrders,
+        },
         createActivityStore,
         identity.refreshContext,
       ),

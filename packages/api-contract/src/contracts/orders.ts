@@ -25,7 +25,7 @@ export const ordersContract = c.router({
     },
     summary: 'List orders',
     description:
-      'Lists current orders from your connected sources. Search matches order numbers, source order IDs, SKU text on order lines and source SKU IDs. Filter by status, payment, source, placed or updated time, or a saved view. Outstanding, overdue and needs-you views count the same orders as the order metrics. Results use `nextCursor` for the following page; a cursor is only valid with the filters and sort that produced it, and any other cursor returns 400 with a message to start from the first page.',
+      'Lists current orders from your connected sources. Search matches order numbers, source order IDs, SKU text on order lines and source SKU IDs. Filter by status, payment, source, placed or updated time, or a saved view. Outstanding, overdue and needs-you views count the same orders as the order metrics. Pass `count=exact` to include the total number of matches; otherwise `totalCount` is null. Results use `nextCursor` for the following page; a cursor is only valid with the filters and sort that produced it, and any other cursor returns 400 with a message to start from the first page.',
   },
   get: {
     method: 'GET',

@@ -76,7 +76,7 @@ export const orderListItemSchema = z.object({
 
 export const orderListSchema = z.object({
   items: z.array(orderListItemSchema),
-  totalCount: z.number().int(),
+  totalCount: z.number().int().nullable(),
   nextCursor: z.string().nullable(),
   asOf: timestamp,
 });
@@ -84,6 +84,12 @@ export const orderListSchema = z.object({
 export const orderListQuerySchema = z
   .object({
     q: z.string().trim().max(120).default(''),
+    count: z
+      .literal('exact')
+      .optional()
+      .describe(
+        'Request the exact number of matches. Without this option, totalCount is null.',
+      ),
     view: orderViewSchema.default('all'),
     status: orderStatusSchema.optional(),
     paymentStatus: orderPaymentStatusSchema.optional(),

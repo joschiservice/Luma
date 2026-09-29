@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 
 import { createCommerceServices } from '@luma/application-runtime';
 import { makeTenantContext } from '@luma/identity';
+import { createOrderListRebuilder } from '@luma/orders/composition';
+import { createTenantDatabase } from '@luma/platform/composition';
 
 /**
  * Creates a Shopify store and an ERP connection, then returns helpers that ingest mapped orders
@@ -151,6 +153,11 @@ export async function ordersFixture(t, f) {
         SELECT $1,entity_id,$3,id FROM snapshots`,
       [f.org.id, templateOrderId, store, count],
     );
+    const rebuild = createOrderListRebuilder(createTenantDatabase(f.db.owner));
+    let after;
+    do {
+      after = await rebuild(context, after ?? undefined);
+    } while (after);
   }
 
   return { store, erp, order, importHistory };

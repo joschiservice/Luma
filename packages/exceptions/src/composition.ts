@@ -74,7 +74,10 @@ export function createCaseEscalation(db: TenantDatabase) {
   return createEscalationService(createEscalationRepository(db));
 }
 
-export { orderAttentionQuery } from './infrastructure/cases.js';
+export {
+  orderAttentionQuery,
+  orderAttentionForOrders,
+} from './infrastructure/cases.js';
 
 export { createOrderAttentionBoundaryReader } from './infrastructure/cases.js';
 

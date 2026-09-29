@@ -1,6 +1,6 @@
 # @luma/orders
 
-Owns canonical orders, order lines, fulfillment identities, and their projections.
+Owns canonical orders, order lines, fulfillment identities, and their projections, including maintained order list rows and search links.
 
 ## Responsibilities
 
@@ -31,5 +31,6 @@ Use `pnpm test` for cross-package integration coverage, including the applicatio
 
 ## Further reading
 
+- [Orders workspace and list backfill](../../docs/orders-workspace.md)
 - [Engineering guide](../../docs/commerce-projections.md)
 - [Package boundaries and runtime composition](../../docs/architecture/005-domain-packages-and-runtimes.md)

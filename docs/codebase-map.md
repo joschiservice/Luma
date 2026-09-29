@@ -194,8 +194,11 @@ grants the read model access to canonical identities and stock projections.
 
 The order list and detail read model is `packages/read-models/src/infrastructure/orders`
 (`workspace.ts` wiring, `list-query.ts` and `list.ts`, `detail.ts` with `detail-facts.ts`
-and `links.ts`, `source-comparison.ts` for "differs by source", `cursor.ts`), with its port
-in `application/orders.ts`. Open, overdue, line progress and fulfillment state come from
+and `links.ts`, `search-query.ts` for indexed search, `legacy-list-query.ts` during backfill, `cursor.ts`), with its port
+in `application/orders.ts`. Maintained list rows and rebuilds live in `packages/orders/src/infrastructure/list-projection.ts`;
+source differences live in that package’s `source-comparison.ts`. Migration `0041` adds the
+list and search tables; `tooling/orders/rebuild-list.mjs` resumes a tenant backfill.
+Open, overdue, line progress and fulfillment state come from
 `packages/orders/src/infrastructure/order-state.ts`; needs-you comes from
 `orderAttentionQuery` in `packages/exceptions/src/infrastructure/cases.ts`. Luma activity for
 an order uses the `subjects` filter in

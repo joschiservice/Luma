@@ -9,6 +9,7 @@ import type {
   CanonicalSnapshot,
   CommerceProjections,
 } from '../application/projections.js';
+import { refreshOrderList } from './list-projection.js';
 import { snapshotSchema } from './validation.js';
 
 /**
@@ -68,7 +69,7 @@ export function createCommerceProjections(
       return db.transaction(context.tenantId, async (tx) => {
         const tenant = context.tenantId;
         await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
-          `orders:${tenant}:${value.entityId}`,
+          `orders:${tenant}:${value.data.type === 'order' ? value.entityId : value.data.orderId}`,
         ]);
         const old = await tx.query<{ document: CanonicalSnapshot }>(
           'SELECT document FROM orders_snapshots WHERE tenant_id=$1 AND entity_id=$2 AND observation_id=$3 AND normalizer_version=$4 AND mapping_version=$5',
@@ -173,6 +174,13 @@ export function createCommerceProjections(
         await tx.query(
           'INSERT INTO orders_projection_events(id,tenant_id,snapshot_id,actor_id) VALUES($1,$2,$3,$4)',
           [randomUUID(), tenant, id, context.actor.id],
+        );
+
+        await refreshOrderList(
+          tx,
+          tenant,
+          [parentId],
+          value.data.type === 'order',
         );
 
         return 'applied';

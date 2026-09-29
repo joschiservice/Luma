@@ -6,7 +6,6 @@ import type {
   OrderSourceFacts,
 } from '../../application/orders.js';
 import type { OrderReadQueries } from './list-query.js';
-import { sourceComparison } from './source-comparison.js';
 import { connectionLabel, iso, money, object, text } from './values.js';
 
 type SourceRow = {
@@ -27,7 +26,7 @@ type SourceRow = {
 // $1 tenant, $2 as-of time, $3 order ID.
 function sourcesSql({ state }: OrderReadQueries) {
   return `WITH ${state.currentOrderSources('order_sources', 'p.entity_id=$3')},
- ${state.orderProgress('order_sources')}, ${sourceComparison('order_sources', 'order_sources')}
+ ${state.orderProgress('order_sources')}, ${state.sourceComparison('order_sources', 'order_sources')}
 SELECT o.connection_id AS "connectionId",s.document,ci.document AS connection,
  m.external_id AS "externalId",m.method AS "mappingMethod",o.fulfillment,o.open,o.overdue,
  o.connection_id=(SELECT connection_id FROM order_sources ORDER BY ${state.sourceSelectionOrder} LIMIT 1) AS selected,
