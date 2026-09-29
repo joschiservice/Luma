@@ -1,0 +1,55 @@
+name: Test benchmarks
+on:
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: Suite to measure
+        type: choice
+        options: [browser, e2e, main, full, workflows]
+        default: browser
+      runs:
+        description: Measured runs after one warmup
+        type: number
+        default: 5
+      workers:
+        description: Optional worker count (browser or e2e only)
+        type: string
+        default: ''
+permissions:
+  contents: read
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      TURBO_CONCURRENCY: '100%'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @luma/api exec playwright install --with-deps chromium
+      - run: pnpm --filter @luma/ui exec playwright install --with-deps chromium
+      - run: pnpm setup:code
+      - run: pnpm setup:benchmarks
+      - name: Measure suite
+        env:
+          BENCHMARK_SUITE: ${{ inputs.suite }}
+          BENCHMARK_RUNS: ${{ inputs.runs }}
+          BENCHMARK_WORKERS: ${{ inputs.workers }}
+        run: |
+          args=(--suite "$BENCHMARK_SUITE" --runs "$BENCHMARK_RUNS" --label ci --show-output)
+          if [ -n "$BENCHMARK_WORKERS" ]; then args+=(--workers "$BENCHMARK_WORKERS"); fi
+          pnpm benchmark "${args[@]}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-benchmark
+          path: |
+            .luma/benchmarks/
+            .luma/playwright/
+          include-hidden-files: true
+          retention-days: 14

@@ -37,7 +37,7 @@ export async function setupSimulator(
   });
   t.onTestFinished(async () => {
     try {
-      if (t.task.result.state !== 'fail') return;
+      if (!(t.failed ?? t.task?.result?.state === 'fail')) return;
       const path = join(
         tmpdir(),
         `luma-operations-failure-${fixture.manifest.runId}.json`,
@@ -76,6 +76,10 @@ export async function setupSimulator(
           2,
         ),
       );
+      await t.attach?.('simulator-evidence', {
+        path,
+        contentType: 'application/json',
+      });
       console.error(`Simulator failure evidence: ${path}`);
     } finally {
       await fixture.close();

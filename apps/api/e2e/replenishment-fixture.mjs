@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 
 import {
@@ -5,7 +6,6 @@ import {
   processWorkflowId,
 } from '@luma/workflow-temporal';
 import { TestWorkflowEnvironment } from '@temporalio/testing';
-import { expect } from 'vitest';
 
 import { until } from './helpers.mjs';
 import { setupSimulator } from './simulator-fixture.mjs';
@@ -33,7 +33,7 @@ export async function replenishmentFixture(
       headers: { origin },
       payload: { email, password: f.password },
     });
-    expect(response.statusCode, response.body).toBe(200);
+    assert.equal(response.statusCode, 200, response.body);
 
     return []
       .concat(response.headers['set-cookie'])
@@ -53,7 +53,7 @@ export async function replenishmentFixture(
       headers: { cookie, origin },
       ...(body ? { payload: body } : {}),
     });
-    expect(response.statusCode, response.body).toBe(status);
+    assert.equal(response.statusCode, status, response.body);
 
     return response.json();
   };
@@ -66,7 +66,7 @@ export async function replenishmentFixture(
   const position = setup.positions.find(
     (p) => p.connectionId === f.manifest.connections.jtl,
   );
-  expect(position).toBeTruthy();
+  assert.ok(position);
   const detail = await request('');
   const configure = async () =>
     request('/replenishment/activations', {
@@ -127,7 +127,7 @@ export async function replenishmentFixture(
     const review = await request(`/replenishment/runs/${run.id}`, undefined, {
       cookie: approverCookie,
     });
-    expect(review.canRespond, JSON.stringify(review)).toBe(true);
+    assert.equal(review.canRespond, true, JSON.stringify(review));
     await request(
       `/replenishment/runs/${run.id}/decision`,
       { decisionId: review.decisionId, outcome },

@@ -1,11 +1,11 @@
 /* global document */
-import { chromium } from 'playwright';
-import { expect, it } from 'vitest';
-
+import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, startProcess } from './helpers.mjs';
 import { invitationProof, settingsFixture } from './settings-fixture.mjs';
 
-it('manages workspace preferences and the complete invitation journey on desktop and narrow screens', async (t) => {
+test('manages workspace preferences and the complete invitation journey on desktop and narrow screens', async ({
+  resources: t,
+}) => {
   const port = await availablePort();
   const origin = `http://127.0.0.1:${port}`;
   const f = await settingsFixture(t, origin);
@@ -17,9 +17,7 @@ it('manages workspace preferences and the complete invitation journey on desktop
     true,
   );
   await web.message('listening');
-  const browser = await chromium.launch();
-  t.onTestFinished(() => browser.close());
-  const context = await browser.newContext({
+  const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },
   });
@@ -147,7 +145,7 @@ it('manages workspace preferences and the complete invitation journey on desktop
   const proof = invitationProof(
     [...f.messages.values()].find((message) => message.to === f.outsider.email),
   );
-  const invitedContext = await browser.newContext({
+  const invitedContext = await t.newContext({
     baseURL: origin,
     viewport: { width: 390, height: 844 },
   });

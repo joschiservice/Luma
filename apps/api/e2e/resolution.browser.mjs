@@ -5,17 +5,18 @@ import { readFile } from 'node:fs/promises';
 import { createDetectionServices } from '@luma/application-runtime';
 import { defaultConfiguration } from '@luma/exceptions';
 import { makeTenantContext } from '@luma/identity/composition';
-import { chromium } from 'playwright';
-import { expect, it } from 'vitest';
 
 import { inventoryCase } from '../../../packages/ui/src/components/issues/case-fixtures.ts';
 import {
   resolutionProgress,
   resolutionReview,
 } from '../../../packages/ui/src/components/issues/resolution-fixtures.ts';
+import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, database, startApi, startProcess } from './helpers.mjs';
 
-it('reviews decisions, recovers ambiguous commands and escalates through the connected API', async (t) => {
+test('reviews decisions, recovers ambiguous commands and escalates through the connected API', async ({
+  resources: t,
+}) => {
   const port = await availablePort();
   const origin = `http://127.0.0.1:${port}`;
   const db = await database(t);
@@ -31,9 +32,7 @@ it('reviews decisions, recovers ambiguous commands and escalates through the con
     true,
   );
   await web.message('listening');
-  const browser = await chromium.launch();
-  t.onTestFinished(() => browser.close());
-  const context = await browser.newContext({
+  const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },
   });

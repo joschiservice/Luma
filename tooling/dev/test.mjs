@@ -65,6 +65,9 @@ try {
         'full_page_writes=off',
         '-c',
         'synchronous_commit=off',
+        // Parallel journeys each open identity, application and provider pools.
+        '-c',
+        'max_connections=300',
       ])
       .start();
     url = container.getConnectionUri();

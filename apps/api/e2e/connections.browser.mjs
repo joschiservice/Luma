@@ -1,7 +1,5 @@
 /* global document, innerWidth, getComputedStyle */
-import { chromium } from 'playwright';
-import { expect, it } from 'vitest';
-
+import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, database, startApi, startProcess } from './helpers.mjs';
 
 let origin;
@@ -22,9 +20,7 @@ async function fixture(t) {
     true,
   );
   await web.message('listening');
-  const browser = await chromium.launch();
-  t.onTestFinished(() => browser.close());
-  const context = await browser.newContext({
+  const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1100 },
   });
@@ -86,7 +82,9 @@ async function save(page, label) {
   return card;
 }
 
-it('connects JTL targets, validates, replaces invalid credentials and disconnects', async (t) => {
+test('connects JTL targets, validates, replaces invalid credentials and disconnects', async ({
+  resources: t,
+}) => {
   const { page, context, db, errors, organizationId, appModules } =
     await fixture(t);
   expect(await page.title()).toBe('Luma');
@@ -299,9 +297,11 @@ it('connects JTL targets, validates, replaces invalid credentials and disconnect
   );
   expect(untrusted.status()).toBe(403);
   expect(errors).toEqual([]);
-}, 120_000);
+});
 
-it('preserves non-secret input on errors, handles stale versions and unavailable service', async (t) => {
+test('preserves non-secret input on errors, handles stale versions and unavailable service', async ({
+  resources: t,
+}) => {
   const { page, context, organizationId } = await fixture(t);
   await setup(page, 'JTL Cloud', 'Keep this name');
   await page
@@ -369,9 +369,11 @@ it('preserves non-secret input on errors, handles stale versions and unavailable
   await page.unroute('**/api/v1/organizations/*/connections');
   await page.getByRole('button', { name: 'Refresh list' }).click();
   await card.waitFor();
-}, 120_000);
+});
 
-it('starts Shopify authorization without token fields and reports callback outcomes', async (t) => {
+test('starts Shopify authorization without token fields and reports callback outcomes', async ({
+  resources: t,
+}) => {
   const { page, errors } = await fixture(t);
   await page.route('**/apps/shopify/access', (route) =>
     route.fulfill({

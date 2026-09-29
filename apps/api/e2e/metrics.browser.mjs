@@ -1,14 +1,14 @@
 /* global document, window */
 import { mkdir } from 'node:fs/promises';
 
-import { chromium } from 'playwright';
-import { expect, it } from 'vitest';
-
+import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, startProcess } from './helpers.mjs';
 import { seedMetricOrders } from './metrics-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
-it('explains unknown order totals, opens accessible cohorts and recovers from errors on desktop and mobile', async (t) => {
+test('explains unknown order totals, opens accessible cohorts and recovers from errors on desktop and mobile', async ({
+  resources: t,
+}) => {
   const port = await availablePort();
   const origin = `http://127.0.0.1:${port}`;
   const f = await settingsFixture(t, origin);
@@ -28,9 +28,7 @@ it('explains unknown order totals, opens accessible cohorts and recovers from er
     true,
   );
   await web.message('listening');
-  const browser = await chromium.launch();
-  t.onTestFinished(() => browser.close());
-  const context = await browser.newContext({
+  const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1100 },
   });

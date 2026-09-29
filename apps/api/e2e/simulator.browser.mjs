@@ -1,14 +1,12 @@
 /* global document, window */
-import { chromium } from 'playwright';
-import { expect, test } from 'vitest';
-
+import { expect, test } from './browser-fixtures.mjs';
 import { setupSimulator } from './simulator-fixture.mjs';
 
-test('panel shows problem removal separately from verified case resolution on desktop and mobile', async (t) => {
+test('panel shows problem removal separately from verified case resolution on desktop and mobile', async ({
+  resources: t,
+}) => {
   const f = await setupSimulator(t);
-  const browser = await chromium.launch({ headless: true });
-  t.onTestFinished(() => browser.close());
-  const page = await browser.newPage({
+  const page = await t.newPage({
     viewport: { width: 1440, height: 1100 },
   });
   const errors = [];

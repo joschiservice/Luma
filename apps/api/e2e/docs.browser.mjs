@@ -1,10 +1,10 @@
 /* global document, innerWidth */
-import { chromium } from 'playwright';
-import { expect, it } from 'vitest';
-
+import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, startProcess } from './helpers.mjs';
 
-it('serves searchable issue guides without a session on desktop and mobile', async (t) => {
+test('serves searchable issue guides without a session on desktop and mobile', async ({
+  resources: t,
+}) => {
   const port = await availablePort();
   const origin = `http://127.0.0.1:${port}`;
   const web = startProcess(
@@ -14,9 +14,7 @@ it('serves searchable issue guides without a session on desktop and mobile', asy
     true,
   );
   await web.message('listening');
-  const browser = await chromium.launch();
-  t.onTestFinished(() => browser.close());
-  const page = await browser.newPage({
+  const page = await t.newPage({
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },
   });

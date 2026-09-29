@@ -9,12 +9,13 @@ import {
   compileProcessWorkflow,
   defineWorkflow,
 } from '@luma/workflows/composition';
-import { chromium } from 'playwright';
-import { expect, it } from 'vitest';
 
+import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, database, startApi, startProcess } from './helpers.mjs';
 
-it('starts a scoped native workflow, preserves uncertain retries and cancels a scheduled start on mobile', async (t) => {
+test('starts a scoped native workflow, preserves uncertain retries and cancels a scheduled start on mobile', async ({
+  resources: t,
+}) => {
   const port = await availablePort(),
     origin = `http://127.0.0.1:${port}`;
   const db = await database(t);
@@ -31,9 +32,7 @@ it('starts a scoped native workflow, preserves uncertain retries and cancels a s
     true,
   );
   await web.message('listening');
-  const browser = await chromium.launch();
-  t.onTestFinished(() => browser.close());
-  const context = await browser.newContext({
+  const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1100 },
   });

@@ -1,10 +1,10 @@
+import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
 
 import { Pool } from 'pg';
-import { assert, vi } from 'vitest';
 
 export const apiDirectory = fileURLToPath(new URL('../', import.meta.url));
 
@@ -14,14 +14,22 @@ export const runtimeDirectory = fileURLToPath(
 
 export const secret = 'backend-e2e-secret-at-least-32-characters';
 
+/** Waits for a truthy result, propagating check errors and rejecting at the deadline. */
 export async function until(check, description, timeout = 15_000) {
   try {
-    return await vi.waitUntil(check, { timeout, interval: 25 });
+    const deadline = Date.now() + timeout;
+    while (Date.now() < deadline) {
+      const result = await check();
+      if (result) return result;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    throw new Error('Condition timed out');
   } catch (cause) {
     throw new Error(`Failed waiting for ${description}`, { cause });
   }
 }
 
+/** Starts an isolated child process and registers forced shutdown with the test cleanup context. */
 export function startProcess(t, script, env = {}, ipc = false) {
   const child = spawn(process.execPath, [script], {
     cwd: apiDirectory,
@@ -52,6 +60,12 @@ export function startProcess(t, script, env = {}, ipc = false) {
   t.onTestFinished(async () => {
     if (!result) child.kill('SIGKILL');
     await wait();
+    if (t.failed && output) {
+      await t.attach?.(`${script}-${child.pid}.log`, {
+        body: Buffer.from(output),
+        contentType: 'text/plain',
+      });
+    }
   });
 
   return {
@@ -73,6 +87,7 @@ export function startProcess(t, script, env = {}, ipc = false) {
   };
 }
 
+/** Creates an isolated database and restricted login; the context must register teardown callbacks. */
 export async function database(t) {
   assert.ok(
     process.env.TEST_DATABASE_URL,
@@ -141,6 +156,7 @@ export async function database(t) {
   };
 }
 
+/** Starts the built API on an assigned port and waits for readiness. */
 export async function startApi(
   t,
   db,
@@ -203,6 +219,7 @@ export async function startApi(
   };
 }
 
+/** Registers a test user and returns its session cookie and identifier. */
 export async function signup(api, name) {
   const response = await api.request('/auth/sign-up/email', {
     method: 'POST',
@@ -221,6 +238,7 @@ export async function signup(api, name) {
   return { cookie, userId: response.body.user.id };
 }
 
+/** Reserves and releases a loopback port for a test server to bind. */
 export async function availablePort() {
   const listener = createServer();
   await new Promise((resolve, reject) => {

@@ -1,7 +1,5 @@
 /* global document, window, innerWidth, requestAnimationFrame */
-import { chromium } from 'playwright';
-import { expect, it } from 'vitest';
-
+import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, database, startApi, startProcess } from './helpers.mjs';
 
 let origin;
@@ -22,9 +20,7 @@ async function fixture(t) {
     true,
   );
   await web.message('listening');
-  const browser = await chromium.launch();
-  t.onTestFinished(() => browser.close());
-  const context = await browser.newContext({
+  const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },
   });
@@ -33,7 +29,7 @@ async function fixture(t) {
   page.on('pageerror', (error) => errors.push(error.message));
   page.setDefaultTimeout(15_000);
 
-  return { db, api, browser, context, page, errors };
+  return { db, api, context, page, errors };
 }
 
 async function heading(page, name) {
@@ -75,7 +71,9 @@ async function signIn(page, email = 'ada@example.test') {
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 }
 
-it('registers, creates EU workspaces, restores links, switches tabs and revokes sessions', async (t) => {
+test('registers, creates EU workspaces, restores links, switches tabs and revokes sessions', async ({
+  resources: t,
+}) => {
   const { db, page, context, errors } = await fixture(t);
   await page.goto('/');
   expect(await page.title()).toBe('Luma');
@@ -184,10 +182,12 @@ it('registers, creates EU workspaces, restores links, switches tabs and revokes 
   await heading(page, 'Choose a workspace');
   expect(new URL(page.url()).origin).toBe(origin);
   expect(errors).toEqual([]);
-}, 120_000);
+});
 
-it('keeps failures recoverable and hides inaccessible tenant content', async (t) => {
-  const { db, page, context, errors } = await fixture(t);
+test('keeps failures recoverable and hides inaccessible tenant content', async ({
+  resources: t,
+}) => {
+  const { db, page, errors } = await fixture(t);
   await page.goto('/sign-up');
   await page
     .getByRole('button', { name: 'Create account', exact: true })
@@ -236,7 +236,7 @@ it('keeps failures recoverable and hides inaccessible tenant content', async (t)
   await page.goto('/app/11111111-1111-4111-8111-111111111111/home');
   await heading(page, 'Workspace unavailable');
   const unavailableText = await page.locator('main').textContent();
-  const outsider = await context.browser().newContext({ baseURL: origin });
+  const outsider = await t.newContext({ baseURL: origin });
   const outsiderPage = await outsider.newPage();
   await register(outsiderPage, 'outsider@example.test');
   await outsiderPage.goto(`/app/${organizationId}/home`);
@@ -284,9 +284,11 @@ it('keeps failures recoverable and hides inaccessible tenant content', async (t)
     '',
   );
   expect(errors).toEqual([]);
-}, 120_000);
+});
 
-it('handles missing sessions, uncertain registration, conflicts and permission failures', async (t) => {
+test('handles missing sessions, uncertain registration, conflicts and permission failures', async ({
+  resources: t,
+}) => {
   const { page, context } = await fixture(t);
   let registrations = 0;
   await page.route('**/api/auth/sign-up/email', async (route) => {
@@ -412,7 +414,9 @@ it('handles missing sessions, uncertain registration, conflicts and permission f
   await heading(page, 'Sign in to Luma');
 });
 
-it('preserves workspace drafts during session revalidation and clears them on session loss', async (t) => {
+test('preserves workspace drafts during session revalidation and clears them on session loss', async ({
+  resources: t,
+}) => {
   const { db, page } = await fixture(t);
   await register(page);
   const name = page.getByLabel('Workspace name');

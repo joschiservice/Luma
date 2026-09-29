@@ -1,12 +1,12 @@
 /* global document, window */
-import { chromium } from 'playwright';
-import { expect, it } from 'vitest';
-
+import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, startProcess } from './helpers.mjs';
 import { ordersFixture } from './orders-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
-it('finds an order by number or SKU, explains it and pages a historical import', async (t) => {
+test('finds an order by number or SKU, explains it and pages a historical import', async ({
+  resources: t,
+}) => {
   const port = await availablePort();
   const origin = `http://127.0.0.1:${port}`;
   const fixture = await settingsFixture(t, origin);
@@ -106,9 +106,7 @@ it('finds an order by number or SKU, explains it and pages a historical import',
     true,
   );
   await web.message('listening');
-  const browser = await chromium.launch();
-  t.onTestFinished(() => browser.close());
-  const context = await browser.newContext({
+  const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1280, height: 900 },
   });

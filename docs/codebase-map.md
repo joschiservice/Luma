@@ -14,6 +14,12 @@ Start with the row closest to the change. Follow imports from these entry points
 | Local simulator wiring                   | `tooling/simulator/cli.mjs`, `platform-client.mjs`, `tooling/pilot/runtime.mjs`                                                                                                           | `apps/api/e2e/simulator.e2e.mjs`                                                                |
 | Isolated platform tests                  | `apps/api/e2e/simulator-fixture.mjs`, `tooling/simulator/e2e-environment.mjs`; database runner in `tooling/dev/test.mjs`                                                                  | Reuse `setupSimulator(t)` in API E2E and browser tests                                          |
 
+Browser E2E uses `apps/api/playwright.config.ts` and the test-scoped resource
+fixture in `apps/api/e2e/browser-fixtures.mjs`. Backend E2E uses Vitest.
+`tooling/dev/test.mjs` owns disposable PostgreSQL for both runners.
+`tooling/benchmarks` contains Hyperfine setup and measurement commands; see
+[benchmarking](benchmarking.md) for local and CI usage.
+
 ## Workspace shell, Home and personal layouts
 
 The design system lives in `packages/ui/src/styles` (tokens, base, primitives,

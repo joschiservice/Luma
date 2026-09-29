@@ -1,8 +1,8 @@
+import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 
 import { buildRuntimeApp } from '@luma/application-runtime';
 import { createIdentity } from '@luma/identity/composition';
-import { expect } from 'vitest';
 
 import { database, secret } from './helpers.mjs';
 
@@ -41,7 +41,7 @@ export async function settingsFixture(t, origin = 'http://localhost:3000') {
       headers: { origin, ...(user ? { cookie: user.cookie } : {}) },
       ...(body === undefined ? {} : { payload: body }),
     });
-    expect(response.statusCode, response.body).toBe(status);
+    assert.equal(response.statusCode, status, response.body);
 
     return response.statusCode === 204 ? null : response.json();
   }
@@ -54,7 +54,7 @@ export async function settingsFixture(t, origin = 'http://localhost:3000') {
       headers: { origin },
       payload: { name, email, password: 'settings-test-password-123' },
     });
-    expect(response.statusCode, response.body).toBe(200);
+    assert.equal(response.statusCode, 200, response.body);
     const cookies = response.headers['set-cookie'];
 
     return {

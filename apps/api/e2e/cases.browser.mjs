@@ -5,12 +5,13 @@ import { readFile } from 'node:fs/promises';
 import { createDetectionServices } from '@luma/application-runtime';
 import { defaultConfiguration } from '@luma/exceptions';
 import { makeTenantContext } from '@luma/identity/composition';
-import { chromium } from 'playwright';
-import { expect, it } from 'vitest';
 
+import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, database, startApi, startProcess } from './helpers.mjs';
 
-it('reads persisted cases, restores desktop/mobile routes and focus, and denies other tenants', async (t) => {
+test('reads persisted cases, restores desktop/mobile routes and focus, and denies other tenants', async ({
+  resources: t,
+}) => {
   const port = await availablePort();
   const origin = `http://127.0.0.1:${port}`;
   const db = await database(t);
@@ -26,9 +27,7 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
     true,
   );
   await web.message('listening');
-  const browser = await chromium.launch();
-  t.onTestFinished(() => browser.close());
-  const context = await browser.newContext({
+  const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },
   });
@@ -67,7 +66,7 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
     `/api/v1/organizations/${randomUUID()}/operations/overview`,
   );
   expect(overviewDenied.status()).toBe(404);
-  const anonymous = await browser.newContext({ baseURL: origin });
+  const anonymous = await t.newContext({ baseURL: origin });
   expect(
     (
       await anonymous.request.get(
@@ -375,7 +374,8 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
   await page.waitForRequest((request) =>
     request.url().includes(`${caseApi}/timeline?`),
   );
-  await page.getByText('Refreshing', { exact: true }).waitFor();
+  // History refreshes independently; current case observation stays live.
+  await expect(page.getByText('Live updates', { exact: true })).toBeVisible();
   expect(await recommendationSteps.allTextContents()).toEqual(recommendations);
   expect(
     await page.getByText('Evidence is stale', { exact: true }).count(),

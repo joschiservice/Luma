@@ -11,10 +11,11 @@
     "start": "node --env-file-if-exists=.env dist/composition/bootstrap.js",
     "db:migrate": "node --env-file-if-exists=.env ../../packages/application-runtime/scripts/migrate.mjs",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
-    "test:browser": "vitest run --config vitest.browser.config.ts"
+    "test:browser": "playwright test --config playwright.config.ts"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",
+    "@playwright/test": "1.63.0",
     "@temporalio/testing": "1.24.0",
     "@types/pg": "8.20.0",
     "drizzle-kit": "0.31.11",

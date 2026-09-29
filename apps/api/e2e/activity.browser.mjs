@@ -2,13 +2,13 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
 
-import { chromium } from 'playwright';
-import { expect, it } from 'vitest';
-
 import { seedActivity } from './activity-fixture.mjs';
+import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, database, startApi, startProcess } from './helpers.mjs';
 
-it('filters, expands, returns, paginates and recovers workspace activity on desktop and narrow screens', async (t) => {
+test('filters, expands, returns, paginates and recovers workspace activity on desktop and narrow screens', async ({
+  resources: t,
+}) => {
   const port = await availablePort(),
     origin = `http://127.0.0.1:${port}`;
   const db = await database(t);
@@ -22,9 +22,7 @@ it('filters, expands, returns, paginates and recovers workspace activity on desk
     true,
   );
   await web.message('listening');
-  const browser = await chromium.launch();
-  t.onTestFinished(() => browser.close());
-  const context = await browser.newContext({
+  const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },
   });

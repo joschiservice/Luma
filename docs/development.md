@@ -141,8 +141,19 @@ the available CPU count and runs Storybook separately from the main tests.
 E2E suites use half the available CPUs, capped at four backend files or six browser
 files at once. Tests within a file remain sequential. On a two-CPU CI runner, each
 shard runs one file at a time.
-Both E2E commands accept Vitest arguments: use `pnpm test:browser --shard=1/4` to
-reproduce a browser shard, or `pnpm test:e2e --maxWorkers=1` for a sequential run.
+Browser E2E uses Playwright Test; backend E2E uses Vitest. Use
+`pnpm test:browser --shard=1/4` to reproduce a browser shard,
+`pnpm test:browser --workers=1` for sequential browser tests, or
+`pnpm test:e2e --maxWorkers=1` for sequential backend tests.
+Browser workers reuse Chromium with fresh contexts and databases for each test.
+Failures retain traces and screenshots in `.luma/playwright/results`; HTML and
+JSON reports are written to `.luma/playwright/`. Open the report with
+`pnpm test:browser:report`. CI uploads a separate report artifact for each shard.
+Retries remain disabled so failures are visible.
+
+To select a browser journey, use `pnpm test:browser identity.browser.mjs`, or
+`pnpm test:browser --grep "journey name"`. Add `--headed` to watch Chromium.
+See [benchmarking](benchmarking.md) for repeated measurements with Hyperfine.
 `pnpm run test` accepts Turbo arguments; CI uses `pnpm run test '--filter=!@luma/ui'`
 because the UI has its own job. Use the explicit `run` form with `--filter` so pnpm
 forwards the filter to the test runner. Plain `pnpm test` still includes UI tests.

@@ -9,9 +9,8 @@ import { makeTenantContext } from '@luma/identity';
 import { createTenantDatabase } from '@luma/platform/composition';
 import { createProcurementMetricReader } from '@luma/procurement/composition';
 import { createOperationalSummary } from '@luma/read-models/composition';
-import { chromium } from 'playwright';
-import { expect, it } from 'vitest';
 
+import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, startProcess } from './helpers.mjs';
 import { metricStream } from './metric-stream-fixture.mjs';
 import {
@@ -21,7 +20,9 @@ import {
 } from './operational-metrics-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
-it('keeps cross-domain cohorts live, recovers races and measures committed changes with concurrent readers', async (t) => {
+test('keeps cross-domain cohorts live, recovers races and measures committed changes with concurrent readers', async ({
+  resources: t,
+}) => {
   const port = await availablePort(),
     origin = `http://127.0.0.1:${port}`;
   const f = await settingsFixture(t, origin);
@@ -46,9 +47,7 @@ it('keeps cross-domain cohorts live, recovers races and measures committed chang
     true,
   );
   await web.message('listening');
-  const browser = await chromium.launch();
-  t.onTestFinished(() => browser.close());
-  const context = await browser.newContext({
+  const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1100 },
   });

@@ -5,14 +5,15 @@ import { join } from 'node:path';
 
 import { parseAction } from '@luma/execution/composition';
 import { TestWorkflowEnvironment } from '@temporalio/testing';
-import { chromium } from 'playwright';
-import { expect, it } from 'vitest';
 
 import { createPilot } from '../../../tooling/pilot/runtime.mjs';
 import { seedPilot } from '../../../tooling/pilot/seed.mjs';
+import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, database, secret, startProcess } from './helpers.mjs';
 
-it('refreshes an expired proposal automatically, preserves the review, and executes one approved change', async (t) => {
+test('refreshes an expired proposal automatically, preserves the review, and executes one approved change', async ({
+  resources: t,
+}) => {
   const port = await availablePort();
   const origin = `http://127.0.0.1:${port}`;
   const db = await database(t);
@@ -88,9 +89,7 @@ it('refreshes an expired proposal automatically, preserves the review, and execu
     true,
   );
   await web.message('listening');
-  const browser = await chromium.launch();
-  t.onTestFinished(() => browser.close());
-  const page = await browser.newPage({
+  const page = await t.newPage({
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },
   });

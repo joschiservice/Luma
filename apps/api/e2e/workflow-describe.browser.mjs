@@ -1,14 +1,14 @@
 /* global document, innerWidth */
 import { mkdir } from 'node:fs/promises';
 
-import { chromium } from 'playwright';
-import { expect, it } from 'vitest';
-
+import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, database, startApi, startProcess } from './helpers.mjs';
 
 const screenshots = '/tmp/luma88-browser';
 
-it('drafts a workflow from a description and applies a reviewed change', async (t) => {
+test('drafts a workflow from a description and applies a reviewed change', async ({
+  resources: t,
+}) => {
   const port = await availablePort(),
     origin = `http://127.0.0.1:${port}`;
   const db = await database(t);
@@ -25,9 +25,7 @@ it('drafts a workflow from a description and applies a reviewed change', async (
     { TEST_API_ORIGIN: api.origin, TEST_WEB_PORT: String(port) },
     true,
   ).message('listening');
-  const browser = await chromium.launch();
-  t.onTestFinished(() => browser.close());
-  const page = await browser.newPage({
+  const page = await t.newPage({
     baseURL: origin,
     viewport: { width: 1440, height: 1000 },
   });

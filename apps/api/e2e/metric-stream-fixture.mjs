@@ -1,4 +1,4 @@
-import { expect } from 'vitest';
+import assert from 'node:assert/strict';
 
 import { until } from './helpers.mjs';
 
@@ -17,7 +17,7 @@ export async function metricStream(
     headers: { cookie: user.cookie },
     signal: abort.signal,
   });
-  expect(response.status).toBe(200);
+  assert.equal(response.status, 200);
   const events = [];
   let ended = false;
   let reading = false;
@@ -41,7 +41,7 @@ export async function metricStream(
         body: JSON.stringify(queryRequest.body),
         signal: abort.signal,
       });
-      expect(result.status).toBe(200);
+      assert.equal(result.status, 200);
       await result.json();
       readCosts.push(performance.now() - start);
     }

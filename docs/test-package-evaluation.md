@@ -6,11 +6,11 @@ Experiments ran in a detached worktree. Application dependencies were not change
 
 ## Decisions
 
-| Package                   | Decision                                           | Evidence                                                                                                                            |
-| ------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| Vitest 5.0.2              | Keep Vitest 4.1.11 for now.                        | No default-config speedup in the two measured packages; stable Storybook's addon excludes Vitest 5.                                 |
-| `@playwright/test` 1.63.0 | Keep the existing E2E runner for performance work. | A prototype with worker-scoped Chromium performed essentially the same as the existing identity journeys.                           |
-| Hyperfine 1.20.0          | Use as an optional developer benchmark tool.       | Repeated measurements expose variability, export JSON, and fail when a measured command fails. No application dependency is needed. |
+| Package                   | Decision                                          | Evidence                                                                                                                            |
+| ------------------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Vitest 5.0.2              | Keep Vitest 4.1.11 for now.                       | No default-config speedup in the two measured packages; stable Storybook's addon excludes Vitest 5.                                 |
+| `@playwright/test` 1.63.0 | Adopt for diagnostics, not a measured speed gain. | A prototype with worker-scoped Chromium performed essentially the same as the existing identity journeys.                           |
+| Hyperfine 1.20.0          | Use as an optional developer benchmark tool.      | Repeated measurements expose variability, export JSON, and fail when a measured command fails. No application dependency is needed. |
 
 ## Vitest 5
 
@@ -98,3 +98,16 @@ For an A/B comparison, measure the same command before and after the change with
 the same test selection, workers, Node version and cache conditions. Keep the raw
 JSON and pass/fail output. Warm measurements do not replace separate cold-start
 measurements or actual CI validation.
+
+## Implementation follow-up
+
+Playwright Test now runs all 30 browser journeys. It reuses Chromium per worker,
+keeps contexts and databases isolated per test, and retains failure traces and
+screenshots. The choice is for diagnostics and fixture ownership; the prototype
+timings above remain the performance evidence. Vitest 4 continues to run unit,
+backend and Storybook tests.
+
+Hyperfine 1.20.0 is available through `pnpm setup:benchmarks` and `pnpm benchmark`.
+It is an optional local binary, verified against pinned archive checksums. A
+manual CI workflow records repeated measurements without adding a PR gate.
+See [benchmarking](benchmarking.md) for commands and interpretation.

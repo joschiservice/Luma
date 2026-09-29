@@ -54,8 +54,8 @@ baseline full check.
   and six for browser tests. Two-CPU CI shards keep one. Process isolation,
   sequential tests within files, database isolation, migration locks and
   assertions remain in place.
-  Override with `--maxWorkers=1` for a sequential comparison.
-- CI uses two backend shards and four browser shards. Vitest shards by file, so
+  Override with `--maxWorkers=1` for backend tests or `--workers=1` for browser tests.
+- CI uses two backend shards and four browser shards. Both runners shard these suites by file, so
   large files can still dominate. More shards also repeat job setup and builds;
   compare total runner minutes as well as elapsed time.
 - Storybook has its own CI job. Main tests exclude only `@luma/ui`; ordinary
@@ -69,13 +69,13 @@ baseline full check.
 
 File durations from the reference CI run include fixture setup and cleanup:
 
-| File                                                        | Duration | Follow-up                                                                            |
-| ----------------------------------------------------------- | -------: | ------------------------------------------------------------------------------------ |
-| `apps/api/e2e/pilot.e2e.mjs`                                |    134 s | Separate the recovery scenario from the other pilot scenarios to improve scheduling. |
-| `apps/api/e2e/identity.browser.mjs`                         |    101 s | Four journeys each start their own database, API, Vite server and Chromium.          |
-| `apps/api/e2e/cases.browser.mjs`                            |     67 s | Long journey, including a deliberate 6.5 s slow-response check.                      |
-| `packages/workflow-temporal/src/exception-workflow.test.ts` |     52 s | Real Temporal startup, worker lifecycle and replay checks.                           |
-| `apps/api/e2e/connections.browser.mjs`                      |     49 s | Three browser journeys with repeated fixture startup.                                |
+| File                                                        | Duration | Follow-up                                                                                                     |
+| ----------------------------------------------------------- | -------: | ------------------------------------------------------------------------------------------------------------- |
+| `apps/api/e2e/pilot.e2e.mjs`                                |    134 s | Separate the recovery scenario from the other pilot scenarios to improve scheduling.                          |
+| `apps/api/e2e/identity.browser.mjs`                         |    101 s | Four journeys each started their own database, API, Vite server and Chromium in the measured Vitest baseline. |
+| `apps/api/e2e/cases.browser.mjs`                            |     67 s | Long journey, including a deliberate 6.5 s slow-response check.                                               |
+| `packages/workflow-temporal/src/exception-workflow.test.ts` |     52 s | Real Temporal startup, worker lifecycle and replay checks.                                                    |
+| `apps/api/e2e/connections.browser.mjs`                      |     49 s | Three browser journeys with repeated fixture startup.                                                         |
 
 The pilot recovery test kills a worker after a provider write. Its workflow has a
 one-minute activity timeout, so more CPUs cannot remove that wait. Keep this real
@@ -93,7 +93,9 @@ role and tenant-isolation coverage; migration tests still need fresh databases.
 
 The [package evaluation](test-package-evaluation.md) now records repeated
 benchmarks and compatibility checks for these options. It recommends keeping
-Vitest 4 and the existing E2E runner, and using Hyperfine for measurements.
+Vitest 4 for unit/backend tests. Browser E2E now uses Playwright Test for fixture
+lifecycle and diagnostics; Hyperfine provides repeated measurements. See
+[benchmarking](benchmarking.md) for the implemented commands.
 
 1. **Vitest 5:** its [release notes](https://vitest.dev/blog/vitest-5) describe
    `vitest doctor`, persistent module caching and Browser Mode improvements.
@@ -101,12 +103,10 @@ Vitest 4 and the existing E2E runner, and using Hyperfine for measurements.
    `@storybook/addon-vitest@10.6.0` declares Vitest 3/4 peers, so coordinate the
    Storybook addon and Vitest browser packages first. Upstream benchmark gains
    are not a prediction for this repository.
-2. **`@playwright/test`:** the E2E suite currently uses Playwright's browser library
-   inside Vitest. The dedicated runner offers [worker-scoped fixtures](https://playwright.dev/docs/test-fixtures)
+2. **`@playwright/test`:** the browser E2E suite now uses the dedicated runner for [worker-scoped fixtures](https://playwright.dev/docs/test-fixtures)
    and [parallel execution and sharding](https://playwright.dev/docs/test-parallel).
-   Browser reuse and fixture lifecycle would be the reason to migrate. Preserve
-   fresh contexts and isolated databases. Treat this as a separate test-harness
-   change, not a drop-in speed switch.
+   Workers reuse Chromium, with fresh contexts and isolated databases per test.
+   This migration improves diagnostics; the prototype did not show a speed gain.
 3. **Hyperfine:** use the [benchmark CLI](https://github.com/sharkdp/hyperfine)
    for repeated whole-command comparisons and variability. It need not become
    an application dependency. Compare warm and cold builds separately.
@@ -118,9 +118,9 @@ to distinguish import overhead from fixture and test time:
 ```sh
 pnpm test:e2e --maxWorkers=1 --reporter=default --reporter=json --outputFile.json=/tmp/luma-e2e-serial.json
 pnpm test:e2e --maxWorkers=4 --reporter=default --reporter=json --outputFile.json=/tmp/luma-e2e-parallel.json
-pnpm test:browser --maxWorkers=1
-pnpm test:browser --maxWorkers=4
-pnpm test:browser --maxWorkers=6
+pnpm test:browser --workers=1
+pnpm test:browser --workers=4
+pnpm test:browser --workers=6
 pnpm --filter @luma/workflows exec vitest run --experimental.importDurations.print
 ```
 

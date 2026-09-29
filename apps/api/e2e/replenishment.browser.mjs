@@ -1,12 +1,13 @@
 /* global document */
 import { processWorkflowId } from '@luma/workflow-temporal';
-import { chromium } from 'playwright';
-import { expect, it } from 'vitest';
 
+import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, startProcess } from './helpers.mjs';
 import { replenishmentFixture } from './replenishment-fixture.mjs';
 
-it('reviews replenishment scope, recovers a lost response, approves and opens the verified order', async (t) => {
+test('reviews replenishment scope, recovers a lost response, approves and opens the verified order', async ({
+  resources: t,
+}) => {
   const port = await availablePort();
   const origin = `http://127.0.0.1:${port}`;
   const f = await replenishmentFixture(t, origin);
@@ -17,10 +18,8 @@ it('reviews replenishment scope, recovers a lost response, approves and opens th
     true,
   );
   await web.message('listening');
-  const browser = await chromium.launch();
-  t.onTestFinished(() => browser.close());
   const contextFor = async (cookie) => {
-    const context = await browser.newContext({
+    const context = await t.newContext({
       baseURL: origin,
       viewport: { width: 1440, height: 1000 },
     });

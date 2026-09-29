@@ -1,15 +1,16 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 
 import { buildRuntimeApp } from '@luma/application-runtime';
-import { chromium } from 'playwright';
-import { expect, it } from 'vitest';
 
+import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, startProcess } from './helpers.mjs';
 import { metricStream } from './metric-stream-fixture.mjs';
 import { seedMetricFulfillment, seedMetricOrders } from './metrics-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
-it('updates visible totals and cohorts, crosses deadlines, and measures delivery and recovery', async (t) => {
+test('updates visible totals and cohorts, crosses deadlines, and measures delivery and recovery', async ({
+  resources: t,
+}) => {
   const port = await availablePort();
   const origin = `http://127.0.0.1:${port}`;
   const f = await settingsFixture(t, origin);
@@ -34,9 +35,7 @@ it('updates visible totals and cohorts, crosses deadlines, and measures delivery
     true,
   );
   await web.message('listening');
-  const browser = await chromium.launch();
-  t.onTestFinished(() => browser.close());
-  const context = await browser.newContext({
+  const context = await t.newContext({
     baseURL: origin,
     viewport: { width: 1440, height: 1050 },
   });

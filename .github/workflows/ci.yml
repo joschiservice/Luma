@@ -88,6 +88,14 @@ jobs:
           path: .luma/evaluations/
           include-hidden-files: true
           if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        if: always() && startsWith(matrix.cache, 'browser-')
+        with:
+          name: playwright-${{ matrix.cache }}
+          path: .luma/playwright/
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: warn
   quality:
     name: Quality gates
     if: always()
