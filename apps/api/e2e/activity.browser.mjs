@@ -55,12 +55,12 @@ it('filters, expands, returns, paginates and recovers workspace activity on desk
   const fixture = await seedActivity(db, tenantId, actor);
   await page.getByRole('link', { name: 'Activity', exact: true }).click();
   await page.locator('.activity-event').first().waitFor();
-  await page.getByLabel('System', { exact: true }).selectOption('jtl-cloud');
+  await page.getByLabel('System', { exact: true }).fill('jtl-cloud');
   await page.getByLabel('Search activity').fill(actor);
   await page.locator('.activity-event').first().waitFor();
   await page.getByLabel('Outcome', { exact: true }).selectOption('uncertain');
   await page
-    .getByRole('button', { name: /execution.completed/ })
+    .getByRole('button', { name: /Execution completed/ })
     .first()
     .click();
   await page.getByText('observation:shipping-1042', { exact: true }).waitFor();
@@ -208,7 +208,7 @@ it('filters, expands, returns, paginates and recovers workspace activity on desk
   await page.setViewportSize({ width: 390, height: 844 });
   const first = page
     .getByRole('button', {
-      name: /execution.completed|connection.connected|policy.approved/,
+      name: /Execution completed|Connection connected|Policy approved/,
     })
     .first();
   await first.focus();
@@ -234,7 +234,7 @@ it('filters, expands, returns, paginates and recovers workspace activity on desk
     .click();
   await expect
     .poll(() =>
-      page.getByRole('button', { name: /connection.connected/ }).count(),
+      page.getByRole('button', { name: /Connection connected/ }).count(),
     )
     .toBe(0);
   const second = await context.request.post('/api/v1/organizations', {

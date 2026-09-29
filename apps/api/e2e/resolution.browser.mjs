@@ -217,7 +217,21 @@ it('reviews decisions, recovers ambiguous commands and escalates through the con
 
     return json(route, receipt);
   });
+  // Inspector sections other than Findings start collapsed on every mount.
+  const openSection = async (name) => {
+    const section = page.getByRole('region', { name, exact: true });
+    const open = await section
+      .locator('details')
+      .first()
+      .evaluate((details) => details.open);
+    if (!open) await section.locator('summary').first().click();
+  };
+  const execution = page.getByRole('region', {
+    name: 'Execution',
+    exact: true,
+  });
   await page.goto(detailUrl);
+  await openSection('Resolution');
   await page.getByText('Human approval required', { exact: true }).waitFor();
   const approve = page.getByRole('button', { name: 'Approve', exact: true });
   expect(await approve.isDisabled()).toBe(true);
@@ -239,6 +253,7 @@ it('reviews decisions, recovers ambiguous commands and escalates through the con
   await page.getByRole('button', { name: 'Close panel', exact: true }).click();
   await page.evaluate(() => window.dispatchEvent(new Event('online')));
   await page.locator(`#case-${exceptionId}`).click();
+  await openSection('Resolution');
   await page
     .getByLabel('Decision reason (required)')
     .fill('Reviewed source order');
@@ -247,8 +262,9 @@ it('reviews decisions, recovers ambiguous commands and escalates through the con
   // An interrupted stream still permits decisions after successful authenticated reads.
   await page.route(`**${path}/events`, (route) => route.abort('failed'));
   await page
-    .getByRole('button', { name: 'Refresh progress', exact: true })
+    .getByRole('button', { name: 'Refresh issue', exact: true })
     .click();
+  await openSection('Execution');
   await page.getByText('Live updates interrupted', { exact: true }).waitFor();
   await expect.poll(() => approve.isEnabled()).toBe(true);
   await page.screenshot({
@@ -260,7 +276,9 @@ it('reviews decisions, recovers ambiguous commands and escalates through the con
     `**/api/v1/organizations/${organizationId}/exceptions?*`,
     (route) => json(route, { message: 'Unavailable' }, 503),
   );
-  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Refresh issues', exact: true })
+    .click();
   await page
     .getByText('Inbox could not be refreshed', { exact: true })
     .waitFor();
@@ -268,7 +286,10 @@ it('reviews decisions, recovers ambiguous commands and escalates through the con
   await page.unroute(`**/api/v1/organizations/${organizationId}/exceptions?*`);
 
   historyFailure = true;
-  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Refresh issues', exact: true })
+    .click();
+  await openSection('Evidence');
   await page
     .getByText('History could not be refreshed', { exact: true })
     .waitFor();
@@ -288,13 +309,17 @@ it('reviews decisions, recovers ambiguous commands and escalates through the con
     .toBe(0);
 
   diagnosisOffset = 1;
-  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Refresh issues', exact: true })
+    .click();
   await page
     .getByText('Resolution review unavailable', { exact: true })
     .waitFor();
   expect(await approve.isDisabled()).toBe(true);
   diagnosisOffset = 0;
-  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Refresh issues', exact: true })
+    .click();
   await expect.poll(() => approve.isEnabled()).toBe(true);
   expect(await page.getByLabel('Decision reason (required)').inputValue()).toBe(
     'Reviewed source order',
@@ -346,9 +371,13 @@ it('reviews decisions, recovers ambiguous commands and escalates through the con
   ).toBe(true);
   release();
   await page.getByText('Approval recorded', { exact: true }).waitFor();
+  await openSection('Execution');
   expect(
-    await page
-      .getByText('Verification: Not recorded', { exact: true })
+    await execution
+      .getByText(
+        'Approval is required before an action can proceed. No execution attempt has been recorded.',
+        { exact: true },
+      )
       .isVisible(),
   ).toBe(true);
   expect(
@@ -357,6 +386,7 @@ it('reviews decisions, recovers ambiguous commands and escalates through the con
   review = structuredClone(resolutionReview);
   progress = structuredClone(resolutionProgress);
   await page.reload();
+  await openSection('Resolution');
   await page
     .getByLabel('Decision reason (required)')
     .fill('Reason for old proposal');
@@ -366,7 +396,9 @@ it('reviews decisions, recovers ambiguous commands and escalates through the con
     proposal: { ...review.proposal, version: 2 },
   };
   progress = { ...progress, caseRevision: 5 };
-  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Refresh issues', exact: true })
+    .click();
   await expect
     .poll(() => page.getByLabel('Decision reason (required)').inputValue())
     .toBe('');
@@ -382,7 +414,9 @@ it('reviews decisions, recovers ambiguous commands and escalates through the con
       },
     },
   };
-  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Refresh issues', exact: true })
+    .click();
   await expect.poll(() => reason.inputValue()).toBe('');
   for (const [scenario, kind, message] of [
     ['success', 'Reject', 'Rejection recorded'],
@@ -406,6 +440,7 @@ it('reviews decisions, recovers ambiguous commands and escalates through the con
     review = structuredClone(resolutionReview);
     progress = structuredClone(resolutionProgress);
     await page.reload();
+    await openSection('Resolution');
     await page
       .getByLabel('Decision reason (required)')
       .fill('Checked current evidence');
@@ -417,6 +452,7 @@ it('reviews decisions, recovers ambiguous commands and escalates through the con
   review = structuredClone(resolutionReview);
   progress = structuredClone(resolutionProgress);
   await page.reload();
+  await openSection('Resolution');
   await page.getByLabel('Decision reason (required)').fill('Checked again');
   await approve.click();
   await page.getByRole('button', { name: 'Check recorded decision' }).waitFor();
@@ -455,14 +491,21 @@ it('reviews decisions, recovers ambiguous commands and escalates through the con
   await page.unroute(`**${path}/decisions/*`);
   await page.unroute(`**${path}/decisions`);
   await page.reload();
+  await openSection('Resolution');
+  // Without a proposal, escalation is the only decision and opens on request.
   await page
-    .getByLabel('Decision reason (required)')
+    .getByRole('button', { name: 'Escalate issue', exact: true })
+    .click();
+  await page
+    .getByLabel('Why does this need escalation?')
     .fill('Requires specialist review');
   const responsePromise = page.waitForResponse(
     (r) =>
       r.url().endsWith(`${path}/decisions`) && r.request().method() === 'POST',
   );
-  await page.getByRole('button', { name: 'Escalate', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Confirm escalation', exact: true })
+    .click();
   const response = await responsePromise;
   expect(response.status()).toBe(200);
   const committed = await response.json();
@@ -472,6 +515,10 @@ it('reviews decisions, recovers ambiguous commands and escalates through the con
   );
   expect(await recovered.json()).toEqual(committed);
   await page.getByText('Escalation recorded', { exact: true }).waitFor();
-  await page.getByText('Issue: Escalated', { exact: true }).waitFor();
+  await page
+    .getByRole('button', { name: 'View execution status', exact: true })
+    .click();
+  await execution.locator('summary', { hasText: 'Execution details' }).click();
+  await execution.getByText('Escalated', { exact: true }).waitFor();
   expect(errors).toEqual([]);
 });

@@ -122,9 +122,14 @@ container across all checks. Each database suite continues to create its own
 isolated database and restricted runtime login. Containers are removed on normal
 completion or failure. Testcontainers' resource reaper handles abandoned resources.
 
+The test container runs with `fsync`, `full_page_writes`, and `synchronous_commit`
+off. Suites drop their databases during teardown, and each `DROP DATABASE` waits for
+a checkpoint; with durable writes, parallel suites can exceed hook timeouts.
+
 To use a separately managed disposable cluster, set `TEST_DATABASE_URL` to an
 administrator connection with database and role creation permissions. Do not use
-a development or production database. CI uses the same Testcontainers path as
+a development or production database. Apply the same settings to that cluster for
+comparable teardown times. CI uses the same Testcontainers path as
 local full checks. No fixed database or browser test ports are required.
 
 CI runs static checks and builds, main tests, backend E2E, and two browser shards

@@ -104,6 +104,11 @@ it('refreshes an expired proposal automatically, preserves the review, and execu
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await page.waitForURL('**/app/**');
   await page.goto(`/app/${manifest.organizationId}/exceptions/${id}`);
+  await page
+    .getByRole('region', { name: 'Resolution', exact: true })
+    .locator('summary')
+    .first()
+    .click();
   await page.getByRole('button', { name: 'Approve', exact: true }).waitFor();
   expect(
     (await pilot.desk.review(await pilot.operator(), id)).proposal.id,
@@ -178,6 +183,11 @@ it('refreshes an expired proposal automatically, preserves the review, and execu
         { timeout: 20_000 },
       )
       .toBe('resolved');
+    await page
+      .getByRole('region', { name: 'Execution', exact: true })
+      .locator('summary')
+      .first()
+      .click();
     await page
       .getByText('Recorded verified resolution', { exact: true })
       .first()

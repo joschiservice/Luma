@@ -183,6 +183,7 @@ test('real installed adapters read remote state, verify a lost write after resta
         context: async () => context,
         installations: options().installations,
         capabilities: runtime,
+        cursors: new Map(),
         manifest: {
           connections: { jtl: connections[0].id, shopify: connections[1].id },
         },

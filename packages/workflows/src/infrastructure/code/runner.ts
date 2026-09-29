@@ -53,6 +53,8 @@ export function createWasmtimeRunner(options: {
   const directory = resolve(options.directory);
   const binary = resolve(directory, 'wasmtime');
   const guest = resolve(directory, 'guest.wasm');
+  // Setup compiles the pinned guest once. Compiling it on every run would spend seconds of the wall-time budget.
+  const precompiled = resolve(directory, 'guest.cwasm');
 
   return {
     async run(inputStep, input, controls) {
@@ -91,21 +93,29 @@ export function createWasmtimeRunner(options: {
         // Installation pins executable bytes; this check rejects an accidentally replaced runtime.
         const manifest = JSON.parse(
           await readFile(resolve(directory, 'manifest.json'), 'utf8'),
-        ) as { wasmtime: string };
-        if (
-          createHash('sha256')
-            .update(await readFile(binary))
-            .digest('hex') !== manifest.wasmtime
-        )
-          return finish('unavailable');
+        ) as { wasmtime: string; precompiled?: string };
+        for (const [file, digest] of [
+          [binary, manifest.wasmtime],
+          [precompiled, manifest.precompiled],
+        ] as const)
+          if (
+            !digest ||
+            createHash('sha256')
+              .update(await readFile(file))
+              .digest('hex') !== digest
+          )
+            return finish('unavailable');
       } catch {
         return finish('unavailable');
       }
       const enforce =
         options.enforceProcessLimits ?? process.env.NODE_ENV === 'production';
       if (enforce && process.platform !== 'linux') return finish('unavailable');
+      // Code generation flags must match `wasmtime compile` in tooling/code-runtime/setup.mjs;
+      // Wasmtime refuses to load an artifact compiled with different settings.
       const args = [
         'run',
+        '--allow-precompiled',
         '-C',
         'parallel-compilation=n,cache=n',
         '-W',
@@ -114,7 +124,7 @@ export function createWasmtimeRunner(options: {
         'memory-reservation=0,memory-reservation-for-growth=0,memory-guard-size=0,guard-before-linear-memory=n',
         '-S',
         'inherit-network=n,inherit-env=n,tcp=n,udp=n,allow-ip-name-lookup=n,http=n,listenfd=n',
-        guest,
+        precompiled,
       ];
       const executable = enforce ? '/usr/bin/prlimit' : binary;
       const commandArgs = enforce

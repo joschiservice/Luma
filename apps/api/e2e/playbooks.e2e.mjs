@@ -58,8 +58,11 @@ for (const transport of ['playbooks', 'workflows']) {
         body,
         status,
       });
+    // The workflows list also includes built-in workflows, so select this definition by ID.
     expect(
-      (await api.request(root, { cookie: member.cookie })).body.items[0].status,
+      (await api.request(root, { cookie: member.cookie })).body.items.find(
+        (item) => item.id === version.definition.id,
+      ).status,
     ).toBe('inactive');
     expect(
       (await api.request(path, { cookie: member.cookie })).body.canManage,

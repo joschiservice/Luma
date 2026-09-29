@@ -417,7 +417,8 @@ it.each([
       cause: undefined,
       details: [],
     });
-    expect((failure as Error).stack).not.toContain('private');
+    // Matches the private messages above, not paths such as macOS /private/tmp checkouts.
+    expect((failure as Error).stack).not.toMatch(/private [a-z]/);
     expect(writeLog).toHaveBeenCalledWith(
       expect.objectContaining({
         level: 'ERROR',

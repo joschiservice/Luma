@@ -83,7 +83,7 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
   await page.getByText('No active connections', { exact: true }).waitFor();
   await page.keyboard.press('Control+k');
   await page.getByRole('dialog', { name: 'Go to a page' }).waitFor();
-  await page.getByRole('textbox', { name: 'Search pages' }).fill('issue');
+  await page.getByRole('textbox', { name: 'Search workspace' }).fill('issue');
   await page
     .getByRole('navigation', { name: 'Search results' })
     .getByRole('link', { name: 'Issues' })
@@ -173,34 +173,41 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
   await page.getByRole('button', { name: 'Return to first page' }).click();
   await page.getByRole('button', { name: 'Next', exact: true }).click();
   await page.getByRole('button', { name: 'Previous', exact: true }).click();
-  await page.getByText('Filter issues', { exact: true }).click();
-  await page.getByRole('combobox', { name: 'Class', exact: true }).click();
-  await page.getByRole('option', { name: 'Sync failure', exact: true }).click();
+  await page.getByRole('button', { name: 'Add filter', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Issue type', exact: true }).click();
+  await page
+    .getByRole('menuitemradio', { name: 'Sync failure', exact: true })
+    .click();
+  const issueTypeFilter = page.getByRole('button', {
+    name: 'Edit Issue type filter: Sync failure',
+    exact: true,
+  });
+  await issueTypeFilter.waitFor();
+  const detailPane = page.getByRole('region', { name: 'Selected issue' });
+  const issueSection = (name) =>
+    detailPane.getByRole('region', { name, exact: true });
+  // Inspector sections other than Overview and Findings start collapsed.
+  const expandSection = async (name) => {
+    const disclosure = issueSection(name).locator('details').first();
+    if ((await disclosure.getAttribute('open')) === null)
+      await disclosure.locator('summary').first().click();
+  };
   const row = page.locator(`#case-${ids[0]}`);
   await row.click();
-  await page
-    .locator('.inbox-detail')
+  await detailPane
     .getByText('Investigation pending', { exact: true })
     .waitFor();
   await expect
-    .poll(() =>
-      page
-        .locator('.inbox-detail')
-        .evaluate((el) => el === document.activeElement),
-    )
+    .poll(() => detailPane.evaluate((el) => el === document.activeElement))
     .toBe(true);
   await page.reload();
-  await page
-    .locator('.inbox-detail')
+  await detailPane
     .getByText('Investigation pending', { exact: true })
     .waitFor();
-  await page.locator('.inbox-filter-disclosure > summary').click();
-  await page
-    .getByRole('combobox', { name: 'Class', exact: true })
-    .getByText('Sync failure', { exact: true })
-    .waitFor();
+  await issueTypeFilter.waitFor();
   expect(await row.isVisible()).toBe(true);
-  await page.getByText('Live', { exact: true }).waitFor();
+  await expandSection('Execution');
+  await page.getByText('Live updates', { exact: true }).waitFor();
   await services.diagnoses.run(tenant, ids[0]);
   // The credentialed stream refreshes the completed investigation without a click.
   await page
@@ -274,6 +281,14 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
       },
     }),
   );
+  const refreshIssue = page.getByRole('button', {
+    name: 'Refresh issue',
+    exact: true,
+  });
+  // The inspector records the case state in the Execution details metadata.
+  const caseState = issueSection('Execution').locator(
+    'dt:text-is("Case state") + dd',
+  );
   for (const state of [
     'awaiting_approval',
     'executing',
@@ -283,9 +298,9 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
     'escalated',
   ]) {
     snapshotState = state;
-    await page.getByRole('button', { name: 'Refresh progress' }).click();
+    await refreshIssue.click();
     await expect
-      .poll(() => page.locator('.case-progress-state strong').textContent())
+      .poll(() => caseState.textContent())
       .toBe(state.replaceAll('_', ' ').replace(/^./, (c) => c.toUpperCase()));
     if (state === 'verifying') {
       expect(await page.getByText('Succeeded', { exact: true }).count()).toBe(
@@ -305,15 +320,15 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
   }
   await page.unroute(`**${caseApi}`);
   await page.unroute(`**${caseApi}/progress`);
-  await page.getByRole('button', { name: 'Refresh progress' }).click();
+  await refreshIssue.click();
   await expect
-    .poll(() => page.locator('.case-progress-state strong').textContent())
+    .poll(() => caseState.textContent())
     .toBe(
       baselineProgress.state
         .replaceAll('_', ' ')
         .replace(/^./, (c) => c.toUpperCase()),
     );
-  await page.getByText('Live', { exact: true }).waitFor();
+  await page.getByText('Live updates', { exact: true }).waitFor();
   const recordedTimeline = await (
     await context.request.get(`${caseApi}/timeline?limit=100`)
   ).json();
@@ -350,24 +365,32 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
       },
     });
   });
-  const recommendations = await page.locator('.case-step').allTextContents();
+  await issueSection('Overview')
+    .getByText('Checks and verification', { exact: true })
+    .click();
+  const recommendationSteps = issueSection('Overview').getByRole('listitem');
+  const recommendations = await recommendationSteps.allTextContents();
   expect(recommendations.length).toBeGreaterThan(0);
   // The request spans a second SSE heartbeat. It must finish without being cancelled.
   await page.waitForRequest((request) =>
     request.url().includes(`${caseApi}/timeline?`),
   );
   await page.getByText('Refreshing', { exact: true }).waitFor();
-  expect(await page.locator('.case-step').allTextContents()).toEqual(
-    recommendations,
-  );
+  expect(await recommendationSteps.allTextContents()).toEqual(recommendations);
   expect(
     await page.getByText('Evidence is stale', { exact: true }).count(),
   ).toBe(0);
+  await expandSection('Audit history');
+  // The trigger without a count appears once the slow page reports older history.
   await page
+    .getByRole('button', { name: 'View full history', exact: true })
+    .click();
+  const auditHistory = page.getByRole('region', { name: 'Audit history' });
+  await auditHistory
     .getByText('Review slow refresh completed', { exact: true })
     .waitFor();
   slowRefresh = false;
-  const auditDetails = page.locator('.case-audit details').first();
+  const auditDetails = auditHistory.locator('details').first();
   await auditDetails.locator('summary').click();
   await auditDetails.evaluate((element) => {
     element.dataset.retained = 'true';
@@ -376,22 +399,29 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
     page.waitForRequest((request) =>
       request.url().includes('cursor=review-page-2'),
     ),
-    page
-      .getByRole('button', { name: 'Load more history and evidence' })
+    auditHistory
+      .getByRole('button', { name: 'Load older events', exact: true })
       .click(),
   ]);
   expect(await auditDetails.getAttribute('open')).not.toBeNull();
   expect(await auditDetails.getAttribute('data-retained')).toBe('true');
   expect(await page.getByLabel('Loading issues').count()).toBe(0);
   releasePage();
-  await page.getByText('Review history page loaded', { exact: true }).waitFor();
+  await auditHistory
+    .getByText('Review history page loaded', { exact: true })
+    .waitFor();
   expect(await auditDetails.getAttribute('data-retained')).toBe('true');
   await page.unroute(`**${caseApi}/timeline?**`);
   await page
-    .locator('.failed-disclosure > summary')
-    .filter({ hasText: 'Findings & evidence' })
+    .getByRole('button', { name: 'Back to issue', exact: true })
     .click();
-  const evidence = page.locator('.case-evidence summary').first();
+  await issueSection('Findings')
+    .getByRole('button', { name: 'View supporting evidence', exact: true })
+    .click();
+  const evidence = page
+    .getByRole('region', { name: 'Supporting evidence' })
+    .locator('summary')
+    .first();
   await evidence.focus();
   await page.keyboard.press('Enter');
   await expect
@@ -399,7 +429,10 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
       evidence.evaluate((el) => el.parentElement.hasAttribute('open')),
     )
     .toBe(true);
-  await page.locator('.inbox-detail').evaluate((el) => {
+  await page
+    .getByRole('button', { name: 'Back to issue', exact: true })
+    .click();
+  await detailPane.evaluate((el) => {
     el.scrollTop = 0;
   });
   expect(
@@ -411,7 +444,7 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
   await context.grantPermissions(['clipboard-read', 'clipboard-write'], {
     origin,
   });
-  await page.getByText('Issue details', { exact: true }).click();
+  await expandSection('Issue details');
   await page
     .getByRole('button', { name: 'Copy issue ID', exact: true })
     .click();
@@ -419,34 +452,34 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
     ids[0],
   );
-  expect(await page.locator('.issue-id code').textContent()).toBe(ids[0]);
-  await page.getByText('Issue details', { exact: true }).click();
-  await page.locator('.inbox-detail').evaluate((el) => {
+  expect(
+    await issueSection('Issue details')
+      .getByText(ids[0], { exact: true })
+      .isVisible(),
+  ).toBe(true);
+  await issueSection('Issue details').locator('summary').first().click();
+  await detailPane.evaluate((el) => {
     el.scrollTop = 0;
   });
-  const inspectorHeader = page.locator('.inbox-case-nav');
+  const inspectorHeader = detailPane.locator('.issue-inspector-header');
   const headerTop = await inspectorHeader.evaluate(
     (el) => el.getBoundingClientRect().top,
   );
-  await page.locator('.inbox-detail').evaluate((el) => {
+  await detailPane.evaluate((el) => {
     el.scrollTop = 500;
   });
   expect(
     await inspectorHeader.evaluate((el) => el.getBoundingClientRect().top),
   ).toBe(headerTop);
   expect(await inspectorHeader.getByRole('heading').isVisible()).toBe(true);
-  expect(
-    await inspectorHeader
-      .getByText('Connection issue', { exact: true })
-      .isVisible(),
-  ).toBe(true);
-  expect(
-    await inspectorHeader.locator('.issue-context-subject strong').isVisible(),
-  ).toBe(true);
+  // The compact header shows status and severity; issue type and subject moved to the sections.
+  expect(await inspectorHeader.locator('.lu-state-pill').isVisible()).toBe(
+    true,
+  );
   expect(await inspectorHeader.getByText('High severity').isVisible()).toBe(
     true,
   );
-  await page.locator('.inbox-detail').evaluate((el) => {
+  await detailPane.evaluate((el) => {
     el.scrollTop = 0;
   });
   await page.screenshot({ path: '/tmp/luma-21-desktop.png', fullPage: true });
@@ -458,23 +491,16 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await page
-    .getByRole('button', { name: 'Refresh issue', exact: true })
-    .click();
+  await refreshIssue.click();
   await page.getByRole('button', { name: 'Close panel' }).click();
+  const issueInbox = page.getByLabel('Issue inbox', { exact: true });
   // The completed diagnosis moved this row beyond page one; focus falls back to the inbox.
   await expect
-    .poll(() =>
-      page
-        .locator('.inbox-list')
-        .evaluate((el) => el === document.activeElement),
-    )
+    .poll(() => issueInbox.evaluate((el) => el === document.activeElement))
     .toBe(true);
   const stableRow = page.locator(`#case-${ids[10]}`);
   await stableRow.scrollIntoViewIfNeeded();
-  const scroll = await page
-    .locator('.inbox-list')
-    .evaluate((el) => el.scrollTop);
+  const scroll = await issueInbox.evaluate((el) => el.scrollTop);
   await stableRow.click();
   await page.keyboard.press('Escape');
   await expect
@@ -485,9 +511,7 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
   await expect
     .poll(() => stableRow.evaluate((el) => el === document.activeElement))
     .toBe(true);
-  expect(await page.locator('.inbox-list').evaluate((el) => el.scrollTop)).toBe(
-    scroll,
-  );
+  expect(await issueInbox.evaluate((el) => el.scrollTop)).toBe(scroll);
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto(`${inbox}/${ids[0]}?view=active&class=sync_failure`);
   await page
@@ -503,11 +527,17 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
       exact: true,
     })
     .waitFor();
-  const audit = page.locator('.case-audit > li');
-  const eventCount = await audit.count();
-  await page.getByRole('button', { name: 'Refresh progress' }).click();
-  await expect.poll(() => audit.count()).toBe(eventCount);
-  await page.getByText('Live', { exact: true }).waitFor();
+  await expandSection('Audit history');
+  const recordedEvents = issueSection('Audit history').getByText(
+    /^\d+\+? recorded events?$/,
+  );
+  const eventCount = await recordedEvents.textContent();
+  await issueSection('Audit history')
+    .getByRole('button', { name: 'Refresh history', exact: true })
+    .click();
+  await expect.poll(() => recordedEvents.textContent()).toBe(eventCount);
+  await expandSection('Execution');
+  await page.getByText('Live updates', { exact: true }).waitFor();
   // An offline notification can precede the transport's error event.
   await page.evaluate(() => window.dispatchEvent(new Event('offline')));
   await page.getByText('Connection lost', { exact: true }).waitFor();
@@ -515,33 +545,38 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
     .getByText('Current state is unconfirmed', { exact: true })
     .waitFor();
   await page.evaluate(() => window.dispatchEvent(new Event('online')));
-  await page.getByText('Live', { exact: true }).waitFor();
+  await page.getByText('Live updates', { exact: true }).waitFor();
   await context.setOffline(true);
   await page.getByText('Connection lost', { exact: true }).waitFor();
   await page
     .getByText('Current state is unconfirmed', { exact: true })
     .waitFor();
   await context.setOffline(false);
-  await page.getByText('Live', { exact: true }).waitFor();
+  await page.getByText('Live updates', { exact: true }).waitFor();
   await services.exceptions.resolve(tenant, ids[0], {
     kind: 'human_disposition',
     reason: 'Handled by operator',
     evidenceRefs: ['scan-0'],
   });
-  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  const refreshIssues = page.getByRole('button', {
+    name: 'Refresh issues',
+    exact: true,
+  });
+  await refreshIssues.click();
   await page
     .getByText('This issue has left the current view', { exact: true })
     .waitFor();
-  await page
+  // The execution summary and the resolution record both use this heading.
+  const humanClosure = issueSection('Execution')
     .getByRole('heading', { name: 'Closed by human disposition' })
-    .waitFor();
+    .last();
+  await humanClosure.waitFor();
   await page.reload();
+  await expandSection('Execution');
+  await humanClosure.waitFor();
+  await page.getByText('Live updates', { exact: true }).waitFor();
   await page
-    .getByRole('heading', { name: 'Closed by human disposition' })
-    .waitFor();
-  await page.getByText('Live', { exact: true }).waitFor();
-  await page
-    .locator('.case-progress')
+    .getByRole('region', { name: 'Execution and audit timeline' })
     .screenshot({ path: '/tmp/luma36-timeline.png' });
   expect(new URL(page.url()).pathname).toContain(ids[0]);
   const foreign = randomUUID();
@@ -569,30 +604,41 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
       }),
     }),
   );
-  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await refreshIssues.click();
   await page
     .getByText('Inbox could not be refreshed', { exact: true })
     .waitFor();
   await services.diagnoses.run(tenant, ids[1]);
   await page.goto(`/app/${organizationId}/home`);
-  await page.locator('.operations-decisions a').first().waitFor();
+  const decisions = page
+    .getByRole('region', { name: 'Needs your attention' })
+    .getByRole('list')
+    .getByRole('link');
+  // Handling totals come from the operations overview and disappear when it is unavailable.
+  const handlingTotals = page
+    .getByRole('region', { name: 'Luma is handling' })
+    .getByRole('term');
+  await decisions.first().waitFor();
   const authoritative = await context.request.get(
     `/api/v1/organizations/${organizationId}/operations/overview`,
   );
   expect(authoritative.status()).toBe(200);
   const summary = await authoritative.json();
-  expect(await page.locator('.home-lead').textContent()).toContain(
-    `${summary.attentionCount} decision`,
+  await page
+    .getByText(
+      new RegExp(`^${summary.attentionCount} decisions? needs? you\\.`),
+    )
+    .waitFor();
+  expect(await decisions.first().getAttribute('href')).toContain(
+    summary.prioritizedDecisions[0].id,
   );
-  expect(
-    await page.locator('.operations-decisions a').first().getAttribute('href'),
-  ).toContain(summary.prioritizedDecisions[0].id);
   await page.unroute('**/api/v1/organizations/*/exceptions?**');
-  await page.locator('.operations-decisions a').first().click();
+  await decisions.first().click();
   await page.getByRole('article', { name: 'Issue investigation' }).waitFor();
   expect(new URL(page.url()).searchParams.get('view')).toBe('needs_you');
   await page.goto(`/app/${organizationId}/home`);
-  await page.locator('.operations-decisions a').first().waitFor();
+  await decisions.first().waitFor();
+  expect(await handlingTotals.count()).toBeGreaterThan(0);
   await page.route(
     '**/api/v1/organizations/*/operations/overview?**',
     (route) =>
@@ -606,23 +652,23 @@ it('reads persisted cases, restores desktop/mobile routes and focus, and denies 
   await page
     .getByText('Operations overview unavailable', { exact: true })
     .waitFor();
-  expect(await page.locator('.operations-metrics').count()).toBe(0);
+  expect(await handlingTotals.count()).toBe(0);
   await page.unroute('**/api/v1/organizations/*/operations/overview?**');
   await page.getByRole('button', { name: 'Retry', exact: true }).click();
-  await page.locator('.operations-decisions a').first().waitFor();
+  await decisions.first().waitFor();
   await context.setOffline(true);
   await page.getByRole('button', { name: 'Refresh', exact: true }).click();
   await page
     .getByText('Updates paused while offline', { exact: true })
     .waitFor();
-  expect(await page.locator('.operations-metrics').count()).toBe(0);
+  expect(await handlingTotals.count()).toBe(0);
   expect(
     await page
       .getByRole('button', { name: 'Refresh', exact: true })
       .isDisabled(),
   ).toBe(true);
   await context.setOffline(false);
-  await page.locator('.operations-decisions a').first().waitFor();
+  await decisions.first().waitFor();
   await page.screenshot({
     path: '/tmp/luma33-overview-desktop.png',
     fullPage: true,

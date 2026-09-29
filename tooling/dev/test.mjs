@@ -52,7 +52,19 @@ try {
   let url = process.env.TEST_DATABASE_URL;
   if (!url) {
     console.log('Starting disposable PostgreSQL 17 with Testcontainers…');
-    container = await new PostgreSqlContainer('postgres:17-alpine').start();
+    // Suites drop their databases during teardown, and DROP DATABASE waits for a checkpoint.
+    // Durable writes made each checkpoint take seconds under parallel suites; this server is disposable.
+    container = await new PostgreSqlContainer('postgres:17-alpine')
+      .withCommand([
+        'postgres',
+        '-c',
+        'fsync=off',
+        '-c',
+        'full_page_writes=off',
+        '-c',
+        'synchronous_commit=off',
+      ])
+      .start();
     url = container.getConnectionUri();
   }
   for (const args of commands)

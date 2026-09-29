@@ -106,10 +106,31 @@ try {
       : 'a9ebcec73c5d2be040389b2748deb53fd699d2b6367a8fe60127e1874a564ca1')
   )
     throw new Error(`Guest build is not reproducible: ${digest}`);
+  // Code generation flags must match the runner's `wasmtime run` flags in
+  // packages/workflows/src/infrastructure/code/runner.ts. Wasmtime rejects a mismatched artifact.
+  // `fuel=1` only enables fuel metering; each run sets its own fuel budget.
+  const precompiled = join(staging, 'guest.cwasm');
+  execFileSync(
+    join(staging, name, 'wasmtime'),
+    [
+      'compile',
+      '-C',
+      'cache=n',
+      '-W',
+      'fuel=1,epoch-interruption=y,nan-canonicalization=y,threads=n,shared-memory=n,memory64=n,component-model=n',
+      '-O',
+      'memory-reservation=0,memory-reservation-for-growth=0,memory-guard-size=0,guard-before-linear-memory=n',
+      '-o',
+      precompiled,
+      guest,
+    ],
+    { timeout: 120000 },
+  );
   await mkdir(destination, { recursive: true, mode: 0o700 });
   for (const [from, to] of [
     [join(staging, name, 'wasmtime'), 'wasmtime'],
     [guest, 'guest.wasm'],
+    [precompiled, 'guest.cwasm'],
   ]) {
     await writeFile(join(destination, `${to}.new`), await readFile(from), {
       mode: 0o700,
@@ -121,6 +142,7 @@ try {
     JSON.stringify({
       wasmtime: hash(await readFile(join(destination, 'wasmtime'))),
       guest: digest,
+      precompiled: hash(await readFile(join(destination, 'guest.cwasm'))),
     }) + '\n',
     { mode: 0o600 },
   );

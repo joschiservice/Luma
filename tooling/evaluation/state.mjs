@@ -92,6 +92,8 @@ export function createState(document = {}) {
       put('failures', [tenant, entry.id], entry),
   };
   const policies = {
+    // Evaluations use the platform default: no workspace settings row, so no approval override.
+    workspacePolicy: async () => ({ revision: 0, required: false }),
     pending: async () => [],
     delivered: async () => undefined,
     saveDecision: async (d) => put('decisions', [d.tenantId, d.id], d),
