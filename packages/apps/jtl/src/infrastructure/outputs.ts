@@ -1,5 +1,11 @@
 import { z } from 'zod';
 
+/**
+ * Version of this adapter's normalized output, recorded as observation provenance. Bump it
+ * whenever the same provider response would normalize differently.
+ */
+export const adapterVersion = 'jtl/1';
+
 const timestamp = z.string().datetime({ offset: true });
 
 const externalId = z
@@ -29,7 +35,7 @@ const observation = <T extends z.ZodTypeAny>(resource: string, data: T) =>
     observedAt: timestamp,
     sourceUpdatedAt: timestamp.nullable(),
     sourceRevision: z.string().nullable(),
-    adapterVersion: z.literal('jtl/0'),
+    adapterVersion: z.literal(adapterVersion),
     schemaVersion: z.literal(1),
     data,
   });

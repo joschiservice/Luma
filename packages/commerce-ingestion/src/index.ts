@@ -13,6 +13,15 @@ export type ProjectionOutcome =
   | { status: 'pending'; missing: SourceIdentity[] }
   | { status: 'applied' | 'retained' | 'duplicate'; entityId: string };
 
+// Snapshot identity includes the normalizer version, so bump it whenever the same observation
+// would normalize to a different document; replay then adds a new snapshot instead of
+// conflicting with the stored one.
+const normalizers = {
+  inventory: 'commerce/1',
+  order: 'commerce/2',
+  fulfillment: 'commerce/1',
+} as const;
+
 /** Coordinates idempotent owner transactions; replay resumes after a partial failure. */
 export function createCommerceIngestion(
   sources: SourceRecords,
@@ -42,7 +51,7 @@ export function createCommerceIngestion(
       schemaVersion: 1 as const,
       connectionId: o.source.connectionId,
       observationId: o.id,
-      normalizerVersion: 'commerce/1',
+      normalizerVersion: normalizers.inventory,
       sourceRevision: o.sourceRevision,
       sourceUpdatedAt: o.sourceUpdatedAt,
       observedAt: o.observedAt,
@@ -105,6 +114,8 @@ export function createCommerceIngestion(
       if (!entityId || missing.length) return { status: 'pending', missing };
       const status = await orders.project(context, {
         ...provenance,
+        schemaVersion: 2,
+        normalizerVersion: normalizers.order,
         entityId,
         kind: 'order',
         mappingVersion: digest(
@@ -163,6 +174,7 @@ export function createCommerceIngestion(
       );
     const status = await orders.project(context, {
       ...provenance,
+      normalizerVersion: normalizers.fulfillment,
       entityId,
       kind: 'fulfillment',
       mappingVersion: digest(

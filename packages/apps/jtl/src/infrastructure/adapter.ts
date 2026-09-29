@@ -14,7 +14,7 @@ import type { JtlTransportOptions } from '@luma/connector-jtl';
 import { API_VERSION, createClient, fail, parse } from '@luma/connector-jtl';
 import { z } from 'zod';
 
-import { outputs } from './outputs.js';
+import { adapterVersion, outputs } from './outputs.js';
 import * as s from './schemas.js';
 import { createJtlShippingMethodCapabilities } from './shipping-method.js';
 
@@ -224,7 +224,7 @@ export function createJtlConnector(
             observedAt,
             sourceUpdatedAt,
             sourceRevision: null,
-            adapterVersion: 'jtl/0',
+            adapterVersion,
             schemaVersion: 1,
             data,
           });
@@ -255,6 +255,8 @@ export function createJtlConnector(
           hasNext = result.hasNext;
           for (const order of result.items) {
             const lines = await orderLines(order.id);
+            // ERP 2.2 sales orders and delivery notes have no modification time, so these
+            // snapshots are ordered by observation time. Creation dates are not update times.
             emit('order', ref(order.id), null, {
               displayNumber: order.salesOrderNumber,
               placedAt: order.salesOrderDate ?? null,
@@ -459,9 +461,9 @@ export function createJtlConnector(
     id: options.connectionId,
     provider: 'jtl',
     status: 'active',
-    adapterVersion: 'jtl/0',
+    adapterVersion,
     mechanism: 'api',
-    executor: { kind: 'connector', id: 'jtl/0' },
+    executor: { kind: 'connector', id: adapterVersion },
     capabilities: {
       ...(options.shippingMethodActions
         ? createJtlShippingMethodCapabilities(options)

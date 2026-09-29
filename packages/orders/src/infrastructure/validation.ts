@@ -23,7 +23,6 @@ const money = z
   .strict();
 
 const base = z.object({
-  schemaVersion: z.literal(1),
   entityId: uuid,
   connectionId: uuid,
   observationId: uuid,
@@ -98,7 +97,22 @@ const fulfillment = z
   })
   .strict();
 
+// Order snapshots use version 2 since they may carry dueAt, placedAt, total and line SKU
+// text and title. Version 1 order documents stay valid, including any of those optional
+// facts they already carry. Fulfillment snapshots are unchanged at version 1.
 export const snapshotSchema = z.union([
-  base.extend({ kind: z.literal('order'), data: order }).strict(),
-  base.extend({ kind: z.literal('fulfillment'), data: fulfillment }).strict(),
+  base
+    .extend({
+      schemaVersion: z.union([z.literal(1), z.literal(2)]),
+      kind: z.literal('order'),
+      data: order,
+    })
+    .strict(),
+  base
+    .extend({
+      schemaVersion: z.literal(1),
+      kind: z.literal('fulfillment'),
+      data: fulfillment,
+    })
+    .strict(),
 ]);

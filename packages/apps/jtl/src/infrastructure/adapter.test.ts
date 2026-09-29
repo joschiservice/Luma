@@ -125,6 +125,7 @@ describe('JTL read adapter', () => {
             {
               source: { provider: 'jtl', externalId: key(10) },
               sourceUpdatedAt: null,
+              adapterVersion: 'jtl/1',
               data: {
                 status: 'open',
                 paymentStatus: 'paid',
@@ -168,12 +169,14 @@ describe('JTL read adapter', () => {
         value: {
           items: [
             {
+              sourceUpdatedAt: null,
               data: {
                 status: 'shipped',
                 lines: [{ quantity: { amount: '1.5', unit: 'each' } }],
               },
             },
             {
+              sourceUpdatedAt: null,
               data: {
                 status: 'processing',
                 lines: [{ quantity: { amount: '2' } }],

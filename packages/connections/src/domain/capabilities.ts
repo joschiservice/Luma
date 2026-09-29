@@ -25,9 +25,12 @@ export interface Observation<T> {
   id: string;
   source: SourceIdentity;
   kind: 'snapshot' | 'tombstone';
+  /** When the point-in-time read started, on Luma's clock; not when the result was received. */
   observedAt: string;
+  /** Source-reported modification time; null when the source does not expose one. */
   sourceUpdatedAt: string | null;
   sourceRevision: string | null;
+  /** Identifies the adapter normalization that produced `data`; bump it when output changes. */
   adapterVersion: string;
   schemaVersion: 1;
   data: T;

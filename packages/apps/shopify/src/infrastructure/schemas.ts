@@ -3,6 +3,12 @@ import { z } from 'zod';
 
 export * from '@luma/connector-shopify/schemas';
 
+/**
+ * Version of this adapter's normalized output, recorded as observation provenance. Bump it
+ * whenever the same provider response would normalize differently.
+ */
+export const adapterVersion = 'shopify/1';
+
 const externalId = z
   .object({ externalId: z.string().min(1), scopeKey: z.string() })
   .strict();
@@ -30,7 +36,7 @@ const observation = <T extends z.ZodTypeAny>(resource: string, data: T) =>
     observedAt: timestamp,
     sourceUpdatedAt: timestamp.nullable(),
     sourceRevision: z.string().nullable(),
-    adapterVersion: z.literal('shopify/0'),
+    adapterVersion: z.literal(adapterVersion),
     schemaVersion: z.literal(1),
     data,
   });

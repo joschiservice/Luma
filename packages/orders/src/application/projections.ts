@@ -35,7 +35,12 @@ export type CommerceData =
     };
 
 export interface CanonicalSnapshot {
-  schemaVersion: 1;
+  /**
+   * Document schema version. Order snapshots are written as 2 and may carry `dueAt`,
+   * `placedAt`, `total` and line `skuCode`/`title`; stored version 1 order documents
+   * remain readable. Fulfillment snapshots use 1.
+   */
+  schemaVersion: 1 | 2;
   entityId: string;
   kind: EntityKind;
   connectionId: string;

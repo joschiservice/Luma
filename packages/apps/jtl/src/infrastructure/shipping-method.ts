@@ -15,6 +15,7 @@ import {
 import { z } from 'zod';
 
 import type { JtlConnectorOptions } from './adapter.js';
+import { adapterVersion } from './outputs.js';
 import { externalId } from './schemas.js';
 
 const ref = z.object({ externalId, scopeKey: z.literal('') }).strict();
@@ -62,7 +63,7 @@ const readOutput = z
             observedAt: z.string().datetime(),
             sourceUpdatedAt: z.null(),
             sourceRevision: z.null(),
-            adapterVersion: z.literal('jtl/0'),
+            adapterVersion: z.literal(adapterVersion),
             schemaVersion: z.literal(1),
             data: z
               .object({
@@ -124,7 +125,7 @@ export function createJtlShippingMethodCapabilities(
           observedAt: now().toISOString(),
           sourceUpdatedAt: null,
           sourceRevision: null,
-          adapterVersion: 'jtl/0',
+          adapterVersion,
           schemaVersion: 1,
           data: {
             shippingMethod: {

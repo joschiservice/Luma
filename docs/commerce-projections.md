@@ -36,11 +36,12 @@ operation rather than overwriting history.
 
 ## Projection rules
 
-Order snapshots can also carry `placedAt`, a source `total` with its currency, and
-line `skuCode` and `title`. These are descriptive source facts: SKU text never
-establishes SKU identity, and totals are never converted between currencies. They
-are optional so earlier snapshots stay valid; an order gains them with the next
-source update Luma reads.
+Order snapshots can also carry `dueAt`, `placedAt`, a source `total` with its
+currency, and line `skuCode` and `title`. These are descriptive source facts: SKU
+text never establishes SKU identity, and totals are never converted between
+currencies. They are optional; absent means the adapter did not report the fact.
+An existing order gains them when a snapshot carrying them becomes current under
+the ordering rules below.
 
 Only complete normalized object snapshots or explicit tombstones are accepted.
 Partial collection pages can supply complete individual objects; missing items in
@@ -49,13 +50,51 @@ values from omitted fields. Order lines can retain an unknown SKU or cancelled
 quantity. Inventory values retain null, zero, negative and fractional quantities
 without deriving or summing stock across sources.
 
-Each source has its own current snapshot. A strictly newer source update time can
-advance it. Older, equal-time or unordered observations remain historical evidence
-and return `retained`; receipt time and opaque revisions never establish order.
-A tombstone follows the same ordering rule, preventing stale resurrection. If an
-existing snapshot lacks source time, an authoritative reconciliation decision is
-needed before advancing it. `duplicate` means the immutable snapshot already
-exists, even when it was previously retained rather than selected.
+Each source has its own current snapshot. An incoming snapshot replaces it when:
+
+- it re-normalizes the current snapshot's observation, for example after a new
+  SKU mapping or normalizer version;
+- both snapshots carry a source update time and the incoming one is strictly
+  newer; or
+- at least one of them has no source update time and the incoming observation
+  time is later. When neither has a source update time and both observation times
+  are equal, the greater observation ID wins.
+
+Every other snapshot remains historical evidence and returns `retained`. Receipt
+time and opaque revisions never establish order. A source update time is never
+compared with an observation time, because they come from different clocks.
+Tombstones follow the same rules, preventing stale resurrection. `duplicate` means
+the immutable snapshot already exists, even when it was previously retained rather
+than selected.
+
+Sources that report no update time, such as JTL sales orders and delivery notes,
+therefore advance with each later read. This relies on the adapter contract:
+`observedAt` is when a point-in-time read started, taken on Luma's clock before
+the request, and one connection's reads of a resource do not overlap. A late or
+replayed older read cannot replace a later one, and the same set of untimed reads
+settles on the same current snapshot in any arrival order. When an adapter starts
+or stops reporting update times, the transition is ordered by observation time.
+
+## Versioning
+
+Snapshot identity is `(entity, observation, normalizerVersion, mappingVersion)`.
+Replaying an observation under the same identity must produce the identical
+document; otherwise projection fails with `Snapshot identity conflict`.
+
+- Bump the adapter version (`jtl/1`, `shopify/1`) whenever the same provider
+  response would normalize to different observation data, including added
+  optional fields. Observation provenance then shows which adapter produced each
+  fact. Capability dispatch identities include the adapter version, so writes
+  started under an earlier version cannot be reconciled by the new one and need
+  operator review.
+- Bump the canonical `schemaVersion` of a snapshot kind when its document shape
+  changes, including added optional fields. Order snapshots are version 2 and
+  may carry `dueAt`, `placedAt`, `total` and line `skuCode`/`title`. Stored
+  version 1 order documents stay valid and readable; they may already carry some
+  of these fields. Fulfillment and inventory snapshots are version 1.
+- Bump the normalizer version (`commerce/2` for orders) whenever the canonical
+  document for an existing observation changes. Replay then stores a new snapshot
+  beside the old one instead of conflicting with it.
 
 Order lines and fulfillments have immutable canonical parent bindings. Fulfillment
 lines must occur in the same connection's order projection and use its units.
@@ -85,5 +124,6 @@ storage layer. Raw provider payloads and customer/address data are not retained.
 
 `commerce.integration.test.ts` runs against PostgreSQL with restricted credentials.
 It covers pending/replay, concurrent delivery, immutable conflicts, isolation,
-source disagreements, timestamps, tombstones, decimal precision, split shipments,
-and parent/unit validation.
+source disagreements, timestamps, sources without update times, version 1 order
+snapshots, tombstones, decimal precision, split shipments, and parent/unit
+validation.

@@ -197,7 +197,7 @@ export function createShopifyConnector(
             observedAt,
             sourceUpdatedAt: updatedAt,
             sourceRevision: null,
-            adapterVersion: 'shopify/0',
+            adapterVersion: s.adapterVersion,
             schemaVersion: 1,
             data,
           });
@@ -494,9 +494,9 @@ export function createShopifyConnector(
     id: options.connectionId,
     provider: 'shopify',
     status: 'active',
-    adapterVersion: 'shopify/0',
+    adapterVersion: s.adapterVersion,
     mechanism: 'api',
-    executor: { kind: 'connector', id: 'shopify/0' },
+    executor: { kind: 'connector', id: s.adapterVersion },
     capabilities: {
       'orders.read': handler('orders.read'),
       'products.read': handler('products.read'),

@@ -116,16 +116,7 @@ export function createCommerceProjections(
             [tenant, value.entityId, value.connectionId],
           )
         ).rows[0]?.document;
-        // Revisions are opaque. Receipt order cannot establish source order.
-        if (
-          current &&
-          current.observationId !== value.observationId &&
-          (!current.sourceUpdatedAt ||
-            !value.sourceUpdatedAt ||
-            Date.parse(value.sourceUpdatedAt) <=
-              Date.parse(current.sourceUpdatedAt))
-        )
-          return 'retained';
+        if (current && !supersedes(value, current)) return 'retained';
         await tx.query(
           `INSERT INTO inventory_projections(tenant_id,entity_id,connection_id,snapshot_id) VALUES($1,$2,$3,$4)
      ON CONFLICT(tenant_id,entity_id,connection_id) DO UPDATE SET snapshot_id=EXCLUDED.snapshot_id,version=inventory_projections.version+1,updated_at=now()`,
@@ -172,6 +163,40 @@ export function createCommerceProjections(
       );
     },
   };
+}
+
+type SnapshotOrder = Pick<
+  CanonicalSnapshot,
+  'observationId' | 'sourceUpdatedAt' | 'observedAt'
+>;
+
+/**
+ * Decides whether `incoming` replaces `current` as its source's current snapshot.
+ *
+ * Applies the same ordering policy as order projections: a re-normalized copy of the
+ * current observation always wins; two source update times compare strictly; otherwise
+ * the later observation time wins, with the greater observation ID breaking ties only
+ * between snapshots that both lack an update time. Source-clock update times are never
+ * compared with Luma-clock observation times.
+ */
+export function supersedes(
+  incoming: SnapshotOrder,
+  current: SnapshotOrder,
+): boolean {
+  if (incoming.observationId === current.observationId) return true;
+  if (incoming.sourceUpdatedAt && current.sourceUpdatedAt)
+    return (
+      Date.parse(incoming.sourceUpdatedAt) > Date.parse(current.sourceUpdatedAt)
+    );
+  const observed =
+    Date.parse(incoming.observedAt) - Date.parse(current.observedAt);
+  if (observed !== 0) return observed > 0;
+
+  return (
+    !incoming.sourceUpdatedAt &&
+    !current.sourceUpdatedAt &&
+    incoming.observationId > current.observationId
+  );
 }
 
 function references(value: CanonicalSnapshot): { kind: string; id: string }[] {
