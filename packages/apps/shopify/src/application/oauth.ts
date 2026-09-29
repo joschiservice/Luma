@@ -27,6 +27,7 @@ export interface ShopifyOAuth {
 }
 
 export interface ShopifyAppConfig {
+  protectedCustomerDataApproved?: boolean;
   clientId: string;
   clientSecret: string;
   environment: string;

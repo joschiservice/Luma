@@ -207,3 +207,11 @@ Procurement reads configured-source stocks and recorded POs. Snapshot compositio
 order v1. Migration 0032 extends invalidations. Tests: domain metric tests,
 `operational-summary.test.ts`, `operational-metrics.e2e.mjs` and
 `operational-metrics.browser.mjs`. See the shared metric and live metric guides.
+
+Shopify operational records: `packages/apps/shopify/src/application/records.ts`
+authorizes reads, `infrastructure/records.ts` queries scoped provider sections,
+and `domain/records.ts` defines their coverage and source-link contracts.
+`src/web/record-page.tsx` provides the Shopify app page; `src/web/records.tsx`
+browses and follows records. Tests are the Shopify record reader, service and
+route unit tests and `Apps/Shopify records` stories. See the
+[Shopify app guide](../packages/apps/shopify/README.md#operational-records).

@@ -4,6 +4,23 @@ import type { ReadCapability } from '@luma/connections';
 import { fail, verifyWebhook } from '@luma/connector-shopify';
 
 const topics: Record<string, ReadCapability[]> = {
+  'order_transactions/create': ['orders.read'],
+  'orders/paid': ['orders.read'],
+  'refunds/create': ['orders.read'],
+  'returns/request': ['orders.read'],
+  'returns/approve': ['orders.read'],
+  'returns/decline': ['orders.read'],
+  'returns/update': ['orders.read'],
+  'returns/process': ['orders.read'],
+  'returns/close': ['orders.read'],
+  'returns/cancel': ['orders.read'],
+  'returns/reopen': ['orders.read'],
+  'customers/update': ['orders.read'],
+  'customers/delete': ['orders.read'],
+  'fulfillment_holds/added': ['fulfillment.read'],
+  'fulfillment_holds/released': ['fulfillment.read'],
+  'inventory_items/update': ['inventory.read', 'products.read'],
+  'locations/update': ['inventory.read'],
   'orders/create': ['orders.read', 'fulfillment.read'],
   'orders/updated': ['orders.read', 'fulfillment.read'],
   'orders/cancelled': ['orders.read', 'fulfillment.read'],

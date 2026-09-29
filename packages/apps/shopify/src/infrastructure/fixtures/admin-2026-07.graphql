@@ -100,7 +100,10 @@ type InventoryItem implements Node {
     reverse: Boolean = false
     query: String
   ): InventoryLevelConnection!
+  sku: String
   tracked: Boolean!
+  updatedAt: DateTime!
+  variant: ProductVariant!
 }
 
 type InventoryLevelConnection {
@@ -117,6 +120,8 @@ type InventoryLevel implements Node {
 
 type Location implements Node {
   id: ID!
+  isActive: Boolean!
+  name: String!
 }
 
 type InventoryQuantity implements Node {
@@ -130,6 +135,60 @@ scalar DateTime
 type PageInfo {
   endCursor: String
   hasNextPage: Boolean!
+}
+
+type ProductVariant implements Node {
+  id: ID!
+  inventoryItem: InventoryItem!
+  price: Money!
+  product: Product!
+  sku: String
+  title: String!
+  updatedAt: DateTime!
+}
+
+scalar Money
+
+type Product implements Node {
+  id: ID!
+  status: ProductStatus!
+  title: String!
+  updatedAt: DateTime!
+  variants(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+    sortKey: ProductVariantSortKeys = POSITION
+  ): ProductVariantConnection!
+}
+
+enum ProductStatus {
+  ACTIVE
+  ARCHIVED
+  DRAFT
+  UNLISTED
+}
+
+enum ProductVariantSortKeys {
+  FULL_TITLE
+  ID
+  INVENTORY_LEVELS_AVAILABLE
+  INVENTORY_MANAGEMENT
+  INVENTORY_POLICY
+  INVENTORY_QUANTITY
+  NAME
+  POPULAR
+  POSITION
+  RELEVANCE
+  SKU
+  TITLE
+}
+
+type ProductVariantConnection {
+  nodes: [ProductVariant!]!
+  pageInfo: PageInfo!
 }
 
 enum OrderSortKeys {
@@ -157,7 +216,20 @@ type OrderConnection {
 type Order implements Node {
   cancelledAt: DateTime
   closed: Boolean!
+  createdAt: DateTime!
+  currentTotalPriceSet: MoneyBag!
+  customer: Customer
   displayFinancialStatus: OrderDisplayFinancialStatus
+  displayFulfillmentStatus: OrderDisplayFulfillmentStatus!
+  events(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+    sortKey: EventSortKeys = ID
+    query: String
+  ): EventConnection!
   fulfillmentOrders(
     displayable: Boolean = false
     first: Int
@@ -177,8 +249,218 @@ type Order implements Node {
     reverse: Boolean = false
   ): LineItemConnection!
   name: String!
+  refunds(first: Int): [Refund!]!
+  returns(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+    query: String
+  ): ReturnConnection!
+  totalOutstandingSet: MoneyBag!
+  transactions(
+    first: Int
+    capturable: Boolean
+    manuallyResolvable: Boolean
+  ): [OrderTransaction!]!
   updatedAt: DateTime!
 }
+
+type MoneyBag {
+  shopMoney: MoneyV2!
+}
+
+type MoneyV2 {
+  amount: Decimal!
+  currencyCode: CurrencyCode!
+}
+
+scalar Decimal
+
+enum CurrencyCode {
+  USD
+  EUR
+  GBP
+  CAD
+  AFN
+  ALL
+  DZD
+  AOA
+  ARS
+  AMD
+  AWG
+  AUD
+  BBD
+  AZN
+  BDT
+  BSD
+  BHD
+  BIF
+  BYN
+  BZD
+  BMD
+  BTN
+  BAM
+  BRL
+  BOB
+  BWP
+  BND
+  BGN
+  MMK
+  KHR
+  CVE
+  XCG
+  KYD
+  XAF
+  CLP
+  CNY
+  COP
+  KMF
+  CDF
+  CRC
+  HRK
+  CZK
+  DKK
+  DJF
+  DOP
+  XCD
+  EGP
+  ERN
+  ETB
+  FKP
+  XPF
+  FJD
+  GIP
+  GMD
+  GHS
+  GTQ
+  GYD
+  GEL
+  GNF
+  HTG
+  HNL
+  HKD
+  HUF
+  ISK
+  INR
+  IDR
+  ILS
+  IRR
+  IQD
+  JMD
+  JPY
+  JEP
+  JOD
+  KZT
+  KES
+  KID
+  KWD
+  KGS
+  LAK
+  LVL
+  LBP
+  LSL
+  LRD
+  LYD
+  LTL
+  MGA
+  MKD
+  MOP
+  MWK
+  MVR
+  MRU
+  MXN
+  MYR
+  MUR
+  MDL
+  MAD
+  MNT
+  MZN
+  NAD
+  NPR
+  ANG
+  NZD
+  NIO
+  NGN
+  NOK
+  OMR
+  PAB
+  PKR
+  PGK
+  PYG
+  PEN
+  PHP
+  PLN
+  QAR
+  RON
+  RUB
+  RWF
+  WST
+  SHP
+  SAR
+  RSD
+  SCR
+  SLL
+  SGD
+  SDG
+  SOS
+  SYP
+  ZAR
+  KRW
+  SSP
+  SBD
+  LKR
+  SRD
+  SZL
+  SEK
+  CHF
+  TWD
+  THB
+  TJS
+  TZS
+  TOP
+  TTD
+  TND
+  TRY
+  TMT
+  UGX
+  UAH
+  AED
+  UYU
+  UZS
+  VUV
+  VES
+  VND
+  XOF
+  YER
+  ZMW
+  USDC
+  BYR
+  STD
+  STN
+  VED
+  VEF
+  XXX
+}
+
+type Customer implements Node {
+  amountSpent: MoneyV2!
+  id: ID!
+  numberOfOrders: UnsignedInt64!
+  orders(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+    sortKey: OrderSortKeys = ID
+    query: String
+  ): OrderConnection!
+  updatedAt: DateTime!
+}
+
+scalar UnsignedInt64
 
 enum OrderDisplayFinancialStatus {
   PENDING
@@ -191,12 +473,42 @@ enum OrderDisplayFinancialStatus {
   EXPIRED
 }
 
+enum OrderDisplayFulfillmentStatus {
+  UNFULFILLED
+  PARTIALLY_FULFILLED
+  FULFILLED
+  RESTOCKED
+  PENDING_FULFILLMENT
+  OPEN
+  IN_PROGRESS
+  ON_HOLD
+  SCHEDULED
+  REQUEST_DECLINED
+}
+
+enum EventSortKeys {
+  CREATED_AT
+  ID
+}
+
+type EventConnection {
+  nodes: [Event!]!
+  pageInfo: PageInfo!
+}
+
+interface Event {
+  createdAt: DateTime!
+  id: ID!
+}
+
 type FulfillmentOrderConnection {
   nodes: [FulfillmentOrder!]!
   pageInfo: PageInfo!
 }
 
 type FulfillmentOrder implements Node {
+  assignedLocation: FulfillmentOrderAssignedLocation!
+  fulfillmentHolds: [FulfillmentHold!]!
   id: ID!
   lineItems(
     first: Int
@@ -205,8 +517,30 @@ type FulfillmentOrder implements Node {
     before: String
     reverse: Boolean = false
   ): FulfillmentOrderLineItemConnection!
+  order: Order!
+  requestStatus: FulfillmentOrderRequestStatus!
   status: FulfillmentOrderStatus!
   updatedAt: DateTime!
+}
+
+type FulfillmentOrderAssignedLocation {
+  location: Location
+}
+
+type FulfillmentHold implements Node {
+  id: ID!
+  reason: FulfillmentHoldReason!
+}
+
+enum FulfillmentHoldReason {
+  AWAITING_PAYMENT
+  HIGH_RISK_OF_FRAUD
+  INCORRECT_ADDRESS
+  INVENTORY_OUT_OF_STOCK
+  UNKNOWN_DELIVERY_DATE
+  ONLINE_STORE_POST_PURCHASE_CROSS_SELL
+  AWAITING_RETURN_ITEMS
+  OTHER
 }
 
 type FulfillmentOrderLineItemConnection {
@@ -223,14 +557,20 @@ type FulfillmentOrderLineItem implements Node {
 
 type LineItem implements Node {
   id: ID!
+  name: String!
   quantity: Int!
   variant: ProductVariant
 }
 
-type ProductVariant implements Node {
-  id: ID!
-  inventoryItem: InventoryItem!
-  sku: String
+enum FulfillmentOrderRequestStatus {
+  UNSUBMITTED
+  SUBMITTED
+  ACCEPTED
+  REJECTED
+  CANCELLATION_REQUESTED
+  CANCELLATION_ACCEPTED
+  CANCELLATION_REJECTED
+  CLOSED
 }
 
 enum FulfillmentOrderStatus {
@@ -283,6 +623,102 @@ type LineItemConnection {
   pageInfo: PageInfo!
 }
 
+type Refund implements Node {
+  createdAt: DateTime
+  id: ID!
+  order: Order!
+  totalRefundedSet: MoneyBag!
+  updatedAt: DateTime!
+}
+
+type ReturnConnection {
+  nodes: [Return!]!
+  pageInfo: PageInfo!
+}
+
+type Return implements Node {
+  id: ID!
+  name: String!
+  order: Order!
+  returnLineItems(
+    processingStatus: ReturnProcessingStatusFilterInput
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+  ): ReturnLineItemTypeConnection!
+  status: ReturnStatus!
+}
+
+enum ReturnProcessingStatusFilterInput {
+  PROCESSED
+  PROCESSABLE
+}
+
+type ReturnLineItemTypeConnection {
+  nodes: [ReturnLineItemType!]!
+  pageInfo: PageInfo!
+}
+
+interface ReturnLineItemType implements Node {
+  id: ID!
+  quantity: Int!
+  returnReason: ReturnReason!
+}
+
+enum ReturnReason {
+  SIZE_TOO_SMALL
+  SIZE_TOO_LARGE
+  UNWANTED
+  NOT_AS_DESCRIBED
+  WRONG_ITEM
+  DEFECTIVE
+  STYLE
+  COLOR
+  OTHER
+  UNKNOWN
+}
+
+enum ReturnStatus {
+  CANCELED
+  CLOSED
+  OPEN
+  REQUESTED
+  DECLINED
+}
+
+type OrderTransaction implements Node {
+  amountSet: MoneyBag!
+  createdAt: DateTime!
+  gateway: String
+  id: ID!
+  kind: OrderTransactionKind!
+  parentTransaction: OrderTransaction
+  processedAt: DateTime
+  status: OrderTransactionStatus!
+}
+
+enum OrderTransactionKind {
+  SALE
+  CAPTURE
+  AUTHORIZATION
+  VOID
+  REFUND
+  CHANGE
+  EMV_AUTHORIZATION
+  SUGGESTED_REFUND
+}
+
+enum OrderTransactionStatus {
+  SUCCESS
+  FAILURE
+  PENDING
+  ERROR
+  AWAITING_RESPONSE
+  UNKNOWN
+}
+
 enum ProductSortKeys {
   CREATED_AT
   ID
@@ -297,48 +733,6 @@ enum ProductSortKeys {
 
 type ProductConnection {
   nodes: [Product!]!
-  pageInfo: PageInfo!
-}
-
-type Product implements Node {
-  id: ID!
-  status: ProductStatus!
-  title: String!
-  updatedAt: DateTime!
-  variants(
-    first: Int
-    after: String
-    last: Int
-    before: String
-    reverse: Boolean = false
-    sortKey: ProductVariantSortKeys = POSITION
-  ): ProductVariantConnection!
-}
-
-enum ProductStatus {
-  ACTIVE
-  ARCHIVED
-  DRAFT
-  UNLISTED
-}
-
-enum ProductVariantSortKeys {
-  FULL_TITLE
-  ID
-  INVENTORY_LEVELS_AVAILABLE
-  INVENTORY_MANAGEMENT
-  INVENTORY_POLICY
-  INVENTORY_QUANTITY
-  NAME
-  POPULAR
-  POSITION
-  RELEVANCE
-  SKU
-  TITLE
-}
-
-type ProductVariantConnection {
-  nodes: [ProductVariant!]!
   pageInfo: PageInfo!
 }
 
@@ -623,4 +1017,17 @@ type WebhookSubscriptionCreatePayload {
 
 type UserError {
   message: String!
+}
+
+type ReturnLineItem implements Node & ReturnLineItemType {
+  fulfillmentLineItem: FulfillmentLineItem!
+  id: ID!
+  quantity: Int!
+  returnReason: ReturnReason!
+}
+
+type BasicEvent implements Event & Node {
+  action: String!
+  createdAt: DateTime!
+  id: ID!
 }

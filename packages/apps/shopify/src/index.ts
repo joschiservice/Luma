@@ -1,12 +1,20 @@
 import '@luma/identity/http';
 
+import { randomUUID } from 'node:crypto';
+
 import type { AppDefinition, AppFactoryContext } from '@luma/app-host';
 import type { ConnectionProvider } from '@luma/connections';
 import { simulationTransport } from '@luma/connections/adapters';
+import {
+  createInstallationRepository,
+  createInstallationService,
+} from '@luma/connections/composition';
 import { IdentityError } from '@luma/identity';
 
+import { registerRecordRoutes } from './api/records.js';
 import { registerShopifyRoutes } from './api/shopify.js';
 import type { ShopifyOAuth } from './application/oauth.js';
+import { createRecordService } from './application/records.js';
 import { readShopifyConfig } from './config.js';
 import { createShopifyConnector } from './infrastructure/adapter.js';
 import {
@@ -15,6 +23,7 @@ import {
   installationTarget,
 } from './infrastructure/installation-validation.js';
 import { createShopifyOAuth } from './infrastructure/oauth.js';
+import { createShopifyRecordReader } from './infrastructure/records.js';
 import { createInstallationVerifier } from './infrastructure/verifier.js';
 
 export {
@@ -97,6 +106,23 @@ export function createApp(context: AppFactoryContext): AppDefinition {
       })
     : undefined;
 
+  const installations = createInstallationService({
+    repository: createInstallationRepository(context.database),
+    cipher: context.cipher,
+    refreshContext: context.refreshContext,
+    verify: createInstallationVerifier({}),
+    ...(oauth ? { refreshCredential: oauth.credential } : {}),
+    id: randomUUID,
+    now: () => new Date(),
+  });
+  const records = createRecordService({
+    installations,
+    reader: createShopifyRecordReader,
+    requireInstalled: (ctx) => context.requireInstalled(ctx, 'shopify'),
+    protectedCustomerDataApproved:
+      context.env.SHOPIFY_PROTECTED_CUSTOMER_DATA_APPROVED === 'true',
+  });
+
   return {
     manifest: {
       id: 'shopify',
@@ -105,7 +131,7 @@ export function createApp(context: AppFactoryContext): AppDefinition {
         'Connect stores to read orders, products, inventory and fulfillment.',
       version: '1.0.0',
       category: 'storefront',
-      ui: ['connections', 'settings'],
+      ui: ['connections', 'settings', 'page'],
       connectionTypes: [{ kind: 'shopify', name: 'Shopify' }],
     },
     connector: createShopifyProvider(oauth ? { oauth } : {}),
@@ -133,6 +159,34 @@ export function createApp(context: AppFactoryContext): AppDefinition {
     },
     registerHttp(server, identity) {
       registerShopifyRoutes(server, oauth, identity);
+      registerRecordRoutes(server, records);
+      server.post(
+        '/v1/organizations/:organizationId/apps/shopify/record-connections',
+        async (request, reply) => {
+          reply.header('cache-control', 'no-store');
+          if (!request.tenantContext)
+            throw new IdentityError(
+              401,
+              'UNAUTHENTICATED',
+              'Sign in to continue',
+            );
+          const version = await context.requireInstalled(
+            request.tenantContext,
+            'shopify',
+          );
+
+          return (await installations.list(request.tenantContext))
+            .filter(
+              (item) =>
+                item.appId === 'shopify' &&
+                item.provider === 'shopify' &&
+                item.target.kind === 'shopify' &&
+                item.appInstallationVersion === version &&
+                item.status === 'active',
+            )
+            .map((item) => ({ id: item.id, label: item.label }));
+        },
+      );
       server.post(
         '/v1/organizations/:organizationId/apps/shopify/authorize',
         async (request) => {
@@ -156,3 +210,10 @@ export function createApp(context: AppFactoryContext): AppDefinition {
     },
   };
 }
+
+export { createShopifyRecordReader } from './infrastructure/records.js';
+
+export type {
+  ShopifyRecordDetail,
+  ShopifyRecordKind,
+} from './domain/records.js';

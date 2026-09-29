@@ -246,7 +246,12 @@ export function createShopifyOAuth(
       const url = new URL(`https://${shop}/admin/oauth/authorize`);
       url.search = new URLSearchParams({
         client_id: config.clientId,
-        scope: shopifyScopes.join(','),
+        scope: [
+          ...shopifyScopes,
+          'read_returns',
+          'read_locations',
+          ...(config.protectedCustomerDataApproved ? ['read_customers'] : []),
+        ].join(','),
         redirect_uri: config.callbackUrl,
         state,
       }).toString();

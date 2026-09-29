@@ -1,4 +1,5 @@
 export interface ShopifyConfig {
+  protectedCustomerDataApproved?: boolean;
   clientId: string;
   clientSecret: string;
   environment: string;
@@ -50,6 +51,9 @@ export function readShopifyConfig(
     throw new Error('SHOPIFY_APP_ENVIRONMENT is invalid');
 
   return {
+    ...(env.SHOPIFY_PROTECTED_CUSTOMER_DATA_APPROVED === 'true'
+      ? { protectedCustomerDataApproved: true }
+      : {}),
     clientId: env.SHOPIFY_CLIENT_ID!,
     clientSecret: env.SHOPIFY_CLIENT_SECRET!,
     environment: env.SHOPIFY_APP_ENVIRONMENT!,

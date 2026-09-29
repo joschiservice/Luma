@@ -69,7 +69,8 @@ same connection, including disconnected or revoked installations.
 
 The app requests `read_orders`, `read_products`, `read_inventory`,
 `read_merchant_managed_fulfillment_orders` and
-`read_third_party_fulfillment_orders`. It does not request write scopes or
+`read_third_party_fulfillment_orders`, plus optional `read_returns` and
+`read_locations`. Approved deployments also request `read_customers`. It does not request write scopes or
 `read_assigned_fulfillment_orders`: Luma is not a fulfillment service. Historical
 orders beyond 60 days require separately approved `read_all_orders`; add this
 only when historical reconciliation is approved and supported.
@@ -199,3 +200,8 @@ References: [standalone authentication](https://shopify.dev/docs/apps/build/auth
 [app distribution](https://shopify.dev/docs/apps/launch/distribution),
 [protected customer data](https://shopify.dev/docs/apps/launch/protected-customer-data),
 [privacy webhooks](https://shopify.dev/docs/apps/build/privacy-law-compliance).
+
+## Operational record pages
+
+Open **Shopify** in the workspace sidebar to select a store, browse orders or
+products, and follow linked records. See the [operational records guide](../packages/apps/shopify/README.md#operational-records) for coverage, protected-data approval and validation.
