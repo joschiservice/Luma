@@ -22,6 +22,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 
+const available = (data: object) =>
+  'available' in data ? data.available : undefined;
+
 describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
   const name = `commerce_${randomUUID().replaceAll('-', '')}`;
   const admin = new Pool({ connectionString: databaseUrl });
@@ -604,7 +607,7 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
       context(),
       left.entityId,
     );
-    expect(positions.map((p) => p.snapshot.data.available).sort()).toEqual([
+    expect(positions.map((p) => available(p.snapshot.data)).sort()).toEqual([
       '3',
       '5',
     ]);
@@ -655,8 +658,8 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
     expect(
       (await services.inventory.current(context(), result.entityId)).find(
         (p) => p.snapshot.connectionId === connection,
-      )?.snapshot.data.available,
-    ).toBe('-2.500001');
+      )?.snapshot.data,
+    ).toMatchObject({ available: '-2.500001' });
     const tombstone = stock({ time: '2026-09-18T03:00:00Z', amount: null });
     tombstone.observation.kind = 'tombstone';
     expect(
@@ -685,8 +688,8 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
       context(),
       result.entityId,
     );
-    expect(history.some((s) => s.data.available === null)).toBe(true);
-    expect(history.some((s) => s.data.available === '0')).toBe(true);
+    expect(history.some((s) => available(s.data) === null)).toBe(true);
+    expect(history.some((s) => available(s.data) === '0')).toBe(true);
     await expect(
       services.ingestion.ingest(
         context(),

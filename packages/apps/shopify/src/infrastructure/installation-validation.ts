@@ -5,6 +5,7 @@ export const installationPermissions = z.enum([
   'products.read',
   'inventory.read',
   'fulfillment.read',
+  'customers.read',
   'orders.shipping-method.read',
   'orders.shipping-method.write',
 ]);

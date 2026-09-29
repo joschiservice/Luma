@@ -25,6 +25,7 @@ import { z } from 'zod';
 
 import type { ShopifyAppConfig as ShopifyConfig } from '../application/oauth.js';
 import { storedCredentials } from './installation-validation.js';
+import { mapShopifyWebhook } from './webhooks.js';
 
 const invalid = () =>
   new IdentityError(
@@ -53,6 +54,21 @@ const shopifyReads = [
   'inventory.read',
   'fulfillment.read',
 ] as const;
+
+// Record changes schedule fresh reads; periodic scans recover any missed delivery.
+const changeTopics = [
+  'ORDERS_CREATE',
+  'ORDERS_UPDATED',
+  'ORDERS_DELETE',
+  'FULFILLMENTS_CREATE',
+  'FULFILLMENTS_UPDATE',
+  'PRODUCTS_CREATE',
+  'PRODUCTS_UPDATE',
+  'PRODUCTS_DELETE',
+  'INVENTORY_LEVELS_UPDATE',
+] as const;
+
+const customerTopics = ['CUSTOMERS_CREATE', 'CUSTOMERS_UPDATE'] as const;
 
 /** Identifies an OAuth application within its configured environment. */
 const appBinding = (config: ShopifyConfig) =>
@@ -177,46 +193,70 @@ export function createShopifyOAuth(
       accessToken: async () => credentials.token,
       ...(deps.fetch ? { fetch: deps.fetch } : {}),
     });
-    for (const topic of ['APP_UNINSTALLED', 'APP_SCOPES_UPDATE'] as const) {
+    const topics = [
+      'APP_UNINSTALLED',
+      'APP_SCOPES_UPDATE',
+      ...changeTopics,
+      ...(config.protectedCustomerDataApproved ? customerTopics : []),
+    ] as const;
+    for (const topic of topics) {
+      const lifecycle =
+        topic === 'APP_UNINSTALLED' || topic === 'APP_SCOPES_UPDATE';
       const url = new URL(config.callbackUrl);
-      url.pathname = `/api/v1/shopify/uninstall/${connection.tenantId}/${connection.id}`;
+      url.pathname = `/api/v1/shopify/changes/${connection.tenantId}/${connection.id}`;
+      if (topic === 'APP_UNINSTALLED')
+        url.pathname = `/api/v1/shopify/uninstall/${connection.tenantId}/${connection.id}`;
       if (topic === 'APP_SCOPES_UPDATE')
         url.pathname = `/api/v1/shopify/scopes/${connection.tenantId}/${connection.id}`;
-      // Shopify rejects identical subscriptions; list first so reconnect remains idempotent.
-      const subscriptions = parse(
-        z.object({
-          webhookSubscriptions: z.object({
-            nodes: z.array(z.object({ uri: z.string() })),
+      try {
+        // Shopify rejects identical subscriptions; list first so reconnect remains idempotent.
+        const subscriptions = parse(
+          z.object({
+            webhookSubscriptions: z.object({
+              nodes: z.array(z.object({ uri: z.string() })),
+            }),
           }),
-        }),
-        await request(
-          `query LumaLifecycleSubscriptions { webhookSubscriptions(first: 100, topics: [${topic}]) { nodes { uri } } }`,
-          {},
-        ),
-      );
-      if (
-        subscriptions.webhookSubscriptions.nodes.some((s) => s.uri === url.href)
-      )
-        continue;
-      const result = parse(
-        z.object({
-          webhookSubscriptionCreate: z.object({
-            webhookSubscription: z.object({ id: z.string() }).nullable(),
-            userErrors: z.array(z.object({ message: z.string() })),
+          await request(
+            `query LumaLifecycleSubscriptions { webhookSubscriptions(first: 100, topics: [${topic}]) { nodes { uri } } }`,
+            {},
+          ),
+        );
+        if (
+          subscriptions.webhookSubscriptions.nodes.some(
+            (s) => s.uri === url.href,
+          )
+        )
+          continue;
+        const result = parse(
+          z.object({
+            webhookSubscriptionCreate: z.object({
+              webhookSubscription: z.object({ id: z.string() }).nullable(),
+              userErrors: z.array(z.object({ message: z.string() })),
+            }),
           }),
-        }),
-        await request(
-          `mutation LumaLifecycleWebhook($uri: String!) { webhookSubscriptionCreate(topic: ${topic}, webhookSubscription: { uri: $uri, format: JSON }) { webhookSubscription { id } userErrors { message } } }`,
-          { uri: url.href },
-        ),
-      );
-      if (
-        !result.webhookSubscriptionCreate.webhookSubscription ||
-        result.webhookSubscriptionCreate.userErrors.length
-      )
-        throw unavailable();
+          await request(
+            `mutation LumaLifecycleWebhook($uri: String!) { webhookSubscriptionCreate(topic: ${topic}, webhookSubscription: { uri: $uri, format: JSON }) { webhookSubscription { id } userErrors { message } } }`,
+            { uri: url.href },
+          ),
+        );
+        if (
+          !result.webhookSubscriptionCreate.webhookSubscription ||
+          result.webhookSubscriptionCreate.userErrors.length
+        )
+          throw unavailable();
+      } catch (error) {
+        // Change notifications only speed up sync; scheduled reads still cover their records.
+        if (lifecycle) throw error;
+      }
     }
   }
+
+  const permissions = [
+    ...shopifyReads,
+    ...(config.protectedCustomerDataApproved
+      ? ['customers.read' as const]
+      : []),
+  ];
 
   const requestedScopes = [
     ...shopifyScopes,
@@ -390,7 +430,7 @@ export function createShopifyOAuth(
             ? { appInstallationVersion: installationVersion }
             : {}),
           label: attempt.label,
-          permissions: [...shopifyReads],
+          permissions: [...permissions],
           granted: [],
           status: 'degraded',
           version: (record?.connection.version ?? 0) + 1,
@@ -500,6 +540,57 @@ export function createShopifyOAuth(
       if (!outcome) throw unavailable();
 
       return outcome;
+    },
+    async changed(
+      tenantId: string,
+      id: string,
+      body: Buffer,
+      signature: string,
+      shop: string,
+      topic: string,
+      eventId: string,
+    ) {
+      if (
+        !shopHostname.safeParse(shop).success ||
+        !validMac(config.clientSecret, body, signature, 'base64')
+      )
+        throw new IdentityError(
+          401,
+          'UNAUTHENTICATED',
+          'Invalid Shopify signature',
+        );
+      const record = await repository.get(tenantId, id);
+      // Deliveries for removed or reassigned connections are acknowledged and ignored.
+      if (
+        !record ||
+        record.connection.target.kind !== 'shopify' ||
+        record.connection.target.shop !== shop
+      )
+        return;
+      let hint: ReturnType<typeof mapShopifyWebhook>;
+      try {
+        hint = mapShopifyWebhook({
+          tenantId,
+          connectionId: id,
+          expectedShop: shop,
+          shop,
+          secret: config.clientSecret,
+          hmac: signature,
+          eventId,
+          topic,
+          body,
+        });
+      } catch {
+        throw invalid();
+      }
+      if (!hint) return;
+      await db.transaction(tenantId, async (tx) => {
+        await tx.query(
+          `INSERT INTO connector_refresh_hints(tenant_id,connection_id,event_key,capabilities)
+          VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
+          [tenantId, id, hint.eventKey, hint.capabilities],
+        );
+      });
     },
     async scopesUpdated(
       tenantId: string,

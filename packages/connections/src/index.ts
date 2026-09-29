@@ -17,8 +17,10 @@ export type {
   CapabilityResult,
   ConnectorErrorCode,
   ConnectorFailure,
+  CustomerSnapshot,
   ExternalId,
   FulfillmentSnapshot,
+  HistoryLimit,
   InventorySnapshot,
   Money,
   Observation,
@@ -51,6 +53,7 @@ export type { ConnectionManagement } from './application/installations.js';
 
 export type {
   CommerceObservation,
+  SourceMapping,
   SourceRecords,
 } from './application/source-records.js';
 

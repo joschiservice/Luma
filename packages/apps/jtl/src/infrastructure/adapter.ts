@@ -80,7 +80,10 @@ export function createJtlConnector(
   const nextId = options.id ?? randomUUID;
 
   function handler<
-    K extends Exclude<ReadCapability, 'orders.shipping-method.read'>,
+    K extends Exclude<
+      ReadCapability,
+      'orders.shipping-method.read' | 'customers.read'
+    >,
   >(capability: K): CapabilityHandler<K> {
     return {
       descriptor: {
@@ -180,7 +183,11 @@ export function createJtlConnector(
           )
             fail('invalid_response');
 
-          return { items: result.items as z.infer<T>[], hasNext };
+          return {
+            items: result.items as z.infer<T>[],
+            hasNext,
+            total: result.totalItems,
+          };
         }
 
         async function children<T extends z.ZodTypeAny>(
@@ -245,6 +252,8 @@ export function createJtlConnector(
         }
 
         let hasNext: boolean;
+        // Sales orders and items map one-to-one to observations, so their count estimates progress.
+        let total: number | undefined;
         if (capability === 'orders.read') {
           const result = await page(
             'sales-orders',
@@ -253,6 +262,7 @@ export function createJtlConnector(
             input.limit,
           );
           hasNext = result.hasNext;
+          total = result.total;
           for (const order of result.items) {
             const lines = await orderLines(order.id);
             // ERP 2.2 sales orders and delivery notes have no modification time, so these
@@ -303,6 +313,7 @@ export function createJtlConnector(
         ) {
           const result = await page('items', s.item, pageNumber, input.limit);
           hasNext = result.hasNext;
+          if (capability === 'products.read') total = result.total;
           for (const item of result.items) {
             if (capability === 'products.read') {
               emit('product', ref(item.id), item.modifiedTimestamp ?? null, {
@@ -432,6 +443,7 @@ export function createJtlConnector(
               ).toString('base64url')
             : null,
           completeness: 'complete',
+          ...(total === undefined ? {} : { total }),
         }) as CapabilityOutput<K>;
         await options.recordObservations({
           tenantId: options.tenantId,

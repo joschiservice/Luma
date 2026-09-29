@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto';
 
 import { requireRole, requireTenant } from '@luma/identity';
-import type { TenantDatabase } from '@luma/platform';
+import type { SqlTransaction, TenantDatabase } from '@luma/platform';
 import { z } from 'zod';
 
 import type {
   CanonicalSnapshot,
   CommerceProjections,
+  Dependent,
 } from '../application/projections.js';
 import { snapshotSchema } from './validation.js';
 
@@ -80,8 +81,44 @@ export function createCommerceProjections(
           );
           if (!same.rows[0]?.matches)
             throw new Error('Snapshot identity conflict');
+          // Replaying after a link change can return to an earlier snapshot of the current
+          // observation, or to an entity whose projection was retired; make it current again.
+          const restored = await tx.query<{ snapshot_id: string }>(
+            `WITH existing AS (SELECT id FROM inventory_snapshots WHERE tenant_id=$1 AND entity_id=$2
+              AND observation_id=$4 AND normalizer_version=$5 AND mapping_version=$6)
+            INSERT INTO inventory_projections(tenant_id,entity_id,connection_id,snapshot_id)
+            SELECT $1,$2,$3,id FROM existing
+            ON CONFLICT(tenant_id,entity_id,connection_id) DO UPDATE SET snapshot_id=EXCLUDED.snapshot_id,
+              version=inventory_projections.version+1,updated_at=now()
+            WHERE inventory_projections.snapshot_id<>EXCLUDED.snapshot_id AND EXISTS (
+              SELECT 1 FROM inventory_snapshots c WHERE c.tenant_id=$1 AND c.id=inventory_projections.snapshot_id
+              AND c.observation_id=$4)
+            RETURNING snapshot_id`,
+            [
+              tenant,
+              value.entityId,
+              value.connectionId,
+              value.observationId,
+              value.normalizerVersion,
+              value.mappingVersion,
+            ],
+          );
+          const snapshot = restored.rows[0]?.snapshot_id;
+          if (!snapshot) return 'duplicate';
+          await tx.query(
+            'INSERT INTO inventory_projection_events(id,tenant_id,snapshot_id,actor_id) VALUES($1,$2,$3,$4)',
+            [randomUUID(), tenant, snapshot, context.actor.id],
+          );
+          if (value.data.type === 'product')
+            await refreshProductSkus(
+              tx,
+              tenant,
+              value.entityId,
+              value.connectionId,
+              value,
+            );
 
-          return 'duplicate';
+          return 'applied';
         }
         for (const ref of references(value)) {
           const found = await tx.query(
@@ -126,8 +163,78 @@ export function createCommerceProjections(
           'INSERT INTO inventory_projection_events(id,tenant_id,snapshot_id,actor_id) VALUES($1,$2,$3,$4)',
           [randomUUID(), tenant, id, context.actor.id],
         );
+        if (value.data.type === 'product')
+          await refreshProductSkus(
+            tx,
+            tenant,
+            value.entityId,
+            value.connectionId,
+            value,
+          );
 
         return 'applied';
+      });
+    },
+    async dependents(context, kind, id, connectionId) {
+      requireTenant(context, context.tenantId);
+      z.string().uuid().parse(id);
+      if (connectionId) z.string().uuid().parse(connectionId);
+
+      return db.transaction(context.tenantId, async (tx) => {
+        const column = kind === 'sku' ? 'sku_id' : 'location_id';
+        const rows = await tx.query<Dependent>(
+          `SELECT p.entity_id AS "entityId",'position' AS kind,p.connection_id AS "connectionId",s.observation_id AS "observationId"
+          FROM inventory_snapshots s JOIN inventory_projections p ON p.tenant_id=s.tenant_id AND p.snapshot_id=s.id
+          WHERE s.tenant_id=$1 AND s.${column}=$2 AND s.kind='position' AND ($3::uuid IS NULL OR p.connection_id=$3)
+          UNION ALL
+          SELECT p.entity_id,'product',p.connection_id,s.observation_id
+          FROM inventory_product_skus k
+          JOIN inventory_projections p ON p.tenant_id=k.tenant_id AND p.entity_id=k.product_id AND p.connection_id=k.connection_id
+          JOIN inventory_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id
+          WHERE $4 AND k.tenant_id=$1 AND k.sku_id=$2 AND ($3::uuid IS NULL OR k.connection_id=$3)
+          ORDER BY 1,3`,
+          [context.tenantId, id, connectionId ?? null, kind === 'sku'],
+        );
+
+        return rows.rows;
+      });
+    },
+    async retire(context, entityId, connectionId, reason) {
+      requireRole(context, ['owner', 'admin']);
+      z.string().uuid().parse(entityId);
+      z.string().uuid().parse(connectionId);
+      z.string().min(1).max(2000).parse(reason);
+
+      return db.transaction(context.tenantId, async (tx) => {
+        const tenant = context.tenantId;
+        await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
+          `inventory:${tenant}:${entityId}`,
+        ]);
+        const removed = await tx.query<{ snapshot_id: string }>(
+          'DELETE FROM inventory_projections WHERE tenant_id=$1 AND entity_id=$2 AND connection_id=$3 RETURNING snapshot_id',
+          [tenant, entityId, connectionId],
+        );
+        const snapshot = removed.rows[0]?.snapshot_id;
+        if (!snapshot) return false;
+        await tx.query(
+          'DELETE FROM inventory_product_skus WHERE tenant_id=$1 AND product_id=$2 AND connection_id=$3',
+          [tenant, entityId, connectionId],
+        );
+        await tx.query(
+          `INSERT INTO inventory_projection_retirements(id,tenant_id,entity_id,connection_id,snapshot_id,reason,actor_id)
+          VALUES($1,$2,$3,$4,$5,$6,$7)`,
+          [
+            randomUUID(),
+            tenant,
+            entityId,
+            connectionId,
+            snapshot,
+            reason,
+            context.actor.id,
+          ],
+        );
+
+        return true;
       });
     },
     async current(context, entityId) {
@@ -200,8 +307,39 @@ export function supersedes(
 }
 
 function references(value: CanonicalSnapshot): { kind: string; id: string }[] {
+  if (value.data.type === 'product')
+    return value.data.skus.map((sku) => ({ kind: 'sku', id: sku.skuId }));
+
   return [
     { kind: 'sku', id: value.data.skuId },
     { kind: 'location', id: value.data.locationId },
   ];
+}
+
+// Indexed product-to-SKU relations for the current source projection; JSON expression
+// indexes are not usable under forced row-level security.
+async function refreshProductSkus(
+  tx: SqlTransaction,
+  tenant: string,
+  productId: string,
+  connectionId: string,
+  value: CanonicalSnapshot,
+) {
+  await tx.query(
+    'DELETE FROM inventory_product_skus WHERE tenant_id=$1 AND product_id=$2 AND connection_id=$3',
+    [tenant, productId, connectionId],
+  );
+  if (value.deleted || value.data.type !== 'product') return;
+  await tx.query(
+    `INSERT INTO inventory_product_skus(tenant_id,product_id,connection_id,sku_id,code)
+    SELECT DISTINCT ON (sku_id) $1::uuid,$2::uuid,$3::uuid,sku_id,code
+    FROM unnest($4::uuid[],$5::text[]) AS s(sku_id,code) ORDER BY sku_id,code NULLS LAST`,
+    [
+      tenant,
+      productId,
+      connectionId,
+      value.data.skus.map((sku) => sku.skuId),
+      value.data.skus.map((sku) => sku.code),
+    ],
+  );
 }

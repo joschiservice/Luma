@@ -31,7 +31,11 @@ const payloads = {
   'shop/redact': base,
 };
 
-/** Verifies compliance deliveries and durably queues encrypted requests for operator fulfillment. */
+/**
+ * Verifies compliance deliveries and durably queues encrypted requests for operator
+ * fulfillment. Redaction requests also erase imported customer profiles in the same
+ * transaction.
+ */
 export function createPrivacyIntake(
   db: TenantDatabase,
   config: ShopifyAppConfig,
@@ -86,6 +90,23 @@ export function createPrivacyIntake(
         'INSERT INTO shopify_privacy_requests(tenant_id,app,event_key,topic,payload) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING',
         [intakeTenant, app, eventKey, topic, encrypted],
       );
+      // Imported customer profiles are erased with the intake; other retained data still
+      // follows the operator workflow.
+      const request = parsed.data as { customer?: { id?: number } };
+      if (
+        topic === 'shop/redact' ||
+        (topic === 'customers/redact' && request.customer?.id)
+      )
+        await tx.query(
+          'SELECT erase_shopify_customer_data($1::text,$2::text,$3::text[])',
+          [
+            app,
+            shop,
+            topic === 'shop/redact'
+              ? null
+              : [`gid://shopify/Customer/${request.customer!.id}`],
+          ],
+        );
     });
   };
 }

@@ -142,3 +142,7 @@ export type { WorkflowConfig } from './workflows.js';
 export { readConnectionsConfig } from './connections.js';
 
 export type { ConnectionsConfig } from './connections.js';
+
+export { readCommerceSyncConfig } from './sync.js';
+
+export type { CommerceSyncConfig } from './sync.js';

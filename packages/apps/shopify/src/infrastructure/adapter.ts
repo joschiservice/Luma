@@ -5,8 +5,10 @@ import {
   type CapabilityInput,
   type CapabilityOutput,
   type ConnectorConnection,
+  type CustomerSnapshot,
   type ExternalId,
   type FulfillmentSnapshot,
+  type HistoryLimit,
   type Observation,
   type OrderSnapshot,
   type Page,
@@ -34,10 +36,10 @@ const ref = (externalId: string, scopeKey = ''): ExternalId => ({
 const quantity = (value: number) => ({ amount: String(value), unit: 'each' });
 
 // Blank or oversized source text is treated as not provided rather than truncated.
-const text = (value: string | null | undefined) => {
+const text = (value: string | null | undefined, max = 512) => {
   const trimmed = value?.trim();
 
-  return trimmed && trimmed.length <= 512 ? trimmed : null;
+  return trimmed && trimmed.length <= max ? trimmed : null;
 };
 
 const record = z.record(z.unknown());
@@ -66,6 +68,22 @@ const workStatuses: Record<string, FulfillmentSnapshot['status']> = {
   INCOMPLETE: 'failed',
 };
 
+const customerStates: Record<string, CustomerSnapshot['state']> = {
+  ENABLED: 'enabled',
+  DISABLED: 'disabled',
+  INVITED: 'invited',
+  DECLINED: 'declined',
+};
+
+// Without read_all_orders, Shopify returns orders created in the last 60 days.
+const recentOrderWindowMs = 60 * 24 * 60 * 60 * 1000;
+
+const counted = {
+  'orders.read': 'ordersCount',
+  'products.read': 'productsCount',
+  'customers.read': 'customersCount',
+} as const;
+
 const shipmentStatuses: Record<string, FulfillmentSnapshot['status']> = {
   PENDING: 'pending',
   OPEN: 'processing',
@@ -88,6 +106,11 @@ export interface ShopifyEvidence {
 export interface ShopifyConnectorOptions extends ShopifyTransportOptions {
   tenantId: string;
   connectionId: string;
+  /**
+   * Enables `customers.read` for deployments approved for protected customer data. Contact
+   * (name, email, phone) and address fields are read only when approved separately.
+   */
+  customerAccess?: { contact: boolean; address: boolean };
   /** Persist the batch before it is returned. Throw if durable recording fails. */
   recordObservations(evidence: ShopifyEvidence): Promise<void>;
   rawRetentionMs?: number;
@@ -119,6 +142,9 @@ export function createShopifyConnector(
         minimumRisk: 'low',
         idempotency: 'none',
         retry: { maxAttempts: 3, initialDelayMs: 1000 },
+        ...(capability === 'inventory.read'
+          ? {}
+          : { filters: ['updatedSince' as const] }),
       },
       parseInput: (input) =>
         s.inputs[capability].parse(input) as CapabilityInput<K>,
@@ -133,6 +159,8 @@ export function createShopifyConnector(
           fail('unavailable');
         const filters = input as CapabilityInput<'inventory.read'> &
           CapabilityInput<'fulfillment.read'>;
+        const updatedSince =
+          'updatedSince' in input ? (input.updatedSince ?? null) : null;
         const binding = createHash('sha256')
           .update(
             JSON.stringify([
@@ -145,6 +173,7 @@ export function createShopifyConnector(
               filters.sku ?? null,
               filters.location ?? null,
               filters.order ?? null,
+              updatedSince,
             ]),
           )
           .digest('hex');
@@ -252,7 +281,9 @@ export function createShopifyConnector(
             ? 'products'
             : capability === 'inventory.read'
               ? 'inventoryItems'
-              : 'orders';
+              : capability === 'customers.read'
+                ? 'customers'
+                : 'orders';
         const rootType =
           root === 'products'
             ? 'Product'
@@ -260,15 +291,108 @@ export function createShopifyConnector(
               ? 'InventoryItem'
               : 'Order';
         const selected = filters.sku ?? filters.order;
+        // Timestamps are validated ISO values, so quoting cannot add search operators.
+        const search = updatedSince ? `updated_at:>='${updatedSince}'` : null;
+        const sorted = search ? ', sortKey: UPDATED_AT' : '';
+        let total: number | null | undefined;
+        let history: HistoryLimit | null | undefined;
+        // The first page of a scan reports the collection size and any history limit.
+        if (!after && !selected && capability !== 'inventory.read') {
+          const countField =
+            capability in counted
+              ? counted[capability as keyof typeof counted]
+              : null;
+          const start = parse(
+            s.scanStart,
+            await request(
+              countField
+                ? `query LumaScanStart($query: String) { currentAppInstallation { accessScopes { handle } } count: ${countField}(query: $query, limit: null) { count precision } }`
+                : 'query LumaScanStart { currentAppInstallation { accessScopes { handle } } }',
+              countField ? { query: search } : {},
+            ),
+          );
+          total = start.count?.count ?? null;
+          if (root === 'orders')
+            history = start.currentAppInstallation.accessScopes.some(
+              (scope) => scope.handle === 'read_all_orders',
+            )
+              ? null
+              : {
+                  availableFrom: new Date(
+                    now().getTime() - recentOrderWindowMs,
+                  ).toISOString(),
+                  requirement: 'read_all_orders',
+                };
+        }
         let roots: { id: string }[];
         let nextAfter: string | null = null;
-        if (selected) {
+        if (capability === 'customers.read') {
+          const access = options.customerAccess;
+          if (!access) fail('unsupported_capability');
+          const fields = [
+            'id createdAt updatedAt state numberOfOrders amountSpent { amount currencyCode } tags',
+            access.contact
+              ? 'displayName defaultEmailAddress { emailAddress } defaultPhoneNumber { phoneNumber }'
+              : '',
+            access.address
+              ? 'defaultAddress { address1 address2 city province zip countryCodeV2 }'
+              : '',
+          ].join(' ');
+          const data = await request(
+            `query LumaCustomers($first: Int!, $after: String, $query: String) { page: customers(first: $first, after: $after, query: $query${sorted}) { nodes { ${fields} } ${pageFields} } }`,
+            { first: input.limit, after, query: search },
+          );
+          const customers = capture(s.connection(s.customerNode), data.page);
+          for (const customer of customers.nodes) {
+            const address = access.address ? customer.defaultAddress : null;
+            const money = customer.amountSpent;
+            emit('customer', ref(customer.id), customer.updatedAt, {
+              displayName: access.contact ? text(customer.displayName) : null,
+              email: access.contact
+                ? text(customer.defaultEmailAddress?.emailAddress, 320)
+                : null,
+              phone: access.contact
+                ? text(customer.defaultPhoneNumber?.phoneNumber, 100)
+                : null,
+              address: address
+                ? {
+                    line1: text(address.address1),
+                    line2: text(address.address2),
+                    city: text(address.city, 256),
+                    region: text(address.province, 256),
+                    postalCode: text(address.zip, 64),
+                    country: text(address.countryCodeV2, 128),
+                  }
+                : null,
+              state: statusFrom(customerStates, customer.state),
+              createdAt: customer.createdAt,
+              orderCount: customer.numberOfOrders,
+              amountSpent:
+                /^-?\d{1,14}(\.\d{1,6})?$/.test(money.amount) &&
+                /^[A-Z]{3}$/.test(money.currencyCode)
+                  ? { amount: money.amount, currency: money.currencyCode }
+                  : null,
+              tags: customer.tags
+                .map((tag) => tag.trim())
+                .filter((tag) => tag.length > 0 && tag.length <= 255)
+                .slice(0, 250),
+              shared: { contact: access.contact, address: access.address },
+            } satisfies CustomerSnapshot);
+          }
+          roots = [];
+          nextAfter = next(customers.pageInfo);
+          if (nextAfter && nextAfter === after) fail('invalid_response');
+        } else if (selected) {
           if (after) fail('invalid_input');
           roots = [{ id: selected.externalId }];
         } else {
           const data = await request(
-            `query LumaPage($first: Int!, $after: String) { page: ${root}(first: $first, after: $after) { nodes { id } ${pageFields} } }`,
-            { first: input.limit, after },
+            root === 'inventoryItems'
+              ? `query LumaPage($first: Int!, $after: String) { page: ${root}(first: $first, after: $after) { nodes { id } ${pageFields} } }`
+              : `query LumaPage($first: Int!, $after: String, $query: String) { page: ${root}(first: $first, after: $after, query: $query${sorted}) { nodes { id } ${pageFields} } }`,
+            root === 'inventoryItems'
+              ? { first: input.limit, after }
+              : { first: input.limit, after, query: search },
           );
           const page = capture(
             s.connection(z.object({ id: s.gid(rootType) })),
@@ -461,6 +585,8 @@ export function createShopifyConnector(
               ).toString('base64url')
             : null,
           completeness: 'complete',
+          ...(total === undefined ? {} : { total }),
+          ...(history === undefined ? {} : { history }),
         };
         const validated = parse<unknown>(
           s.outputs[capability],
@@ -502,6 +628,9 @@ export function createShopifyConnector(
       'products.read': handler('products.read'),
       'inventory.read': handler('inventory.read'),
       'fulfillment.read': handler('fulfillment.read'),
+      ...(options.customerAccess
+        ? { 'customers.read': handler('customers.read') }
+        : {}),
     },
   };
 }

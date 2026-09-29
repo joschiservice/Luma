@@ -155,6 +155,7 @@ export function violation(from, to) {
         'apps/api/src/app.test.ts',
         'apps/api/src/exceptions.integration.test.ts',
         'apps/api/src/commerce.integration.test.ts',
+        'apps/api/src/commerce-sync.integration.test.ts',
         'apps/api/src/orders.integration.test.ts',
         'apps/api/src/activity.integration.test.ts',
         'apps/api/src/execution.integration.test.ts',
@@ -172,6 +173,8 @@ export function violation(from, to) {
         'apps/api/src/index.ts',
         'apps/worker/src/index.ts',
         'apps/worker/src/bootstrap.ts',
+        'apps/worker/src/sync.ts',
+        'apps/worker/src/sync-bootstrap.ts',
       ].includes(from) &&
       !/^apps\/api\/src\/composition\/[^/]+\.ts$/.test(from) &&
       !from.startsWith('apps/api/e2e/')

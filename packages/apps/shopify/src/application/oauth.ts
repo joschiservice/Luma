@@ -44,6 +44,19 @@ export interface ShopifyOAuth {
     shop: string,
     topic: string,
   ): Promise<void>;
+  /**
+   * Verifies a signed record-change notification and durably schedules fresh reads for the
+   * affected record types. The notification body is never imported.
+   */
+  changed(
+    tenantId: string,
+    id: string,
+    body: Buffer,
+    signature: string,
+    shop: string,
+    topic: string,
+    eventId: string,
+  ): Promise<void>;
 }
 
 export interface ShopifyAppConfig {

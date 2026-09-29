@@ -21,6 +21,7 @@ export const stockPositionSchema = z.object({
   id: z.string().uuid(),
   skuId: z.string().uuid(),
   sku: z.string(),
+  skuKey: z.string(),
   locationId: z.string().uuid(),
   location: z.string(),
   unit: z.string(),

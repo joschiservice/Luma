@@ -46,7 +46,14 @@ const page = <T extends z.ZodTypeAny>(item: T) =>
     items: z.array(item),
     nextCursor: z.string().nullable(),
     completeness: z.enum(['complete', 'partial']),
+    total: z.number().int().nonnegative().nullable().optional(),
+    history: z
+      .object({ availableFrom: timestamp, requirement: z.string().nullable() })
+      .nullable()
+      .optional(),
   });
+
+const optionalText = (max: number) => z.string().min(1).max(max).nullable();
 
 export const outputs = {
   'orders.read': page(
@@ -109,6 +116,38 @@ export const outputs = {
       }),
     ),
   ),
+  'customers.read': page(
+    observation(
+      'customer',
+      z.object({
+        displayName: optionalText(512),
+        email: optionalText(320),
+        phone: optionalText(100),
+        address: z
+          .object({
+            line1: optionalText(512),
+            line2: optionalText(512),
+            city: optionalText(256),
+            region: optionalText(256),
+            postalCode: optionalText(64),
+            country: optionalText(128),
+          })
+          .nullable(),
+        state: z.enum([
+          'enabled',
+          'disabled',
+          'invited',
+          'declined',
+          'unknown',
+        ]),
+        createdAt: timestamp.nullable(),
+        orderCount: z.number().int().nonnegative().nullable(),
+        amountSpent: total,
+        tags: z.array(z.string().min(1).max(255)).max(250),
+        shared: z.object({ contact: z.boolean(), address: z.boolean() }),
+      }),
+    ),
+  ),
   'fulfillment.read': page(
     observation(
       'fulfillment',
@@ -142,15 +181,69 @@ const pageInput = z
   })
   .strict();
 
+const changedInput = pageInput.extend({ updatedSince: timestamp.optional() });
+
 const scoped = (type: string) =>
   z.object({ externalId: gid(type), scopeKey: z.literal('') }).strict();
 
 export const inputs = {
-  'orders.read': pageInput,
-  'products.read': pageInput,
+  'orders.read': changedInput,
+  'products.read': changedInput,
+  'customers.read': changedInput,
   'inventory.read': pageInput.extend({
     sku: scoped('InventoryItem').optional(),
     location: scoped('Location').optional(),
   }),
-  'fulfillment.read': pageInput.extend({ order: scoped('Order').optional() }),
+  'fulfillment.read': changedInput.extend({
+    order: scoped('Order').optional(),
+  }),
 };
+
+export const customerNode = z.object({
+  id: gid('Customer'),
+  createdAt: timestamp,
+  updatedAt: timestamp,
+  state: z.string(),
+  numberOfOrders: z.union([
+    z
+      .string()
+      .regex(/^\d{1,15}$/)
+      .transform(Number),
+    z.number().int().nonnegative(),
+  ]),
+  amountSpent: z.object({ amount: z.string(), currencyCode: z.string() }),
+  tags: z.array(z.string()),
+  displayName: z.string().optional(),
+  defaultEmailAddress: z
+    .object({ emailAddress: z.string().nullable() })
+    .nullable()
+    .optional(),
+  defaultPhoneNumber: z
+    .object({ phoneNumber: z.string().nullable() })
+    .nullable()
+    .optional(),
+  defaultAddress: z
+    .object({
+      address1: z.string().nullable(),
+      address2: z.string().nullable(),
+      city: z.string().nullable(),
+      province: z.string().nullable(),
+      zip: z.string().nullable(),
+      countryCodeV2: z.string().nullable(),
+    })
+    .nullable()
+    .optional(),
+});
+
+export const scanStart = z.object({
+  currentAppInstallation: z.object({
+    accessScopes: z.array(z.object({ handle: z.string() })),
+  }),
+  count: z
+    .object({
+      count: z.number().int().nonnegative(),
+      precision: z.enum(['EXACT', 'AT_LEAST']),
+    })
+    .nullable()
+    .optional(),
+});

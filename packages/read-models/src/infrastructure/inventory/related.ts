@@ -49,7 +49,7 @@ export async function readStockContext(
      FROM procurement_purchase_orders p CROSS JOIN LATERAL jsonb_array_elements(p.document->'lines') line
      WHERE p.tenant_id=$1 AND line->>'sku' IN ($2,$3)
      GROUP BY p.id,p.document,line->>'unit' ORDER BY p.document->>'status'='open' DESC,p.id LIMIT 51`,
-    [tenantId, position.skuId, position.sku],
+    [tenantId, position.skuId, position.skuKey],
   );
   const issues = await tx.query<InventoryDetail['issues'][number]>(
     `SELECT DISTINCT e.id,COALESCE(e.document->>'summary',e.document->>'exceptionClass','Stock issue') AS label,e.state
@@ -62,7 +62,7 @@ export async function readStockContext(
        AND m.canonical_id=$3::uuid AND m.external_id=e.subject_id
        AND e.document->'subject'->'scope' ? m.connection_id::text))))
      ORDER BY e.state,e.id LIMIT 51`,
-    [tenantId, position.id, position.skuId, position.sku],
+    [tenantId, position.id, position.skuId, position.skuKey],
   );
 
   return {

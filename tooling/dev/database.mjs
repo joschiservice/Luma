@@ -23,12 +23,12 @@ export async function provision(saved, migrationUrl) {
       [
         'luma_api',
         saved.apiPassword,
-        'luma_identity,luma_connectors,luma_case_reader,luma_desk',
+        'luma_identity,luma_connectors,luma_case_reader,luma_desk,luma_commerce_sync',
       ],
       [
         'luma_worker',
         saved.workerPassword,
-        'luma_exceptions,luma_policies,luma_execution,luma_audit,luma_connectors,luma_orders,luma_inventory,luma_desk',
+        'luma_exceptions,luma_policies,luma_execution,luma_audit,luma_connectors,luma_orders,luma_inventory,luma_desk,luma_commerce_sync,luma_customers',
       ],
     ]) {
       const exists = await client.query(
