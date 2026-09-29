@@ -61,6 +61,21 @@ function IssueWorkspace({
           >
             <ArrowLeft size={16} aria-hidden="true" /> Issues
           </Link>
+          {item?.subject.kind === 'sku' ? (
+            <Link
+              to="/app/$organizationId/inventory"
+              params={{ organizationId }}
+              search={{
+                q: item.subject.id,
+                connectionId: connections.data?.find((connection) =>
+                  item.subject.scope.includes(connection.id),
+                )?.id,
+                from: `${location.pathname}${location.searchStr}`,
+              }}
+            >
+              Inspect inventory <ArrowRight size={14} />
+            </Link>
+          ) : null}
           {item ? (
             <Link
               to="/app/$organizationId/records"

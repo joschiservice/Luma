@@ -21,12 +21,14 @@ import type { ModelGateway, Observability, Observation } from '@luma/platform';
 import type { ProcurementService } from '@luma/procurement';
 import { procurementRoutes } from '@luma/procurement/http';
 import type {
+  InventoryWorkspace,
   OperationalMetrics,
   OperationalSummary,
   OrderWorkspace,
   RecordExplorer,
 } from '@luma/read-models';
 import {
+  inventoryRoutes,
   metricRoutes,
   orderRoutes,
   recordRoutes,
@@ -94,6 +96,7 @@ export interface AppDependencies {
   metrics?: OperationalMetrics;
   operationalSummary?: OperationalSummary;
   records?: RecordExplorer;
+  inventory?: InventoryWorkspace;
   orders?: OrderWorkspace;
   metricEvents?: MetricEvents;
   apps?: AppService;
@@ -342,6 +345,7 @@ export function buildApp(
         },
         connectorProviders: createConnectors(dependencies.providerCatalog),
         records: recordRoutes(dependencies.records),
+        inventory: inventoryRoutes(dependencies.inventory),
         orders: orderRoutes(dependencies.orders),
       },
       routerApp,

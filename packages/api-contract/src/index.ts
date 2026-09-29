@@ -8,6 +8,7 @@ import { connectionsContract } from './contracts/connections.js';
 import { caseDeskContract } from './contracts/desk.js';
 import { draftTestsContract } from './contracts/draft-tests.js';
 import { identityContract } from './contracts/identity.js';
+import { inventoryContract } from './contracts/inventory.js';
 import { resolutionLearningContract } from './contracts/learning.js';
 import { metricsContract } from './contracts/metrics.js';
 import { ordersContract } from './contracts/orders.js';
@@ -46,6 +47,7 @@ const routes: {
   system: typeof systemContract;
   connectorProviders: typeof connectorProvidersContract;
   records: typeof recordsContract;
+  inventory: typeof inventoryContract;
   orders: typeof ordersContract;
 } = {
   shadow: shadowContract,
@@ -68,6 +70,7 @@ const routes: {
   system: systemContract,
   connectorProviders: connectorProvidersContract,
   records: recordsContract,
+  inventory: inventoryContract,
   orders: ordersContract,
 };
 const options = {
@@ -156,3 +159,5 @@ export * from './operational-metrics.js';
 export * from './records.js';
 
 export * from './orders.js';
+
+export * from './inventory.js';

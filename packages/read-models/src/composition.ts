@@ -5,3 +5,5 @@ export { createOperationalSummary } from './infrastructure/operational-summary.j
 export { createRecordExplorer } from './infrastructure/record-explorer.js';
 
 export { createOrderWorkspace } from './infrastructure/orders/workspace.js';
+
+export { createInventoryWorkspace } from './infrastructure/inventory/workspace.js';

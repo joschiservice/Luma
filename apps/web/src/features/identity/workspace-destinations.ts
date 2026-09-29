@@ -2,6 +2,7 @@ import type { Domain } from '@luma/ui/components/primitives/domain-icon';
 import {
   Activity,
   Blocks,
+  Boxes,
   ChartNoAxesColumn,
   Database,
   House,
@@ -23,6 +24,7 @@ export type DestinationPath =
   | 'activity'
   | 'insights'
   | 'orders'
+  | 'inventory'
   | 'workflows'
   | 'procurement'
   | 'apps'
@@ -91,6 +93,15 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
     group: 'operations',
     domain: 'orders',
     shortcut: 'o',
+  },
+  {
+    path: 'inventory',
+    label: 'Inventory',
+    Icon: Boxes,
+    description: 'Compare stock across SKUs, locations and sources',
+    group: 'operations',
+    domain: 'inventory',
+    shortcut: 'v',
   },
   {
     path: 'workflows',

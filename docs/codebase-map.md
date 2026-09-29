@@ -260,3 +260,14 @@ The restricted operator command is `tooling/shopify/privacy.mjs`. See
 [Shopify partner readiness](shopify-production.md) for portal settings, approval
 gates, privacy fulfillment and smoke-test evidence. Tests are the OAuth
 PostgreSQL suite, privacy unit tests and the connections browser journey.
+
+## Inventory workspace
+
+Start at `packages/read-models/src/application/inventory.ts` for read contracts,
+`domain/inventory.ts` for exact quantity comparison, and
+`infrastructure/inventory` for current positions and related records. API contracts
+are in `packages/api-contract/src/inventory.ts`; the frontend is
+`apps/web/src/features/inventory`. Stock metric drilldowns and SKU issues link here.
+Tests: `domain/inventory.test.ts`, `apps/api/e2e/inventory.e2e.mjs`,
+`inventory.browser.mjs` and `Inventory/Workspace` stories. See
+[Inventory workspace](inventory-workspace.md) for quantity and relationship semantics.
