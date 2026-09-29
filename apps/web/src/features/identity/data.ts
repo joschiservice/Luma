@@ -1,3 +1,4 @@
+import { type ApiError, apiErrorSchema } from '@luma/api-contract';
 import { type QueryClient, queryOptions } from '@tanstack/react-query';
 import { createAuthClient } from 'better-auth/client';
 import { z } from 'zod';
@@ -14,9 +15,34 @@ const api = createWebApiClient();
 
 export const sessionKey = ['private', 'session'] as const;
 
+/**
+ * A failed API or auth request. Keeps the HTTP status and, when the response carried the API
+ * error payload, its `code`, `message` and `requestId`. `message` falls back to a generic
+ * description when the server sent none, so check `code` before showing it to people.
+ */
 export class IdentityError extends Error {
-  constructor(public status: number) {
-    super('Identity request failed');
+  readonly code: ApiError['code'] | undefined;
+  readonly requestId: string | undefined;
+
+  constructor(
+    public status: number,
+    body?: unknown,
+  ) {
+    const payload = body && typeof body === 'object' ? body : {};
+    const message =
+      'message' in payload && typeof payload.message === 'string'
+        ? payload.message
+        : undefined;
+    super(message ?? 'The request could not be completed.');
+    this.name = 'IdentityError';
+    const code = apiErrorSchema.shape.code.safeParse(
+      'code' in payload ? payload.code : undefined,
+    );
+    this.code = code.success ? code.data : undefined;
+    this.requestId =
+      'requestId' in payload && typeof payload.requestId === 'string'
+        ? payload.requestId
+        : undefined;
   }
 }
 
@@ -95,7 +121,8 @@ export const sessionOptions = () =>
       const result = await auth.getSession({
         fetchOptions: { signal, cache: 'no-store' },
       });
-      if (result.error) throw new IdentityError(result.error.status);
+      if (result.error)
+        throw new IdentityError(result.error.status, result.error);
 
       return result.data
         ? {
@@ -118,7 +145,8 @@ export const organizationsOptions = () =>
       const result = await api.identity.listOrganizations({
         fetchOptions: { signal, cache: 'no-store' },
       });
-      if (result.status !== 200) throw new IdentityError(result.status);
+      if (result.status !== 200)
+        throw new IdentityError(result.status, result.body);
 
       return result.body.items;
     },
@@ -139,7 +167,8 @@ export const contextOptions = (organizationId: string) =>
         params: { organizationId },
         fetchOptions: { signal, cache: 'no-store' },
       });
-      if (result.status !== 200) throw new IdentityError(result.status);
+      if (result.status !== 200)
+        throw new IdentityError(result.status, result.body);
 
       return result.body;
     },
@@ -157,7 +186,8 @@ export async function createOrganization(name: string) {
       dataRegion: 'EU',
     },
   });
-  if (result.status !== 201) throw new IdentityError(result.status);
+  if (result.status !== 201)
+    throw new IdentityError(result.status, result.body);
 
   return result.body;
 }

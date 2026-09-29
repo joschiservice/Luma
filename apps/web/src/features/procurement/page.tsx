@@ -1,9 +1,14 @@
 import './procurement.css';
 
+import type { PurchaseOrder, Supplier } from '@luma/api-contract';
 import { Alert } from '@luma/ui/components/primitives/alert';
-import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
 import { CollectionToolbar } from '@luma/ui/components/primitives/collection-toolbar';
+import {
+  DataTable,
+  type DataTableColumn,
+  DataTableRowLink,
+} from '@luma/ui/components/primitives/data-table';
 import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { Empty } from '@luma/ui/components/primitives/empty';
 import { Input } from '@luma/ui/components/primitives/input';
@@ -20,7 +25,6 @@ import {
 import {
   ArrowUpRight,
   Building2,
-  ChevronRight,
   FileText,
   PackageCheck,
   Plus,
@@ -33,6 +37,102 @@ import { IdentityError } from '../identity/data';
 import { ordersOptions, procurementError, suppliersOptions } from './data';
 import { OrderDialog, SupplierDialog } from './forms';
 import { OrderStatus, statusLabels } from './presentation';
+
+function orderColumns(
+  organizationId: string,
+): DataTableColumn<PurchaseOrder>[] {
+  return [
+    {
+      key: 'reference',
+      header: 'Purchase order',
+      cell: (order) => (
+        <DataTableRowLink
+          render={
+            <Link
+              to="/app/$organizationId/procurement/$purchaseOrderId"
+              params={{ organizationId, purchaseOrderId: order.id }}
+            />
+          }
+        >
+          {order.reference}
+        </DataTableRowLink>
+      ),
+    },
+    {
+      key: 'supplier',
+      header: 'Supplier',
+      cell: (order) => order.supplierName,
+    },
+    {
+      key: 'lines',
+      header: 'Lines',
+      numeric: true,
+      hideOnNarrow: true,
+      cell: (order) => order.lines.length,
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      cell: (order) => <OrderStatus status={order.status} />,
+    },
+    {
+      key: 'ownership',
+      header: 'Ownership',
+      hideOnNarrow: true,
+      cell: (order) =>
+        order.authority === 'luma' ? 'Luma-owned' : 'Externally owned',
+    },
+  ];
+}
+
+function supplierColumns({
+  orderCount,
+  showOrders,
+}: {
+  orderCount: (supplier: Supplier) => number | undefined;
+  showOrders: (supplier: Supplier) => void;
+}): DataTableColumn<Supplier>[] {
+  return [
+    { key: 'name', header: 'Supplier', cell: (supplier) => supplier.name },
+    {
+      key: 'references',
+      header: 'External references',
+      cell: (supplier) =>
+        supplier.externalReferences.length
+          ? supplier.externalReferences
+              .map((ref) => `${ref.system} · ${ref.externalId}`)
+              .join(' / ')
+          : 'None',
+    },
+    {
+      key: 'added',
+      header: 'Added',
+      hideOnNarrow: true,
+      cell: (supplier) => <WorkspaceDate value={supplier.createdAt} />,
+    },
+    {
+      key: 'orders',
+      header: 'Orders',
+      numeric: true,
+      cell: (supplier) => orderCount(supplier) ?? '—',
+    },
+    {
+      key: 'actions',
+      header: <span className="sr-only">Actions</span>,
+      cell: (supplier) => (
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={`View orders for ${supplier.name}`}
+          title="View orders"
+          onClick={() => showOrders(supplier)}
+        >
+          <ArrowUpRight size={16} aria-hidden="true" />
+        </Button>
+      ),
+    },
+  ];
+}
 
 /** Keeps procurement views and filters shareable without accepting unsupported statuses. */
 export function parseProcurementSearch(value: Record<string, unknown>): {
@@ -296,39 +396,13 @@ export function ProcurementPage() {
                 )}
               </Empty>
             ) : (
-              <ul className="procurement-rows" aria-label="Purchase orders">
-                {visibleOrders.map((order) => (
-                  <li key={order.id}>
-                    <Link
-                      to="/app/$organizationId/procurement/$purchaseOrderId"
-                      params={{ organizationId, purchaseOrderId: order.id }}
-                      className="procurement-row"
-                    >
-                      <span className="procurement-record-icon">
-                        <FileText size={19} />
-                      </span>
-                      <div className="procurement-row-main">
-                        <h3>{order.reference}</h3>
-                        <p>
-                          {order.supplierName}
-                          <span>·</span>
-                          {order.lines.length}{' '}
-                          {order.lines.length === 1 ? 'line' : 'lines'}
-                        </p>
-                      </div>
-                      <div className="procurement-row-meta">
-                        <OrderStatus status={order.status} />
-                        <span>
-                          {order.authority === 'luma'
-                            ? 'Luma-owned'
-                            : 'Externally owned'}
-                        </span>
-                      </div>
-                      <ChevronRight size={16} />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+              <DataTable
+                caption="Purchase orders"
+                variant="plain"
+                columns={orderColumns(organizationId)}
+                rows={visibleOrders}
+                rowKey={(order) => order.id}
+              />
             )}
           </>
         ) : !visibleSuppliers?.length ? (
@@ -357,41 +431,18 @@ export function ProcurementPage() {
             )}
           </Empty>
         ) : (
-          <ul className="procurement-rows" aria-label="Suppliers">
-            {visibleSuppliers.map((supplier) => (
-              <li key={supplier.id} className="procurement-supplier-row">
-                <span className="procurement-record-icon">
-                  <Building2 size={19} />
-                </span>
-                <div className="procurement-row-main">
-                  <h3>{supplier.name}</h3>
-                  <p>
-                    {supplier.externalReferences.length
-                      ? supplier.externalReferences
-                          .map((ref) => `${ref.system} · ${ref.externalId}`)
-                          .join(' / ')
-                      : 'No external references'}
-                  </p>
-                  <span className="procurement-created">
-                    Added <WorkspaceDate value={supplier.createdAt} />
-                  </span>
-                </div>
-                <Badge tone="neutral">
-                  {orders.data ? (orderCounts.get(supplier.id) ?? 0) : '—'}{' '}
-                  {orderCounts.get(supplier.id) === 1 ? 'order' : 'orders'}
-                </Badge>
-                <Button
-                  variant="ghost"
-                  aria-label={`View orders for ${supplier.name}`}
-                  onClick={() =>
-                    change({ view: 'orders', q: supplier.name, status: '' })
-                  }
-                >
-                  <ArrowUpRight size={16} />
-                </Button>
-              </li>
-            ))}
-          </ul>
+          <DataTable
+            caption="Suppliers"
+            variant="plain"
+            columns={supplierColumns({
+              orderCount: (supplier) =>
+                orders.data ? (orderCounts.get(supplier.id) ?? 0) : undefined,
+              showOrders: (supplier) =>
+                change({ view: 'orders', q: supplier.name, status: '' }),
+            })}
+            rows={visibleSuppliers}
+            rowKey={(supplier) => supplier.id}
+          />
         )}
       </div>
       {suppliers.error && filters.view === 'orders' && (

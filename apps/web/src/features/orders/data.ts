@@ -110,6 +110,30 @@ export function orderFilters(search: OrdersSearch): OrdersSearch {
   return filters;
 }
 
+export type OrdersError = {
+  kind: 'access' | 'page' | 'unavailable';
+  /** The server's explanation, when it sent one that people can act on. */
+  message?: string | undefined;
+};
+
+/**
+ * Classifies an order list failure. 403 and 404 mean the reader lost access, because the API
+ * hides workspaces they no longer belong to. A validation error on a request with a page cursor
+ * means the page link no longer matches its filters; the reader can start from the first page.
+ */
+export function orderListError(
+  error: unknown,
+  search: OrdersSearch,
+): OrdersError | undefined {
+  if (!error) return undefined;
+  if (!(error instanceof IdentityError)) return { kind: 'unavailable' };
+  if ([403, 404].includes(error.status)) return { kind: 'access' };
+  if (error.code === 'VALIDATION_ERROR' && search.cursor)
+    return { kind: 'page', message: error.message };
+
+  return { kind: 'unavailable' };
+}
+
 /** Loads one keyset page of current orders for the active workspace. */
 export function ordersOptions(
   organizationId: string,
@@ -128,7 +152,8 @@ export function ordersOptions(
         query,
         fetchOptions: { signal, cache: 'no-store' },
       });
-      if (result.status !== 200) throw new IdentityError(result.status);
+      if (result.status !== 200)
+        throw new IdentityError(result.status, result.body);
 
       return orderListSchema.parse(result.body);
     },
@@ -146,7 +171,8 @@ export function orderOptions(organizationId: string, orderId: string) {
         params: { organizationId, orderId },
         fetchOptions: { signal, cache: 'no-store' },
       });
-      if (result.status !== 200) throw new IdentityError(result.status);
+      if (result.status !== 200)
+        throw new IdentityError(result.status, result.body);
 
       return orderDetailSchema.parse(result.body);
     },

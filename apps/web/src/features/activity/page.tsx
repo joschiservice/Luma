@@ -69,6 +69,13 @@ export function ActivityPage() {
   const error = page.error ?? head.error;
   const accessLost =
     error instanceof IdentityError && [401, 403, 404].includes(error.status);
+  // The API rejects a page cursor that no longer matches the filters and explains why.
+  const staleMessage =
+    page.error instanceof IdentityError &&
+    page.error.code === 'VALIDATION_ERROR' &&
+    filters.cursor
+      ? page.error.message
+      : undefined;
   if (error instanceof IdentityError && error.status === 401)
     return <SignInRedirect />;
   const newEvents =
@@ -88,10 +95,12 @@ export function ActivityPage() {
       error={
         accessLost
           ? 'Workspace access changed. Activity is no longer available.'
-          : error
-            ? 'Activity could not be updated. Previously loaded events may be outdated.'
-            : undefined
+          : (staleMessage ??
+            (error
+              ? 'Activity could not be updated. Previously loaded events may be outdated.'
+              : undefined))
       }
+      stalePage={!!staleMessage}
       change={(next) => void navigate({ search: next, resetScroll: false })}
       refresh={() => {
         if (filters.cursor) {
@@ -116,6 +125,7 @@ export function ActivityView({
   offline,
   newEvents,
   error,
+  stalePage = false,
   change,
   refresh,
 }: {
@@ -127,6 +137,8 @@ export function ActivityView({
   offline?: boolean;
   newEvents?: boolean;
   error?: string | undefined;
+  /** The error is a page link that no longer matches the filters; offers the latest events. */
+  stalePage?: boolean;
   change: (filters: ActivityFilters) => void;
   refresh: () => void;
 }) {
@@ -248,9 +260,25 @@ export function ActivityView({
       {error ? (
         <Alert tone="danger" role="alert" className="activity-notice">
           {error}{' '}
-          <Button variant="outline" onClick={refresh}>
-            Retry
-          </Button>
+          {stalePage ? (
+            <Button
+              variant="outline"
+              onClick={() =>
+                change({
+                  ...filters,
+                  cursor: undefined,
+                  latest: undefined,
+                  event: undefined,
+                })
+              }
+            >
+              Latest events
+            </Button>
+          ) : (
+            <Button variant="outline" onClick={refresh}>
+              Retry
+            </Button>
+          )}
         </Alert>
       ) : null}
       {newEvents ? (

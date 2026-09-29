@@ -20,7 +20,8 @@ function uniqueEntries<T extends { id: string }>(items: T[]): T[] {
 
 async function read(promise: Promise<{ status: number; body: unknown }>) {
   const response = await promise;
-  if (response.status !== 200) throw new IdentityError(response.status);
+  if (response.status !== 200)
+    throw new IdentityError(response.status, response.body);
 
   return response.body;
 }

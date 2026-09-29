@@ -297,6 +297,8 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
                   onPrevious={goPrevious}
                   onNext={goNext}
                   disabled={list.isFetching}
+                  itemLabel="issues"
+                  label="Issue pages"
                 />
                 {search.cursor && pageIndex < 0 && (
                   <Button variant="ghost" onClick={() => update({})}>

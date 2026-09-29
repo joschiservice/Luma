@@ -29,7 +29,8 @@ export function overviewOptions(organizationId: string, window: '24h' | '7d') {
         query: { window },
         fetchOptions: { signal, cache: 'no-store' },
       });
-      if (result.status !== 200) throw new IdentityError(result.status);
+      if (result.status !== 200)
+        throw new IdentityError(result.status, result.body);
 
       return operationsOverviewSchema.parse(result.body);
     },

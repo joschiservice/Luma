@@ -25,7 +25,8 @@ export function appsOptions(organizationId: string) {
         params: { organizationId },
         fetchOptions: { signal, cache: 'no-store' },
       });
-      if (result.status !== 200) throw new IdentityError(result.status);
+      if (result.status !== 200)
+        throw new IdentityError(result.status, result.body);
 
       return result.body;
     },
@@ -44,7 +45,8 @@ export async function changeApp(
     action === 'install'
       ? await api.apps.install({ params, body: { version } })
       : await api.apps.uninstall({ params, body: { version: version! } });
-  if (result.status !== 200) throw new IdentityError(result.status);
+  if (result.status !== 200)
+    throw new IdentityError(result.status, result.body);
 
   return result.body;
 }

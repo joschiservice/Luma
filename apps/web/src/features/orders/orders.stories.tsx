@@ -10,9 +10,9 @@ import { type ReactNode, useState } from 'react';
 import { expect, userEvent, within } from 'storybook/test';
 
 import appStyles from '../../styles.css?inline';
-import type { OrdersSearch } from './data';
+import type { OrdersError, OrdersSearch } from './data';
 import { OrderDetailView, type OrderError } from './detail';
-import { type OrdersError, OrdersView } from './page';
+import { OrdersView } from './page';
 
 const organizationId = '33333333-3333-4333-8333-333333333333';
 const shop = '44444444-4444-4444-8444-444444444444';
@@ -253,13 +253,15 @@ function ListPreview({ state = 'ready' }: { state?: ListState }) {
     state === 'unmatched' ? { q: 'NOPE', view: 'overdue' } : {},
   );
   const error: OrdersError | undefined =
-    state === 'unavailable'
-      ? 'unavailable'
+    state === 'unavailable' || state === 'access'
+      ? { kind: state }
       : state === 'page'
-        ? 'page'
-        : state === 'access'
-          ? 'access'
-          : undefined;
+        ? {
+            kind: 'page',
+            message:
+              'This page link no longer matches the order filters. Start from the first page.',
+          }
+        : undefined;
 
   return (
     <OrdersView
@@ -376,6 +378,11 @@ export const Browse: Story = {
       within(canvas.getByRole('table')).getByText('Needs you'),
     ).toBeVisible();
     await expect(canvas.getByText('1–3 of 1,284 orders')).toBeVisible();
+    const placed = canvas.getByRole('columnheader', { name: /Placed/ });
+    await userEvent.click(within(placed).getByRole('button'));
+    await expect(placed).toHaveAttribute('aria-sort', 'descending');
+    await userEvent.click(within(placed).getByRole('button'));
+    await expect(placed).toHaveAttribute('aria-sort', 'ascending');
     await userEvent.click(canvas.getByRole('button', { name: 'Overdue' }));
     await expect(
       canvas.getByRole('button', { name: 'Overdue' }),
@@ -394,7 +401,18 @@ export const NoMatches: Story = { args: { state: 'unmatched' } };
 
 export const Unavailable: Story = { args: { state: 'unavailable' } };
 
-export const StalePage: Story = { args: { state: 'page' } };
+export const StalePage: Story = {
+  args: { state: 'page' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByText(/This page link no longer matches/),
+    ).toBeVisible();
+    await expect(
+      canvas.getByRole('button', { name: 'Go to the first page' }),
+    ).toBeVisible();
+  },
+};
 
 export const AccessLost: Story = { args: { state: 'access' } };
 

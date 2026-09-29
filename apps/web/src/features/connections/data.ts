@@ -29,7 +29,8 @@ export const connectionsOptions = (organizationId: string) =>
         params: { organizationId },
         fetchOptions: { signal, cache: 'no-store' },
       });
-      if (result.status !== 200) throw new IdentityError(result.status);
+      if (result.status !== 200)
+        throw new IdentityError(result.status, result.body);
 
       return result.body.items.map((item) =>
         installedConnectionSchema.parse(item),
@@ -49,7 +50,8 @@ export async function installConnection(
     params: { organizationId },
     body,
   });
-  if (result.status !== 201) throw new IdentityError(result.status);
+  if (result.status !== 201)
+    throw new IdentityError(result.status, result.body);
 
   return installedConnectionSchema.parse(result.body);
 }
@@ -73,7 +75,8 @@ export async function changeConnection(
           body: { ...body, credentials: credentials! },
         })
       : await api.connections[action]({ params, body });
-  if (result.status !== 200) throw new IdentityError(result.status);
+  if (result.status !== 200)
+    throw new IdentityError(result.status, result.body);
 
   return installedConnectionSchema.parse(result.body);
 }

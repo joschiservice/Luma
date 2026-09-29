@@ -4,7 +4,9 @@ import { Button } from './button';
 
 /**
  * Displays the current page and total pages with previous and next controls. `itemLabel` names
- * the plural items in the range text and `label` names the navigation landmark.
+ * the plural items in the range text, such as "orders", and `label` names the navigation
+ * landmark, such as "Order pages". Omit `totalCount` when the source does not report a total;
+ * the range and page number are then shown without one.
  */
 export function Pagination({
   count,
@@ -16,11 +18,11 @@ export function Pagination({
   onNext,
   disabled = false,
   pageSize = 25,
-  itemLabel = 'issues',
-  label = 'Issue pages',
+  itemLabel = 'items',
+  label = 'Pages',
 }: {
   count: number;
-  totalCount: number;
+  totalCount?: number | undefined;
   offset?: number | undefined;
   page?: number | undefined;
   pageSize?: number;
@@ -33,14 +35,19 @@ export function Pagination({
 }) {
   const start = offset ?? (page ? (page - 1) * pageSize : 0);
   const currentPage = Math.floor(start / pageSize) + 1;
-  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const totalPages =
+    totalCount === undefined
+      ? undefined
+      : Math.max(1, Math.ceil(totalCount / pageSize));
 
   return (
-    <nav className="issue-pagination" aria-label={label}>
+    <nav data-slot="pagination" className="ui-pagination" aria-label={label}>
       <span role="status">
         {count === 0
           ? `No ${itemLabel}`
-          : `${start + 1}–${start + count} of ${totalCount.toLocaleString()} ${itemLabel}`}
+          : totalCount === undefined
+            ? `${start + 1}–${start + count} ${itemLabel}`
+            : `${start + 1}–${start + count} of ${totalCount.toLocaleString()} ${itemLabel}`}
       </span>
       <div className="pagination-controls">
         <Button
@@ -54,8 +61,16 @@ export function Pagination({
           <ChevronLeft aria-hidden="true" />
         </Button>
         <span className="pagination-page" aria-live="polite">
-          Page <strong>{Math.min(currentPage, totalPages)}</strong> of{' '}
-          <strong>{totalPages.toLocaleString()}</strong>
+          {totalPages === undefined ? (
+            <>
+              Page <strong>{currentPage.toLocaleString()}</strong>
+            </>
+          ) : (
+            <>
+              Page <strong>{Math.min(currentPage, totalPages)}</strong> of{' '}
+              <strong>{totalPages.toLocaleString()}</strong>
+            </>
+          )}
         </span>
         <Button
           variant="outline"

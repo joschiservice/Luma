@@ -58,30 +58,8 @@
   color: var(--muted-foreground);
   font-size: 0.83rem;
 }
-.record-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  overflow: hidden;
-  background: var(--card);
-}
-.record-list li + li {
-  border-top: 1px solid var(--border);
-}
-.record-row {
-  display: grid;
-  grid-template-columns: 100px minmax(180px, 1fr) 130px 100px 20px;
-  gap: 1rem;
-  align-items: center;
-  padding: 1.05rem 1.2rem;
-  color: inherit;
-  text-decoration: none;
-}
-.record-row:hover,
-.record-row:focus-visible {
-  background: var(--accent);
+.record-row-kind {
+  white-space: nowrap;
 }
 .record-row-kind,
 .record-eyebrow {
@@ -96,11 +74,8 @@
   display: grid;
   gap: 0.18rem;
 }
-.record-row-main strong,
 .record-row-main small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .record-row-main small,
 .record-row-source {
@@ -281,13 +256,6 @@
   }
   .record-detail-grid {
     grid-template-columns: 1fr;
-  }
-  .record-row {
-    grid-template-columns: 70px 1fr 20px;
-  }
-  .record-row-status,
-  .record-row-source {
-    display: none;
   }
   .record-explorer-head {
     flex-wrap: wrap;

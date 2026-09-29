@@ -95,7 +95,12 @@ it('searches scoped records and returns from a metric to the same cohort', async
   await page.getByRole('textbox', { name: 'Search records' }).fill('#1000');
   await page.getByRole('button', { name: 'Search', exact: true }).click();
   await page.getByRole('link', { name: /#1000/ }).waitFor();
-  expect(await page.locator('.record-list li').count()).toBe(1);
+  expect(
+    await page
+      .getByRole('table', { name: 'Matching records' })
+      .locator('tbody tr')
+      .count(),
+  ).toBe(1);
 
   await page.goto(`/app/${fixture.org.id}/insights`);
   await page

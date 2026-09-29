@@ -18,10 +18,15 @@ Feature compositions live separately in `components/issues` and `components/work
 | Short labels                         | `Badge`                                                                           | Severity, activation status, personal settings and counts                                    |
 | Empty collections                    | `Empty`                                                                           | Lists with nothing to show; describe this view, not the whole business                       |
 | Expandable supporting content        | `Disclosure`                                                                      | Evidence, audit events, metadata and technical details                                       |
+| Record lists and fact tables         | `DataTable`, `DataTableRowLink`                                                   | Sortable lists whose rows open a record, and numeric fact tables inside record sections      |
 
-`Button`, `Input`, `Textarea`, `Select`, `SearchableSelect`, `Field`, `Switch`, `Dialog`, `DropdownMenu`, `Tabs`, `Pagination` and `SectionNavigation` remain the interaction primitives. `Button` has default (Cobalt), outline, ghost and destructive variants in default, `sm`, `lg` and `icon` sizes; coarse pointers receive 44px targets. Link-styled buttons use `buttonVariants()` on the link itself so link semantics are preserved.
+`Button`, `Input`, `Textarea`, `Select`, `SearchableSelect`, `Field`, `Switch`, `Dialog`, `DropdownMenu`, `Tabs`, `Pagination` and `SectionNavigation` remain the interaction primitives. `Pagination` omits the total when a source doesn't report one. `Button` has default (Cobalt), outline, ghost and destructive variants in default, `sm`, `lg` and `icon` sizes; coarse pointers receive 44px targets. Link-styled buttons use `buttonVariants()` on the link itself so link semantics are preserved.
 
 Choose states from `issueStatus` and `issueKind` in `components/issues/case-presentation` rather than mapping case states in each feature. Verified means the intended outcome was observed; an accepted request is still running.
+
+## Tables
+
+`DataTable` takes column definitions and rows. Every table needs a `caption`; it is visually hidden and names the table for assistive technology. The first column labels each row unless `rowHeader` names another. Mark quantities, amounts and counts `numeric` for right alignment and tabular figures, and `hideOnNarrow` for secondary columns. Sortable columns set `sortKey`; the caller owns the sort state through `sort` and `onSortChange`. Put one `DataTableRowLink` in a row to make the whole row open the record; pass a router link through `render`. Use `density="compact"` and `variant="plain"` for tables inside cards. A table wider than its container scrolls horizontally and becomes a focusable region.
 
 ## Workspace shell
 

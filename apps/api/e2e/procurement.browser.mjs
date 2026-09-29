@@ -128,7 +128,7 @@ it('creates and reviews procurement records with safe retries on desktop and mob
     .click();
   await page.getByRole('button', { name: /Suppliers 1/ }).click();
   await page
-    .getByRole('heading', { name: 'Northstar Supply', exact: true })
+    .getByRole('rowheader', { name: 'Northstar Supply', exact: true })
     .waitFor();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({

@@ -409,7 +409,7 @@
   }
 }
 
-.inbox-list > .issue-pagination {
+.inbox-list > .ui-pagination {
   position: sticky;
   bottom: 0;
   margin-top: auto;

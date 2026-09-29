@@ -54,7 +54,8 @@ export async function sendDecision(
     body,
     extraHeaders: { 'x-luma-action-id': body.commandId },
   });
-  if (result.status !== 200) throw new IdentityError(result.status);
+  if (result.status !== 200)
+    throw new IdentityError(result.status, result.body);
 
   return decisionReceiptSchema.parse(result.body);
 }
@@ -69,7 +70,8 @@ export async function recoverDecision(
     params: { organizationId, exceptionId, commandId },
     fetchOptions: { cache: 'no-store' },
   });
-  if (result.status !== 200) throw new IdentityError(result.status);
+  if (result.status !== 200)
+    throw new IdentityError(result.status, result.body);
 
   return decisionReceiptSchema.parse(result.body);
 }
@@ -110,7 +112,7 @@ export async function refreshResolution(
       throw error;
     });
   if (result.status !== 200) {
-    const error = new IdentityError(result.status);
+    const error = new IdentityError(result.status, result.body);
     error.message =
       result.status === 409
         ? result.body.message

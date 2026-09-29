@@ -142,6 +142,8 @@ function IssuesExample({
                   hasNext={page === 1}
                   onPrevious={page > 1 ? () => setPage(page - 1) : undefined}
                   onNext={() => setPage(page + 1)}
+                  itemLabel="issues"
+                  label="Issue pages"
                 />
               </div>
             }

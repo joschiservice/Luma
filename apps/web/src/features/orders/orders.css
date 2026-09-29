@@ -51,75 +51,6 @@
   font-size: 13px;
 }
 
-.orders-table-wrap {
-  overflow-x: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-panel);
-  background: var(--card);
-}
-
-.orders-table,
-.order-lines,
-.order-comparison {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-  text-align: left;
-}
-
-.orders-table thead th,
-.order-lines thead th,
-.order-comparison thead th {
-  padding: 8px 12px;
-  background: var(--muted);
-  color: var(--muted-foreground);
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.orders-table tbody th,
-.orders-table td,
-.order-lines tbody th,
-.order-lines td,
-.order-comparison tbody th,
-.order-comparison td {
-  padding: 10px 12px;
-  border-top: 1px solid var(--border);
-  font-weight: 400;
-  vertical-align: top;
-}
-
-.orders-table tbody tr {
-  position: relative;
-}
-
-.orders-table tbody tr:hover {
-  background: var(--muted);
-}
-
-.orders-row-link {
-  color: var(--foreground);
-  font-weight: 550;
-  text-decoration: none;
-}
-
-/* The order link covers its row so the whole row opens the order. */
-.orders-row-link::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-}
-
-.orders-row-link:focus-visible {
-  outline: none;
-}
-
-.orders-table tbody tr:has(.orders-row-link:focus-visible) {
-  outline: 2px solid var(--ring);
-  outline-offset: -2px;
-}
-
 .orders-row-flags {
   display: flex;
   flex-wrap: wrap;
@@ -145,24 +76,6 @@
   gap: 4px;
 }
 
-.orders-number {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.orders-sort {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-
 .orders-loading {
   display: grid;
   gap: 8px;
@@ -181,11 +94,6 @@
   gap: 4px;
   font-size: 13px;
   white-space: nowrap;
-}
-
-.orders-table tbody th,
-.order-lines tbody th {
-  min-width: 9rem;
 }
 
 .order-page {
@@ -294,7 +202,7 @@
   color: var(--foreground);
 }
 
-.order-comparison tr[data-differs] th {
+.order-comparison-field {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -354,10 +262,6 @@
 }
 
 @media (max-width: 760px) {
-  .orders-optional {
-    display: none;
-  }
-
   .orders-date {
     flex: 1 1 140px;
   }

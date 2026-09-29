@@ -5,8 +5,15 @@ import {
   recordKindSchema,
   type RecordSummary,
 } from '@luma/api-contract';
+import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
+import {
+  DataTable,
+  type DataTableColumn,
+  DataTableRowLink,
+} from '@luma/ui/components/primitives/data-table';
+import { Pagination } from '@luma/ui/components/primitives/pagination';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { PageHeader } from '@luma/ui/components/workspace/page-header';
 import { useQuery } from '@tanstack/react-query';
@@ -20,7 +27,13 @@ import { ArrowLeft, ArrowRight, RefreshCw, Search } from 'lucide-react';
 import { useState } from 'react';
 
 import { IdentityError } from '../identity/data';
-import { recordOptions, recordReturnPath, recordsOptions } from './data';
+import {
+  recordListError,
+  recordOptions,
+  recordPageSize,
+  recordReturnPath,
+  recordsOptions,
+} from './data';
 
 const kinds: { value: RecordKind | ''; label: string }[] = [
   { value: '', label: 'All records' },
@@ -41,6 +54,8 @@ function recordHref(
     kind?: RecordKind | undefined;
     connectionId?: string | undefined;
     from?: string | undefined;
+    cursor?: string | undefined;
+    page?: number | undefined;
   },
 ) {
   const params = new URLSearchParams();
@@ -48,20 +63,48 @@ function recordHref(
   if (search.kind) params.set('kind', search.kind);
   if (search.connectionId) params.set('connectionId', search.connectionId);
   if (search.from) params.set('from', search.from);
+  if (search.cursor) params.set('cursor', search.cursor);
+  if (search.page) params.set('page', String(search.page));
 
   return `/app/${encodeURIComponent(organizationId)}/records/${kind}/${id}${params.size ? `?${params}` : ''}`;
 }
 
-function RecordRow({ record, href }: { record: RecordSummary; href: string }) {
-  return (
-    <li>
-      <a className="record-row" href={href}>
+function recordColumns(
+  href: (record: RecordSummary) => string,
+): DataTableColumn<RecordSummary>[] {
+  return [
+    {
+      key: 'kind',
+      header: 'Type',
+      cell: (record) => (
         <span className="record-row-kind">{record.kind.replace('_', ' ')}</span>
+      ),
+    },
+    {
+      key: 'record',
+      header: 'Record',
+      cell: (record) => (
         <span className="record-row-main">
-          <strong>{record.label}</strong>
+          <DataTableRowLink href={href(record)}>
+            {record.label}
+          </DataTableRowLink>
           <small>{record.description}</small>
         </span>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      hideOnNarrow: true,
+      cell: (record) => (
         <span className="record-row-status">{record.status}</span>
+      ),
+    },
+    {
+      key: 'source',
+      header: 'Source',
+      hideOnNarrow: true,
+      cell: (record) => (
         <span className="record-row-source">
           <Badge
             tone={
@@ -82,13 +125,15 @@ function RecordRow({ record, href }: { record: RecordSummary; href: string }) {
             </small>
           ) : null}
         </span>
-        <ArrowRight size={16} aria-hidden="true" />
-      </a>
-    </li>
-  );
+      ),
+    },
+  ];
 }
 
-/** Searches current commerce and issue records with URL-backed filters. */
+/**
+ * Searches current commerce and issue records with URL-backed filters and pages through results
+ * with the API cursor, keeping a previous-page trail per search.
+ */
 export function RecordsPage() {
   const { organizationId } = useParams({
     from: '/app/$organizationId/records/',
@@ -96,16 +141,23 @@ export function RecordsPage() {
   const search = useSearch({ from: '/app/$organizationId/records/' });
   const navigate = useNavigate({ from: '/app/$organizationId/records/' });
   const [draft, setDraft] = useState(search.q);
-  const query = useQuery(
-    recordsOptions(organizationId, {
-      q: search.q,
-      kind: search.kind,
-      connectionId: search.connectionId,
-    }),
+  const query = useQuery(recordsOptions(organizationId, search));
+  const [trails, setTrails] = useState<Record<string, (string | undefined)[]>>(
+    {},
   );
-  const denied =
-    query.error instanceof IdentityError &&
-    [401, 403, 404].includes(query.error.status);
+  const filters = {
+    q: search.q,
+    kind: search.kind,
+    connectionId: search.connectionId,
+    from: search.from,
+  };
+  const filterKey = JSON.stringify(filters);
+  const trail = trails[filterKey] ?? [undefined];
+  const position = trail.indexOf(search.cursor);
+  const error = recordListError(query.error, search);
+  const goTo = (cursor: string | undefined, page: number | undefined) =>
+    void navigate({ search: { ...filters, cursor, page } });
+  const nextCursor = query.data?.nextCursor;
 
   return (
     <main className="records-page">
@@ -180,7 +232,8 @@ export function RecordsPage() {
         ) : null}
         <span>
           Customer and return records are waiting for connected source
-          projections. Search results show up to 50 matches.
+          projections. Results show 50 records per page, most recently observed
+          first.
         </span>
       </div>
       {query.isPending ? (
@@ -191,28 +244,74 @@ export function RecordsPage() {
         <p className="record-notice" role="status">
           Disconnected. Reconnect to load records.
         </p>
-      ) : denied ? (
+      ) : error?.kind === 'access' ? (
         <p className="record-notice" role="alert">
           You no longer have access to this workspace.
         </p>
+      ) : error?.kind === 'page' ? (
+        <Alert role="alert">
+          {error.message ??
+            'This page link no longer matches the record search.'}{' '}
+          <Button variant="outline" onClick={() => goTo(undefined, undefined)}>
+            Go to the first page
+          </Button>
+        </Alert>
       ) : query.isError ? (
         <p className="record-notice" role="alert">
           Records are unavailable. Try refreshing.
         </p>
-      ) : !query.data?.items.length ? (
-        <p className="record-notice">
-          No records match this search. Source coverage may still be incomplete.
-        </p>
       ) : (
-        <ul className="record-list">
-          {query.data.items.map((record) => (
-            <RecordRow
-              key={`${record.kind}:${record.id}`}
-              record={record}
-              href={recordHref(organizationId, record.kind, record.id, search)}
+        <>
+          <DataTable
+            caption="Matching records"
+            columns={recordColumns((record) =>
+              recordHref(organizationId, record.kind, record.id, search),
+            )}
+            rows={query.data.items}
+            rowKey={(record) => `${record.kind}:${record.id}`}
+            rowHeader="record"
+            empty={
+              <p className="record-notice">
+                No records match this search. Source coverage may still be
+                incomplete.
+              </p>
+            }
+          />
+          {query.data.items.length || search.cursor ? (
+            <Pagination
+              count={query.data.items.length}
+              page={search.page ?? 1}
+              pageSize={recordPageSize}
+              hasNext={!!nextCursor}
+              onPrevious={
+                position > 0
+                  ? () =>
+                      goTo(
+                        trail[position - 1],
+                        Math.max(1, (search.page ?? 1) - 1),
+                      )
+                  : undefined
+              }
+              onNext={() => {
+                if (!nextCursor) return;
+                if (position >= 0)
+                  setTrails((previous) => ({
+                    ...previous,
+                    [filterKey]: [...trail.slice(0, position + 1), nextCursor],
+                  }));
+                goTo(nextCursor, (search.page ?? 1) + 1);
+              }}
+              disabled={query.isFetching}
+              itemLabel="records"
+              label="Record pages"
             />
-          ))}
-        </ul>
+          ) : null}
+          {search.cursor && position < 0 ? (
+            <Button variant="ghost" onClick={() => goTo(undefined, undefined)}>
+              Return to first page
+            </Button>
+          ) : null}
+        </>
       )}
     </main>
   );
@@ -303,6 +402,8 @@ export function RecordDetailPage() {
     q: search.q,
     kind: search.kind,
     connectionId: search.connectionId,
+    cursor: search.cursor,
+    page: search.page ? String(search.page) : undefined,
   };
   const listParams = new URLSearchParams(
     Object.entries(listSearch).filter(

@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import { createQueryClient } from '../../lib/query-client';
-import { clearPrivate, organizationSlug, returnPath } from './data';
+import {
+  clearPrivate,
+  IdentityError,
+  organizationSlug,
+  returnPath,
+} from './data';
 
 describe('identity navigation', () => {
   it.each([
@@ -63,5 +68,40 @@ describe('identity navigation', () => {
     ).toBe('new tenant');
     await clearPrivate(client);
     expect(client.getQueryCache().getAll()).toHaveLength(0);
+  });
+});
+
+describe('API errors', () => {
+  it('keeps the error payload the server sent', () => {
+    const error = new IdentityError(409, {
+      code: 'CONFLICT',
+      message: 'That workspace address is taken',
+      requestId: 'req-1',
+    });
+    expect(error).toMatchObject({
+      status: 409,
+      code: 'CONFLICT',
+      message: 'That workspace address is taken',
+      requestId: 'req-1',
+    });
+  });
+
+  it('falls back to a generic message without a payload', () => {
+    for (const body of [undefined, null, 'Bad gateway', { detail: 'x' }]) {
+      const error = new IdentityError(502, body);
+      expect(error.status).toBe(502);
+      expect(error.code).toBeUndefined();
+      expect(error.requestId).toBeUndefined();
+      expect(error.message).toBe('The request could not be completed.');
+    }
+  });
+
+  it('keeps a server message but ignores codes outside the API contract', () => {
+    const error = new IdentityError(401, {
+      code: 'SESSION_EXPIRED',
+      message: 'Session expired',
+    });
+    expect(error.code).toBeUndefined();
+    expect(error.message).toBe('Session expired');
   });
 });

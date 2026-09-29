@@ -20,27 +20,66 @@ export const recordsSearch = z.object({
     .catch(undefined),
   connectionId: z.string().uuid().optional().catch(undefined),
   from: z.string().max(2048).optional().catch(undefined),
+  cursor: z.string().min(1).max(1024).optional().catch(undefined),
+  page: z.coerce.number().int().min(1).max(100000).optional().catch(undefined),
 });
 
-/** Loads a bounded, tenant-scoped page of current records. */
+export type RecordsSearch = z.infer<typeof recordsSearch>;
+
+export const recordPageSize = 50;
+
+export type RecordsError = {
+  kind: 'access' | 'page' | 'unavailable';
+  /** The server's explanation, when it sent one that people can act on. */
+  message?: string | undefined;
+};
+
+/**
+ * Classifies a record list failure. 401, 403 and 404 mean the reader lost access to the
+ * workspace. A validation error on a request with a page cursor means the page link no longer
+ * matches its search; the reader can start from the first page.
+ */
+export function recordListError(
+  error: unknown,
+  search: RecordsSearch,
+): RecordsError | undefined {
+  if (!error) return undefined;
+  if (!(error instanceof IdentityError)) return { kind: 'unavailable' };
+  if ([401, 403, 404].includes(error.status)) return { kind: 'access' };
+  if (error.code === 'VALIDATION_ERROR' && search.cursor)
+    return { kind: 'page', message: error.message };
+
+  return { kind: 'unavailable' };
+}
+
+/** Loads one page of current records for a search; `cursor` continues a previous page. */
 export function recordsOptions(
   organizationId: string,
   search: {
     q: string;
     kind?: RecordKind | undefined;
     connectionId?: string | undefined;
+    cursor?: string | undefined;
   },
 ) {
+  const query = {
+    q: search.q,
+    kind: search.kind,
+    connectionId: search.connectionId,
+    cursor: search.cursor,
+  };
+
   return queryOptions({
     ...privateQueryDefaults,
-    queryKey: ['private', 'organization', organizationId, 'records', search],
+    queryKey: ['private', 'organization', organizationId, 'records', query],
     queryFn: async ({ signal }) => {
       const result = await api.records.list({
         params: { organizationId },
-        query: search,
+        query,
         fetchOptions: { signal, cache: 'no-store' },
       });
-      if (result.status !== 200) throw new IdentityError(result.status);
+      if (result.status !== 200)
+        throw new IdentityError(result.status, result.body);
 
       return recordListSchema.parse(result.body);
     },
@@ -68,7 +107,8 @@ export function recordOptions(
         params: { organizationId, kind, recordId },
         fetchOptions: { signal, cache: 'no-store' },
       });
-      if (result.status !== 200) throw new IdentityError(result.status);
+      if (result.status !== 200)
+        throw new IdentityError(result.status, result.body);
 
       return recordDetailSchema.parse(result.body);
     },

@@ -137,34 +137,6 @@
 .procurement-filters > [data-slot='select-trigger'] {
   width: 145px;
 }
-.procurement-rows {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.procurement-rows > li + li {
-  border-top: 1px solid var(--border);
-}
-.procurement-row,
-.procurement-supplier-row {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 21px 24px;
-  color: inherit;
-  text-decoration: none;
-  min-width: 0;
-}
-.procurement-row {
-  transition: background 0.15s;
-}
-.procurement-row:hover {
-  background: var(--accent);
-}
-.procurement-row:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: -3px;
-}
 .procurement-record-icon {
   display: grid;
   place-items: center;
@@ -175,42 +147,6 @@
   width: 39px;
   height: 43px;
   flex-shrink: 0;
-}
-.procurement-row-main {
-  flex: 1;
-  min-width: 0;
-}
-.procurement-row-main h3 {
-  font-size: 14px;
-  overflow-wrap: anywhere;
-}
-.procurement-row-main p {
-  margin-top: 7px;
-  font-size: 12px;
-  color: var(--muted-foreground);
-  overflow-wrap: anywhere;
-}
-.procurement-row-main p > span {
-  padding: 0 8px;
-}
-.procurement-created {
-  display: block;
-  margin-top: 8px;
-  font-size: 12px;
-  color: var(--muted-foreground);
-}
-.procurement-row-meta {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-}
-.procurement-row-meta > span:last-child {
-  color: var(--muted-foreground);
-  font-size: 12px;
-  min-width: 88px;
-}
-.procurement-row > svg {
-  color: var(--muted-foreground);
 }
 .procurement-status-dot {
   width: 5px;
@@ -328,33 +264,7 @@
   font-size: 12px;
   overflow-wrap: anywhere;
 }
-.procurement-table-wrap {
-  overflow-x: auto;
-}
-.procurement-panel table {
-  border-collapse: collapse;
-  width: 100%;
-  text-align: left;
-  font-size: 13px;
-}
-.procurement-panel th {
-  padding: 10px 20px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--muted-foreground);
-  background: var(--muted);
-}
-.procurement-panel td {
-  padding: 20px;
-  border-top: 1px solid var(--border);
-  overflow-wrap: anywhere;
-  max-width: 300px;
-}
-.procurement-number {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-.procurement-number span {
+.procurement-unit {
   color: var(--muted-foreground);
   font-size: 12px;
 }
@@ -512,14 +422,6 @@
     grid-template-columns: minmax(0, 1fr) 260px;
     gap: 16px;
   }
-  .procurement-row-meta {
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 8px;
-  }
-  .procurement-row-meta > span:last-child {
-    min-width: 0;
-  }
 }
 @media (max-width: 640px) {
   .procurement-overview {
@@ -547,14 +449,6 @@
   .procurement-filters {
     width: 100%;
   }
-  .procurement-row,
-  .procurement-supplier-row {
-    padding: 18px 14px;
-    gap: 10px;
-  }
-  .procurement-row > .procurement-record-icon {
-    display: none;
-  }
   .procurement-views {
     flex-wrap: wrap;
   }
@@ -568,14 +462,5 @@
   }
   .procurement-detail-title h1 {
     font-size: 22px;
-  }
-  .procurement-panel td,
-  .procurement-panel th {
-    padding: 14px;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .procurement-row {
-    transition: none;
   }
 }

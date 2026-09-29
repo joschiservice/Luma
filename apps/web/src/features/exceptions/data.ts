@@ -50,7 +50,8 @@ export function casesOptions(organizationId: string, search: InboxSearch) {
         query,
         fetchOptions: { signal, cache: 'no-store' },
       });
-      if (result.status !== 200) throw new IdentityError(result.status);
+      if (result.status !== 200)
+        throw new IdentityError(result.status, result.body);
 
       return caseListSchema.parse(result.body);
     },
@@ -73,7 +74,8 @@ export function caseOptions(organizationId: string, exceptionId: string) {
         params: { organizationId, exceptionId },
         fetchOptions: { signal, cache: 'no-store' },
       });
-      if (result.status !== 200) throw new IdentityError(result.status);
+      if (result.status !== 200)
+        throw new IdentityError(result.status, result.body);
 
       return caseDetailSchema.parse(result.body);
     },

@@ -17,7 +17,7 @@ export class CodeEvaluationRejected extends Error {}
 
 function failure(result: { status: number; body: unknown }): never {
   if ([401, 403, 404].includes(result.status))
-    throw new IdentityError(result.status);
+    throw new IdentityError(result.status, result.body);
   const Failure = [400, 409, 422].includes(result.status)
     ? CodeEvaluationRejected
     : Error;

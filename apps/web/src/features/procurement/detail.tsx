@@ -1,9 +1,13 @@
 import './procurement.css';
 
-import type { PurchaseOrderStatus } from '@luma/api-contract';
+import type { PurchaseOrder, PurchaseOrderStatus } from '@luma/api-contract';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
+import {
+  DataTable,
+  type DataTableColumn,
+} from '@luma/ui/components/primitives/data-table';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from '@tanstack/react-router';
@@ -15,6 +19,24 @@ import { IdentityError } from '../identity/data';
 import { procurementError, purchaseOrderOptions } from './data';
 import { TransitionDialog } from './forms';
 import { OrderStatus, statusLabels } from './presentation';
+
+const lineColumns: DataTableColumn<PurchaseOrder['lines'][number]>[] = [
+  { key: 'item', header: 'Item', cell: (line) => line.description },
+  { key: 'sku', header: 'SKU', cell: (line) => <code>{line.sku}</code> },
+  {
+    key: 'quantity',
+    header: 'Quantity',
+    numeric: true,
+    cell: (line) => (
+      <>
+        {line.quantity.toLocaleString(undefined, {
+          maximumSignificantDigits: 15,
+        })}{' '}
+        <span className="procurement-unit">{line.unit}</span>
+      </>
+    ),
+  },
+];
 
 /** Shows an order's immutable commercial details, ownership and audited lifecycle. */
 export function PurchaseOrderPage() {
@@ -85,33 +107,13 @@ export function PurchaseOrderPage() {
                 {order.lines.length === 1 ? 'line' : 'lines'}
               </Badge>
             </div>
-            <div className="procurement-table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Item</th>
-                    <th>SKU</th>
-                    <th className="procurement-number">Quantity</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {order.lines.map((line) => (
-                    <tr key={line.id}>
-                      <td>{line.description}</td>
-                      <td>
-                        <code>{line.sku}</code>
-                      </td>
-                      <td className="procurement-number">
-                        {line.quantity.toLocaleString(undefined, {
-                          maximumSignificantDigits: 15,
-                        })}{' '}
-                        <span>{line.unit}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+              caption="Order lines"
+              variant="plain"
+              columns={lineColumns}
+              rows={order.lines}
+              rowKey={(line) => line.id}
+            />
           </section>
           <section className="procurement-panel">
             <div className="procurement-panel-heading">
