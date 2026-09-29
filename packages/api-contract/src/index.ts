@@ -14,6 +14,7 @@ import { operationsContract } from './contracts/overview.js';
 import { playbooksContract } from './contracts/playbooks.js';
 import { procurementContract } from './contracts/procurement.js';
 import { connectorProvidersContract } from './contracts/providers.js';
+import { recordsContract } from './contracts/records.js';
 import { settingsContract } from './contracts/settings.js';
 import { shadowContract } from './contracts/shadow.js';
 import { systemContract } from './contracts/system.js';
@@ -43,6 +44,7 @@ const routes: {
   apps: typeof appsContract;
   system: typeof systemContract;
   connectorProviders: typeof connectorProvidersContract;
+  records: typeof recordsContract;
 } = {
   shadow: shadowContract,
   activity: activityContract,
@@ -63,6 +65,7 @@ const routes: {
   apps: appsContract,
   system: systemContract,
   connectorProviders: connectorProvidersContract,
+  records: recordsContract,
 };
 const options = {
   strictStatusCodes: true as const,
@@ -146,3 +149,5 @@ export * from './replenishment.js';
 export * from './metrics.js';
 
 export * from './operational-metrics.js';
+
+export * from './records.js';

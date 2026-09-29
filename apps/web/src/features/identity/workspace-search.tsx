@@ -7,6 +7,7 @@ import {
 } from '@luma/ui/components/primitives/dialog';
 import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { Kbd } from '@luma/ui/components/primitives/kbd';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import {
   ArrowDown,
@@ -30,6 +31,7 @@ import {
 
 import { usesCommandKey } from '../../lib/keyboard';
 import { setThemePreference, type ThemePreference } from '../../lib/theme';
+import { recordsOptions } from '../records/data';
 import { workspaceDestinations } from './workspace-destinations';
 
 const subscribePlatform = () => () => undefined;
@@ -116,6 +118,7 @@ export function WorkspaceSearch({
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [recordQuery, setRecordQuery] = useState('');
   const modifier = useSyncExternalStore(
     subscribePlatform,
     platformModifier,
@@ -141,6 +144,17 @@ export function WorkspaceSearch({
 
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setRecordQuery(query.trim()), 250);
+
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const records = useQuery({
+    ...recordsOptions(organizationId, { q: recordQuery }),
+    enabled: open && recordQuery.length >= 2,
+  });
 
   const pages = workspaceDestinations.filter((item) =>
     matches(query, `${item.label} ${item.description}`),
@@ -181,8 +195,8 @@ export function WorkspaceSearch({
           <Search size={17} aria-hidden="true" />
           <input
             ref={input}
-            aria-label="Search pages"
-            placeholder="Search pages and actions…"
+            aria-label="Search workspace"
+            placeholder="Search records, pages and actions…"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={(event) => {
@@ -241,6 +255,43 @@ export function WorkspaceSearch({
               </span>
             </Link>
           ))}
+          {recordQuery.length >= 2 ? (
+            <p className="command-section-label">Records</p>
+          ) : null}
+          {records.data?.items.slice(0, 8).map((record) => (
+            <Link
+              key={`${record.kind}:${record.id}`}
+              className="command-item"
+              to="/app/$organizationId/records/$kind/$recordId"
+              params={{
+                organizationId,
+                kind: record.kind,
+                recordId: record.id,
+              }}
+              search={{ q: recordQuery }}
+              onClick={() => changeOpen(false)}
+            >
+              <span className="command-item-icon">
+                <Search size={16} aria-hidden="true" />
+              </span>
+              <span className="command-item-copy">
+                <strong>{record.label}</strong>
+                <span>
+                  {record.kind} · {record.description}
+                </span>
+              </span>
+              <CornerDownLeft
+                className="command-item-enter"
+                size={14}
+                aria-hidden="true"
+              />
+            </Link>
+          ))}
+          {recordQuery.length >= 2 && records.isPending ? (
+            <p className="command-section-label" role="status">
+              Searching records…
+            </p>
+          ) : null}
           {actions.length ? (
             <p className="command-section-label">Actions</p>
           ) : null}
@@ -284,7 +335,7 @@ export function WorkspaceSearch({
               </span>
             );
           })}
-          {!pages.length && !actions.length ? (
+          {!pages.length && !actions.length && !records.data?.items.length ? (
             <div className="command-empty" role="status">
               <Search size={20} aria-hidden="true" />
               <strong>No pages found</strong>
