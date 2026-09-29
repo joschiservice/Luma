@@ -18,13 +18,14 @@ export const ordersContract = c.router({
     query: orderListQuerySchema,
     responses: {
       200: orderListSchema,
+      400: apiErrorSchema,
       401: apiErrorSchema,
       404: apiErrorSchema,
       503: apiErrorSchema,
     },
     summary: 'List orders',
     description:
-      'Lists current orders from your connected sources. Search matches order numbers, source order IDs, SKU text on order lines and source SKU IDs. Filter by status, payment, source, placed or updated time, or a saved view. Outstanding, overdue and needs-you views count the same orders as the order metrics. Results use `nextCursor` for the following page; a cursor is only valid with the filters and sort that produced it.',
+      'Lists current orders from your connected sources. Search matches order numbers, source order IDs, SKU text on order lines and source SKU IDs. Filter by status, payment, source, placed or updated time, or a saved view. Outstanding, overdue and needs-you views count the same orders as the order metrics. Results use `nextCursor` for the following page; a cursor is only valid with the filters and sort that produced it, and any other cursor returns 400 with a message to start from the first page.',
   },
   get: {
     method: 'GET',

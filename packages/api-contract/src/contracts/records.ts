@@ -19,13 +19,14 @@ export const recordsContract = c.router({
     query: recordQuerySchema,
     responses: {
       200: recordListSchema,
+      400: apiErrorSchema,
       401: apiErrorSchema,
       404: apiErrorSchema,
       503: apiErrorSchema,
     },
     summary: 'Search workspace records',
     description:
-      'Searches current records in your workspace. Filter by connection to inspect one source. Results are limited to 50 and include source identity, freshness, and coverage. Customer and return coverage is unavailable.',
+      'Searches current records in your workspace, most recently observed first. Filter by connection to inspect one source. Each page holds up to 50 records with source identity, freshness and coverage; pass `nextCursor` as `cursor` to read the next page. A cursor from a different search returns 400. Customer and return coverage is unavailable.',
   },
   get: {
     method: 'GET',

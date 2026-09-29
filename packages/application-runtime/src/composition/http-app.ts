@@ -21,27 +21,31 @@ import type { ModelGateway, Observability, Observation } from '@luma/platform';
 import type { ProcurementService } from '@luma/procurement';
 import { procurementRoutes } from '@luma/procurement/http';
 import type {
+  OperationalMetrics,
+  OperationalSummary,
+  OrderWorkspace,
+  RecordExplorer,
+} from '@luma/read-models';
+import {
+  metricRoutes,
+  orderRoutes,
+  recordRoutes,
+} from '@luma/read-models/http';
+import type {
   ActivityService,
   DeskService,
   LearningService,
   MetricEvents,
-  OperationalMetrics,
-  OperationalSummary,
   OperationsOverviewService,
-  OrderWorkspace,
   PlaybookLibrary,
-  RecordExplorer,
   ShadowService,
 } from '@luma/resolution';
 import {
   activityRoutes,
   deskRoutes,
   learningRoutes,
-  metricRoutes,
   operationsRoutes,
-  orderRoutes,
   playbookRoutes,
-  recordRoutes,
   registerDeskEvents,
   registerMetricEvents,
   shadowRoutes,
@@ -235,6 +239,16 @@ export function buildApp(
       },
     };
     const knownError = typeof status === 'number' ? errors[status] : undefined;
+    // Errors marked `expose` carry a message written for the person making the request.
+    const message =
+      knownError &&
+      typeof error === 'object' &&
+      error !== null &&
+      'expose' in error &&
+      error.expose === true &&
+      error instanceof Error
+        ? error.message
+        : knownError?.message;
     if (!knownError) {
       if (request.observation)
         dependencies.observability?.captureError(request.observation.context);
@@ -244,10 +258,9 @@ export function buildApp(
       );
     }
     reply.status(knownError && typeof status === 'number' ? status : 500).send({
-      ...(knownError ?? {
-        code: 'INTERNAL_ERROR',
-        message: 'Internal server error',
-      }),
+      ...(knownError
+        ? { code: knownError.code, message }
+        : { code: 'INTERNAL_ERROR', message: 'Internal server error' }),
       requestId: request.id,
     });
   });

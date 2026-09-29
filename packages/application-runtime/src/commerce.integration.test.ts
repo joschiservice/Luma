@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 
 import { buildApp, createCommerceServices } from '@luma/application-runtime';
@@ -8,7 +8,7 @@ import {
   createProductIdentityReader,
   createReadChecks,
 } from '@luma/connections/composition';
-import { createOrderAttentionReader } from '@luma/exceptions/composition';
+import { orderAttentionQuery } from '@luma/exceptions/composition';
 import type { IdentityService } from '@luma/identity';
 import { makeTenantContext } from '@luma/identity/composition';
 import { createOrderMetricReader } from '@luma/orders/composition';
@@ -16,7 +16,7 @@ import { createTenantDatabase } from '@luma/platform/composition';
 import {
   createOperationalMetrics,
   createRecordExplorer,
-} from '@luma/resolution/composition';
+} from '@luma/read-models/composition';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -230,6 +230,64 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
     expect(
       await explorer.get(context(otherTenant), 'position', first.entityId),
     ).toBeNull();
+  });
+  it('pages through every matching record with a cursor bound to the search', async () => {
+    const ids = Array.from({ length: 60 }, () => randomUUID());
+    for (const id of ids) {
+      const fingerprint = createHash('sha256').update(id).digest('hex');
+      await owner.query(
+        'INSERT INTO exceptions(id,tenant_id,fingerprint,state,document) VALUES($1,$2,$3,$4,$5)',
+        [
+          id,
+          otherTenant,
+          fingerprint,
+          'detected',
+          {
+            id,
+            tenantId: otherTenant,
+            fingerprint,
+            state: 'detected',
+            occurrenceCount: 1,
+            exceptionClass: 'inventory_mismatch',
+            severity: 'medium',
+            subject: { subjectKind: 'sku', subjectId: 'paging-sku', scope: [] },
+          },
+        ],
+      );
+    }
+    try {
+      const explorer = createRecordExplorer(createTenantDatabase(runtime));
+      const first = await explorer.list(context(otherTenant), { q: '' });
+      expect(first.items).toHaveLength(50);
+      expect(first.nextCursor).toEqual(expect.any(String));
+      const second = await explorer.list(context(otherTenant), {
+        q: '',
+        cursor: first.nextCursor!,
+      });
+      expect(second.items).toHaveLength(10);
+      expect(second.nextCursor).toBeNull();
+      expect(
+        new Set([...first.items, ...second.items].map((item) => item.id)),
+      ).toEqual(new Set(ids));
+      // A cursor only continues the search that produced it.
+      await expect(
+        explorer.list(context(otherTenant), {
+          q: 'paging',
+          cursor: first.nextCursor!,
+        }),
+      ).rejects.toMatchObject({ statusCode: 400, expose: true });
+      await expect(
+        explorer.list(context(), { q: '', cursor: first.nextCursor! }),
+      ).rejects.toMatchObject({ statusCode: 400 });
+      expect(
+        (await explorer.list(context(otherTenant), { q: '', kind: 'order' }))
+          .items,
+      ).toEqual([]);
+    } finally {
+      await owner.query('DELETE FROM exceptions WHERE tenant_id=$1', [
+        otherTenant,
+      ]);
+    }
   });
   it('reads product labels by mapped SKU with tenant isolation and latest product revisions', async () => {
     const db = createTenantDatabase(runtime);
@@ -942,14 +1000,300 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
       services.ingestion.replay(context(), connection, 'other-order'),
     ).rejects.toThrow('another order');
   });
+  describe('sources without update times', () => {
+    const jtl = randomUUID();
+
+    beforeAll(async () => {
+      await owner.query(
+        'INSERT INTO connector_installations(tenant_id,id,version,document,secret) VALUES($1,$2,1,$3,$4)',
+        [
+          tenant,
+          jtl,
+          {
+            id: jtl,
+            tenantId: tenant,
+            version: 1,
+            status: 'active',
+            target: { kind: 'jtl' },
+            label: 'JTL fixture',
+            permissions: [],
+            granted: [],
+          },
+          'encrypted-fixture',
+        ],
+      );
+    });
+
+    const source = {
+      tenantId: tenant,
+      connectionId: jtl,
+      provider: 'jtl',
+      externalId: '10',
+      scopeKey: '',
+    };
+
+    function order(
+      observedAt: string,
+      status: 'open' | 'completed' | 'cancelled',
+    ): CommerceObservation & { capability: 'orders.read' } {
+      return {
+        capability: 'orders.read',
+        observation: {
+          id: randomUUID(),
+          source: { ...source, resource: 'order' },
+          kind: 'snapshot',
+          observedAt,
+          sourceUpdatedAt: null,
+          sourceRevision: null,
+          adapterVersion: 'jtl/1',
+          schemaVersion: 1,
+          data: {
+            displayNumber: 'SIM-10',
+            placedAt: '2026-09-20T09:00:00Z',
+            total: { amount: '48', currency: 'EUR' },
+            status,
+            paymentStatus: 'paid',
+            lines: [
+              {
+                id: { externalId: '101', scopeKey: '10' },
+                sku: null,
+                quantity: { amount: '2', unit: 'each' },
+                cancelledQuantity: null,
+                skuCode: 'LUMA-001',
+                title: 'Canvas tote',
+              },
+            ],
+          },
+        },
+      };
+    }
+
+    function note(
+      observedAt: string,
+      status: 'processing' | 'shipped',
+    ): CommerceObservation & { capability: 'fulfillment.read' } {
+      return {
+        capability: 'fulfillment.read',
+        observation: {
+          id: randomUUID(),
+          source: { ...source, externalId: '30', resource: 'fulfillment' },
+          kind: 'snapshot',
+          observedAt,
+          sourceUpdatedAt: null,
+          sourceRevision: null,
+          adapterVersion: 'jtl/1',
+          schemaVersion: 1,
+          data: {
+            order: { externalId: '10', scopeKey: '' },
+            status,
+            lines: [
+              {
+                orderLine: { externalId: '101', scopeKey: '10' },
+                quantity: { amount: '2', unit: 'each' },
+              },
+            ],
+            lastProgressAt: '2026-09-20T10:00:00Z',
+            progressBasis: 'note_created_or_package_shipped',
+            failureCode: null,
+          },
+        },
+      };
+    }
+
+    async function mapOrder(input: ReturnType<typeof order>, key: string) {
+      expect(
+        (await services.ingestion.ingest(context(), key, input)).status,
+      ).toBe('pending');
+      const id = await services.ingestion.bind(
+        context(),
+        input.observation.source,
+        'jtl-order-10',
+        input.observation.id,
+        'manual',
+      );
+      const lineId = await services.ingestion.bind(
+        context(),
+        {
+          ...source,
+          externalId: '101',
+          scopeKey: '10',
+          resource: 'order_line',
+        },
+        'jtl-line-101',
+        input.observation.id,
+        'manual',
+      );
+
+      return { id, lineId };
+    }
+
+    it('makes a later read current and retains an older read that arrives late', async () => {
+      const first = order('2026-09-20T10:00:00Z', 'open');
+      const { id } = await mapOrder(first, 'jtl-first');
+      expect(
+        (await services.ingestion.replay(context(), jtl, 'jtl-first')).status,
+      ).toBe('applied');
+
+      const completed = order('2026-09-20T10:05:00Z', 'completed');
+      expect(
+        (await services.ingestion.ingest(context(), 'jtl-second', completed))
+          .status,
+      ).toBe('applied');
+      const late = order('2026-09-20T10:02:00Z', 'cancelled');
+      expect(
+        (await services.ingestion.ingest(context(), 'jtl-late', late)).status,
+      ).toBe('retained');
+      const [current] = await services.orders.current(context(), id);
+      expect(current).toMatchObject({
+        version: 2,
+        snapshot: {
+          observationId: completed.observation.id,
+          schemaVersion: 2,
+          normalizerVersion: 'commerce/2',
+          sourceUpdatedAt: null,
+          data: {
+            status: 'completed',
+            placedAt: '2026-09-20T09:00:00Z',
+            total: { amount: '48', currency: 'EUR' },
+            lines: [{ skuCode: 'LUMA-001', title: 'Canvas tote' }],
+          },
+        },
+      });
+      expect(await services.orders.history(context(), id)).toHaveLength(3);
+
+      const processing = note('2026-09-20T10:06:00Z', 'processing');
+      await services.ingestion.ingest(context(), 'jtl-note', processing);
+      const noteId = await services.ingestion.bind(
+        context(),
+        processing.observation.source,
+        'jtl-note-30',
+        processing.observation.id,
+        'manual',
+      );
+      expect(
+        (await services.ingestion.replay(context(), jtl, 'jtl-note')).status,
+      ).toBe('applied');
+      expect(
+        (
+          await services.ingestion.ingest(
+            context(),
+            'jtl-note-shipped',
+            note('2026-09-20T10:10:00Z', 'shipped'),
+          )
+        ).status,
+      ).toBe('applied');
+      expect(
+        (
+          await services.ingestion.ingest(
+            context(),
+            'jtl-note-late',
+            note('2026-09-20T10:08:00Z', 'processing'),
+          )
+        ).status,
+      ).toBe('retained');
+      expect(
+        (await services.orders.current(context(), noteId))[0]?.snapshot.data
+          .status,
+      ).toBe('shipped');
+    });
+
+    it('settles equal observation times on the greater observation ID', async () => {
+      const first = order('2026-09-20T10:00:00Z', 'open');
+      const { id } = await mapOrder(first, 'jtl-tie-seed');
+      await services.ingestion.replay(context(), jtl, 'jtl-tie-seed');
+      const [low, middle, high] = [
+        order('2026-09-20T11:00:00Z', 'completed'),
+        order('2026-09-20T11:00:00Z', 'cancelled'),
+        order('2026-09-20T11:00:00Z', 'open'),
+      ].sort((a, b) => (a.observation.id < b.observation.id ? -1 : 1));
+      for (const [key, input, status] of [
+        ['jtl-tie-middle', middle!, 'applied'],
+        ['jtl-tie-low', low!, 'retained'],
+        ['jtl-tie-high', high!, 'applied'],
+      ] as const)
+        expect(
+          (await services.ingestion.ingest(context(), key, input)).status,
+        ).toBe(status);
+      expect(
+        (await services.orders.current(context(), id))[0]?.snapshot
+          .observationId,
+      ).toBe(high!.observation.id);
+    });
+
+    it('keeps stored version 1 order snapshots readable and re-normalizes their observations', async () => {
+      const input = order('2026-09-20T10:00:00Z', 'open');
+      const { id, lineId } = await mapOrder(input, 'jtl-legacy');
+      const lines = [
+        {
+          id: lineId,
+          skuId: null,
+          quantity: '2',
+          cancelledQuantity: null,
+          unit: 'each',
+          skuCode: 'LUMA-001',
+          title: 'Canvas tote',
+        },
+      ];
+      // The identity the previous normalizer wrote for this observation.
+      const legacy = {
+        schemaVersion: 1 as const,
+        entityId: id,
+        kind: 'order' as const,
+        connectionId: jtl,
+        observationId: input.observation.id,
+        normalizerVersion: 'commerce/1',
+        mappingVersion: createHash('sha256')
+          .update(JSON.stringify([id, lines.map((l) => [l.id, l.skuId])]))
+          .digest('hex'),
+        sourceRevision: null,
+        sourceUpdatedAt: null,
+        observedAt: input.observation.observedAt,
+        deleted: false,
+        data: {
+          type: 'order' as const,
+          displayNumber: 'SIM-10',
+          placedAt: '2026-09-20T09:00:00Z',
+          status: 'open',
+          paymentStatus: 'paid',
+          lines,
+        },
+      };
+      expect(await services.orders.project(context(), legacy)).toBe('applied');
+      expect(
+        (await services.orders.current(context(), id))[0]?.snapshot,
+      ).toEqual(legacy);
+
+      expect(
+        (await services.ingestion.replay(context(), jtl, 'jtl-legacy')).status,
+      ).toBe('applied');
+      const history = await services.orders.history(context(), id);
+      expect(
+        history.map((s) => [s.schemaVersion, s.normalizerVersion]),
+      ).toEqual([
+        [1, 'commerce/1'],
+        [2, 'commerce/2'],
+      ]);
+      expect(
+        (await services.orders.current(context(), id))[0]?.snapshot,
+      ).toMatchObject({
+        schemaVersion: 2,
+        data: { total: { amount: '48', currency: 'EUR' } },
+      });
+      await expect(
+        services.orders.project(context(), {
+          ...legacy,
+          schemaVersion: 3 as never,
+        }),
+      ).rejects.toThrow();
+    });
+  });
   it('reconciles metric cohorts across lifecycle changes, source identity, filters and snapshot conflicts', async () => {
     let clock = new Date('2026-09-20T00:00:00Z');
     const db = createTenantDatabase(runtime);
     const metrics = createOperationalMetrics(
       db,
       {
-        orders: createOrderMetricReader,
-        attention: createOrderAttentionReader,
+        orders: (db) => createOrderMetricReader(db, orderAttentionQuery),
         coverage: createConnectionCoverage,
       },
       () => clock,
@@ -1319,8 +1663,7 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
       const measured = createOperationalMetrics(
         measuredDb,
         {
-          orders: createOrderMetricReader,
-          attention: createOrderAttentionReader,
+          orders: (db) => createOrderMetricReader(db, orderAttentionQuery),
           coverage: createConnectionCoverage,
         },
         () => clock,

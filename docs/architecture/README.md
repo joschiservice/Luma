@@ -41,3 +41,5 @@ Update ADRs through pull requests. After pushing, link the repository file from 
 - [ADR-006: First-party workspace apps](006-workspace-apps.md)
 
 - [ADR-007: First-class Workflow ownership](007-workflow-model.md)
+
+- [ADR-008: Workspace read models](008-workspace-read-models.md)

@@ -1,6 +1,6 @@
 # @luma/resolution
 
-Coordinates exception resolution: proposals, review, refresh, playbooks, learning, activity, and operational views.
+Coordinates exception resolution: proposals, review, refresh, playbooks, learning, activity and the operations overview. Cross-owner workspace reads live in [@luma/read-models](../read-models/README.md).
 
 ## Responsibilities
 

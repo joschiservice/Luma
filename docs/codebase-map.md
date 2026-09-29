@@ -178,11 +178,11 @@ Draft tests: cases, validation and prefill live in `packages/workflows/src/domai
 
 ## Shared record explorer
 
-Record search and detail reads use `packages/resolution/src/application/records.ts` and
+Record search and detail reads use `packages/read-models/src/application/records.ts` and
 `infrastructure/record-explorer.ts`. The read model keeps current source snapshots
-separate and resolves issue subjects through tenant-scoped source mappings. The
-contract is `packages/api-contract/src/records.ts`; HTTP routing is
-`packages/resolution/src/api/records.ts`. The web explorer and deep links are in
+separate, resolves issue subjects through tenant-scoped source mappings and pages with a
+keyset cursor. The contract is `packages/api-contract/src/records.ts`; HTTP routing is
+`packages/read-models/src/api/records.ts`. The web explorer and deep links are in
 `apps/web/src/features/records`, with global search in
 `apps/web/src/features/identity/workspace-search.tsx`.
 
@@ -192,17 +192,22 @@ grants the read model access to canonical identities and stock projections.
 
 ## Orders workspace
 
-The order list and detail read model is `packages/resolution/src/infrastructure/orders.ts`,
-with its port in `application/orders.ts` and progress, fulfillment and difference rules in
-`domain/orders.ts`. Luma activity for an order uses the `subjects` filter in
-`infrastructure/persistence/activity.ts`. The contract is `packages/api-contract/src/orders.ts`
-and `contracts/orders.ts`; routes are `packages/resolution/src/api/orders.ts`. The web
-feature is `apps/web/src/features/orders` (list `page.tsx`, detail `detail.tsx`, URL state
-`data.ts`, wording `presentation.ts`). Live source context uses the app `record` slot;
+The order list and detail read model is `packages/read-models/src/infrastructure/orders`
+(`workspace.ts` wiring, `list-query.ts` and `list.ts`, `detail.ts` with `detail-facts.ts`
+and `links.ts`, `source-comparison.ts` for "differs by source", `cursor.ts`), with its port
+in `application/orders.ts`. Open, overdue, line progress and fulfillment state come from
+`packages/orders/src/infrastructure/order-state.ts`; needs-you comes from
+`orderAttentionQuery` in `packages/exceptions/src/infrastructure/cases.ts`. Luma activity for
+an order uses the `subjects` filter in
+`packages/resolution/src/infrastructure/persistence/activity.ts`. The contract is
+`packages/api-contract/src/orders.ts` and `contracts/orders.ts`; routes are
+`packages/read-models/src/api/orders.ts`. The web feature is `apps/web/src/features/orders`
+(list `page.tsx`, detail `detail.tsx` and their section components, URL state `data.ts`,
+wording `presentation.ts`). Live source context uses the app `record` slot;
 Shopify's is `packages/apps/shopify/src/web/order-context.tsx`. Adapters fill the optional
 order facts in their `infrastructure/adapter.ts`.
 
-Tests: `domain/orders.test.ts`, `packages/application-runtime/src/orders.integration.test.ts`
+Tests: `packages/application-runtime/src/orders.integration.test.ts`
 (including metric parity and the large-import benchmark), the web `orders` unit tests,
 the `Orders/Workspace` stories and `apps/api/e2e/orders.browser.mjs`. See
 [Orders workspace](orders-workspace.md).
@@ -210,9 +215,10 @@ the `Orders/Workspace` stories and `apps/api/e2e/orders.browser.mjs`. See
 ## Operational metrics
 
 Start with `packages/orders/src/domain/metrics.ts` for versioned definitions and
-`orders/src/infrastructure/metrics.ts` for canonical SQL. Resolution composes
-coverage and inbox attention inside a shared read transaction in
-`packages/resolution/src/infrastructure/metrics.ts`. API contracts live in
+`orders/src/infrastructure/metrics.ts` for canonical SQL, built from the order state blocks
+in `order-state.ts` and the injected inbox attention query. The read model composes
+coverage and attention boundaries inside a shared read transaction in
+`packages/read-models/src/infrastructure/metrics.ts`. API contracts live in
 `packages/api-contract/src/metrics.ts`; the UI is
 `apps/web/src/features/overview/order-metrics.tsx`, shown on the Insights page
 (`insights.tsx`) and as an optional Home module.
@@ -232,7 +238,7 @@ Cross-domain metrics: domain definitions and summaries live in
 `packages/exceptions/src/domain/metrics.ts`, `packages/procurement/src/domain/metrics.ts`
 and `packages/connections/src/domain/metrics.ts`. Exceptions reuses the inbox SQL;
 Procurement reads configured-source stocks and recorded POs. Snapshot composition is
-`packages/resolution/src/infrastructure/operational-summary.ts`; typed v2 transport is
+`packages/read-models/src/infrastructure/operational-summary.ts`; typed v2 transport is
 `packages/api-contract/src/operational-metrics.ts`. The grouped frontend is
 `apps/web/src/features/overview/operational-metrics.tsx` and shares the live hook with
 order v1. Migration 0032 extends invalidations. Tests: domain metric tests,

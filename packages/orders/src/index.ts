@@ -14,5 +14,6 @@ export type {
   OrderMetricScope,
   OrderMetricRead,
   OrderMetricReader,
-  AttentionOrder,
 } from './application/metrics.js';
+
+export type { OrderStateQueries } from './application/order-state.js';

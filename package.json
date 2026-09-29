@@ -80,6 +80,7 @@
     "@luma/policies": "workspace:*",
     "@luma/execution": "workspace:*",
     "@luma/exceptions": "workspace:*",
+    "@luma/read-models": "workspace:*",
     "@luma/resolution": "workspace:*",
     "@luma/application-runtime": "workspace:*",
     "@luma/commerce-ingestion": "workspace:*",

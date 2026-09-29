@@ -2600,7 +2600,7 @@
     },
     "/v1/organizations/{organizationId}/activity": {
       "get": {
-        "description": "Returns recorded events newest first by recorded timestamp and immutable ID. Date bounds apply to recorded time, including from and excluding to, for at most 366 days. Search matches issue ID, persisted target reference, action label, actor ID and workflow run ID (literal, case-insensitive substring). Raw payloads are not searched. Cursors are bound to workspace, role, filters and page size. Connection administration events are visible only to owners and administrators. Approval and provider acceptance do not establish verified resolution.",
+        "description": "Returns recorded events newest first by recorded timestamp and immutable ID. Date bounds apply to recorded time, including from and excluding to, for at most 366 days. Search matches issue ID, persisted target reference, action label, actor ID and workflow run ID (literal, case-insensitive substring). Raw payloads are not searched. Cursors are bound to workspace, role, filters and page size; any other cursor returns 400 with a message to start from the first page. Connection administration events are visible only to owners and administrators. Approval and provider acceptance do not establish verified resolution.",
         "summary": "Search workspace activity",
         "tags": ["activity"],
         "parameters": [
@@ -68915,7 +68915,7 @@
     },
     "/v1/organizations/{organizationId}/records": {
       "get": {
-        "description": "Searches current records in your workspace. Filter by connection to inspect one source. Results are limited to 50 and include source identity, freshness, and coverage. Customer and return coverage is unavailable.",
+        "description": "Searches current records in your workspace, most recently observed first. Filter by connection to inspect one source. Each page holds up to 50 records with source identity, freshness and coverage; pass `nextCursor` as `cursor` to read the next page. A cursor from a different search returns 400. Customer and return coverage is unavailable.",
         "summary": "Search workspace records",
         "tags": ["records"],
         "parameters": [
@@ -68958,6 +68958,15 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
             }
           }
         ],
@@ -69072,6 +69081,10 @@
                         ]
                       }
                     },
+                    "nextCursor": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "coverage": {
                       "type": "object",
                       "properties": {
@@ -69087,7 +69100,7 @@
                       "required": ["customer", "return"]
                     }
                   },
-                  "required": ["items", "coverage"]
+                  "required": ["items", "nextCursor", "coverage"]
                 }
               }
             }
@@ -69822,7 +69835,7 @@
     },
     "/v1/organizations/{organizationId}/orders": {
       "get": {
-        "description": "Lists current orders from your connected sources. Search matches order numbers, source order IDs, SKU text on order lines and source SKU IDs. Filter by status, payment, source, placed or updated time, or a saved view. Outstanding, overdue and needs-you views count the same orders as the order metrics. Results use `nextCursor` for the following page; a cursor is only valid with the filters and sort that produced it.",
+        "description": "Lists current orders from your connected sources. Search matches order numbers, source order IDs, SKU text on order lines and source SKU IDs. Filter by status, payment, source, placed or updated time, or a saved view. Outstanding, overdue and needs-you views count the same orders as the order metrics. Results use `nextCursor` for the following page; a cursor is only valid with the filters and sort that produced it, and any other cursor returns 400 with a message to start from the first page.",
         "summary": "List orders",
         "tags": ["orders"],
         "parameters": [

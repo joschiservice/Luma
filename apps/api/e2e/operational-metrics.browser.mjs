@@ -8,7 +8,7 @@ import { createCaseMetricReader } from '@luma/exceptions/composition';
 import { makeTenantContext } from '@luma/identity';
 import { createTenantDatabase } from '@luma/platform/composition';
 import { createProcurementMetricReader } from '@luma/procurement/composition';
-import { createOperationalSummary } from '@luma/resolution/composition';
+import { createOperationalSummary } from '@luma/read-models/composition';
 import { chromium } from 'playwright';
 import { expect, it } from 'vitest';
 

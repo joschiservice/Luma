@@ -8,10 +8,13 @@ import type { VerificationEvaluator } from '@luma/exceptions';
 import {
   createCaseMetricReader,
   createOrderAttentionBoundaryReader,
-  createOrderAttentionReader,
+  orderAttentionQuery,
 } from '@luma/exceptions/composition';
 import type { IdentityService } from '@luma/identity';
-import { createOrderMetricReader } from '@luma/orders/composition';
+import {
+  createOrderMetricReader,
+  orderStateQueries,
+} from '@luma/orders/composition';
 import type { ModelGateway, TenantDatabase } from '@luma/platform';
 import { createReplenishmentScenarios } from '@luma/procurement';
 import {
@@ -19,17 +22,19 @@ import {
   createProcurementMetricReader,
 } from '@luma/procurement/composition';
 import {
+  createOperationalMetrics,
+  createOperationalSummary,
+  createOrderWorkspace,
+  createRecordExplorer,
+} from '@luma/read-models/composition';
+import {
   createShippingMethodTemplate,
   shippingMethodPlaybook,
   shippingMethodVocabulary,
 } from '@luma/resolution';
 import {
   createActivityStore,
-  createOperationalMetrics,
-  createOperationalSummary,
   createOperationsOverview,
-  createOrderWorkspace,
-  createRecordExplorer,
   createResolutionLearning,
   createShadowEvaluations,
   createWorkspaceActivity,
@@ -257,8 +262,7 @@ export function createApplicationServices(
         coverage: createConnectionCoverage,
       }),
       metrics: createOperationalMetrics(database, {
-        orders: createOrderMetricReader,
-        attention: createOrderAttentionReader,
+        orders: (db) => createOrderMetricReader(db, orderAttentionQuery),
         attentionBoundary: createOrderAttentionBoundaryReader,
         coverage: createConnectionCoverage,
       }),
@@ -269,10 +273,8 @@ export function createApplicationServices(
       records: createRecordExplorer(database),
       orders: createOrderWorkspace(
         database,
-        {
-          attention: createOrderAttentionReader,
-          activity: createActivityStore,
-        },
+        { state: orderStateQueries, attention: orderAttentionQuery },
+        createActivityStore,
         identity.refreshContext,
       ),
     },

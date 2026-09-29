@@ -1,6 +1,9 @@
+import { createHash } from 'node:crypto';
+
 import type { TenantContext } from '@luma/identity';
 import { requireTenant } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
+import { z } from 'zod';
 
 import type {
   RecordDetail,
@@ -8,6 +11,8 @@ import type {
   RecordKind,
   RecordSummary,
 } from '../application/records.js';
+
+type RecordQuery = Parameters<RecordExplorer['list']>[1];
 
 type Row = {
   kind: RecordKind;
@@ -146,17 +151,82 @@ function summary(rows: Row[]): RecordSummary {
   };
 }
 
-async function rowsFor(
+type PageRow = Row & { latest: string };
+
+interface RecordCursor {
+  latest: string;
+  kind: RecordKind;
+  id: string;
+}
+
+const pageSize = 50;
+
+const cursorSchema = z
+  .object({
+    context: z.string(),
+    latest: z.string().max(64),
+    kind: z.enum([
+      'order',
+      'fulfillment',
+      'position',
+      'sku',
+      'product',
+      'issue',
+    ]),
+    id: z.string().uuid(),
+  })
+  .strict();
+
+function cursorContext(tenantId: string, query: RecordQuery) {
+  return createHash('sha256')
+    .update(
+      JSON.stringify([
+        'records-v1',
+        tenantId,
+        query.q,
+        query.kind ?? null,
+        query.connectionId ?? null,
+      ]),
+    )
+    .digest('hex');
+}
+
+function readCursor(value: string, context: string): RecordCursor {
+  try {
+    const bytes = Buffer.from(value, 'base64url');
+    if (bytes.toString('base64url') !== value) throw new Error('Encoding');
+    const cursor = cursorSchema.parse(JSON.parse(bytes.toString()));
+    if (cursor.context !== context) throw new Error('Context');
+
+    return cursor;
+  } catch {
+    throw Object.assign(
+      new Error(
+        'This page link no longer matches the record search. Start from the first page.',
+      ),
+      { statusCode: 400, expose: true },
+    );
+  }
+}
+
+// Filters are applied inside each record type, so a kind filter reads only that type. Records
+// are ordered by their newest source observation, then kind and ID; the page reads the rows of
+// at most `$10` records after the cursor ($7–$9).
+async function recordRows(
   tx: SqlTransaction,
   tenantId: string,
-  kind?: RecordKind,
-  id?: string,
-  query = '',
-  connectionId?: string,
+  filter: {
+    kind?: RecordKind | undefined;
+    id?: string | undefined;
+    q?: string | undefined;
+    connectionId?: string | undefined;
+  },
+  page?: { after: RecordCursor | null; limit: number },
 ) {
-  const result = await tx.query<Row>(
-    `WITH records AS MATERIALIZED (${projectionRows}), matched AS MATERIALIZED (
-     SELECT * FROM records
+  const query = filter.q ?? '';
+  const result = await tx.query<PageRow>(
+    `WITH matched AS MATERIALIZED (
+     SELECT * FROM (${projectionRows}) records
      WHERE ($2::text IS NULL OR kind=$2) AND ($3::uuid IS NULL OR id=$3)
      AND ($6::uuid IS NULL OR "connectionId"=$6)
      AND ($4::text='' OR id::text ILIKE $5 OR "externalId" ILIKE $5
@@ -165,18 +235,24 @@ async function rowsFor(
        OR document->>'summary' ILIKE $5
        OR document->'subject'->>'subjectId' ILIKE $5)
      ), selected AS (
-       SELECT kind,id,max(COALESCE(document->>'observedAt','')) AS latest
-       FROM matched GROUP BY kind,id ORDER BY latest DESC,kind,id LIMIT 50
+       SELECT kind,id,max(COALESCE(document->>'observedAt','')) AS latest FROM matched GROUP BY kind,id
+       HAVING $7::text IS NULL OR max(COALESCE(document->>'observedAt','')) < $7
+        OR (max(COALESCE(document->>'observedAt',''))=$7 AND (kind>$8 OR (kind=$8 AND id>$9::uuid)))
+       ORDER BY latest DESC,kind,id LIMIT $10
      )
-     SELECT matched.* FROM matched JOIN selected USING(kind,id)
-     ORDER BY kind,id,"connectionId"`,
+     SELECT matched.*,selected.latest FROM matched JOIN selected USING(kind,id)
+     ORDER BY selected.latest DESC,kind,id,"connectionId"`,
     [
       tenantId,
-      kind ?? null,
-      id ?? null,
+      filter.kind ?? null,
+      filter.id ?? null,
       query,
       `%${query.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`,
-      connectionId ?? null,
+      filter.connectionId ?? null,
+      page?.after?.latest ?? null,
+      page?.after?.kind ?? null,
+      page?.after?.id ?? null,
+      page ? page.limit : null,
     ],
   );
 
@@ -186,43 +262,40 @@ async function rowsFor(
 /** Reads current tenant records, retaining separate source snapshots and explicit identity coverage. */
 export function createRecordExplorer(db: TenantDatabase): RecordExplorer {
   return {
-    async list(
-      context: TenantContext,
-      query: {
-        q: string;
-        kind?: RecordKind | undefined;
-        connectionId?: string | undefined;
-      },
-    ) {
+    async list(context: TenantContext, query: RecordQuery) {
       requireTenant(context, context.tenantId);
+      const scope = cursorContext(context.tenantId, query);
+      const after = query.cursor ? readCursor(query.cursor, scope) : null;
 
       return db.transaction(
         context.tenantId,
         async (tx) => {
-          const rows = await rowsFor(
-            tx,
-            context.tenantId,
-            query.kind,
-            undefined,
-            query.q,
-            query.connectionId,
-          );
-          const groups = new Map<string, Row[]>();
+          const rows = await recordRows(tx, context.tenantId, query, {
+            after,
+            limit: pageSize + 1,
+          });
+          // Rows arrive grouped by record in page order.
+          const groups = new Map<string, PageRow[]>();
           for (const row of rows) {
             const key = `${row.kind}:${row.id}`;
             groups.set(key, [...(groups.get(key) ?? []), row]);
           }
-          const items = [...groups.values()]
-            .map(summary)
-            .sort(
-              (left, right) =>
-                (right.observedAt ?? '').localeCompare(left.observedAt ?? '') ||
-                left.label.localeCompare(right.label),
-            )
-            .slice(0, 50);
+          const records = [...groups.values()];
+          const last =
+            records.length > pageSize ? records[pageSize - 1]![0]! : null;
 
           return {
-            items,
+            items: records.slice(0, pageSize).map(summary),
+            nextCursor: last
+              ? Buffer.from(
+                  JSON.stringify({
+                    context: scope,
+                    latest: last.latest,
+                    kind: last.kind,
+                    id: last.id,
+                  }),
+                ).toString('base64url')
+              : null,
             coverage: {
               customer: 'unavailable' as const,
               return: 'unavailable' as const,
@@ -242,7 +315,7 @@ export function createRecordExplorer(db: TenantDatabase): RecordExplorer {
       return db.transaction(
         context.tenantId,
         async (tx) => {
-          const rows = await rowsFor(tx, context.tenantId, kind, id);
+          const rows = await recordRows(tx, context.tenantId, { kind, id });
           if (!rows.length) return null;
           const links: RecordDetail['links'] = [];
           const add = (
@@ -316,10 +389,10 @@ export function createRecordExplorer(db: TenantDatabase): RecordExplorer {
             const found = await tx.query<{ id: string }>(
               `SELECT DISTINCT e.id FROM exceptions e LEFT JOIN connector_source_mappings m
              ON m.tenant_id=e.tenant_id AND m.resource=$2 AND m.canonical_id=$3
-             AND m.external_id=e.document->'subject'->>'subjectId'
+             AND m.external_id=e.subject_id
              AND m.connection_id::text=e.document->'subject'->'scope'->>0
-             WHERE e.tenant_id=$1 AND e.document->'subject'->>'subjectKind'=$2
-             AND (e.document->'subject'->>'subjectId'=$3::text OR m.id IS NOT NULL)`,
+             WHERE e.tenant_id=$1 AND e.subject_kind=$2
+             AND (e.subject_id=$3::text OR m.id IS NOT NULL)`,
               [context.tenantId, kind, id],
             );
             for (const row of found.rows)

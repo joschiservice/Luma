@@ -156,6 +156,7 @@ export function violation(from, to) {
         'apps/api/src/exceptions.integration.test.ts',
         'apps/api/src/commerce.integration.test.ts',
         'apps/api/src/orders.integration.test.ts',
+        'apps/api/src/activity.integration.test.ts',
         'apps/api/src/execution.integration.test.ts',
         'apps/api/src/diagnosis-reread.test.ts',
         'apps/api/src/workflow-runtime.test.ts',

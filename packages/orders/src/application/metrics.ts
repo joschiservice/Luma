@@ -19,11 +19,6 @@ export interface OrderMetricRow {
   issueIds: string[];
 }
 
-export interface AttentionOrder {
-  orderId: string;
-  issueId: string;
-}
-
 export interface OrderMetricRead {
   nextRefreshAt?: string | null;
   revision: string;
@@ -47,6 +42,5 @@ export type OrderMetricReader = (
     asOf: string;
     limit: number;
     offset: number;
-    attention: AttentionOrder[];
   },
 ) => Promise<OrderMetricRead>;

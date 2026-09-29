@@ -34,6 +34,7 @@
     "@luma/orders": "workspace:*",
     "@luma/platform": "workspace:*",
     "@luma/policies": "workspace:*",
+    "@luma/read-models": "workspace:*",
     "@luma/resolution": "workspace:*",
     "@luma/workflow-temporal": "workspace:*",
     "@ts-rest/fastify": "3.52.1",

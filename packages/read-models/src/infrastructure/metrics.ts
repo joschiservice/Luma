@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 
 import type { CoverageReader } from '@luma/connections';
 import { IdentityError, requireTenant } from '@luma/identity';
-import type { AttentionOrder, OrderMetricReader } from '@luma/orders';
+import type { OrderMetricReader } from '@luma/orders';
 import type { TenantDatabase } from '@luma/platform';
 
 import {
@@ -16,9 +16,6 @@ interface Readers {
     db: TenantDatabase,
   ) => (tenantId: string, asOf: string) => Promise<string | null>;
   orders: (db: TenantDatabase) => OrderMetricReader;
-  attention: (
-    db: TenantDatabase,
-  ) => (tenantId: string, asOf: string) => Promise<AttentionOrder[]>;
   coverage: (db: TenantDatabase) => CoverageReader;
 }
 
@@ -36,6 +33,8 @@ export function createOperationalMetrics(
         context.tenantId,
         async (tx) => {
           await tx.query("SET LOCAL statement_timeout = '3000ms'");
+          // JIT compilation of these large plans costs more than it saves on interactive reads.
+          await tx.query('SET LOCAL jit = off');
           const scoped: TenantDatabase = {
             transaction: async (tenantId, operation) => {
               requireTenant(context, tenantId);
@@ -49,14 +48,9 @@ export function createOperationalMetrics(
             !connections.some((c) => c.id === request.scope.connectionId)
           )
             throw new IdentityError(404, 'NOT_FOUND', 'Connection not found');
-          const attention = await readers.attention(scoped)(
-            context.tenantId,
-            asOf,
-          );
           const result = await readers.orders(scoped)(context, {
             ...request,
             asOf,
-            attention,
           });
           const boundary = await readers.attentionBoundary?.(scoped)(
             context.tenantId,

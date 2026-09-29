@@ -1,7 +1,14 @@
 import type { TenantContext } from '@luma/identity';
 
-import type { ActivityEvent } from '../domain/activity.js';
-import type { FulfillmentState, OrderDifference } from '../domain/orders.js';
+/** Fulfillment across an order's lines, from shipped, delivered or completed work of the same source. */
+export type FulfillmentState =
+  'unfulfilled' | 'partial' | 'fulfilled' | 'not_required' | 'no_lines';
+
+/** A compared field whose known values disagree between current sources; null is unknown. */
+export interface OrderDifference {
+  field: 'status' | 'paymentStatus' | 'total' | 'lines';
+  values: { connectionId: string; value: string | null }[];
+}
 
 export type OrderView =
   'all' | 'outstanding' | 'overdue' | 'needs_you' | 'differs';
@@ -142,20 +149,37 @@ export interface OrderDetail {
     truncated: boolean;
   };
   activity: {
-    entries: Pick<
-      ActivityEvent,
-      | 'id'
-      | 'recordedAt'
-      | 'action'
-      | 'type'
-      | 'outcome'
-      | 'actorKind'
-      | 'exceptionId'
-      | 'summary'
-    >[];
+    entries: OrderActivityEntry[];
     truncated: boolean;
   };
   asOf: string;
+}
+
+export interface OrderActivityEntry {
+  id: string;
+  recordedAt: string;
+  action: string;
+  type: string;
+  outcome: string;
+  actorKind: string | null;
+  exceptionId: string | null;
+  summary: string | null;
+}
+
+/**
+ * Reads workspace activity linked to an order's issues, workflow runs or order references,
+ * applying the same visibility rules as the Activity page.
+ */
+export interface OrderActivityReader {
+  list(
+    context: TenantContext,
+    query: {
+      from: string;
+      to: string;
+      limit: number;
+      subjects: { issueIds: string[]; runIds: string[]; orderRefs: string[] };
+    },
+  ): Promise<{ items: OrderActivityEntry[]; nextCursor: string | null }>;
 }
 
 /** Reads current orders for one tenant from canonical projections and linked Luma records. */

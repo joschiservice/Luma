@@ -4,16 +4,19 @@ import { readdir, readFile } from 'node:fs/promises';
 import { buildApp, createCommerceServices } from '@luma/application-runtime';
 import type { CommerceObservation } from '@luma/connections';
 import { createConnectionCoverage } from '@luma/connections/composition';
-import { createOrderAttentionReader } from '@luma/exceptions/composition';
+import { orderAttentionQuery } from '@luma/exceptions/composition';
 import type { IdentityService } from '@luma/identity';
 import { makeTenantContext } from '@luma/identity/composition';
-import { createOrderMetricReader } from '@luma/orders/composition';
+import {
+  createOrderMetricReader,
+  orderStateQueries,
+} from '@luma/orders/composition';
 import { createTenantDatabase } from '@luma/platform/composition';
 import {
-  createActivityStore,
   createOperationalMetrics,
   createOrderWorkspace,
-} from '@luma/resolution/composition';
+} from '@luma/read-models/composition';
+import { createActivityStore } from '@luma/resolution/composition';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -60,7 +63,8 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
   function workspace() {
     return createOrderWorkspace(
       createTenantDatabase(reader),
-      { attention: createOrderAttentionReader, activity: createActivityStore },
+      { state: orderStateQueries, attention: orderAttentionQuery },
+      createActivityStore,
       async (value) => value,
       () => clock,
     );
@@ -545,8 +549,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
     const metrics = createOperationalMetrics(
       createTenantDatabase(reader),
       {
-        orders: createOrderMetricReader,
-        attention: createOrderAttentionReader,
+        orders: (db) => createOrderMetricReader(db, orderAttentionQuery),
         coverage: createConnectionCoverage,
       },
       () => clock,
@@ -810,6 +813,8 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
         erp.document.observationId,
       ],
     );
+    // Production tables carry planner statistics; a bulk load needs them before plans are measured.
+    await owner.query('ANALYZE');
     await owner.query('ANALYZE orders_projections');
     await owner.query('ANALYZE orders_snapshots');
     const plans: Record<string, string> = {};
@@ -824,7 +829,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
             (tx) =>
               operation({
                 query: async (sql, values) => {
-                  if (explain && sql.startsWith('WITH current'))
+                  if (explain && sql.startsWith('WITH order_sources'))
                     plans[explain] = (
                       await tx.query<{ 'QUERY PLAN': string }>(
                         'EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT) ' + sql,
@@ -840,7 +845,8 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
             options,
           ),
       },
-      { attention: createOrderAttentionReader, activity: createActivityStore },
+      { state: orderStateQueries, attention: orderAttentionQuery },
+      createActivityStore,
       async (value) => value,
       () => clock,
     );

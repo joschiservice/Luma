@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto';
 
-import type { TenantDatabase } from '@luma/platform';
+import type { SqlTransaction, TenantDatabase } from '@luma/platform';
 import { z } from 'zod';
 
 import type { ActivityStore } from '../../application/activity.js';
-import type { ActivityEvent } from '../../domain/activity.js';
+import type { ActivityEvent, ActivityQuery } from '../../domain/activity.js';
 import { activityOutcomeRules } from '../../domain/activity-outcome.js';
 
 const coverage =
@@ -21,6 +21,68 @@ const outcomeSql =
     )
     .join(' ') +
   " ELSE 'recorded' END";
+
+// The subject filter compares against uuid::text, which is always lowercase and hyphenated,
+// so only canonical UUID strings can match an issue, run or proposal ID.
+const canonicalUuid =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const uuids = (values: string[]) =>
+  values.filter((value) => canonicalUuid.test(value));
+
+// Subject reads scan only source rows whose exception or proposal can pass the final subject
+// filter. Plain columns keep both arms index-backed under row-level security; the second arm
+// skips rows the first arm already returned.
+const linkedSources = `(SELECT * FROM workspace_activity_sources WHERE exception_id=ANY($16::uuid[])
+  UNION ALL SELECT * FROM workspace_activity_sources
+  WHERE proposal_id=ANY($17::uuid[]) AND (exception_id=ANY($16::uuid[])) IS NOT TRUE)`;
+
+/**
+ * Lists every exception and proposal ID through which a source row can reach the subject
+ * filter: the given issues and runs, order-subject issues, proposals and runs of those issues,
+ * proposals, runs and admission steps targeting the order, admission steps of the runs, and
+ * proposals of audit or execution events correlated with a trigger run in the time window.
+ * The result may include unrelated IDs; the final subject filter stays the exact check.
+ */
+async function readLinkedKeys(
+  tx: SqlTransaction,
+  tenantId: string,
+  query: ActivityQuery,
+  subjects: NonNullable<ActivityQuery['subjects']>,
+) {
+  const result = await tx.query<{ issueIds: string[]; proposalIds: string[] }>(
+    `WITH issues AS (
+      SELECT unnest($2::uuid[]) AS id
+      UNION SELECT id FROM exceptions WHERE tenant_id=$1 AND subject_kind='order' AND subject_id=ANY($4)
+    ), trigger_runs AS (
+      SELECT id::text FROM workflow_trigger_runs WHERE tenant_id=$1 AND id=ANY($3::uuid[])
+    ), proposals AS (
+      SELECT unnest($3::uuid[]) AS id
+      UNION SELECT id FROM case_proposals WHERE tenant_id=$1 AND (exception_id IN (SELECT id FROM issues)
+       OR (document->'target'->>'kind'='order' AND document->'target'->>'id'=ANY($4)))
+      UNION SELECT id FROM playbook_runs WHERE tenant_id=$1 AND incident_id=ANY($2::uuid[]::text[])
+      UNION SELECT id FROM playbook_runs WHERE tenant_id=$1 AND target_kind='order' AND target_id=ANY($4)
+      UNION SELECT proposal_id FROM action_admission_steps WHERE tenant_id=$1 AND (run_id=ANY($3::uuid[])
+       OR (document->'action'->'target'->>'kind'='order' AND document->'action'->'target'->>'id'=ANY($4)))
+      UNION SELECT proposal_id FROM audit_entries WHERE tenant_id=$1 AND EXISTS(SELECT 1 FROM trigger_runs)
+       AND created_at>=$5::timestamptz AND created_at<$6::timestamptz
+       AND document->>'correlationId' IN (SELECT id FROM trigger_runs)
+      UNION SELECT proposal_id FROM execution_outbox WHERE tenant_id=$1 AND EXISTS(SELECT 1 FROM trigger_runs)
+       AND created_at>=$5::timestamptz AND created_at<$6::timestamptz
+       AND document->>'correlationId' IN (SELECT id FROM trigger_runs)
+    )
+    SELECT ARRAY(SELECT id::text FROM issues) AS "issueIds",ARRAY(SELECT id::text FROM proposals) AS "proposalIds"`,
+    [
+      tenantId,
+      uuids(subjects.issueIds),
+      uuids(subjects.runIds),
+      subjects.orderRefs,
+      query.from,
+      query.to,
+    ],
+  );
+
+  return result.rows[0]!;
+}
 
 /** Reads canonical durable events without per-issue queries or raw payload exposure. */
 export function createActivityStore(db: TenantDatabase): ActivityStore {
@@ -63,11 +125,16 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
             after = value;
           } catch {
             throw Object.assign(
-              new Error('Activity cursor does not match these filters'),
-              { statusCode: 400 },
+              new Error(
+                'This page link no longer matches the activity filters. Start from the first page.',
+              ),
+              { statusCode: 400, expose: true },
             );
           }
         }
+        const linked = query.subjects
+          ? await readLinkedKeys(tx, context.tenantId, query, query.subjects)
+          : null;
         const result = await tx.query<{ item: ActivityEvent; at: string }>(
           `
       WITH enriched AS (
@@ -81,7 +148,7 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
         COALESCE(s.doc->>'eventType','case.updated') AS action,
         w.id::text AS workflow_run_id,
         s.doc->'details' AS details
-        FROM workspace_activity_sources s
+        FROM ${linked ? linkedSources : 'workspace_activity_sources'} s
         LEFT JOIN case_proposals p ON p.tenant_id=s.tenant_id AND p.id=s.proposal_id
         LEFT JOIN exceptions e ON e.tenant_id=s.tenant_id AND e.id=COALESCE(s.exception_id,p.exception_id)
         LEFT JOIN playbook_runs r ON r.tenant_id=s.tenant_id AND r.id=s.proposal_id
@@ -150,6 +217,7 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
             query.subjects?.issueIds ?? null,
             query.subjects?.runIds ?? [],
             query.subjects?.orderRefs ?? [],
+            ...(linked ? [linked.issueIds, linked.proposalIds] : []),
           ],
         );
         const rows = result.rows.slice(0, query.limit);

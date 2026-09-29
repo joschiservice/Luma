@@ -40,6 +40,15 @@ export const dependencies = {
     'connectors',
     'audit',
   ],
+  // Read-only workspace views. Business rules come from their owners; see ADR-008.
+  reads: [
+    'platform',
+    'identity',
+    'orders',
+    'exceptions',
+    'connectors',
+    'procurement',
+  ],
 };
 
 export const layers = {
@@ -65,6 +74,7 @@ export const domainPackages = {
   execution: 'execution',
   exceptions: 'exceptions',
   resolution: 'resolution',
+  'read-models': 'reads',
   workflows: 'workflows',
   'commerce-ingestion': 'commerce',
   'workflow-temporal': 'temporal',

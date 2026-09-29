@@ -40,6 +40,8 @@ export const recordSummarySchema = z.object({
 
 export const recordListSchema = z.object({
   items: z.array(recordSummarySchema),
+  /** Continues the same search on the next page; null on the last page. */
+  nextCursor: z.string().nullable(),
   coverage: z.object({
     customer: z.literal('unavailable'),
     return: z.literal('unavailable'),
@@ -64,6 +66,7 @@ export const recordQuerySchema = z
     q: z.string().trim().max(120).default(''),
     kind: recordKindSchema.optional(),
     connectionId: z.string().uuid().optional(),
+    cursor: z.string().min(1).max(1024).optional(),
   })
   .strict();
 

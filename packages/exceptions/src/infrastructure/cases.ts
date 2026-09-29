@@ -29,7 +29,8 @@ type Row = {
 
 // Attention comes from persisted lifecycle, uncertainty escalation or deterministic manual steps.
 // Model-selected hypotheses and severity never create an attention request.
-const projection = `WITH cases AS (
+// Inbox attention rules. Expects $1 tenant ID and $2 evaluation time.
+const caseCtes = `cases AS (
  SELECT e.document,e.version,d.document AS diagnosis,
  CASE WHEN e.state='resolved' THEN NULL
  WHEN e.state='escalated' OR u.review_required THEN 'uncertainty'
@@ -64,6 +65,24 @@ const projection = `WITH cases AS (
  ) pa ON true
  WHERE e.tenant_id=$1
 ), ordered AS (SELECT *, CASE WHEN attention_reason IS NULL THEN document->>'firstDetectedAt' ELSE attention_at END AS sort_at FROM cases)`;
+
+const projection = `WITH ${caseCtes}`;
+
+/**
+ * Selects `order_id` and `issue_id` for every unresolved fulfillment issue that needs a person
+ * under the inbox's attention rules. Other reads embed it in their own transaction; bind `$1`
+ * to the tenant ID and `$2` to the evaluation time.
+ */
+export const orderAttentionQuery = `WITH ${caseCtes}
+ SELECT DISTINCT r.order_id,(o.document->>'id')::uuid AS issue_id
+ FROM ordered o
+ JOIN connector_source_mappings m ON m.tenant_id=$1
+  AND m.resource='fulfillment'
+  AND m.connection_id::text=o.document->'subject'->'scope'->>0
+  AND m.external_id=o.document->'subject'->>'subjectId'
+  AND m.scope_key=''
+ JOIN orders_relationships r ON r.tenant_id=m.tenant_id AND r.child_id=m.canonical_id
+ WHERE o.attention_reason IS NOT NULL AND o.document->'subject'->>'subjectKind'='fulfillment'`;
 
 const cursorSchema = z
   .object({
@@ -422,31 +441,6 @@ export function createCaseReader(
           : null;
       }),
   };
-}
-
-/** Reads canonical order links for the same persisted attention rules used by the inbox. */
-export function createOrderAttentionReader(db: TenantDatabase) {
-  return async (tenantId: string, asOf: string) =>
-    db.transaction(tenantId, async (tx) => {
-      const result = await tx.query<{ orderId: string; issueId: string }>(
-        `${projection}
-      SELECT DISTINCT r.order_id AS "orderId",o.document->>'id' AS "issueId"
-      FROM ordered o
-      JOIN connector_source_mappings m ON m.tenant_id=$1
-        AND m.resource='fulfillment'
-        AND m.connection_id::text=o.document->'subject'->'scope'->>0
-        AND m.external_id=o.document->'subject'->>'subjectId'
-        AND m.scope_key=''
-      JOIN orders_relationships r ON r.tenant_id=m.tenant_id AND r.child_id=m.canonical_id
-      WHERE o.attention_reason IS NOT NULL AND o.document->'subject'->>'subjectKind'='fulfillment'
-      LIMIT 10001`,
-        [tenantId, asOf],
-      );
-      if (result.rows.length > 10000)
-        throw new Error('Order attention read exceeds its limit');
-
-      return result.rows;
-    });
 }
 
 /** Returns the next diagnosis or approval expiry that can change order attention without a write. */

@@ -69,15 +69,7 @@ export type { ProposalRefreshDependencies } from './application/refresh-proposal
 
 export type { ShadowService } from './application/shadow.js';
 
-export type { OperationalMetrics } from './application/metrics.js';
-
 export type {
   MetricEvents,
   MetricWakeup,
 } from './application/metric-events.js';
-
-export type { OperationalSummary } from './application/operational-summary.js';
-
-export type { RecordExplorer } from './application/records.js';
-
-export type { OrderWorkspace } from './application/orders.js';
