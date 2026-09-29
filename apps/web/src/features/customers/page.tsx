@@ -8,6 +8,7 @@ import { useState } from 'react';
 
 import { appsOptions } from '../apps/data';
 import { AppExtension } from '../apps/extension';
+import { SyncCoverage } from '../sync/coverage';
 
 /** Opens customer context from installed apps, keeping each source identity separate. */
 export function CustomersPage() {
@@ -32,6 +33,7 @@ export function CustomersPage() {
         title="Customers"
         description="Understand a customer’s orders, service history and work in Luma."
       />
+      <SyncCoverage organizationId={organizationId} type="customers" />
       {apps.isPending ? (
         <p role="status">Loading customer sources…</p>
       ) : apps.error ? (

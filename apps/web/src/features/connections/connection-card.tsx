@@ -1,4 +1,7 @@
-import { type InstalledConnection } from '@luma/api-contract';
+import {
+  type InstalledConnection,
+  type SyncConnectionView,
+} from '@luma/api-contract';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
 import {
@@ -13,10 +16,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@luma/ui/components/primitives/dialog';
+import { StateDot } from '@luma/ui/components/primitives/state';
+import { Link } from '@tanstack/react-router';
 import { Check, Minus, ShieldCheck, Unplug } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 import { AppExtension } from '../apps/extension';
+import { connectionSummary } from '../sync/presentation';
 import { changeConnection, connectionError } from './data';
 import { capabilities, statuses } from './presentation';
 import { ProviderIcon } from './provider-icon';
@@ -31,12 +37,17 @@ export function ConnectionCard({
   canManage,
   appAvailable = true,
   refresh,
+  sync,
+  syncAsOf,
 }: {
   connection: InstalledConnection;
   organizationId: string;
   canManage: boolean;
   appAvailable?: boolean;
   refresh: () => Promise<void>;
+  /** Import and sync state for this connection, when loaded. */
+  sync?: SyncConnectionView | undefined;
+  syncAsOf?: string | undefined;
 }) {
   const [dialog, setDialog] = useState<'settings' | 'disconnect' | null>(null);
   const [pending, setPending] = useState(false);
@@ -49,6 +60,8 @@ export function ConnectionCard({
   }, [connection.id]);
   const [message, setMessage] = useState('');
   const lock = useRef(false);
+  const summary =
+    sync && syncAsOf && appAvailable ? connectionSummary(sync, syncAsOf) : null;
   const terminal =
     connection.status === 'disconnected' || connection.status === 'revoked';
   const permitted =
@@ -119,9 +132,20 @@ export function ConnectionCard({
           : terminal
             ? 'Access stopped. Add a connection to reconnect.'
             : connection.status === 'active'
-              ? 'Credentials and requested permissions validated. Observation freshness is unknown.'
+              ? 'Credentials and requested permissions validated.'
               : 'Validate access or open connection settings to restore access.'}
       </p>
+      {summary ? (
+        <p className="connection-sync">
+          <StateDot state={summary.state} />
+          <span>
+            {summary.text}{' '}
+            <Link to="/app/$organizationId/sync" params={{ organizationId }}>
+              View data sync
+            </Link>
+          </span>
+        </p>
+      ) : null}
       <div className="connection-access">
         <h4>
           <ShieldCheck size={15} aria-hidden="true" />

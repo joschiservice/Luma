@@ -271,13 +271,22 @@ export function ConnectionsModule({
         <span>
           Recent means observed within {overview.freshnessThresholdHours} hours
         </span>
-        <Link
-          className="home-module-link"
-          to="/app/$organizationId/apps"
-          params={{ organizationId }}
-        >
-          <LinkLabel>Manage apps</LinkLabel>
-        </Link>
+        <span className="home-module-links">
+          <Link
+            className="home-module-link"
+            to="/app/$organizationId/sync"
+            params={{ organizationId }}
+          >
+            <LinkLabel>Data sync</LinkLabel>
+          </Link>
+          <Link
+            className="home-module-link"
+            to="/app/$organizationId/apps"
+            params={{ organizationId }}
+          >
+            <LinkLabel>Manage apps</LinkLabel>
+          </Link>
+        </span>
       </footer>
     </>
   );
