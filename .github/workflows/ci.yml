@@ -23,7 +23,7 @@ jobs:
         include:
           - name: Static checks and builds
             cache: builds
-            command: pnpm format:check && pnpm lint && pnpm typecheck && pnpm build
+            command: pnpm format:check && pnpm lint && pnpm knip:check && pnpm typecheck && pnpm build
           - name: Main tests
             cache: tests
             # Forward --filter to our database runner, not pnpm's recursive test shortcut.
@@ -81,6 +81,17 @@ jobs:
       - if: matrix.cache != 'builds' && matrix.cache != 'ui'
         run: pnpm setup:code
       - run: ${{ matrix.command }}
+      - name: Summarize performance budgets
+        if: always() && (startsWith(matrix.cache, 'browser-') || startsWith(matrix.cache, 'e2e-'))
+        run: node tooling/performance/summary.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && (startsWith(matrix.cache, 'browser-') || startsWith(matrix.cache, 'e2e-'))
+        with:
+          name: performance-${{ matrix.cache }}
+          path: .luma/performance/
+          include-hidden-files: true
+          retention-days: 14
+          if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         if: always() && matrix.cache == 'evaluation'
         with:

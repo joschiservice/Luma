@@ -20,6 +20,8 @@ export async function metricStream(
   assert.equal(response.status, 200);
   const events = [];
   let ended = false;
+  let maxFrameBytes = 0;
+  let receivedBytes = 0;
   let reading = false;
   let dirty = false;
   const readCosts = [];
@@ -51,11 +53,13 @@ export async function metricStream(
     let buffer = '';
     try {
       for await (const chunk of response.body) {
+        receivedBytes += chunk.byteLength;
         buffer += new TextDecoder().decode(chunk);
         let boundary;
         while ((boundary = buffer.indexOf('\n\n')) >= 0) {
           const frame = buffer.slice(0, boundary);
           buffer = buffer.slice(boundary + 2);
+          maxFrameBytes = Math.max(maxFrameBytes, Buffer.byteLength(frame));
           const data = frame.match(/^data: (.+)$/m);
           if (data) {
             const event = JSON.parse(data[1]);
@@ -78,6 +82,12 @@ export async function metricStream(
 
   return {
     events,
+    get receivedBytes() {
+      return receivedBytes;
+    },
+    get maxFrameBytes() {
+      return maxFrameBytes;
+    },
     readCosts,
     readErrors,
     close: () => abort.abort(),

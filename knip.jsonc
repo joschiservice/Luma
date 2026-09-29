@@ -1,0 +1,36 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema-jsonc.json",
+  "rules": { "types": "off", "nsTypes": "off" },
+  "ignoreBinaries": ["docker", "mise", "hyperfine"],
+  "workspaces": {
+    ".": {
+      "entry": ["tooling/**/*.test.mjs", "tooling/orders/rebuild-list.mjs"],
+      "project": ["*.mjs", "tooling/**/*.mjs"],
+      // The app generator writes this import into another workspace.
+      "ignoreDependencies": ["@luma/app-host"],
+    },
+    "apps/api": {
+      "entry": [
+        "e2e/*.e2e.mjs",
+        "e2e/*.browser.mjs",
+        "e2e/*-server.mjs",
+        "e2e/execution-worker.mjs",
+        "drizzle.studio.config.ts",
+      ],
+      "project": ["src/**/*.ts", "e2e/**/*.mjs", "*.ts"],
+    },
+    "apps/simulator": { "entry": ["src/server.ts"] },
+    "apps/simulator-web": { "entry": ["src/app.js"] },
+    "packages/api-contract": { "entry": ["src/generate-openapi.ts"] },
+    // Public subpaths resolve to compiled output; retain their source entry points.
+    "packages/connectors/*": { "entry": ["src/index.ts", "src/schemas.ts"] },
+    "packages/application-runtime": {
+      "entry": ["scripts/*.mjs"],
+      // CLI integration tests load tsx through child_process execArgv --import.
+      "ignoreDependencies": ["tsx"],
+    },
+    "packages/ui": {
+      "entry": [".storybook/*.{ts,tsx}", "src/**/*.stories.tsx"],
+    },
+  },
+}

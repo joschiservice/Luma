@@ -29,9 +29,9 @@
     "@luma/api-contract": "workspace:*",
     "@luma/identity": "workspace:*",
     "@luma/platform": "workspace:*",
-    "@ts-rest/fastify": "3.52.1",
-    "fastify": "5.12.5",
-    "zod": "3.25.76",
+    "@ts-rest/fastify": "catalog:",
+    "fastify": "catalog:",
+    "zod": "catalog:zod3",
     "@luma/audit": "workspace:*",
     "@luma/connections": "workspace:*",
     "@luma/execution": "workspace:*",
@@ -40,7 +40,7 @@
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",
-    "@types/node": "^24.0.0",
-    "vitest": "4.1.11"
+    "@types/node": "catalog:",
+    "vitest": "catalog:"
   }
 }

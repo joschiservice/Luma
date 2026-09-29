@@ -1,7 +1,8 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 
 import { buildRuntimeApp } from '@luma/application-runtime';
 
+import { performanceReport } from '../../../tooling/performance/report.mjs';
 import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, startProcess } from './helpers.mjs';
 import { metricStream } from './metric-stream-fixture.mjs';
@@ -225,11 +226,14 @@ test('updates visible totals and cohorts, crosses deadlines, and measures delive
     latestSourceObservationAgeMs:
       Date.parse(latest.readAt) - Date.parse(latest.observedAt),
     durations,
+    subscriberBytes: subscriptions.reduce((sum, s) => sum + s.receivedBytes, 0),
+    maxFrameBytes: Math.max(...subscriptions.map((s) => s.maxFrameBytes)),
   };
-  await writeFile(
-    '/tmp/luma85-load.json',
-    JSON.stringify(measurements, null, 2),
-  );
+  await performanceReport('metric-live', measurements, {
+    commitToVisibleP95Ms: 1000,
+    maxFrameBytes: 4096,
+    subscriberBytes: 128 * 1024,
+  });
   console.log(JSON.stringify(measurements));
   expect(measurements.commitToVisibleP95Ms).toBeLessThan(1000);
   // Session loss clears the visible private result and stops further live reads.

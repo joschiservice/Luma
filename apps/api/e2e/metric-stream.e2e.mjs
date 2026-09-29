@@ -1,9 +1,9 @@
-import { writeFile } from 'node:fs/promises';
 import { setTimeout as wait } from 'node:timers/promises';
 
 import { buildRuntimeApp } from '@luma/application-runtime';
 import { expect, it } from 'vitest';
 
+import { performanceReport } from '../../../tooling/performance/report.mjs';
 import { until } from './helpers.mjs';
 import { metricStream } from './metric-stream-fixture.mjs';
 import { seedMetricOrders } from './metrics-fixture.mjs';
@@ -120,12 +120,14 @@ it('fans out committed changes, coalesces bursts and recovers listeners, subscri
     () => streams.every((s) => s.events.at(-1).connected),
     'listener recovery',
   );
-  await writeFile(
-    '/tmp/luma85-recovery.json',
-    JSON.stringify({
+  await performanceReport(
+    'metric-recovery',
+    {
       listenerRecoveryMs: Math.round(performance.now() - start),
       burstInvalidations,
-    }),
+      maxFrameBytes: Math.max(...streams.map((s) => s.maxFrameBytes)),
+    },
+    { maxFrameBytes: 4096 },
   );
   expect((await count()).metrics[0].observedCount).toBe(0);
   streams[0].close();

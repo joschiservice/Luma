@@ -1,0 +1,148 @@
+{
+  "apps/web/src/styles/entry.css": {
+    "reason": "Existing appearance values retained to avoid visual changes in the tooling rollout. Remove entries when migrating to tokens or shared variants.",
+    "findings": {
+      "raw-color: .deep-surface,\n.auth-story,\n.landing { --deep-glow: radial-gradient(\n      90% 70% at 15% -10%,\n      rgb(16 37 83 / 0.95) 0%,\n      rgb(16 37 83 / 0) 62%\n    ),\n    radial-gradient(\n      60% 55% at 100% 110%,\n      rgb(49 107 255 / 0.14) 0%,\n      rgb(49 107 255 / 0) 70%\n    ),\n    #0b1020 }": 1,
+      "primitive-appearance: .form-field-toggle[data-slot='button'] { padding-inline: 6px }": 1,
+      "primitive-appearance: .form-field-toggle[data-slot='button'] { color: var(--foreground-subtle) }": 1,
+      "primitive-appearance: .form-field-toggle[data-slot='button'] { font-size: 12px }": 1,
+      "raw-color: .auth-story { color: #f2f4f9 }": 1,
+      "raw-color: .auth-story::before,\n.landing::before { border: 1px solid rgb(84 163 255 / 0.22) }": 1,
+      "raw-color: .auth-story .entry-brand,\n.landing .entry-brand { color: #f2f4f9 }": 1,
+      "raw-color: .auth-story .lu-lockup-by,\n.landing .lu-lockup-by { color: #8290a8 }": 1,
+      "raw-color: .auth-story-lead { color: #b3bcce }": 1,
+      "raw-color: .resolution-story li { border: 1px solid rgb(255 255 255 / 0.08) }": 1,
+      "raw-color: .resolution-story li { background: rgb(255 255 255 / 0.04) }": 1,
+      "raw-color: .resolution-story .lu-state-pill { --pill-text: #f2f4f9 }": 1,
+      "raw-color: .resolution-story .lu-state-pill[data-state='running'] { --pill-color: #54a3ff }": 1,
+      "raw-color: .resolution-story strong { color: #f2f4f9 }": 1,
+      "raw-color: .resolution-story li > span:not(.lu-state-pill) { color: #b3bcce }": 1,
+      "raw-color: .resolution-story-arrow { color: #54a3ff }": 1,
+      "raw-color: .resolution-story figcaption { color: #8290a8 }": 1,
+      "raw-color: .landing { color: #f2f4f9 }": 1,
+      "raw-color: .landing-link { color: #b3bcce }": 1,
+      "raw-color: .landing-link:hover { color: #f2f4f9 }": 1,
+      "raw-color: .landing-hero .lu-eyebrow { color: #8290a8 }": 1,
+      "raw-color: .landing-hero .lu-eyebrow::before { background: #54a3ff }": 1,
+      "raw-color: .landing-hero h1 { color: #f2f4f9 }": 1,
+      "raw-color: .landing-lead { color: #b3bcce }": 1,
+      "raw-color: .landing-button { background: #f2f4f9 }": 1,
+      "raw-color: .landing-button { color: #0b1020 }": 1,
+      "raw-color: .landing-button:hover { background: #fff }": 1,
+      "raw-color: .landing-button[data-variant='secondary'] { box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.2) }": 1,
+      "raw-color: .landing-button[data-variant='secondary'] { color: #f2f4f9 }": 1,
+      "raw-color: .landing-button[data-variant='secondary']:hover { background: rgb(255 255 255 / 0.06) }": 1,
+      "raw-color: .landing-panel { border: 1px solid rgb(255 255 255 / 0.08) }": 1,
+      "raw-color: .landing-panel { background: rgb(11 16 32 / 0.5) }": 1,
+      "raw-color: .landing-loop li { border-left: 1px solid rgb(255 255 255 / 0.1) }": 1,
+      "raw-color: .landing-loop-index { color: #8290a8 }": 1,
+      "raw-color: .landing-loop strong { color: #f2f4f9 }": 1,
+      "raw-color: .landing-loop li > span:last-child { color: #b3bcce }": 1,
+      "raw-color: .landing-footer { border-top: 1px solid rgb(255 255 255 / 0.1) }": 1,
+      "raw-color: .landing-footer { color: #8290a8 }": 1
+    }
+  },
+  "apps/web/src/styles/shell.css": {
+    "reason": "Existing appearance values retained to avoid visual changes in the tooling rollout. Remove entries when migrating to tokens or shared variants.",
+    "findings": {
+      "primitive-appearance: .sidebar-collapse[data-slot='button'] { color: var(--foreground-subtle) }": 1,
+      "raw-color: .workspace-avatar { box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.2) }": 1,
+      "raw-color: .workspace-avatar { color: #fff }": 1,
+      "raw-color: .sidebar-search:hover { box-shadow: 0 1px 2px #1025530f,\n    0 0 0 1px var(--line-strong) }": 1,
+      "primitive-appearance: .desk-header-tools [data-slot='button'] { color: var(--foreground-subtle) }": 1
+    }
+  },
+  "apps/web/src/features/workflows/code-steps.css": {
+    "reason": "Existing appearance values retained to avoid visual changes in the tooling rollout. Remove entries when migrating to tokens or shared variants.",
+    "findings": {
+      "raw-color: .code-step-source,\n.code-step-result pre { background: #0b1020 }": 1,
+      "raw-color: .code-step-source,\n.code-step-result pre { color: #dbe3f2 }": 1
+    }
+  },
+  "apps/web/src/features/workflows/workflows.css": {
+    "reason": "Existing appearance values retained to avoid visual changes in the tooling rollout. Remove entries when migrating to tokens or shared variants.",
+    "findings": {
+      "primitive-appearance: .workflow-views [data-slot='button'] { padding-inline: 10px }": 1,
+      "primitive-appearance: .workflow-views [data-slot='button'] { border-radius: 7px }": 1,
+      "primitive-appearance: .workflow-views [data-slot='button'] { color: var(--foreground-subtle) }": 1,
+      "primitive-appearance: .workflow-views [data-slot='button'][aria-pressed='true'] { background: var(--surface-raised) }": 1,
+      "raw-color: .workflow-views [data-slot='button'][aria-pressed='true'] { box-shadow: 0 1px 2px rgb(16 37 83 / 0.08),\n    0 0 0 1px var(--line) }": 1,
+      "primitive-appearance: .workflow-views [data-slot='button'][aria-pressed='true'] { box-shadow: 0 1px 2px rgb(16 37 83 / 0.08),\n    0 0 0 1px var(--line) }": 1,
+      "primitive-appearance: .workflow-views [data-slot='button'][aria-pressed='true'] { color: var(--foreground) }": 1,
+      "primitive-appearance: .dark .workflow-views [data-slot='button'][aria-pressed='true'] { background: color-mix(in srgb, var(--foreground) 10%, transparent) }": 1
+    }
+  },
+  "apps/web/src/features/workflows/authoring/authoring.css": {
+    "reason": "Existing appearance values retained to avoid visual changes in the tooling rollout. Remove entries when migrating to tokens or shared variants.",
+    "findings": {
+      "primitive-appearance: .authoring-categories [data-slot='button'] { padding-inline: 10px }": 1,
+      "primitive-appearance: .authoring-categories [data-slot='button'] { border-radius: 7px }": 1,
+      "primitive-appearance: .authoring-categories [data-slot='button'] { color: var(--foreground-subtle) }": 1,
+      "primitive-appearance: .authoring-categories [data-slot='button'][aria-pressed='true'] { background: var(--surface-raised) }": 1,
+      "raw-color: .authoring-categories [data-slot='button'][aria-pressed='true'] { box-shadow: 0 1px 2px rgb(16 37 83 / 0.08),\n    0 0 0 1px var(--line) }": 1,
+      "primitive-appearance: .authoring-categories [data-slot='button'][aria-pressed='true'] { box-shadow: 0 1px 2px rgb(16 37 83 / 0.08),\n    0 0 0 1px var(--line) }": 1,
+      "primitive-appearance: .authoring-categories [data-slot='button'][aria-pressed='true'] { color: var(--foreground) }": 1,
+      "primitive-appearance: .dark .authoring-categories [data-slot='button'][aria-pressed='true'] { background: color-mix(in srgb, var(--foreground) 10%, transparent) }": 1,
+      "raw-color: .authoring-requirements li > svg { color: var(--state-verified, #148a4a) }": 1,
+      "raw-color: .authoring-requirements li[data-met='false'] > svg { color: var(--state-approval-text, #9a6700) }": 1,
+      "raw-color: .authoring-problems li[data-severity='warning'] strong { color: var(--state-approval-text, #9a6700) }": 1,
+      "raw-color: .authoring-field-problems li[data-severity='warning'] { color: var(--state-approval-text, #9a6700) }": 1,
+      "raw-color: .authoring-question { background: color-mix(in srgb, var(--info, #316bff) 10%, transparent) }": 1,
+      "raw-color: .authoring-test-steps > li[data-branch='paused'] { border-left-color: var(--state-approval, #d99a1e) }": 1,
+      "raw-color: :root { --kind-start: #475569 }": 1,
+      "raw-color: :root { --kind-read: #1d4ed8 }": 1,
+      "raw-color: :root { --kind-condition: #a16207 }": 1,
+      "raw-color: :root { --kind-capability: #4338ca }": 1,
+      "raw-color: :root { --kind-approval: #c2410c }": 1,
+      "raw-color: :root { --kind-wait: #475569 }": 1,
+      "raw-color: :root { --kind-verification: #15803d }": 1,
+      "raw-color: :root { --kind-escalation: #b91c1c }": 1,
+      "raw-color: :root { --kind-end: #0f766e }": 1,
+      "raw-color: :root { --kind-code: #7e22ce }": 1,
+      "raw-color: .dark { --kind-start: #cbd5e1 }": 1,
+      "raw-color: .dark { --kind-read: #93c5fd }": 1,
+      "raw-color: .dark { --kind-condition: #fcd34d }": 1,
+      "raw-color: .dark { --kind-capability: #a5b4fc }": 1,
+      "raw-color: .dark { --kind-approval: #fdba74 }": 1,
+      "raw-color: .dark { --kind-wait: #cbd5e1 }": 1,
+      "raw-color: .dark { --kind-verification: #86efac }": 1,
+      "raw-color: .dark { --kind-escalation: #fca5a5 }": 1,
+      "raw-color: .dark { --kind-end: #5eead4 }": 1,
+      "raw-color: .dark { --kind-code: #d8b4fe }": 1,
+      "primitive-appearance: .authoring-slot-button[data-slot='button'] { border: 1px solid var(--line-strong) }": 1,
+      "primitive-appearance: .authoring-slot-button[data-slot='button'] { border-radius: 999px }": 1,
+      "primitive-appearance: .authoring-slot-button[data-slot='button'] { background: var(--surface-raised) }": 1,
+      "primitive-appearance: .authoring-slot-button[data-slot='button'] { color: var(--foreground-subtle) }": 1,
+      "raw-color: .authoring-slot[data-selected='true'] .authoring-slot-button { color: #ffffff }": 1,
+      "primitive-appearance: .authoring-palette-reset[data-slot='button'] { padding-inline: 6px }": 1,
+      "raw-color: .authoring-palette-limit { color: var(--state-approval-text, #9a6700) }": 1,
+      "raw-color: .authoring-drag-preview { box-shadow: 0 12px 32px rgb(16 37 83 / 0.18),\n    0 0 0 1px color-mix(in srgb, var(--kind) 45%, transparent) }": 1
+    }
+  },
+  "apps/web/src/features/settings/settings.css": {
+    "reason": "Existing appearance values retained to avoid visual changes in the tooling rollout. Remove entries when migrating to tokens or shared variants.",
+    "findings": {
+      "raw-color: .settings-theme-preview { --preview-bg: #f4f5f8 }": 1,
+      "raw-color: .settings-theme-preview { --preview-panel: #ffffff }": 1,
+      "raw-color: .settings-theme-preview { --preview-line: #15171c1f }": 1,
+      "raw-color: .settings-theme-preview { --preview-accent: #316bff }": 1,
+      "raw-color: .settings-theme[data-theme='dark'] .settings-theme-preview { --preview-bg: #0b1020 }": 1,
+      "raw-color: .settings-theme[data-theme='dark'] .settings-theme-preview { --preview-panel: #141b2f }": 1,
+      "raw-color: .settings-theme[data-theme='dark'] .settings-theme-preview { --preview-line: #ffffff1f }": 1,
+      "raw-color: .settings-theme[data-theme='dark'] .settings-theme-preview { --preview-accent: #54a3ff }": 1,
+      "raw-color: .settings-theme[data-theme='system'] .settings-theme-preview { background: linear-gradient(115deg, #f4f5f8 0 50%, #0b1020 50% 100%) }": 1
+    }
+  },
+  "apps/web/src/features/overview/operational-metrics.css": {
+    "reason": "Existing appearance values retained to avoid visual changes in the tooling rollout. Remove entries when migrating to tokens or shared variants.",
+    "findings": {
+      "primitive-appearance: .operational-group[data-slot='card'] { padding: 0 }": 1
+    }
+  },
+  "apps/web/src/features/home/home.css": {
+    "reason": "Existing appearance values retained to avoid visual changes in the tooling rollout. Remove entries when migrating to tokens or shared variants.",
+    "findings": {
+      "raw-color: .home-module[data-editing] { box-shadow: 0 0 0 1px color-mix(in srgb, var(--signal) 35%, transparent),\n    0 6px 16px -10px #1025532e }": 1
+    }
+  }
+}

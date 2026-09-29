@@ -7,6 +7,10 @@ export const root = fileURLToPath(new URL('../../', import.meta.url));
  * Runs a command without a shell and forwards termination signals; resolves trimmed captured
  * output or rejects with the child exit code. Pass logFd to stream both outputs to
  * a caller-owned file descriptor instead of the terminal; it overrides capture.
+ * @param {string} command
+ * @param {string[]} args
+ * @param {{ env?: NodeJS.ProcessEnv, capture?: boolean, cwd?: string, logFd?: number }} options
+ * @returns {Promise<string>}
  */
 export function run(
   command,
@@ -26,16 +30,29 @@ export function run(
             : 'inherit',
     });
     let output = '';
+    /** @type {NodeJS.Signals | undefined} */
     let stopped;
+    /** @type {ReturnType<typeof setTimeout> | undefined} */
     let timer;
+    /** Signals the owned process group.
+     * @param {NodeJS.Signals} signal
+     */
     const kill = (signal) => {
       try {
         if (process.platform === 'win32') child.kill(signal);
-        else process.kill(-child.pid, signal);
+        else if (child.pid !== undefined) process.kill(-child.pid, signal);
       } catch (error) {
-        if (error.code !== 'ESRCH') throw error;
+        if (!(
+          error instanceof Error &&
+          'code' in error &&
+          error.code === 'ESRCH'
+        ))
+          throw error;
       }
     };
+    /** Forwards termination and schedules forced cleanup.
+     * @param {NodeJS.Signals} signal
+     */
     const stop = (signal) => {
       stopped = signal;
       kill(signal);
@@ -86,8 +103,16 @@ export function run(
 /**
  * Reports a command failure and sets the process exit code, suppressing expected
  * interruption messages.
+ * @param {unknown} error
  */
 export function fail(error) {
-  if (![130, 143].includes(error.exitCode)) console.error(error.message);
-  process.exitCode = error.exitCode ?? 1;
+  const exitCode =
+    error instanceof Error &&
+    'exitCode' in error &&
+    typeof error.exitCode === 'number'
+      ? error.exitCode
+      : 1;
+  if (![130, 143].includes(exitCode))
+    console.error(error instanceof Error ? error.message : String(error));
+  process.exitCode = exitCode;
 }

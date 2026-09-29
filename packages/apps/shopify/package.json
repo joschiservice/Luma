@@ -19,20 +19,19 @@
     "@luma/connections": "workspace:*",
     "@luma/identity": "workspace:*",
     "@luma/platform": "workspace:*",
-    "zod": "3.25.76",
+    "zod": "catalog:zod3",
     "@luma/connector-shopify": "workspace:*",
     "@luma/app-host": "workspace:*",
-    "fastify": "5.12.5",
+    "fastify": "catalog:",
     "@luma/ui": "workspace:*",
-    "@luma/api-contract": "workspace:*",
-    "react": "^19.2.0",
-    "@tanstack/react-form": "1.33.5"
+    "react": "catalog:",
+    "@tanstack/react-form": "catalog:"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",
-    "@types/node": "^24.0.0",
-    "graphql": "^16.14.2",
-    "vitest": "4.1.11",
-    "@types/react": "^19.2.0"
+    "@types/node": "catalog:",
+    "graphql": "catalog:",
+    "vitest": "catalog:",
+    "@types/react": "catalog:"
   }
 }

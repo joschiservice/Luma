@@ -1,6 +1,6 @@
 /* global document, window */
 import { randomUUID } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 
 import { buildRuntimeApp } from '@luma/application-runtime';
 import { createConnectionCoverage } from '@luma/connections/composition';
@@ -10,6 +10,7 @@ import { createTenantDatabase } from '@luma/platform/composition';
 import { createProcurementMetricReader } from '@luma/procurement/composition';
 import { createOperationalSummary } from '@luma/read-models/composition';
 
+import { performanceReport } from '../../../tooling/performance/report.mjs';
 import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, startProcess } from './helpers.mjs';
 import { metricStream } from './metric-stream-fixture.mjs';
@@ -259,11 +260,9 @@ test('keeps cross-domain cohorts live, recovers races and measures committed cha
     durations,
     readCosts: streams.flatMap((s) => s.readCosts),
     plans,
+    queryCount: plans.length,
   };
-  await writeFile(
-    '/tmp/luma87-performance.json',
-    JSON.stringify(report, null, 2),
-  );
+  await performanceReport('operational-metrics', report, { queryCount: 12 });
   console.log(
     'LUMA-87 latency',
     JSON.stringify({

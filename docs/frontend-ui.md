@@ -77,3 +77,16 @@ The UI stylesheet owns `--card-padding`, `--content-gap`, `--content-related-gap
 Use component variants for appearance and `className` for layout. Do not add page selectors that restyle shared card padding, Alert colors or Badge typography. Keep text at 12px or larger and check contrast on tinted surfaces.
 
 Storybook's **Foundations/Theme** documents tokens, states and landmarks. Feature stories cover the actual domain compositions in both themes and at narrow viewport widths.
+
+## Automated appearance checks
+
+`pnpm lint` checks literal JSX style colors and appearance overrides on imported
+shared primitives, including aliased imports. `pnpm lint:ui` parses product and
+workspace-app CSS to reject literal hex/function colors and appearance declarations
+targeting shared card, badge, alert and button selectors. Layout remains feature-owned.
+
+Existing CSS declarations are listed exactly in `tooling/style/ui-baseline.json`;
+new declarations fail, and removed declarations require removing their baseline entry.
+Keep theme token definitions and primitive styling
+in the UI package. The checks cover static syntax; they do not replace visual and
+accessibility review or resolve arbitrary dynamic class names.

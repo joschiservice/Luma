@@ -20,19 +20,19 @@
     "@luma/platform": "workspace:*",
     "@luma/resolution": "workspace:*",
     "@luma/workflows": "workspace:*",
-    "@opentelemetry/api": "1.9.1",
+    "@opentelemetry/api": "catalog:",
     "@temporalio/activity": "1.24.0",
     "@temporalio/client": "1.24.0",
     "@temporalio/common": "1.24.0",
     "@temporalio/interceptors-opentelemetry-v2": "1.24.0",
     "@temporalio/worker": "1.24.0",
     "@temporalio/workflow": "1.24.0",
-    "zod": "3.25.76"
+    "zod": "catalog:zod3"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",
-    "@temporalio/testing": "1.24.0",
-    "@types/node": "^24.0.0",
-    "vitest": "4.1.11"
+    "@temporalio/testing": "catalog:",
+    "@types/node": "catalog:",
+    "vitest": "catalog:"
   }
 }

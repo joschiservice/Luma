@@ -28,15 +28,14 @@
     "@luma/connections": "workspace:*",
     "@luma/identity": "workspace:*",
     "@luma/platform": "workspace:*",
-    "zod": "3.25.76",
+    "zod": "catalog:zod3",
     "@luma/api-contract": "workspace:*",
-    "fastify": "5.12.5",
-    "@ts-rest/fastify": "3.52.1"
+    "fastify": "catalog:",
+    "@ts-rest/fastify": "catalog:"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",
-    "@types/node": "^24.0.0",
-    "graphql": "^16.14.2",
-    "vitest": "4.1.11"
+    "@types/node": "catalog:",
+    "vitest": "catalog:"
   }
 }

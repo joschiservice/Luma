@@ -27,16 +27,16 @@
   },
   "dependencies": {
     "@luma/api-contract": "workspace:*",
-    "@ts-rest/fastify": "3.52.1",
-    "better-auth": "1.7.5",
+    "@ts-rest/fastify": "catalog:",
+    "better-auth": "catalog:",
     "drizzle-orm": "0.45.2",
-    "fastify": "5.12.5",
-    "pg": "8.20.0"
+    "fastify": "catalog:",
+    "pg": "catalog:pg-8-20-0"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",
-    "@types/node": "^24.0.0",
-    "@types/pg": "8.20.0",
-    "vitest": "4.1.11"
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "vitest": "catalog:"
   }
 }

@@ -24,30 +24,30 @@
     "build:storybook": "storybook build --output-dir storybook-static"
   },
   "peerDependencies": {
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react": "catalog:",
+    "react-dom": "catalog:"
   },
   "devDependencies": {
     "@luma/api-contract": "workspace:*",
     "@luma/typescript-config": "workspace:*",
     "@storybook/addon-a11y": "10.6.0",
     "@storybook/addon-vitest": "10.6.0",
-    "@storybook/react-vite": "10.6.0",
-    "@tailwindcss/vite": "4.3.3",
-    "@tanstack/react-form": "1.33.5",
-    "@tanstack/react-query": "5.103.0",
-    "@types/react": "^19.2.0",
-    "@types/react-dom": "^19.2.0",
+    "@storybook/react-vite": "catalog:",
+    "@tailwindcss/vite": "catalog:",
+    "@tanstack/react-form": "catalog:",
+    "@tanstack/react-query": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
     "@vitest/browser-playwright": "4.1.11",
-    "playwright": "1.63.0",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "storybook": "10.6.0",
+    "playwright": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "storybook": "catalog:",
     "tailwindcss": "4.3.3",
-    "ts-pattern": "5.9.0",
-    "vite": "8.3.0",
-    "vitest": "4.1.11",
-    "zod": "4.6.5"
+    "ts-pattern": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:",
+    "zod": "catalog:zod4"
   },
   "dependencies": {
     "@base-ui/react": "1.8.0",
@@ -63,7 +63,7 @@
     "@lezer/highlight": "1.2.5",
     "class-variance-authority": "0.7.1",
     "cn": "0.3.0",
-    "lucide-react": "1.46.0",
+    "lucide-react": "catalog:",
     "react-resizable-panels": "4.13.3"
   }
 }

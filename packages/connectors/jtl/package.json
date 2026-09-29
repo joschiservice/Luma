@@ -23,7 +23,7 @@
     }
   },
   "dependencies": {
-    "zod": "3.25.76",
+    "zod": "catalog:zod3",
     "@luma/connector-core": "workspace:*"
   }
 }

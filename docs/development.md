@@ -47,7 +47,7 @@ Docker and Playwright Chromium are required. Install Chromium with `pnpm --filte
 | Repository gate   | Final validation across packages                         | `pnpm check`                                                    |
 | All CI gates      | Changes spanning platform workflows and browser surfaces | `pnpm test:full`                                                |
 
-The feature command currently accepts only `simulator`. It does not replace `pnpm check` or run unrelated platform E2E suites. Individual `test:e2e` and `test:browser` commands still build their prerequisites for standalone use.
+The feature command accepts `simulator`, `workflows` and `orders`. Each prepares the Code Step runtime, builds dependencies, checks selected packages with a disposable database, and runs related journeys. Workflows covers authoring, triggers, playbooks, Code Steps and replenishment; Orders covers order/read-model/ingestion packages and order/record browser journeys. It does not replace `pnpm check` or run unrelated platform E2E suites. Individual `test:e2e` and `test:browser` commands still build their prerequisites for standalone use.
 
 ## API imports
 
@@ -177,3 +177,34 @@ References: [mise](https://mise.jdx.dev/walkthrough.html),
 [Compose services](https://docs.docker.com/reference/compose-file/services/),
 [Testcontainers PostgreSQL](https://node.testcontainers.org/modules/postgresql/),
 [Temporal CLI](https://github.com/temporalio/cli/blob/main/README.md).
+
+## Repository quality checks
+
+Shared dependency versions live in `pnpm-workspace.yaml` catalogs. Keep named catalogs
+when consumers deliberately require different versions, such as Zod 3 and 4.
+Change a catalog version as a separate dependency upgrade with relevant validation.
+
+`pnpm knip:check` checks unused files and dependencies across all workspaces and
+runtime exports in the connector-core package. `pnpm knip --workspace <path>` runs
+a broader audit for a workspace. Extend the export gate as packages become clean.
+Runtime-loaded entry points and documented exceptions belong in `knip.jsonc`;
+review consumers before removing a reported dependency or export.
+
+`pnpm typecheck:tooling` checks the shared process, environment and test-plan helpers
+with strict TypeScript `checkJs`. Add JSDoc contracts and expand `tooling/tsconfig.json`
+when bringing another tooling module under type checking. The root typecheck includes it.
+
+`pnpm test:full` includes Code Step setup, repository checks, backend and browser
+E2E, simulator tooling, evaluation tests, playbook evaluation and code evaluation.
+A regression test compares its command coverage with the CI matrix. Keep both in
+sync when adding a gate. Optional model-backed authoring evaluation is not a CI gate.
+
+Performance scenarios write measurements, budgets and violations to `.luma/performance`.
+CI uploads reports separately for each backend/browser shard and summarizes budgets
+in the job summary. Reports are written before budget failures are raised. Order-page
+payloads are capped at 128 KiB for 50 items, metric SSE frames at 4 KiB, the five measured SSE subscribers at 128 KiB total
+for the live-metric scenario, and the
+cross-domain summary at 12 SELECT/WITH statements for its six readers. These are
+regression ceilings, not production latency guarantees. The live-metric scenario
+retains its existing one-second commit-to-visible p95 assertion. Review the scenario
+and report before changing a budget; do not increase it just to silence a failure.

@@ -14,10 +14,10 @@
     "@luma/application-runtime": "workspace:*",
     "@luma/config": "workspace:*",
     "@luma/platform": "workspace:*",
-    "@opentelemetry/instrumentation": "0.222.0"
+    "@opentelemetry/instrumentation": "catalog:"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",
-    "tsx": "^4.20.0"
+    "tsx": "catalog:"
   }
 }

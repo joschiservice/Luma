@@ -1,4 +1,5 @@
 /* global document, window */
+import { performanceReport } from '../../../tooling/performance/report.mjs';
 import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, startProcess } from './helpers.mjs';
 import { ordersFixture } from './orders-fixture.mjs';
@@ -76,6 +77,20 @@ test('finds an order by number or SKU, explains it and pages a historical import
     ],
   });
   await orders.importHistory(mug, 150);
+  const orderPage = await fixture.request(
+    fixture.member,
+    `${fixture.base}/orders?limit=50`,
+  );
+  expect(orderPage.items).toHaveLength(50);
+  await performanceReport(
+    'orders-page',
+    {
+      datasetOrders: 153,
+      pageItems: orderPage.items.length,
+      payloadBytes: Buffer.byteLength(JSON.stringify(orderPage)),
+    },
+    { pageItems: 50, payloadBytes: 128 * 1024 },
+  );
 
   const listed = await fixture.request(
     fixture.member,

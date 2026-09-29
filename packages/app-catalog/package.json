@@ -19,15 +19,13 @@
     "@luma/connections": "workspace:*",
     "@luma/identity": "workspace:*",
     "@luma/platform": "workspace:*",
-    "zod": "3.25.76",
     "@luma/app-host": "workspace:*",
     "@luma/app-jtl": "workspace:*",
     "@luma/app-shopify": "workspace:*"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",
-    "@types/node": "^24.0.0",
-    "graphql": "^16.14.2",
-    "vitest": "4.1.11"
+    "@types/node": "catalog:",
+    "vitest": "catalog:"
   }
 }

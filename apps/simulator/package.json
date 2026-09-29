@@ -17,7 +17,7 @@
     "@luma/simulator-core": "workspace:*",
     "@luma/simulator-jtl": "workspace:*",
     "@luma/simulator-shopify": "workspace:*",
-    "fastify": "5.12.5",
-    "zod": "3.25.76"
+    "fastify": "catalog:",
+    "zod": "catalog:zod3"
   }
 }

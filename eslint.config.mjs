@@ -8,6 +8,7 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 import architecture from './tooling/architecture/eslint-plugin.mjs';
+import ui from './tooling/style/eslint-plugin.mjs';
 
 export default tseslint.config(
   {
@@ -55,6 +56,14 @@ export default tseslint.config(
     files: ['apps/**/*.{ts,tsx,js,mjs}', 'packages/**/*.{ts,tsx,js,mjs}'],
     plugins: { architecture },
     rules: { 'architecture/boundaries': 'error' },
+  },
+  {
+    files: [
+      'apps/web/src/**/*.{ts,tsx}',
+      'packages/apps/*/src/web/**/*.{ts,tsx}',
+    ],
+    plugins: { ui },
+    rules: { 'ui/primitive-appearance': 'error' },
   },
   prettier,
   {

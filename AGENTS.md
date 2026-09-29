@@ -110,9 +110,9 @@ Start with the smallest meaningful proof. Test observable behavior and important
 - Focused unit tests: `pnpm --filter @luma/resolution test inventory-monitor.test.ts`, substituting the owning package and file.
 - Backend journey: `pnpm test:e2e <file.e2e.mjs>`. Browser journey: `pnpm test:browser <file.browser.mjs>`.
 - Shared UI: `pnpm test:ui`; inspect relevant stories and test the integrated journey when routing, authentication or live data changes.
-- Simulator changes: `pnpm verify:feature simulator`. Extend its explicit test selection when adding scenarios.
+- Feature checks: `pnpm verify:feature <simulator|workflows|orders>`. Extend the explicit test selection when adding scenarios.
 - Before review of code changes, run `pnpm check` and the relevant integration/browser suites. Documentation-only changes need formatting and link checks.
-- `pnpm test:full` runs `check`, backend E2E and browser E2E with a shared disposable PostgreSQL server. Simulator tooling and release evaluations are additional gates; consult [CI](.github/workflows/ci.yml) for the complete set.
+- `pnpm test:full` prepares the Code Step runtime and runs all CI gates, including simulator tooling and release evaluations, with a shared disposable PostgreSQL server. Its command coverage is checked against [CI](.github/workflows/ci.yml).
 - `pnpm test:local` does not provision PostgreSQL and can skip database integration tests. Report that limitation when using it.
 
 Backend E2E uses Vitest; browser E2E uses Playwright Test. Browser failures retain traces and screenshots under `.luma/playwright`; open the report with `pnpm test:browser:report`. See [development validation](docs/development.md#feature-validation) and [benchmarking](docs/benchmarking.md) for focused checks and performance measurements.

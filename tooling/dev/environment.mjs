@@ -6,6 +6,18 @@ import { parseEnv } from 'node:util';
 
 import { root, run } from './process.mjs';
 
+/**
+ * @typedef {object} WorktreeState
+ * @property {string} project
+ * @property {string} databasePassword
+ * @property {string} apiPassword
+ * @property {string} workerPassword
+ * @property {string} authSecret
+ * @property {string} seedPassword
+ * @property {number} webPort
+ * @property {number} apiPort
+ */
+
 export const stateDirectory = join(root, '.luma');
 
 const statePath = join(stateDirectory, 'state.json');
@@ -24,7 +36,8 @@ export async function connectionKey(path = connectionKeyPath) {
       flag: 'wx',
     });
   } catch (error) {
-    if (error.code !== 'EEXIST') throw error;
+    if (!(error instanceof Error && 'code' in error && error.code === 'EEXIST'))
+      throw error;
   }
   const key = await readFile(path, 'utf8');
   if (
@@ -44,6 +57,7 @@ export const project = `luma-${createHash('sha256').update(root).digest('hex').s
  * Finds the Code Step runtime for local processes: an explicit `LUMA_CODE_RUNTIME_DIR` from
  * apps/api/.env wins, otherwise the directory `pnpm setup:code` installs into when it exists.
  * Returns null when no runtime is installed, so Code Steps stay unavailable.
+ * @param {NodeJS.ProcessEnv} apiEnv
  */
 export async function codeRuntimeDirectory(
   apiEnv = {},
@@ -67,11 +81,14 @@ export async function freePort() {
   const server = createServer();
   await new Promise((resolve, reject) => {
     server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolve);
+    server.listen(0, '127.0.0.1', () => resolve(undefined));
   });
-  const port = server.address().port;
+  const address = server.address();
+  if (!address || typeof address === 'string')
+    throw new Error('No TCP port was assigned');
+  const port = address.port;
   await new Promise((resolve, reject) =>
-    server.close((error) => (error ? reject(error) : resolve())),
+    server.close((error) => (error ? reject(error) : resolve(undefined))),
   );
 
   return port;
@@ -80,6 +97,7 @@ export async function freePort() {
 /**
  * Loads this worktree's local state, creating it only when requested; rejects state from
  * another checkout.
+ * @returns {Promise<WorktreeState>}
  */
 export async function state(create = false) {
   try {
@@ -91,7 +109,8 @@ export async function state(create = false) {
 
     return saved;
   } catch (error) {
-    if (error.code !== 'ENOENT') throw error;
+    if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT'))
+      throw error;
     if (!create)
       throw new Error(
         'No local environment exists. Run mise run setup first.',
@@ -123,6 +142,8 @@ export async function state(create = false) {
 /**
  * Runs Docker Compose for this worktree with its saved database credentials and optional
  * captured output.
+ * @param {WorktreeState} saved
+ * @param {string[]} args
  */
 export function compose(saved, args, capture = false) {
   return run(
@@ -138,19 +159,26 @@ export function compose(saved, args, capture = false) {
 /**
  * Builds process settings from worktree state and published service ports, including
  * optional Temporal access.
+ * @param {WorktreeState} saved
  */
 export async function environment(saved, workflows = false, observing = false) {
   const binding = await compose(saved, ['port', 'postgres', '5432'], true);
   const dbPort = Number(binding.split(':').at(-1));
   if (!dbPort)
     throw new Error('PostgreSQL has no published port. Run pnpm run setup.');
+  /** Builds a connection to this worktree database.
+   * @param {string} user
+   * @param {string} password
+   */
   const database = (user, password) =>
     `postgresql://${user}:${password}@127.0.0.1:${dbPort}/luma`;
+  /** @type {NodeJS.ProcessEnv} */
   let apiEnv = {};
   try {
     apiEnv = parseEnv(await readFile(join(root, 'apps/api/.env'), 'utf8'));
   } catch (error) {
-    if (error.code !== 'ENOENT') throw error;
+    if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT'))
+      throw error;
   }
   const localOrigin = `http://127.0.0.1:${saved.webPort}`;
   const webOrigin =
@@ -160,6 +188,7 @@ export async function environment(saved, workflows = false, observing = false) {
     !['http:', 'https:'].includes(new URL(webOrigin).protocol)
   )
     throw new Error('The configured web URL must be an exact HTTP origin');
+  /** @type {Record<string, string>} */
   const generated = {
     CONNECTIONS_ACTIVE_KEY_ID: 'local',
     CONNECTIONS_KEYS: JSON.stringify({ local: await connectionKey() }),
@@ -216,6 +245,7 @@ export async function environment(saved, workflows = false, observing = false) {
 /**
  * Writes generated settings to the worktree's private environment file with owner-only
  * permissions.
+ * @param {Record<string, string>} generated
  */
 export async function saveEnvironment(generated) {
   await writeFile(

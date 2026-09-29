@@ -23,6 +23,6 @@
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",
-    "@types/node": "^24.0.0"
+    "@types/node": "catalog:"
   }
 }

@@ -16,17 +16,16 @@
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",
     "@playwright/test": "1.63.0",
-    "@temporalio/testing": "1.24.0",
-    "@types/pg": "8.20.0",
+    "@temporalio/testing": "catalog:",
+    "@types/pg": "catalog:",
     "drizzle-kit": "0.31.11",
-    "graphql": "^16.14.2",
-    "playwright": "1.63.0",
-    "tsx": "^4.20.0"
+    "playwright": "catalog:",
+    "tsx": "catalog:"
   },
   "dependencies": {
     "@luma/application-runtime": "workspace:*",
     "@luma/config": "workspace:*",
     "@luma/platform": "workspace:*",
-    "@opentelemetry/instrumentation": "0.222.0"
+    "@opentelemetry/instrumentation": "catalog:"
   }
 }
