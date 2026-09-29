@@ -10,6 +10,7 @@ import {
   createInstallationService,
 } from '@luma/connections/composition';
 import { IdentityError } from '@luma/identity';
+import { z } from 'zod';
 
 import { registerRecordRoutes } from './api/records.js';
 import { registerShopifyRoutes } from './api/shopify.js';
@@ -23,12 +24,14 @@ import {
   installationTarget,
 } from './infrastructure/installation-validation.js';
 import { createShopifyOAuth } from './infrastructure/oauth.js';
+import { createPrivacyIntake } from './infrastructure/privacy.js';
 import { createShopifyRecordReader } from './infrastructure/records.js';
 import { createInstallationVerifier } from './infrastructure/verifier.js';
 
 export {
   createShopifyConnector,
   createShopifyOAuth,
+  createPrivacyIntake,
   createInstallationVerifier,
   readShopifyConfig,
   registerShopifyRoutes,
@@ -148,6 +151,10 @@ export function createApp(context: AppFactoryContext): AppDefinition {
       return context.database.transaction(
         '00000000-0000-4000-8000-000000000000',
         async (tx) => {
+          const privacy = await tx.query<{ present: boolean }>(
+            "SELECT to_regclass('public.shopify_privacy_requests') IS NOT NULL AS present",
+          );
+          if (!privacy.rows[0]?.present) return false;
           await tx.query('SELECT digest FROM shopify_oauth_states LIMIT 0');
           await tx.query(
             'SELECT connection_id FROM shopify_installation_bindings LIMIT 0',
@@ -158,7 +165,14 @@ export function createApp(context: AppFactoryContext): AppDefinition {
       );
     },
     registerHttp(server, identity) {
-      registerShopifyRoutes(server, oauth, identity);
+      registerShopifyRoutes(
+        server,
+        oauth,
+        identity,
+        config
+          ? createPrivacyIntake(context.database, config, context.cipher)
+          : undefined,
+      );
       registerRecordRoutes(server, records);
       server.post(
         '/v1/organizations/:organizationId/apps/shopify/record-connections',
@@ -185,6 +199,31 @@ export function createApp(context: AppFactoryContext): AppDefinition {
                 item.status === 'active',
             )
             .map((item) => ({ id: item.id, label: item.label }));
+        },
+      );
+      server.post(
+        '/v1/organizations/:organizationId/apps/shopify/access',
+        async (request, reply) => {
+          reply.header('cache-control', 'no-store');
+          if (!request.tenantContext)
+            throw new IdentityError(
+              401,
+              'UNAUTHENTICATED',
+              'Sign in to continue',
+            );
+          await context.requireInstalled(request.tenantContext, 'shopify');
+          if (!oauth)
+            throw new IdentityError(
+              503,
+              'SERVICE_UNAVAILABLE',
+              'Shopify authorization is not configured',
+            );
+          const input = z
+            .object({ connectionId: z.string().uuid().optional() })
+            .strict()
+            .parse(request.body);
+
+          return oauth.access(request.tenantContext, input.connectionId);
         },
       );
       server.post(

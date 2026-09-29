@@ -7,6 +7,7 @@ import { useForm } from '@tanstack/react-form';
 import { useRef, useState } from 'react';
 import { z } from 'zod';
 
+import { ShopifyAccess } from './access.js';
 import { ShopifyOrderContext } from './order-context.js';
 import { ShopifyRecordPage } from './record-page.js';
 import { ShopifyRecords } from './records.js';
@@ -76,6 +77,7 @@ function ShopifyAuthorization(props: AppUiProps) {
           Approve read access to orders, products, inventory, returns and
           fulfillment in Shopify. You can cancel before approving.
         </p>
+        <ShopifyAccess services={services} connectionId={connection?.id} />
         {(['label', 'shop'] as const).map((name) => (
           <form.Field key={name} name={name}>
             {(field) => (

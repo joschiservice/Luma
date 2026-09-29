@@ -373,6 +373,17 @@ it('preserves non-secret input on errors, handles stale versions and unavailable
 
 it('starts Shopify authorization without token fields and reports callback outcomes', async (t) => {
   const { page, errors } = await fixture(t);
+  await page.route('**/apps/shopify/access', (route) =>
+    route.fulfill({
+      status: 200,
+      json: {
+        customerDataApproved: false,
+        allOrdersApproved: false,
+        grantedScopes: null,
+        missingScopes: [],
+      },
+    }),
+  );
   await page
     .getByRole('button', { name: 'Install Shopify', exact: true })
     .click();
@@ -382,6 +393,17 @@ it('starts Shopify authorization without token fields and reports callback outco
   expect(await page.getByLabel('Access token', { exact: true }).count()).toBe(
     0,
   );
+  await page
+    .getByText('Order history is limited to the last 60 days.', {
+      exact: false,
+    })
+    .waitFor();
+  await page
+    .getByText(
+      'Customer context is unavailable until Shopify approves access',
+      { exact: false },
+    )
+    .waitFor();
   await page.getByLabel('Connection name').fill('Dev shop');
   await page.getByLabel('Shop hostname').fill('dev-shop.myshopify.com');
   await page.route('**/apps/shopify/authorize', (route) =>

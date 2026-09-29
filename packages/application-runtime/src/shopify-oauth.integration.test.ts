@@ -1,9 +1,13 @@
+import { execFile } from 'node:child_process';
 import { createHmac, randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { promisify } from 'node:util';
 
 import { createAppRegistry, createAppService } from '@luma/app-host';
-import { createShopifyOAuth } from '@luma/app-shopify';
+import { createPrivacyIntake, createShopifyOAuth } from '@luma/app-shopify';
 import { ConnectorError } from '@luma/connections';
 import { createSecretCipher } from '@luma/connections/composition';
 import { makeTenantContext } from '@luma/identity/composition';
@@ -100,6 +104,15 @@ describe.skipIf(!databaseUrl)('Shopify OAuth on PostgreSQL', () => {
         'utf8',
       ),
     );
+    await owner.query(
+      await readFile(
+        new URL(
+          '../migrations/0038_shopify_privacy_requests.sql',
+          import.meta.url,
+        ),
+        'utf8',
+      ),
+    );
     const password = randomUUID();
     await admin.query(
       `CREATE ROLE "${name}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`,
@@ -141,7 +154,15 @@ describe.skipIf(!databaseUrl)('Shopify OAuth on PostgreSQL', () => {
       expect(
         validate(schema, parse(query)).map((error) => error.message),
       ).toEqual([]);
-      if (query.includes('LumaUninstallSubscriptions'))
+      if (query.includes('LumaScopeUpdate'))
+        return Response.json({
+          data: {
+            currentAppInstallation: {
+              accessScopes: granted.split(',').map((handle) => ({ handle })),
+            },
+          },
+        });
+      if (query.includes('LumaLifecycleSubscriptions'))
         return Response.json({ data: { webhookSubscriptions: { nodes: [] } } });
 
       return Response.json({
@@ -255,6 +276,197 @@ describe.skipIf(!databaseUrl)('Shopify OAuth on PostgreSQL', () => {
     };
   }
 
+  it('queues privacy requests once without tenant-facing read or update access', async () => {
+    const f = fixture();
+    const intake = createPrivacyIntake(f.db, config, f.cipher);
+    const body = Buffer.from(
+      JSON.stringify({ shop_id: 123, shop_domain: f.shop }),
+    );
+    const mac = createHmac('sha256', config.clientSecret)
+      .update(body)
+      .digest('base64');
+    await intake(body, mac, f.shop, 'shop/redact');
+    await intake(body, mac, f.shop, 'shop/redact');
+    const rows = await owner.query(
+      "SELECT * FROM shopify_privacy_requests WHERE app='development:client'",
+    );
+    expect(rows.rowCount).toBe(1);
+    expect(rows.rows[0].payload).not.toContain(f.shop);
+    expect(rows.rows[0].completed_at).toBeNull();
+    const directory = await mkdtemp(join(tmpdir(), 'luma-privacy-'));
+    try {
+      const file = join(directory, 'request.json');
+      const database = new URL(databaseUrl!);
+      database.pathname = `/${name}`;
+      const execute = (args: string[]) =>
+        promisify(execFile)(
+          process.execPath,
+          [
+            new URL('../../../tooling/shopify/privacy.mjs', import.meta.url)
+              .pathname,
+            ...args,
+          ],
+          {
+            env: {
+              ...process.env,
+              SHOPIFY_PRIVACY_DATABASE_URL: database.href,
+              CONNECTIONS_ACTIVE_KEY_ID: 'test',
+              CONNECTIONS_KEYS: JSON.stringify({
+                test: keys.get('test')!.toString('base64'),
+              }),
+            },
+          },
+        );
+      await execute([
+        'export',
+        'development:client',
+        rows.rows[0].event_key,
+        file,
+      ]);
+      expect(JSON.parse(await readFile(file, 'utf8')).request.shop_domain).toBe(
+        f.shop,
+      );
+      expect((await stat(file)).mode & 0o777).toBe(0o600);
+      await expect(
+        execute(['export', 'development:client', rows.rows[0].event_key, file]),
+      ).rejects.toThrow();
+      await execute([
+        'complete',
+        'development:client',
+        rows.rows[0].event_key,
+        'test-evidence-reference',
+      ]);
+      await intake(body, mac, f.shop, 'shop/redact');
+      const completed = await owner.query(
+        'SELECT payload,completed_at,evidence FROM shopify_privacy_requests WHERE event_key=$1',
+        [rows.rows[0].event_key],
+      );
+      expect(completed.rows).toHaveLength(1);
+      expect(completed.rows[0].payload).toBeNull();
+      expect(completed.rows[0].completed_at).not.toBeNull();
+      expect(completed.rows[0].evidence).toBe('test-evidence-reference');
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+
+    await expect(
+      runtime.query('SELECT * FROM shopify_privacy_requests'),
+    ).rejects.toThrow();
+    await expect(
+      runtime.query('UPDATE shopify_privacy_requests SET payload=NULL'),
+    ).rejects.toThrow();
+  });
+  it('requests approved history access only when enabled and exposes missing grants', async () => {
+    const f = fixture();
+    const normal = new URL(
+      (await f.oauth.start(f.ctx, { shop: f.shop, label: 'Store' }))
+        .authorizationUrl,
+    );
+    expect(normal.searchParams.get('scope')).not.toContain('read_all_orders');
+    const approved = createShopifyOAuth(
+      f.db,
+      {
+        ...config,
+        allOrdersApproved: true,
+        protectedCustomerDataApproved: true,
+      },
+      f.deps,
+    );
+    const start = new URL(
+      (await approved.start(f.ctx, { shop: f.shop, label: 'Store' }))
+        .authorizationUrl,
+    );
+    expect(start.searchParams.get('scope')).toContain('read_all_orders');
+    expect(start.searchParams.get('scope')).toContain('read_customers');
+    await approved.callback(f.ctx, await f.query({}, approved));
+    const connection = await f.connection();
+    const access = await approved.access(f.ctx, connection.id);
+    expect(access.missingScopes).toContain('read_all_orders');
+    expect(JSON.stringify(access)).not.toContain('private-access');
+    await expect(approved.access(context(), connection.id)).rejects.toThrow();
+  });
+  it('reconciles current grants rather than trusting stale scope-change payloads', async () => {
+    const f = fixture();
+    await f.oauth.callback(f.ctx, await f.query());
+    const c = await f.connection();
+    const body = Buffer.from(JSON.stringify({ current: scopes.split(',') }));
+    const mac = createHmac('sha256', config.clientSecret)
+      .update(body)
+      .digest('base64');
+    await expect(
+      f.oauth.scopesUpdated(
+        f.ctx.tenantId,
+        c.id,
+        body,
+        'bad',
+        f.shop,
+        'app/scopes_update',
+      ),
+    ).rejects.toThrow();
+    f.missingScopes();
+    await f.oauth.scopesUpdated(
+      f.ctx.tenantId,
+      c.id,
+      body,
+      mac,
+      f.shop,
+      'app/scopes_update',
+    );
+    expect((await f.connection()).status).toBe('degraded');
+    expect((await f.oauth.access(f.ctx, c.id)).grantedScopes).toEqual([
+      'read_orders',
+    ]);
+    await expect(f.oauth.credential(f.ctx, c.id)).rejects.toThrow();
+  });
+  it('keeps rotated credentials when a scope probe must be retried', async () => {
+    const f = fixture();
+    await f.oauth.callback(f.ctx, await f.query());
+    const c = await f.connection();
+    const body = Buffer.from('{}');
+    const mac = createHmac('sha256', config.clientSecret)
+      .update(body)
+      .digest('base64');
+    const transport = f.transport.getMockImplementation()!;
+    let failed = false;
+    f.transport.mockImplementation(async (url, init) => {
+      if (!failed && String(init?.body).includes('LumaScopeUpdate')) {
+        failed = true;
+
+        return new Response(null, { status: 503 });
+      }
+
+      return transport(url, init);
+    });
+    f.advance();
+    await expect(
+      f.oauth.scopesUpdated(
+        f.ctx.tenantId,
+        c.id,
+        body,
+        mac,
+        f.shop,
+        'app/scopes_update',
+      ),
+    ).rejects.toThrow();
+    expect((await f.connection()).status).toBe('degraded');
+    await f.oauth.scopesUpdated(
+      f.ctx.tenantId,
+      c.id,
+      body,
+      mac,
+      f.shop,
+      'app/scopes_update',
+    );
+    expect((await f.connection()).status).toBe('active');
+    expect((await f.oauth.credential(f.ctx, c.id)).token).toBe(
+      'private-access-2',
+    );
+    expect(
+      f.transport.mock.calls.filter(([url]) =>
+        String(url).includes('access_token'),
+      ),
+    ).toHaveLength(2);
+  });
   it('serializes uninstall with an in-flight token refresh without losing the refresh transaction', async () => {
     const f = fixture();
     await f.oauth.callback(f.ctx, await f.query());

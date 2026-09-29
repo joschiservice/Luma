@@ -11,8 +11,10 @@ function oauth(): ShopifyOAuth {
   return {
     config: { webOrigin: 'https://luma.test' },
     start: vi.fn(),
+    access: vi.fn(),
     credential: vi.fn(),
     uninstall: vi.fn(),
+    scopesUpdated: vi.fn(),
     callbackTenant: () => tenant,
     callback: vi.fn(),
   };
@@ -74,6 +76,37 @@ it('passes the original webhook bytes to signature verification', async () => {
       'shop.myshopify.com',
       'app/uninstalled',
     );
+  } finally {
+    await app.close();
+  }
+});
+
+it('acknowledges compliance intake only after persistence and preserves original bytes', async () => {
+  const app = Fastify();
+  const privacy = vi.fn().mockResolvedValue(undefined);
+  registerShopifyRoutes(app, undefined, undefined, privacy);
+  const payload = '{ "shop_id": 123, "shop_domain": "shop.myshopify.com" }';
+  const request = {
+    method: 'POST' as const,
+    url: '/v1/shopify/privacy',
+    headers: {
+      'content-type': 'application/json',
+      'x-shopify-hmac-sha256': 'sig',
+      'x-shopify-shop-domain': 'shop.myshopify.com',
+      'x-shopify-topic': 'shop/redact',
+    },
+    payload,
+  };
+  try {
+    expect((await app.inject(request)).statusCode).toBe(204);
+    expect(privacy).toHaveBeenCalledWith(
+      Buffer.from(payload),
+      'sig',
+      'shop.myshopify.com',
+      'shop/redact',
+    );
+    privacy.mockRejectedValue(new Error('Persistence failed'));
+    expect((await app.inject(request)).statusCode).toBe(500);
   } finally {
     await app.close();
   }

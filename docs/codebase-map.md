@@ -246,3 +246,11 @@ and `domain/records.ts` defines their coverage and source-link contracts.
 browses and follows records. Tests are the Shopify record reader, service and
 route unit tests and `Apps/Shopify records` stories. See the
 [Shopify app guide](../packages/apps/shopify/README.md#operational-records).
+
+Shopify authorization and lifecycle webhooks live in
+`packages/apps/shopify/src/infrastructure/oauth.ts`; compliance intake lives in
+`infrastructure/privacy.ts` with migration `0038_shopify_privacy_requests.sql`.
+The restricted operator command is `tooling/shopify/privacy.mjs`. See
+[Shopify partner readiness](shopify-production.md) for portal settings, approval
+gates, privacy fulfillment and smoke-test evidence. Tests are the OAuth
+PostgreSQL suite, privacy unit tests and the connections browser journey.

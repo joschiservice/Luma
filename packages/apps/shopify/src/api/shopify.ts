@@ -6,6 +6,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import type { ShopifyOAuth } from '../application/oauth.js';
+import type { PrivacyIntake } from '../infrastructure/privacy.js';
 
 /**
  * Registers Shopify authorization callbacks and uninstall webhooks with signature and
@@ -15,6 +16,7 @@ export function registerShopifyRoutes(
   app: FastifyInstance,
   oauth?: ShopifyOAuth,
   identity?: Pick<IdentityService, 'resolveTenant'>,
+  privacy?: PrivacyIntake,
 ) {
   app.get(
     '/v1/shopify/callback',
@@ -54,28 +56,20 @@ export function registerShopifyRoutes(
       (_request, body, done) => done(null, body),
     );
     webhook.post(
-      '/v1/shopify/uninstall/:organizationId/:connectionId',
+      '/v1/shopify/privacy',
       { config: { authentication: 'app' } },
       async (request, reply) => {
-        if (!oauth)
+        if (!privacy)
           throw new IdentityError(
             503,
             'SERVICE_UNAVAILABLE',
             'Shopify is not configured',
           );
-        const params = z
-          .object({
-            organizationId: z.string().uuid(),
-            connectionId: z.string().uuid(),
-          })
-          .parse(request.params);
         const header = (name: string) =>
           typeof request.headers[name] === 'string'
             ? (request.headers[name] as string)
             : '';
-        await oauth.uninstall(
-          params.organizationId,
-          params.connectionId,
+        await privacy(
           request.body as Buffer,
           header('x-shopify-hmac-sha256'),
           header('x-shopify-shop-domain'),
@@ -85,5 +79,38 @@ export function registerShopifyRoutes(
         return reply.status(204).send();
       },
     );
+    for (const action of ['uninstall', 'scopes'] as const)
+      webhook.post(
+        `/v1/shopify/${action}/:organizationId/:connectionId`,
+        { config: { authentication: 'app' } },
+        async (request, reply) => {
+          if (!oauth)
+            throw new IdentityError(
+              503,
+              'SERVICE_UNAVAILABLE',
+              'Shopify is not configured',
+            );
+          const params = z
+            .object({
+              organizationId: z.string().uuid(),
+              connectionId: z.string().uuid(),
+            })
+            .parse(request.params);
+          const header = (name: string) =>
+            typeof request.headers[name] === 'string'
+              ? (request.headers[name] as string)
+              : '';
+          await oauth[action === 'uninstall' ? 'uninstall' : 'scopesUpdated'](
+            params.organizationId,
+            params.connectionId,
+            request.body as Buffer,
+            header('x-shopify-hmac-sha256'),
+            header('x-shopify-shop-domain'),
+            header('x-shopify-topic'),
+          );
+
+          return reply.status(204).send();
+        },
+      );
   });
 }

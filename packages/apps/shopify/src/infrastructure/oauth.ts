@@ -102,10 +102,11 @@ export function createShopifyOAuth(
     tenantId: string,
     shop: string,
     operation: (tx: SqlTransaction) => Promise<T>,
+    requireApp = true,
   ) {
     return db.transaction(tenantId, async (tx) => {
       // Hold app state before connection locks and provider token rotation.
-      if (deps.requireInstalled) {
+      if (requireApp && deps.requireInstalled) {
         const installation = await tx.query(
           "SELECT app_id FROM workspace_apps WHERE tenant_id=$1 AND app_id='shopify' AND status='installed' FOR SHARE",
           [tenantId],
@@ -166,7 +167,7 @@ export function createShopifyOAuth(
     };
   }
 
-  async function registerUninstall(
+  async function registerLifecycleWebhooks(
     connection: InstalledConnection,
     credentials: InstallationCredentials,
   ) {
@@ -176,45 +177,93 @@ export function createShopifyOAuth(
       accessToken: async () => credentials.token,
       ...(deps.fetch ? { fetch: deps.fetch } : {}),
     });
-    const url = new URL(config.callbackUrl);
-    url.pathname = `/api/v1/shopify/uninstall/${connection.tenantId}/${connection.id}`;
-    // Shopify rejects identical subscriptions; list first so reconnect remains idempotent.
-    const subscriptions = parse(
-      z.object({
-        webhookSubscriptions: z.object({
-          nodes: z.array(z.object({ uri: z.string() })),
+    for (const topic of ['APP_UNINSTALLED', 'APP_SCOPES_UPDATE'] as const) {
+      const url = new URL(config.callbackUrl);
+      url.pathname = `/api/v1/shopify/uninstall/${connection.tenantId}/${connection.id}`;
+      if (topic === 'APP_SCOPES_UPDATE')
+        url.pathname = `/api/v1/shopify/scopes/${connection.tenantId}/${connection.id}`;
+      // Shopify rejects identical subscriptions; list first so reconnect remains idempotent.
+      const subscriptions = parse(
+        z.object({
+          webhookSubscriptions: z.object({
+            nodes: z.array(z.object({ uri: z.string() })),
+          }),
         }),
-      }),
-      await request(
-        'query LumaUninstallSubscriptions { webhookSubscriptions(first: 100, topics: [APP_UNINSTALLED]) { nodes { uri } } }',
-        {},
-      ),
-    );
-    if (
-      subscriptions.webhookSubscriptions.nodes.some((s) => s.uri === url.href)
-    )
-      return;
-    const result = parse(
-      z.object({
-        webhookSubscriptionCreate: z.object({
-          webhookSubscription: z.object({ id: z.string() }).nullable(),
-          userErrors: z.array(z.object({ message: z.string() })),
+        await request(
+          `query LumaLifecycleSubscriptions { webhookSubscriptions(first: 100, topics: [${topic}]) { nodes { uri } } }`,
+          {},
+        ),
+      );
+      if (
+        subscriptions.webhookSubscriptions.nodes.some((s) => s.uri === url.href)
+      )
+        continue;
+      const result = parse(
+        z.object({
+          webhookSubscriptionCreate: z.object({
+            webhookSubscription: z.object({ id: z.string() }).nullable(),
+            userErrors: z.array(z.object({ message: z.string() })),
+          }),
         }),
-      }),
-      await request(
-        'mutation LumaUninstall($uri: String!) { webhookSubscriptionCreate(topic: APP_UNINSTALLED, webhookSubscription: { uri: $uri, format: JSON }) { webhookSubscription { id } userErrors { message } } }',
-        { uri: url.href },
-      ),
-    );
-    if (
-      !result.webhookSubscriptionCreate.webhookSubscription ||
-      result.webhookSubscriptionCreate.userErrors.length
-    )
-      throw unavailable();
+        await request(
+          `mutation LumaLifecycleWebhook($uri: String!) { webhookSubscriptionCreate(topic: ${topic}, webhookSubscription: { uri: $uri, format: JSON }) { webhookSubscription { id } userErrors { message } } }`,
+          { uri: url.href },
+        ),
+      );
+      if (
+        !result.webhookSubscriptionCreate.webhookSubscription ||
+        result.webhookSubscriptionCreate.userErrors.length
+      )
+        throw unavailable();
+    }
   }
+
+  const requestedScopes = [
+    ...shopifyScopes,
+    'read_returns',
+    'read_locations',
+    ...(config.protectedCustomerDataApproved ? ['read_customers'] : []),
+    ...(config.allOrdersApproved ? ['read_all_orders'] : []),
+  ];
 
   return {
     config: { webOrigin: config.webOrigin },
+    async access(context: TenantContext, connectionId?: string) {
+      const fresh = await deps.refreshContext(context);
+      const installationVersion = await deps.requireInstalled?.(fresh);
+      let scopes: string[] | null = null;
+      if (connectionId) {
+        const record = await repository.get(fresh.tenantId, connectionId);
+        if (
+          !record ||
+          record.connection.target.kind !== 'shopify' ||
+          (installationVersion !== undefined &&
+            record.connection.appInstallationVersion !== installationVersion)
+        )
+          throw new IdentityError(
+            404,
+            'NOT_FOUND',
+            'Shopify connection not found',
+          );
+        if (record.secret) {
+          const credentials = storedCredentials.parse(
+            deps.cipher.open(record.secret, secretBinding(record.connection)),
+          );
+          if (credentials.shopify?.app === app)
+            scopes = credentials.shopify.scopes;
+        }
+      }
+
+      return {
+        customerDataApproved: config.protectedCustomerDataApproved === true,
+        allOrdersApproved: config.allOrdersApproved === true,
+        requestedScopes,
+        grantedScopes: scopes,
+        missingScopes: connectionId
+          ? requestedScopes.filter((scope) => !scopes?.includes(scope))
+          : [],
+      };
+    },
     async start(context: TenantContext, input: unknown) {
       const fresh = await deps.refreshContext(context);
       requireRole(fresh, ['owner', 'admin']);
@@ -246,12 +295,7 @@ export function createShopifyOAuth(
       const url = new URL(`https://${shop}/admin/oauth/authorize`);
       url.search = new URLSearchParams({
         client_id: config.clientId,
-        scope: [
-          ...shopifyScopes,
-          'read_returns',
-          'read_locations',
-          ...(config.protectedCustomerDataApproved ? ['read_customers'] : []),
-        ].join(','),
+        scope: requestedScopes.join(','),
         redirect_uri: config.callbackUrl,
         state,
       }).toString();
@@ -355,19 +399,19 @@ export function createShopifyOAuth(
           updatedAt: timestamp,
         };
         // Persist degraded credentials too, so a scope failure has a recoverable connection.
-        if (
-          shopifyScopes.every((scope) =>
-            credentials.shopify!.scopes.includes(scope),
-          )
-        ) {
-          try {
+        try {
+          await registerLifecycleWebhooks(connection, credentials);
+          if (
+            shopifyScopes.every((scope) =>
+              credentials.shopify!.scopes.includes(scope),
+            )
+          ) {
             connection.granted = await deps.verify(connection, credentials);
-            await registerUninstall(connection, credentials);
             if (shopifyReads.every((cap) => connection.granted.includes(cap)))
               connection.status = 'active';
-          } catch {
-            connection.granted = [];
           }
+        } catch {
+          connection.granted = [];
         }
         requireRole(await deps.refreshContext(context), ['owner', 'admin']);
         await persist(
@@ -457,6 +501,133 @@ export function createShopifyOAuth(
 
       return outcome;
     },
+    async scopesUpdated(
+      tenantId: string,
+      id: string,
+      body: Buffer,
+      signature: string,
+      shop: string,
+      topic: string,
+    ) {
+      if (
+        topic !== 'app/scopes_update' ||
+        !shopHostname.safeParse(shop).success ||
+        !validMac(config.clientSecret, body, signature, 'base64')
+      )
+        throw new IdentityError(
+          401,
+          'UNAUTHENTICATED',
+          'Invalid Shopify signature',
+        );
+      let retryError: unknown;
+      await locked(
+        tenantId,
+        shop,
+        async (tx) => {
+          const record = await scoped(tx, tenantId).get(tenantId, id);
+          if (
+            !record?.secret ||
+            record.connection.target.kind !== 'shopify' ||
+            record.connection.target.shop !== shop
+          )
+            return;
+          let credentials = storedCredentials.parse(
+            deps.cipher.open(record.secret, secretBinding(record.connection)),
+          );
+          if (credentials.shopify?.app !== app) return;
+          let rotated = false;
+          try {
+            if (
+              Date.parse(credentials.shopify.expiresAt) <=
+              now().getTime() + 60000
+            ) {
+              credentials = await client.token(shop, {
+                refresh_token: credentials.shopify.refreshToken,
+              });
+              rotated = true;
+            }
+            const request = createClient({
+              shop,
+              accessToken: async () => credentials.token,
+              ...(deps.fetch ? { fetch: deps.fetch } : {}),
+            });
+            const access = parse(
+              z.object({
+                currentAppInstallation: z.object({
+                  accessScopes: z.array(z.object({ handle: z.string() })),
+                }),
+              }),
+              await request(
+                'query LumaScopeUpdate { currentAppInstallation { accessScopes { handle } } }',
+                {},
+              ),
+            );
+            credentials.shopify!.scopes =
+              access.currentAppInstallation.accessScopes.map(
+                (scope) => scope.handle,
+              );
+            const granted = await deps.verify(record.connection, credentials);
+            const active =
+              shopifyScopes.every((scope) =>
+                credentials.shopify!.scopes.includes(scope),
+              ) && shopifyReads.every((cap) => granted.includes(cap));
+            await persist(
+              tx,
+              record,
+              {
+                ...next(record, active ? 'active' : 'degraded'),
+                granted,
+                credentialVersion: record.connection.credentialVersion + 1,
+              },
+              credentials,
+              'shopify',
+              'shopify_scopes_updated',
+            );
+          } catch (error) {
+            if (
+              !(error instanceof ConnectorError) ||
+              !['authentication', 'permission_denied'].includes(
+                error.failure.code,
+              )
+            ) {
+              if (!rotated) throw error;
+              // Commit the rotated token before asking Shopify to retry a failed grant probe.
+              await persist(
+                tx,
+                record,
+                {
+                  ...next(record, 'degraded'),
+                  granted: [],
+                  credentialVersion: record.connection.credentialVersion + 1,
+                },
+                credentials,
+                'shopify',
+                'shopify_scope_check_failed',
+              );
+              retryError = error;
+
+              return;
+            }
+            const revoked = error.failure.code === 'authentication';
+            await persist(
+              tx,
+              record,
+              {
+                ...next(record, revoked ? 'revoked' : 'degraded'),
+                granted: [],
+                credentialVersion:
+                  record.connection.credentialVersion + (rotated ? 1 : 0),
+              },
+              revoked ? null : credentials,
+              'shopify',
+              'shopify_scopes_updated',
+            );
+          }
+        },
+        false,
+      );
+      if (retryError) throw retryError;
+    },
     async uninstall(
       tenantId: string,
       id: string,
@@ -475,66 +646,71 @@ export function createShopifyOAuth(
         .object({ myshopify_domain: z.literal(shop) })
         .safeParse(JSON.parse(body.toString('utf8')));
       if (!payload.success) throw invalid();
-      await locked(tenantId, shop, async (tx) => {
-        const record = await scoped(tx, tenantId).get(tenantId, id);
-        if (
-          !record?.secret ||
-          record.connection.target.kind !== 'shopify' ||
-          record.connection.target.shop !== shop
-        )
-          return;
-        let credentials = storedCredentials.parse(
-          deps.cipher.open(record.secret, secretBinding(record.connection)),
-        );
-        if (credentials.shopify?.app !== app) return;
-        // A delayed uninstall must not revoke a subsequent reinstall, even after token expiry.
-        let rotated = false;
-        try {
+      await locked(
+        tenantId,
+        shop,
+        async (tx) => {
+          const record = await scoped(tx, tenantId).get(tenantId, id);
           if (
-            Date.parse(credentials.shopify.expiresAt) <=
-            now().getTime() + 60000
-          ) {
-            if (
-              Date.parse(credentials.shopify.refreshExpiresAt) <=
-              now().getTime()
-            )
-              throw unavailable();
-            credentials = await client.token(shop, {
-              refresh_token: credentials.shopify.refreshToken,
-            });
-            rotated = true;
-          }
-          await deps.verify(record.connection, credentials);
-          if (rotated)
-            await persist(
-              tx,
-              record,
-              {
-                ...next(record, record.connection.status),
-                credentialVersion: record.connection.credentialVersion + 1,
-              },
-              credentials,
-              'shopify',
-              'shopify_token_refreshed',
-            );
-
-          return;
-        } catch (error) {
-          if (
-            !(error instanceof ConnectorError) ||
-            error.failure.code !== 'authentication'
+            !record?.secret ||
+            record.connection.target.kind !== 'shopify' ||
+            record.connection.target.shop !== shop
           )
-            throw error;
-        }
-        await persist(
-          tx,
-          record,
-          { ...next(record, 'revoked'), granted: [] },
-          null,
-          'shopify',
-          'shopify_uninstalled',
-        );
-      });
+            return;
+          let credentials = storedCredentials.parse(
+            deps.cipher.open(record.secret, secretBinding(record.connection)),
+          );
+          if (credentials.shopify?.app !== app) return;
+          // A delayed uninstall must not revoke a subsequent reinstall, even after token expiry.
+          let rotated = false;
+          try {
+            if (
+              Date.parse(credentials.shopify.expiresAt) <=
+              now().getTime() + 60000
+            ) {
+              if (
+                Date.parse(credentials.shopify.refreshExpiresAt) <=
+                now().getTime()
+              )
+                throw unavailable();
+              credentials = await client.token(shop, {
+                refresh_token: credentials.shopify.refreshToken,
+              });
+              rotated = true;
+            }
+            await deps.verify(record.connection, credentials);
+            if (rotated)
+              await persist(
+                tx,
+                record,
+                {
+                  ...next(record, record.connection.status),
+                  credentialVersion: record.connection.credentialVersion + 1,
+                },
+                credentials,
+                'shopify',
+                'shopify_token_refreshed',
+              );
+
+            return;
+          } catch (error) {
+            if (
+              !(error instanceof ConnectorError) ||
+              error.failure.code !== 'authentication'
+            )
+              throw error;
+          }
+          await persist(
+            tx,
+            record,
+            { ...next(record, 'revoked'), granted: [] },
+            null,
+            'shopify',
+            'shopify_uninstalled',
+          );
+        },
+        false,
+      );
     },
   };
 }

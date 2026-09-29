@@ -1,5 +1,6 @@
 export interface ShopifyConfig {
   protectedCustomerDataApproved?: boolean;
+  allOrdersApproved?: boolean;
   clientId: string;
   clientSecret: string;
   environment: string;
@@ -50,7 +51,16 @@ export function readShopifyConfig(
   if (!/^[a-zA-Z0-9_-]{1,64}$/.test(env.SHOPIFY_APP_ENVIRONMENT!))
     throw new Error('SHOPIFY_APP_ENVIRONMENT is invalid');
 
+  for (const name of [
+    'SHOPIFY_PROTECTED_CUSTOMER_DATA_APPROVED',
+    'SHOPIFY_ALL_ORDERS_APPROVED',
+  ]) {
+    if (env[name] !== undefined && !['true', 'false'].includes(env[name]!))
+      throw new Error(`${name} must be true or false`);
+  }
+
   return {
+    allOrdersApproved: env.SHOPIFY_ALL_ORDERS_APPROVED === 'true',
     ...(env.SHOPIFY_PROTECTED_CUSTOMER_DATA_APPROVED === 'true'
       ? { protectedCustomerDataApproved: true }
       : {}),

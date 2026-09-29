@@ -31,3 +31,16 @@ it('requires a complete app configuration and exact HTTPS callback', () => {
     }),
   ).toThrow();
 });
+
+it('enables approved access explicitly and rejects mistyped approval settings', () => {
+  expect(readShopifyConfig(settings)?.allOrdersApproved).toBe(false);
+  expect(
+    readShopifyConfig({ ...settings, SHOPIFY_ALL_ORDERS_APPROVED: 'true' })
+      ?.allOrdersApproved,
+  ).toBe(true);
+  for (const name of [
+    'SHOPIFY_ALL_ORDERS_APPROVED',
+    'SHOPIFY_PROTECTED_CUSTOMER_DATA_APPROVED',
+  ])
+    expect(() => readShopifyConfig({ ...settings, [name]: 'yes' })).toThrow();
+});

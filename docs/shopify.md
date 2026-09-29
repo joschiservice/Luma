@@ -132,10 +132,10 @@ Before public launch:
 - Complete Shopify public-app review and distribution approval.
 - Obtain protected customer data access required for order reads. Request only
   the data needed by Luma; the adapter excludes customer and address fields.
-- Implement and register the required `customers/data_request`,
-  `customers/redact`, and `shop/redact` privacy webhooks with verified signatures
-  and the applicable data-access/deletion workflows. The uninstall endpoint does
-  not replace these compliance handlers.
+- Register `customers/data_request`, `customers/redact`, and `shop/redact` at
+  `/api/v1/shopify/privacy`. Assign and rehearse the privacy-queue operator
+  workflow before production onboarding. The uninstall endpoint does not
+  replace compliance handling.
 - Verify production scopes, callback allowlists, uninstall delivery, encrypted
   backups, key rotation and recovery with the approved app.
 
@@ -205,3 +205,6 @@ References: [standalone authentication](https://shopify.dev/docs/apps/build/auth
 
 Open **Shopify** in the workspace sidebar to select a store, browse orders or
 products, and follow linked records. See the [operational records guide](../packages/apps/shopify/README.md#operational-records) for coverage, protected-data approval and validation.
+
+Production configuration, approval requests, privacy operations and smoke-test
+evidence are documented in [Shopify partner readiness](shopify-production.md).
