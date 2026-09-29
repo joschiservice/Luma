@@ -7,6 +7,15 @@ schema {
 
 type QueryRoot {
   currentAppInstallation: AppInstallation!
+  customers(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+    sortKey: CustomerSortKeys = ID
+    query: String
+  ): CustomerConnection!
   inventoryItems(
     first: Int
     after: String
@@ -84,191 +93,37 @@ The `Boolean` scalar type represents `true` or `false`.
 """
 scalar Boolean
 
-type InventoryItemConnection {
-  nodes: [InventoryItem!]!
-  pageInfo: PageInfo!
-}
-
-type InventoryItem implements Node {
-  id: ID!
-  inventoryLevels(
-    includeInactive: Boolean = false
-    first: Int
-    after: String
-    last: Int
-    before: String
-    reverse: Boolean = false
-    query: String
-  ): InventoryLevelConnection!
-  sku: String
-  tracked: Boolean!
-  updatedAt: DateTime!
-  variant: ProductVariant!
-}
-
-type InventoryLevelConnection {
-  nodes: [InventoryLevel!]!
-  pageInfo: PageInfo!
-}
-
-type InventoryLevel implements Node {
-  id: ID!
-  location: Location!
-  quantities(names: [String!]!): [InventoryQuantity!]!
-  updatedAt: DateTime!
-}
-
-type Location implements Node {
-  id: ID!
-  isActive: Boolean!
-  name: String!
-}
-
-type InventoryQuantity implements Node {
-  id: ID!
-  name: String!
-  quantity: Int!
-}
-
-scalar DateTime
-
-type PageInfo {
-  endCursor: String
-  hasNextPage: Boolean!
-}
-
-type ProductVariant implements Node {
-  id: ID!
-  inventoryItem: InventoryItem!
-  price: Money!
-  product: Product!
-  sku: String
-  title: String!
-  updatedAt: DateTime!
-}
-
-scalar Money
-
-type Product implements Node {
-  id: ID!
-  status: ProductStatus!
-  title: String!
-  updatedAt: DateTime!
-  variants(
-    first: Int
-    after: String
-    last: Int
-    before: String
-    reverse: Boolean = false
-    sortKey: ProductVariantSortKeys = POSITION
-  ): ProductVariantConnection!
-}
-
-enum ProductStatus {
-  ACTIVE
-  ARCHIVED
-  DRAFT
-  UNLISTED
-}
-
-enum ProductVariantSortKeys {
-  FULL_TITLE
-  ID
-  INVENTORY_LEVELS_AVAILABLE
-  INVENTORY_MANAGEMENT
-  INVENTORY_POLICY
-  INVENTORY_QUANTITY
-  NAME
-  POPULAR
-  POSITION
-  RELEVANCE
-  SKU
-  TITLE
-}
-
-type ProductVariantConnection {
-  nodes: [ProductVariant!]!
-  pageInfo: PageInfo!
-}
-
-enum OrderSortKeys {
+enum CustomerSortKeys {
   CREATED_AT
-  CURRENT_TOTAL_PRICE
-  CUSTOMER_NAME
-  DESTINATION
-  FINANCIAL_STATUS
-  FULFILLMENT_STATUS
   ID
-  ORDER_NUMBER
-  PO_NUMBER
-  PROCESSED_AT
+  LOCATION
+  NAME
   RELEVANCE
-  TOTAL_ITEMS_QUANTITY
-  TOTAL_PRICE
   UPDATED_AT
 }
 
-type OrderConnection {
-  nodes: [Order!]!
+type CustomerConnection {
+  nodes: [Customer!]!
   pageInfo: PageInfo!
 }
 
-type Order implements Node {
-  cancelledAt: DateTime
-  closed: Boolean!
-  createdAt: DateTime!
-  currentTotalPriceSet: MoneyBag!
-  customer: Customer
-  displayFinancialStatus: OrderDisplayFinancialStatus
-  displayFulfillmentStatus: OrderDisplayFulfillmentStatus!
-  events(
-    first: Int
-    after: String
-    last: Int
-    before: String
-    reverse: Boolean = false
-    sortKey: EventSortKeys = ID
-    query: String
-  ): EventConnection!
-  fulfillmentOrders(
-    displayable: Boolean = false
-    first: Int
-    after: String
-    last: Int
-    before: String
-    reverse: Boolean = false
-    query: String
-  ): FulfillmentOrderConnection!
-  fulfillments(first: Int, query: String): [Fulfillment!]!
+type Customer implements Node {
+  amountSpent: MoneyV2!
+  defaultEmailAddress: CustomerEmailAddress
+  defaultPhoneNumber: CustomerPhoneNumber
+  displayName: String!
   id: ID!
-  lineItems(
+  numberOfOrders: UnsignedInt64!
+  orders(
     first: Int
     after: String
     last: Int
     before: String
     reverse: Boolean = false
-  ): LineItemConnection!
-  name: String!
-  refunds(first: Int): [Refund!]!
-  returns(
-    first: Int
-    after: String
-    last: Int
-    before: String
-    reverse: Boolean = false
+    sortKey: OrderSortKeys = ID
     query: String
-  ): ReturnConnection!
-  totalOutstandingSet: MoneyBag!
-  transactions(
-    first: Int
-    capturable: Boolean
-    manuallyResolvable: Boolean
-  ): [OrderTransaction!]!
+  ): OrderConnection!
   updatedAt: DateTime!
-}
-
-type MoneyBag {
-  shopMoney: MoneyV2!
 }
 
 type MoneyV2 {
@@ -444,23 +299,97 @@ enum CurrencyCode {
   XXX
 }
 
-type Customer implements Node {
-  amountSpent: MoneyV2!
-  id: ID!
-  numberOfOrders: UnsignedInt64!
-  orders(
+type CustomerEmailAddress {
+  emailAddress: String!
+}
+
+type CustomerPhoneNumber {
+  phoneNumber: String!
+}
+
+scalar UnsignedInt64
+
+enum OrderSortKeys {
+  CREATED_AT
+  CURRENT_TOTAL_PRICE
+  CUSTOMER_NAME
+  DESTINATION
+  FINANCIAL_STATUS
+  FULFILLMENT_STATUS
+  ID
+  ORDER_NUMBER
+  PO_NUMBER
+  PROCESSED_AT
+  RELEVANCE
+  TOTAL_ITEMS_QUANTITY
+  TOTAL_PRICE
+  UPDATED_AT
+}
+
+type OrderConnection {
+  nodes: [Order!]!
+  pageInfo: PageInfo!
+}
+
+type Order implements Node {
+  cancelledAt: DateTime
+  closed: Boolean!
+  createdAt: DateTime!
+  currentTotalPriceSet: MoneyBag!
+  customer: Customer
+  displayFinancialStatus: OrderDisplayFinancialStatus
+  displayFulfillmentStatus: OrderDisplayFulfillmentStatus!
+  events(
     first: Int
     after: String
     last: Int
     before: String
     reverse: Boolean = false
-    sortKey: OrderSortKeys = ID
+    sortKey: EventSortKeys = ID
     query: String
-  ): OrderConnection!
+  ): EventConnection!
+  fulfillmentOrders(
+    displayable: Boolean = false
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+    query: String
+  ): FulfillmentOrderConnection!
+  fulfillments(first: Int, query: String): [Fulfillment!]!
+  id: ID!
+  lineItems(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+  ): LineItemConnection!
+  name: String!
+  refunds(first: Int): [Refund!]!
+  returns(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+    query: String
+  ): ReturnConnection!
+  totalOutstandingSet: MoneyBag!
+  transactions(
+    first: Int
+    capturable: Boolean
+    manuallyResolvable: Boolean
+  ): [OrderTransaction!]!
   updatedAt: DateTime!
 }
 
-scalar UnsignedInt64
+scalar DateTime
+
+type MoneyBag {
+  shopMoney: MoneyV2!
+}
 
 enum OrderDisplayFinancialStatus {
   PENDING
@@ -501,6 +430,11 @@ interface Event {
   id: ID!
 }
 
+type PageInfo {
+  endCursor: String
+  hasNextPage: Boolean!
+}
+
 type FulfillmentOrderConnection {
   nodes: [FulfillmentOrder!]!
   pageInfo: PageInfo!
@@ -525,6 +459,12 @@ type FulfillmentOrder implements Node {
 
 type FulfillmentOrderAssignedLocation {
   location: Location
+}
+
+type Location implements Node {
+  id: ID!
+  isActive: Boolean!
+  name: String!
 }
 
 type FulfillmentHold implements Node {
@@ -561,6 +501,95 @@ type LineItem implements Node {
   quantity: Int!
   sku: String
   variant: ProductVariant
+}
+
+type ProductVariant implements Node {
+  id: ID!
+  inventoryItem: InventoryItem!
+  price: Money!
+  product: Product!
+  sku: String
+  title: String!
+  updatedAt: DateTime!
+}
+
+type InventoryItem implements Node {
+  id: ID!
+  inventoryLevels(
+    includeInactive: Boolean = false
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+    query: String
+  ): InventoryLevelConnection!
+  sku: String
+  tracked: Boolean!
+  updatedAt: DateTime!
+  variant: ProductVariant!
+}
+
+type InventoryLevelConnection {
+  nodes: [InventoryLevel!]!
+  pageInfo: PageInfo!
+}
+
+type InventoryLevel implements Node {
+  id: ID!
+  location: Location!
+  quantities(names: [String!]!): [InventoryQuantity!]!
+  updatedAt: DateTime!
+}
+
+type InventoryQuantity implements Node {
+  id: ID!
+  name: String!
+  quantity: Int!
+}
+
+scalar Money
+
+type Product implements Node {
+  id: ID!
+  status: ProductStatus!
+  title: String!
+  updatedAt: DateTime!
+  variants(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+    sortKey: ProductVariantSortKeys = POSITION
+  ): ProductVariantConnection!
+}
+
+enum ProductStatus {
+  ACTIVE
+  ARCHIVED
+  DRAFT
+  UNLISTED
+}
+
+enum ProductVariantSortKeys {
+  FULL_TITLE
+  ID
+  INVENTORY_LEVELS_AVAILABLE
+  INVENTORY_MANAGEMENT
+  INVENTORY_POLICY
+  INVENTORY_QUANTITY
+  NAME
+  POPULAR
+  POSITION
+  RELEVANCE
+  SKU
+  TITLE
+}
+
+type ProductVariantConnection {
+  nodes: [ProductVariant!]!
+  pageInfo: PageInfo!
 }
 
 enum FulfillmentOrderRequestStatus {
@@ -718,6 +747,11 @@ enum OrderTransactionStatus {
   ERROR
   AWAITING_RESPONSE
   UNKNOWN
+}
+
+type InventoryItemConnection {
+  nodes: [InventoryItem!]!
+  pageInfo: PageInfo!
 }
 
 enum ProductSortKeys {

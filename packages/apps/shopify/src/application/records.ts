@@ -3,6 +3,7 @@ import type { TenantContext } from '@luma/identity';
 import { IdentityError } from '@luma/identity';
 
 import {
+  type CustomerSearch,
   recordCapability,
   recordInput,
   type ShopifyRecordDetail,
@@ -14,17 +15,22 @@ export function createRecordService(options: {
   installations: Pick<InstallationService, 'credential'>;
   requireInstalled(context: TenantContext): Promise<number>;
   protectedCustomerDataApproved: boolean;
+  /** Enable only when Shopify approves name, email and phone access for this deployment. */
+  protectedCustomerContactApproved?: boolean;
   /** Creates a provider reader using the authorized connection and current token resolver. */
   reader(options: {
     tenantId: string;
     connectionId: string;
     shop: string;
     protectedCustomerDataApproved: boolean;
+    /** Enable only when Shopify approves name, email and phone access for this deployment. */
+    protectedCustomerContactApproved?: boolean;
     accessToken(): Promise<string>;
   }): (
     kind: ShopifyRecordKind,
     id?: string,
     cursor?: string,
+    search?: CustomerSearch,
   ) => Promise<ShopifyRecordDetail>;
 }) {
   return async (context: TenantContext, input: unknown) => {
@@ -35,7 +41,7 @@ export function createRecordService(options: {
         'CONFLICT',
         'Choose a valid Shopify record type and ID.',
       );
-    const { connectionId, kind, id, cursor } = parsed.data;
+    const { connectionId, kind, id, cursor, search } = parsed.data;
     const capability = recordCapability(kind);
     const credential = async () => {
       const version = await options.requireInstalled(context);
@@ -66,6 +72,8 @@ export function createRecordService(options: {
       connectionId,
       shop,
       protectedCustomerDataApproved: options.protectedCustomerDataApproved,
+      protectedCustomerContactApproved:
+        options.protectedCustomerContactApproved === true,
       accessToken: async () => {
         const fresh = await credential();
         if (fresh.connection.target.shop !== shop)
@@ -79,6 +87,6 @@ export function createRecordService(options: {
       },
     });
 
-    return reader(kind, id, cursor);
+    return reader(kind, id, cursor, search);
   };
 }

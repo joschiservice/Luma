@@ -40,6 +40,7 @@ const fields = {
   QueryRoot: [
     'node',
     'orders',
+    'customers',
     'products',
     'inventoryItems',
     'shop',
@@ -122,7 +123,19 @@ const fields = {
     'fulfillmentLineItems',
   ],
   FulfillmentLineItem: ['id', 'quantity', 'lineItem'],
-  Customer: ['id', 'updatedAt', 'numberOfOrders', 'amountSpent', 'orders'],
+  Customer: [
+    'id',
+    'updatedAt',
+    'numberOfOrders',
+    'amountSpent',
+    'orders',
+    'displayName',
+    'defaultEmailAddress',
+    'defaultPhoneNumber',
+  ],
+  CustomerConnection: ['nodes', 'pageInfo'],
+  CustomerEmailAddress: ['emailAddress'],
+  CustomerPhoneNumber: ['phoneNumber'],
   MoneyBag: ['shopMoney'],
   MoneyV2: ['amount', 'currencyCode'],
   OrderTransaction: [

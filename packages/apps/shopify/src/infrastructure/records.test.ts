@@ -26,6 +26,9 @@ const customer = {
   numberOfOrders: '3',
   amountSpent: money,
   email: 'must-not-leak@example.com',
+  displayName: 'Avery Tan',
+  defaultEmailAddress: { emailAddress: 'avery@example.test' },
+  defaultPhoneNumber: { phoneNumber: '+81312345678' },
 };
 const refund = {
   id: gid('Refund'),
@@ -77,7 +80,7 @@ const page = (nodes: unknown[], cursor: string | null = null) => ({
   pageInfo: { hasNextPage: !!cursor, endCursor: cursor },
 });
 
-function fixture(granted = scopes, approved = true) {
+function fixture(granted = scopes, approved = true, contactsApproved = false) {
   const fetch = vi.fn<typeof globalThis.fetch>(async (_url, init) => {
     const { query, variables } = JSON.parse(String(init?.body));
     if (query.includes('LumaRecordAccess'))
@@ -88,6 +91,16 @@ function fixture(granted = scopes, approved = true) {
           },
         },
       });
+    if (query.includes('LumaCustomerList'))
+      return Response.json({
+        data: {
+          records: page(
+            query.includes('records: orders') ? [{ customer }] : [customer],
+          ),
+        },
+      });
+    if (query.includes('LumaCustomerOrders'))
+      return Response.json({ data: { node: { orders: page([order]) } } });
     if (query.includes('LumaRecordList'))
       return Response.json({
         data: {
@@ -204,6 +217,7 @@ function fixture(granted = scopes, approved = true) {
       accessToken: token,
       fetch,
       protectedCustomerDataApproved: approved,
+      protectedCustomerContactApproved: contactsApproved,
       now: () => new Date(updatedAt),
     }),
   };
@@ -278,7 +292,9 @@ describe('Shopify operational records', () => {
       'Customer',
       gid('Customer'),
     );
-    expect(missing.sections[0]?.status).toBe('missing_scope');
+    expect(
+      missing.sections.find((section) => section.key === 'customer')?.status,
+    ).toBe('missing_scope');
   });
   it('isolates denied sections but rejects transport and malformed responses', async () => {
     const f = fixture();
@@ -354,6 +370,15 @@ describe('Shopify operational records', () => {
     );
     const f = fixture();
     for (const kind of recordKinds) await f.read(kind, gid(kind));
+    await f.read('Customer');
+    const contacts = fixture(scopes, true, true);
+    await contacts.read('Customer');
+    await contacts.read('Customer', gid('Customer'));
+    await contacts.read('Customer', undefined, undefined, {
+      field: 'order',
+      value: '#1001',
+    });
+    f.fetch.mock.calls.push(...contacts.fetch.mock.calls);
     await f.read('Order');
     await f.read('Product');
     for (const [, init] of f.fetch.mock.calls) {
@@ -363,5 +388,131 @@ describe('Shopify operational records', () => {
         query,
       ).toEqual([]);
     }
+  });
+  it('withholds contact fields and name/email search without explicit contact approval', async () => {
+    const f = fixture();
+    const list = await f.read('Customer');
+    expect(JSON.stringify(list)).not.toMatch(
+      /Avery|avery|81312345678|must-not-leak/,
+    );
+    expect(list.sections[0]?.rows[0]?.fields.Orders).toBe('3');
+    f.fetch.mockClear();
+    const denied = await f.read('Customer', undefined, undefined, {
+      field: 'email',
+      value: 'avery@example.test',
+    });
+    expect(denied.sections[0]).toMatchObject({
+      status: 'approval_required',
+      rows: [],
+    });
+    expect(f.fetch).toHaveBeenCalledTimes(1);
+    const unapproved = fixture(scopes, false, true);
+    expect((await unapproved.read('Customer')).sections[0]).toMatchObject({
+      status: 'approval_required',
+      rows: [],
+    });
+    expect(unapproved.fetch).toHaveBeenCalledTimes(1);
+  });
+  it('reads approved contacts and follows order identity rather than matching customer text', async () => {
+    const f = fixture(scopes, true, true);
+    const detail = await f.read('Customer', gid('Customer'));
+    expect(
+      detail.sections.find((v) => v.key === 'contact')?.rows[0]?.fields,
+    ).toEqual({
+      Name: 'Avery Tan',
+      Email: 'avery@example.test',
+      Phone: '+81312345678',
+    });
+    expect(detail.sections.find((v) => v.key === 'orders')?.rows[0]?.id).toBe(
+      gid('Order'),
+    );
+    const list = await f.read('Customer', undefined, undefined, {
+      field: 'order',
+      value: '#1001',
+    });
+    expect(list.sections[0]?.rows[0]?.id).toBe(gid('Customer'));
+    expect(JSON.stringify(list)).not.toContain('must-not-leak');
+    const missing = fixture(['read_customers'], true, true);
+    expect(
+      (
+        await missing.read('Customer', undefined, undefined, {
+          field: 'order',
+          value: '#1001',
+        })
+      ).sections[0],
+    ).toMatchObject({ status: 'missing_scope', rows: [] });
+    expect(missing.fetch).toHaveBeenCalledTimes(1);
+  });
+  it('preserves distinct customer IDs, deduplicates repeated order relations and pages source results', async () => {
+    const f = fixture(scopes, true, true);
+    const fallback = f.fetch.getMockImplementation()!;
+    f.fetch.mockImplementation((url, init) => {
+      const { query, variables } = JSON.parse(String(init?.body));
+      if (query.includes('LumaCustomerList'))
+        return Promise.resolve(
+          Response.json({
+            data: {
+              records: page(
+                [
+                  { customer },
+                  { customer },
+                  { customer: { ...customer, id: 'gid://shopify/Customer/2' } },
+                  { customer: null },
+                ],
+                variables.after ? null : 'next',
+              ),
+            },
+          }),
+        );
+      if (query.includes('LumaCustomerOrders'))
+        return Promise.resolve(
+          Response.json({
+            data: {
+              node: { orders: page([order], variables.after ? null : 'next') },
+            },
+          }),
+        );
+
+      return fallback(url, init);
+    });
+    const search = { field: 'order' as const, value: '#1001' };
+    const first = await f.read('Customer', undefined, undefined, search);
+    expect(first.sections[0]?.rows).toHaveLength(2);
+    expect(first.nextCursor).toBe('next');
+    expect(
+      (await f.read('Customer', undefined, 'next', search)).nextCursor,
+    ).toBeNull();
+    expect((await f.read('Customer', gid('Customer'))).nextCursor).toBe('next');
+    expect(
+      (await f.read('Customer', gid('Customer'), 'next')).nextCursor,
+    ).toBeNull();
+  });
+  it('discards provider-denied contact payloads while retaining separately authorized history', async () => {
+    const f = fixture(scopes, true, true);
+    const fallback = f.fetch.getMockImplementation()!;
+    f.fetch.mockImplementation((url, init) =>
+      String(init?.body).includes('defaultEmailAddress')
+        ? Promise.resolve(
+            Response.json({
+              data: { node: customer },
+              errors: [
+                {
+                  extensions: { code: 'ACCESS_DENIED' },
+                  message: 'private contact',
+                },
+              ],
+            }),
+          )
+        : fallback(url, init),
+    );
+    const detail = await f.read('Customer', gid('Customer'));
+    expect(detail.sections.find((v) => v.key === 'contact')).toMatchObject({
+      status: 'access_denied',
+      rows: [],
+    });
+    expect(detail.sections.find((v) => v.key === 'orders')?.rows).toHaveLength(
+      1,
+    );
+    expect(JSON.stringify(detail)).not.toMatch(/Avery|avery|private contact/);
   });
 });

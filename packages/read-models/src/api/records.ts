@@ -13,6 +13,21 @@ import type { RecordExplorer } from '../application/records.js';
 /** Exposes scoped record search and detail reads to workspace members. */
 export function recordRoutes(service?: RecordExplorer) {
   return initServer().router(apiContract.records, {
+    resolve: async ({ request, query }) => {
+      if (!request.tenantContext)
+        throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+      if (!service)
+        throw new IdentityError(
+          503,
+          'SERVICE_UNAVAILABLE',
+          'Record mapping is unavailable',
+        );
+
+      return {
+        status: 200,
+        body: await service.resolve(request.tenantContext, query),
+      };
+    },
     list: async ({ request, query }) => {
       if (!request.tenantContext)
         throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');

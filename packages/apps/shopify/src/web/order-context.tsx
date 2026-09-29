@@ -1,72 +1,48 @@
 import type { AppUiProps } from '@luma/app-host/web';
 import { Button } from '@luma/ui/components/primitives/button';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 
-import {
-  recordDetail,
-  type ShopifyRecordDetail,
-  type ShopifyRecordKind,
-} from '../domain/records.js';
-import { recordError } from './record-error.js';
+import type { ShopifyRecordKind } from '../domain/records.js';
+import { customerHref, useCustomerRecord } from './customer-data.js';
 import { ShopifyRecordSections } from './sections.js';
 
 const orderId = /^gid:\/\/shopify\/Order\/(\d+)$/;
 
-/**
- * Reads one order live from Shopify with the connection's current scopes, then follows its
- * customer, fulfillment, return and refund links in place.
- */
+/** Reads live order context with current permissions and follows source records or the customer workspace. */
 export function ShopifyOrderContext({
   record,
   services,
+  organizationId,
 }: {
   record: NonNullable<AppUiProps['record']>;
   services: AppUiProps['services'];
+  organizationId?: string;
 }) {
   const [trail, setTrail] = useState<{ kind: ShopifyRecordKind; id: string }[]>(
     [{ kind: 'Order', id: record.externalId }],
   );
-  const [detail, setDetail] = useState<ShopifyRecordDetail | null>(null);
-  const [message, setMessage] = useState('');
-  const [pending, setPending] = useState(true);
-  const [attempt, setAttempt] = useState(0);
-  const generation = useRef(0);
   const current = trail.at(-1)!;
   const numeric = orderId.exec(record.externalId)?.[1];
-
-  useEffect(() => {
-    if (!numeric) return;
-    const request = ++generation.current;
-    setPending(true);
-    setMessage('');
-    services
-      .request('records', {
-        connectionId: record.connectionId,
-        kind: current.kind,
-        id: current.id,
-      })
-      .then((value) => {
-        if (generation.current === request)
-          setDetail(recordDetail.parse(value));
-      })
-      .catch((error) => {
-        if (generation.current === request) {
-          setDetail(null);
-          setMessage(recordError(error, services.error));
-        }
-      })
-      .finally(() => {
-        if (generation.current === request) setPending(false);
-      });
-  }, [
+  const read = useCustomerRecord(
     services,
-    record.connectionId,
-    current.kind,
-    current.id,
-    numeric,
-    attempt,
-  ]);
-
+    numeric
+      ? {
+          connectionId: record.connectionId,
+          kind: current.kind,
+          id: current.id,
+        }
+      : null,
+  );
+  const detail = read.data;
+  const customers = new Map(
+    detail?.sections.flatMap((section) =>
+      section.rows.flatMap((row) =>
+        row.links
+          .filter((link) => link.kind === 'Customer')
+          .map((link) => [link.id, link] as const),
+      ),
+    ),
+  );
   if (!numeric)
     return (
       <p className="field-help">
@@ -79,7 +55,7 @@ export function ShopifyOrderContext({
     <section
       className="shopify-order-context"
       aria-label="Shopify order details"
-      aria-busy={pending}
+      aria-busy={read.pending}
     >
       <div className="shopify-order-context-head">
         {trail.length > 1 ? (
@@ -87,7 +63,6 @@ export function ShopifyOrderContext({
             type="button"
             variant="ghost"
             size="sm"
-            disabled={pending}
             onClick={() => setTrail(trail.slice(0, -1))}
           >
             Back
@@ -96,14 +71,14 @@ export function ShopifyOrderContext({
         <p className="field-help">
           {detail
             ? `Read live from ${detail.shop} at ${new Date(detail.observedAt).toLocaleString()}`
-            : 'Reading live from Shopify…'}
+            : 'Live Shopify details'}
         </p>
         <Button
           type="button"
           variant="ghost"
           size="sm"
-          disabled={pending}
-          onClick={() => setAttempt((value) => value + 1)}
+          disabled={read.pending}
+          onClick={read.refresh}
           aria-label="Refresh Shopify details"
         >
           Refresh
@@ -119,15 +94,27 @@ export function ShopifyOrderContext({
           </a>
         ) : null}
       </div>
-      {message ? <p role="alert">{message}</p> : null}
-      {pending && !detail ? (
-        <p role="status">Loading Shopify details…</p>
-      ) : null}
+      {read.error ? <p role="alert">{read.error}</p> : null}
+      {read.pending ? <p role="status">Loading Shopify details…</p> : null}
       {detail ? (
         <div aria-live="polite">
+          {organizationId
+            ? [...customers.values()].map((link) => (
+                <a
+                  key={link.id}
+                  href={customerHref(
+                    organizationId,
+                    record.connectionId,
+                    link.id,
+                  )}
+                >
+                  Open customer workspace →
+                </a>
+              ))
+            : null}
           <ShopifyRecordSections
             detail={detail}
-            pending={pending}
+            pending={read.pending}
             headingLevel={4}
             follow={(link) =>
               setTrail([...trail, { kind: link.kind, id: link.id }])

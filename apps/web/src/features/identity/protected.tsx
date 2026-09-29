@@ -38,5 +38,5 @@ export function Protected() {
   if (session.isPending) return <Pending />;
   if (!session.data) return <SignInRedirect />;
 
-  return <Outlet />;
+  return <Outlet key={session.data.sessionId} />;
 }

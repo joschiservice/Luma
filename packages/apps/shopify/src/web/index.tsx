@@ -8,15 +8,21 @@ import { useRef, useState } from 'react';
 import { z } from 'zod';
 
 import { ShopifyAccess } from './access.js';
+import { ShopifyCustomers } from './customers.js';
 import { ShopifyOrderContext } from './order-context.js';
 import { ShopifyRecordPage } from './record-page.js';
 import { ShopifyRecords } from './records.js';
 
 /** Renders Shopify authorization, the record browser page or live context for a host record. */
 export default function ShopifySettings(props: AppUiProps) {
+  if (props.slot === 'customers') return <ShopifyCustomers {...props} />;
   if (props.slot === 'record')
     return props.record ? (
-      <ShopifyOrderContext record={props.record} services={props.services} />
+      <ShopifyOrderContext
+        record={props.record}
+        services={props.services}
+        organizationId={props.organizationId}
+      />
     ) : null;
 
   return props.slot === 'page' ? (

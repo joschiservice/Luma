@@ -29,8 +29,11 @@ health. Set `SHOPIFY_PROTECTED_CUSTOMER_DATA_APPROVED=true` only after approval
 for the deployed app in Shopify, then reconnect to request `read_customers`.
 The flag is an operator attestation, not proof of Shopify approval; provider
 denials remain visible. Customer context reads identity, update time, order
-count, spend and linked orders. Names, contact details, addresses and free-text
-event messages are not requested or retained.
+count, spend and linked orders. Set `SHOPIFY_CUSTOMER_CONTACT_APPROVED=true`
+only after Shopify approves name, email and phone access. These fields are read
+live in the Customers workspace; provider denial withholds the contact section.
+Addresses and free-text event messages are not requested. See
+[Customers workspace](../../../docs/customers-workspace.md).
 
 Webhook refresh hints now include transactions, refunds, returns, customer
 updates, inventory items, locations and fulfillment holds. They retain the

@@ -264,6 +264,17 @@ The restricted operator command is `tooling/shopify/privacy.mjs`. See
 gates, privacy fulfillment and smoke-test evidence. Tests are the OAuth
 PostgreSQL suite, privacy unit tests and the connections browser journey.
 
+## Customers workspace
+
+Start at `apps/web/src/features/customers/page.tsx` and the installed app’s
+`customers` UI slot. Shopify owns live search, contact and history reads in
+`packages/apps/shopify/src/infrastructure/customer-records.ts` and `records.ts`,
+with UI in `src/web/customers.tsx`. Exact source-order resolution uses the Records
+contract and `packages/read-models/src/infrastructure/record-explorer.ts`.
+
+Tests: Shopify records and authorization tests, `Customers/Workspace` stories
+and `apps/api/e2e/customers.browser.mjs`. See [Customers workspace](customers-workspace.md).
+
 ## Inventory workspace
 
 Start at `packages/read-models/src/application/inventory.ts` for read contracts,

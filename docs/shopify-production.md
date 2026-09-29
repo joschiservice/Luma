@@ -60,6 +60,11 @@ when Shopify grants older-order access. Both default to false. Restart the
 server and reconnect after changing either flag. These flags request access;
 they cannot grant it. The record reader checks actual grants for each request.
 
+Set `SHOPIFY_CUSTOMER_CONTACT_APPROVED=true` only after Shopify also approves
+name, email and phone access for this deployment. It defaults to false. Without
+it, Customers shows source identities and authorized order history, and withholds
+contact fields and name/email search. Restart after changing this flag.
+
 ## External approvals
 
 | Approval                | Where to request it                                                                   | Current state / effect                                                                                                                                                       |
