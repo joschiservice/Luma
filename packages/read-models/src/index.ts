@@ -8,3 +8,5 @@ export type {
   OrderActivityReader,
   OrderWorkspace,
 } from './application/orders.js';
+
+export type { InventoryWorkspace } from './application/inventory.js';

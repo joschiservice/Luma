@@ -1,4 +1,5 @@
 import type { OrderStateQueries } from '../application/order-state.js';
+import { anyDifference, sourceComparison } from './source-comparison.js';
 
 // SQL building blocks for order state under `orderMetricDefinitions` v1. The order metrics,
 // the Orders list and the order detail compose these so open, overdue and fulfillment state
@@ -46,7 +47,7 @@ export function orderProgress(set: string) {
  SELECT s.order_id,p.connection_id,l->>'orderLineId' AS line_id,sum((l->>'quantity')::numeric) AS quantity
  FROM (SELECT DISTINCT entity_id,connection_id FROM ${set}) o
  JOIN orders_snapshots s ON s.tenant_id=$1 AND s.order_id=o.entity_id
- JOIN orders_projections p ON p.tenant_id=s.tenant_id AND p.snapshot_id=s.id AND p.connection_id=o.connection_id
+ JOIN orders_projections p ON p.tenant_id=s.tenant_id AND p.entity_id=s.entity_id AND p.snapshot_id=s.id AND p.connection_id=o.connection_id
  CROSS JOIN LATERAL jsonb_array_elements(s.document->'data'->'lines') l
  WHERE s.kind='fulfillment' AND s.status IN ('completed','shipped','delivered')
  AND NOT (s.document->>'deleted')::boolean AND s.observed_at <= $2
@@ -81,6 +82,8 @@ export function orderProgress(set: string) {
 /** SQL building blocks that define order state; see `orderProgress` for the rules. */
 export const orderStateQueries: OrderStateQueries = {
   sourceSelectionOrder,
+  anyDifference,
+  sourceComparison,
   currentOrderSources,
   orderProgress,
 };

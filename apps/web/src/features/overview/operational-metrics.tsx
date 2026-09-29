@@ -543,6 +543,13 @@ function CohortItem({
         <small>Position {item.id.slice(0, 8)}</small>
         <div className="operational-links">
           <Link
+            to="/app/$organizationId/inventory/$positionId"
+            params={{ organizationId, positionId: item.id }}
+          >
+            Inspect stock
+            <ArrowUpRight size={12} />
+          </Link>
+          <Link
             to="/app/$organizationId/workflows/$definitionId"
             params={{ organizationId, definitionId: 'inventory-replenishment' }}
             hash={`rule-${item.ruleId}`}

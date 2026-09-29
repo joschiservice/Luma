@@ -30,7 +30,8 @@ type Row = {
 // Attention comes from persisted lifecycle, uncertainty escalation or deterministic manual steps.
 // Model-selected hypotheses and severity never create an attention request.
 // Inbox attention rules. Expects $1 tenant ID and $2 evaluation time.
-const caseCtes = `cases AS (
+function caseQuery(filter = 'true') {
+  return `cases AS (
  SELECT e.document,e.version,d.document AS diagnosis,
  CASE WHEN e.state='resolved' THEN NULL
  WHEN e.state='escalated' OR u.review_required THEN 'uncertainty'
@@ -63,8 +64,11 @@ const caseCtes = `cases AS (
    AND (p.document->'preconditions'->>'validUntil')::timestamptz>$2::timestamptz
    AND NOT EXISTS(SELECT 1 FROM policy_approvals a WHERE a.tenant_id=p.tenant_id AND a.proposal_id=p.id AND a.action_hash=p.action_hash AND a.policy_version=pd.document->>'policyVersion')
  ) pa ON true
- WHERE e.tenant_id=$1
+ WHERE e.tenant_id=$1 AND (${filter})
 ), ordered AS (SELECT *, CASE WHEN attention_reason IS NULL THEN document->>'firstDetectedAt' ELSE attention_at END AS sort_at FROM cases)`;
+}
+
+const caseCtes = caseQuery();
 
 const projection = `WITH ${caseCtes}`;
 
@@ -73,7 +77,10 @@ const projection = `WITH ${caseCtes}`;
  * under the inbox's attention rules. Other reads embed it in their own transaction; bind `$1`
  * to the tenant ID and `$2` to the evaluation time.
  */
-export const orderAttentionQuery = `WITH ${caseCtes}
+function attentionQuery(
+  filter = "e.state<>'resolved' AND e.subject_kind='fulfillment'",
+) {
+  return `WITH ${caseQuery(filter)}
  SELECT DISTINCT r.order_id,(o.document->>'id')::uuid AS issue_id
  FROM ordered o
  JOIN connector_source_mappings m ON m.tenant_id=$1
@@ -83,6 +90,24 @@ export const orderAttentionQuery = `WITH ${caseCtes}
   AND m.scope_key=''
  JOIN orders_relationships r ON r.tenant_id=m.tenant_id AND r.child_id=m.canonical_id
  WHERE o.attention_reason IS NOT NULL AND o.document->'subject'->>'subjectKind'='fulfillment'`;
+}
+
+/** Selects all unresolved order attention using the inbox rules at $2. */
+export const orderAttentionQuery = attentionQuery();
+
+/**
+ * Limits attention evaluation to the trusted SQL relation's entity_id column. The relation
+ * must contain tenant-scoped order IDs; values remain bound through $1 and $2.
+ */
+export function orderAttentionForOrders(orders: string) {
+  return attentionQuery(`e.state<>'resolved' AND e.subject_kind='fulfillment' AND e.id IN (
+    SELECT issue.id FROM orders_relationships r
+    JOIN connector_source_mappings m ON m.tenant_id=r.tenant_id AND m.canonical_id=r.child_id
+      AND m.resource='fulfillment' AND m.scope_key=''
+    JOIN exceptions issue ON issue.tenant_id=m.tenant_id AND issue.subject_kind='fulfillment'
+      AND issue.subject_id=m.external_id AND issue.document->'subject'->'scope'->>0=m.connection_id::text
+    WHERE r.tenant_id=$1 AND r.order_id IN (SELECT entity_id FROM ${orders}))`);
+}
 
 const cursorSchema = z
   .object({

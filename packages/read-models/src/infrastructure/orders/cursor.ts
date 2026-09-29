@@ -23,9 +23,10 @@ const cursorSchema = z
 export function cursorContext(tenantId: string, query: OrderListQuery) {
   const scope: Partial<OrderListQuery> = { ...query };
   delete scope.cursor;
+  delete scope.count;
 
   return createHash('sha256')
-    .update(JSON.stringify(['orders-v1', tenantId, scope]))
+    .update(JSON.stringify(['orders-v2', tenantId, scope]))
     .digest('hex');
 }
 

@@ -610,6 +610,23 @@ export function RecordDetailPage() {
                   >
                     Investigate issue <ArrowRight size={14} />
                   </Link>
+                ) : record.kind === 'position' ? (
+                  <Link
+                    to="/app/$organizationId/inventory/$positionId"
+                    params={{ organizationId, positionId: record.id }}
+                    className="record-action"
+                  >
+                    Inspect stock <ArrowRight size={14} />
+                  </Link>
+                ) : record.kind === 'sku' ? (
+                  <Link
+                    to="/app/$organizationId/inventory"
+                    params={{ organizationId }}
+                    search={{ skuId: record.id }}
+                    className="record-action"
+                  >
+                    View inventory <ArrowRight size={14} />
+                  </Link>
                 ) : record.kind === 'order' ? (
                   <Link
                     to="/app/$organizationId/orders/$orderId"

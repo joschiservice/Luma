@@ -8,6 +8,7 @@ import type { VerificationEvaluator } from '@luma/exceptions';
 import {
   createCaseMetricReader,
   createOrderAttentionBoundaryReader,
+  orderAttentionForOrders,
   orderAttentionQuery,
 } from '@luma/exceptions/composition';
 import type { IdentityService } from '@luma/identity';
@@ -22,6 +23,7 @@ import {
   createProcurementMetricReader,
 } from '@luma/procurement/composition';
 import {
+  createInventoryWorkspace,
   createOperationalMetrics,
   createOperationalSummary,
   createOrderWorkspace,
@@ -97,6 +99,7 @@ export interface ApplicationServices {
     metrics: ReturnType<typeof createOperationalMetrics>;
     operationalSummary: ReturnType<typeof createOperationalSummary>;
     records: ReturnType<typeof createRecordExplorer>;
+    inventory: ReturnType<typeof createInventoryWorkspace>;
     orders: ReturnType<typeof createOrderWorkspace>;
   };
 }
@@ -270,10 +273,15 @@ export function createApplicationServices(
         detection.cases,
         createConnectionCoverage(database),
       ),
+      inventory: createInventoryWorkspace(database),
       records: createRecordExplorer(database),
       orders: createOrderWorkspace(
         database,
-        { state: orderStateQueries, attention: orderAttentionQuery },
+        {
+          state: orderStateQueries,
+          attention: orderAttentionQuery,
+          attentionFor: orderAttentionForOrders,
+        },
         createActivityStore,
         identity.refreshContext,
       ),
