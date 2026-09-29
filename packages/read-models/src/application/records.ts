@@ -41,6 +41,12 @@ export interface RecordDetail {
 
 /** Reads current records and confirmed relationships for one tenant. */
 export interface RecordExplorer {
+  /** Resolves an exact source identity; multiple IDs indicate an ambiguous mapping. */
+  resolve(
+    context: TenantContext,
+    query: { connectionId: string; externalId: string; kind: 'order' },
+  ): Promise<{ ids: string[] }>;
+
   /**
    * Reads up to 50 matching records, most recently observed first. Rejects a cursor issued for
    * a different search with a 400 error.

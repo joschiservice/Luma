@@ -8,6 +8,7 @@ import {
   lazy,
   type ReactNode,
   Suspense,
+  useMemo,
 } from 'react';
 
 import {
@@ -15,7 +16,8 @@ import {
   connectionError,
   installConnection,
 } from '../connections/data';
-import { IdentityError } from '../identity/data';
+import { loadCustomerOrderContext } from '../customers/order-context';
+import { IdentityError, sessionOptions } from '../identity/data';
 import { appsOptions } from './data';
 
 const modules = import.meta.glob<{ default: ComponentType<AppUiProps> }>(
@@ -52,6 +54,7 @@ export function AppExtension({
   slot,
   connection,
   record,
+  customer,
   done,
 }: {
   appId: string;
@@ -59,9 +62,43 @@ export function AppExtension({
   slot: AppUiProps['slot'];
   connection?: InstalledConnection;
   record?: AppUiProps['record'];
+  customer?: AppUiProps['customer'];
   done: () => Promise<void>;
 }) {
   const state = useQuery(appsOptions(organizationId));
+  const session = useQuery(sessionOptions());
+  const services = useMemo<AppUiProps['services']>(
+    () => ({
+      orderContext: (connectionId, externalId) =>
+        loadCustomerOrderContext(organizationId, connectionId, externalId),
+      install: (input) => installConnection(organizationId, input),
+      rotate: (current, credentials) =>
+        changeConnection(organizationId, current, 'rotate', credentials),
+      error: connectionError,
+      uncertain: (error) =>
+        !(error instanceof IdentityError) ||
+        error.status >= 500 ||
+        error.status === 409,
+      async request(path, body) {
+        if (!/^[a-z0-9-]+$/.test(path))
+          throw new Error('Invalid app operation');
+        const response = await fetch(
+          `/api/v1/organizations/${encodeURIComponent(organizationId)}/apps/${encodeURIComponent(appId)}/${path}`,
+          {
+            method: 'POST',
+            cache: 'no-store',
+            credentials: 'same-origin',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(body),
+          },
+        );
+        if (!response.ok) throw new IdentityError(response.status);
+
+        return response.json();
+      },
+    }),
+    [organizationId, appId],
+  );
   if (state.isPending) return <p role="status">Loading app…</p>;
   if (state.error) return <p role="alert">{connectionError(state.error)}</p>;
   const manifest = state.data.catalog.find((app) => app.id === appId);
@@ -71,35 +108,10 @@ export function AppExtension({
   const Extension = components.get(appId);
   if (!installed || !manifest || !manifest.ui.includes(slot) || !Extension)
     return <p>This app is unavailable in this workspace.</p>;
-  const services: AppUiProps['services'] = {
-    install: (input) => installConnection(organizationId, input),
-    rotate: (current, credentials) =>
-      changeConnection(organizationId, current, 'rotate', credentials),
-    error: connectionError,
-    uncertain: (error) =>
-      !(error instanceof IdentityError) ||
-      error.status >= 500 ||
-      error.status === 409,
-    async request(path, body) {
-      if (!/^[a-z0-9-]+$/.test(path)) throw new Error('Invalid app operation');
-      const response = await fetch(
-        `/api/v1/organizations/${encodeURIComponent(organizationId)}/apps/${encodeURIComponent(appId)}/${path}`,
-        {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(body),
-        },
-      );
-      if (!response.ok) throw new IdentityError(response.status);
-
-      return response.json();
-    },
-  };
 
   return (
     <ExtensionBoundary
-      key={`${organizationId}/${appId}/${slot}/${record?.connectionId ?? ''}/${record?.externalId ?? ''}`}
+      key={`${session.data?.sessionId ?? ''}/${organizationId}/${appId}/${slot}/${customer?.connectionId ?? ''}/${customer?.id ?? ''}/${record?.connectionId ?? ''}/${record?.externalId ?? ''}`}
     >
       <Suspense fallback={<p role="status">Loading app…</p>}>
         {createElement(Extension, {
@@ -107,6 +119,7 @@ export function AppExtension({
           slot,
           connection,
           record,
+          customer,
           done,
           services,
         })}

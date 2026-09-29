@@ -41,6 +41,7 @@ it('enables approved access explicitly and rejects mistyped approval settings', 
   for (const name of [
     'SHOPIFY_ALL_ORDERS_APPROVED',
     'SHOPIFY_PROTECTED_CUSTOMER_DATA_APPROVED',
+    'SHOPIFY_CUSTOMER_CONTACT_APPROVED',
   ])
     expect(() => readShopifyConfig({ ...settings, [name]: 'yes' })).toThrow();
 });

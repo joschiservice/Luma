@@ -9,12 +9,19 @@ import {
 import { z } from 'zod';
 
 import {
+  type CustomerSearch,
   recordKinds,
   type ShopifyRecordDetail,
   type ShopifyRecordKind,
   type ShopifyRecordRow,
   type ShopifyRecordSection,
 } from '../domain/records.js';
+import {
+  contactRow,
+  customerContact,
+  customerContactFields,
+  readCustomerPage,
+} from './customer-records.js';
 import * as s from './record-schemas.js';
 
 const workScopes = [
@@ -110,6 +117,8 @@ export function createShopifyRecordReader(
     connectionId: string;
     /** Enable only after Shopify approves this deployment's protected customer data access. */
     protectedCustomerDataApproved: boolean;
+    /** Enable only when Shopify approves name, email and phone access for this deployment. */
+    protectedCustomerContactApproved?: boolean;
     now?: () => Date;
   },
 ) {
@@ -119,11 +128,14 @@ export function createShopifyRecordReader(
     kind: ShopifyRecordKind,
     id?: string,
     cursor?: string,
+    search?: CustomerSearch,
   ): Promise<ShopifyRecordDetail> => {
     parse(z.enum(recordKinds), kind);
     if (
       cursor &&
-      (!['Order', 'Product'].includes(kind) || id || cursor.length > 4096)
+      (!['Order', 'Product', 'Customer'].includes(kind) ||
+        (id && kind !== 'Customer') ||
+        cursor.length > 4096)
     )
       fail('invalid_input');
     if (id && !new RegExp(`^gid://shopify/${kind}/[0-9]+$`).test(id))
@@ -145,6 +157,7 @@ export function createShopifyRecordReader(
     const has = (scope: string) =>
       scopes.has(scope) || scopes.has(scope.replace(/^read_/, 'write_'));
     const sections: ShopifyRecordSection[] = [];
+    let nextCursor: string | null = null;
 
     async function node<T>(
       type: string,
@@ -241,6 +254,73 @@ export function createShopifyRecordReader(
       return values;
     }
 
+    if (!id && kind === 'Customer') {
+      const contactsApproved =
+        options.protectedCustomerContactApproved === true;
+      if (search && search.field !== 'order' && !contactsApproved)
+        sections.push({
+          key: 'records',
+          title: 'Customer search',
+          status: 'approval_required',
+          requiredScopes: ['read_customers'],
+          message:
+            'Name and email search requires approved customer contact access. You can browse source identities or search by order number.',
+          rows: [],
+        });
+      else
+        await section(
+          'records',
+          'Customers',
+          search?.field === 'order'
+            ? ['read_customers', 'read_orders']
+            : ['read_customers'],
+          async () => {
+            const page = await readCustomerPage(
+              request,
+              customerFields,
+              cursor,
+              search,
+              contactsApproved,
+            );
+            nextCursor = page.nextCursor;
+
+            return page.rows;
+          },
+          true,
+        );
+      if (!contactsApproved)
+        sections.push({
+          key: 'contact',
+          title: 'Contact access',
+          status: 'approval_required',
+          requiredScopes: ['read_customers'],
+          message:
+            'Contact access is unavailable. Browse source identities or search by order number.',
+          rows: [],
+        });
+      if (search?.field === 'order' && !has('read_all_orders'))
+        sections.push({
+          key: 'history',
+          title: 'Order search coverage',
+          status: 'partial',
+          requiredScopes: ['read_all_orders'],
+          message:
+            'Order search covers the granted Shopify history window, normally 60 days.',
+          rows: [],
+        });
+
+      return {
+        tenantId: options.tenantId,
+        connectionId: options.connectionId,
+        shop: options.shop,
+        kind,
+        id: '',
+        observedAt: (options.now ?? (() => new Date()))().toISOString(),
+        apiVersion: API_VERSION,
+        sections,
+        nextCursor,
+      };
+    }
     if (!id) {
       if (kind !== 'Order' && kind !== 'Product') fail('invalid_input');
       const isOrder = kind === 'Order';
@@ -410,6 +490,28 @@ export function createShopifyRecordReader(
           rows: [],
         });
     } else if (kind === 'Customer') {
+      if (options.protectedCustomerContactApproved)
+        await section(
+          'contact',
+          'Contact',
+          ['read_customers'],
+          async () => [
+            contactRow(
+              await node(kind, customerContactFields, customerContact),
+            ),
+          ],
+          true,
+        );
+      else
+        sections.push({
+          key: 'contact',
+          title: 'Contact',
+          status: 'approval_required',
+          requiredScopes: ['read_customers'],
+          message:
+            'Customer contact access has not been approved. Source identity and authorized order history remain available.',
+          rows: [],
+        });
       await section(
         'customer',
         'Customer',
@@ -421,8 +523,26 @@ export function createShopifyRecordReader(
         'orders',
         'Customer orders',
         ['read_customers', 'read_orders'],
-        async () =>
-          (await children('orders', orderFields, s.orderDetail)).map(mapOrder),
+        async () => {
+          const data = await request(
+            `query LumaCustomerOrders($id: ID!, $after: String) { node(id: $id) { ... on Customer { orders(first: 20, after: $after, sortKey: PROCESSED_AT, reverse: true) { nodes { ${orderFields} } pageInfo { hasNextPage endCursor } } } } }`,
+            { id, after: cursor ?? null },
+          );
+          if (data.node === null) fail('not_found');
+          const value = parse(
+            z.object({ orders: s.connection(s.orderDetail) }),
+            data.node,
+          );
+          const info = value.orders.pageInfo;
+          if (
+            info.hasNextPage &&
+            (!info.endCursor || info.endCursor === cursor)
+          )
+            fail('invalid_response');
+          nextCursor = info.hasNextPage ? info.endCursor : null;
+
+          return value.orders.nodes.map(mapOrder);
+        },
         true,
       );
       if (!has('read_all_orders'))
@@ -539,7 +659,7 @@ export function createShopifyRecordReader(
       observedAt: (options.now ?? (() => new Date()))().toISOString(),
       apiVersion: API_VERSION,
       sections,
-      nextCursor: null,
+      nextCursor,
     };
   };
 }

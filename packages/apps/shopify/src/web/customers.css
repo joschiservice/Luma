@@ -1,0 +1,86 @@
+.customer-workspace {
+  display: grid;
+  gap: var(--content-gap);
+  min-width: 0;
+}
+
+.customer-toolbar {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.customer-toolbar .form-field {
+  margin: 0;
+}
+
+.customer-search {
+  flex: 1 1 240px;
+  max-width: 520px;
+}
+
+.customer-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: var(--content-gap);
+}
+
+.customer-facts {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+.customer-facts > div {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(0, 2fr);
+  gap: 12px;
+}
+
+.customer-facts dt {
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+
+.customer-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.customer-id {
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+.customer-section-heading,
+.customer-linked-work > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.customer-section-heading h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.customer-linked-work {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  list-style: none;
+}
+
+@media (width <= 760px) {
+  .customer-overview {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .customer-facts > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+}

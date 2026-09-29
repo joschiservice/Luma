@@ -21,6 +21,7 @@ import { Route as DocsIndexRouteImport } from './routes/docs.index'
 import { Route as DocsSplatRouteImport } from './routes/docs.$'
 import { Route as AppOrganizationIdActivityRouteImport } from './routes/app.$organizationId.activity'
 import { Route as AppOrganizationIdConnectionsRouteImport } from './routes/app.$organizationId.connections'
+import { Route as AppOrganizationIdCustomersRouteImport } from './routes/app.$organizationId.customers'
 import { Route as AppOrganizationIdExceptionsRouteImport } from './routes/app.$organizationId.exceptions'
 import { Route as AppOrganizationIdHomeRouteImport } from './routes/app.$organizationId.home'
 import { Route as AppOrganizationIdInsightsRouteImport } from './routes/app.$organizationId.insights'
@@ -108,6 +109,12 @@ const AppOrganizationIdConnectionsRoute =
   AppOrganizationIdConnectionsRouteImport.update({
     id: '/connections',
     path: '/connections',
+    getParentRoute: () => AppOrganizationIdRoute,
+  } as any)
+const AppOrganizationIdCustomersRoute =
+  AppOrganizationIdCustomersRouteImport.update({
+    id: '/customers',
+    path: '/customers',
     getParentRoute: () => AppOrganizationIdRoute,
   } as any)
 const AppOrganizationIdExceptionsRoute =
@@ -277,6 +284,7 @@ export interface FileRoutesByFullPath {
   '/docs/': typeof DocsIndexRoute
   '/app/$organizationId/activity': typeof AppOrganizationIdActivityRoute
   '/app/$organizationId/connections': typeof AppOrganizationIdConnectionsRoute
+  '/app/$organizationId/customers': typeof AppOrganizationIdCustomersRoute
   '/app/$organizationId/exceptions': typeof AppOrganizationIdExceptionsRouteWithChildren
   '/app/$organizationId/home': typeof AppOrganizationIdHomeRoute
   '/app/$organizationId/insights': typeof AppOrganizationIdInsightsRoute
@@ -316,6 +324,7 @@ export interface FileRoutesByTo {
   '/docs': typeof DocsIndexRoute
   '/app/$organizationId/activity': typeof AppOrganizationIdActivityRoute
   '/app/$organizationId/connections': typeof AppOrganizationIdConnectionsRoute
+  '/app/$organizationId/customers': typeof AppOrganizationIdCustomersRoute
   '/app/$organizationId/exceptions': typeof AppOrganizationIdExceptionsRouteWithChildren
   '/app/$organizationId/home': typeof AppOrganizationIdHomeRoute
   '/app/$organizationId/insights': typeof AppOrganizationIdInsightsRoute
@@ -357,6 +366,7 @@ export interface FileRoutesById {
   '/docs/': typeof DocsIndexRoute
   '/app/$organizationId/activity': typeof AppOrganizationIdActivityRoute
   '/app/$organizationId/connections': typeof AppOrganizationIdConnectionsRoute
+  '/app/$organizationId/customers': typeof AppOrganizationIdCustomersRoute
   '/app/$organizationId/exceptions': typeof AppOrganizationIdExceptionsRouteWithChildren
   '/app/$organizationId/home': typeof AppOrganizationIdHomeRoute
   '/app/$organizationId/insights': typeof AppOrganizationIdInsightsRoute
@@ -399,6 +409,7 @@ export interface FileRouteTypes {
     | '/docs/'
     | '/app/$organizationId/activity'
     | '/app/$organizationId/connections'
+    | '/app/$organizationId/customers'
     | '/app/$organizationId/exceptions'
     | '/app/$organizationId/home'
     | '/app/$organizationId/insights'
@@ -438,6 +449,7 @@ export interface FileRouteTypes {
     | '/docs'
     | '/app/$organizationId/activity'
     | '/app/$organizationId/connections'
+    | '/app/$organizationId/customers'
     | '/app/$organizationId/exceptions'
     | '/app/$organizationId/home'
     | '/app/$organizationId/insights'
@@ -478,6 +490,7 @@ export interface FileRouteTypes {
     | '/docs/'
     | '/app/$organizationId/activity'
     | '/app/$organizationId/connections'
+    | '/app/$organizationId/customers'
     | '/app/$organizationId/exceptions'
     | '/app/$organizationId/home'
     | '/app/$organizationId/insights'
@@ -601,6 +614,13 @@ declare module '@tanstack/react-router' {
       path: '/connections'
       fullPath: '/app/$organizationId/connections'
       preLoaderRoute: typeof AppOrganizationIdConnectionsRouteImport
+      parentRoute: typeof AppOrganizationIdRoute
+    }
+    '/app/$organizationId/customers': {
+      id: '/app/$organizationId/customers'
+      path: '/customers'
+      fullPath: '/app/$organizationId/customers'
+      preLoaderRoute: typeof AppOrganizationIdCustomersRouteImport
       parentRoute: typeof AppOrganizationIdRoute
     }
     '/app/$organizationId/exceptions': {
@@ -806,6 +826,7 @@ const AppOrganizationIdExceptionsRouteWithChildren =
 interface AppOrganizationIdRouteChildren {
   AppOrganizationIdActivityRoute: typeof AppOrganizationIdActivityRoute
   AppOrganizationIdConnectionsRoute: typeof AppOrganizationIdConnectionsRoute
+  AppOrganizationIdCustomersRoute: typeof AppOrganizationIdCustomersRoute
   AppOrganizationIdExceptionsRoute: typeof AppOrganizationIdExceptionsRouteWithChildren
   AppOrganizationIdHomeRoute: typeof AppOrganizationIdHomeRoute
   AppOrganizationIdInsightsRoute: typeof AppOrganizationIdInsightsRoute
@@ -833,6 +854,7 @@ interface AppOrganizationIdRouteChildren {
 const AppOrganizationIdRouteChildren: AppOrganizationIdRouteChildren = {
   AppOrganizationIdActivityRoute: AppOrganizationIdActivityRoute,
   AppOrganizationIdConnectionsRoute: AppOrganizationIdConnectionsRoute,
+  AppOrganizationIdCustomersRoute: AppOrganizationIdCustomersRoute,
   AppOrganizationIdExceptionsRoute:
     AppOrganizationIdExceptionsRouteWithChildren,
   AppOrganizationIdHomeRoute: AppOrganizationIdHomeRoute,

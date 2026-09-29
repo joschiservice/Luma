@@ -10,6 +10,7 @@ import {
   Receipt,
   Settings,
   ShoppingCart,
+  Users,
   Workflow,
 } from 'lucide-react';
 
@@ -23,6 +24,7 @@ export type DestinationPath =
   | 'activity'
   | 'insights'
   | 'orders'
+  | 'customers'
   | 'workflows'
   | 'procurement'
   | 'apps'
@@ -91,6 +93,14 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
     group: 'operations',
     domain: 'orders',
     shortcut: 'o',
+  },
+  {
+    path: 'customers',
+    label: 'Customers',
+    Icon: Users,
+    description: 'Customer identity, order history and service context',
+    group: 'operations',
+    shortcut: 'u',
   },
   {
     path: 'workflows',

@@ -262,6 +262,20 @@ async function recordRows(
 /** Reads current tenant records, retaining separate source snapshots and explicit identity coverage. */
 export function createRecordExplorer(db: TenantDatabase): RecordExplorer {
   return {
+    async resolve(context, query) {
+      requireTenant(context, context.tenantId);
+
+      return db.transaction(context.tenantId, async (tx) => {
+        const result = await tx.query<{ id: string }>(
+          `SELECT DISTINCT canonical_id AS id FROM connector_source_mappings
+           WHERE tenant_id=$1 AND connection_id=$2 AND resource=$3 AND external_id=$4
+           AND scope_key='' ORDER BY canonical_id LIMIT 2`,
+          [context.tenantId, query.connectionId, query.kind, query.externalId],
+        );
+
+        return { ids: result.rows.map((row) => row.id) };
+      });
+    },
     async list(context: TenantContext, query: RecordQuery) {
       requireTenant(context, context.tenantId);
       const scope = cursorContext(context.tenantId, query);

@@ -7,7 +7,14 @@ export const appManifestSchema = z.object({
   version: z.string(),
   category: z.enum(['storefront', 'erp', 'utility']),
   ui: z.array(
-    z.enum(['connections', 'settings', 'app-settings', 'page', 'record']),
+    z.enum([
+      'connections',
+      'settings',
+      'app-settings',
+      'page',
+      'record',
+      'customers',
+    ]),
   ),
   connectionTypes: z.array(z.object({ kind: z.string(), name: z.string() })),
 });

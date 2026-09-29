@@ -126,6 +126,7 @@ export const sessionOptions = () =>
 
       return result.data
         ? {
+            sessionId: result.data.session.id,
             user: {
               id: result.data.user.id,
               name: result.data.user.name,

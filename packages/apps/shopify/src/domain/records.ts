@@ -20,15 +20,29 @@ export const recordInput = z
       .regex(/^gid:\/\/shopify\/[A-Za-z]+\/[0-9]+$/)
       .optional(),
     cursor: z.string().min(1).max(4096).optional(),
+    search: z
+      .object({
+        field: z.enum(['name', 'email', 'order']),
+        value: z.string().trim().min(1).max(120),
+      })
+      .strict()
+      .optional(),
   })
   .strict()
   .refine(
     (value) =>
       value.id
-        ? value.id.startsWith(`gid://shopify/${value.kind}/`) && !value.cursor
-        : ['Order', 'Product'].includes(value.kind),
+        ? value.id.startsWith(`gid://shopify/${value.kind}/`) &&
+          (!value.cursor || value.kind === 'Customer')
+        : ['Order', 'Product', 'Customer'].includes(value.kind),
     'Record type must match its ID',
+  )
+  .refine(
+    (value) => !value.search || (value.kind === 'Customer' && !value.id),
+    'Search requires a customer list',
   );
+
+export type CustomerSearch = NonNullable<z.infer<typeof recordInput>['search']>;
 
 const link = z.object({
   kind: z.enum(recordKinds),

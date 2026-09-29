@@ -12,6 +12,28 @@ import {
 const c = initContract();
 
 export const recordsContract = c.router({
+  resolve: {
+    method: 'GET',
+    path: '/v1/organizations/:organizationId/record-source',
+    pathParams: organizationParamsSchema,
+    query: z
+      .object({
+        connectionId: z.string().uuid(),
+        kind: z.literal('order'),
+        externalId: z.string().min(1).max(512),
+      })
+      .strict(),
+    responses: {
+      200: z.object({ ids: z.array(z.string().uuid()).max(2) }),
+      400: apiErrorSchema,
+      401: apiErrorSchema,
+      404: apiErrorSchema,
+      503: apiErrorSchema,
+    },
+    summary: 'Resolve a source order',
+    description:
+      'Finds an order by its exact connection and source ID. No IDs means it has not been mapped. Two IDs indicate an ambiguous mapping; do not select one automatically.',
+  },
   list: {
     method: 'GET',
     path: '/v1/organizations/:organizationId/records',

@@ -124,6 +124,8 @@ export function createApp(context: AppFactoryContext): AppDefinition {
     requireInstalled: (ctx) => context.requireInstalled(ctx, 'shopify'),
     protectedCustomerDataApproved:
       context.env.SHOPIFY_PROTECTED_CUSTOMER_DATA_APPROVED === 'true',
+    protectedCustomerContactApproved:
+      context.env.SHOPIFY_CUSTOMER_CONTACT_APPROVED === 'true',
   });
 
   return {
@@ -134,7 +136,7 @@ export function createApp(context: AppFactoryContext): AppDefinition {
         'Connect stores to read orders, products, inventory and fulfillment.',
       version: '1.0.0',
       category: 'storefront',
-      ui: ['connections', 'settings', 'page', 'record'],
+      ui: ['connections', 'settings', 'page', 'record', 'customers'],
       connectionTypes: [{ kind: 'shopify', name: 'Shopify' }],
     },
     connector: createShopifyProvider(oauth ? { oauth } : {}),
