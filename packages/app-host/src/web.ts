@@ -7,9 +7,15 @@ import type {
 /** Workspace-scoped services supplied to first-party UI contributions. */
 export interface AppUiProps {
   organizationId: string;
-  /** Setup uses connections; settings receives a connection; app-settings edits workspace-wide options. */
-  slot: 'connections' | 'settings' | 'app-settings' | 'page';
+  /**
+   * Setup uses connections; settings receives a connection; app-settings edits workspace-wide
+   * options; page is the app's own page; record shows live source context for `record`.
+   */
+  slot: 'connections' | 'settings' | 'app-settings' | 'page' | 'record';
   connection?: InstalledConnection | undefined;
+  /** The source record the host is showing, identified by its connection and source ID. */
+  record?:
+    { kind: 'order'; connectionId: string; externalId: string } | undefined;
   /** Closes setup and refreshes workspace data after a successful mutation. */
   done(): Promise<void>;
   services: {

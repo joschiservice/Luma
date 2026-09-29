@@ -32,6 +32,10 @@ export const order = z.object({
   isCancelled: z.boolean(),
   deliveryStatus: z.number().int(),
   paymentStatus: z.number().int(),
+  // Descriptive facts become unknown when malformed; they never block the order's status read.
+  salesOrderDate: timestamp.nullable().optional().catch(null),
+  totalGrossAmount: decimal.nullable().optional().catch(null),
+  currencyIso: z.string().nullable().optional().catch(null),
 });
 
 export const orderLine = z.object({
@@ -45,6 +49,8 @@ export const orderLine = z.object({
   ]),
   quantity: decimal,
   salesUnit: z.string().min(1),
+  name: z.string().nullable().optional().catch(null),
+  sKU: z.string().nullable().optional().catch(null),
 });
 
 export const item = z.object({

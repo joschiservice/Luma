@@ -181,6 +181,11 @@
   color: var(--muted-foreground);
   font-size: 12px;
 }
+.order-cohort-open {
+  justify-self: start;
+  font-size: 13px;
+}
+
 .order-cohort-pagination {
   display: flex;
   align-items: center;

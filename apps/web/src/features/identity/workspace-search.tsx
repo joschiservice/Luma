@@ -262,13 +262,21 @@ export function WorkspaceSearch({
             <Link
               key={`${record.kind}:${record.id}`}
               className="command-item"
-              to="/app/$organizationId/records/$kind/$recordId"
-              params={{
-                organizationId,
-                kind: record.kind,
-                recordId: record.id,
-              }}
-              search={{ q: recordQuery }}
+              {...(record.kind === 'order'
+                ? {
+                    to: '/app/$organizationId/orders/$orderId' as const,
+                    params: { organizationId, orderId: record.id },
+                    search: { q: recordQuery },
+                  }
+                : {
+                    to: '/app/$organizationId/records/$kind/$recordId' as const,
+                    params: {
+                      organizationId,
+                      kind: record.kind,
+                      recordId: record.id,
+                    },
+                    search: { q: recordQuery },
+                  })}
               onClick={() => changeOpen(false)}
             >
               <span className="command-item-icon">

@@ -143,13 +143,17 @@ describe('Shopify read capabilities', () => {
             source: { provider: 'shopify', externalId: commerce.order.id },
             data: {
               paymentStatus: 'paid',
+              placedAt: '2026-09-14T08:30:00Z',
+              total: { amount: '42.50', currency: 'EUR' },
               lines: [
                 {
                   sku: ref(commerce.inventoryItem.id),
                   quantity: { amount: '3' },
                   cancelledQuantity: null,
+                  skuCode: 'MUG-Blue',
+                  title: 'Blue mug',
                 },
-                { sku: null },
+                { sku: null, skuCode: null, title: null },
               ],
             },
           },

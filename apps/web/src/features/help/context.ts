@@ -2,6 +2,7 @@ export type HelpTopic =
   | 'issues'
   | 'issues/investigate'
   | 'issues/resolve'
+  | 'orders'
   | 'workflows'
   | 'workflows/create';
 

@@ -20,6 +20,7 @@ export type {
   ExternalId,
   FulfillmentSnapshot,
   InventorySnapshot,
+  Money,
   Observation,
   OrderSnapshot,
   Page,

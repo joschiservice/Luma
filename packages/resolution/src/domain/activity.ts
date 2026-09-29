@@ -29,6 +29,9 @@ export interface ActivityQuery {
   outcome?: ActivityOutcome | undefined;
   limit: number;
   cursor?: string | undefined;
+  /** Keeps only events for these linked issues, workflow runs or order references. */
+  subjects?:
+    { issueIds: string[]; runIds: string[]; orderRefs: string[] } | undefined;
 }
 
 export interface ActivityEvent {

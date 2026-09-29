@@ -17,9 +17,17 @@ export const pageInfo = z.object({
 export const connection = <T extends z.ZodTypeAny>(node: T) =>
   z.object({ nodes: z.array(node), pageInfo });
 
+/** Shopify money in the shop currency. */
+export const money = z.object({
+  amount: z.string().regex(/^-?\d{1,14}(\.\d{1,6})?$/),
+  currencyCode: z.string().regex(/^[A-Z]{3}$/),
+});
+
 export const orderLine = z.object({
   id: gid('LineItem'),
   quantity: count,
+  name: z.string().nullable().optional().catch(null),
+  sku: z.string().nullable().optional().catch(null),
   variant: z
     .object({ inventoryItem: z.object({ id: gid('InventoryItem') }) })
     .nullable(),
@@ -32,6 +40,13 @@ export const order = z.object({
   cancelledAt: timestamp.nullable(),
   closed: z.boolean(),
   displayFinancialStatus: z.string().nullable(),
+  // Descriptive facts become unknown when malformed; they never block the order's status read.
+  createdAt: timestamp.nullable().optional().catch(null),
+  currentTotalPriceSet: z
+    .object({ shopMoney: money })
+    .nullable()
+    .optional()
+    .catch(null),
 });
 
 export const variant = z.object({

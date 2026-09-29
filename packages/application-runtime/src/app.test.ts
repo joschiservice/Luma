@@ -95,7 +95,7 @@ describe('HTTP foundation', () => {
 
   it('normalizes missing routes and does not expose tenant endpoints', async () => {
     const response = await createApp().inject(
-      '/v1/organizations/forged/orders',
+      '/v1/organizations/forged/unknown-resource',
     );
     expect(response.statusCode).toBe(404);
     expect(apiErrorSchema.parse(response.json()).code).toBe('NOT_FOUND');

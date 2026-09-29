@@ -39,6 +39,12 @@ timeline entries come from Shopify's paginated events, not webhook arrival or
 snapshot read times. Deployment webhook registration and delivery infrastructure
 remain separate from the refresh-hint mapper.
 
+The `record` UI slot shows the same live read for one order inside the Orders
+workspace: totals, transactions, customer (when approved), fulfillment orders and
+holds, returns, refunds and source events, with a link to the order in Shopify
+admin. Linked records open in place. The host passes the order's Shopify GID; the
+slot shows nothing it could not read with the connection's current scopes.
+
 Validate with `pnpm --filter @luma/app-shopify test` and the
 `Apps/Shopify records` stories. Refresh the pinned provider schema with
 `node apps/api/scripts/update-shopify-schema.mjs 2026-07`.

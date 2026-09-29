@@ -9,6 +9,10 @@ export interface JtlState {
     deliveryStatus: number;
     paymentStatus: number;
     shippingMethodId: string;
+    /** Absent in simulator states saved before order dates and totals were recorded. */
+    salesOrderDate?: string;
+    totalGrossAmount?: number;
+    currencyIso?: string;
   }[];
   lines: {
     id: string;
@@ -16,6 +20,8 @@ export interface JtlState {
     itemId: string;
     quantity: string;
     salesUnit: string;
+    name?: string;
+    sKU?: string;
   }[];
   items: {
     id: string;
@@ -49,6 +55,9 @@ export type JtlCommand =
   | { kind: 'stock'; quantity: number; id?: string | undefined }
   | { kind: 'ship'; id: string }
   | { kind: 'shipping-method'; id: string; shippingMethodId: string };
+
+// Simulated orders sell the seeded tote at a fixed gross price.
+const unitPrice = 24;
 
 /** Seeds independent JTL records using provider field names. */
 export function seed(): JtlState {
@@ -117,6 +126,9 @@ export function command(state: JtlState, command: JtlCommand, time: number) {
       deliveryStatus: 1,
       paymentStatus: 2,
       shippingMethodId: '7',
+      salesOrderDate: new Date(time).toISOString(),
+      totalGrossAmount: command.quantity * unitPrice,
+      currencyIso: 'EUR',
     });
     state.lines.push({
       id: command.id,
@@ -124,6 +136,8 @@ export function command(state: JtlState, command: JtlCommand, time: number) {
       itemId: item.id,
       quantity: String(command.quantity),
       salesUnit: 'each',
+      name: item.name,
+      sKU: item.sKU,
     });
     item.stockReservedTotal = String(
       Number(item.stockReservedTotal) + command.quantity,

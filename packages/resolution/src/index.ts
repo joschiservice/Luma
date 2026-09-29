@@ -79,3 +79,5 @@ export type {
 export type { OperationalSummary } from './application/operational-summary.js';
 
 export type { RecordExplorer } from './application/records.js';
+
+export type { OrderWorkspace } from './application/orders.js';

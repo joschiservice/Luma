@@ -29,7 +29,7 @@ App packages missing from a deployment are omitted from the catalog. Their histo
 1. Create a workspace package at `packages/apps/<app-id>` with a public `createApp(context): AppDefinition` export. Use the same stable ID for the directory, manifest, and connector contribution.
 2. Return metadata and optional connector, lifecycle, HTTP, and readiness contributions. Validate app-specific settings inside the app. Never branch on provider IDs in core.
 3. For connectors, implement `ConnectionProvider`. Its `build` method receives a connection service that checks current tenant ownership, app installation, status, and grants on every credential request. Keep normalized capabilities and execution authorization in core.
-4. For UI, export a default component from `src/web/index.tsx` accepting `AppUiProps`. Declare supported slots in `manifest.ui`: `connections`, `settings`, `app-settings`, or `page`. Page contributions appear in workspace navigation. The host supplies connection operations and authenticated requests within the app's workspace API namespace.
+4. For UI, export a default component from `src/web/index.tsx` accepting `AppUiProps`. Declare supported slots in `manifest.ui`: `connections`, `settings`, `app-settings`, `page`, or `record`. Page contributions appear in workspace navigation. The host supplies connection operations and authenticated requests within the app's workspace API namespace.
 5. Register workspace HTTP operations below `/v1/organizations/:organizationId/apps/<app-id>/...`. Core membership and Origin checks apply. Each handler must call `context.requireInstalled` before doing app work. Signed callbacks and webhooks can declare `config.authentication: 'app'`; those handlers must validate their own signature and session as appropriate.
 6. Put new app migrations in `packages/apps/<app-id>/migrations/*.sql`. The migration runner applies core migrations first, then app migrations in directory and filename order. Names are recorded as `app:<app-id>/<filename>`. Use tenant RLS and grant only required runtime access. Existing provider migrations remain in the immutable historical core migration sequence.
 7. Run `pnpm apps:sync`, `pnpm install`, and the normal checks. The catalog generator updates composition dependencies from packages present on disk.
@@ -64,6 +64,11 @@ UI slots have distinct responsibilities:
 - `app-settings`: optional workspace-wide app settings, rendered on the management
   page for owners and admins without a `connection`.
 - `page`: the app's own workspace page, separate from management.
+- `record`: live source context for a record the host is showing. The host passes
+  `record` (`kind`, `connectionId` and the record's source `externalId`) and mounts
+  the slot only for a source connection owned by the app. The Orders workspace uses
+  it for each order source. Read through the app's own authorized operations; do not
+  retain the returned details.
 
 Declare only the slots the app implements. Connector apps do not need to contribute
 `app-settings` to receive the standard connection management page. Apps without

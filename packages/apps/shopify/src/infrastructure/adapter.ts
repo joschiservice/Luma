@@ -33,6 +33,13 @@ const ref = (externalId: string, scopeKey = ''): ExternalId => ({
 
 const quantity = (value: number) => ({ amount: String(value), unit: 'each' });
 
+// Blank or oversized source text is treated as not provided rather than truncated.
+const text = (value: string | null | undefined) => {
+  const trimmed = value?.trim();
+
+  return trimmed && trimmed.length <= 512 ? trimmed : null;
+};
+
 const record = z.record(z.unknown());
 
 const statusFrom = <T extends string>(
@@ -276,18 +283,23 @@ export function createShopifyConnector(
             const order = await node(
               parent.id,
               'Order',
-              'id updatedAt name cancelledAt closed displayFinancialStatus',
+              'id updatedAt createdAt name cancelledAt closed displayFinancialStatus currentTotalPriceSet { shopMoney { amount currencyCode } }',
               s.order,
             );
             const lines = await children(
               parent.id,
               'Order',
               'lineItems',
-              'id quantity variant { inventoryItem { id } }',
+              'id quantity name sku variant { inventoryItem { id } }',
               s.orderLine,
             );
+            const total = order.currentTotalPriceSet?.shopMoney;
             emit('order', ref(order.id), order.updatedAt, {
               displayNumber: order.name,
+              placedAt: order.createdAt ?? null,
+              total: total
+                ? { amount: total.amount, currency: total.currencyCode }
+                : null,
               status: order.cancelledAt
                 ? 'cancelled'
                 : order.closed
@@ -302,6 +314,8 @@ export function createShopifyConnector(
                 sku: line.variant ? ref(line.variant.inventoryItem.id) : null,
                 quantity: quantity(line.quantity),
                 cancelledQuantity: null,
+                skuCode: text(line.sku),
+                title: text(line.name),
               })),
             });
           } else if (capability === 'products.read') {

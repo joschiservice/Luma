@@ -66915,7 +66915,8 @@
                                 "connections",
                                 "settings",
                                 "app-settings",
-                                "page"
+                                "page",
+                                "record"
                               ]
                             }
                           },
@@ -69560,6 +69561,1568 @@
                     }
                   },
                   "required": ["record", "links", "snapshots"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/orders": {
+      "get": {
+        "description": "Lists current orders from your connected sources. Search matches order numbers, source order IDs, SKU text on order lines and source SKU IDs. Filter by status, payment, source, placed or updated time, or a saved view. Outstanding, overdue and needs-you views count the same orders as the order metrics. Results use `nextCursor` for the following page; a cursor is only valid with the filters and sort that produced it.",
+        "summary": "List orders",
+        "tags": ["orders"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "default": "",
+              "type": "string",
+              "maxLength": 120
+            }
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "schema": {
+              "default": "all",
+              "type": "string",
+              "enum": ["all", "outstanding", "overdue", "needs_you", "differs"]
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["open", "completed", "cancelled", "unknown"]
+            }
+          },
+          {
+            "name": "paymentStatus",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "authorized",
+                "paid",
+                "partially_refunded",
+                "refunded",
+                "failed",
+                "unknown"
+              ]
+            }
+          },
+          {
+            "name": "connectionId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "placedFrom",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "placedBefore",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "updatedFrom",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "updatedBefore",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "default": "updated",
+              "type": "string",
+              "enum": ["updated", "placed", "number", "due"]
+            }
+          },
+          {
+            "name": "direction",
+            "in": "query",
+            "schema": {
+              "default": "desc",
+              "type": "string",
+              "enum": ["asc", "desc"]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            }
+          }
+        ],
+        "operationId": "orders.list",
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "displayNumber": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "placedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "total": {
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "string"
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "nullable": true
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "open",
+                              "completed",
+                              "cancelled",
+                              "unknown"
+                            ]
+                          },
+                          "paymentStatus": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "authorized",
+                              "paid",
+                              "partially_refunded",
+                              "refunded",
+                              "failed",
+                              "unknown"
+                            ]
+                          },
+                          "fulfillment": {
+                            "type": "string",
+                            "enum": [
+                              "unfulfilled",
+                              "partial",
+                              "fulfilled",
+                              "not_required",
+                              "no_lines"
+                            ]
+                          },
+                          "lineCount": {
+                            "type": "integer"
+                          },
+                          "open": {
+                            "type": "boolean",
+                            "nullable": true
+                          },
+                          "overdue": {
+                            "type": "boolean",
+                            "nullable": true
+                          },
+                          "dueAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "issueIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid"
+                            }
+                          },
+                          "differs": {
+                            "type": "boolean"
+                          },
+                          "sources": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "connectionId": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "label": {
+                                  "type": "string"
+                                },
+                                "system": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "connectionStatus": {
+                                  "type": "string"
+                                },
+                                "externalId": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "selected": {
+                                  "type": "boolean"
+                                },
+                                "deleted": {
+                                  "type": "boolean"
+                                },
+                                "observedAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "sourceUpdatedAt": {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "nullable": true
+                                }
+                              },
+                              "required": [
+                                "connectionId",
+                                "label",
+                                "system",
+                                "connectionStatus",
+                                "externalId",
+                                "selected",
+                                "deleted",
+                                "observedAt",
+                                "sourceUpdatedAt"
+                              ]
+                            }
+                          },
+                          "observedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "sourceUpdatedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "displayNumber",
+                          "placedAt",
+                          "total",
+                          "status",
+                          "paymentStatus",
+                          "fulfillment",
+                          "lineCount",
+                          "open",
+                          "overdue",
+                          "dueAt",
+                          "issueIds",
+                          "differs",
+                          "sources",
+                          "observedAt",
+                          "sourceUpdatedAt"
+                        ]
+                      }
+                    },
+                    "totalCount": {
+                      "type": "integer"
+                    },
+                    "nextCursor": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "asOf": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": ["items", "totalCount", "nextCursor", "asOf"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/orders/{orderId}": {
+      "get": {
+        "description": "Returns each source’s current facts for one order, where they differ, fulfillment progress, observed source history, linked issues and workflow runs, and recent Luma activity. Customer and payment details stay in the connected app and are not part of this response.",
+        "summary": "Inspect an order",
+        "tags": ["orders"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "orderId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "operationId": "orders.get",
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "order": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "displayNumber": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "placedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        },
+                        "total": {
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "string"
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "nullable": true
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": ["open", "completed", "cancelled", "unknown"]
+                        },
+                        "paymentStatus": {
+                          "type": "string",
+                          "enum": [
+                            "pending",
+                            "authorized",
+                            "paid",
+                            "partially_refunded",
+                            "refunded",
+                            "failed",
+                            "unknown"
+                          ]
+                        },
+                        "fulfillment": {
+                          "type": "string",
+                          "enum": [
+                            "unfulfilled",
+                            "partial",
+                            "fulfilled",
+                            "not_required",
+                            "no_lines"
+                          ]
+                        },
+                        "lineCount": {
+                          "type": "integer"
+                        },
+                        "open": {
+                          "type": "boolean",
+                          "nullable": true
+                        },
+                        "overdue": {
+                          "type": "boolean",
+                          "nullable": true
+                        },
+                        "dueAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        },
+                        "issueIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "format": "uuid"
+                          }
+                        },
+                        "differs": {
+                          "type": "boolean"
+                        },
+                        "sources": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "connectionId": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "system": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "connectionStatus": {
+                                "type": "string"
+                              },
+                              "externalId": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "selected": {
+                                "type": "boolean"
+                              },
+                              "deleted": {
+                                "type": "boolean"
+                              },
+                              "observedAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "sourceUpdatedAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "connectionId",
+                              "label",
+                              "system",
+                              "connectionStatus",
+                              "externalId",
+                              "selected",
+                              "deleted",
+                              "observedAt",
+                              "sourceUpdatedAt"
+                            ]
+                          }
+                        },
+                        "observedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "sourceUpdatedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "displayNumber",
+                        "placedAt",
+                        "total",
+                        "status",
+                        "paymentStatus",
+                        "fulfillment",
+                        "lineCount",
+                        "open",
+                        "overdue",
+                        "dueAt",
+                        "issueIds",
+                        "differs",
+                        "sources",
+                        "observedAt",
+                        "sourceUpdatedAt"
+                      ]
+                    },
+                    "sources": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "connectionId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "system": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "connectionStatus": {
+                            "type": "string"
+                          },
+                          "externalId": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "selected": {
+                            "type": "boolean"
+                          },
+                          "deleted": {
+                            "type": "boolean"
+                          },
+                          "observedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "sourceUpdatedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "appId": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "mappingMethod": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "displayNumber": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "open",
+                              "completed",
+                              "cancelled",
+                              "unknown"
+                            ]
+                          },
+                          "paymentStatus": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "authorized",
+                              "paid",
+                              "partially_refunded",
+                              "refunded",
+                              "failed",
+                              "unknown"
+                            ]
+                          },
+                          "placedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "total": {
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "string"
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "nullable": true
+                          },
+                          "dueAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "fulfillment": {
+                            "type": "string",
+                            "enum": [
+                              "unfulfilled",
+                              "partial",
+                              "fulfilled",
+                              "not_required",
+                              "no_lines"
+                            ]
+                          },
+                          "open": {
+                            "type": "boolean",
+                            "nullable": true
+                          },
+                          "lines": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "skuId": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "nullable": true
+                                },
+                                "skuCode": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "title": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "quantity": {
+                                  "type": "string"
+                                },
+                                "cancelledQuantity": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "unit": {
+                                  "type": "string"
+                                },
+                                "fulfilledQuantity": {
+                                  "type": "string"
+                                },
+                                "remainingQuantity": {
+                                  "type": "string",
+                                  "nullable": true
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "skuId",
+                                "skuCode",
+                                "title",
+                                "quantity",
+                                "cancelledQuantity",
+                                "unit",
+                                "fulfilledQuantity",
+                                "remainingQuantity"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "connectionId",
+                          "label",
+                          "system",
+                          "connectionStatus",
+                          "externalId",
+                          "selected",
+                          "deleted",
+                          "observedAt",
+                          "sourceUpdatedAt",
+                          "appId",
+                          "mappingMethod",
+                          "displayNumber",
+                          "status",
+                          "paymentStatus",
+                          "placedAt",
+                          "total",
+                          "dueAt",
+                          "fulfillment",
+                          "open",
+                          "lines"
+                        ]
+                      }
+                    },
+                    "differences": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "field": {
+                            "type": "string",
+                            "enum": [
+                              "status",
+                              "paymentStatus",
+                              "total",
+                              "lines"
+                            ]
+                          },
+                          "values": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "connectionId": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "value": {
+                                  "type": "string",
+                                  "nullable": true
+                                }
+                              },
+                              "required": ["connectionId", "value"]
+                            }
+                          }
+                        },
+                        "required": ["field", "values"]
+                      }
+                    },
+                    "fulfillments": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "connectionId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "externalId": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "lastProgressAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "failureCode": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "deleted": {
+                            "type": "boolean"
+                          },
+                          "observedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "sourceUpdatedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "lines": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "orderLineId": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "quantity": {
+                                  "type": "string"
+                                },
+                                "unit": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["orderLineId", "quantity", "unit"]
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "connectionId",
+                          "externalId",
+                          "status",
+                          "lastProgressAt",
+                          "failureCode",
+                          "deleted",
+                          "observedAt",
+                          "sourceUpdatedAt",
+                          "lines"
+                        ]
+                      }
+                    },
+                    "issues": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "class": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string"
+                          },
+                          "severity": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "relationship": {
+                            "type": "string",
+                            "enum": ["order", "fulfillment", "sku"]
+                          },
+                          "needsYou": {
+                            "type": "boolean"
+                          },
+                          "lastDetectedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "class",
+                          "state",
+                          "severity",
+                          "relationship",
+                          "needsYou",
+                          "lastDetectedAt"
+                        ]
+                      }
+                    },
+                    "workflows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "definitionId": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "version": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "state": {
+                            "type": "string"
+                          },
+                          "relationship": {
+                            "type": "string",
+                            "enum": ["order", "issue"]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "definitionId",
+                          "name",
+                          "version",
+                          "createdAt",
+                          "state",
+                          "relationship"
+                        ]
+                      }
+                    },
+                    "history": {
+                      "type": "object",
+                      "properties": {
+                        "entries": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "snapshotId": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "entityKind": {
+                                "type": "string",
+                                "enum": ["order", "fulfillment"]
+                              },
+                              "entityId": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "connectionId": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "status": {
+                                "type": "string"
+                              },
+                              "paymentStatus": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "deleted": {
+                                "type": "boolean"
+                              },
+                              "current": {
+                                "type": "boolean"
+                              },
+                              "observedAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "sourceUpdatedAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "snapshotId",
+                              "entityKind",
+                              "entityId",
+                              "connectionId",
+                              "status",
+                              "paymentStatus",
+                              "deleted",
+                              "current",
+                              "observedAt",
+                              "sourceUpdatedAt"
+                            ]
+                          }
+                        },
+                        "truncated": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": ["entries", "truncated"]
+                    },
+                    "activity": {
+                      "type": "object",
+                      "properties": {
+                        "entries": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "recordedAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "action": {
+                                "type": "string"
+                              },
+                              "type": {
+                                "type": "string"
+                              },
+                              "outcome": {
+                                "type": "string"
+                              },
+                              "actorKind": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "exceptionId": {
+                                "type": "string",
+                                "format": "uuid",
+                                "nullable": true
+                              },
+                              "summary": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "recordedAt",
+                              "action",
+                              "type",
+                              "outcome",
+                              "actorKind",
+                              "exceptionId",
+                              "summary"
+                            ]
+                          }
+                        },
+                        "truncated": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": ["entries", "truncated"]
+                    },
+                    "asOf": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "order",
+                    "sources",
+                    "differences",
+                    "fulfillments",
+                    "issues",
+                    "workflows",
+                    "history",
+                    "activity",
+                    "asOf"
+                  ]
                 }
               }
             }

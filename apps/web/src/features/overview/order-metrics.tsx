@@ -276,6 +276,15 @@ function LiveOrderMetrics({ organizationId }: { organizationId: string }) {
                 <span>Complete data through: unavailable</span>
               </div>
               <Cohort metric={metric} organizationId={organizationId} />
+              <Link
+                className="order-cohort-open"
+                to="/app/$organizationId/orders"
+                params={{ organizationId }}
+                search={{ view: cohortViews[metric.definition.id] }}
+              >
+                Open these orders in Orders{' '}
+                <ArrowRight size={12} aria-hidden="true" />
+              </Link>
               <div className="order-cohort-pagination">
                 <span>
                   {metric.observedCount
@@ -365,13 +374,13 @@ function Cohort({
             <strong>{order.displayNumber ?? 'Order without a number'}</strong>
             <code title={order.id}>{order.id}</code>
             <Link
-              to="/app/$organizationId/records/$kind/$recordId"
-              params={{ organizationId, kind: 'order', recordId: order.id }}
+              to="/app/$organizationId/orders/$orderId"
+              params={{ organizationId, orderId: order.id }}
               search={{
                 from: `${location.pathname}?metric=${encodeURIComponent(metric.definition.id)}`,
               }}
             >
-              Inspect record <ArrowRight size={12} aria-hidden="true" />
+              Open order <ArrowRight size={12} aria-hidden="true" />
             </Link>
           </div>
           <div>
@@ -398,6 +407,13 @@ function Cohort({
     </ul>
   );
 }
+
+// Each order metric has an Orders view that applies the same definition.
+const cohortViews = {
+  'orders.open': 'outstanding',
+  'orders.overdue': 'overdue',
+  'orders.attention': 'needs_you',
+} as const;
 
 function observationAge(readAt: string, observedAt: string) {
   const seconds = Math.max(

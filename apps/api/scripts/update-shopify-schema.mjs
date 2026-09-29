@@ -75,7 +75,7 @@ const fields = {
     'refunds',
     'events',
   ],
-  LineItem: ['id', 'name', 'quantity', 'variant'],
+  LineItem: ['id', 'name', 'quantity', 'sku', 'variant'],
   Product: ['id', 'updatedAt', 'title', 'status', 'variants'],
   ProductVariant: [
     'id',

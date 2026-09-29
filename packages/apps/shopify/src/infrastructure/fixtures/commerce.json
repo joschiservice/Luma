@@ -5,15 +5,27 @@
     "name": "#1001",
     "cancelledAt": null,
     "closed": false,
-    "displayFinancialStatus": "PAID"
+    "displayFinancialStatus": "PAID",
+    "createdAt": "2026-09-14T08:30:00Z",
+    "currentTotalPriceSet": {
+      "shopMoney": { "amount": "42.50", "currencyCode": "EUR" }
+    }
   },
   "orderLines": [
     {
       "id": "gid://shopify/LineItem/11",
       "quantity": 3,
+      "name": "Blue mug",
+      "sku": "MUG-Blue",
       "variant": { "inventoryItem": { "id": "gid://shopify/InventoryItem/31" } }
     },
-    { "id": "gid://shopify/LineItem/12", "quantity": 1, "variant": null }
+    {
+      "id": "gid://shopify/LineItem/12",
+      "quantity": 1,
+      "name": " ",
+      "sku": null,
+      "variant": null
+    }
   ],
   "product": {
     "id": "gid://shopify/Product/2",

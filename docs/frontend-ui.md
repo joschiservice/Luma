@@ -25,7 +25,7 @@ Choose states from `issueStatus` and `issueKind` in `components/issues/case-pres
 
 ## Workspace shell
 
-`WorkspaceLayout` renders a persistent sidebar on the canvas and an inset page surface. The sidebar holds the workspace switcher, search, core areas (Home, Issues, Activity, Insights), pinned pages, operations domains (Workflows, Procurement), installed apps, and Apps and Settings. It collapses to an icon rail with `[` and moves into a drawer below 900px. The top bar shows breadcrumbs, page controls portaled through `WorkspaceHeaderSlot`, the pin control and contextual help.
+`WorkspaceLayout` renders a persistent sidebar on the canvas and an inset page surface. The sidebar holds the workspace switcher, search, core areas (Home, Issues, Records, Activity, Insights), pinned pages, operations domains (Orders, Workflows, Procurement), installed apps, and Apps and Settings. It collapses to an icon rail with `[` and moves into a drawer below 900px. The top bar shows breadcrumbs, page controls portaled through `WorkspaceHeaderSlot`, the pin control and contextual help.
 
 Search opens a command menu with ⌘K or Ctrl K. It lists pages and actions such as switching appearance. `G` followed by a letter jumps to a destination, for example G then I for Issues.
 

@@ -24,9 +24,11 @@ import {
   shippingMethodVocabulary,
 } from '@luma/resolution';
 import {
+  createActivityStore,
   createOperationalMetrics,
   createOperationalSummary,
   createOperationsOverview,
+  createOrderWorkspace,
   createRecordExplorer,
   createResolutionLearning,
   createShadowEvaluations,
@@ -90,6 +92,7 @@ export interface ApplicationServices {
     metrics: ReturnType<typeof createOperationalMetrics>;
     operationalSummary: ReturnType<typeof createOperationalSummary>;
     records: ReturnType<typeof createRecordExplorer>;
+    orders: ReturnType<typeof createOrderWorkspace>;
   };
 }
 
@@ -264,6 +267,14 @@ export function createApplicationServices(
         createConnectionCoverage(database),
       ),
       records: createRecordExplorer(database),
+      orders: createOrderWorkspace(
+        database,
+        {
+          attention: createOrderAttentionReader,
+          activity: createActivityStore,
+        },
+        identity.refreshContext,
+      ),
     },
   };
 }

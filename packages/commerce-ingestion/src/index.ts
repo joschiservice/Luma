@@ -98,6 +98,8 @@ export function createCommerceIngestion(
             quantity: line.quantity.amount,
             cancelledQuantity: line.cancelledQuantity?.amount ?? null,
             unit: line.quantity.unit,
+            ...(line.skuCode === undefined ? {} : { skuCode: line.skuCode }),
+            ...(line.title === undefined ? {} : { title: line.title }),
           });
       }
       if (!entityId || missing.length) return { status: 'pending', missing };
@@ -112,6 +114,8 @@ export function createCommerceIngestion(
           type: 'order',
           displayNumber: data.displayNumber,
           ...(data.dueAt === undefined ? {} : { dueAt: data.dueAt }),
+          ...(data.placedAt === undefined ? {} : { placedAt: data.placedAt }),
+          ...(data.total === undefined ? {} : { total: data.total }),
           status: data.status,
           paymentStatus: data.paymentStatus,
           lines,

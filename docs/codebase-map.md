@@ -190,6 +190,23 @@ Tests: `packages/application-runtime/src/commerce.integration.test.ts` and
 `apps/api/e2e/records.browser.mjs`. Migration `0037_record_explorer_reads.sql`
 grants the read model access to canonical identities and stock projections.
 
+## Orders workspace
+
+The order list and detail read model is `packages/resolution/src/infrastructure/orders.ts`,
+with its port in `application/orders.ts` and progress, fulfillment and difference rules in
+`domain/orders.ts`. Luma activity for an order uses the `subjects` filter in
+`infrastructure/persistence/activity.ts`. The contract is `packages/api-contract/src/orders.ts`
+and `contracts/orders.ts`; routes are `packages/resolution/src/api/orders.ts`. The web
+feature is `apps/web/src/features/orders` (list `page.tsx`, detail `detail.tsx`, URL state
+`data.ts`, wording `presentation.ts`). Live source context uses the app `record` slot;
+Shopify's is `packages/apps/shopify/src/web/order-context.tsx`. Adapters fill the optional
+order facts in their `infrastructure/adapter.ts`.
+
+Tests: `domain/orders.test.ts`, `packages/application-runtime/src/orders.integration.test.ts`
+(including metric parity and the large-import benchmark), the web `orders` unit tests,
+the `Orders/Workspace` stories and `apps/api/e2e/orders.browser.mjs`. See
+[Orders workspace](orders-workspace.md).
+
 ## Operational metrics
 
 Start with `packages/orders/src/domain/metrics.ts` for versioned definitions and

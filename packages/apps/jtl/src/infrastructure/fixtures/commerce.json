@@ -6,6 +6,9 @@
       "isCancelled": false,
       "deliveryStatus": 4,
       "paymentStatus": 2,
+      "salesOrderDate": "2026-09-12T09:15:00+02:00",
+      "totalGrossAmount": 107.1,
+      "currencyIso": "EUR",
       "billingAddressEmailAddress": "excluded@example.test"
     }
   ],
@@ -14,6 +17,8 @@
       "id": 101,
       "salesOrderId": 10,
       "itemId": 20,
+      "name": "Rolled oats",
+      "sKU": "Mixed-Case-SKU",
       "quantity": 3.5,
       "salesUnit": "stk"
     },

@@ -1,0 +1,37 @@
+---
+title: Work with orders
+description: Find an order, see what still needs work, and check the source facts behind it.
+---
+
+Orders lists every current order Luma has read from your connected stores and ERPs. When the same order exists in more than one system, Luma shows it once and keeps each system's facts separate.
+
+## Find an order
+
+Search by order number, the order's ID in its source system, SKU text on an order line or a source SKU ID. Combine search with filters for status, payment, source and placed date, and sort by last update, placed date, order number or due date.
+
+The views narrow the list to work that matters:
+
+- **Outstanding** shows open orders with units still to fulfill.
+- **Overdue** shows outstanding orders past the deadline their source reported.
+- **Needs you** shows orders linked to an issue that needs a decision or review.
+- **Differs by source** shows orders whose status, payment, total or ordered items disagree between systems.
+
+Outstanding, overdue and needs you count the same orders as the order metrics on Insights. Choosing a metric there opens the matching view here.
+
+Every filter, sort and page is part of the address, so you can share it or pin it to the sidebar.
+
+## Read an order
+
+**Current state** explains the order in a few sentences: its status and payment, how many units are still to fulfill, whether it is overdue, and which issues need you. Luma bases it on the source with the newest update and names any system that disagrees.
+
+**Lines** shows ordered, cancelled, fulfilled and remaining quantities per item. When a source does not report cancelled quantities, remaining work is shown as unknown instead of guessed.
+
+**Source comparison** lines up each system's facts side by side. Order numbers and dates are shown but not compared, because each system assigns its own.
+
+**Observed history** lists each state Luma read from a source. It shows what the source reported at that time, not every change the source made.
+
+For Shopify orders, the Shopify details section reads payments, customer, fulfillment holds, returns, refunds and source events live from your store. Customer details appear only when your Shopify app is approved for protected customer data.
+
+## Act on an order
+
+Open a linked issue to review it, open a workflow run to see its steps, or follow an item to its stock and product. **Copy link** copies the order's address for a colleague.

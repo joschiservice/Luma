@@ -10,6 +10,12 @@ const decimal = z.string().regex(/^-?\d{1,14}(\.\d{1,6})?$/);
 
 const quantity = z.object({ amount: decimal, unit: z.string().min(1) });
 
+const total = z
+  .object({ amount: decimal, currency: z.string().regex(/^[A-Z]{3}$/) })
+  .nullable();
+
+const text = z.string().min(1).max(512).nullable();
+
 const observation = <T extends z.ZodTypeAny>(resource: string, data: T) =>
   z.object({
     id: z.string().uuid(),
@@ -41,6 +47,8 @@ export const outputs = {
       'order',
       z.object({
         displayNumber: z.string().nullable(),
+        placedAt: timestamp.nullable(),
+        total,
         status: z.enum(['open', 'completed', 'cancelled', 'unknown']),
         paymentStatus: z.enum([
           'pending',
@@ -57,6 +65,8 @@ export const outputs = {
             sku: externalId.nullable(),
             quantity,
             cancelledQuantity: quantity.nullable(),
+            skuCode: text,
+            title: text,
           }),
         ),
       }),

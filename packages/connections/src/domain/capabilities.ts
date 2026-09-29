@@ -51,10 +51,21 @@ export interface Quantity {
   unit: string;
 }
 
+/** A decimal amount in an ISO 4217 currency, as reported by the source. */
+export interface Money {
+  /** Decimal string with at most six fractional and fourteen integer digits. */
+  amount: string;
+  currency: string;
+}
+
 export interface OrderSnapshot {
   displayNumber: string | null;
   /** Source-provided fulfillment deadline; omit when the source does not provide one. */
   dueAt?: string | null;
+  /** When the order was placed at the source; omit when the adapter does not read it. */
+  placedAt?: string | null;
+  /** Source-reported order total, including tax; null when the source does not report one. */
+  total?: Money | null;
   status: 'open' | 'completed' | 'cancelled' | 'unknown';
   paymentStatus:
     | 'pending'
@@ -70,6 +81,10 @@ export interface OrderSnapshot {
     quantity: Quantity;
     /** Null when the source cannot distinguish cancellations from refunds or edits. */
     cancelledQuantity: Quantity | null;
+    /** SKU text on the source line. It describes the line but never establishes SKU identity. */
+    skuCode?: string | null;
+    /** Line title at the source when the order was read. */
+    title?: string | null;
   }[];
 }
 

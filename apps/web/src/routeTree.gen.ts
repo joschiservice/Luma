@@ -30,6 +30,8 @@ import { Route as AppWorkspacesNewRouteImport } from './routes/app.workspaces.ne
 import { Route as AppOrganizationIdAppsIndexRouteImport } from './routes/app.$organizationId.apps.index'
 import { Route as AppOrganizationIdAppsAppIdRouteImport } from './routes/app.$organizationId.apps.$appId'
 import { Route as AppOrganizationIdExceptionsExceptionIdRouteImport } from './routes/app.$organizationId.exceptions.$exceptionId'
+import { Route as AppOrganizationIdOrdersIndexRouteImport } from './routes/app.$organizationId.orders.index'
+import { Route as AppOrganizationIdOrdersOrderIdRouteImport } from './routes/app.$organizationId.orders.$orderId'
 import { Route as AppOrganizationIdPlaybooksIndexRouteImport } from './routes/app.$organizationId.playbooks.index'
 import { Route as AppOrganizationIdPlaybooksDefinitionIdRouteImport } from './routes/app.$organizationId.playbooks.$definitionId'
 import { Route as AppOrganizationIdProcurementIndexRouteImport } from './routes/app.$organizationId.procurement.index'
@@ -159,6 +161,18 @@ const AppOrganizationIdExceptionsExceptionIdRoute =
     path: '/$exceptionId',
     getParentRoute: () => AppOrganizationIdExceptionsRoute,
   } as any)
+const AppOrganizationIdOrdersIndexRoute =
+  AppOrganizationIdOrdersIndexRouteImport.update({
+    id: '/orders/',
+    path: '/orders/',
+    getParentRoute: () => AppOrganizationIdRoute,
+  } as any)
+const AppOrganizationIdOrdersOrderIdRoute =
+  AppOrganizationIdOrdersOrderIdRouteImport.update({
+    id: '/orders/$orderId',
+    path: '/orders/$orderId',
+    getParentRoute: () => AppOrganizationIdRoute,
+  } as any)
 const AppOrganizationIdPlaybooksIndexRoute =
   AppOrganizationIdPlaybooksIndexRouteImport.update({
     id: '/playbooks/',
@@ -271,6 +285,7 @@ export interface FileRoutesByFullPath {
   '/app/workspaces/': typeof AppWorkspacesIndexRoute
   '/app/$organizationId/apps/$appId': typeof AppOrganizationIdAppsAppIdRoute
   '/app/$organizationId/exceptions/$exceptionId': typeof AppOrganizationIdExceptionsExceptionIdRoute
+  '/app/$organizationId/orders/$orderId': typeof AppOrganizationIdOrdersOrderIdRoute
   '/app/$organizationId/playbooks/$definitionId': typeof AppOrganizationIdPlaybooksDefinitionIdRoute
   '/app/$organizationId/procurement/$purchaseOrderId': typeof AppOrganizationIdProcurementPurchaseOrderIdRoute
   '/app/$organizationId/settings/$section': typeof AppOrganizationIdSettingsSectionRoute
@@ -278,6 +293,7 @@ export interface FileRoutesByFullPath {
   '/app/$organizationId/workflows/new': typeof AppOrganizationIdWorkflowsNewRoute
   '/app/invitations/$organizationId/$invitationId': typeof AppInvitationsOrganizationIdInvitationIdRoute
   '/app/$organizationId/apps/': typeof AppOrganizationIdAppsIndexRoute
+  '/app/$organizationId/orders/': typeof AppOrganizationIdOrdersIndexRoute
   '/app/$organizationId/playbooks/': typeof AppOrganizationIdPlaybooksIndexRoute
   '/app/$organizationId/procurement/': typeof AppOrganizationIdProcurementIndexRoute
   '/app/$organizationId/records/': typeof AppOrganizationIdRecordsIndexRoute
@@ -308,6 +324,7 @@ export interface FileRoutesByTo {
   '/app/workspaces': typeof AppWorkspacesIndexRoute
   '/app/$organizationId/apps/$appId': typeof AppOrganizationIdAppsAppIdRoute
   '/app/$organizationId/exceptions/$exceptionId': typeof AppOrganizationIdExceptionsExceptionIdRoute
+  '/app/$organizationId/orders/$orderId': typeof AppOrganizationIdOrdersOrderIdRoute
   '/app/$organizationId/playbooks/$definitionId': typeof AppOrganizationIdPlaybooksDefinitionIdRoute
   '/app/$organizationId/procurement/$purchaseOrderId': typeof AppOrganizationIdProcurementPurchaseOrderIdRoute
   '/app/$organizationId/settings/$section': typeof AppOrganizationIdSettingsSectionRoute
@@ -315,6 +332,7 @@ export interface FileRoutesByTo {
   '/app/$organizationId/workflows/new': typeof AppOrganizationIdWorkflowsNewRoute
   '/app/invitations/$organizationId/$invitationId': typeof AppInvitationsOrganizationIdInvitationIdRoute
   '/app/$organizationId/apps': typeof AppOrganizationIdAppsIndexRoute
+  '/app/$organizationId/orders': typeof AppOrganizationIdOrdersIndexRoute
   '/app/$organizationId/playbooks': typeof AppOrganizationIdPlaybooksIndexRoute
   '/app/$organizationId/procurement': typeof AppOrganizationIdProcurementIndexRoute
   '/app/$organizationId/records': typeof AppOrganizationIdRecordsIndexRoute
@@ -347,6 +365,7 @@ export interface FileRoutesById {
   '/app/workspaces/': typeof AppWorkspacesIndexRoute
   '/app/$organizationId/apps/$appId': typeof AppOrganizationIdAppsAppIdRoute
   '/app/$organizationId/exceptions/$exceptionId': typeof AppOrganizationIdExceptionsExceptionIdRoute
+  '/app/$organizationId/orders/$orderId': typeof AppOrganizationIdOrdersOrderIdRoute
   '/app/$organizationId/playbooks/$definitionId': typeof AppOrganizationIdPlaybooksDefinitionIdRoute
   '/app/$organizationId/procurement/$purchaseOrderId': typeof AppOrganizationIdProcurementPurchaseOrderIdRoute
   '/app/$organizationId/settings/$section': typeof AppOrganizationIdSettingsSectionRoute
@@ -354,6 +373,7 @@ export interface FileRoutesById {
   '/app/$organizationId/workflows/new': typeof AppOrganizationIdWorkflowsNewRoute
   '/app/invitations/$organizationId/$invitationId': typeof AppInvitationsOrganizationIdInvitationIdRoute
   '/app/$organizationId/apps/': typeof AppOrganizationIdAppsIndexRoute
+  '/app/$organizationId/orders/': typeof AppOrganizationIdOrdersIndexRoute
   '/app/$organizationId/playbooks/': typeof AppOrganizationIdPlaybooksIndexRoute
   '/app/$organizationId/procurement/': typeof AppOrganizationIdProcurementIndexRoute
   '/app/$organizationId/records/': typeof AppOrganizationIdRecordsIndexRoute
@@ -387,6 +407,7 @@ export interface FileRouteTypes {
     | '/app/workspaces/'
     | '/app/$organizationId/apps/$appId'
     | '/app/$organizationId/exceptions/$exceptionId'
+    | '/app/$organizationId/orders/$orderId'
     | '/app/$organizationId/playbooks/$definitionId'
     | '/app/$organizationId/procurement/$purchaseOrderId'
     | '/app/$organizationId/settings/$section'
@@ -394,6 +415,7 @@ export interface FileRouteTypes {
     | '/app/$organizationId/workflows/new'
     | '/app/invitations/$organizationId/$invitationId'
     | '/app/$organizationId/apps/'
+    | '/app/$organizationId/orders/'
     | '/app/$organizationId/playbooks/'
     | '/app/$organizationId/procurement/'
     | '/app/$organizationId/records/'
@@ -424,6 +446,7 @@ export interface FileRouteTypes {
     | '/app/workspaces'
     | '/app/$organizationId/apps/$appId'
     | '/app/$organizationId/exceptions/$exceptionId'
+    | '/app/$organizationId/orders/$orderId'
     | '/app/$organizationId/playbooks/$definitionId'
     | '/app/$organizationId/procurement/$purchaseOrderId'
     | '/app/$organizationId/settings/$section'
@@ -431,6 +454,7 @@ export interface FileRouteTypes {
     | '/app/$organizationId/workflows/new'
     | '/app/invitations/$organizationId/$invitationId'
     | '/app/$organizationId/apps'
+    | '/app/$organizationId/orders'
     | '/app/$organizationId/playbooks'
     | '/app/$organizationId/procurement'
     | '/app/$organizationId/records'
@@ -462,6 +486,7 @@ export interface FileRouteTypes {
     | '/app/workspaces/'
     | '/app/$organizationId/apps/$appId'
     | '/app/$organizationId/exceptions/$exceptionId'
+    | '/app/$organizationId/orders/$orderId'
     | '/app/$organizationId/playbooks/$definitionId'
     | '/app/$organizationId/procurement/$purchaseOrderId'
     | '/app/$organizationId/settings/$section'
@@ -469,6 +494,7 @@ export interface FileRouteTypes {
     | '/app/$organizationId/workflows/new'
     | '/app/invitations/$organizationId/$invitationId'
     | '/app/$organizationId/apps/'
+    | '/app/$organizationId/orders/'
     | '/app/$organizationId/playbooks/'
     | '/app/$organizationId/procurement/'
     | '/app/$organizationId/records/'
@@ -640,6 +666,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOrganizationIdExceptionsExceptionIdRouteImport
       parentRoute: typeof AppOrganizationIdExceptionsRoute
     }
+    '/app/$organizationId/orders/': {
+      id: '/app/$organizationId/orders/'
+      path: '/orders'
+      fullPath: '/app/$organizationId/orders/'
+      preLoaderRoute: typeof AppOrganizationIdOrdersIndexRouteImport
+      parentRoute: typeof AppOrganizationIdRoute
+    }
+    '/app/$organizationId/orders/$orderId': {
+      id: '/app/$organizationId/orders/$orderId'
+      path: '/orders/$orderId'
+      fullPath: '/app/$organizationId/orders/$orderId'
+      preLoaderRoute: typeof AppOrganizationIdOrdersOrderIdRouteImport
+      parentRoute: typeof AppOrganizationIdRoute
+    }
     '/app/$organizationId/playbooks/': {
       id: '/app/$organizationId/playbooks/'
       path: '/playbooks'
@@ -771,12 +811,14 @@ interface AppOrganizationIdRouteChildren {
   AppOrganizationIdInsightsRoute: typeof AppOrganizationIdInsightsRoute
   AppOrganizationIdOverviewRoute: typeof AppOrganizationIdOverviewRoute
   AppOrganizationIdAppsAppIdRoute: typeof AppOrganizationIdAppsAppIdRoute
+  AppOrganizationIdOrdersOrderIdRoute: typeof AppOrganizationIdOrdersOrderIdRoute
   AppOrganizationIdPlaybooksDefinitionIdRoute: typeof AppOrganizationIdPlaybooksDefinitionIdRoute
   AppOrganizationIdProcurementPurchaseOrderIdRoute: typeof AppOrganizationIdProcurementPurchaseOrderIdRoute
   AppOrganizationIdSettingsSectionRoute: typeof AppOrganizationIdSettingsSectionRoute
   AppOrganizationIdWorkflowsDefinitionIdRoute: typeof AppOrganizationIdWorkflowsDefinitionIdRoute
   AppOrganizationIdWorkflowsNewRoute: typeof AppOrganizationIdWorkflowsNewRoute
   AppOrganizationIdAppsIndexRoute: typeof AppOrganizationIdAppsIndexRoute
+  AppOrganizationIdOrdersIndexRoute: typeof AppOrganizationIdOrdersIndexRoute
   AppOrganizationIdPlaybooksIndexRoute: typeof AppOrganizationIdPlaybooksIndexRoute
   AppOrganizationIdProcurementIndexRoute: typeof AppOrganizationIdProcurementIndexRoute
   AppOrganizationIdRecordsIndexRoute: typeof AppOrganizationIdRecordsIndexRoute
@@ -797,6 +839,7 @@ const AppOrganizationIdRouteChildren: AppOrganizationIdRouteChildren = {
   AppOrganizationIdInsightsRoute: AppOrganizationIdInsightsRoute,
   AppOrganizationIdOverviewRoute: AppOrganizationIdOverviewRoute,
   AppOrganizationIdAppsAppIdRoute: AppOrganizationIdAppsAppIdRoute,
+  AppOrganizationIdOrdersOrderIdRoute: AppOrganizationIdOrdersOrderIdRoute,
   AppOrganizationIdPlaybooksDefinitionIdRoute:
     AppOrganizationIdPlaybooksDefinitionIdRoute,
   AppOrganizationIdProcurementPurchaseOrderIdRoute:
@@ -806,6 +849,7 @@ const AppOrganizationIdRouteChildren: AppOrganizationIdRouteChildren = {
     AppOrganizationIdWorkflowsDefinitionIdRoute,
   AppOrganizationIdWorkflowsNewRoute: AppOrganizationIdWorkflowsNewRoute,
   AppOrganizationIdAppsIndexRoute: AppOrganizationIdAppsIndexRoute,
+  AppOrganizationIdOrdersIndexRoute: AppOrganizationIdOrdersIndexRoute,
   AppOrganizationIdPlaybooksIndexRoute: AppOrganizationIdPlaybooksIndexRoute,
   AppOrganizationIdProcurementIndexRoute:
     AppOrganizationIdProcurementIndexRoute,
@@ -857,3 +901,12 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}

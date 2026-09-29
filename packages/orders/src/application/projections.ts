@@ -8,6 +8,10 @@ export type CommerceData =
       displayNumber: string | null;
       /** Source-provided fulfillment deadline; absent means unknown. */
       dueAt?: string | null;
+      /** When the order was placed at the source; absent means the adapter did not read it. */
+      placedAt?: string | null;
+      /** Source-reported total including tax; absent or null means unknown. */
+      total?: { amount: string; currency: string } | null;
       status: string;
       paymentStatus: string;
       lines: {
@@ -16,6 +20,9 @@ export type CommerceData =
         quantity: string;
         cancelledQuantity: string | null;
         unit: string;
+        /** Source SKU text. Descriptive only; `skuId` carries the mapped identity. */
+        skuCode?: string | null;
+        title?: string | null;
       }[];
     }
   | {

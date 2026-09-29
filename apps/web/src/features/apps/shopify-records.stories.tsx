@@ -15,7 +15,7 @@ const organizationId = '22222222-2222-4222-8222-222222222222';
 const timestamp = '2026-09-28T08:00:00Z';
 const gid = (kind: string) => `gid://shopify/${kind}/123`;
 
-function Preview() {
+function Preview({ slot = 'page' }: { slot?: 'page' | 'record' }) {
   if (!Shopify) return <p>Shopify is not installed in this deployment.</p>;
   const services: AppUiProps['services'] = {
     install: async () => {
@@ -122,7 +122,12 @@ function Preview() {
     <Suspense fallback={<p>Loading Shopify…</p>}>
       <Shopify
         organizationId={organizationId}
-        slot="page"
+        slot={slot}
+        record={
+          slot === 'record'
+            ? { kind: 'order', connectionId, externalId: gid('Order') }
+            : undefined
+        }
         services={services}
         done={async () => {}}
       />
@@ -165,4 +170,22 @@ export const BrowseAndFollowLinks: Story = {
 export const Dark: Story = {
   globals: { theme: 'dark' },
   play: BrowseAndFollowLinks.play!,
+};
+
+export const OrderContext: Story = {
+  args: { slot: 'record' },
+  play: async ({ canvasElement }) => {
+    if (!Shopify) return;
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByText('84.00 EUR', undefined, { timeout: 10000 }),
+    ).toBeVisible();
+    await expect(
+      canvas.getByRole('link', { name: 'Open in Shopify admin' }),
+    ).toHaveAttribute('href', 'https://tokyo.myshopify.com/admin/orders/123');
+    await userEvent.click(canvas.getByRole('button', { name: 'Refund' }));
+    await expect(await canvas.findByText('12.00 EUR')).toBeVisible();
+    await userEvent.click(canvas.getByRole('button', { name: 'Back' }));
+    await expect(await canvas.findByText('84.00 EUR')).toBeVisible();
+  },
 };

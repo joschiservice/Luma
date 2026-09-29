@@ -18,6 +18,13 @@ import { outputs } from './outputs.js';
 import * as s from './schemas.js';
 import { createJtlShippingMethodCapabilities } from './shipping-method.js';
 
+// Blank or oversized source text is treated as not provided rather than truncated.
+const text = (value: string | null | undefined) => {
+  const trimmed = value?.trim();
+
+  return trimmed && trimmed.length <= 512 ? trimmed : null;
+};
+
 const ref = (id: number | string, scopeKey = ''): ExternalId => ({
   externalId: String(id),
   scopeKey,
@@ -250,6 +257,15 @@ export function createJtlConnector(
             const lines = await orderLines(order.id);
             emit('order', ref(order.id), null, {
               displayNumber: order.salesOrderNumber,
+              placedAt: order.salesOrderDate ?? null,
+              total:
+                order.totalGrossAmount != null &&
+                /^[A-Z]{3}$/.test(order.currencyIso ?? '')
+                  ? {
+                      amount: order.totalGrossAmount,
+                      currency: order.currencyIso!,
+                    }
+                  : null,
               status:
                 order.isCancelled || order.deliveryStatus === 0
                   ? 'cancelled'
@@ -274,6 +290,8 @@ export function createJtlConnector(
                     : ref(line.itemId),
                 quantity: { amount: line.quantity, unit: unit(line.salesUnit) },
                 cancelledQuantity: null,
+                skuCode: text(line.sKU),
+                title: text(line.name),
               })),
             });
           }

@@ -41,6 +41,12 @@ export const sourceSchema = external
 
 const quantity = z.object({ amount: positive, unit }).strict();
 
+const money = z
+  .object({ amount: decimal, currency: z.string().regex(/^[A-Z]{3}$/) })
+  .strict();
+
+const text = z.string().min(1).max(512);
+
 const observation = <T extends z.ZodTypeAny>(
   resource: 'order' | 'sku' | 'fulfillment',
   data: T,
@@ -69,6 +75,8 @@ export const commerceSchema = z.discriminatedUnion('capability', [
           .object({
             displayNumber: z.string().nullable(),
             dueAt: z.string().datetime({ offset: true }).nullable().optional(),
+            placedAt: timestamp.nullable().optional(),
+            total: money.nullable().optional(),
             status: z.enum(['open', 'completed', 'cancelled', 'unknown']),
             paymentStatus: z.enum([
               'pending',
@@ -89,6 +97,8 @@ export const commerceSchema = z.discriminatedUnion('capability', [
                     .object({ amount: decimal, unit })
                     .strict()
                     .nullable(),
+                  skuCode: text.nullable().optional(),
+                  title: text.nullable().optional(),
                 })
                 .strict()
                 .refine(

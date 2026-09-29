@@ -7,11 +7,17 @@ import { useForm } from '@tanstack/react-form';
 import { useRef, useState } from 'react';
 import { z } from 'zod';
 
+import { ShopifyOrderContext } from './order-context.js';
 import { ShopifyRecordPage } from './record-page.js';
 import { ShopifyRecords } from './records.js';
 
-/** Starts Shopify authorization for a workspace, optionally reconnecting a specified shop. */
+/** Renders Shopify authorization, the record browser page or live context for a host record. */
 export default function ShopifySettings(props: AppUiProps) {
+  if (props.slot === 'record')
+    return props.record ? (
+      <ShopifyOrderContext record={props.record} services={props.services} />
+    ) : null;
+
   return props.slot === 'page' ? (
     <ShopifyRecordPage {...props} />
   ) : (

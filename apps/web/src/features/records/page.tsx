@@ -509,6 +509,14 @@ export function RecordDetailPage() {
                   >
                     Investigate issue <ArrowRight size={14} />
                   </Link>
+                ) : record.kind === 'order' ? (
+                  <Link
+                    to="/app/$organizationId/orders/$orderId"
+                    params={{ organizationId, orderId: record.id }}
+                    className="record-action"
+                  >
+                    Open in Orders <ArrowRight size={14} />
+                  </Link>
                 ) : null}
               </section>
             </aside>

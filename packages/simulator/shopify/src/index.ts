@@ -41,6 +41,9 @@ export type ShopifyCommand =
   | { kind: 'ship'; id: string };
 const gid = (type: string, id = '1') => `gid://shopify/${type}/${id}`;
 
+// Simulated orders sell the seeded tote at a fixed shop-currency price.
+const unitPrice = 24;
+
 /** Reads the seeded stock pool's on-hand, reserved, and available quantities. */
 export function stock(state: ShopifyState, id = '1') {
   const values = state.nodes[gid('InventoryLevel', id)]!.quantities as {
@@ -164,15 +167,24 @@ export function command(
       state.nodes[id] = {
         id,
         updatedAt,
+        createdAt: updatedAt,
         name: `#SIM-${command.id}`,
         cancelledAt: null,
         closed: false,
         displayFinancialStatus: 'PAID',
+        currentTotalPriceSet: {
+          shopMoney: {
+            amount: (command.quantity * unitPrice).toFixed(2),
+            currencyCode: 'EUR',
+          },
+        },
         fulfillments: [],
       };
       state.nodes[lineId] = {
         id: lineId,
         quantity: command.quantity,
+        name: 'Canvas tote',
+        sku: 'LUMA-001',
         variant: { inventoryItem: { id: gid('InventoryItem') } },
       };
       state.nodes[workId] = { id: workId, updatedAt, status: 'OPEN' };

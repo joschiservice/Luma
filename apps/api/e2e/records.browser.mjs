@@ -103,7 +103,7 @@ it('searches scoped records and returns from a metric to the same cohort', async
     .first()
     .click();
   const dialog = page.getByRole('dialog');
-  await dialog.getByRole('link', { name: 'Inspect record' }).click();
+  await dialog.getByRole('link', { name: 'Open order' }).click();
   await page.getByRole('heading', { name: '#1000' }).waitFor();
   await page.getByRole('link', { name: 'Back to context' }).click();
   await dialog.getByRole('heading', { name: 'Open orders' }).waitFor();

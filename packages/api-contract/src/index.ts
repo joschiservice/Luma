@@ -10,6 +10,7 @@ import { draftTestsContract } from './contracts/draft-tests.js';
 import { identityContract } from './contracts/identity.js';
 import { resolutionLearningContract } from './contracts/learning.js';
 import { metricsContract } from './contracts/metrics.js';
+import { ordersContract } from './contracts/orders.js';
 import { operationsContract } from './contracts/overview.js';
 import { playbooksContract } from './contracts/playbooks.js';
 import { procurementContract } from './contracts/procurement.js';
@@ -45,6 +46,7 @@ const routes: {
   system: typeof systemContract;
   connectorProviders: typeof connectorProvidersContract;
   records: typeof recordsContract;
+  orders: typeof ordersContract;
 } = {
   shadow: shadowContract,
   activity: activityContract,
@@ -66,6 +68,7 @@ const routes: {
   system: systemContract,
   connectorProviders: connectorProvidersContract,
   records: recordsContract,
+  orders: ordersContract,
 };
 const options = {
   strictStatusCodes: true as const,
@@ -151,3 +154,5 @@ export * from './metrics.js';
 export * from './operational-metrics.js';
 
 export * from './records.js';
+
+export * from './orders.js';

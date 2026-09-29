@@ -7,6 +7,7 @@ import {
   House,
   Inbox,
   type LucideIcon,
+  Receipt,
   Settings,
   ShoppingCart,
   Workflow,
@@ -21,6 +22,7 @@ export type DestinationPath =
   | 'exceptions'
   | 'activity'
   | 'insights'
+  | 'orders'
   | 'workflows'
   | 'procurement'
   | 'apps'
@@ -80,6 +82,15 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
     description: 'Live operational metrics and order flow',
     group: 'core',
     shortcut: 'm',
+  },
+  {
+    path: 'orders',
+    label: 'Orders',
+    Icon: Receipt,
+    description: 'Search order history, fulfillment progress and source facts',
+    group: 'operations',
+    domain: 'orders',
+    shortcut: 'o',
   },
   {
     path: 'workflows',

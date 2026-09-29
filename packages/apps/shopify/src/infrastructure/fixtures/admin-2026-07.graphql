@@ -559,6 +559,7 @@ type LineItem implements Node {
   id: ID!
   name: String!
   quantity: Int!
+  sku: String
   variant: ProductVariant
 }
 

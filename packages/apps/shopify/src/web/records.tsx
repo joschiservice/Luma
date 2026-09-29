@@ -10,6 +10,7 @@ import {
   type ShopifyRecordKind,
 } from '../domain/records.js';
 import { recordError } from './record-error.js';
+import { ShopifyRecordSections } from './sections.js';
 
 /** Shows live Shopify records and follows source links within the selected connection. */
 export function ShopifyRecords({
@@ -138,66 +139,11 @@ export function ShopifyRecords({
           <p className="field-help">
             {detail.shop} · Read {new Date(detail.observedAt).toLocaleString()}
           </p>
-          {detail.sections.map((section) => (
-            <section
-              key={section.key}
-              className="shopify-record-section"
-              aria-label={section.title}
-            >
-              <h3>{section.title}</h3>
-              {section.message ? (
-                <p className="shopify-coverage-message" role="status">
-                  {section.message}
-                </p>
-              ) : null}
-              {section.status === 'available' && section.rows.length === 0 ? (
-                <p className="field-help">No records returned by Shopify.</p>
-              ) : null}
-              {section.rows.map((row) => (
-                <article key={row.id} className="shopify-source-record">
-                  <p className="shopify-source-id">{row.id}</p>
-                  <dl>
-                    {Object.entries(row.fields).map(([label, value]) => (
-                      <div key={label}>
-                        <dt>{label}</dt>
-                        <dd>
-                          {value === null
-                            ? 'Not provided'
-                            : typeof value === 'boolean'
-                              ? value
-                                ? 'Yes'
-                                : 'No'
-                              : String(value)}
-                        </dd>
-                      </div>
-                    ))}
-                  </dl>
-                  {row.sourceUpdatedAt ? (
-                    <p className="field-help">
-                      Updated in Shopify{' '}
-                      {new Date(row.sourceUpdatedAt).toLocaleString()}
-                    </p>
-                  ) : null}
-                  <div className="shopify-record-links">
-                    {row.links
-                      .filter((link) => link.id !== detail.id)
-                      .map((link) => (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          key={`${link.kind}:${link.id}`}
-                          onClick={() => void load(link.kind, link.id)}
-                          disabled={pending}
-                        >
-                          {link.label}
-                        </Button>
-                      ))}
-                  </div>
-                </article>
-              ))}
-            </section>
-          ))}
+          <ShopifyRecordSections
+            detail={detail}
+            pending={pending}
+            follow={(link) => void load(link.kind, link.id)}
+          />
           {detail.nextCursor ? (
             <Button
               type="button"

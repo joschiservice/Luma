@@ -107,3 +107,29 @@
   color: var(--foreground-muted);
   font-size: 0.8125rem;
 }
+.shopify-order-context-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+.shopify-order-context-head .field-help {
+  flex: 1 1 14rem;
+  margin: 0;
+  color: var(--foreground-muted);
+  font-size: 0.8125rem;
+}
+.shopify-admin-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.8125rem;
+}
+.shopify-order-context h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.shopify-order-context .shopify-record-section {
+  margin-top: 1rem;
+}

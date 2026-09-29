@@ -51,12 +51,14 @@ export function AppExtension({
   organizationId,
   slot,
   connection,
+  record,
   done,
 }: {
   appId: string;
   organizationId: string;
   slot: AppUiProps['slot'];
   connection?: InstalledConnection;
+  record?: AppUiProps['record'];
   done: () => Promise<void>;
 }) {
   const state = useQuery(appsOptions(organizationId));
@@ -96,12 +98,15 @@ export function AppExtension({
   };
 
   return (
-    <ExtensionBoundary key={`${organizationId}/${appId}/${slot}`}>
+    <ExtensionBoundary
+      key={`${organizationId}/${appId}/${slot}/${record?.connectionId ?? ''}/${record?.externalId ?? ''}`}
+    >
       <Suspense fallback={<p role="status">Loading app…</p>}>
         {createElement(Extension, {
           organizationId,
           slot,
           connection,
+          record,
           done,
           services,
         })}

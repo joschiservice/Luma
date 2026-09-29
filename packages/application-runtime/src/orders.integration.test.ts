@@ -1,0 +1,927 @@
+import { randomUUID } from 'node:crypto';
+import { readdir, readFile } from 'node:fs/promises';
+
+import { buildApp, createCommerceServices } from '@luma/application-runtime';
+import type { CommerceObservation } from '@luma/connections';
+import { createConnectionCoverage } from '@luma/connections/composition';
+import { createOrderAttentionReader } from '@luma/exceptions/composition';
+import type { IdentityService } from '@luma/identity';
+import { makeTenantContext } from '@luma/identity/composition';
+import { createOrderMetricReader } from '@luma/orders/composition';
+import { createTenantDatabase } from '@luma/platform/composition';
+import {
+  createActivityStore,
+  createOperationalMetrics,
+  createOrderWorkspace,
+} from '@luma/resolution/composition';
+import { Pool } from 'pg';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+
+const databaseUrl = process.env.TEST_DATABASE_URL;
+
+type OrderData = Extract<
+  CommerceObservation,
+  { capability: 'orders.read' }
+>['observation']['data'];
+
+describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
+  const name = `orders_${randomUUID().replaceAll('-', '')}`;
+  const admin = new Pool({ connectionString: databaseUrl });
+  let owner: Pool,
+    reader: Pool,
+    services: ReturnType<typeof createCommerceServices>;
+  const tenant = randomUUID(),
+    otherTenant = randomUUID(),
+    shopify = randomUUID(),
+    jtl = randomUUID(),
+    foreign = randomUUID();
+  let clock = new Date('2026-09-20T12:00:00Z');
+
+  function context(tenantId: string = tenant) {
+    return makeTenantContext(
+      { userId: 'operator', sessionId: 'session' },
+      {
+        id: tenantId,
+        name: 'Fixture',
+        slug: 'fixture',
+        status: 'active',
+        dataRegion: 'EU',
+      },
+      {
+        id: 'membership',
+        organizationId: tenantId,
+        userId: 'operator',
+        role: 'owner',
+      },
+      randomUUID(),
+    );
+  }
+
+  function workspace() {
+    return createOrderWorkspace(
+      createTenantDatabase(reader),
+      { attention: createOrderAttentionReader, activity: createActivityStore },
+      async (value) => value,
+      () => clock,
+    );
+  }
+
+  /** Ingests one order observation and binds its identities with explicit keys. */
+  async function seedOrder(options: {
+    tenantId?: string;
+    connectionId: string;
+    external: string;
+    key: string;
+    updatedAt: string;
+    data: Partial<OrderData>;
+    lines: {
+      external: string;
+      key: string;
+      quantity: string;
+      cancelled?: string | null;
+      sku?: { external: string; key: string } | null;
+      skuCode?: string | null;
+      title?: string | null;
+    }[];
+  }) {
+    const tenantId = options.tenantId ?? tenant;
+    const source = {
+      tenantId,
+      connectionId: options.connectionId,
+      provider: options.connectionId === jtl ? 'jtl' : 'shopify',
+      resource: 'order' as const,
+      externalId: options.external,
+      scopeKey: '',
+    };
+    const observation: CommerceObservation & { capability: 'orders.read' } = {
+      capability: 'orders.read',
+      observation: {
+        id: randomUUID(),
+        source,
+        kind: 'snapshot',
+        observedAt: options.updatedAt,
+        sourceUpdatedAt: options.updatedAt,
+        sourceRevision: null,
+        adapterVersion: 'fixture/1',
+        schemaVersion: 1,
+        data: {
+          displayNumber: null,
+          status: 'open',
+          paymentStatus: 'paid',
+          ...options.data,
+          lines: options.lines.map((line) => ({
+            id: { externalId: line.external, scopeKey: options.external },
+            sku: line.sku
+              ? { externalId: line.sku.external, scopeKey: '' }
+              : null,
+            quantity: { amount: line.quantity, unit: 'each' },
+            cancelledQuantity:
+              line.cancelled === null
+                ? null
+                : { amount: line.cancelled ?? '0', unit: 'each' },
+            skuCode: line.skuCode ?? null,
+            title: line.title ?? null,
+          })),
+        },
+      },
+    };
+    const actor = context(tenantId);
+    const key = observation.observation.id;
+    await services.ingestion.ingest(actor, key, observation);
+    const orderId = await services.ingestion.bind(
+      actor,
+      source,
+      options.key,
+      observation.observation.id,
+      'operator-confirmed',
+    );
+    for (const line of options.lines) {
+      await services.ingestion.bind(
+        actor,
+        {
+          ...source,
+          resource: 'order_line',
+          externalId: line.external,
+          scopeKey: options.external,
+        },
+        line.key,
+        observation.observation.id,
+        'operator-confirmed',
+      );
+      if (line.sku)
+        await services.ingestion.bind(
+          actor,
+          {
+            ...source,
+            resource: 'sku',
+            externalId: line.sku.external,
+            scopeKey: '',
+          },
+          line.sku.key,
+          observation.observation.id,
+          'operator-confirmed',
+        );
+    }
+    const result = await services.ingestion.replay(
+      actor,
+      options.connectionId,
+      key,
+    );
+    expect(result.status).toBe('applied');
+
+    return orderId;
+  }
+
+  async function seedShipment(options: {
+    connectionId: string;
+    order: string;
+    external: string;
+    line: string;
+    quantity: string;
+    status: 'shipped' | 'processing';
+  }) {
+    const observation: CommerceObservation & {
+      capability: 'fulfillment.read';
+    } = {
+      capability: 'fulfillment.read',
+      observation: {
+        id: randomUUID(),
+        source: {
+          tenantId: tenant,
+          connectionId: options.connectionId,
+          provider: options.connectionId === jtl ? 'jtl' : 'shopify',
+          resource: 'fulfillment',
+          externalId: options.external,
+          scopeKey: '',
+        },
+        kind: 'snapshot',
+        observedAt: '2026-09-19T10:00:00Z',
+        sourceUpdatedAt: '2026-09-19T10:00:00Z',
+        sourceRevision: null,
+        adapterVersion: 'fixture/1',
+        schemaVersion: 1,
+        data: {
+          order: { externalId: options.order, scopeKey: '' },
+          status: options.status,
+          lastProgressAt: '2026-09-19T10:00:00Z',
+          failureCode: null,
+          lines: [
+            {
+              orderLine: { externalId: options.line, scopeKey: options.order },
+              quantity: { amount: options.quantity, unit: 'each' },
+            },
+          ],
+        },
+      },
+    };
+    const key = observation.observation.id;
+    await services.ingestion.ingest(context(), key, observation);
+    const id = await services.ingestion.bind(
+      context(),
+      observation.observation.source,
+      options.external,
+      observation.observation.id,
+      'operator-confirmed',
+    );
+    await services.ingestion.replay(context(), options.connectionId, key);
+
+    return id;
+  }
+
+  beforeAll(async () => {
+    await admin.query(`CREATE DATABASE "${name}"`);
+    const url = new URL(databaseUrl!);
+    url.pathname = `/${name}`;
+    owner = new Pool({ connectionString: url.toString() });
+    const setup = await admin.connect();
+    try {
+      await setup.query(
+        "SELECT pg_advisory_lock(hashtext('luma_test_role_setup'))",
+      );
+      for (const file of (
+        await readdir(new URL('../migrations/', import.meta.url))
+      ).sort())
+        if (file.endsWith('.sql'))
+          await owner.query(
+            await readFile(
+              new URL(`../migrations/${file}`, import.meta.url),
+              'utf8',
+            ),
+          );
+    } finally {
+      await setup.query(
+        "SELECT pg_advisory_unlock(hashtext('luma_test_role_setup'))",
+      );
+      setup.release();
+    }
+    const password = randomUUID();
+    // The writer mirrors the ingestion worker; the reader mirrors the API login.
+    for (const [role, grants] of [
+      [`${name}_w`, 'luma_connectors,luma_orders,luma_inventory'],
+      [`${name}_r`, 'luma_connectors,luma_case_reader,luma_desk'],
+    ] as const) {
+      await admin.query(
+        `CREATE ROLE "${role}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`,
+      );
+      await admin.query(`GRANT ${grants} TO "${role}"`);
+    }
+    url.password = password;
+    url.username = `${name}_w`;
+    services = createCommerceServices(url.toString());
+    url.username = `${name}_r`;
+    reader = new Pool({ connectionString: url.toString() });
+    for (const [tenantId, id, kind, label] of [
+      [tenant, shopify, 'shopify', 'Shopify store'],
+      [tenant, jtl, 'jtl', 'JTL-Wawi'],
+      [otherTenant, foreign, 'shopify', 'Other store'],
+    ]) {
+      await owner.query(
+        "INSERT INTO workspace_apps(tenant_id,app_id,status,version) VALUES($1,$2,'installed',1) ON CONFLICT DO NOTHING",
+        [tenantId, kind],
+      );
+      await owner.query(
+        'INSERT INTO connector_installations(tenant_id,id,version,document,secret) VALUES($1,$2,1,$3,$4)',
+        [
+          tenantId,
+          id,
+          {
+            id,
+            tenantId,
+            version: 1,
+            status: 'active',
+            appId: kind,
+            appInstallationVersion: 1,
+            target: { kind },
+            label,
+            permissions: [],
+            granted: [],
+          },
+          'encrypted-fixture',
+        ],
+      );
+    }
+  });
+
+  afterAll(async () => {
+    await services?.close();
+    await reader?.end();
+    await owner?.end();
+    await admin.query(`DROP DATABASE IF EXISTS "${name}"`);
+    await admin.query(`DROP ROLE IF EXISTS "${name}_w"`);
+    await admin.query(`DROP ROLE IF EXISTS "${name}_r"`);
+    await admin.end();
+  });
+
+  beforeEach(async () => {
+    clock = new Date('2026-09-20T12:00:00Z');
+    await owner.query(
+      'TRUNCATE connector_observations,connector_source_mappings,orders_entities,inventory_entities,exceptions,playbook_definitions CASCADE',
+    );
+  });
+
+  async function seedWorkspace() {
+    const tote = { external: 'gid://shopify/InventoryItem/31', key: 'tote' };
+    const a = await seedOrder({
+      connectionId: shopify,
+      external: 'gid://shopify/Order/1001',
+      key: 'order-a',
+      updatedAt: '2026-09-18T09:00:00Z',
+      data: {
+        displayNumber: '#1001',
+        placedAt: '2026-09-10T08:00:00Z',
+        total: { amount: '48.00', currency: 'EUR' },
+      },
+      lines: [
+        {
+          external: 'gid://shopify/LineItem/11',
+          key: 'order-a-line',
+          quantity: '2',
+          sku: tote,
+          skuCode: 'TOTE-RED',
+          title: 'Canvas tote',
+        },
+      ],
+    });
+    // The same order observed in the ERP later, with its own number and a pending payment.
+    const mirrored = await seedOrder({
+      connectionId: jtl,
+      external: 'jtl-order-10',
+      key: 'order-a',
+      updatedAt: '2026-09-19T09:00:00Z',
+      data: {
+        displayNumber: 'SO-10',
+        paymentStatus: 'pending',
+        placedAt: '2026-09-10T08:05:00Z',
+        total: { amount: '48', currency: 'EUR' },
+      },
+      lines: [
+        {
+          external: '101',
+          key: 'order-a-line-jtl',
+          quantity: '2',
+          sku: { external: 'jtl-item-77', key: 'tote' },
+          skuCode: 'TOTE-RED',
+        },
+      ],
+    });
+    const b = await seedOrder({
+      connectionId: shopify,
+      external: 'gid://shopify/Order/1002',
+      key: 'order-b',
+      updatedAt: '2026-09-17T09:00:00Z',
+      data: {
+        displayNumber: '#1002',
+        status: 'completed',
+        placedAt: '2026-09-11T08:00:00Z',
+      },
+      lines: [
+        {
+          external: 'gid://shopify/LineItem/12',
+          key: 'order-b-line',
+          quantity: '1',
+          skuCode: 'MUG-BLUE',
+        },
+      ],
+    });
+    const c = await seedOrder({
+      connectionId: shopify,
+      external: 'gid://shopify/Order/1003',
+      key: 'order-c',
+      updatedAt: '2026-09-16T09:00:00Z',
+      data: {
+        displayNumber: '#1003',
+        dueAt: '2026-09-19T00:00:00Z',
+        placedAt: '2026-09-12T08:00:00Z',
+      },
+      lines: [
+        {
+          external: 'gid://shopify/LineItem/13',
+          key: 'order-c-line',
+          quantity: '4',
+          cancelled: '1',
+        },
+      ],
+    });
+    const shipment = await seedShipment({
+      connectionId: shopify,
+      order: 'gid://shopify/Order/1001',
+      external: 'gid://shopify/Fulfillment/51',
+      line: 'gid://shopify/LineItem/11',
+      quantity: '1',
+      status: 'shipped',
+    });
+    const foreignOrder = await seedOrder({
+      tenantId: otherTenant,
+      connectionId: foreign,
+      external: 'gid://shopify/Order/1001',
+      key: 'order-a',
+      updatedAt: '2026-09-18T09:00:00Z',
+      data: { displayNumber: '#1001' },
+      lines: [{ external: 'line', key: 'line', quantity: '1' }],
+    });
+    const issueId = randomUUID();
+    await owner.query(
+      `INSERT INTO exceptions(id,tenant_id,fingerprint,state,document) VALUES($1,$2,$3,'escalated',$4)`,
+      [
+        issueId,
+        tenant,
+        'f'.repeat(64),
+        {
+          id: issueId,
+          tenantId: tenant,
+          fingerprint: 'f'.repeat(64),
+          state: 'escalated',
+          exceptionClass: 'stuck_fulfillment',
+          severity: 'high',
+          occurrenceCount: 1,
+          subject: {
+            ruleIdentity: 'fulfillment-progress',
+            subjectKind: 'fulfillment',
+            subjectId: 'gid://shopify/Fulfillment/51',
+            scope: [shopify],
+          },
+          firstDetectedAt: '2026-09-19T11:00:00Z',
+          lastDetectedAt: '2026-09-19T11:00:00Z',
+        },
+      ],
+    );
+    await owner.query(
+      'INSERT INTO exception_outbox(id,tenant_id,exception_id,document,created_at) VALUES($1,$2,$3,$4,$5)',
+      [
+        randomUUID(),
+        tenant,
+        issueId,
+        { type: 'exception.detected', occurredAt: '2026-09-19T11:00:00Z' },
+        '2026-09-19T11:00:00Z',
+      ],
+    );
+
+    return { a, mirrored, b, c, shipment, foreignOrder, issueId };
+  }
+
+  it('searches, filters, sorts and pages orders within one tenant', async () => {
+    const { a, mirrored, b, c, foreignOrder } = await seedWorkspace();
+    expect(mirrored).toBe(a);
+    const orders = workspace();
+    const list = (query: Partial<Parameters<typeof orders.list>[1]> = {}) =>
+      orders.list(context(), {
+        q: '',
+        view: 'all',
+        sort: 'updated',
+        direction: 'desc',
+        limit: 50,
+        ...query,
+      });
+    const ids = async (query: Parameters<typeof list>[0]) =>
+      (await list(query)).items.map((item) => item.id);
+
+    const all = await list();
+    expect(all.totalCount).toBe(3);
+    expect(all.items.map((item) => item.id)).toEqual([a, b, c]);
+    const first = all.items[0]!;
+    expect(first).toMatchObject({
+      displayNumber: 'SO-10',
+      paymentStatus: 'pending',
+      placedAt: '2026-09-10T08:05:00.000Z',
+      total: { amount: '48', currency: 'EUR' },
+      fulfillment: 'unfulfilled',
+      open: true,
+      overdue: null,
+      differs: true,
+      lineCount: 1,
+    });
+    expect(first.issueIds).toHaveLength(1);
+    expect(
+      first.sources.map((source) => [source.connectionId, source.selected]),
+    ).toEqual(
+      expect.arrayContaining([
+        [shopify, false],
+        [jtl, true],
+      ]),
+    );
+    expect(
+      first.sources.find((source) => source.connectionId === shopify),
+    ).toMatchObject({
+      externalId: 'gid://shopify/Order/1001',
+      label: 'Shopify store',
+    });
+
+    // Numbers, source IDs, SKU text and source SKU IDs all find the same order.
+    for (const q of [
+      '1001',
+      'so-10',
+      'jtl-order-10',
+      'tote-red',
+      'jtl-item-77',
+      a,
+    ])
+      expect(await ids({ q }), q).toEqual([a]);
+    expect(await ids({ q: 'MUG' })).toEqual([b]);
+    expect(await ids({ q: '100%' })).toEqual([]);
+
+    expect(await ids({ status: 'completed' })).toEqual([b]);
+    expect(await ids({ paymentStatus: 'pending' })).toEqual([a]);
+    expect(await ids({ connectionId: jtl })).toEqual([a]);
+    const scoped = (await list({ connectionId: shopify })).items[0]!;
+    expect(scoped).toMatchObject({
+      id: a,
+      paymentStatus: 'paid',
+      fulfillment: 'partial',
+    });
+    expect(
+      await ids({
+        placedFrom: '2026-09-11T00:00:00Z',
+        placedBefore: '2026-09-12T00:00:00Z',
+      }),
+    ).toEqual([b]);
+    expect(await ids({ updatedFrom: '2026-09-18T00:00:00Z' })).toEqual([a]);
+
+    expect(await ids({ view: 'outstanding' })).toEqual([a, c]);
+    expect(await ids({ view: 'overdue' })).toEqual([c]);
+    expect(await ids({ view: 'needs_you' })).toEqual([a]);
+    expect(await ids({ view: 'differs' })).toEqual([a]);
+
+    // The views count exactly the orders behind the shared order metrics.
+    const metrics = createOperationalMetrics(
+      createTenantDatabase(reader),
+      {
+        orders: createOrderMetricReader,
+        attention: createOrderAttentionReader,
+        coverage: createConnectionCoverage,
+      },
+      () => clock,
+    );
+    const counts = (await metrics(context(), {})).metrics.map(
+      (metric) => metric.observedCount,
+    );
+    expect(counts).toEqual([
+      (await list({ view: 'outstanding' })).totalCount,
+      (await list({ view: 'overdue' })).totalCount,
+      (await list({ view: 'needs_you' })).totalCount,
+    ]);
+
+    expect(await ids({ sort: 'number', direction: 'asc' })).toEqual([b, c, a]);
+    expect(await ids({ sort: 'placed', direction: 'asc' })).toEqual([a, b, c]);
+    // Orders without a deadline sort last in both directions.
+    expect((await ids({ sort: 'due', direction: 'desc' }))[0]).toBe(c);
+    expect((await ids({ sort: 'due', direction: 'asc' }))[0]).toBe(c);
+
+    const seen: string[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await list({
+        sort: 'placed',
+        direction: 'desc',
+        limit: 1,
+        cursor,
+      });
+      expect(page.totalCount).toBe(3);
+      seen.push(...page.items.map((item) => item.id));
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor);
+    expect(seen).toEqual([c, b, a]);
+    const firstPage = await list({ limit: 1 });
+    await expect(
+      list({ limit: 1, view: 'overdue', cursor: firstPage.nextCursor! }),
+    ).rejects.toMatchObject({ statusCode: 400 });
+
+    const isolated = await orders.list(context(otherTenant), {
+      q: '1001',
+      view: 'all',
+      sort: 'updated',
+      direction: 'desc',
+      limit: 50,
+    });
+    expect(isolated.items.map((item) => item.id)).toEqual([foreignOrder]);
+    expect(await orders.get(context(otherTenant), a)).toBeNull();
+  }, 60000);
+
+  it('explains one order with source facts, progress, evidence and linked work', async () => {
+    const { a, shipment, issueId } = await seedWorkspace();
+    const definition = 'shipping-method';
+    const digest = 'd'.repeat(64);
+    const activation = randomUUID(),
+      run = randomUUID();
+    await owner.query(
+      'INSERT INTO playbook_definitions(tenant_id,id,document) VALUES($1,$2,$3)',
+      [tenant, definition, { id: definition, name: 'Correct shipping method' }],
+    );
+    await owner.query(
+      'INSERT INTO playbook_versions(tenant_id,definition_id,version,digest,document) VALUES($1,$2,$3,$4,$5)',
+      [
+        tenant,
+        definition,
+        '1',
+        digest,
+        { definition: { id: definition }, version: '1', digest },
+      ],
+    );
+    await owner.query(
+      'INSERT INTO playbook_activations(tenant_id,id,definition_id,version,version_digest,document) VALUES($1,$2,$3,$4,$5,$6)',
+      [
+        tenant,
+        activation,
+        definition,
+        '1',
+        digest,
+        {
+          id: activation,
+          tenantId: tenant,
+          definitionId: definition,
+          version: '1',
+          versionDigest: digest,
+        },
+      ],
+    );
+    await owner.query(
+      'INSERT INTO playbook_runs(tenant_id,id,activation_id,definition_id,version,version_digest,document) VALUES($1,$2,$3,$4,$5,$6,$7)',
+      [
+        tenant,
+        run,
+        activation,
+        definition,
+        '1',
+        digest,
+        {
+          id: run,
+          tenantId: tenant,
+          activationId: activation,
+          definitionId: definition,
+          version: '1',
+          versionDigest: digest,
+          createdAt: '2026-09-19T12:00:00Z',
+          incidentId: randomUUID(),
+          action: { id: run, target: { kind: 'order', id: 'jtl-order-10' } },
+        },
+      ],
+    );
+
+    const detail = (await workspace().get(context(), a))!;
+    expect(detail.order).toMatchObject({
+      id: a,
+      displayNumber: 'SO-10',
+      differs: true,
+      issueIds: [issueId],
+    });
+    const shop = detail.sources.find((item) => item.connectionId === shopify)!;
+    expect(shop).toMatchObject({
+      selected: false,
+      appId: 'shopify',
+      externalId: 'gid://shopify/Order/1001',
+      mappingMethod: 'operator-confirmed',
+      fulfillment: 'partial',
+      lines: [
+        {
+          skuCode: 'TOTE-RED',
+          title: 'Canvas tote',
+          quantity: '2',
+          fulfilledQuantity: '1',
+          remainingQuantity: '1',
+        },
+      ],
+    });
+    expect(
+      detail.sources.find((item) => item.connectionId === jtl),
+    ).toMatchObject({ selected: true, fulfillment: 'unfulfilled' });
+    expect(detail.differences.map((item) => item.field)).toEqual([
+      'paymentStatus',
+    ]);
+    expect(detail.fulfillments).toMatchObject([
+      {
+        id: shipment,
+        connectionId: shopify,
+        status: 'shipped',
+        externalId: 'gid://shopify/Fulfillment/51',
+      },
+    ]);
+    expect(detail.issues).toMatchObject([
+      {
+        id: issueId,
+        class: 'stuck_fulfillment',
+        relationship: 'fulfillment',
+        needsYou: true,
+      },
+    ]);
+    expect(detail.workflows).toMatchObject([
+      {
+        id: run,
+        name: 'Correct shipping method',
+        relationship: 'order',
+        state: 'recorded',
+      },
+    ]);
+    expect(detail.history.entries).toHaveLength(3);
+    expect(
+      detail.history.entries.every((entry) => entry.current === true),
+    ).toBe(true);
+    expect(detail.history.entries.map((entry) => entry.entityKind)).toEqual(
+      expect.arrayContaining(['order', 'fulfillment']),
+    );
+    expect(detail.activity.entries).toMatchObject([
+      { exceptionId: issueId, action: 'exception.detected' },
+    ]);
+
+    const app = buildApp(
+      {},
+      {
+        orders: workspace(),
+        trustedOrigins: ['http://localhost:3000'],
+        identity: {
+          resolveTenant: async (_credentials: unknown, id: string) =>
+            context(id),
+        } as unknown as IdentityService,
+      },
+    );
+    try {
+      const base = `/v1/organizations/${tenant}/orders`;
+      const listed = await app.inject(`${base}?q=tote-red&view=needs_you`);
+      expect(listed.statusCode).toBe(200);
+      expect(
+        listed.json().items.map((item: { id: string }) => item.id),
+      ).toEqual([a]);
+      expect((await app.inject(`${base}/${a}`)).statusCode).toBe(200);
+      expect((await app.inject(`${base}/${randomUUID()}`)).statusCode).toBe(
+        404,
+      );
+      expect((await app.inject(`${base}?cursor=not-a-cursor`)).statusCode).toBe(
+        400,
+      );
+      expect((await app.inject(`${base}?limit=101`)).statusCode).toBe(400);
+      expect(
+        (await app.inject(`/v1/organizations/${otherTenant}/orders/${a}`))
+          .statusCode,
+      ).toBe(404);
+    } finally {
+      await app.close();
+    }
+  }, 60000);
+
+  it('pages a large import completely and in order', async () => {
+    const count = Number(process.env.LUMA_ORDER_BENCHMARK ?? 2000);
+    const { a } = await seedWorkspace();
+    const template = async (connectionId: string) =>
+      (
+        await owner.query<{
+          document: Record<string, unknown>;
+          mapping: string;
+        }>(
+          `SELECT s.document,s.mapping_version AS mapping FROM orders_projections p
+         JOIN orders_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id
+         WHERE p.tenant_id=$1 AND p.entity_id=$2 AND p.connection_id=$3`,
+          [tenant, a, connectionId],
+        )
+      ).rows[0]!;
+    const shop = await template(shopify);
+    const erp = await template(jtl);
+    // Historical orders with source dates, totals and SKU text on two connections.
+    await owner.query(
+      `WITH entities AS (
+        INSERT INTO orders_entities(id,tenant_id,kind,reconciliation_key)
+        SELECT gen_random_uuid(),$1,'order','import-' || n FROM generate_series(1,$6::int) n RETURNING id,reconciliation_key
+      ), numbered AS (
+        SELECT id,substr(reconciliation_key,8)::int AS n FROM entities
+      ), sources AS (
+        SELECT e.*,c.connection_id,c.offset_minutes FROM numbered e
+        CROSS JOIN (VALUES ($2::uuid,0),($3::uuid,5)) c(connection_id,offset_minutes)
+        WHERE c.connection_id=$2 OR e.n % 3 = 0
+      ), snapshots AS (
+        INSERT INTO orders_snapshots(id,tenant_id,entity_id,kind,connection_id,observation_id,normalizer_version,mapping_version,source_updated_at,observed_at,document)
+        SELECT gen_random_uuid(),$1,s.id,'order',s.connection_id,
+          CASE WHEN s.connection_id=$2 THEN $4 ELSE $8 END::uuid,'import/1',$5,
+          timestamptz '2024-01-01' + s.n * interval '17 minutes',timestamptz '2026-09-19',
+          jsonb_set(jsonb_set(jsonb_set(jsonb_set(jsonb_set(jsonb_set(jsonb_set($7::jsonb,
+            '{entityId}',to_jsonb(s.id::text)),'{connectionId}',to_jsonb(s.connection_id::text)),
+            '{observationId}',to_jsonb(CASE WHEN s.connection_id=$2 THEN $4 ELSE $8 END::text)),
+            '{sourceUpdatedAt}',to_jsonb(to_char((timestamptz '2024-01-01' + s.n * interval '17 minutes') AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"'))),
+            '{data,displayNumber}',to_jsonb('#' || (100000 + s.n))),
+            '{data,placedAt}',to_jsonb(to_char((timestamptz '2024-01-01' + s.n * interval '13 minutes' + s.offset_minutes * interval '1 minute') AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"'))),
+            '{data,status}',to_jsonb(CASE WHEN s.n % 4 = 0 THEN 'completed' ELSE 'open' END))
+        FROM sources s RETURNING entity_id,connection_id,id
+      ) INSERT INTO orders_projections(tenant_id,entity_id,connection_id,snapshot_id)
+        SELECT $1,entity_id,connection_id,id FROM snapshots`,
+      [
+        tenant,
+        shopify,
+        jtl,
+        shop.document.observationId,
+        shop.mapping,
+        count,
+        shop.document,
+        erp.document.observationId,
+      ],
+    );
+    await owner.query('ANALYZE orders_projections');
+    await owner.query('ANALYZE orders_snapshots');
+    const plans: Record<string, string> = {};
+    let explain: string | null = null;
+    const db = createTenantDatabase(reader);
+    // Benchmark runs record one plan per measured query for the performance guide.
+    const planned = createOrderWorkspace(
+      {
+        transaction: (tenantId, operation, options) =>
+          db.transaction(
+            tenantId,
+            (tx) =>
+              operation({
+                query: async (sql, values) => {
+                  if (explain && sql.startsWith('WITH current'))
+                    plans[explain] = (
+                      await tx.query<{ 'QUERY PLAN': string }>(
+                        'EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT) ' + sql,
+                        values,
+                      )
+                    ).rows
+                      .map((row) => row['QUERY PLAN'])
+                      .join('\n');
+
+                  return tx.query(sql, values);
+                },
+              }),
+            options,
+          ),
+      },
+      { attention: createOrderAttentionReader, activity: createActivityStore },
+      async (value) => value,
+      () => clock,
+    );
+    const orders = workspace();
+    const query = {
+      q: '',
+      view: 'all' as const,
+      sort: 'placed' as const,
+      direction: 'asc' as const,
+      limit: 100,
+    };
+    const timings: Record<string, number> = {};
+    const timed = async <T>(
+      label: string,
+      read: (workspace: typeof orders) => Promise<T>,
+    ) => {
+      const start = performance.now();
+      const result = await read(orders);
+      timings[label] = Math.round(performance.now() - start);
+      if (process.env.LUMA_ORDER_BENCHMARK) {
+        explain = label;
+        await read(planned);
+        explain = null;
+      }
+
+      return result;
+    };
+    const firstPage = await timed('first page, placed', (workspace) =>
+      workspace.list(context(), query),
+    );
+    expect(firstPage.totalCount).toBe(count + 3);
+    // The default import is walked end to end; a benchmark import walks its first pages.
+    const benchmark = !!process.env.LUMA_ORDER_BENCHMARK;
+    const seen = new Set<string>();
+    let previous = '';
+    let cursor: string | undefined;
+    let pages = 0;
+    const walkStart = performance.now();
+    do {
+      const page = await orders.list(context(), { ...query, cursor });
+      for (const item of page.items) {
+        expect(seen.has(item.id)).toBe(false);
+        seen.add(item.id);
+        const placed = item.placedAt ?? '9999';
+        expect(placed >= previous).toBe(true);
+        previous = placed;
+      }
+      cursor = page.nextCursor ?? undefined;
+      pages++;
+    } while (cursor && (!benchmark || pages < 10));
+    timings['average cursor page'] = Math.round(
+      (performance.now() - walkStart) / pages,
+    );
+    if (!benchmark) expect(seen.size).toBe(count + 3);
+    await timed('default sort', (workspace) =>
+      workspace.list(context(), {
+        ...query,
+        sort: 'updated',
+        direction: 'desc',
+      }),
+    );
+    const searched = await timed('number search', (workspace) =>
+      workspace.list(context(), { ...query, q: String(100000 + count - 1) }),
+    );
+    expect(searched.items).toHaveLength(1);
+    await timed('outstanding view', (workspace) =>
+      workspace.list(context(), { ...query, view: 'outstanding' }),
+    );
+    await timed('differs view', (workspace) =>
+      workspace.list(context(), { ...query, view: 'differs' }),
+    );
+    await timed('SKU search', (workspace) =>
+      workspace.list(context(), { ...query, q: 'tote-red' }),
+    );
+    await timed('detail', (workspace) => workspace.get(context(), a));
+    if (process.env.LUMA_ORDER_BENCHMARK) {
+      const { writeFile } = await import('node:fs/promises');
+      await writeFile(
+        '/tmp/luma98-order-queries.json',
+        JSON.stringify({ orders: count + 3, timings, plans }, null, 2),
+      );
+    }
+  }, 300000);
+});

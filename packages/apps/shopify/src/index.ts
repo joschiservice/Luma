@@ -131,7 +131,7 @@ export function createApp(context: AppFactoryContext): AppDefinition {
         'Connect stores to read orders, products, inventory and fulfillment.',
       version: '1.0.0',
       category: 'storefront',
-      ui: ['connections', 'settings', 'page'],
+      ui: ['connections', 'settings', 'page', 'record'],
       connectionTypes: [{ kind: 'shopify', name: 'Shopify' }],
     },
     connector: createShopifyProvider(oauth ? { oauth } : {}),

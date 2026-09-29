@@ -41,6 +41,7 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
               query.type ?? '',
               query.outcome ?? '',
               query.limit,
+              query.subjects ?? null,
             ]),
           )
           .digest('hex');
@@ -73,6 +74,7 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
         SELECT s.*,COALESCE(s.exception_id,p.exception_id,(r.document->>'incidentId')::uuid) AS issue_id,
         COALESCE(s.connection_id,(s.doc->>'connectionId')::uuid,(p.document->>'connectionId')::uuid,(r.document->'action'->>'connectionId')::uuid) AS conn_id,
         COALESCE(s.doc->'details'->>'purchaseOrderId',p.document->'target'->>'id',r.document->'action'->'target'->>'id',a.document->'action'->'target'->>'id',e.document->'subject'->>'subjectId') AS resource,
+        COALESCE(CASE WHEN s.doc->'details'->>'purchaseOrderId' IS NOT NULL THEN 'purchase_order' END,p.document->'target'->>'kind',r.document->'action'->'target'->>'kind',a.document->'action'->'target'->>'kind',e.document->'subject'->>'subjectKind') AS resource_kind,
         COALESCE(CASE WHEN s.doc->>'eventType' LIKE 'purchase_order.%' THEN s.doc->'details'->>'reason' END,p.document->>'capability',r.document->'action'->>'capability',a.document->'action'->>'capability') AS summary,
         CASE WHEN e.document->'subject'->>'subjectKind'='connection' THEN e.document->'subject'->>'subjectId' END AS subject_connection,
         COALESCE(r.definition_id,w.definition_id,s.doc->'details'->>'definitionId') AS playbook_id,COALESCE(v.document->'provenance'->>'kind',wv.document->'provenance'->>'kind') AS mode,
@@ -129,6 +131,8 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
       FROM classified WHERE ($7::text IS NULL OR EXISTS(SELECT 1 FROM jsonb_array_elements(connections) c WHERE c->>'system'=$7)) AND ($8::uuid IS NULL OR EXISTS(SELECT 1 FROM jsonb_array_elements(connections) c WHERE c->>'id'=$8::text))
       AND ($9::text IS NULL OR type=$9) AND ($10::text IS NULL OR outcome=$10)
       AND ($11::text='' OR position(lower($11) in lower(concat_ws(' ',issue_id::text,resource,action,doc->'actor'->>'id',workflow_run_id)))>0)
+      AND ($13::text[] IS NULL OR issue_id::text=ANY($13) OR workflow_run_id=ANY($14) OR proposal_id::text=ANY($14)
+        OR (resource_kind='order' AND resource=ANY($15)))
       ORDER BY recorded_at DESC,id DESC LIMIT $12`,
           [
             context.tenantId,
@@ -143,6 +147,9 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
             query.outcome ?? null,
             query.q ?? '',
             query.limit + 1,
+            query.subjects?.issueIds ?? null,
+            query.subjects?.runIds ?? [],
+            query.subjects?.orderRefs ?? [],
           ],
         );
         const rows = result.rows.slice(0, query.limit);

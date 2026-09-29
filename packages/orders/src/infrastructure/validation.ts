@@ -16,6 +16,12 @@ const timestamp = z.string().datetime({ offset: true });
 
 const unit = z.string().min(1).max(64);
 
+const text = z.string().min(1).max(512);
+
+const money = z
+  .object({ amount: decimal, currency: z.string().regex(/^[A-Z]{3}$/) })
+  .strict();
+
 const base = z.object({
   schemaVersion: z.literal(1),
   entityId: uuid,
@@ -36,6 +42,8 @@ const line = z
     quantity: positive,
     cancelledQuantity: decimal.nullable(),
     unit,
+    skuCode: text.nullable().optional(),
+    title: text.nullable().optional(),
   })
   .strict()
   .refine(
@@ -50,6 +58,8 @@ const order = z
     type: z.literal('order'),
     displayNumber: z.string().nullable(),
     dueAt: timestamp.nullable().optional(),
+    placedAt: timestamp.nullable().optional(),
+    total: money.nullable().optional(),
     status: z.enum(['open', 'completed', 'cancelled', 'unknown']),
     paymentStatus: z.enum([
       'pending',

@@ -128,12 +128,16 @@ describe('JTL read adapter', () => {
               data: {
                 status: 'open',
                 paymentStatus: 'paid',
+                placedAt: '2026-09-12T09:15:00+02:00',
+                total: { amount: '107.1', currency: 'EUR' },
                 lines: [
                   {
                     id: { externalId: key(101), scopeKey: key(10) },
                     quantity: { amount: '3.5', unit: 'each' },
+                    skuCode: 'Mixed-Case-SKU',
+                    title: 'Rolled oats',
                   },
-                  { sku: null },
+                  { sku: null, skuCode: null, title: null },
                 ],
               },
             },
@@ -329,6 +333,30 @@ describe('JTL read adapter', () => {
       ok: true,
       value: {
         items: [{ data: { onHand: null, reserved: null, available: null } }],
+      },
+    });
+  });
+
+  it('treats malformed descriptive order facts as unknown without rejecting the order', async () => {
+    const f = fixture();
+    Object.assign(f.data.orders[0]!, {
+      salesOrderDate: '0001-01-01T00:00:00',
+      totalGrossAmount: 0.30000000000000004,
+    });
+    Object.assign(f.data.orderLines[0]!, { sKU: '   ', name: 42 });
+    expect(await f.read('orders.read')).toMatchObject({
+      ok: true,
+      value: {
+        items: [
+          {
+            data: {
+              status: 'open',
+              placedAt: null,
+              total: null,
+              lines: [{ skuCode: null, title: null }, {}],
+            },
+          },
+        ],
       },
     });
   });

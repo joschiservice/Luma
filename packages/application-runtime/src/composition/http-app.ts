@@ -28,6 +28,7 @@ import type {
   OperationalMetrics,
   OperationalSummary,
   OperationsOverviewService,
+  OrderWorkspace,
   PlaybookLibrary,
   RecordExplorer,
   ShadowService,
@@ -38,6 +39,7 @@ import {
   learningRoutes,
   metricRoutes,
   operationsRoutes,
+  orderRoutes,
   playbookRoutes,
   recordRoutes,
   registerDeskEvents,
@@ -88,6 +90,7 @@ export interface AppDependencies {
   metrics?: OperationalMetrics;
   operationalSummary?: OperationalSummary;
   records?: RecordExplorer;
+  orders?: OrderWorkspace;
   metricEvents?: MetricEvents;
   apps?: AppService;
   appRegistry?: AppRegistry;
@@ -326,6 +329,7 @@ export function buildApp(
         },
         connectorProviders: createConnectors(dependencies.providerCatalog),
         records: recordRoutes(dependencies.records),
+        orders: orderRoutes(dependencies.orders),
       },
       routerApp,
       {

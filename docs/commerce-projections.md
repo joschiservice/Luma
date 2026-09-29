@@ -36,6 +36,12 @@ operation rather than overwriting history.
 
 ## Projection rules
 
+Order snapshots can also carry `placedAt`, a source `total` with its currency, and
+line `skuCode` and `title`. These are descriptive source facts: SKU text never
+establishes SKU identity, and totals are never converted between currencies. They
+are optional so earlier snapshots stay valid; an order gains them with the next
+source update Luma reads.
+
 Only complete normalized object snapshots or explicit tombstones are accepted.
 Partial collection pages can supply complete individual objects; missing items in
 those pages never delete stored entities. Required nulls distinguish unknown
