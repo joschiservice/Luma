@@ -27,6 +27,7 @@ import {
   createOperationalMetrics,
   createOperationalSummary,
   createOperationsOverview,
+  createRecordExplorer,
   createResolutionLearning,
   createShadowEvaluations,
   createWorkspaceActivity,
@@ -88,6 +89,7 @@ export interface ApplicationServices {
     operations: ReturnType<typeof createOperationsOverview>;
     metrics: ReturnType<typeof createOperationalMetrics>;
     operationalSummary: ReturnType<typeof createOperationalSummary>;
+    records: ReturnType<typeof createRecordExplorer>;
   };
 }
 
@@ -261,6 +263,7 @@ export function createApplicationServices(
         detection.cases,
         createConnectionCoverage(database),
       ),
+      records: createRecordExplorer(database),
     },
   };
 }

@@ -176,6 +176,20 @@ Sandboxed Code Steps: `packages/workflows/src/domain/code-step.ts`, `application
 
 Draft tests: cases, validation and prefill live in `packages/workflows/src/domain/draft-test.ts`; step results in `domain/draft-test-presentation.ts`. `application/draft-tests.ts` runs the real `runProcess` with example activities and optional sandboxed Code Steps. Storage is `infrastructure/draft-tests.ts` with migration `0035_workflow_draft_tests.sql`; routes are `api/draft-tests.ts` and `packages/api-contract/src/contracts/draft-tests.ts`. Adapters add scenarios through `TestScenarioSource`; replenishment's are in `packages/procurement/src/application/replenishment-scenarios.ts`. Tests: `draft-test.test.ts`, `infrastructure/draft-tests.test.ts`, `draft-test-code.test.ts`, `packages/application-runtime/src/composition/draft-tests.test.ts` and `apps/api/e2e/workflow-draft-tests.e2e.mjs`. See [Test a draft](workflows.md#test-a-draft).
 
+## Shared record explorer
+
+Record search and detail reads use `packages/resolution/src/application/records.ts` and
+`infrastructure/record-explorer.ts`. The read model keeps current source snapshots
+separate and resolves issue subjects through tenant-scoped source mappings. The
+contract is `packages/api-contract/src/records.ts`; HTTP routing is
+`packages/resolution/src/api/records.ts`. The web explorer and deep links are in
+`apps/web/src/features/records`, with global search in
+`apps/web/src/features/identity/workspace-search.tsx`.
+
+Tests: `packages/application-runtime/src/commerce.integration.test.ts` and
+`apps/api/e2e/records.browser.mjs`. Migration `0037_record_explorer_reads.sql`
+grants the read model access to canonical identities and stock projections.
+
 ## Operational metrics
 
 Start with `packages/orders/src/domain/metrics.ts` for versioned definitions and

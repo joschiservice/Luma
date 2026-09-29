@@ -13,7 +13,10 @@ import type { IdentityService } from '@luma/identity';
 import { makeTenantContext } from '@luma/identity/composition';
 import { createOrderMetricReader } from '@luma/orders/composition';
 import { createTenantDatabase } from '@luma/platform/composition';
-import { createOperationalMetrics } from '@luma/resolution/composition';
+import {
+  createOperationalMetrics,
+  createRecordExplorer,
+} from '@luma/resolution/composition';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -185,6 +188,48 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
     await owner.query(
       'TRUNCATE connector_observations,connector_source_mappings,orders_entities,inventory_entities CASCADE',
     );
+  });
+  it('searches mapped records within one tenant and keeps differing source facts separate', async () => {
+    const first = await mapStock(stock({ amount: '3' }), 'explorer-left');
+    const second = await mapStock(
+      stock({ connectionId: secondConnection, amount: '5' }),
+      'explorer-right',
+    );
+    if (first.status === 'pending' || second.status === 'pending')
+      throw new Error('Stock projection did not complete');
+    expect(first.entityId).toBe(second.entityId);
+    const explorer = createRecordExplorer(createTenantDatabase(runtime));
+    const list = await explorer.list(context(), { q: '' });
+    expect(list.coverage).toEqual({
+      customer: 'unavailable',
+      return: 'unavailable',
+    });
+    const position = list.items.find((item) => item.kind === 'position');
+    expect(position).toMatchObject({
+      id: first.entityId,
+      coverage: 'projected',
+    });
+    expect(position?.sources.map((source) => source.connectionId)).toEqual(
+      expect.arrayContaining([connection, secondConnection]),
+    );
+    const scoped = await explorer.list(context(), {
+      q: '',
+      connectionId: secondConnection,
+    });
+    expect(
+      scoped.items.find((item) => item.kind === 'position')?.sources,
+    ).toMatchObject([{ connectionId: secondConnection }]);
+    const detail = await explorer.get(context(), 'position', first.entityId);
+    expect(
+      detail?.snapshots.map((snapshot) => snapshot.data.available),
+    ).toEqual(expect.arrayContaining(['3', '5']));
+    expect(detail?.links.some((link) => link.kind === 'sku')).toBe(true);
+    expect(await explorer.list(context(otherTenant), { q: '' })).toMatchObject({
+      items: [],
+    });
+    expect(
+      await explorer.get(context(otherTenant), 'position', first.entityId),
+    ).toBeNull();
   });
   it('reads product labels by mapped SKU with tenant isolation and latest product revisions', async () => {
     const db = createTenantDatabase(runtime);

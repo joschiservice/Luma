@@ -2,8 +2,14 @@ import { caseLabel } from '@luma/ui/components/issues/case-investigation';
 import { IssuePageLayout } from '@luma/ui/components/issues/issue-page-layout';
 import { Button } from '@luma/ui/components/primitives/button';
 import { useQuery } from '@tanstack/react-query';
-import { Link, useParams, useSearch } from '@tanstack/react-router';
-import { ArrowLeft, RefreshCw } from 'lucide-react';
+import {
+  Link,
+  useLocation,
+  useParams,
+  useSearch,
+} from '@tanstack/react-router';
+import { ArrowLeft, ArrowRight, RefreshCw } from 'lucide-react';
+import { z } from 'zod';
 
 import { connectionsOptions } from '../connections/data';
 import { IssueActions } from './actions';
@@ -35,6 +41,7 @@ function IssueWorkspace({
   const search = useSearch({
     from: '/app/$organizationId/exceptions_/$exceptionId/detail',
   });
+  const location = useLocation();
   const observation = useCaseObservation(organizationId, exceptionId);
   const connections = useQuery(connectionsOptions(organizationId));
   const item = observation.denied
@@ -45,14 +52,33 @@ function IssueWorkspace({
     <IssuePageLayout
       item={item}
       back={
-        <Link
-          to="/app/$organizationId/exceptions/$exceptionId"
-          params={{ organizationId, exceptionId }}
-          search={search}
-          aria-label="Back to issues"
-        >
-          <ArrowLeft size={16} aria-hidden="true" /> Issues
-        </Link>
+        <>
+          <Link
+            to="/app/$organizationId/exceptions/$exceptionId"
+            params={{ organizationId, exceptionId }}
+            search={search}
+            aria-label="Back to issues"
+          >
+            <ArrowLeft size={16} aria-hidden="true" /> Issues
+          </Link>
+          {item ? (
+            <Link
+              to="/app/$organizationId/records"
+              params={{ organizationId }}
+              search={{
+                q: item.subject.id,
+                connectionId: z.string().uuid().safeParse(item.subject.scope[0])
+                  .success
+                  ? item.subject.scope[0]
+                  : undefined,
+                from: `${location.pathname}${location.searchStr}`,
+              }}
+              aria-label="Find underlying records"
+            >
+              Find records <ArrowRight size={14} aria-hidden="true" />
+            </Link>
+          ) : null}
+        </>
       }
       refresh={
         <Button

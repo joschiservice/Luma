@@ -3,6 +3,7 @@ import {
   Activity,
   Blocks,
   ChartNoAxesColumn,
+  Database,
   House,
   Inbox,
   type LucideIcon,
@@ -23,7 +24,8 @@ export type DestinationPath =
   | 'workflows'
   | 'procurement'
   | 'apps'
-  | 'settings';
+  | 'settings'
+  | 'records';
 
 export type WorkspaceDestination = {
   path: DestinationPath;
@@ -54,6 +56,14 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
     description: 'Investigate and resolve issues',
     group: 'core',
     shortcut: 'i',
+  },
+  {
+    path: 'records',
+    label: 'Records',
+    Icon: Database,
+    description: 'Search orders, stock, fulfillments and related records',
+    group: 'core',
+    shortcut: 'r',
   },
   {
     path: 'activity',

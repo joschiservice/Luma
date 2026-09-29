@@ -16,7 +16,7 @@ import {
   DialogTitle,
 } from '@luma/ui/components/primitives/dialog';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
-import { Link } from '@tanstack/react-router';
+import { Link, useLocation } from '@tanstack/react-router';
 import {
   ArrowRight,
   Clock3,
@@ -41,11 +41,17 @@ export function OrderMetrics({ organizationId }: { organizationId: string }) {
 }
 
 function LiveOrderMetrics({ organizationId }: { organizationId: string }) {
+  const location = useLocation();
+  const restoredMetric = new URLSearchParams(location.searchStr).get('metric');
   const trigger = useRef<HTMLButtonElement>(null);
   const { query, request, setRequest, connection } =
     useLiveMetrics(organizationId);
-  const [selected, setSelected] = useState('orders.open');
-  const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState(
+    restoredMetric?.startsWith('orders.') ? restoredMetric : 'orders.open',
+  );
+  const [open, setOpen] = useState(
+    Boolean(restoredMetric?.startsWith('orders.')),
+  );
   const data =
     query.isError ||
     query.isPaused ||
@@ -338,6 +344,7 @@ function Cohort({
   metric: Metric;
   organizationId: string;
 }) {
+  const location = useLocation();
   if (!metric.items.length)
     return (
       <div className="order-cohort-empty">
@@ -357,6 +364,15 @@ function Cohort({
           <div>
             <strong>{order.displayNumber ?? 'Order without a number'}</strong>
             <code title={order.id}>{order.id}</code>
+            <Link
+              to="/app/$organizationId/records/$kind/$recordId"
+              params={{ organizationId, kind: 'order', recordId: order.id }}
+              search={{
+                from: `${location.pathname}?metric=${encodeURIComponent(metric.definition.id)}`,
+              }}
+            >
+              Inspect record <ArrowRight size={12} aria-hidden="true" />
+            </Link>
           </div>
           <div>
             {order.dueAt ? (

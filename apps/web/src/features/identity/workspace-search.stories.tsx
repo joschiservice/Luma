@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,
   createRootRoute,
@@ -12,6 +13,7 @@ import appStyles from '../../styles.css?inline';
 import { WorkspaceSearch } from './workspace-search';
 
 function SearchExample() {
+  const [client] = useState(() => new QueryClient());
   const [router] = useState(() =>
     createRouter({
       history: createMemoryHistory(),
@@ -26,7 +28,11 @@ function SearchExample() {
     }),
   );
 
-  return <RouterProvider router={router} />;
+  return (
+    <QueryClientProvider client={client}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>
+  );
 }
 
 const meta = {
@@ -46,7 +52,9 @@ export const Open: Story = {
       }),
     );
     const body = within(canvasElement.ownerDocument.body);
-    const input = await body.findByRole('textbox', { name: 'Search pages' });
+    const input = await body.findByRole('textbox', {
+      name: 'Search workspace',
+    });
     await waitFor(() => expect(input).toHaveFocus());
     await userEvent.keyboard('{ArrowDown}');
     await expect(body.getByRole('link', { name: /^Home/ })).toHaveFocus();

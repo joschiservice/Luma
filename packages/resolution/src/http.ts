@@ -13,3 +13,5 @@ export { shadowRoutes } from './api/shadow.js';
 export { metricRoutes } from './api/metrics.js';
 
 export { registerMetricEvents } from './api/metric-events.js';
+
+export { recordRoutes } from './api/records.js';

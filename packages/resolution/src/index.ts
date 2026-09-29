@@ -77,3 +77,5 @@ export type {
 } from './application/metric-events.js';
 
 export type { OperationalSummary } from './application/operational-summary.js';
+
+export type { RecordExplorer } from './application/records.js';

@@ -29,6 +29,7 @@ import type {
   OperationalSummary,
   OperationsOverviewService,
   PlaybookLibrary,
+  RecordExplorer,
   ShadowService,
 } from '@luma/resolution';
 import {
@@ -38,6 +39,7 @@ import {
   metricRoutes,
   operationsRoutes,
   playbookRoutes,
+  recordRoutes,
   registerDeskEvents,
   registerMetricEvents,
   shadowRoutes,
@@ -85,6 +87,7 @@ export interface AppDependencies {
   operations?: OperationsOverviewService;
   metrics?: OperationalMetrics;
   operationalSummary?: OperationalSummary;
+  records?: RecordExplorer;
   metricEvents?: MetricEvents;
   apps?: AppService;
   appRegistry?: AppRegistry;
@@ -322,6 +325,7 @@ export function buildApp(
           },
         },
         connectorProviders: createConnectors(dependencies.providerCatalog),
+        records: recordRoutes(dependencies.records),
       },
       routerApp,
       {
