@@ -291,3 +291,22 @@ are in `packages/api-contract/src/inventory.ts`; the frontend is
 Tests: `domain/inventory.test.ts`, `apps/api/e2e/inventory.e2e.mjs`,
 `inventory.browser.mjs` and `Inventory/Workspace` stories. See
 [Inventory workspace](inventory-workspace.md) for quantity and relationship semantics.
+
+## Commerce sync and history import
+
+Start at `packages/commerce-sync/src/domain/streams.ts` for scan planning, retry and
+status rules, `application/runner.ts` for page processing and link requests, and
+`application/service.ts` for the operator view. Persistence is
+`infrastructure/store.ts` and `infrastructure/identities.ts` with migration
+`0042_commerce_sync.sql`. Imports project through `ingestion.import`/`link`/`unlink` in
+`packages/commerce-ingestion/src/index.ts`; customer profiles live in
+`packages/customers`. Composition is
+`packages/application-runtime/src/composition/commerce-sync.ts`, started by
+`apps/worker/src/sync.ts`. Shopify change notifications enter through `changed` in
+`packages/apps/shopify/src/infrastructure/oauth.ts`. Contracts are
+`packages/api-contract/src/sync.ts`; the web feature is `apps/web/src/features/sync`
+(page, coverage note, SKU links on stock detail).
+
+Tests: commerce-sync domain tests, `commerce-sync.integration.test.ts`, Shopify adapter
+and privacy tests, `Data sync/Workspace` stories and the web sync presentation tests.
+See [Commerce sync](commerce-sync.md).
