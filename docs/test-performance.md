@@ -91,6 +91,10 @@ role and tenant-isolation coverage; migration tests still need fresh databases.
 
 ## Packages and further experiments
 
+The [package evaluation](test-package-evaluation.md) now records repeated
+benchmarks and compatibility checks for these options. It recommends keeping
+Vitest 4 and the existing E2E runner, and using Hyperfine for measurements.
+
 1. **Vitest 5:** its [release notes](https://vitest.dev/blog/vitest-5) describe
    `vitest doctor`, persistent module caching and Browser Mode improvements.
    Benchmark it in a separate dependency upgrade. Installed
