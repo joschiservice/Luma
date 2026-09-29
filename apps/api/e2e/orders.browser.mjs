@@ -81,6 +81,7 @@ it('finds an order by number or SKU, explains it and pages a historical import',
     fixture.member,
     `${fixture.base}/orders?q=tote-red`,
   );
+  expect(listed.totalCount).toBeNull();
   expect(listed.items.map((item) => item.id)).toEqual([tote]);
   await fixture.request(
     fixture.outsider,
@@ -122,6 +123,19 @@ it('finds an order by number or SKU, explains it and pages a historical import',
   page.setDefaultTimeout(15000);
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() !== 'error') return;
+    const url = message.location().url;
+    // The settings fixture omits app catalog and connection services used by the shell.
+    if (url.endsWith(`${fixture.base}/apps`) && message.text().includes('500'))
+      return;
+    if (
+      url.endsWith(`${fixture.base}/connections`) &&
+      message.text().includes('503')
+    )
+      return;
+    errors.push(`${url}: ${message.text()}`);
+  });
 
   // The G then O shortcut opens Orders from anywhere in the workspace.
   await page.goto(`/app/${fixture.org.id}/home`);
@@ -129,21 +143,24 @@ it('finds an order by number or SKU, explains it and pages a historical import',
   await page.keyboard.press('g');
   await page.keyboard.press('o');
   await page.getByRole('heading', { name: 'Orders', exact: true }).waitFor();
-  await page.getByText('1–50 of 153 orders').waitFor();
+  await page.getByText('1–50 orders').waitFor();
   await page.getByRole('button', { name: 'Next' }).click();
-  await page.getByText('51–100 of 153 orders').waitFor();
+  await page.getByText('51–100 orders').waitFor();
+  await page
+    .getByRole('navigation', { name: 'Order pages' })
+    .screenshot({ path: '/tmp/luma116-order-pagination.png' });
   expect(new URL(page.url()).searchParams.get('page')).toBe('2');
   await page.getByRole('button', { name: 'Previous' }).click();
-  await page.getByText('1–50 of 153 orders').waitFor();
+  await page.getByText('1–50 orders').waitFor();
 
   await page.getByRole('button', { name: 'Overdue', exact: true }).click();
-  await page.getByText('1–1 of 1 orders').waitFor();
+  await page.getByText('1–1 orders').waitFor();
   await page.getByRole('link', { name: '#2003' }).waitFor();
   await page.getByRole('button', { name: 'All orders' }).click();
 
   await page.getByRole('searchbox', { name: 'Search orders' }).fill('TOTE-red');
   await page.keyboard.press('Enter');
-  await page.getByText('1–1 of 1 orders').waitFor();
+  await page.getByText('1–1 orders').waitFor();
   await page.getByRole('link', { name: '#2001' }).click();
   await page.getByRole('heading', { name: '#2001', level: 1 }).waitFor();
   await page.getByRole('heading', { name: 'Current state' }).waitFor();
@@ -186,7 +203,7 @@ it('finds an order by number or SKU, explains it and pages a historical import',
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`/app/${fixture.org.id}/orders?sort=number&direction=asc`);
-  await page.getByText('1–50 of 153 orders').waitFor();
+  await page.getByText('1–50 orders').waitFor();
   expect(
     await page
       .getByRole('columnheader', { name: /Order/ })

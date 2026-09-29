@@ -17,6 +17,8 @@ export type OrderSort = 'updated' | 'placed' | 'number' | 'due';
 
 export interface OrderListQuery {
   q: string;
+  /** Request an exact total; omitted counts return null and avoid counting every match. */
+  count?: 'exact' | undefined;
   view: OrderView;
   status?: string | undefined;
   paymentStatus?: string | undefined;
@@ -70,7 +72,7 @@ export interface OrderListItem {
 
 export interface OrderList {
   items: OrderListItem[];
-  totalCount: number;
+  totalCount: number | null;
   nextCursor: string | null;
   asOf: string;
 }

@@ -257,7 +257,7 @@ export function OrdersView({
           {list.items.length ? (
             <Pagination
               count={list.items.length}
-              totalCount={list.totalCount}
+              totalCount={list.totalCount ?? undefined}
               page={search.page ?? 1}
               pageSize={orderPageSize}
               hasNext={!!next}

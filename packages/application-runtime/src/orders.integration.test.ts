@@ -4,10 +4,14 @@ import { readdir, readFile } from 'node:fs/promises';
 import { buildApp, createCommerceServices } from '@luma/application-runtime';
 import type { CommerceObservation } from '@luma/connections';
 import { createConnectionCoverage } from '@luma/connections/composition';
-import { orderAttentionQuery } from '@luma/exceptions/composition';
+import {
+  orderAttentionForOrders,
+  orderAttentionQuery,
+} from '@luma/exceptions/composition';
 import type { IdentityService } from '@luma/identity';
 import { makeTenantContext } from '@luma/identity/composition';
 import {
+  createOrderListRebuilder,
   createOrderMetricReader,
   orderStateQueries,
 } from '@luma/orders/composition';
@@ -31,6 +35,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
   const name = `orders_${randomUUID().replaceAll('-', '')}`;
   const admin = new Pool({ connectionString: databaseUrl });
   let owner: Pool,
+    writer: Pool,
     reader: Pool,
     services: ReturnType<typeof createCommerceServices>;
   const tenant = randomUUID(),
@@ -63,7 +68,11 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
   function workspace() {
     return createOrderWorkspace(
       createTenantDatabase(reader),
-      { state: orderStateQueries, attention: orderAttentionQuery },
+      {
+        state: orderStateQueries,
+        attention: orderAttentionQuery,
+        attentionFor: orderAttentionForOrders,
+      },
       createActivityStore,
       async (value) => value,
       () => clock,
@@ -272,6 +281,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
     url.password = password;
     url.username = `${name}_w`;
     services = createCommerceServices(url.toString());
+    writer = new Pool({ connectionString: url.toString() });
     url.username = `${name}_r`;
     reader = new Pool({ connectionString: url.toString() });
     for (const [tenantId, id, kind, label] of [
@@ -309,6 +319,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
   afterAll(async () => {
     await services?.close();
     await reader?.end();
+    await writer?.end();
     await owner?.end();
     await admin.query(`DROP DATABASE IF EXISTS "${name}"`);
     await admin.query(`DROP ROLE IF EXISTS "${name}_w"`);
@@ -470,6 +481,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
     const list = (query: Partial<Parameters<typeof orders.list>[1]> = {}) =>
       orders.list(context(), {
         q: '',
+        count: 'exact',
         view: 'all',
         sort: 'updated',
         direction: 'desc',
@@ -759,6 +771,377 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
     }
   }, 60000);
 
+  it('keeps short, Unicode and wildcard searches literal and source scoped', async () => {
+    const { a } = await seedWorkspace();
+    const special = await seedOrder({
+      connectionId: shopify,
+      external: 'literal-source',
+      key: 'literal',
+      updatedAt: '2026-09-19T11:00:00Z',
+      data: { displayNumber: 'Ä_%\\東京' },
+      lines: [
+        {
+          external: 'literal-line',
+          key: 'literal-line',
+          quantity: '1',
+          skuCode: 'ABCD',
+        },
+      ],
+    });
+    const list = (q: string, connectionId?: string) =>
+      workspace().list(context(), {
+        q,
+        connectionId,
+        view: 'all',
+        sort: 'updated',
+        direction: 'desc',
+        limit: 50,
+      });
+    for (const q of ['ä', '_', '%', '\\', '東京', 'BC', 'Ä_%\\東京'])
+      expect((await list(q)).items.map((x) => x.id)).toContain(special);
+    expect((await list('東京AB')).items).toEqual([]);
+    expect((await list('#1001', jtl)).items).toEqual([]);
+    expect((await list('jtl-item-77', shopify)).items).toEqual([]);
+    expect((await list('jtl-item-77', jtl)).items.map((x) => x.id)).toEqual([
+      a,
+    ]);
+    expect((await list(a.toUpperCase())).items.map((x) => x.id)).toEqual([a]);
+    expect((await list('')).totalCount).toBeNull();
+    await createTenantDatabase(reader).transaction(otherTenant, async (tx) => {
+      for (const table of [
+        'orders_list',
+        'orders_search_values',
+        'orders_search_links',
+        'orders_search_grams',
+        'orders_list_skus',
+        'connector_mapping_grams',
+      ])
+        expect(
+          (
+            await tx.query(`SELECT 1 FROM ${table} WHERE tenant_id=$1`, [
+              tenant,
+            ])
+          ).rowCount,
+        ).toBe(0);
+      await expect(
+        tx.query('DELETE FROM orders_list WHERE tenant_id=$1', [otherTenant]),
+      ).rejects.toThrow('permission denied');
+    });
+  });
+
+  it('indexes mapping-only aliases atomically without republishing orders', async () => {
+    const { a } = await seedWorkspace();
+    // Projection exposes connection identity on its snapshot.
+    const current = (await services.orders.current(context(), a)).find(
+      (p) => p.snapshot.connectionId === shopify,
+    )!;
+    const stored = await services.sources.get(
+      context(),
+      shopify,
+      current.snapshot.observationId,
+    );
+    const input = structuredClone(stored!);
+    if (input.capability !== 'orders.read') throw new Error('Expected order');
+    input.observation.id = randomUUID();
+    input.observation.data.lines[0]!.sku = {
+      externalId: 'new-alias-%',
+      scopeKey: '',
+    };
+    const source = {
+      ...input.observation.source,
+      resource: 'sku' as const,
+      externalId: 'new-alias-%',
+      scopeKey: '',
+    };
+    await services.sources.record(context(), input.observation.id, input);
+    const query = {
+      q: 'new-alias-%',
+      view: 'all' as const,
+      sort: 'updated' as const,
+      direction: 'desc' as const,
+      limit: 50,
+    };
+    expect((await workspace().list(context(), query)).items).toEqual([]);
+    await services.ingestion.bind(
+      context(),
+      source,
+      'tote',
+      input.observation.id,
+      'operator-confirmed',
+    );
+    expect(
+      (await workspace().list(context(), query)).items.map((x) => x.id),
+    ).toEqual([a]);
+    expect(
+      (await services.orders.current(context(), a)).find(
+        (p) => p.snapshot.connectionId === shopify,
+      )?.snapshotId,
+    ).toBe(current.snapshotId);
+  });
+
+  it('streams common source aliases without truncating broad search results', async () => {
+    const { a } = await seedWorkspace();
+    // Bulk alias evidence exercises the postings query beyond its 1,001-reference probe.
+    await owner.query(
+      `INSERT INTO connector_source_mappings(id,tenant_id,connection_id,resource,scope_key,external_id,canonical_id,observation_id,method,actor_id)
+      SELECT gen_random_uuid(),tenant_id,connection_id,resource,scope_key,'common-alias-'||n,canonical_id,observation_id,method,actor_id
+      FROM connector_source_mappings CROSS JOIN generate_series(1,1500) n
+      WHERE tenant_id=$1 AND canonical_id=$2 AND resource='order' AND connection_id=$3`,
+      [tenant, a, shopify],
+    );
+    await owner.query('ANALYZE connector_mapping_grams');
+    await owner.query('ANALYZE connector_source_mappings');
+    const query = {
+      q: 'common-alias',
+      view: 'all' as const,
+      sort: 'updated' as const,
+      direction: 'desc' as const,
+      limit: 50,
+    };
+    expect(
+      (await workspace().list(context(), query)).items.map((x) => x.id),
+    ).toEqual([a]);
+    expect(
+      (await workspace().list(context(), { ...query, q: 'common-alias-z' }))
+        .items,
+    ).toEqual([]);
+    expect(
+      (await workspace().list(context(), { ...query, connectionId: jtl }))
+        .items,
+    ).toEqual([]);
+  });
+
+  it('publishes search and state atomically, preserves replay and rejects stale snapshots', async () => {
+    const { a } = await seedWorkspace();
+    const current = (await services.orders.current(context(), a)).find(
+      (p) => p.snapshot.connectionId === shopify,
+    )!;
+    const updated = structuredClone(current.snapshot);
+    if (updated.data.type !== 'order') throw new Error('Expected order');
+    updated.normalizerVersion = 'test/search-v2';
+    updated.data.displayNumber = 'REPLACED';
+    expect(await services.orders.project(context(), updated)).toBe('applied');
+    expect(await services.orders.project(context(), updated)).toBe('duplicate');
+    const query = {
+      q: 'REPLACED',
+      view: 'all' as const,
+      sort: 'updated' as const,
+      direction: 'desc' as const,
+      limit: 50,
+    };
+    expect(
+      (await workspace().list(context(), query)).items.map((x) => x.id),
+    ).toEqual([a]);
+    expect(
+      (await workspace().list(context(), { ...query, q: '#1001' })).items,
+    ).toEqual([]);
+    const observation = structuredClone(
+      (await services.sources.get(
+        context(),
+        shopify,
+        current.snapshot.observationId,
+      ))!,
+    );
+    observation.observation.id = randomUUID();
+    await services.sources.record(
+      context(),
+      observation.observation.id,
+      observation,
+    );
+    const stale = {
+      ...updated,
+      observationId: observation.observation.id,
+      sourceUpdatedAt: '2020-01-01T00:00:00Z',
+      data: { ...updated.data, displayNumber: 'STALE' },
+    };
+    expect(await services.orders.project(context(), stale)).toBe('retained');
+    expect(await services.orders.project(context(), stale)).toBe('duplicate');
+    expect(
+      (await workspace().list(context(), { ...query, q: 'STALE' })).items,
+    ).toEqual([]);
+    await owner.query(
+      "ALTER TABLE orders_list ADD CONSTRAINT reject_test CHECK(display_number IS DISTINCT FROM 'reject-write')",
+    );
+    try {
+      await expect(
+        services.orders.project(context(), {
+          ...updated,
+          normalizerVersion: 'test/failed',
+          data: { ...updated.data, displayNumber: 'reject-write' },
+        }),
+      ).rejects.toThrow('reject_test');
+      expect(
+        (await services.orders.current(context(), a)).find(
+          (p) => p.snapshot.connectionId === shopify,
+        )?.snapshot.normalizerVersion,
+      ).toBe('test/search-v2');
+      expect(
+        (await services.orders.history(context(), a)).some(
+          (s) => s.normalizerVersion === 'test/failed',
+        ),
+      ).toBe(false);
+    } finally {
+      await owner.query('ALTER TABLE orders_list DROP CONSTRAINT reject_test');
+    }
+    const tombstone = {
+      ...updated,
+      normalizerVersion: 'test/tombstone',
+      deleted: true,
+    };
+    await services.orders.project(context(), tombstone);
+    const removed = await workspace().list(context(), {
+      ...query,
+      connectionId: shopify,
+    });
+    expect(removed.items[0]?.open).toBe(false);
+    expect(removed.items[0]?.differs).toBe(false);
+  });
+
+  it('serializes sibling fulfillments and evaluates future observations at read time', async () => {
+    const { c } = await seedWorkspace();
+    await Promise.all(
+      ['split-a', 'split-b'].map((external) =>
+        seedShipment({
+          connectionId: shopify,
+          order: 'gid://shopify/Order/1003',
+          external,
+          line: 'gid://shopify/LineItem/13',
+          quantity: '2',
+          status: 'shipped',
+        }),
+      ),
+    );
+    const query = {
+      q: c,
+      view: 'all' as const,
+      sort: 'updated' as const,
+      direction: 'desc' as const,
+      limit: 50,
+    };
+    expect(
+      (await workspace().list(context(), query)).items[0]?.fulfillment,
+    ).toBe('fulfilled');
+    const shipment = (
+      await owner.query<{ canonical_id: string }>(
+        "SELECT canonical_id FROM connector_source_mappings WHERE tenant_id=$1 AND external_id='split-b'",
+        [tenant],
+      )
+    ).rows[0]!.canonical_id;
+    const current = (await services.orders.current(context(), shipment))[0]!;
+    await services.orders.project(context(), {
+      ...current.snapshot,
+      normalizerVersion: 'test/future',
+      observedAt: '2026-09-22T00:00:00Z',
+    });
+    const before = (await workspace().list(context(), query)).items[0]!;
+    expect(before.fulfillment).toBe('partial');
+    expect(before.open).toBe(true);
+    expect(before.overdue).toBe(true);
+    clock = new Date('2026-09-23T00:00:00Z');
+    expect((await workspace().list(context(), query)).items[0]?.open).toBe(
+      false,
+    );
+  });
+
+  it('keeps legacy reads until the final backfill batch and repairs rows idempotently', async () => {
+    await seedWorkspace();
+    const query = {
+      q: '',
+      view: 'all' as const,
+      sort: 'updated' as const,
+      direction: 'desc' as const,
+      limit: 1,
+    };
+    const expected = await workspace().list(context(), {
+      ...query,
+      limit: 50,
+      count: 'exact',
+    });
+    await owner.query(
+      'INSERT INTO orders_list_backfill(tenant_id) VALUES($1)',
+      [tenant],
+    );
+    await owner.query('DELETE FROM orders_list WHERE tenant_id=$1', [tenant]);
+    expect(
+      await workspace().list(context(), {
+        ...query,
+        limit: 50,
+        count: 'exact',
+      }),
+    ).toEqual(expected);
+    const rebuild = createOrderListRebuilder(createTenantDatabase(writer));
+    let after = await rebuild(context(), undefined, 1);
+    expect(after).not.toBeNull();
+    expect(
+      (
+        await owner.query(
+          'SELECT 1 FROM orders_list_backfill WHERE tenant_id=$1',
+          [tenant],
+        )
+      ).rowCount,
+    ).toBe(1);
+    await expect(rebuild(context(), randomUUID(), 1)).rejects.toThrow(
+      'checkpoint',
+    );
+    const current = (
+      await services.orders.current(context(), expected.items[0]!.id)
+    )[0]!;
+    [after] = await Promise.all([
+      rebuild(context(), undefined, 1),
+      services.orders.project(context(), {
+        ...current.snapshot,
+        normalizerVersion: 'test/backfill-race',
+      }),
+    ]);
+    while (after) after = await rebuild(context(), after, 1);
+    expect(
+      (
+        await owner.query(
+          'SELECT 1 FROM orders_list_backfill WHERE tenant_id=$1',
+          [tenant],
+        )
+      ).rowCount,
+    ).toBe(0);
+    expect(
+      await workspace().list(context(), {
+        ...query,
+        limit: 50,
+        count: 'exact',
+      }),
+    ).toEqual(expected);
+    await rebuild(context());
+    expect(
+      await workspace().list(context(), {
+        ...query,
+        limit: 50,
+        count: 'exact',
+      }),
+    ).toEqual(expected);
+    const first = await workspace().list(context(), query);
+    const second = await workspace().list(context(), {
+      ...query,
+      cursor: first.nextCursor!,
+      count: 'exact',
+    });
+    expect(second.items[0]?.id).not.toBe(first.items[0]?.id);
+    expect(second.totalCount).toBe(3);
+    const removed = expected.items[0]!.id;
+    await owner.query(
+      'DELETE FROM orders_projections WHERE tenant_id=$1 AND entity_id=$2 AND connection_id=$3',
+      [tenant, removed, shopify],
+    );
+    await rebuild(context());
+    expect(
+      (
+        await workspace().list(context(), {
+          ...query,
+          q: removed,
+          connectionId: shopify,
+        })
+      ).items,
+    ).toEqual([]);
+  });
+
   it('pages a large import completely and in order', async () => {
     const count = Number(process.env.LUMA_ORDER_BENCHMARK ?? 2000);
     const { a } = await seedWorkspace();
@@ -813,10 +1196,18 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
         erp.document.observationId,
       ],
     );
+    await owner.query('ANALYZE');
+    const rebuildStart = performance.now();
+    const rebuild = createOrderListRebuilder(createTenantDatabase(writer));
+    let after: string | null | undefined;
+    do {
+      after = await rebuild(context(), after ?? undefined, 2000);
+    } while (after);
     // Production tables carry planner statistics; a bulk load needs them before plans are measured.
     await owner.query('ANALYZE');
     await owner.query('ANALYZE orders_projections');
     await owner.query('ANALYZE orders_snapshots');
+    const rebuildMs = Math.round(performance.now() - rebuildStart);
     const plans: Record<string, string> = {};
     let explain: string | null = null;
     const db = createTenantDatabase(reader);
@@ -829,8 +1220,17 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
             (tx) =>
               operation({
                 query: async (sql, values) => {
-                  if (explain && sql.startsWith('WITH order_sources'))
-                    plans[explain] = (
+                  if (
+                    explain &&
+                    (sql.startsWith('WITH future_sources') ||
+                      sql.startsWith('WITH order_sources') ||
+                      sql.startsWith('WITH search_grams'))
+                  )
+                    plans[
+                      sql.startsWith('WITH search_grams')
+                        ? `${explain}:candidates`
+                        : explain
+                    ] = (
                       await tx.query<{ 'QUERY PLAN': string }>(
                         'EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT) ' + sql,
                         values,
@@ -845,7 +1245,11 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
             options,
           ),
       },
-      { state: orderStateQueries, attention: orderAttentionQuery },
+      {
+        state: orderStateQueries,
+        attention: orderAttentionQuery,
+        attentionFor: orderAttentionForOrders,
+      },
       createActivityStore,
       async (value) => value,
       () => clock,
@@ -877,7 +1281,10 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
     const firstPage = await timed('first page, placed', (workspace) =>
       workspace.list(context(), query),
     );
-    expect(firstPage.totalCount).toBe(count + 3);
+    expect(firstPage.totalCount).toBeNull();
+    expect(
+      (await orders.list(context(), { ...query, count: 'exact' })).totalCount,
+    ).toBe(count + 3);
     // The default import is walked end to end; a benchmark import walks its first pages.
     const benchmark = !!process.env.LUMA_ORDER_BENCHMARK;
     const seen = new Set<string>();
@@ -921,13 +1328,113 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
     await timed('SKU search', (workspace) =>
       workspace.list(context(), { ...query, q: 'tote-red' }),
     );
+    await timed('connection page', (workspace) =>
+      workspace.list(context(), { ...query, connectionId: jtl }),
+    );
+    await timed('short search', (workspace) =>
+      workspace.list(context(), { ...query, q: '1' }),
+    );
+    await timed('exact count', (workspace) =>
+      workspace.list(context(), { ...query, count: 'exact' }),
+    );
+    // Jump to the middle using the same cursor context to verify a real deep keyset seek.
+    const middle = (
+      await owner.query<{ entity_id: string; placed_key: string }>(
+        'SELECT entity_id,placed_key FROM orders_list WHERE tenant_id=$1 AND selected ORDER BY placed_rank,placed_key,entity_id OFFSET $2 LIMIT 1',
+        [tenant, Math.floor(count / 2)],
+      )
+    ).rows[0]!;
+    const position = JSON.parse(
+      Buffer.from(firstPage.nextCursor!, 'base64url').toString(),
+    );
+    position.key = middle.placed_key;
+    position.id = middle.entity_id;
+    const deep = await timed('deep cursor', (workspace) =>
+      workspace.list(context(), {
+        ...query,
+        cursor: Buffer.from(JSON.stringify(position)).toString('base64url'),
+      }),
+    );
+    expect(deep.items).toHaveLength(100);
     await timed('detail', (workspace) => workspace.get(context(), a));
     if (process.env.LUMA_ORDER_BENCHMARK) {
       const { writeFile } = await import('node:fs/promises');
+      const storage = (
+        await owner.query(`SELECT relname,pg_total_relation_size(oid)::text AS bytes FROM pg_class
+        WHERE relnamespace='public'::regnamespace AND relkind='r' AND (relname LIKE 'orders_%' OR relname='connector_mapping_grams') ORDER BY relname`)
+      ).rows;
+      const existing = (await services.orders.current(context(), a))[0]!
+        .snapshot;
+      const writeStart = performance.now();
+      await services.orders.project(context(), {
+        ...existing,
+        normalizerVersion: 'benchmark/reindex',
+      });
+      timings['order update'] = Math.round(performance.now() - writeStart);
+      const writeDb = createTenantDatabase(writer);
+      const profiled = createCommerceServices({
+        transaction: (tenantId, operation, options) =>
+          writeDb.transaction(
+            tenantId,
+            (tx) =>
+              operation({
+                query: async (sql, values) => {
+                  if (
+                    sql.startsWith('WITH sources AS') ||
+                    sql.startsWith('WITH search_values AS') ||
+                    sql.startsWith('WITH inserted AS')
+                  ) {
+                    plans[`write:${sql.split('\n')[0]}`] = (
+                      await tx.query<{ 'QUERY PLAN': string }>(
+                        'EXPLAIN (ANALYZE,BUFFERS,FORMAT TEXT) ' + sql,
+                        values,
+                      )
+                    ).rows
+                      .map((row) => row['QUERY PLAN'])
+                      .join('\n');
+
+                    return { rows: [], rowCount: 0 };
+                  }
+
+                  return tx.query(sql, values);
+                },
+              }),
+            options,
+          ),
+      });
+      await profiled.orders.project(context(), {
+        ...existing,
+        normalizerVersion: 'benchmark/profile',
+      });
+      await profiled.close();
       await writeFile(
-        '/tmp/luma98-order-queries.json',
-        JSON.stringify({ orders: count + 3, timings, plans }, null, 2),
+        `/tmp/luma116-order-queries-${count}.json`,
+        JSON.stringify(
+          { orders: count + 3, rebuildMs, storage, timings, plans },
+          null,
+          2,
+        ),
+      );
+      expect(plans['first page, placed']).toMatch(
+        /Index (?:Only )?Scan(?: Backward)? using orders_list_placed/,
+      );
+      expect(plans['deep cursor']).toMatch(
+        /Index Cond:.*ROW\(placed_key, entity_id\)/,
+      );
+      expect(plans['SKU search']).toContain('orders_search_order');
+      expect(plans['SKU search']).not.toContain('hashed SubPlan');
+      expect(plans['write:WITH search_values AS MATERIALIZED (']).toContain(
+        'value_hash = v.value_hash',
+      );
+      expect(plans['write:WITH search_values AS MATERIALIZED (']).not.toContain(
+        'Seq Scan on orders_search_values',
+      );
+      expect(plans['number search:candidates']).not.toContain(
+        'Seq Scan on orders_search_values',
+      );
+      expect(plans['short search:candidates']).not.toContain(
+        'Seq Scan on orders_search_values',
       );
     }
-  }, 300000);
+  }, 1800000);
 });
