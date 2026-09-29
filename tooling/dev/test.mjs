@@ -45,8 +45,10 @@ try {
     throw new Error('Expected test, e2e, browser, simulator or full');
   const extraArgs = process.argv.slice(3);
   if (extraArgs.length) {
-    if (!['e2e', 'browser'].includes(suite))
-      throw new Error('Test arguments are supported only for e2e and browser');
+    if (!['test', 'e2e', 'browser'].includes(suite))
+      throw new Error(
+        'Test arguments are supported only for test, e2e and browser',
+      );
     commands.at(-1).push(...extraArgs);
   }
   let url = process.env.TEST_DATABASE_URL;

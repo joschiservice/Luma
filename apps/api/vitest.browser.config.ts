@@ -1,3 +1,5 @@
+import { availableParallelism } from 'node:os';
+
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
@@ -7,7 +9,11 @@ export default defineConfig({
     include: ['e2e/**/*.browser.mjs'],
     testTimeout: 120_000,
     hookTimeout: 30_000,
-    fileParallelism: false,
+    // Each file starts Chromium and a web server as well as its API fixtures.
+    maxWorkers: Math.min(
+      6,
+      Math.max(1, Math.floor(availableParallelism() / 2)),
+    ),
     sequence: { hooks: 'stack' },
   },
 });

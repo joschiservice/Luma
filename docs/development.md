@@ -132,11 +132,22 @@ a development or production database. Apply the same settings to that cluster fo
 comparable teardown times. CI uses the same Testcontainers path as
 local full checks. No fixed database or browser test ports are required.
 
-CI runs static checks and builds, main tests, backend E2E, and two browser shards
-in parallel. Each test job provisions its own PostgreSQL container. Turbo build
-results are cached between runs; tests always execute. To reproduce one browser
-shard, run `pnpm test:browser --shard=1/2` or `pnpm test:browser --shard=2/2`.
-Both E2E commands accept Vitest arguments, including file filters and `--shard`.
+CI runs static checks and builds, main tests, UI component tests, two backend E2E
+shards, four browser shards, simulator tests, and release evaluations in parallel.
+Database suites provision their own PostgreSQL container. Turbo build results are
+cached between runs; tests always execute. CI limits simultaneous Turbo tasks to
+the available CPU count and runs Storybook separately from the main tests.
+
+E2E suites use half the available CPUs, capped at four backend files or six browser
+files at once. Tests within a file remain sequential. On a two-CPU CI runner, each
+shard runs one file at a time.
+Both E2E commands accept Vitest arguments: use `pnpm test:browser --shard=1/4` to
+reproduce a browser shard, or `pnpm test:e2e --maxWorkers=1` for a sequential run.
+`pnpm run test` accepts Turbo arguments; CI uses `pnpm run test '--filter=!@luma/ui'`
+because the UI has its own job. Use the explicit `run` form with `--filter` so pnpm
+forwards the filter to the test runner. Plain `pnpm test` still includes UI tests.
+
+See [test performance](test-performance.md) for measurements and further options.
 
 For a fast check without containers, use `pnpm test:local`. Database integration
 suites skip if no test connection is supplied; backend and browser E2E require a

@@ -1,3 +1,5 @@
+import { availableParallelism } from 'node:os';
+
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
@@ -7,7 +9,11 @@ export default defineConfig({
     include: ['e2e/**/*.e2e.mjs'],
     testTimeout: 60_000,
     hookTimeout: 30_000,
-    fileParallelism: false,
+    // Each file provisions databases and processes; leave capacity for those services.
+    maxWorkers: Math.min(
+      4,
+      Math.max(1, Math.floor(availableParallelism() / 2)),
+    ),
     sequence: { hooks: 'stack' },
   },
 });

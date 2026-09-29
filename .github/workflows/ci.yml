@@ -14,6 +14,9 @@ jobs:
     name: ${{ matrix.name }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      # Package tasks each start their own workers; avoid ten tasks on two CPUs.
+      TURBO_CONCURRENCY: '100%'
     strategy:
       fail-fast: false
       matrix:
@@ -23,8 +26,12 @@ jobs:
             command: pnpm format:check && pnpm lint && pnpm typecheck && pnpm build
           - name: Main tests
             cache: tests
+            # Forward --filter to our database runner, not pnpm's recursive test shortcut.
+            command: pnpm run test --filter=!@luma/ui
+          - name: UI component tests
+            cache: ui
             browser: '@luma/ui'
-            command: pnpm test
+            command: pnpm exec turbo run test --filter=@luma/ui
           - name: Simulator integration and browser
             cache: simulator
             browser: '@luma/api'
@@ -32,17 +39,28 @@ jobs:
           - name: Playbook release evaluation
             cache: evaluation
             command: pnpm test:evaluation && pnpm evaluate:playbook && pnpm evaluate:code
-          - name: Backend E2E
-            cache: e2e
-            command: pnpm test:e2e
-          - name: Browser E2E (1/2)
+          - name: Backend E2E (1/2)
+            cache: e2e-1
+            command: pnpm test:e2e --shard=1/2
+          - name: Backend E2E (2/2)
+            cache: e2e-2
+            command: pnpm test:e2e --shard=2/2
+          - name: Browser E2E (1/4)
             cache: browser-1
             browser: '@luma/api'
-            command: pnpm test:browser --shard=1/2
-          - name: Browser E2E (2/2)
+            command: pnpm test:browser --shard=1/4
+          - name: Browser E2E (2/4)
             cache: browser-2
             browser: '@luma/api'
-            command: pnpm test:browser --shard=2/2
+            command: pnpm test:browser --shard=2/4
+          - name: Browser E2E (3/4)
+            cache: browser-3
+            browser: '@luma/api'
+            command: pnpm test:browser --shard=3/4
+          - name: Browser E2E (4/4)
+            cache: browser-4
+            browser: '@luma/api'
+            command: pnpm test:browser --shard=4/4
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -55,10 +73,12 @@ jobs:
         with:
           path: .turbo
           key: turbo-${{ runner.os }}-node24-${{ matrix.cache }}-${{ github.sha }}
-          restore-keys: turbo-${{ runner.os }}-node24-${{ matrix.cache }}-
+          restore-keys: |
+            turbo-${{ runner.os }}-node24-${{ matrix.cache }}-
+            turbo-${{ runner.os }}-node24-
       - if: matrix.browser
         run: pnpm --filter '${{ matrix.browser }}' exec playwright install --with-deps chromium
-      - if: matrix.cache != 'builds'
+      - if: matrix.cache != 'builds' && matrix.cache != 'ui'
         run: pnpm setup:code
       - run: ${{ matrix.command }}
       - uses: actions/upload-artifact@v4
