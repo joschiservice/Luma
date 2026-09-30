@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { AppRegistry, AppService } from '@luma/app-host';
 import {
   type AppFactory,
+  type AppFactoryContext,
   createAppRegistry,
   createAppService,
 } from '@luma/app-host';
@@ -34,6 +35,7 @@ export function createAppHost(
     refreshContext: InstallationDependencies['refreshContext'];
     env?: Readonly<Record<string, string | undefined>>;
     factories?: readonly AppFactory[];
+    simulation?: AppFactoryContext['simulation'];
   },
 ): {
   registry: AppRegistry;
@@ -57,6 +59,7 @@ export function createAppHost(
       factory({
         database,
         cipher,
+        ...(options.simulation ? { simulation: options.simulation } : {}),
         refreshContext: options.refreshContext,
         env: options.env ?? process.env,
         requireInstalled: (context, appId) =>

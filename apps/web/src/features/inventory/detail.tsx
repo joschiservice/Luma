@@ -13,6 +13,8 @@ import { Link, useParams, useSearch } from '@tanstack/react-router';
 import { ArrowLeft, RefreshCw } from 'lucide-react';
 import type { ReactNode } from 'react';
 
+import { appsOptions } from '../apps/data';
+import { AppExtension } from '../apps/extension';
 import { SignInRedirect } from '../identity/common';
 import { IdentityError } from '../identity/data';
 import { IdentityLinks } from '../sync/identity-links';
@@ -27,6 +29,7 @@ export function StockPage() {
   const search = useSearch({
     from: '/app/$organizationId/inventory/$positionId',
   });
+  const apps = useQuery(appsOptions(organizationId));
   const query = useQuery(stockOptions(organizationId, positionId));
   if (query.error instanceof IdentityError && query.error.status === 401)
     return <SignInRedirect />;
@@ -41,6 +44,22 @@ export function StockPage() {
       refreshing={query.isFetching}
       offline={query.isPaused}
       refresh={() => void query.refetch()}
+      correction={
+        query.data &&
+        apps.data?.installations.some(
+          (app) => app.appId === 'shopify' && app.status === 'installed',
+        ) ? (
+          <AppExtension
+            appId="shopify"
+            organizationId={organizationId}
+            slot="inventory"
+            inventory={{ positionId }}
+            done={async () => {
+              await query.refetch();
+            }}
+          />
+        ) : null
+      }
       identity={
         query.data ? (
           <IdentityLinks
@@ -65,6 +84,7 @@ export function StockDetailView({
   offline = false,
   refresh,
   identity,
+  correction,
 }: {
   organizationId: string;
   search?: InventorySearch;
@@ -76,6 +96,8 @@ export function StockDetailView({
   refresh: () => void;
   /** The sources behind this SKU and link controls. */
   identity?: ReactNode;
+  /** Installed provider correction controls for this stock position. */
+  correction?: ReactNode;
 }) {
   const position = detail?.position;
 
@@ -219,6 +241,7 @@ export function StockDetailView({
               },
             ]}
           />
+          {correction}
           <div className="inventory-context-grid">
             <Card className="inventory-section">
               <h2>Orders with this SKU</h2>

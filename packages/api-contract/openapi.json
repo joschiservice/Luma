@@ -64244,6 +64244,7 @@
                                 "orders.read",
                                 "products.read",
                                 "inventory.read",
+                                "inventory.available.reconcile",
                                 "fulfillment.read",
                                 "fulfillment.hold.release",
                                 "fulfillment.open",
@@ -64262,6 +64263,7 @@
                                 "orders.read",
                                 "products.read",
                                 "inventory.read",
+                                "inventory.available.reconcile",
                                 "fulfillment.read",
                                 "fulfillment.hold.release",
                                 "fulfillment.open",
@@ -64735,6 +64737,7 @@
                         "orders.read",
                         "products.read",
                         "inventory.read",
+                        "inventory.available.reconcile",
                         "fulfillment.read",
                         "fulfillment.hold.release",
                         "fulfillment.open",
@@ -64745,7 +64748,7 @@
                       ]
                     },
                     "minItems": 1,
-                    "maxItems": 10
+                    "maxItems": 16
                   },
                   "credentials": {
                     "type": "object",
@@ -64829,6 +64832,7 @@
                           "orders.read",
                           "products.read",
                           "inventory.read",
+                          "inventory.available.reconcile",
                           "fulfillment.read",
                           "fulfillment.hold.release",
                           "fulfillment.open",
@@ -64847,6 +64851,7 @@
                           "orders.read",
                           "products.read",
                           "inventory.read",
+                          "inventory.available.reconcile",
                           "fulfillment.read",
                           "fulfillment.hold.release",
                           "fulfillment.open",
@@ -65370,6 +65375,7 @@
                           "orders.read",
                           "products.read",
                           "inventory.read",
+                          "inventory.available.reconcile",
                           "fulfillment.read",
                           "fulfillment.hold.release",
                           "fulfillment.open",
@@ -65388,6 +65394,7 @@
                           "orders.read",
                           "products.read",
                           "inventory.read",
+                          "inventory.available.reconcile",
                           "fulfillment.read",
                           "fulfillment.hold.release",
                           "fulfillment.open",
@@ -65927,6 +65934,7 @@
                           "orders.read",
                           "products.read",
                           "inventory.read",
+                          "inventory.available.reconcile",
                           "fulfillment.read",
                           "fulfillment.hold.release",
                           "fulfillment.open",
@@ -65945,6 +65953,7 @@
                           "orders.read",
                           "products.read",
                           "inventory.read",
+                          "inventory.available.reconcile",
                           "fulfillment.read",
                           "fulfillment.hold.release",
                           "fulfillment.open",
@@ -66469,6 +66478,7 @@
                           "orders.read",
                           "products.read",
                           "inventory.read",
+                          "inventory.available.reconcile",
                           "fulfillment.read",
                           "fulfillment.hold.release",
                           "fulfillment.open",
@@ -66487,6 +66497,7 @@
                           "orders.read",
                           "products.read",
                           "inventory.read",
+                          "inventory.available.reconcile",
                           "fulfillment.read",
                           "fulfillment.hold.release",
                           "fulfillment.open",
@@ -66961,7 +66972,8 @@
                                 "app-settings",
                                 "page",
                                 "record",
-                                "customers"
+                                "customers",
+                                "inventory"
                               ]
                             }
                           },

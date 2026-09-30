@@ -11,6 +11,7 @@ export const capabilities: Record<InstallationCapability, string> = {
   'orders.read': 'Read orders',
   'products.read': 'Read products',
   'inventory.read': 'Read inventory',
+  'inventory.available.reconcile': 'Reconcile Shopify available stock',
   'fulfillment.read': 'Read fulfillment',
   'fulfillment.hold.release': 'Release a fulfillment hold',
   'fulfillment.open': 'Reopen fulfillment',

@@ -55,6 +55,7 @@ export function AppExtension({
   connection,
   record,
   customer,
+  inventory,
   done,
 }: {
   appId: string;
@@ -63,6 +64,7 @@ export function AppExtension({
   connection?: InstalledConnection;
   record?: AppUiProps['record'];
   customer?: AppUiProps['customer'];
+  inventory?: AppUiProps['inventory'];
   done: () => Promise<void>;
 }) {
   const state = useQuery(appsOptions(organizationId));
@@ -74,11 +76,14 @@ export function AppExtension({
       install: (input) => installConnection(organizationId, input),
       rotate: (current, credentials) =>
         changeConnection(organizationId, current, 'rotate', credentials),
-      error: connectionError,
+      error: (error) =>
+        slot === 'inventory' && error instanceof IdentityError && error.code
+          ? error.message
+          : connectionError(error),
       uncertain: (error) =>
         !(error instanceof IdentityError) ||
         error.status >= 500 ||
-        error.status === 409,
+        (slot !== 'inventory' && error.status === 409),
       async request(path, body) {
         if (!/^[a-z0-9-]+$/.test(path))
           throw new Error('Invalid app operation');
@@ -92,12 +97,16 @@ export function AppExtension({
             body: JSON.stringify(body),
           },
         );
-        if (!response.ok) throw new IdentityError(response.status);
+        if (!response.ok)
+          throw new IdentityError(
+            response.status,
+            await response.json().catch(() => undefined),
+          );
 
         return response.json();
       },
     }),
-    [organizationId, appId],
+    [organizationId, appId, slot],
   );
   if (state.isPending) return <p role="status">Loading app…</p>;
   if (state.error) return <p role="alert">{connectionError(state.error)}</p>;
@@ -111,7 +120,7 @@ export function AppExtension({
 
   return (
     <ExtensionBoundary
-      key={`${session.data?.sessionId ?? ''}/${organizationId}/${appId}/${slot}/${customer?.connectionId ?? ''}/${customer?.id ?? ''}/${record?.connectionId ?? ''}/${record?.externalId ?? ''}`}
+      key={`${session.data?.sessionId ?? ''}/${organizationId}/${appId}/${slot}/${customer?.connectionId ?? ''}/${customer?.id ?? ''}/${record?.connectionId ?? ''}/${record?.externalId ?? ''}/${inventory?.positionId ?? ''}`}
     >
       <Suspense fallback={<p role="status">Loading app…</p>}>
         {createElement(Extension, {
@@ -120,6 +129,7 @@ export function AppExtension({
           connection,
           record,
           customer,
+          inventory,
           done,
           services,
         })}

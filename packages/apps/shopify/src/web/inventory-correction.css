@@ -1,0 +1,40 @@
+.shopify-stock-correction {
+  margin-block: var(--content-section-gap);
+}
+.shopify-stock-content,
+.shopify-stock-review {
+  display: grid;
+  gap: var(--content-gap);
+}
+.shopify-stock-sources {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: var(--content-gap);
+}
+.shopify-stock-sources label,
+.shopify-stock-review label {
+  display: grid;
+  gap: var(--content-related-gap);
+}
+.shopify-stock-location,
+.shopify-stock-change,
+.shopify-stock-controls,
+.shopify-stock-stages {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--content-gap);
+}
+.shopify-stock-stages {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.shopify-stock-change {
+  font-variant-numeric: tabular-nums;
+}
+
+.shopify-stock-content dd {
+  margin-inline-start: 0;
+  overflow-wrap: anywhere;
+}

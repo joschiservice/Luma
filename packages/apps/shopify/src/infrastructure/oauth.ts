@@ -260,6 +260,7 @@ export function createShopifyOAuth(
 
   const requestedScopes = [
     ...shopifyScopes,
+    'write_inventory',
     'write_merchant_managed_fulfillment_orders',
     'write_third_party_fulfillment_orders',
     'read_returns',
@@ -434,6 +435,7 @@ export function createShopifyOAuth(
           label: attempt.label,
           permissions: [
             ...permissions,
+            'inventory.available.reconcile',
             'fulfillment.hold.release',
             'fulfillment.open',
             'fulfillment.move',

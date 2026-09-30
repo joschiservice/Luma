@@ -10,6 +10,8 @@ export interface ShopifyState {
   nodes: Record<string, Node>;
   roots: { orders: string[]; products: string[]; inventoryItems: string[] };
   children: Record<string, Record<string, string[]>>;
+  /** Durable provider idempotency receipts, retained when the simulator run is restored. */
+  inventoryCorrections?: Record<string, { input: string; receipt: unknown }>;
 }
 
 /** Restores total quantities in saved simulator graphs created before this field was stored. */
@@ -241,24 +243,36 @@ export function command(
 export function identify(request: ProviderRequest) {
   const body = JSON.parse(request.body ?? '{}') as {
     query?: string;
-    variables?: { id?: string };
+    variables?: {
+      id?: string;
+      input?: { quantities?: { inventoryItemId?: string }[] };
+    };
   };
   const query = body.query ?? '';
+  const resource =
+    body.variables?.id ??
+    body.variables?.input?.quantities?.[0]?.inventoryItemId;
 
   return {
-    operation: /fulfillment|Fulfillment/.test(query)
-      ? 'fulfillment.read'
-      : /on Product|page:\s*products/.test(query)
-        ? 'products.read'
-        : /on InventoryItem|page:\s*inventoryItems/.test(query)
-          ? 'inventory.read'
-          : 'orders.read',
-    ...(body.variables?.id ? { resource: body.variables.id } : {}),
+    operation: query.includes('inventorySetQuantities')
+      ? 'inventory.available.reconcile'
+      : /fulfillment|Fulfillment/.test(query)
+        ? 'fulfillment.read'
+        : /on Product|page:\s*products/.test(query)
+          ? 'products.read'
+          : /on InventoryItem|page:\s*inventoryItems/.test(query)
+            ? 'inventory.read'
+            : 'orders.read',
+    ...(resource ? { resource } : {}),
   };
 }
 
-/** Handles the connector's named GraphQL read queries and nested cursor pagination. */
-export function handle(state: ShopifyState, request: ProviderRequest) {
+/** Handles named reads and idempotent inventory CAS; uses the supplied simulator clock for writes. */
+export function handle(
+  state: ShopifyState,
+  request: ProviderRequest,
+  time = Date.now(),
+) {
   if (
     request.method !== 'POST' ||
     !new URL(request.url).pathname.endsWith('/admin/api/2026-07/graphql.json')
@@ -267,7 +281,24 @@ export function handle(state: ShopifyState, request: ProviderRequest) {
   if (!request.headers['x-shopify-access-token']) return json({}, 401);
   const { query = '', variables = {} } = JSON.parse(request.body ?? '{}') as {
     query?: string;
-    variables?: { id?: string; first?: number; after?: string | null };
+    variables?: {
+      id?: string;
+      first?: number;
+      after?: string | null;
+      locationId?: string;
+      key?: string;
+      input?: {
+        name?: string;
+        reason?: string;
+        referenceDocumentUri?: string;
+        quantities?: {
+          inventoryItemId?: string;
+          locationId?: string;
+          changeFromQuantity?: number;
+          quantity?: number;
+        }[];
+      };
+    };
   };
   const result = (data: unknown) => ({
     ...json({ data }),
@@ -282,7 +313,9 @@ export function handle(state: ShopifyState, request: ProviderRequest) {
       'products',
       'inventory',
       'merchant_managed_fulfillment_orders',
-    ].map((s) => ({ handle: `read_${s}` })),
+    ]
+      .map((s) => ({ handle: `read_${s}` }))
+      .concat([{ handle: 'write_inventory' }]),
   };
   if (query.includes('VerifyInstallation'))
     return result({
@@ -338,6 +371,115 @@ export function handle(state: ShopifyState, request: ProviderRequest) {
     return root
       ? result({ page: page(state.roots[root], variables.first ?? 100) })
       : json({ errors: [{ message: 'Unsupported query' }] }, 400);
+  }
+  if (query.includes('LumaInventoryCorrection')) {
+    const error = (code: string) =>
+      result({
+        result: {
+          inventoryAdjustmentGroup: null,
+          userErrors: [
+            {
+              code,
+              field: ['quantities'],
+              message: 'Stock correction refused',
+            },
+          ],
+        },
+      });
+    if (query.startsWith('mutation')) {
+      const input = variables.input,
+        quantity = input?.quantities?.[0],
+        key = variables.key;
+      if (
+        !key ||
+        input?.name !== 'available' ||
+        input.reason !== 'correction' ||
+        input.quantities?.length !== 1 ||
+        !quantity?.inventoryItemId ||
+        !quantity.locationId ||
+        !Number.isInteger(quantity.changeFromQuantity) ||
+        !Number.isInteger(quantity.quantity) ||
+        quantity.quantity === undefined ||
+        quantity.quantity < 0
+      )
+        return error('INVALID_QUANTITY');
+      const previous = state.inventoryCorrections?.[key];
+      const serialized = JSON.stringify(input);
+      if (previous)
+        return previous.input === serialized
+          ? result(previous.receipt)
+          : error('IDEMPOTENCY_KEY_CONFLICT');
+      const item = state.nodes[quantity.inventoryItemId];
+      const levels =
+        state.children[quantity.inventoryItemId]?.inventoryLevels ?? [];
+      const level = levels
+        .map((id) => state.nodes[id]!)
+        .find(
+          (node) =>
+            (node.location as { id: string }).id === quantity.locationId,
+        );
+      if (!item?.tracked || !level)
+        return error('ITEM_NOT_STOCKED_AT_LOCATION');
+      const values = level.quantities as { name: string; quantity: number }[];
+      const available = values.find((value) => value.name === 'available');
+      if (!available || available.quantity !== quantity.changeFromQuantity)
+        return error('CHANGE_FROM_QUANTITY_STALE');
+      const delta = quantity.quantity - available.quantity;
+      available.quantity = quantity.quantity;
+      const onHand = values.find((value) => value.name === 'on_hand');
+      if (onHand) onHand.quantity += delta;
+      level.updatedAt = new Date(time).toISOString();
+      const receipt = {
+        result: {
+          inventoryAdjustmentGroup: {
+            reason: 'correction',
+            referenceDocumentUri: input.referenceDocumentUri ?? null,
+            changes: [
+              {
+                name: 'available',
+                delta,
+                quantityAfterChange: available.quantity,
+              },
+            ],
+          },
+          userErrors: [],
+        },
+      };
+      state.inventoryCorrections ??= {};
+      state.inventoryCorrections[key] = { input: serialized, receipt };
+
+      return { ...result(receipt), committed: true };
+    }
+    const item = variables.id ? state.nodes[variables.id] : undefined;
+    const levels = variables.id
+      ? (state.children[variables.id]?.inventoryLevels ?? [])
+      : [];
+    const level = levels
+      .map((id) => state.nodes[id]!)
+      .find(
+        (node) => (node.location as { id: string }).id === variables.locationId,
+      );
+
+    return result({
+      node: item
+        ? {
+            ...item,
+            inventoryLevel: level
+              ? {
+                  ...level,
+                  location: {
+                    id: variables.locationId,
+                    name: 'Simulator warehouse',
+                    isActive: true,
+                  },
+                  quantities: (
+                    level.quantities as { name: string; quantity: number }[]
+                  ).filter((value) => value.name === 'available'),
+                }
+              : null,
+          }
+        : null,
+    });
   }
   const node = variables.id ? state.nodes[variables.id] : undefined;
   if (!node) return result({ node: null });

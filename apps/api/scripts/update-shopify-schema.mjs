@@ -55,6 +55,7 @@ const fields = {
     'fulfillmentOrderReleaseHold',
     'fulfillmentOrderOpen',
     'fulfillmentOrderMove',
+    'inventorySetQuantities',
   ],
   Shop: ['id', 'myshopifyDomain'],
   AppInstallation: ['id', 'accessScopes'],
@@ -99,11 +100,16 @@ const fields = {
     'id',
     'tracked',
     'inventoryLevels',
+    'inventoryLevel',
     'updatedAt',
     'sku',
     'variant',
   ],
   InventoryLevel: ['id', 'updatedAt', 'location', 'quantities'],
+  InventorySetQuantitiesPayload: ['inventoryAdjustmentGroup', 'userErrors'],
+  InventorySetQuantitiesUserError: ['field', 'message', 'code'],
+  InventoryAdjustmentGroup: ['id', 'reason', 'referenceDocumentUri', 'changes'],
+  InventoryChange: ['name', 'delta', 'quantityAfterChange'],
   InventoryQuantity: ['id', 'name', 'quantity'],
   Location: ['id', 'name', 'isActive'],
   FulfillmentOrder: [
@@ -259,7 +265,13 @@ function include(name) {
 
 for (const name of Object.keys(fields)) include(name);
 
-const document = `# Generated from ${source}\n# Adapter surface only; regenerate with scripts/update-shopify-schema.mjs.\nschema { query: QueryRoot mutation: Mutation }\n\n${[...definitions.values()].map(print).join('\n\n')}\n`;
+const idempotent = schema.getDirective('idempotent');
+if (!idempotent) throw new Error('Missing Shopify idempotency directive');
+for (const argument of idempotent.args)
+  include(String(argument.type).replace(/[![\]]/g, ''));
+const directiveDefinition = `directive @idempotent(${idempotent.args.map((argument) => `${argument.name}: ${argument.type}`).join(', ')}) on ${idempotent.locations.join(' | ')}`;
+
+const document = `# Generated from ${source}\n# Adapter surface only; regenerate with scripts/update-shopify-schema.mjs.\nschema { query: QueryRoot mutation: Mutation }\n${directiveDefinition}\n\n${[...definitions.values()].map(print).join('\n\n')}\n`;
 
 assertValidSchema(buildSchema(document));
 

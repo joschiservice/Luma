@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 
-import { command, handle, seed } from './index.js';
+import { command, handle, seed, stock } from './index.js';
 
 it('maintains independent Shopify resources and cursor pages', () => {
   const state = seed(0);
@@ -41,4 +41,45 @@ it('maintains independent Shopify resources and cursor pages', () => {
     { remainingQuantity: 0, totalQuantity: 3 },
   );
   expect(other.roots.orders).toEqual([]);
+});
+
+it('persists inventory CAS receipts and refuses concurrent changes without overwriting them', () => {
+  const state = seed(Date.now());
+  const input = {
+    name: 'available',
+    reason: 'correction',
+    referenceDocumentUri: 'luma://test',
+    quantities: [
+      {
+        inventoryItemId: 'gid://shopify/InventoryItem/1',
+        locationId: 'gid://shopify/Location/1',
+        changeFromQuantity: 100,
+        quantity: 90,
+      },
+    ],
+  };
+  const request = (key: string, quantity = 90) => ({
+    url: 'https://test.myshopify.com/admin/api/2026-07/graphql.json',
+    method: 'POST',
+    headers: { 'x-shopify-access-token': 'synthetic' },
+    body: JSON.stringify({
+      query: 'mutation LumaInventoryCorrection { inventorySetQuantities }',
+      variables: {
+        key,
+        input: { ...input, quantities: [{ ...input.quantities[0], quantity }] },
+      },
+    }),
+  });
+  const first = handle(state, request('one'));
+  expect(first.body).toMatchObject({ data: { result: { userErrors: [] } } });
+  const restored = JSON.parse(JSON.stringify(state));
+  expect(handle(restored, request('one')).body).toEqual(first.body);
+  expect(stock(restored).available).toBe(90);
+  expect(handle(restored, request('two')).body).toMatchObject({
+    data: { result: { userErrors: [{ code: 'CHANGE_FROM_QUANTITY_STALE' }] } },
+  });
+  expect(handle(restored, request('one', 80)).body).toMatchObject({
+    data: { result: { userErrors: [{ code: 'IDEMPOTENCY_KEY_CONFLICT' }] } },
+  });
+  expect(stock(restored).available).toBe(90);
 });

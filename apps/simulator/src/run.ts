@@ -40,6 +40,7 @@ export const faultSchema = z
       'products.read',
       'items.read',
       'inventory.read',
+      'inventory.available.reconcile',
       'fulfillment.read',
       'orders.shipping-method.read',
       'orders.shipping-method.write',
@@ -55,13 +56,17 @@ export const faultSchema = z
     if (
       (f.kind === 'response-loss') !== (f.phase === 'after-commit') ||
       (f.kind === 'response-loss' &&
-        (f.instance !== 'jtl' ||
-          f.operation !== 'orders.shipping-method.write'))
+        !(
+          (f.instance === 'jtl' &&
+            f.operation === 'orders.shipping-method.write') ||
+          (f.instance === 'shopify' &&
+            f.operation === 'inventory.available.reconcile')
+        ))
     )
       ctx.addIssue({
         code: 'custom',
         message:
-          'Response loss requires a JTL shipping-method write after commit',
+          'Response loss requires a supported JTL shipping-method or Shopify inventory write after commit',
       });
   });
 
@@ -229,7 +234,7 @@ export function dispatch(
   const response =
     instance === 'jtl'
       ? jtl.handle(run.jtl, request, run.clock.now)
-      : shopify.handle(run.shopify, request);
+      : shopify.handle(run.shopify, request, run.clock.now);
   if ('committed' in response && response.committed) {
     journal(
       run.clock,
