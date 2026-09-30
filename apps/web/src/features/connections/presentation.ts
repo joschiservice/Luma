@@ -12,6 +12,9 @@ export const capabilities: Record<InstallationCapability, string> = {
   'products.read': 'Read products',
   'inventory.read': 'Read inventory',
   'fulfillment.read': 'Read fulfillment',
+  'fulfillment.hold.release': 'Release a fulfillment hold',
+  'fulfillment.open': 'Reopen fulfillment',
+  'fulfillment.move': 'Move fulfillment',
   'orders.shipping-method.read': 'Read shipping method',
   'orders.shipping-method.write': 'Correct shipping method',
 };

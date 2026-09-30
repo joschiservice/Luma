@@ -55,3 +55,11 @@ Validate with `pnpm --filter @luma/app-shopify test` and the
 Provider references: [Order](https://shopify.dev/docs/api/admin-graphql/2026-07/objects/Order),
 [FulfillmentOrder](https://shopify.dev/docs/api/admin-graphql/2026-07/objects/FulfillmentOrder),
 [protected customer data](https://shopify.dev/docs/apps/launch/protected-customer-data).
+
+## Fulfillment recovery
+
+Owners and admins can preview an exact hold release, reopening or move from a
+fulfillment order. Another administrator approves it before Action Admission
+executes it. Mutation acceptance and independently observed fulfillment progress
+remain distinct. See [Shopify fulfillment recovery](../../../docs/shopify-fulfillment-recovery.md)
+for claims, retries, scope requirements and validation.

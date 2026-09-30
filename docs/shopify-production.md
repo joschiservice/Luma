@@ -9,19 +9,22 @@ app credentials, databases and encryption keys.
 Use the development store `luma-dev-store-1dmrgwsn.myshopify.com` for synthetic
 smoke tests. There is no production deployment or approved public app yet.
 
-| Setting                    | Value                                                                                                                                               |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Distribution               | Public distribution for unrelated merchants; select before requesting protected data                                                                |
-| Embedded app               | Off                                                                                                                                                 |
-| App URL                    | The public HTTPS Luma web origin (development: the running tunnel)                                                                                  |
-| Allowed redirection URL    | `https://<luma-host>/api/v1/shopify/callback` (exact match)                                                                                         |
-| Installation               | Authorization-code grant; `use_legacy_install_flow = true`                                                                                          |
-| API and webhook version    | `2026-07`                                                                                                                                           |
-| Required scopes            | `read_orders,read_products,read_inventory,read_merchant_managed_fulfillment_orders,read_third_party_fulfillment_orders,read_returns,read_locations` |
-| Customer scope             | Add `read_customers` after enabling the protected-data selection for development or receiving production approval                                   |
-| Historical scope           | Add `read_all_orders` only after Shopify grants this scope                                                                                          |
-| Compliance topics          | `customers/data_request`, `customers/redact`, `shop/redact`                                                                                         |
-| Compliance URL (all three) | `https://<luma-host>/api/v1/shopify/privacy`                                                                                                        |
+| Setting                    | Value                                                                                                                                                                                                                              |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Distribution               | Public distribution for unrelated merchants; select before requesting protected data                                                                                                                                               |
+| Embedded app               | Off                                                                                                                                                                                                                                |
+| App URL                    | The public HTTPS Luma web origin (development: the running tunnel)                                                                                                                                                                 |
+| Allowed redirection URL    | `https://<luma-host>/api/v1/shopify/callback` (exact match)                                                                                                                                                                        |
+| Installation               | Authorization-code grant; `use_legacy_install_flow = true`                                                                                                                                                                         |
+| API and webhook version    | `2026-07`                                                                                                                                                                                                                          |
+| Required scopes            | `read_orders,read_products,read_inventory,read_merchant_managed_fulfillment_orders,read_third_party_fulfillment_orders,read_returns,read_locations,write_merchant_managed_fulfillment_orders,write_third_party_fulfillment_orders` |
+| Customer scope             | Add `read_customers` after enabling the protected-data selection for development or receiving production approval                                                                                                                  |
+| Historical scope           | Add `read_all_orders` only after Shopify grants this scope                                                                                                                                                                         |
+| Compliance topics          | `customers/data_request`, `customers/redact`, `shop/redact`                                                                                                                                                                        |
+| Compliance URL (all three) | `https://<luma-host>/api/v1/shopify/privacy`                                                                                                                                                                                       |
+
+Fulfillment recovery requires the fulfillment write scopes. Existing read-only
+connections keep their read access and must reconnect to enable recovery.
 
 Publish the configuration version after changing URLs or scopes. The server
 registers connection-specific `app/uninstalled` and `app/scopes_update`
@@ -37,7 +40,7 @@ application_url = "https://<luma-host>"
 embedded = false
 
 [access_scopes]
-scopes = "read_orders,read_products,read_inventory,read_merchant_managed_fulfillment_orders,read_third_party_fulfillment_orders,read_returns,read_locations"
+scopes = "read_orders,read_products,read_inventory,read_merchant_managed_fulfillment_orders,read_third_party_fulfillment_orders,read_returns,read_locations,write_merchant_managed_fulfillment_orders,write_third_party_fulfillment_orders"
 use_legacy_install_flow = true
 
 [auth]

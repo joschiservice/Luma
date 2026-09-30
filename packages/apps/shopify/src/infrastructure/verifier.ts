@@ -61,6 +61,20 @@ export function createInstallationVerifier(options: {
     )
       granted.push('fulfillment.read');
 
+    if (
+      has('orders') &&
+      [
+        'write_merchant_managed_fulfillment_orders',
+        'write_third_party_fulfillment_orders',
+      ].some((scope) => scopes.has(scope))
+    ) {
+      granted.push(
+        'fulfillment.hold.release',
+        'fulfillment.open',
+        'fulfillment.move',
+      );
+    }
+
     return granted;
   };
 }

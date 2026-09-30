@@ -64245,6 +64245,9 @@
                                 "products.read",
                                 "inventory.read",
                                 "fulfillment.read",
+                                "fulfillment.hold.release",
+                                "fulfillment.open",
+                                "fulfillment.move",
                                 "orders.shipping-method.read",
                                 "orders.shipping-method.write"
                               ]
@@ -64259,6 +64262,9 @@
                                 "products.read",
                                 "inventory.read",
                                 "fulfillment.read",
+                                "fulfillment.hold.release",
+                                "fulfillment.open",
+                                "fulfillment.move",
                                 "orders.shipping-method.read",
                                 "orders.shipping-method.write"
                               ]
@@ -64728,12 +64734,15 @@
                         "products.read",
                         "inventory.read",
                         "fulfillment.read",
+                        "fulfillment.hold.release",
+                        "fulfillment.open",
+                        "fulfillment.move",
                         "orders.shipping-method.read",
                         "orders.shipping-method.write"
                       ]
                     },
                     "minItems": 1,
-                    "maxItems": 6
+                    "maxItems": 9
                   },
                   "credentials": {
                     "type": "object",
@@ -64818,6 +64827,9 @@
                           "products.read",
                           "inventory.read",
                           "fulfillment.read",
+                          "fulfillment.hold.release",
+                          "fulfillment.open",
+                          "fulfillment.move",
                           "orders.shipping-method.read",
                           "orders.shipping-method.write"
                         ]
@@ -64832,6 +64844,9 @@
                           "products.read",
                           "inventory.read",
                           "fulfillment.read",
+                          "fulfillment.hold.release",
+                          "fulfillment.open",
+                          "fulfillment.move",
                           "orders.shipping-method.read",
                           "orders.shipping-method.write"
                         ]
@@ -65351,6 +65366,9 @@
                           "products.read",
                           "inventory.read",
                           "fulfillment.read",
+                          "fulfillment.hold.release",
+                          "fulfillment.open",
+                          "fulfillment.move",
                           "orders.shipping-method.read",
                           "orders.shipping-method.write"
                         ]
@@ -65365,6 +65383,9 @@
                           "products.read",
                           "inventory.read",
                           "fulfillment.read",
+                          "fulfillment.hold.release",
+                          "fulfillment.open",
+                          "fulfillment.move",
                           "orders.shipping-method.read",
                           "orders.shipping-method.write"
                         ]
@@ -65900,6 +65921,9 @@
                           "products.read",
                           "inventory.read",
                           "fulfillment.read",
+                          "fulfillment.hold.release",
+                          "fulfillment.open",
+                          "fulfillment.move",
                           "orders.shipping-method.read",
                           "orders.shipping-method.write"
                         ]
@@ -65914,6 +65938,9 @@
                           "products.read",
                           "inventory.read",
                           "fulfillment.read",
+                          "fulfillment.hold.release",
+                          "fulfillment.open",
+                          "fulfillment.move",
                           "orders.shipping-method.read",
                           "orders.shipping-method.write"
                         ]
@@ -66434,6 +66461,9 @@
                           "products.read",
                           "inventory.read",
                           "fulfillment.read",
+                          "fulfillment.hold.release",
+                          "fulfillment.open",
+                          "fulfillment.move",
                           "orders.shipping-method.read",
                           "orders.shipping-method.write"
                         ]
@@ -66448,6 +66478,9 @@
                           "products.read",
                           "inventory.read",
                           "fulfillment.read",
+                          "fulfillment.hold.release",
+                          "fulfillment.open",
+                          "fulfillment.move",
                           "orders.shipping-method.read",
                           "orders.shipping-method.write"
                         ]

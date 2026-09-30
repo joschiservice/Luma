@@ -25,7 +25,10 @@
     "fastify": "catalog:",
     "@luma/ui": "workspace:*",
     "react": "catalog:",
-    "@tanstack/react-form": "catalog:"
+    "@tanstack/react-form": "catalog:",
+    "@luma/execution": "workspace:*",
+    "@luma/policies": "workspace:*",
+    "@luma/audit": "workspace:*"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",

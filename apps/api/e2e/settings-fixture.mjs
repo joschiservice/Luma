@@ -6,7 +6,11 @@ import { createIdentity } from '@luma/identity/composition';
 
 import { database, secret } from './helpers.mjs';
 
-export async function settingsFixture(t, origin = 'http://localhost:3000') {
+export async function settingsFixture(
+  t,
+  origin = 'http://localhost:3000',
+  connections,
+) {
   const db = await database(t);
   await db.migrate();
   await db.grantRuntime();
@@ -28,7 +32,13 @@ export async function settingsFixture(t, origin = 'http://localhost:3000') {
     },
   };
   const identity = createIdentity(config);
-  const app = await buildRuntimeApp(config);
+  const app = await buildRuntimeApp(
+    config,
+    {},
+    undefined,
+    undefined,
+    connections,
+  );
   t.onTestFinished(async () => {
     await app.close();
     await identity.close();

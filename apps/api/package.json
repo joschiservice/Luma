@@ -20,7 +20,8 @@
     "@types/pg": "catalog:",
     "drizzle-kit": "0.31.11",
     "playwright": "catalog:",
-    "tsx": "catalog:"
+    "tsx": "catalog:",
+    "graphql": "catalog:"
   },
   "dependencies": {
     "@luma/application-runtime": "workspace:*",

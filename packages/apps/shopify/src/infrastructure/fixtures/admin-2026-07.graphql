@@ -451,14 +451,26 @@ type FulfillmentOrder implements Node {
     before: String
     reverse: Boolean = false
   ): FulfillmentOrderLineItemConnection!
+  locationsForMove(
+    lineItemIds: [ID!] = []
+    query: String
+    locationIds: [ID!]
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+  ): FulfillmentOrderLocationForMoveConnection!
   order: Order!
   requestStatus: FulfillmentOrderRequestStatus!
   status: FulfillmentOrderStatus!
+  supportedActions: [FulfillmentOrderSupportedAction!]!
   updatedAt: DateTime!
 }
 
 type FulfillmentOrderAssignedLocation {
   location: Location
+  name: String!
 }
 
 type Location implements Node {
@@ -468,6 +480,7 @@ type Location implements Node {
 }
 
 type FulfillmentHold implements Node {
+  heldByRequestingApp: Boolean!
   id: ID!
   reason: FulfillmentHoldReason!
 }
@@ -592,6 +605,27 @@ type ProductVariantConnection {
   pageInfo: PageInfo!
 }
 
+type FulfillmentOrderLocationForMoveConnection {
+  nodes: [FulfillmentOrderLocationForMove!]!
+  pageInfo: PageInfo!
+}
+
+type FulfillmentOrderLocationForMove {
+  location: Location!
+  movable: Boolean!
+  unavailableLineItemsCount: Count
+}
+
+type Count {
+  count: Int!
+  precision: CountPrecision!
+}
+
+enum CountPrecision {
+  EXACT
+  AT_LEAST
+}
+
 enum FulfillmentOrderRequestStatus {
   UNSUBMITTED
   SUBMITTED
@@ -611,6 +645,25 @@ enum FulfillmentOrderStatus {
   CLOSED
   SCHEDULED
   ON_HOLD
+}
+
+type FulfillmentOrderSupportedAction {
+  action: FulfillmentOrderAction!
+}
+
+enum FulfillmentOrderAction {
+  CREATE_FULFILLMENT
+  REQUEST_FULFILLMENT
+  CANCEL_FULFILLMENT_ORDER
+  MOVE
+  REQUEST_CANCELLATION
+  MARK_AS_OPEN
+  RELEASE_HOLD
+  HOLD
+  EXTERNAL
+  SPLIT
+  MERGE
+  REPORT_PROGRESS
 }
 
 type Fulfillment implements Node {
@@ -1024,10 +1077,56 @@ type WebhookSubscription implements Node {
 }
 
 type Mutation {
+  fulfillmentOrderMove(
+    id: ID!
+    newLocationId: ID!
+    fulfillmentOrderLineItems: [FulfillmentOrderLineItemInput!]
+  ): FulfillmentOrderMovePayload
+  fulfillmentOrderOpen(id: ID!): FulfillmentOrderOpenPayload
+  fulfillmentOrderReleaseHold(
+    id: ID!
+    holdIds: [ID!]
+    externalId: String
+  ): FulfillmentOrderReleaseHoldPayload
   webhookSubscriptionCreate(
     topic: WebhookSubscriptionTopic!
     webhookSubscription: WebhookSubscriptionInput!
   ): WebhookSubscriptionCreatePayload
+}
+
+input FulfillmentOrderLineItemInput {
+  id: ID!
+  quantity: Int!
+}
+
+type FulfillmentOrderMovePayload {
+  movedFulfillmentOrder: FulfillmentOrder
+  userErrors: [FulfillmentOrderMoveFulfillmentOrderMoveUserError!]!
+}
+
+type FulfillmentOrderMoveFulfillmentOrderMoveUserError {
+  field: [String!]
+  message: String!
+}
+
+type FulfillmentOrderOpenPayload {
+  fulfillmentOrder: FulfillmentOrder
+  userErrors: [UserError!]!
+}
+
+type UserError {
+  field: [String!]
+  message: String!
+}
+
+type FulfillmentOrderReleaseHoldPayload {
+  fulfillmentOrder: FulfillmentOrder
+  userErrors: [FulfillmentOrderReleaseHoldUserError!]!
+}
+
+type FulfillmentOrderReleaseHoldUserError {
+  field: [String!]
+  message: String!
 }
 
 input WebhookSubscriptionInput {
@@ -1048,10 +1147,6 @@ input HasMetafieldsMetafieldIdentifierInput {
 type WebhookSubscriptionCreatePayload {
   userErrors: [UserError!]!
   webhookSubscription: WebhookSubscription
-}
-
-type UserError {
-  message: String!
 }
 
 type ReturnLineItem implements Node & ReturnLineItemType {

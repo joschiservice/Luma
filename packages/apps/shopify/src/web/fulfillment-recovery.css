@@ -1,0 +1,36 @@
+.shopify-recovery {
+  display: grid;
+  gap: 1rem;
+  padding-block: 1rem;
+  border-block-start: 1px solid var(--line);
+}
+.shopify-recovery-heading,
+.shopify-recovery-facts,
+.shopify-recovery-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.shopify-recovery-heading {
+  justify-content: space-between;
+}
+.shopify-recovery label,
+.shopify-recovery-review {
+  display: grid;
+  gap: 0.5rem;
+}
+.shopify-recovery-stages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0;
+  list-style: none;
+}
+.shopify-recovery .shopify-source-id {
+  overflow-wrap: anywhere;
+}
+
+.shopify-recovery > button {
+  justify-self: start;
+}

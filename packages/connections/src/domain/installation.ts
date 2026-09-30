@@ -1,7 +1,11 @@
 import type { ReadCapability } from './capabilities.js';
 
 export type InstallationCapability =
-  ReadCapability | 'orders.shipping-method.write';
+  | ReadCapability
+  | 'orders.shipping-method.write'
+  | 'fulfillment.hold.release'
+  | 'fulfillment.open'
+  | 'fulfillment.move';
 
 /** Public provider settings; each app validates its own fields. */
 export type InstallationTarget = { kind: string; [key: string]: string };

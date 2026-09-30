@@ -291,3 +291,17 @@ are in `packages/api-contract/src/inventory.ts`; the frontend is
 Tests: `domain/inventory.test.ts`, `apps/api/e2e/inventory.e2e.mjs`,
 `inventory.browser.mjs` and `Inventory/Workspace` stories. See
 [Inventory workspace](inventory-workspace.md) for quantity and relationship semantics.
+
+## Shopify fulfillment recovery
+
+Start at `packages/apps/shopify/src/application/fulfillment-recovery.ts` for
+previews, approval and reference-only commands; composition is
+`src/fulfillment-recovery.ts`. Provider mutations and reads are in
+`infrastructure/fulfillment-recovery-provider.ts`; domain eligibility and progress
+rules are in `domain/fulfillment-recovery.ts`. Migration `0042` owns previews,
+revision claims and evidence. The UI is `web/fulfillment-recovery.tsx`, used by
+both the Shopify record browser and order context.
+
+Tests: provider recovery tests, `apps/api/e2e/shopify-fulfillment.e2e.mjs` and the
+`Orders/Shopify fulfillment recovery` stories. See [Shopify fulfillment
+recovery](shopify-fulfillment-recovery.md).

@@ -137,7 +137,22 @@ export interface ShippingMethodSnapshot {
   isCancelled: boolean;
 }
 
+/** A recovery command is bound to an exact provider record and reviewed revision. */
+export interface FulfillmentRecoveryInput {
+  orderId: string;
+  fulfillmentOrderId: string;
+  expectedRevision: string;
+  holdId?: string;
+  locationId?: string;
+}
+
 export interface CapabilityContract {
+  'fulfillment.hold.release': {
+    input: FulfillmentRecoveryInput;
+    output: WriteReceipt;
+  };
+  'fulfillment.open': { input: FulfillmentRecoveryInput; output: WriteReceipt };
+  'fulfillment.move': { input: FulfillmentRecoveryInput; output: WriteReceipt };
   'orders.shipping-method.read': {
     input: PageQuery & { order: ExternalId };
     output: Page<ShippingMethodSnapshot>;

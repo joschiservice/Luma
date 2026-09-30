@@ -220,6 +220,8 @@ export function createShopifyOAuth(
 
   const requestedScopes = [
     ...shopifyScopes,
+    'write_merchant_managed_fulfillment_orders',
+    'write_third_party_fulfillment_orders',
     'read_returns',
     'read_locations',
     ...(config.protectedCustomerDataApproved ? ['read_customers'] : []),
@@ -390,7 +392,12 @@ export function createShopifyOAuth(
             ? { appInstallationVersion: installationVersion }
             : {}),
           label: attempt.label,
-          permissions: [...shopifyReads],
+          permissions: [
+            ...shopifyReads,
+            'fulfillment.hold.release',
+            'fulfillment.open',
+            'fulfillment.move',
+          ],
           granted: [],
           status: 'degraded',
           version: (record?.connection.version ?? 0) + 1,

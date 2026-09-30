@@ -12,11 +12,13 @@ import {
 import { IdentityError } from '@luma/identity';
 import { z } from 'zod';
 
+import { registerRecoveryRoutes } from './api/fulfillment-recovery.js';
 import { registerRecordRoutes } from './api/records.js';
 import { registerShopifyRoutes } from './api/shopify.js';
 import type { ShopifyOAuth } from './application/oauth.js';
 import { createRecordService } from './application/records.js';
 import { readShopifyConfig } from './config.js';
+import { createShopifyRecovery } from './fulfillment-recovery.js';
 import { createShopifyConnector } from './infrastructure/adapter.js';
 import {
   installationCredentials,
@@ -176,6 +178,10 @@ export function createApp(context: AppFactoryContext): AppDefinition {
           : undefined,
       );
       registerRecordRoutes(server, records);
+      registerRecoveryRoutes(
+        server,
+        createShopifyRecovery(context, installations),
+      );
       server.post(
         '/v1/organizations/:organizationId/apps/shopify/record-connections',
         async (request, reply) => {

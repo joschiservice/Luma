@@ -412,6 +412,9 @@ importers:
       drizzle-kit:
         specifier: 0.31.11
         version: 0.31.11
+      graphql:
+        specifier: 'catalog:'
+        version: 16.14.2
       playwright:
         specifier: 'catalog:'
         version: 1.63.0
@@ -791,18 +794,27 @@ importers:
       '@luma/app-host':
         specifier: workspace:*
         version: link:../../app-host
+      '@luma/audit':
+        specifier: workspace:*
+        version: link:../../audit
       '@luma/connections':
         specifier: workspace:*
         version: link:../../connections
       '@luma/connector-shopify':
         specifier: workspace:*
         version: link:../../connectors/shopify
+      '@luma/execution':
+        specifier: workspace:*
+        version: link:../../execution
       '@luma/identity':
         specifier: workspace:*
         version: link:../../identity
       '@luma/platform':
         specifier: workspace:*
         version: link:../../platform
+      '@luma/policies':
+        specifier: workspace:*
+        version: link:../../policies
       '@luma/ui':
         specifier: workspace:*
         version: link:../../ui

@@ -9,6 +9,7 @@ import {
   type ShopifyRecordDetail,
   type ShopifyRecordKind,
 } from '../domain/records.js';
+import { ShopifyFulfillmentRecovery } from './fulfillment-recovery.js';
 import { recordError } from './record-error.js';
 import { ShopifyRecordSections } from './sections.js';
 
@@ -139,6 +140,22 @@ export function ShopifyRecords({
           <p className="field-help">
             {detail.shop} · Read {new Date(detail.observedAt).toLocaleString()}
           </p>
+          {detail.kind === 'FulfillmentOrder'
+            ? detail.sections
+                .flatMap((section) => section.rows.flatMap((row) => row.links))
+                .filter((link) => link.kind === 'Order')
+                .slice(0, 1)
+                .map((link) => (
+                  <ShopifyFulfillmentRecovery
+                    key={`${connectionId}:${detail.id}`}
+                    connectionId={connectionId}
+                    orderId={link.id}
+                    fulfillmentOrderId={detail.id}
+                    services={services}
+                    headingLevel={3}
+                  />
+                ))
+            : null}
           <ShopifyRecordSections
             detail={detail}
             pending={pending}
