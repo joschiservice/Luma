@@ -23,6 +23,7 @@ import {
   parseAction,
 } from '@luma/execution/composition';
 import type { IdentityService, TenantContext } from '@luma/identity';
+import { requireTenant } from '@luma/identity';
 import { createCommerceProjections as createInventoryProjections } from '@luma/inventory/composition';
 import { createCommerceProjections as createOrderProjections } from '@luma/orders/composition';
 import type { TenantDatabase } from '@luma/platform';
@@ -110,30 +111,78 @@ export function createDetectionServices(
 /** Persist connector observations and replay canonical projections in owner transactions. */
 export function createCommerceServices(database: string | TenantDatabase) {
   const { db, close } = serviceDatabase(database);
-  const inventory = createInventoryProjections(db);
-  const orders = createOrderProjections(db, (context, kind, id) =>
-    inventory.has(context, kind, id),
-  );
-  const sources = createSourceRecords(db, async (context, kind, id) =>
-    kind === 'order' ||
-    kind === 'order_line' ||
-    kind === 'fulfillment' ||
-    kind === 'return' ||
-    kind === 'refund'
-      ? orders.has(context, kind, id)
-      : kind === 'customer'
-        ? false
-        : inventory.has(context, kind, id),
-  );
+
+  function assemble(scoped: TenantDatabase) {
+    const inventory = createInventoryProjections(scoped);
+    const orders = createOrderProjections(scoped, (context, kind, id) =>
+      inventory.has(context, kind, id),
+    );
+    const sources = createSourceRecords(scoped, async (context, kind, id) =>
+      kind === 'order' ||
+      kind === 'order_line' ||
+      kind === 'fulfillment' ||
+      kind === 'return' ||
+      kind === 'refund'
+        ? orders.has(context, kind, id)
+        : kind === 'customer'
+          ? false
+          : inventory.has(context, kind, id),
+    );
+
+    return {
+      sources,
+      orders,
+      inventory,
+      ingestion: createCommerceIngestion(sources, orders, inventory, (value) =>
+        createHash('sha256').update(value).digest('hex'),
+      ),
+    };
+  }
+
+  const services = assemble(db);
+  const ingestion = services.ingestion;
+
+  async function atomic<T>(
+    context: TenantContext,
+    operation: (scoped: typeof ingestion) => Promise<T>,
+  ) {
+    requireTenant(context, context.tenantId);
+
+    return db.transaction(context.tenantId, async (tx) => {
+      // Projection, mapping and retirement reads must share a snapshot. The tenant lock also
+      // keeps a simultaneous sync/import from projecting an obsolete mapping during a link.
+      await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
+        `commerce-ingestion:${context.tenantId}`,
+      ]);
+      const scoped: TenantDatabase = {
+        transaction: async (tenantId, next) => {
+          requireTenant(context, tenantId);
+
+          return next(tx);
+        },
+      };
+
+      return operation(assemble(scoped).ingestion);
+    });
+  }
 
   return {
-    sources,
-    orders,
-    inventory,
-    ingestion: createCommerceIngestion(sources, orders, inventory, (value) =>
-      createHash('sha256').update(value).digest('hex'),
-    ),
+    ...services,
     close,
+    ingestion: {
+      ingest: (...args: Parameters<typeof ingestion.ingest>) =>
+        atomic(args[0], (service) => service.ingest(...args)),
+      import: (...args: Parameters<typeof ingestion.import>) =>
+        atomic(args[0], (service) => service.import(...args)),
+      replay: (...args: Parameters<typeof ingestion.replay>) =>
+        atomic(args[0], (service) => service.replay(...args)),
+      bind: (...args: Parameters<typeof ingestion.bind>) =>
+        atomic(args[0], (service) => service.bind(...args)),
+      link: (...args: Parameters<typeof ingestion.link>) =>
+        atomic(args[0], (service) => service.link(...args)),
+      unlink: (...args: Parameters<typeof ingestion.unlink>) =>
+        atomic(args[0], (service) => service.unlink(...args)),
+    },
   };
 }
 

@@ -130,7 +130,7 @@ export const syncCommandSchema = z
   })
   .strict();
 
-export const identityKindSchema = z.enum(['sku', 'location']);
+export const identityKindSchema = z.enum(['sku', 'location', 'order']);
 
 export const linkRequestSchema = z.object({
   id: z.string().uuid(),
@@ -155,6 +155,14 @@ const identitySourceSchema = z.object({
   method: z.string(),
   linkedAt: timestamp,
   revisedAt: timestamp.nullable(),
+  order: z
+    .object({
+      number: z.string().nullable(),
+      externalNumber: z.string().nullable(),
+      placedAt: timestamp.nullable(),
+      total: z.object({ amount: z.string(), currency: z.string() }).nullable(),
+    })
+    .optional(),
   codes: z.array(z.string()),
   titles: z.array(z.string()),
 });

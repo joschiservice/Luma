@@ -239,14 +239,16 @@ export function createSourceRecords(
           actor_id: string;
           created_at: Date;
           revised_at: Date | null;
+          revision_id: string | null;
+          from_canonical_id: string | null;
         }>(
           `SELECT m.connection_id,COALESCE(i.document->>'provider',i.document->'target'->>'kind') AS provider,
             m.scope_key,m.external_id,m.canonical_id,
             COALESCE(r.method,m.method) AS method,COALESCE(r.actor_id,m.actor_id) AS actor_id,
-            m.created_at,r.created_at AS revised_at
+            m.created_at,r.created_at AS revised_at,r.id AS revision_id,r.from_canonical_id
           FROM connector_source_mappings m
           JOIN connector_installations i ON i.tenant_id=m.tenant_id AND i.id=m.connection_id
-          LEFT JOIN LATERAL (SELECT method,actor_id,created_at FROM connector_mapping_revisions r
+          LEFT JOIN LATERAL (SELECT id,method,actor_id,created_at,from_canonical_id FROM connector_mapping_revisions r
             WHERE r.tenant_id=m.tenant_id AND r.mapping_id=m.id ORDER BY r.created_at DESC,r.id DESC LIMIT 1) r ON true
           WHERE m.tenant_id=$1 AND m.resource=$2 AND m.canonical_id=$3
           ORDER BY m.connection_id,m.scope_key,m.external_id`,
@@ -267,6 +269,8 @@ export function createSourceRecords(
           actorId: row.actor_id,
           createdAt: row.created_at.toISOString(),
           revisedAt: row.revised_at?.toISOString() ?? null,
+          revisionId: row.revision_id,
+          previousCanonicalId: row.from_canonical_id,
         }));
       });
     },

@@ -239,6 +239,7 @@ export const commerceSchema = z.discriminatedUnion('capability', [
         z
           .object({
             displayNumber: z.string().nullable(),
+            externalOrderNumber: z.string().max(512).nullable().optional(),
             dueAt: z.string().datetime({ offset: true }).nullable().optional(),
             placedAt: timestamp.nullable().optional(),
             total: money.nullable().optional(),

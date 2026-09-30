@@ -104,6 +104,8 @@ export interface OrderSourceFacts extends OrderSource {
 }
 
 export interface OrderDetail {
+  /** Retired URL identity, when this read resolved to the current order. */
+  redirectedFrom?: string | null;
   order: OrderListItem;
   sources: OrderSourceFacts[];
   differences: OrderDifference[];

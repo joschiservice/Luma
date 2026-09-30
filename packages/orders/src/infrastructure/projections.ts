@@ -109,13 +109,16 @@ export function createCommerceProjections(
           // Replaying after a SKU link change can return to an earlier snapshot of the
           // current observation; make it current again.
           const restored = await tx.query<{ snapshot_id: string }>(
-            `UPDATE orders_projections p SET snapshot_id=s.id,version=p.version+1,updated_at=now()
-            FROM orders_snapshots s, orders_snapshots c
-            WHERE p.tenant_id=$1 AND p.entity_id=$2 AND p.connection_id=$3
-              AND s.tenant_id=$1 AND s.entity_id=$2 AND s.observation_id=$4 AND s.normalizer_version=$5
-              AND s.mapping_version=$6 AND c.tenant_id=$1 AND c.id=p.snapshot_id AND c.observation_id=$4
-              AND p.snapshot_id<>s.id
-            RETURNING p.snapshot_id`,
+            `WITH existing AS (SELECT id FROM orders_snapshots WHERE tenant_id=$1 AND entity_id=$2
+              AND observation_id=$4 AND normalizer_version=$5 AND mapping_version=$6)
+            INSERT INTO orders_projections(tenant_id,entity_id,connection_id,snapshot_id)
+            SELECT $1,$2,$3,id FROM existing
+            ON CONFLICT(tenant_id,entity_id,connection_id) DO UPDATE SET snapshot_id=EXCLUDED.snapshot_id,
+              version=orders_projections.version+1,updated_at=now()
+            WHERE orders_projections.snapshot_id<>EXCLUDED.snapshot_id AND EXISTS (
+              SELECT 1 FROM orders_snapshots c WHERE c.tenant_id=$1 AND c.id=orders_projections.snapshot_id
+              AND c.observation_id=$4)
+            RETURNING snapshot_id`,
             [
               tenant,
               value.entityId,
@@ -258,6 +261,103 @@ export function createCommerceProjections(
           ).rows,
       );
     },
+    async childParent(context, childId) {
+      requireTenant(context, context.tenantId);
+
+      return db.transaction(
+        context.tenantId,
+        async (tx) =>
+          (
+            await tx.query<{ order_id: string }>(
+              'SELECT order_id FROM orders_relationships WHERE tenant_id=$1 AND child_id=$2',
+              [context.tenantId, childId],
+            )
+          ).rows[0]?.order_id ?? null,
+      );
+    },
+    async orderDependents(context, orderId, connectionId) {
+      requireTenant(context, context.tenantId);
+
+      return db.transaction(
+        context.tenantId,
+        async (tx) =>
+          (
+            await tx.query<{
+              entityId: string;
+              connectionId: string;
+              observationId: string;
+            }>(
+              `SELECT p.entity_id AS "entityId",p.connection_id AS "connectionId",s.observation_id AS "observationId"
+           FROM orders_projections p JOIN orders_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id
+           WHERE p.tenant_id=$1 AND (p.entity_id=$2 OR s.order_id=$2)
+             AND ($3::uuid IS NULL OR p.connection_id=$3)
+           ORDER BY CASE s.kind WHEN 'order' THEN 0 WHEN 'fulfillment' THEN 1 WHEN 'return' THEN 2 ELSE 3 END,p.entity_id`,
+              [context.tenantId, orderId, connectionId ?? null],
+            )
+          ).rows,
+      );
+    },
+    async retire(context, entityId, connectionId, targetId, reason) {
+      requireRole(context, ['owner', 'admin']);
+      z.string().trim().min(1).max(2000).parse(reason);
+      if (entityId === targetId)
+        throw new Error('Cannot retire a record into itself');
+
+      return db.transaction(context.tenantId, async (tx) => {
+        const tenant = context.tenantId;
+        const source = (
+          await tx.query<{ document: CanonicalSnapshot }>(
+            `SELECT s.document FROM orders_projections p JOIN orders_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id
+           WHERE p.tenant_id=$1 AND p.entity_id=$2 AND p.connection_id=$3`,
+            [tenant, entityId, connectionId],
+          )
+        ).rows[0]?.document;
+        if (!source) return false;
+        const orderId =
+          source.data.type === 'order' ? entityId : source.data.orderId;
+        await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
+          `orders:${tenant}:${orderId}`,
+        ]);
+        const target = await tx.query(
+          `SELECT p.entity_id FROM orders_projections p JOIN orders_entities e ON e.tenant_id=p.tenant_id AND e.id=p.entity_id
+           WHERE p.tenant_id=$1 AND p.entity_id=$2 AND p.connection_id=$3 AND e.kind=$4`,
+          [tenant, targetId, connectionId, source.kind],
+        );
+        if (!target.rowCount)
+          throw new Error('Retirement target projection not found');
+        const removed = await tx.query<{ snapshot_id: string }>(
+          'DELETE FROM orders_projections WHERE tenant_id=$1 AND entity_id=$2 AND connection_id=$3 RETURNING snapshot_id',
+          [tenant, entityId, connectionId],
+        );
+        const snapshot = removed.rows[0]?.snapshot_id;
+        if (!snapshot) return false;
+        await tx.query(
+          `INSERT INTO orders_projection_retirements(id,tenant_id,entity_id,connection_id,target_entity_id,snapshot_id,reason,actor_id)
+          VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
+          [
+            randomUUID(),
+            tenant,
+            entityId,
+            connectionId,
+            targetId,
+            snapshot,
+            reason,
+            context.actor.id,
+          ],
+        );
+        await tx.query(
+          `INSERT INTO orders_entity_redirects(tenant_id,entity_id,target_entity_id)
+          SELECT $1,$2,$3 WHERE NOT EXISTS (SELECT 1 FROM orders_projections WHERE tenant_id=$1 AND entity_id=$2)
+          ON CONFLICT(tenant_id,entity_id) DO UPDATE SET target_entity_id=EXCLUDED.target_entity_id`,
+          [tenant, entityId, targetId],
+        );
+        await refreshOrderList(tx, tenant, [orderId]);
+        await refreshFulfillmentList(tx, tenant, [orderId]);
+        await refreshReturnList(tx, tenant, orderId);
+
+        return true;
+      });
+    },
     async skuDependents(context, skuId, connectionId) {
       requireTenant(context, context.tenantId);
       z.string().uuid().parse(skuId);
@@ -386,6 +486,10 @@ async function refresh(
   tenantId: string,
   value: CanonicalSnapshot,
 ) {
+  await tx.query(
+    'DELETE FROM orders_entity_redirects WHERE tenant_id=$1 AND entity_id=$2',
+    [tenantId, value.entityId],
+  );
   if (value.data.type === 'return' || value.data.type === 'refund') {
     await refreshReturnList(tx, tenantId, value.data.orderId);
 

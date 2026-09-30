@@ -232,9 +232,17 @@ wording `presentation.ts`). Live source context uses the app `record` slot;
 Shopify's is `packages/apps/shopify/src/web/order-context.tsx`. Adapters fill the optional
 order facts in their `infrastructure/adapter.ts`.
 
+Post-import order links use `apps/web/src/features/orders/identity-links.tsx` and the
+shared sync panel. `packages/commerce-ingestion/src/application/order-links.ts` re-keys
+children; orders owns retirement and redirects (migration `0048`). Read-model
+`identity-references.ts` resolves retired order and child identities. See
+[Commerce sync](commerce-sync.md#links).
+
 Tests: `packages/application-runtime/src/orders.integration.test.ts`
 (including metric parity and the large-import benchmark), the web `orders` unit tests,
-the `Orders/Workspace` stories and `apps/api/e2e/orders.browser.mjs`. See
+the `Orders/Workspace` and `Orders/Linked sources` stories, order-link coverage in
+`commerce-sync.integration.test.ts`, and `apps/api/e2e/orders.browser.mjs` with
+`order-links.browser.mjs`. See
 [Orders workspace](orders-workspace.md).
 
 ## Operational metrics

@@ -11,6 +11,10 @@ import type {
   RecordKind,
   RecordSummary,
 } from '../application/records.js';
+import {
+  orderEntityAliases,
+  resolveOrderEntity,
+} from './orders/identity-references.js';
 
 type RecordQuery = Parameters<RecordExplorer['list']>[1];
 
@@ -329,6 +333,8 @@ export function createRecordExplorer(db: TenantDatabase): RecordExplorer {
       return db.transaction(
         context.tenantId,
         async (tx) => {
+          if (kind === 'order' || kind === 'fulfillment')
+            id = await resolveOrderEntity(tx, context.tenantId, id);
           const rows = await recordRows(tx, context.tenantId, { kind, id });
           if (!rows.length) return null;
           const links: RecordDetail['links'] = [];
@@ -394,20 +400,26 @@ export function createRecordExplorer(db: TenantDatabase): RecordExplorer {
               for (const row of found.rows)
                 add(
                   subjectKind as RecordKind,
-                  row.id,
+                  subjectKind === 'order' || subjectKind === 'fulfillment'
+                    ? await resolveOrderEntity(tx, context.tenantId, row.id)
+                    : row.id,
                   subjectKind,
                   'Affected record',
                 );
             }
           } else {
+            const aliases =
+              kind === 'order' || kind === 'fulfillment'
+                ? await orderEntityAliases(tx, context.tenantId, [id])
+                : [id];
             const found = await tx.query<{ id: string }>(
               `SELECT DISTINCT e.id FROM exceptions e LEFT JOIN connector_source_mappings m
              ON m.tenant_id=e.tenant_id AND m.resource=$2 AND m.canonical_id=$3
              AND m.external_id=e.subject_id
              AND m.connection_id::text=e.document->'subject'->'scope'->>0
              WHERE e.tenant_id=$1 AND e.subject_kind=$2
-             AND (e.subject_id=$3::text OR m.id IS NOT NULL)`,
-              [context.tenantId, kind, id],
+             AND (e.subject_id=ANY($4::text[]) OR m.id IS NOT NULL)`,
+              [context.tenantId, kind, id, aliases],
             );
             for (const row of found.rows)
               add('issue', row.id, 'Issue', 'Investigates');

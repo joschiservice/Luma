@@ -95,13 +95,20 @@ export interface IdentitySource {
   method: string;
   linkedAt: string;
   revisedAt: string | null;
+  /** Order facts help a person review a match; missing fields remain unknown. */
+  order?: {
+    number: string | null;
+    externalNumber: string | null;
+    placedAt: string | null;
+    total: { amount: string; currency: string } | null;
+  };
   codes: string[];
   titles: string[];
 }
 
 export interface LinkRequestView {
   id: string;
-  kind: 'sku' | 'location';
+  kind: 'sku' | 'location' | 'order';
   operation: 'link' | 'unlink';
   entityId: string;
   otherId: string | null;
@@ -114,7 +121,7 @@ export interface LinkRequestView {
 }
 
 export interface IdentityDetail {
-  entity: { id: string; kind: 'sku' | 'location'; label: string };
+  entity: { id: string; kind: 'sku' | 'location' | 'order'; label: string };
   sources: IdentitySource[];
   suggestions: {
     id: string;
@@ -129,14 +136,14 @@ export interface IdentityDetail {
 export type LinkInput =
   | {
       operation: 'link';
-      kind: 'sku' | 'location';
+      kind: 'sku' | 'location' | 'order';
       entityId: string;
       otherId: string;
       reason: string;
     }
   | {
       operation: 'unlink';
-      kind: 'sku' | 'location';
+      kind: 'sku' | 'location' | 'order';
       entityId: string;
       connectionId: string;
       reason: string;

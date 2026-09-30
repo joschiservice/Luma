@@ -281,6 +281,7 @@ export function createJtlConnector(
             // snapshots are ordered by observation time. Creation dates are not update times.
             emit('order', ref(order.id), null, {
               displayNumber: order.salesOrderNumber,
+              externalOrderNumber: order.externalSalesOrderNumber ?? null,
               placedAt: order.salesOrderDate ?? null,
               total:
                 order.totalGrossAmount != null &&

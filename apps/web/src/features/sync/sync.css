@@ -370,3 +370,45 @@
   font-size: 13px;
   font-weight: 500;
 }
+
+.sync-order-match {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.sync-order-facts,
+.sync-order-facts > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.sync-order-facts small {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.sync-order-search {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.sync-order-search label {
+  display: grid;
+  gap: 6px;
+}
+
+@media (max-width: 600px) {
+  .sync-order-match {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.sync-identity-note {
+  color: var(--muted-foreground);
+  font-size: 13px;
+}

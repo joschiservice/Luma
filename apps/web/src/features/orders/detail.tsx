@@ -6,11 +6,17 @@ import { Button } from '@luma/ui/components/primitives/button';
 import { WorkspaceTimezone } from '@luma/ui/components/primitives/workspace-date';
 import { workspaceDateValue } from '@luma/ui/lib/timezone';
 import { onlineManager, useQuery } from '@tanstack/react-query';
-import { Link, useParams, useSearch } from '@tanstack/react-router';
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useSearch,
+} from '@tanstack/react-router';
 import { ArrowLeft } from 'lucide-react';
 import {
   type ReactNode,
   useContext,
+  useEffect,
   useState,
   useSyncExternalStore,
 } from 'react';
@@ -22,6 +28,7 @@ import { IdentityError } from '../identity/data';
 import { recordReturnPath } from '../records/data';
 import { OrderReturns } from '../returns/order-returns';
 import { orderFilters, orderOptions, type OrdersSearch } from './data';
+import { OrderIdentityLinks } from './identity-links';
 import { OrderHeader } from './order-header';
 import { OrderInspector } from './order-inspector';
 import { OrderSection } from './order-section';
@@ -44,6 +51,16 @@ export function OrderPage() {
   });
   const search = useSearch({ from: '/app/$organizationId/orders/$orderId' });
   const query = useQuery(orderOptions(organizationId, orderId));
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (query.data && query.data.order.id !== orderId)
+      void navigate({
+        to: '/app/$organizationId/orders/$orderId',
+        params: { organizationId, orderId: query.data.order.id },
+        search: { ...search, linkedFrom: orderId },
+        replace: true,
+      });
+  }, [query.data, orderId, organizationId, search, navigate]);
   const apps = useQuery(appsOptions(organizationId));
   const online = useSyncExternalStore(
     subscribe,
@@ -82,6 +99,14 @@ export function OrderPage() {
               : 'unavailable'
       }
       refresh={() => void query.refetch()}
+      linkedSources={
+        query.data ? (
+          <OrderIdentityLinks
+            organizationId={organizationId}
+            orderId={query.data.order.id}
+          />
+        ) : null
+      }
       sourceContext={(source) =>
         source.appId && source.externalId && recordApps.has(source.appId) ? (
           <AppExtension
@@ -113,6 +138,7 @@ export function OrderDetailView({
   error,
   refresh,
   sourceContext,
+  linkedSources,
 }: {
   organizationId: string;
   search: OrdersSearch;
@@ -121,6 +147,7 @@ export function OrderDetailView({
   offline?: boolean;
   error?: OrderError | undefined;
   refresh: () => void;
+  linkedSources?: ReactNode;
   sourceContext?: (source: OrderSourceFacts) => ReactNode;
 }) {
   const timeZone = useContext(WorkspaceTimezone);
@@ -193,6 +220,12 @@ export function OrderDetailView({
         ) : null
       ) : (
         <>
+          {detail.redirectedFrom || search.linkedFrom ? (
+            <Alert role="status">
+              This order was linked to another source. You’re viewing the
+              combined order; each source’s evidence is preserved.
+            </Alert>
+          ) : null}
           <OrderHeader order={detail.order} />
           <div className="order-layout">
             <div className="order-main">
@@ -215,6 +248,7 @@ export function OrderDetailView({
                 organizationId={organizationId}
                 from={here}
               />
+              {linkedSources}
               {detail.sources.length > 1 ? (
                 <SourceComparison detail={detail} />
               ) : null}

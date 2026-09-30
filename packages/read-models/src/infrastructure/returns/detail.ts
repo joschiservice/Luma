@@ -5,6 +5,7 @@ import type {
   ReturnDetail,
   ReturnListItem,
 } from '../../application/returns.js';
+import { resolveOrderEntity } from '../orders/identity-references.js';
 import { itemColumns, readReturnSources } from './list.js';
 
 type Current = { entityId: string; document: CanonicalSnapshot };
@@ -29,6 +30,7 @@ export async function readReturnDetail(
   tenantId: string,
   id: string,
 ): Promise<Omit<ReturnDetail, 'asOf'> | null> {
+  id = await resolveOrderEntity(tx, tenantId, id);
   let item = await readItem(tx, tenantId, id);
   if (!item) {
     const settled = await tx.query<{ returnId: string | null }>(

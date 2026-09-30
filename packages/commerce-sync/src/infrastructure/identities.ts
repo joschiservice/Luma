@@ -14,6 +14,7 @@ type SourceRow = {
   method: string;
   created_at: Date;
   revised_at: Date | null;
+  order_facts: IdentitySource['order'] | null;
   codes: string[];
   titles: string[];
 };
@@ -21,12 +22,16 @@ type SourceRow = {
 async function sources(
   tx: SqlTransaction,
   tenantId: string,
-  kind: 'sku' | 'location',
+  kind: 'sku' | 'location' | 'order',
   ids: string[],
 ) {
   const rows = await tx.query<SourceRow>(
     `SELECT m.canonical_id,m.connection_id,COALESCE(c.document->>'label','Connected source') AS connection_label,
       COALESCE(c.document->>'provider',c.document->'target'->>'kind','source') AS provider,
+      (SELECT jsonb_build_object('number',l.display_number,'externalNumber',l.external_order_number,
+        'placedAt',snap.document->'data'->'placedAt','total',snap.document->'data'->'total')
+        FROM orders_list l JOIN orders_snapshots snap ON snap.tenant_id=l.tenant_id AND snap.id=l.snapshot_id
+        WHERE l.tenant_id=m.tenant_id AND l.entity_id=m.canonical_id AND l.connection_id=m.connection_id) AS order_facts,
       m.external_id,m.scope_key,COALESCE(r.method,m.method) AS method,m.created_at,r.created_at AS revised_at,
       ARRAY(SELECT DISTINCT k.code FROM inventory_product_skus k WHERE k.tenant_id=m.tenant_id
         AND k.sku_id=m.canonical_id AND k.connection_id=m.connection_id AND k.code_key IS NOT NULL ORDER BY k.code) AS codes,
@@ -56,6 +61,7 @@ async function sources(
         method: row.method,
         linkedAt: row.created_at.toISOString(),
         revisedAt: row.revised_at?.toISOString() ?? null,
+        ...(row.order_facts ? { order: row.order_facts } : {}),
         codes: row.codes,
         titles: row.titles,
       },
@@ -64,7 +70,13 @@ async function sources(
   return grouped;
 }
 
-function label(kind: 'sku' | 'location', key: string, items: IdentitySource[]) {
+function label(
+  kind: 'sku' | 'location' | 'order',
+  key: string,
+  items: IdentitySource[],
+) {
+  if (kind === 'order')
+    return items.find((item) => item.order?.number)?.order?.number ?? 'Order';
   const code = items.flatMap((item) => item.codes)[0];
   if (code) return code;
   const title = items.flatMap((item) => item.titles)[0];
@@ -74,14 +86,15 @@ function label(kind: 'sku' | 'location', key: string, items: IdentitySource[]) {
 }
 
 /**
- * Reads the sources behind one SKU or location. SKU suggestions come from other connections'
- * SKUs with the same normalized code; a code is a hint for a person, never identity.
+ * Reads sources and explicit match signals across connections. SKU codes and marketplace
+ * order references suggest records for review; they never establish identity automatically.
  */
 export function createIdentityReader(db: TenantDatabase): IdentityReader {
   return (tenantId, kind, entityId) =>
     db.transaction(
       tenantId,
       async (tx) => {
+        if (kind === 'order') return readOrderIdentity(tx, tenantId, entityId);
         const entity = (
           await tx.query<{ reconciliation_key: string }>(
             'SELECT reconciliation_key FROM inventory_entities WHERE tenant_id=$1 AND kind=$2 AND id=$3',
@@ -142,4 +155,55 @@ export function createIdentityReader(db: TenantDatabase): IdentityReader {
       },
       { readOnlySnapshot: true },
     );
+}
+
+/** Suggests only a JTL marketplace reference matching a Shopify order number in this tenant. */
+async function readOrderIdentity(
+  tx: SqlTransaction,
+  tenantId: string,
+  entityId: string,
+) {
+  const own =
+    (await sources(tx, tenantId, 'order', [entityId])).get(entityId) ?? [];
+  if (!own.length) return null;
+  const candidates = (
+    await tx.query<{ id: string; number: string }>(
+      `SELECT DISTINCT ON (other.entity_id) other.entity_id AS id,
+      COALESCE(mine.external_order_number,other.external_order_number) AS number
+     FROM orders_list mine JOIN connector_installations a ON a.tenant_id=mine.tenant_id AND a.id=mine.connection_id
+     JOIN orders_list other ON other.tenant_id=mine.tenant_id AND other.entity_id<>mine.entity_id
+       AND ((mine.external_order_key IS NOT NULL AND mine.external_order_key=other.display_number_key)
+         OR (other.external_order_key IS NOT NULL AND other.external_order_key=mine.display_number_key))
+     JOIN connector_installations b ON b.tenant_id=other.tenant_id AND b.id=other.connection_id
+     WHERE mine.tenant_id=$1 AND mine.entity_id=$2 AND NOT mine.deleted AND NOT other.deleted
+       AND ((COALESCE(a.document->>'provider',a.document->'target'->>'kind')='jtl' AND COALESCE(b.document->>'provider',b.document->'target'->>'kind')='shopify' AND mine.external_order_key=other.display_number_key)
+         OR (COALESCE(a.document->>'provider',a.document->'target'->>'kind')='shopify' AND COALESCE(b.document->>'provider',b.document->'target'->>'kind')='jtl' AND other.external_order_key=mine.display_number_key))
+       AND NOT EXISTS (SELECT 1 FROM connector_source_mappings x JOIN connector_source_mappings y
+         ON y.tenant_id=x.tenant_id AND y.connection_id=x.connection_id AND y.resource='order' AND y.canonical_id=other.entity_id
+         WHERE x.tenant_id=$1 AND x.resource='order' AND x.canonical_id=$2)
+     ORDER BY other.entity_id,number LIMIT 10`,
+      [tenantId, entityId],
+    )
+  ).rows;
+  const others = await sources(
+    tx,
+    tenantId,
+    'order',
+    candidates.map((candidate) => candidate.id),
+  );
+
+  return {
+    entity: {
+      id: entityId,
+      kind: 'order' as const,
+      label: label('order', '', own),
+    },
+    sources: own,
+    suggestions: candidates.map((candidate) => ({
+      id: candidate.id,
+      label: label('order', '', others.get(candidate.id) ?? []),
+      reason: `JTL external order number “${candidate.number}” matches Shopify`,
+      sources: others.get(candidate.id) ?? [],
+    })),
+  };
 }
