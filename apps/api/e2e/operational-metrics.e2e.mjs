@@ -163,7 +163,10 @@ it('reconciles all domain cohorts, stock expiry, lifecycle transitions, scopes a
     f.member,
     `/v2/organizations/${f.org.id}/metrics`,
   );
-  expect(registry).toHaveLength(11);
+  expect(registry).toHaveLength(22);
+  expect(
+    registry.filter((definition) => definition.family === 'resolution'),
+  ).toHaveLength(11);
   expect(await f.request(f.member, `${f.base}/metrics`)).toHaveLength(3);
 });
 

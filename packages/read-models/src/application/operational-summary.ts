@@ -12,9 +12,15 @@ import {
   procurementMetricDefinitions,
   stockMetricDefinitions,
 } from '@luma/procurement';
+import type {
+  MeasurementEnvironment,
+  ResolutionMetricItem,
+} from '@luma/resolution';
+import { resolutionMetricDefinitions } from '@luma/resolution';
 
 export const operationalMetricDefinitions = [
   ...caseMetricDefinitions,
+  ...resolutionMetricDefinitions,
   ...stockMetricDefinitions,
   ...procurementMetricDefinitions,
   ...connectionMetricDefinitions,
@@ -25,6 +31,8 @@ export interface OperationalSummaryRequest {
   metrics: string[];
   scope?:
     | {
+        environment?: MeasurementEnvironment | undefined;
+        window?: '24h' | '7d' | undefined;
         connectionId?: string | undefined;
         supplierId?: string | undefined;
         authority?: 'luma' | 'external' | undefined;
@@ -37,6 +45,7 @@ export interface OperationalSummaryRequest {
 }
 
 export type OperationalCohortItem =
+  | ResolutionMetricItem
   | CaseMetricItem
   | StockMetricItem
   | PurchaseOrderMetricItem

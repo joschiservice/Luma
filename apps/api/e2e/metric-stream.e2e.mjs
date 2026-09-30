@@ -36,7 +36,18 @@ it('fans out committed changes, coalesces bursts and recovers listeners, subscri
   const coverage = await f.db.owner.query(
     "SELECT event_object_table, array_agg(event_manipulation::text ORDER BY event_manipulation) AS operations FROM information_schema.triggers WHERE trigger_name='metric_change' GROUP BY event_object_table",
   );
-  expect(coverage.rows).toHaveLength(20);
+  expect(coverage.rows).toHaveLength(28);
+  expect(coverage.rows.map((row) => row.event_object_table)).toEqual(
+    expect.arrayContaining([
+      'resolution_measurement_facts',
+      'resolution_runs',
+      'resolution_learning_events',
+      'action_admission_steps',
+      'exception_evidence',
+      'exception_sources',
+      'exception_outbox',
+    ]),
+  );
   expect(
     coverage.rows.every(
       (row) =>

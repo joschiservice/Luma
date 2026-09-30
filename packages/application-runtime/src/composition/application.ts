@@ -41,6 +41,8 @@ import {
   createActivityStore,
   createOperationsOverview,
   createResolutionLearning,
+  createResolutionMeasurements,
+  createResolutionMetricReader,
   createShadowEvaluations,
   createWorkspaceActivity,
 } from '@luma/resolution/composition';
@@ -97,6 +99,7 @@ export interface ApplicationServices {
     procurement: ReturnType<typeof createProcurement>;
     playbooks: ReturnType<typeof createPersistentPlaybookLibrary>;
     activity: ReturnType<typeof createWorkspaceActivity>;
+    measurements: ReturnType<typeof createResolutionMeasurements>;
     learning: ReturnType<typeof createResolutionLearning>;
     operations: ReturnType<typeof createOperationsOverview>;
     metrics: ReturnType<typeof createOperationalMetrics>;
@@ -269,9 +272,14 @@ export function createApplicationServices(
       desk,
       playbooks: library,
       activity: createWorkspaceActivity(database, identity.refreshContext),
+      measurements: createResolutionMeasurements(
+        database,
+        identity.refreshContext,
+      ),
       learning: createResolutionLearning(database, identity.refreshContext),
       operationalSummary: createOperationalSummary(database, {
         cases: createCaseMetricReader,
+        resolution: createResolutionMetricReader,
         procurement: createProcurementMetricReader,
         coverage: createConnectionCoverage,
       }),
@@ -283,6 +291,8 @@ export function createApplicationServices(
       operations: createOperationsOverview(
         detection.cases,
         createConnectionCoverage(database),
+        () => new Date(),
+        createResolutionMetricReader(database),
       ),
       inventory: createInventoryWorkspace(database),
       products: createProductWorkspace(database),

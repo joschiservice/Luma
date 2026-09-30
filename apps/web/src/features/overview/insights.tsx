@@ -3,6 +3,7 @@ import { useParams } from '@tanstack/react-router';
 
 import { OperationalMetrics } from './operational-metrics';
 import { OrderMetrics } from './order-metrics';
+import { ResolutionOutcomes } from './resolution-outcomes';
 
 /** Shows live operational metrics and order flow, with drill-downs into matching records. */
 export function InsightsPage() {
@@ -18,6 +19,10 @@ export function InsightsPage() {
       />
       <OperationalMetrics
         key={`summary-${organizationId}`}
+        organizationId={organizationId}
+      />
+      <ResolutionOutcomes
+        key={`resolution-${organizationId}`}
         organizationId={organizationId}
       />
       <OrderMetrics key={organizationId} organizationId={organizationId} />

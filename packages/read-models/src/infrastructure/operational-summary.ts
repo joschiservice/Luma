@@ -10,6 +10,7 @@ import type {
   PurchaseOrderMetricItem,
   StockMetricItem,
 } from '@luma/procurement';
+import type { ResolutionMetricReader } from '@luma/resolution';
 
 import type {
   OperationalCohortItem,
@@ -19,6 +20,7 @@ import type {
 import { operationalMetricRequestSchema } from './operational-metric-validation.js';
 
 interface Readers {
+  resolution?(db: TenantDatabase): ResolutionMetricReader;
   cases(
     db: TenantDatabase,
   ): (
@@ -73,6 +75,21 @@ export function createOperationalSummary(
         };
         const results: OperationalMetricRead<OperationalCohortItem>[] = [];
         const families = new Set(request.metrics.map((id) => id.split('.')[0]));
+        if (families.has('resolution')) {
+          if (!readers.resolution)
+            throw new IdentityError(
+              503,
+              'SERVICE_UNAVAILABLE',
+              'Resolution measurements are unavailable',
+            );
+          results.push(
+            ...(await readers.resolution(scoped)(
+              context.tenantId,
+              asOf,
+              request.scope,
+            )),
+          );
+        }
         if (families.has('cases'))
           results.push(
             ...(await readers.cases(scoped)(context.tenantId, asOf)),
@@ -146,10 +163,19 @@ export function createOperationalSummary(
           offset: request.offset,
           metrics: metrics.map((metric) => ({
             ...metric,
-            items: metric.items.slice(
-              request.offset,
-              request.offset + request.limit,
-            ),
+            items: metric.items
+              .slice(request.offset, request.offset + request.limit)
+              .map((item) =>
+                item.kind === 'resolution'
+                  ? {
+                      ...item,
+                      evidenceRefCount: item.evidenceRefs.length,
+                      factCount: item.factIds.length,
+                      evidenceRefs: item.evidenceRefs.slice(0, 50),
+                      factIds: item.factIds.slice(0, 50),
+                    }
+                  : item,
+              ),
           })),
         };
       },

@@ -32,6 +32,23 @@ export const operationsOverviewSchema = z.object({
       freshness: z.enum(['fresh', 'stale', 'unobserved']),
     }),
   ),
+  measurement: z
+    .object({
+      environment: z.literal('live'),
+      countingUnit: z.literal('incident'),
+      coverage: z.enum(['complete', 'partial', 'unavailable']),
+      explanation: z.string(),
+      eligible: count,
+      verified: count,
+      autonomous: count,
+      human: count,
+      unknownEligibility: count,
+      unknownAttribution: count,
+      unknownEnvironment: count,
+      pending: count,
+      dataThrough: z.string().datetime().nullable(),
+    })
+    .optional(),
   attentionCount: count,
   activeCount: count,
   verifiedResolutions: count,

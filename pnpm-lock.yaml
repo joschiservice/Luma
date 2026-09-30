@@ -1330,6 +1330,9 @@ importers:
       '@luma/procurement':
         specifier: workspace:*
         version: link:../procurement
+      '@luma/resolution':
+        specifier: workspace:*
+        version: link:../resolution
       '@ts-rest/fastify':
         specifier: 'catalog:'
         version: 3.52.1(@ts-rest/core@3.52.1(@types/node@24.13.5)(zod@3.25.76))(fastify@5.12.5)(zod@3.25.76)

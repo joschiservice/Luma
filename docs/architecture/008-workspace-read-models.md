@@ -36,7 +36,7 @@ operational metrics composition, the operational summary and the Orders workspac
 - Owners' public `index.ts` exports only the types of these building blocks
   (`OrderStateQueries`). Fragments document the parameters they bind (`$1` tenant, `$2`
   evaluation time).
-- The module may import platform, identity, orders, exceptions, connectors and procurement
+- The module may import platform, identity, orders, exceptions, connectors, procurement and resolution
   (see `tooling/architecture/policy.mjs`). Nothing imports it except composition roots.
 
 Resolution keeps diagnosis, case coordination, learning, activity and the operations
