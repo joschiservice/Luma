@@ -16,6 +16,10 @@ import { registerRecoveryRoutes } from './api/fulfillment-recovery.js';
 import { registerInventoryCorrectionRoutes } from './api/inventory-correction.js';
 import { registerRecordRoutes } from './api/records.js';
 import { registerShopifyRoutes } from './api/shopify.js';
+import {
+  correctionDecision,
+  recoveryDecision,
+} from './application/decisions.js';
 import type { ShopifyOAuth } from './application/oauth.js';
 import { createRecordService } from './application/records.js';
 import { readShopifyConfig } from './config.js';
@@ -137,6 +141,9 @@ export function createApp(context: AppFactoryContext): AppDefinition {
       context.env.SHOPIFY_CUSTOMER_CONTACT_APPROVED === 'true',
   });
 
+  const recovery = createShopifyRecovery(context, installations);
+  const corrections = createShopifyInventoryCorrection(context, installations);
+
   return {
     manifest: {
       id: 'shopify',
@@ -168,6 +175,28 @@ export function createApp(context: AppFactoryContext): AppDefinition {
           }
         : {}),
     }),
+    async decisions(tenant) {
+      try {
+        await context.requireInstalled(tenant, 'shopify');
+      } catch (error) {
+        // Absent (404) and not installed (409) apps have no decisions for this workspace.
+        if (
+          error instanceof IdentityError &&
+          [403, 404, 409].includes(error.statusCode)
+        )
+          return [];
+        throw error;
+      }
+      const [recoveries, stock] = await Promise.all([
+        recovery.pending(tenant),
+        corrections.pending(tenant),
+      ]);
+
+      return [
+        ...recoveries.map((view) => recoveryDecision(view, tenant.actor.id)),
+        ...stock.map((view) => correctionDecision(view, tenant.actor.id)),
+      ];
+    },
     async uninstalled({ tenantId, transaction }) {
       if (config)
         await transaction.query(
@@ -204,14 +233,8 @@ export function createApp(context: AppFactoryContext): AppDefinition {
           : undefined,
       );
       registerRecordRoutes(server, records);
-      registerInventoryCorrectionRoutes(
-        server,
-        createShopifyInventoryCorrection(context, installations),
-      );
-      registerRecoveryRoutes(
-        server,
-        createShopifyRecovery(context, installations),
-      );
+      registerInventoryCorrectionRoutes(server, corrections);
+      registerRecoveryRoutes(server, recovery);
       server.post(
         '/v1/organizations/:organizationId/apps/shopify/record-connections',
         async (request, reply) => {

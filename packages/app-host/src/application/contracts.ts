@@ -28,9 +28,61 @@ export interface AppManifest {
 
 export type { WorkspaceApp } from '../domain/installation.js';
 
+/**
+ * A decision an app-owned service is waiting on a person for. The host lists it in Needs you;
+ * responses still go through the app's own review, which checks the exact proposal again.
+ */
+export interface AppDecision {
+  /** Stable and app-prefixed, such as `shopify:inventory_correction:<id>`. */
+  id: string;
+  kind: 'fulfillment_recovery' | 'inventory_correction';
+  reason: 'approval' | 'run' | 'recovery';
+  domain: 'orders' | 'fulfillment' | 'inventory';
+  title: string;
+  /** Why a person is needed. */
+  why: string;
+  /** What each response available to the reader causes. */
+  consequences: { response: string; text: string }[];
+  /** The exact proposed change: source, target, location and quantities. */
+  change: { label: string; value: string }[];
+  /** Business impact; `unknown` unless the app has an explicit rule for it. */
+  impact: { level: 'high' | 'medium' | 'low' | 'unknown'; text: string | null };
+  requestedAt: string;
+  /** When the proposal loses its authority; null when nothing expires. */
+  deadline: string | null;
+  requesterId: string | null;
+  evidence: { observedAt: string | null; validUntil: string | null };
+  response: 'decide' | 'run' | 'check' | 'awaiting_other' | 'view_only';
+  subject: { label: string; detail: string | null };
+  /** The affected record by canonical ID or by its source identity. */
+  record:
+    | { kind: 'position' | 'order' | 'fulfillment'; id: string }
+    | {
+        kind: 'order' | 'fulfillment';
+        source: { connectionId: string; externalId: string };
+      }
+    | null;
+  /** The app UI slot and target whose review owns the decision. */
+  owner:
+    | {
+        kind: 'app_fulfillment';
+        connectionId: string;
+        orderId: string;
+        fulfillmentId: string;
+      }
+    | { kind: 'app_inventory'; positionId: string };
+  group: { key: string; label: string };
+}
+
 export interface AppDefinition {
   manifest: AppManifest;
   connector?: ConnectionProvider;
+  /**
+   * Lists the tenant's decisions this app waits on a person for, from persisted state only.
+   * Must check workspace installation and roles; return an empty list when the reader can't
+   * see them. Do not perform provider reads.
+   */
+  decisions?(context: TenantContext): Promise<AppDecision[]>;
   /** Registers app-owned HTTP handlers; handlers must check workspace installation. */
   registerHttp?(server: FastifyInstance, identity?: IdentityService): void;
   /** Updates app-owned storage inside the installation transaction. Do not perform network requests. */

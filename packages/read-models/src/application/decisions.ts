@@ -1,0 +1,93 @@
+import type { TenantContext } from '@luma/identity';
+import type { ReplenishmentDecision } from '@luma/procurement';
+
+import type {
+  DecisionAssignment,
+  DecisionCandidate,
+  DecisionDomain,
+  DecisionItem,
+  DecisionOwner,
+  DecisionReason,
+  DecisionView,
+} from '../domain/decision-item.js';
+
+export type {
+  DecisionAssignment,
+  DecisionCandidate,
+  DecisionDomain,
+  DecisionItem,
+  DecisionKind,
+  DecisionOwner,
+  DecisionReason,
+  DecisionRecordKind,
+  DecisionResponse,
+  DecisionView,
+} from '../domain/decision-item.js';
+
+/** An owner that lists its own decisions for the reader. It must not read providers. */
+export interface DecisionProvider {
+  id: string;
+  label: string;
+  pending(context: TenantContext): Promise<DecisionCandidate[]>;
+}
+
+export interface DecisionQuery {
+  view: DecisionView;
+  domain?: DecisionDomain | undefined;
+  reason?: DecisionReason | undefined;
+  cursor?: string | undefined;
+  /** Reads only this decision. */
+  id?: string | undefined;
+  /** Page size, 1 to 100. */
+  limit: number;
+}
+
+export interface DecisionList {
+  schemaVersion: 1;
+  asOf: string;
+  items: DecisionItem[];
+  nextCursor: string | null;
+  totalCount: number;
+  /** Items before this page in the same view and filters. */
+  offset: number;
+  counts: {
+    views: Record<DecisionView, number>;
+    domains: Record<DecisionDomain, number>;
+    reasons: Record<DecisionReason, number>;
+  };
+  /** Owners that failed to answer are `unavailable`; their decisions are missing, not resolved. */
+  sources: { id: string; label: string; state: 'available' | 'unavailable' }[];
+}
+
+/** A decision contributed by a workspace app; the host adds the app ID to its owner. */
+export type AppOwnedDecision = Omit<DecisionCandidate, 'owner'> & {
+  owner: DecisionOwner extends infer O
+    ? O extends { appId: string }
+      ? Omit<O, 'appId'>
+      : never
+    : never;
+};
+
+/** Lists the replenishment proposals that wait for approval; see the procurement owner. */
+export type ReplenishmentDecisionReader = (
+  context: TenantContext,
+) => Promise<ReplenishmentDecision[]>;
+
+/**
+ * Reads the decisions across owners that need a person, ranked by explicit urgency rules.
+ * Responses go through each owner's review; the queue never decides anything.
+ */
+export interface DecisionQueue {
+  /** Rejects a cursor produced by another view, filter or page size with a 400 error. */
+  list(context: TenantContext, query: DecisionQuery): Promise<DecisionList>;
+  /** Returns the current item with this ID, or null when it no longer needs a person. */
+  find(context: TenantContext, id: string): Promise<DecisionItem | null>;
+}
+
+/** Changes who looks after a decision. Implemented by the resolution owner. */
+export interface DecisionAssignments {
+  assign(
+    context: TenantContext,
+    input: { decisionId: string; assigneeId: string | null; revision: number },
+  ): Promise<{ decisionId: string; assignment: DecisionAssignment }>;
+}

@@ -376,6 +376,7 @@ export async function createPilot(
       identity: identity.service,
       execution: { kind: 'enabled', effects },
       verifier,
+      decisionSources: installations.registry.decisionSources(),
       desk: {
         capability: supported,
         notifyDecision: async (actor, exceptionId) => {
@@ -681,6 +682,7 @@ export async function createPilot(
       runtime,
       replenishment: application.replenishment,
       procurement: application.procurement,
+      decisions: application.http.decisions,
       context,
       operator,
       detection,

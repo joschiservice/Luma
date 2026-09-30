@@ -35,6 +35,10 @@ partial reads and unchanged quantities remain unverified. The operator gets an
 explicit recovery decision and can inspect Shopify or check again. Luma does not
 close an operational issue from a mutation receipt.
 
+[Needs you](needs-you.md) lists recoveries awaiting approval, approved recoveries waiting for
+their requester, and accepted or uncertain recoveries without verified progress, through the
+same `fulfillment` slot.
+
 Validation: `pnpm test:e2e shopify-fulfillment.e2e.mjs`, the Shopify provider unit
 tests, and `Orders/Shopify fulfillment recovery` stories. Refresh and validate the
 pinned GraphQL schema with `node apps/api/scripts/update-shopify-schema.mjs 2026-07`.

@@ -1,7 +1,6 @@
 import type { OperationsOverview } from '@luma/api-contract';
 import {
   elapsed,
-  issueKind,
   issueStatus,
 } from '@luma/ui/components/issues/case-presentation';
 import { buttonVariants } from '@luma/ui/components/primitives/button';
@@ -19,6 +18,13 @@ import { useContext } from 'react';
 
 import { activityOptions } from '../activity/data';
 import { activityLabel, activityState } from '../activity/presentation';
+import { decisionsOptions } from '../decisions/data';
+import { useNow } from '../decisions/live';
+import {
+  decisionStatus,
+  domainIcons,
+  timeLeft,
+} from '../decisions/presentation';
 import { casesOptions } from '../exceptions/data';
 import { fulfillmentsOptions } from '../fulfillment/data';
 import { viewLabels as fulfillmentViewLabels } from '../fulfillment/presentation';
@@ -48,7 +54,10 @@ function ModuleSkeleton({ rows = 3 }: { rows?: number }) {
   );
 }
 
-/** Lists the decisions waiting for the reader, most urgent first. */
+/**
+ * Lists the most urgent decisions waiting on a person across issues, workflows and apps, from
+ * the same queue and ranking as Needs you.
+ */
 export function AttentionModule({
   organizationId,
   overview,
@@ -56,36 +65,50 @@ export function AttentionModule({
   organizationId: string;
   overview: OperationsOverview;
 }) {
-  const decisions = overview.prioritizedDecisions;
+  const decisions = useQuery(decisionsOptions(organizationId, {}, 5));
+  const now = useNow();
+  if (decisions.isPending) return <ModuleSkeleton />;
+  if (decisions.isError)
+    return (
+      <p className="home-note">
+        Decisions couldn’t be loaded. Open Needs you or try again shortly.
+      </p>
+    );
+  const { items, counts, sources } = decisions.data;
+  const missing = sources.filter((source) => source.state === 'unavailable');
 
   return (
     <>
-      {decisions.length ? (
+      {missing.length ? (
+        <p className="home-note">
+          {missing.map((source) => source.label).join(', ')} didn’t answer, so
+          some decisions may be missing.
+        </p>
+      ) : null}
+      {items.length ? (
         <ol className="home-rows operations-decisions">
-          {decisions.map((item) => {
-            const kind = issueKind(item);
-            const status = issueStatus(item);
+          {items.map((item) => {
+            const status = decisionStatus(item);
 
             return (
               <li key={item.id}>
                 <Link
                   className="home-row"
-                  to="/app/$organizationId/exceptions/$exceptionId"
-                  params={{ organizationId, exceptionId: item.id }}
-                  search={{ view: 'needs_you' }}
+                  to="/app/$organizationId/needs-you"
+                  params={{ organizationId }}
+                  search={{ item: item.id }}
                 >
-                  <DomainIcon domain={kind.domain} size="sm" />
+                  <DomainIcon domain={domainIcons[item.domain]} size="sm" />
                   <span className="home-row-main">
-                    <strong>{item.summary.replace(/\.+$/, '')}</strong>
-                    <span>{item.attention.explanation}</span>
+                    <strong>{item.title}</strong>
+                    <span>{item.subject.label}</span>
                   </span>
                   <span className="home-row-meta">
                     <StatePill state={status.state}>{status.label}</StatePill>
-                    <span
-                      className="home-row-age"
-                      title={item.attention.requestedAt ?? item.detectedAt}
-                    >
-                      {elapsed(item.attention.requestedAt ?? item.detectedAt)}
+                    <span className="home-row-age" title={item.requestedAt}>
+                      {item.deadline && item.urgency === 'expiring'
+                        ? timeLeft(item.deadline, now)
+                        : elapsed(item.requestedAt, now)}
                     </span>
                   </span>
                 </Link>
@@ -97,7 +120,7 @@ export function AttentionModule({
         <div className="home-empty">
           <StateDot state="verified" />
           <div>
-            <strong>No issues need your review.</strong>
+            <strong>Nothing needs your decision.</strong>
             <p>
               {overview.activeCount
                 ? `${overview.activeCount} ${overview.activeCount === 1 ? 'issue is' : 'issues are'} still in progress. Luma will ask when it needs you.`
@@ -108,15 +131,14 @@ export function AttentionModule({
       )}
       <footer className="home-module-footer">
         <span className="lu-numeric">
-          {overview.attentionCount} waiting · severity, then oldest request
+          {counts.views.all} waiting · most urgent first
         </span>
         <Link
           className="home-module-link"
-          to="/app/$organizationId/exceptions"
+          to="/app/$organizationId/needs-you"
           params={{ organizationId }}
-          search={{ view: 'needs_you' }}
         >
-          <LinkLabel>Open inbox</LinkLabel>
+          <LinkLabel>Open Needs you</LinkLabel>
         </Link>
       </footer>
     </>

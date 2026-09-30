@@ -80,4 +80,5 @@ For interactive local use, start the simulator stack, let it collect mapped
 inventory, add a supplier in Procurement, and open **Workflows → Replenish low
 stock → Stock rules**. Activate a rule with a minimum above current stock, then
 use **Check stock now** or let the worker detect the condition. Sign in as the
-other workspace admin to approve the exact proposal in Recent runs.
+other workspace admin to approve the exact proposal in Recent runs or in
+[Needs you](needs-you.md), which lists the same decision until it expires.

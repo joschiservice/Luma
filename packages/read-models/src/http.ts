@@ -11,3 +11,5 @@ export { productRoutes } from './api/products.js';
 export { fulfillmentRoutes } from './api/fulfillment.js';
 
 export { returnRoutes } from './api/returns.js';
+
+export { decisionRoutes } from './api/decisions.js';

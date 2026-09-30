@@ -7,7 +7,8 @@ and scroll. Views, filters and pagination live in validated search parameters.
 Refresh restarts pagination. Focus refetches persisted reads without moving focus.
 
 Needs you includes persisted approval state, uncertainty escalation and current,
-rule-produced manual recommendations. Severity and model hypotheses never create
+rule-produced manual recommendations. The workspace [Needs you queue](needs-you.md)
+lists the same case attention next to workflow and app decisions. Severity and model hypotheses never create
 attention. Active includes failed and escalated cases. History includes verified
 resolutions and human dispositions; these are labeled separately.
 

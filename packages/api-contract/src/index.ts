@@ -5,6 +5,7 @@ import { activityContract } from './contracts/activity.js';
 import { appsContract } from './contracts/apps.js';
 import { exceptionsContract } from './contracts/cases.js';
 import { connectionsContract } from './contracts/connections.js';
+import { decisionsContract } from './contracts/decisions.js';
 import { caseDeskContract } from './contracts/desk.js';
 import { draftTestsContract } from './contracts/draft-tests.js';
 import { fulfillmentContract } from './contracts/fulfillment.js';
@@ -57,6 +58,7 @@ const routes: {
   orders: typeof ordersContract;
   returns: typeof returnsContract;
   sync: typeof syncContract;
+  decisions: typeof decisionsContract;
 } = {
   shadow: shadowContract,
   activity: activityContract,
@@ -84,6 +86,7 @@ const routes: {
   orders: ordersContract,
   returns: returnsContract,
   sync: syncContract,
+  decisions: decisionsContract,
 };
 const options = {
   strictStatusCodes: true as const,
@@ -183,3 +186,5 @@ export * from './products.js';
 export * from './returns.js';
 
 export * from './sync.js';
+
+export * from './decisions.js';

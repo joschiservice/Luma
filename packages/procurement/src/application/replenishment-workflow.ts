@@ -48,6 +48,33 @@ export interface ReplenishmentTransport {
   ): Promise<unknown>;
 }
 
+/** A purchase-order proposal that waits for a person's approval. */
+export interface ReplenishmentDecision {
+  runId: string;
+  definitionId: string;
+  positionId: string;
+  connectionId: string;
+  sku: string;
+  supplier: string;
+  quantity: number;
+  unit: string | null;
+  available: number | null;
+  minimum: number;
+  target: number;
+  /** Quantities above this limit make the proposal high risk. */
+  approvalQuantity: number;
+  reference: string | null;
+  /** When the stock read that justifies the proposal was taken. */
+  checkedAt: string | null;
+  requestedAt: string;
+  requesterId: string;
+  /** The proposal can't be approved after this; approval doesn't extend it. */
+  expiresAt: string;
+  risk: 'low' | 'medium' | 'high';
+  /** Whether the reader may approve or reject it now, as the run review decides. */
+  canRespond: boolean;
+}
+
 type ReplenishmentRuleInput = Parameters<ReplenishmentWorkflow['configure']>[1];
 
 type WorkflowActivationView = Awaited<
@@ -230,6 +257,20 @@ export function createReplenishmentService(deps: {
 
     return run;
   }
+
+  // Approval needs an owner or admin other than the principal who started the run, while the
+  // rule is active and the proposal's evidence is still valid.
+  const respondable = (
+    context: TenantContext,
+    run: { actor: { id: string } },
+    rule: ReplenishmentActivation,
+    validUntil: string | undefined,
+  ) =>
+    rule.active &&
+    context.actor.role !== 'member' &&
+    context.actor.id !== run.actor.id &&
+    !!validUntil &&
+    Date.parse(validUntil) > Date.now();
 
   const api: ReplenishmentWorkflow = {
     definitionId,
@@ -553,10 +594,12 @@ export function createReplenishmentService(deps: {
           !!waiting &&
           state === 'awaiting_decision' &&
           !terminal &&
-          rule.active &&
-          context.actor.role !== 'member' &&
-          context.actor.id !== run.actor.id &&
-          Date.parse(binding!.action.preconditions.validUntil) > Date.now(),
+          respondable(
+            context,
+            run,
+            rule,
+            binding?.action.preconditions.validUntil,
+          ),
       };
     },
     async decide(context, id, input) {
@@ -1000,6 +1043,85 @@ export function createReplenishmentService(deps: {
     version,
     vocabulary,
     template,
+    /**
+     * Lists unexpired purchase-order proposals that wait for approval, from persisted run state
+     * only. It reads no provider and starts nothing; approval still goes through `api.decide`.
+     */
+    async pending(context: TenantContext): Promise<ReplenishmentDecision[]> {
+      context = await authorize(context);
+      const existing = await runs.pending(context, definitionId);
+      if (!existing.length) return [];
+      const [evidence, rules] = await Promise.all([
+        steps.list(
+          context,
+          existing.map((r) => r.id),
+        ),
+        store.list(context),
+      ]);
+      const items: ReplenishmentDecision[] = [];
+      for (const run of existing) {
+        const outputs = evidence.get(run.id) ?? [];
+        if (
+          presentTriggerRun(run, outputs).processState !== 'awaiting_decision'
+        )
+          continue;
+        const waiting = outputs.find(
+          (step) => step.kind === 'capability' && step.state === 'waiting',
+        );
+        const rule = rules.find(
+          (r) => r.id === String(run.context.inputs.activationId),
+        );
+        if (!waiting?.evidenceRefs[0] || !rule) continue;
+        const [binding, decision] = await Promise.all([
+          deps.safety.provisioning.step(context, run.id, 'create-order'),
+          deps.safety.policies.decision(context, waiting.evidenceRefs[0]),
+        ]);
+        if (
+          !binding ||
+          decision?.outcome !== 'approval_required' ||
+          decision.approval ||
+          decision.proposalId !== binding.action.id ||
+          Date.parse(binding.action.preconditions.validUntil) <= Date.now()
+        )
+          continue;
+        const line = JSON.parse(String(binding.action.parameters.lines))[0];
+        const inventory = outputs.find((step) => step.stepId === 'inventory');
+        items.push({
+          runId: run.id,
+          definitionId,
+          positionId: rule.positionId,
+          connectionId: rule.connectionId,
+          sku: rule.sku,
+          supplier: rule.supplier,
+          quantity: Number(line.quantity),
+          unit: typeof line.unit === 'string' ? line.unit : null,
+          available:
+            typeof inventory?.values.available === 'number'
+              ? inventory.values.available
+              : null,
+          minimum: rule.minimum,
+          target: rule.target,
+          approvalQuantity: rule.approvalQuantity,
+          reference:
+            typeof binding.action.parameters.reference === 'string'
+              ? binding.action.parameters.reference
+              : null,
+          checkedAt: inventory?.observedAt ?? null,
+          requestedAt: waiting.recordedAt,
+          requesterId: run.actor.id,
+          expiresAt: binding.action.preconditions.validUntil,
+          risk: binding.action.risk,
+          canRespond: respondable(
+            context,
+            run,
+            rule,
+            binding.action.preconditions.validUntil,
+          ),
+        });
+      }
+
+      return items;
+    },
     /** Recovers committed starts and evaluates active stock conditions with observation deduplication. */
     async tick(context: TenantContext) {
       context = await authorize(context, true);

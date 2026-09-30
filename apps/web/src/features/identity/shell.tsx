@@ -16,9 +16,9 @@ import { useEffect } from 'react';
 import { isTypingTarget } from '../../lib/keyboard';
 import { setThemePreference, useThemePreference } from '../../lib/theme';
 import { AppNavigation } from '../apps/navigation';
+import { decisionsOptions } from '../decisions/data';
 import { ContextHelp } from '../help/context-help';
 import { PinCurrentPage, PinnedNavigation } from '../layout/pins';
-import { overviewOptions } from '../overview/data';
 import { settingsOptions } from '../settings/data';
 import { Failure, Pending } from './common';
 import { contextOptions, organizationsOptions, sessionOptions } from './data';
@@ -83,9 +83,9 @@ function Navigation({
   const onAppPage = useLocation({
     select: (location) => appPagePattern.test(location.pathname),
   });
-  const attention = useQuery({
-    ...overviewOptions(organizationId, '24h'),
-    select: (overview) => overview.attentionCount,
+  const waiting = useQuery({
+    ...decisionsOptions(organizationId, {}, 1),
+    select: (list) => list.counts.views.all,
   });
   const group = (name: WorkspaceDestination['group']) =>
     workspaceDestinations.filter((item) => item.group === name);
@@ -95,7 +95,7 @@ function Navigation({
         destination={destination}
         organizationId={organizationId}
         close={close}
-        count={destination.path === 'exceptions' ? attention.data : undefined}
+        count={destination.path === 'needs-you' ? waiting.data : undefined}
         exact={destination.path === 'apps' && onAppPage}
       />
     </li>

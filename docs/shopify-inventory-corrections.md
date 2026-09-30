@@ -43,6 +43,10 @@ shows **Quantity verified**; it does not optimistically rewrite canonical snapsh
 or close related operational issues. Data sync and the independent issue monitor
 retain ownership of those updates.
 
+Pending approvals, approved corrections waiting for their requester, and accepted or
+uncertain corrections without a verified quantity also appear in [Needs you](needs-you.md),
+which mounts the same `inventory` slot.
+
 Entry points are Inventory's stock detail, the app's `inventory` UI slot, and
 `inventory-correction-{candidates,inspect,preview,approve,execute,check}` commands.
 Validation: Shopify provider unit tests, simulator CAS/idempotency tests,

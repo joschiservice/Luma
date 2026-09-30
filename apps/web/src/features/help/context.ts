@@ -1,4 +1,5 @@
 export type HelpTopic =
+  | 'needs-you'
   | 'issues'
   | 'issues/investigate'
   | 'issues/resolve'

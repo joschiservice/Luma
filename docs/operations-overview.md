@@ -10,7 +10,9 @@ and connection health describe the current state, including older unresolved cas
 
 Counts and the five priority decisions use the inbox's persisted attention rules.
 Severity descending, oldest attention request, then ID determine the order.
-Decisions link to case details in the `needs_you` view. Reads never run diagnosis
+Decisions link to case details in the `needs_you` view. Home's attention module and
+its headline count read the [Needs you queue](needs-you.md) instead, which adds
+replenishment and app decisions to these case decisions. Reads never run diagnosis
 or a model. Connection and case projections remain in their owning modules;
 the workflow application service composes their public readers.
 
