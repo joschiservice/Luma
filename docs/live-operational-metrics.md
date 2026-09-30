@@ -113,3 +113,10 @@ existing reconnect and polling recovery. The operational summary and order v1 pa
 use separate family requests and share one tenant subscription per browser page.
 The subscription closes after its last consumer unmounts. Online recovery and
 stream retries reopen that single connection for all consumers.
+
+Resolution outcomes use the same stream and recovery contract. Migration 0044
+adds wake-ups for measurement facts, learning/repair records, admission bindings,
+incident evidence/sources and disposition audit records. Existing approvals, case
+commands and exception state triggers cover the other dependencies. Eligibility
+changes, late verification and new linked recurrences invalidate matching cohorts;
+see [Resolution measurement](resolution-measurement.md).

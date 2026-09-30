@@ -349,3 +349,15 @@ status rules, `application/runner.ts` for page processing and link requests, and
 Tests: commerce-sync domain tests, `commerce-sync.integration.test.ts`, Shopify adapter
 and privacy tests, `Data sync/Workspace` stories and the web sync presentation tests.
 See [Commerce sync](commerce-sync.md).
+
+Resolution outcome measurement: `packages/resolution/src/domain/measurement.ts`
+owns eligibility, attribution and counting rules; `application/measurement.ts`
+owns fresh authorization; `infrastructure/persistence/measurement.ts` owns the
+append-only ledger and public metric reader. Contracts are `measurement.ts` and
+`operational-metrics.ts` in `packages/api-contract`; migration 0044 adds storage,
+RLS and committed notifications. The shared operational summary injects this
+reader; Home composes its summary and Insights uses
+`apps/web/src/features/overview/resolution-outcomes.tsx` and
+`resolution-evidence.tsx`. Tests: `measurement.test.ts`,
+`resolution-measurement.e2e.mjs`, `resolution-measurement.browser.mjs`. See
+[Resolution measurement](resolution-measurement.md).

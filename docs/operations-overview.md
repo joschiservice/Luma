@@ -28,12 +28,15 @@ Failures hide previous health claims and totals until retry succeeds. Offline
 queries show a paused notice and hide health and totals, including before the
 first load. Reconnection resumes the query automatically.
 
-Automation eligibility and human-work attribution are not persisted yet. Both
-`automaticallyResolved` and `automation` therefore return null. Home shows “—” in
-the handling module and “Unavailable” in the resolution outcomes module; verified resolutions remain a separate count and are never
-relabelled as automatic. The contract supports an authoritative numerator and
-denominator when those records become available. A zero denominator displays no
-percentage. Synthetic automation values exist only in Storybook.
+Overview now composes the versioned [resolution measurement](resolution-measurement.md)
+reader. The nested `measurement` summary uses live incidents first detected in the
+selected window, distinct from `verifiedResolutions`, whose legacy completion-time
+window is preserved. Home's outcomes module labels its detection cohort explicitly.
+Exact `automaticallyResolved` and `automation` are available only with complete
+relevant classification; unknown facts and unclassified environments remain visible.
+A known zero denominator displays no percentage. The shared registry supplies the
+same numerator, eligibility denominator and authorized cohorts on Insights. No
+verified outcome is relabelled automatic without complete human-work attribution.
 
 TanStack Query isolates caches by organization and window, discards unused private
 data, polls every 30 seconds while visible, and refreshes on focus or reconnect.

@@ -5,7 +5,7 @@ export interface OperationalMetricDefinition {
   description: string;
   version: 2;
   unit: 'case' | 'second' | 'stock_position' | 'purchase_order' | 'connection';
-  family: 'cases' | 'inventory' | 'procurement' | 'connections';
+  family: 'cases' | 'inventory' | 'procurement' | 'connections' | 'resolution';
   filters: readonly string[];
   timeSemantics: string;
   permissions: 'workspace_member';

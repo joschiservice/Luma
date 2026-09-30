@@ -28,7 +28,7 @@ import {
   Plug,
   RefreshCw,
 } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 
 import { IdentityError } from '../identity/data';
 import { useLiveMetricQuery } from './metrics-live';
@@ -36,8 +36,9 @@ import {
   operationalMetricRequest,
   operationalMetricsOptions,
 } from './operational-metrics-data';
+import { ResolutionEvidence } from './resolution-evidence';
 
-const config = {
+const defaultConfig = {
   initial: operationalMetricRequest,
   key: 'operational-metrics',
   options: operationalMetricsOptions,
@@ -74,6 +75,10 @@ const groups = [
   },
 ];
 const reasonLabels: Record<string, string> = {
+  eligible: 'Eligible',
+  unknown_eligibility: 'Unknown eligibility',
+  unknown_attribution: 'Unknown attribution',
+  unknown_environment: 'Unknown environment · excluded',
   approval: 'Approval',
   manual_intervention: 'Manual intervention',
   uncertainty: 'Uncertainty',
@@ -95,9 +100,34 @@ const reasonLabels: Record<string, string> = {
 /** Groups current operational priorities and opens their authorized matching records. */
 export function OperationalMetrics({
   organizationId,
+  initialRequest,
+  heading = 'Your operational pulse',
+  description = 'Find the work that needs your next move.',
+  metricGroups = groups,
 }: {
   organizationId: string;
+  initialRequest?: OperationalMetricRequest;
+  heading?: string;
+  description?: string;
+  metricGroups?: {
+    id: string;
+    title: string;
+    subtitle: string;
+    icon: typeof CircleAlert;
+    metrics?: string[];
+  }[];
 }) {
+  const config = useMemo(
+    () =>
+      initialRequest
+        ? {
+            initial: initialRequest,
+            key: 'resolution-metrics',
+            options: operationalMetricsOptions,
+          }
+        : defaultConfig,
+    [initialRequest],
+  );
   const { query, request, setRequest, connection } = useLiveMetricQuery<
     OperationalMetricRequest,
     OperationalMetricResponse
@@ -119,15 +149,14 @@ export function OperationalMetrics({
   };
 
   return (
-    <section
-      className="operational-metrics"
-      aria-labelledby="operational-title"
-    >
+    <section className="operational-metrics" aria-label={heading}>
       <header className="operational-heading">
         <div>
-          <p className="order-metrics-eyebrow">Right now</p>
-          <h2 id="operational-title">Your operational pulse</h2>
-          <p>Find the work that needs your next move.</p>
+          <p className="order-metrics-eyebrow">
+            {initialRequest ? 'Detection cohort' : 'Right now'}
+          </p>
+          <h2>{heading}</h2>
+          <p>{description}</p>
         </div>
         <div className="operational-status">
           <Badge tone={connection === 'live' ? 'neutral' : 'warning'}>
@@ -181,7 +210,7 @@ export function OperationalMetrics({
       ) : data ? (
         <>
           <div className="operational-groups">
-            {groups.map((group) => {
+            {metricGroups.map((group) => {
               const Icon = group.icon;
 
               return (
@@ -195,7 +224,11 @@ export function OperationalMetrics({
                   </header>
                   <div>
                     {data.metrics
-                      .filter((m) => m.definition.family === group.id)
+                      .filter((m) =>
+                        group.metrics
+                          ? group.metrics.includes(m.definition.id)
+                          : m.definition.family === group.id,
+                      )
                       .map((m) => (
                         <button
                           type="button"
@@ -264,9 +297,11 @@ export function OperationalMetrics({
               <dl className="order-cohort-facts">
                 <div>
                   <dt>
-                    {metric.definition.unit === 'second'
-                      ? 'Age since first detection'
-                      : 'Known matches'}
+                    {metric.definition.id === 'resolution.time_to_outcome'
+                      ? 'Median verified duration'
+                      : metric.definition.unit === 'second'
+                        ? 'Age since first detection'
+                        : 'Known matches'}
                   </dt>
                   <dd>{metricValue(metric)}</dd>
                 </div>
@@ -295,6 +330,16 @@ export function OperationalMetrics({
                 </div>
               ) : null}
               <p className="order-cohort-note">{metric.coverageExplanation}</p>
+              {metric.definition.family === 'resolution' ? (
+                <p className="order-cohort-note">
+                  Data-through time:{' '}
+                  {metric.dataThrough ? (
+                    <WorkspaceDate value={metric.dataThrough} />
+                  ) : (
+                    'Unknown. No complete provider scan watermark.'
+                  )}
+                </p>
+              ) : null}
               {metric.items.length ? (
                 <ul
                   className="operational-cohort"
@@ -322,7 +367,9 @@ export function OperationalMetrics({
                     {metric.unknownCount
                       ? 'Unknown records prevent a complete total.'
                       : metric.coverage === 'unavailable'
-                        ? 'Add a replenishment rule to monitor a stock position.'
+                        ? metric.definition.family === 'resolution'
+                          ? 'No classified incidents in this environment and detection window. Check unknown environment or choose another cohort.'
+                          : 'Add a replenishment rule to monitor a stock position.'
                         : 'This cohort is empty at the evaluation time.'}
                   </p>
                 </div>
@@ -396,6 +443,12 @@ export function OperationalMetrics({
 }
 
 function metricValue(metric: Metric) {
+  if (
+    metric.definition.id === 'resolution.autonomous' &&
+    metric.total === null &&
+    metric.coverage !== 'unavailable'
+  )
+    return `${metric.observedCount} known`;
   if (metric.definition.unit === 'second')
     return metric.value === null ? '—' : age(metric.value);
 
@@ -405,6 +458,14 @@ function metricValue(metric: Metric) {
 }
 
 function metricHint(metric: Metric) {
+  if (metric.definition.family === 'resolution')
+    return metric.coverage === 'unavailable'
+      ? 'No classified cohort'
+      : metric.unknownCount
+        ? `${metric.unknownCount} unknown · partial coverage`
+        : metric.definition.id === 'resolution.autonomous'
+          ? 'Eligible · verified · complete attribution'
+          : 'Each incident counted once';
   if (metric.definition.unit === 'second')
     return metric.unknownCount
       ? 'Unknown detection times'
@@ -448,6 +509,39 @@ function CohortItem({
   item: Item;
   organizationId: string;
 }) {
+  if (item.kind === 'resolution')
+    return (
+      <div className="resolution-cohort-item">
+        <Link
+          to="/app/$organizationId/exceptions/$exceptionId"
+          params={{ organizationId, exceptionId: item.id }}
+          search={{ view: item.outcome === 'verified' ? 'history' : 'active' }}
+        >
+          {item.title.replaceAll('_', ' ')} <ArrowUpRight size={13} />
+        </Link>
+        <span>
+          <Badge tone={item.involvement === 'unknown' ? 'warning' : 'neutral'}>
+            {item.involvement === 'none'
+              ? 'Complete attribution · no human work'
+              : item.involvement === 'human'
+                ? 'Human involvement recorded'
+                : 'Attribution unknown'}
+          </Badge>{' '}
+          <Badge tone="neutral">{item.eligibility}</Badge>
+        </span>
+        <small>
+          First detected <WorkspaceDate value={item.detectedAt} /> ·{' '}
+          {item.verifiedAt ? (
+            <>
+              Verified <WorkspaceDate value={item.verifiedAt} />
+            </>
+          ) : (
+            'Awaiting independent verification'
+          )}
+        </small>
+        <ResolutionEvidence organizationId={organizationId} item={item} />
+      </div>
+    );
   if (item.kind === 'case')
     return (
       <>

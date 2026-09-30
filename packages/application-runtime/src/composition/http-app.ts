@@ -41,6 +41,7 @@ import type {
   ActivityService,
   DeskService,
   LearningService,
+  MeasurementService,
   MetricEvents,
   OperationsOverviewService,
   PlaybookLibrary,
@@ -94,6 +95,7 @@ export interface AppDependencies {
   workflowGeneration?: DraftGeneration;
   procurement?: ProcurementService;
   learning?: LearningService;
+  measurements?: MeasurementService;
   desk?: DeskService;
   eventSettings?: { intervalMs: number; lifetimeMs: number };
   operations?: OperationsOverviewService;
@@ -300,7 +302,10 @@ export function buildApp(
         exceptions: caseRoutes(dependencies.cases),
         caseDesk: deskRoutes(dependencies.desk),
         resolutionLearning: learningRoutes(dependencies.learning),
-        operations: operationsRoutes(dependencies.operations),
+        operations: operationsRoutes(
+          dependencies.operations,
+          dependencies.measurements,
+        ),
         metrics: metricRoutes(
           dependencies.metrics,
           dependencies.operationalSummary,

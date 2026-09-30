@@ -34,7 +34,9 @@ export function operationalMetricsOptions(
       'private',
       'organization',
       organizationId,
-      'operational-metrics',
+      request.metrics.some((id) => id.startsWith('resolution.'))
+        ? 'resolution-metrics'
+        : 'operational-metrics',
       request,
     ],
     ...privateQueryDefaults,

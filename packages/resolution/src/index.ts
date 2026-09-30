@@ -20,6 +20,19 @@ export type {
   WorkflowSource,
 } from './application/runtime.js';
 
+export { resolutionMetricDefinitions } from './domain/measurement.js';
+
+export type {
+  MeasurementEnvironment,
+  MeasurementScope,
+  ResolutionMetricItem,
+} from './domain/measurement.js';
+
+export type {
+  MeasurementService,
+  ResolutionMetricReader,
+} from './application/measurement.js';
+
 export type { OperationsOverviewService } from './application/overview.js';
 
 export type {

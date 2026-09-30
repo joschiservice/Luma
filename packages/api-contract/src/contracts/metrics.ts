@@ -46,7 +46,7 @@ export const metricsContract = c.router({
     },
     summary: 'Read selected operational metrics and matching records',
     description:
-      'Counts cases, monitored stock positions, recorded purchase orders and connection problems in one authorized snapshot. Select metric IDs explicitly. Filters must be supported by every selected metric. Reuse snapshot and asOf for pagination; refresh on 409. Current-state filters do not select historical reporting windows. Null values, unknown classification and unavailable coverage are distinct from zero.',
+      'Reads cases, monitored stock, purchase orders, connection health and evidence-backed resolution outcomes in one authorized snapshot. Select metric IDs explicitly. Filters must be supported by every selected metric. Reuse snapshot and asOf for pagination; refresh on 409. Resolution alone accepts environment and a 24-hour or seven-day first-detection window; other families describe current state. Null values, unknown classification and unavailable coverage are distinct from zero.',
   },
   definitions: {
     method: 'GET',

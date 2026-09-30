@@ -9,6 +9,17 @@ export const operationalMetricIdSchema = z.enum([
   'procurement.purchase_orders.draft',
   'procurement.purchase_orders.open',
   'connections.needing_attention',
+  'resolution.unknown_eligibility',
+  'resolution.eligible',
+  'resolution.verified',
+  'resolution.autonomous',
+  'resolution.human',
+  'resolution.unknown',
+  'resolution.pending',
+  'resolution.recurrent',
+  'resolution.incorrect_actions',
+  'resolution.time_to_outcome',
+  'resolution.unresolved_age',
 ]);
 const timestamp = z.string().datetime({ offset: true });
 
@@ -17,13 +28,17 @@ export const operationalMetricScopeSchema = z
     connectionId: z.string().uuid().optional(),
     supplierId: z.string().uuid().optional(),
     authority: z.enum(['luma', 'external']).optional(),
+    environment: z
+      .enum(['live', 'pilot', 'synthetic', 'shadow', 'unknown'])
+      .optional(),
+    window: z.enum(['24h', '7d']).optional(),
   })
   .strict();
 
 export const operationalMetricRequestSchema = z
   .object({
     definitionVersion: z.literal(2),
-    metrics: z.array(operationalMetricIdSchema).min(1).max(8),
+    metrics: z.array(operationalMetricIdSchema).min(1).max(19),
     scope: operationalMetricScopeSchema.default({}),
     limit: z.number().int().min(1).max(100).default(20),
     offset: z.number().int().min(0).max(10000).default(0),
@@ -47,9 +62,11 @@ export const operationalMetricRequestSchema = z
     (v) =>
       Object.keys(v.scope).every((key) =>
         v.metrics.every((id) =>
-          key === 'connectionId'
-            ? id.startsWith('inventory.') || id.startsWith('connections.')
-            : id.startsWith('procurement.'),
+          key === 'environment' || key === 'window'
+            ? id.startsWith('resolution.')
+            : key === 'connectionId'
+              ? id.startsWith('inventory.') || id.startsWith('connections.')
+              : id.startsWith('procurement.'),
         ),
       ),
     'The selected metrics do not support these filters.',

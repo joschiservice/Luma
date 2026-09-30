@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+import {
+  measurementEnvironmentSchema,
+  resolutionMetricItemSchema,
+} from './measurement.js';
+
 export const operationalMetricIdSchema = z.enum([
   'cases.active',
   'cases.attention',
@@ -9,6 +14,17 @@ export const operationalMetricIdSchema = z.enum([
   'procurement.purchase_orders.draft',
   'procurement.purchase_orders.open',
   'connections.needing_attention',
+  'resolution.unknown_eligibility',
+  'resolution.eligible',
+  'resolution.verified',
+  'resolution.autonomous',
+  'resolution.human',
+  'resolution.unknown',
+  'resolution.pending',
+  'resolution.recurrent',
+  'resolution.incorrect_actions',
+  'resolution.time_to_outcome',
+  'resolution.unresolved_age',
 ]);
 const timestamp = z.string().datetime({ offset: true });
 
@@ -17,7 +33,13 @@ export const operationalMetricDefinitionSchema = z.object({
   title: z.string(),
   description: z.string(),
   version: z.literal(2),
-  family: z.enum(['cases', 'inventory', 'procurement', 'connections']),
+  family: z.enum([
+    'cases',
+    'inventory',
+    'procurement',
+    'connections',
+    'resolution',
+  ]),
   unit: z.enum([
     'case',
     'second',
@@ -25,7 +47,15 @@ export const operationalMetricDefinitionSchema = z.object({
     'purchase_order',
     'connection',
   ]),
-  filters: z.array(z.enum(['connectionId', 'supplierId', 'authority'])),
+  filters: z.array(
+    z.enum([
+      'connectionId',
+      'supplierId',
+      'authority',
+      'environment',
+      'window',
+    ]),
+  ),
   timeSemantics: z.string(),
   permissions: z.literal('workspace_member'),
 });
@@ -35,13 +65,15 @@ export const operationalMetricScopeSchema = z
     connectionId: z.string().uuid().optional(),
     supplierId: z.string().uuid().optional(),
     authority: z.enum(['luma', 'external']).optional(),
+    environment: measurementEnvironmentSchema.optional(),
+    window: z.enum(['24h', '7d']).optional(),
   })
   .strict();
 
 export const operationalMetricRequestSchema = z
   .object({
     definitionVersion: z.literal(2),
-    metrics: z.array(operationalMetricIdSchema).min(1).max(8),
+    metrics: z.array(operationalMetricIdSchema).min(1).max(19),
     scope: operationalMetricScopeSchema.default({}),
     limit: z.number().int().min(1).max(100).default(20),
     offset: z.number().int().min(0).max(10000).default(0),
@@ -65,15 +97,18 @@ export const operationalMetricRequestSchema = z
     (v) =>
       Object.keys(v.scope).every((key) =>
         v.metrics.every((id) =>
-          key === 'connectionId'
-            ? id.startsWith('inventory.') || id.startsWith('connections.')
-            : id.startsWith('procurement.'),
+          key === 'environment' || key === 'window'
+            ? id.startsWith('resolution.')
+            : key === 'connectionId'
+              ? id.startsWith('inventory.') || id.startsWith('connections.')
+              : id.startsWith('procurement.'),
         ),
       ),
     'The selected metrics do not support these filters.',
   );
 
 export const operationalMetricItemSchema = z.discriminatedUnion('kind', [
+  resolutionMetricItemSchema,
   z.object({
     kind: z.literal('case'),
     id: z.string().uuid(),

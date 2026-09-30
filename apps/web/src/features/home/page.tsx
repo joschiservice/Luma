@@ -320,7 +320,9 @@ export function HomePage() {
           <ConnectionsModule organizationId={organizationId} overview={data} />
         );
       case 'outcomes':
-        return <OutcomesModule overview={data} />;
+        return (
+          <OutcomesModule overview={data} organizationId={organizationId} />
+        );
     }
   }
 

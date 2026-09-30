@@ -35,7 +35,8 @@
     "@luma/procurement": "workspace:*",
     "@ts-rest/fastify": "catalog:",
     "fastify": "catalog:",
-    "zod": "catalog:zod3"
+    "zod": "catalog:zod3",
+    "@luma/resolution": "workspace:*"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",

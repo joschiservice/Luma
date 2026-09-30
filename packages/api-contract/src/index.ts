@@ -101,6 +101,8 @@ export * from './desk.js';
 
 export * from './overview.js';
 
+export * from './measurement.js';
+
 export * from './cases.js';
 
 export * from './connections.js';

@@ -41,9 +41,8 @@ source revisions are retained in history but do not replace current state, and
 newer corrections replace it. Reading history by observation time would incorrectly
 revive rejected source updates. No metric maintains a second aggregate projection.
 
-LUMA-80 continues to own verified outcome eligibility and human-work attribution.
-Those facts are not available yet and are not fabricated or registered as order
-metrics.
+Resolution owns [verified outcome and human-involvement facts](resolution-measurement.md).
+Its `resolution.*` v2 family is registered separately from order metrics.
 
 ## API and consistency
 

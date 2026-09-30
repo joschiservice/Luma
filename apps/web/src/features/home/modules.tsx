@@ -353,7 +353,13 @@ export function ActivityModule({ organizationId }: { organizationId: string }) {
 }
 
 /** Summarizes verified resolutions and how much Luma resolved without help. */
-export function OutcomesModule({ overview }: { overview: OperationsOverview }) {
+export function OutcomesModule({
+  overview,
+  organizationId,
+}: {
+  overview: OperationsOverview;
+  organizationId?: string;
+}) {
   const rate =
     overview.automation && overview.automation.denominator > 0
       ? Math.round(
@@ -363,50 +369,83 @@ export function OutcomesModule({ overview }: { overview: OperationsOverview }) {
       : null;
 
   return (
-    <div className="home-outcomes operations-metrics">
-      <div>
-        <span>Verified resolutions</span>
-        <strong className="lu-numeric">{overview.verifiedResolutions}</strong>
-        <p>Outcomes confirmed in the source systems.</p>
+    <>
+      <div className="home-outcomes operations-metrics">
+        <div>
+          <span>Verified resolutions</span>
+          <strong className="lu-numeric">
+            {overview.measurement?.verified ?? overview.verifiedResolutions}
+          </strong>
+          <p>
+            {overview.measurement
+              ? 'Live issues first detected in the selected window, with an independently verified outcome.'
+              : 'Outcomes confirmed in the source systems.'}
+          </p>
+        </div>
+        <div>
+          <span>Resolved automatically</span>
+          <strong
+            className="lu-numeric"
+            data-text={overview.automaticallyResolved === null ? '' : undefined}
+          >
+            {overview.automaticallyResolved ?? 'Unavailable'}
+          </strong>
+          <p>
+            {overview.automaticallyResolved === null
+              ? overview.measurement
+                ? `${overview.measurement.unknownAttribution} with unknown attribution; ${overview.measurement.human} with human involvement.`
+                : 'Human-work attribution is not available.'
+              : 'Verified without a person’s work.'}
+          </p>
+        </div>
+        <div>
+          <span>Eligible automation rate</span>
+          <strong
+            className="lu-numeric"
+            data-text={rate === null ? '' : undefined}
+          >
+            {rate !== null
+              ? `${rate}%`
+              : overview.automation
+                ? '—'
+                : 'Unavailable'}
+          </strong>
+          {rate !== null ? (
+            <span className="home-meter" aria-hidden="true">
+              <span style={{ width: `${rate}%` }} />
+            </span>
+          ) : null}
+          <p>
+            {overview.automation
+              ? `${overview.automation.numerator} of ${overview.automation.denominator} eligible issues resolved correctly without help.`
+              : overview.measurement
+                ? `${overview.measurement.unknownEligibility} unknown eligibility · ${overview.measurement.unknownEnvironment} unknown environment. A complete rate is unavailable.`
+                : 'Eligibility data is not available.'}
+          </p>
+        </div>
       </div>
-      <div>
-        <span>Resolved automatically</span>
-        <strong
-          className="lu-numeric"
-          data-text={overview.automaticallyResolved === null ? '' : undefined}
-        >
-          {overview.automaticallyResolved ?? 'Unavailable'}
-        </strong>
-        <p>
-          {overview.automaticallyResolved === null
-            ? 'Human-work attribution is not available.'
-            : 'Verified without a person’s work.'}
-        </p>
-      </div>
-      <div>
-        <span>Eligible automation rate</span>
-        <strong
-          className="lu-numeric"
-          data-text={rate === null ? '' : undefined}
-        >
-          {rate !== null
-            ? `${rate}%`
-            : overview.automation
-              ? '—'
-              : 'Unavailable'}
-        </strong>
-        {rate !== null ? (
-          <span className="home-meter" aria-hidden="true">
-            <span style={{ width: `${rate}%` }} />
+      <footer className="home-module-footer">
+        {overview.measurement ? (
+          <span>
+            {overview.measurement.coverage === 'complete'
+              ? 'Complete for recorded live incidents.'
+              : overview.measurement.coverage === 'partial'
+                ? 'Partial measurement coverage.'
+                : 'No classified live cohort.'}{' '}
+            Provider data-through time is unknown.
           </span>
         ) : null}
-        <p>
-          {overview.automation
-            ? `${overview.automation.numerator} of ${overview.automation.denominator} eligible issues resolved correctly without help.`
-            : 'Eligibility data is not available.'}
-        </p>
-      </div>
-    </div>
+        {organizationId ? (
+          <Link
+            className="home-module-link"
+            to="/app/$organizationId/insights"
+            params={{ organizationId }}
+          >
+            Inspect outcome cohorts <ArrowRight size={14} aria-hidden="true" />
+          </Link>
+        ) : null}
+      </footer>
+    </>
   );
 }
 

@@ -201,6 +201,7 @@ export function violation(from, to) {
     if (
       (source.layer === 'api' ||
         from.endsWith('/infrastructure/learning-validation.ts') ||
+        from.endsWith('/infrastructure/measurement-validation.ts') ||
         from.endsWith('/infrastructure/shadow-validation.ts') ||
         from.endsWith('/infrastructure/diagnosis-validation.ts')) &&
       to === 'packages/api-contract/'
