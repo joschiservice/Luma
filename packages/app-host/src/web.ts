@@ -10,7 +10,8 @@ export interface AppUiProps {
   organizationId: string;
   /**
    * Setup uses connections; settings receives a connection; app-settings edits workspace-wide
-   * options; page is the app's own page; record shows live source context for `record`.
+   * options; page is the app's own page; record shows live source context for `record`;
+   * fulfillment offers source actions for `fulfillment`.
    */
   slot:
     | 'connections'
@@ -19,7 +20,12 @@ export interface AppUiProps {
     | 'page'
     | 'record'
     | 'inventory'
-    | 'customers';
+    | 'customers'
+    | 'fulfillment';
+  /** The source fulfillment and order whose actions the host is showing, by source ID. */
+  fulfillment?:
+    | { connectionId: string; orderId: string; fulfillmentId: string }
+    | undefined;
   /** Canonical stock position whose provider corrections the host is showing. */
   inventory?: { positionId: string } | undefined;
   connection?: InstalledConnection | undefined;

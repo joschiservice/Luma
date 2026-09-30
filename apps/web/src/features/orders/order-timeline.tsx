@@ -67,15 +67,12 @@ export function OrderFulfillments({
                 </small>
               </span>
               <Link
-                to="/app/$organizationId/records/$kind/$recordId"
-                params={{
-                  organizationId,
-                  kind: 'fulfillment',
-                  recordId: item.id,
-                }}
+                to="/app/$organizationId/fulfillment/$fulfillmentId"
+                params={{ organizationId, fulfillmentId: item.id }}
                 search={{ from }}
+                aria-label={`Open ${shipmentLabels[item.status] ?? item.status} fulfillment`}
               >
-                Record <ArrowRight size={13} aria-hidden="true" />
+                Open <ArrowRight size={13} aria-hidden="true" />
               </Link>
             </li>
           ))}

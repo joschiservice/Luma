@@ -32,13 +32,30 @@ export type CommerceData =
       lastProgressAt: string | null;
       failureCode: string | null;
       lines: { orderLineId: string; quantity: string; unit: string }[];
+      /** Fulfillment work or a shipment; absent means the adapter did not say. */
+      kind?: 'fulfillment_order' | 'shipment' | null;
+      /** Holds stopping the work; absent means the adapter does not read holds. */
+      holds?: { reason: string }[];
+      /** Assigned or shipping location; `locationId` is null when the source location is unmapped. */
+      location?: { locationId: string | null; name: string | null } | null;
+      fulfillAt?: string | null;
+      fulfillBy?: string | null;
+      estimatedDeliveryAt?: string | null;
+      method?: { type: string; name: string | null } | null;
+      tracking?: {
+        carrier: string | null;
+        number: string | null;
+        url: string | null;
+      }[];
+      delivery?: string | null;
     };
 
 export interface CanonicalSnapshot {
   /**
    * Document schema version. Order snapshots are written as 2 and may carry `dueAt`,
-   * `placedAt`, `total` and line `skuCode`/`title`; stored version 1 order documents
-   * remain readable. Fulfillment snapshots use 1.
+   * `placedAt`, `total` and line `skuCode`/`title`. Fulfillment snapshots are written as 2
+   * and may carry kind, holds, location, dates, method, tracking and delivery state. Stored
+   * version 1 documents of both kinds remain readable.
    */
   schemaVersion: 1 | 2;
   entityId: string;
@@ -83,6 +100,17 @@ export interface CommerceProjections {
   skuDependents(
     context: TenantContext,
     skuId: string,
+    connectionId?: string,
+  ): Promise<
+    { entityId: string; connectionId: string; observationId: string }[]
+  >;
+  /**
+   * Lists current fulfillment projections assigned to this location, optionally limited to
+   * one connection. Re-project them after the location's mappings change.
+   */
+  locationDependents(
+    context: TenantContext,
+    locationId: string,
     connectionId?: string,
   ): Promise<
     { entityId: string; connectionId: string; observationId: string }[]

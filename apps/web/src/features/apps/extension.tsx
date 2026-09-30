@@ -56,6 +56,7 @@ export function AppExtension({
   record,
   customer,
   inventory,
+  fulfillment,
   done,
 }: {
   appId: string;
@@ -65,6 +66,7 @@ export function AppExtension({
   record?: AppUiProps['record'];
   customer?: AppUiProps['customer'];
   inventory?: AppUiProps['inventory'];
+  fulfillment?: AppUiProps['fulfillment'];
   done: () => Promise<void>;
 }) {
   const state = useQuery(appsOptions(organizationId));
@@ -120,7 +122,7 @@ export function AppExtension({
 
   return (
     <ExtensionBoundary
-      key={`${session.data?.sessionId ?? ''}/${organizationId}/${appId}/${slot}/${customer?.connectionId ?? ''}/${customer?.id ?? ''}/${record?.connectionId ?? ''}/${record?.externalId ?? ''}/${inventory?.positionId ?? ''}`}
+      key={`${session.data?.sessionId ?? ''}/${organizationId}/${appId}/${slot}/${customer?.connectionId ?? ''}/${customer?.id ?? ''}/${record?.connectionId ?? ''}/${record?.externalId ?? ''}/${inventory?.positionId ?? ''}/${fulfillment?.fulfillmentId ?? ''}`}
     >
       <Suspense fallback={<p role="status">Loading app…</p>}>
         {createElement(Extension, {
@@ -130,6 +132,7 @@ export function AppExtension({
           record,
           customer,
           inventory,
+          fulfillment,
           done,
           services,
         })}

@@ -40,7 +40,23 @@ export function restoreTotalQuantities(state: ShopifyState): boolean {
 export type ShopifyCommand =
   | { kind: 'order'; id: string; quantity: number }
   | { kind: 'stock'; quantity: number; id?: string | undefined }
-  | { kind: 'ship'; id: string };
+  | { kind: 'ship'; id: string }
+  | { kind: 'hold'; id: string; reason: ShopifyHoldReason }
+  | { kind: 'release'; id: string };
+
+/** Hold reasons a merchant can apply in the simulator. */
+export const shopifyHoldReasons = [
+  'AWAITING_PAYMENT',
+  'HIGH_RISK_OF_FRAUD',
+  'INCORRECT_ADDRESS',
+  'INVENTORY_OUT_OF_STOCK',
+  'UNKNOWN_DELIVERY_DATE',
+  'OTHER',
+] as const;
+
+export type ShopifyHoldReason = (typeof shopifyHoldReasons)[number];
+
+const dayMs = 86_400_000;
 const gid = (type: string, id = '1') => `gid://shopify/${type}/${id}`;
 
 // Simulated orders sell the seeded tote at a fixed shop-currency price.
@@ -208,7 +224,23 @@ export function command(
         sku: 'LUMA-001',
         variant: { inventoryItem: { id: gid('InventoryItem') } },
       };
-      state.nodes[workId] = { id: workId, updatedAt, status: 'OPEN' };
+      state.nodes[workId] = {
+        id: workId,
+        updatedAt,
+        status: 'OPEN',
+        fulfillAt: null,
+        fulfillBy: new Date(time + 2 * dayMs).toISOString(),
+        fulfillmentHolds: [],
+        assignedLocation: {
+          name: 'Main warehouse',
+          location: { id: gid('Location') },
+        },
+        deliveryMethod: {
+          id: gid('DeliveryMethod', command.id),
+          methodType: 'SHIPPING',
+          presentedName: 'Standard shipping',
+        },
+      };
       const workLine = gid('FulfillmentOrderLineItem', command.id);
       state.nodes[workLine] = {
         id: workLine,
@@ -220,10 +252,40 @@ export function command(
       state.children[workId] = { lineItems: [workLine] };
       state.roots.orders.push(id);
       committed.quantity += command.quantity;
+    } else if (command.kind === 'hold' || command.kind === 'release') {
+      const work = state.nodes[workId];
+      if (!work || state.nodes[id]?.closed)
+        throw new Error('Open fulfillment order not found');
+      // Runs saved before holds were simulated have no hold list yet.
+      const holds = (work.fulfillmentHolds ??= []) as {
+        id: string;
+        reason: string;
+      }[];
+      if (command.kind === 'hold') {
+        if (!shopifyHoldReasons.includes(command.reason))
+          throw new Error('Invalid hold reason');
+        const holdId = gid(
+          'FulfillmentHold',
+          `${command.id}${String(holds.length + 1).padStart(3, '0')}`,
+        );
+        holds.push({ id: holdId, reason: command.reason });
+        state.nodes[holdId] = { id: holdId, reason: command.reason };
+        work.status = 'ON_HOLD';
+      } else {
+        if (!holds.length) throw new Error('Fulfillment order is not on hold');
+        work.fulfillmentHolds = [];
+        work.status = 'OPEN';
+      }
+      work.updatedAt = updatedAt;
+      state.nodes[id]!.updatedAt = updatedAt;
+
+      return;
     } else {
       const order = state.nodes[id];
       if (!order || order.closed)
         throw new Error('Order missing or already shipped');
+      if (state.nodes[workId]!.status === 'ON_HOLD')
+        throw new Error('Release the fulfillment hold before shipping');
       order.closed = true;
       order.updatedAt = updatedAt;
       state.nodes[workId]!.status = 'CLOSED';
@@ -238,6 +300,16 @@ export function command(
         status: 'SUCCESS',
         deliveredAt: null,
         inTransitAt: updatedAt,
+        displayStatus: 'IN_TRANSIT',
+        estimatedDeliveryAt: new Date(time + 3 * dayMs).toISOString(),
+        location: { id: gid('Location'), name: 'Main warehouse' },
+        trackingInfo: [
+          {
+            company: 'DHL',
+            number: `00340434${command.id.padStart(10, '0')}`,
+            url: `https://tracking.example.test/00340434${command.id.padStart(10, '0')}`,
+          },
+        ],
       };
       state.nodes[shipmentId] = shipment;
       order.fulfillments = [shipment];

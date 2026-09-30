@@ -7,6 +7,7 @@ import { exceptionsContract } from './contracts/cases.js';
 import { connectionsContract } from './contracts/connections.js';
 import { caseDeskContract } from './contracts/desk.js';
 import { draftTestsContract } from './contracts/draft-tests.js';
+import { fulfillmentContract } from './contracts/fulfillment.js';
 import { identityContract } from './contracts/identity.js';
 import { inventoryContract } from './contracts/inventory.js';
 import { resolutionLearningContract } from './contracts/learning.js';
@@ -49,6 +50,7 @@ const routes: {
   system: typeof systemContract;
   connectorProviders: typeof connectorProvidersContract;
   records: typeof recordsContract;
+  fulfillment: typeof fulfillmentContract;
   inventory: typeof inventoryContract;
   products: typeof productsContract;
   orders: typeof ordersContract;
@@ -74,6 +76,7 @@ const routes: {
   system: systemContract,
   connectorProviders: connectorProvidersContract,
   records: recordsContract,
+  fulfillment: fulfillmentContract,
   inventory: inventoryContract,
   products: productsContract,
   orders: ordersContract,
@@ -167,6 +170,8 @@ export * from './records.js';
 export * from './orders.js';
 
 export * from './inventory.js';
+
+export * from './fulfillment.js';
 
 export * from './products.js';
 

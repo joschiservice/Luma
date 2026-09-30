@@ -54,10 +54,10 @@ this option does not invalidate a cursor.
 ### Detail
 
 The detail read returns every source's facts, differences, fulfillments with source
-IDs, up to 100 snapshots of the order and its fulfillments, linked issues and workflow
+IDs (each opens in the [Fulfillment workspace](fulfillment-workspace.md)), up to 100 snapshots of the order and its fulfillments, linked issues and workflow
 runs, and the latest 25 activity events from the past year.
 
-- **Issues**: fulfillment issues through the fulfillment mapping, order issues through
+- **Issues**: fulfillment issues through the fulfillment ID or mapping, order issues through
   the order mapping or ID, SKU issues for any ordered SKU, and workflow-failure issues
   for runs on this order.
 - **Workflow runs**: Resolution runs whose target is this order (by Luma ID or any

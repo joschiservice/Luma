@@ -12,3 +12,5 @@ export type {
 export type { InventoryWorkspace } from './application/inventory.js';
 
 export type { ProductWorkspace } from './application/products.js';
+
+export type { FulfillmentWorkspace } from './application/fulfillment.js';

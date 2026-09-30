@@ -88,6 +88,29 @@ function IssueWorkspace({
               Inspect product <ArrowRight size={14} />
             </Link>
           ) : null}
+          {item?.subject.kind === 'fulfillment' ? (
+            z.string().uuid().safeParse(item.subject.id).success ? (
+              <Link
+                to="/app/$organizationId/fulfillment/$fulfillmentId"
+                params={{ organizationId, fulfillmentId: item.subject.id }}
+                search={{ from: `${location.pathname}${location.searchStr}` }}
+              >
+                Inspect fulfillment <ArrowRight size={14} />
+              </Link>
+            ) : (
+              <Link
+                to="/app/$organizationId/fulfillment"
+                params={{ organizationId }}
+                search={{
+                  q: item.subject.id,
+                  view: 'all',
+                  from: `${location.pathname}${location.searchStr}`,
+                }}
+              >
+                Inspect fulfillment <ArrowRight size={14} />
+              </Link>
+            )
+          ) : null}
           {item ? (
             <Link
               to="/app/$organizationId/records"

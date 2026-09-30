@@ -167,8 +167,8 @@ test('inventory scenario detects, verifies and recurs through the same HTTP APIs
   expect(sources).toHaveLength(3);
   expect(sources.map((item) => item.adapterVersion).sort()).toEqual([
     'canonical-mapping-v1',
-    'jtl/2',
-    'shopify/2',
+    'jtl/3',
+    'shopify/3',
   ]);
   expect((await check()).incident).toMatchObject({
     id: firstId,

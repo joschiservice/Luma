@@ -13,6 +13,7 @@ import {
   Receipt,
   Settings,
   ShoppingCart,
+  Truck,
   Users,
   Workflow,
 } from 'lucide-react';
@@ -30,6 +31,7 @@ export type DestinationPath =
   | 'customers'
   | 'products'
   | 'inventory'
+  | 'fulfillment'
   | 'workflows'
   | 'procurement'
   | 'apps'
@@ -126,6 +128,16 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
     group: 'operations',
     domain: 'inventory',
     shortcut: 'v',
+  },
+  {
+    path: 'fulfillment',
+    label: 'Fulfillment',
+    Icon: Truck,
+    description:
+      'Held, delayed and in-transit fulfillment with the next safe step',
+    group: 'operations',
+    domain: 'fulfillment',
+    shortcut: 'f',
   },
   {
     path: 'workflows',

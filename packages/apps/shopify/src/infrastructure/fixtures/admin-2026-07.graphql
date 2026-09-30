@@ -708,6 +708,9 @@ type FulfillmentOrderConnection {
 
 type FulfillmentOrder implements Node {
   assignedLocation: FulfillmentOrderAssignedLocation!
+  deliveryMethod: DeliveryMethod
+  fulfillAt: DateTime
+  fulfillBy: DateTime
   fulfillmentHolds: [FulfillmentHold!]!
   id: ID!
   lineItems(
@@ -743,6 +746,22 @@ type Location implements Node {
   id: ID!
   isActive: Boolean!
   name: String!
+}
+
+type DeliveryMethod implements Node {
+  id: ID!
+  maxDeliveryDateTime: DateTime
+  methodType: DeliveryMethodType!
+  presentedName: String
+}
+
+enum DeliveryMethodType {
+  SHIPPING
+  PICK_UP
+  NONE
+  RETAIL
+  LOCAL
+  PICKUP_POINT
 }
 
 type FulfillmentHold implements Node {
@@ -946,6 +965,8 @@ enum FulfillmentOrderAction {
 
 type Fulfillment implements Node {
   deliveredAt: DateTime
+  displayStatus: FulfillmentDisplayStatus
+  estimatedDeliveryAt: DateTime
   fulfillmentLineItems(
     first: Int
     after: String
@@ -955,8 +976,31 @@ type Fulfillment implements Node {
   ): FulfillmentLineItemConnection!
   id: ID!
   inTransitAt: DateTime
+  location: Location
   status: FulfillmentStatus!
+  trackingInfo(first: Int): [FulfillmentTrackingInfo!]!
   updatedAt: DateTime!
+}
+
+enum FulfillmentDisplayStatus {
+  ATTEMPTED_DELIVERY
+  CANCELED
+  CONFIRMED
+  DELAYED
+  DELIVERED
+  FAILURE
+  FULFILLED
+  CARRIER_PICKED_UP
+  IN_TRANSIT
+  LABEL_PRINTED
+  LABEL_PURCHASED
+  LABEL_VOIDED
+  MARKED_AS_FULFILLED
+  NOT_DELIVERED
+  OUT_FOR_DELIVERY
+  READY_FOR_PICKUP
+  PICKED_UP
+  SUBMITTED
 }
 
 type FulfillmentLineItemConnection {
@@ -978,6 +1022,14 @@ enum FulfillmentStatus {
   ERROR
   FAILURE
 }
+
+type FulfillmentTrackingInfo {
+  company: String
+  number: String
+  url: URL
+}
+
+scalar URL
 
 type LineItemConnection {
   nodes: [LineItem!]!

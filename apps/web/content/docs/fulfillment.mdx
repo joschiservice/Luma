@@ -1,0 +1,48 @@
+---
+title: Unblock held and delayed fulfillment
+description: Find fulfillment work that is held or not moving, see why, and take the next safe step.
+---
+
+Fulfillment shows the work your connected systems report for each order: **fulfillment orders**, the work a location must pick and pack, and **shipments** that left a location. Each system's work appears separately, even when a store and an ERP hold the same order.
+
+## Find what needs attention
+
+The page opens on **Needs attention**, with the fulfillments that have waited longest first. A fulfillment needs attention when:
+
+- **On hold**: the source put open work on hold, for example because of an incorrect address or a payment that has not arrived.
+- **Past fulfill-by**: open work passed the date the source promised to fulfill it.
+- **No progress**: open work has reported no progress for 48 hours. Work scheduled to start later does not count.
+- **Delivery problem**: the carrier reports an attempted, delayed or failed delivery.
+- **Late delivery**: a shipment passed its estimated delivery date and is not delivered.
+- **Failed**: the source reports that the fulfillment failed.
+
+Search by order number, tracking number, location or a source ID. Filter by source, location or type, and sort by the longest wait, the most recent progress or the nearest deadline. Every filter is part of the address, so you can share a view or pin it to the sidebar.
+
+## Understand one fulfillment
+
+Open a fulfillment to see:
+
+- **What is happening**, in one sentence, and the **next safe step**.
+- **Source facts**: status, holds, location, delivery method, deadlines, carrier status and tracking. Facts a source does not report are marked, rather than left out.
+- **Progress evidence**: when the source last reported progress and the last change Luma saw.
+- **Items** in this fulfillment, compared with the quantity ordered.
+- **Source timeline**: each state Luma read, with what changed since the read before.
+- The **order**, the order's **other fulfillments** and shipments, **issues** and **Luma activity**.
+
+Customer, payment and address details stay on the order page, which reads them live from the store.
+
+## Take the next safe step
+
+For Shopify fulfillment orders, you can act from the page: release a hold, reopen work or move it to another location. Shopify decides which actions are available, and Luma only offers actions that are currently eligible. Each action follows your workspace's approval rules; the person who approves must be different from the person who requested it.
+
+Fix the reason for a hold before you release it. Releasing an incorrect-address hold without correcting the address ships to the wrong place.
+
+For other sources, and for delivery problems, the next step tells you where to act: at the source, at the fulfilling location or with the carrier.
+
+## Know when work actually moved
+
+An accepted request is not the same as a fulfilled order. After Shopify accepts a hold release, Luma reads the fulfillment again. It counts the fulfillment as restored only when that read shows fewer units left to fulfill.
+
+Correcting an order's shipping method is also different from fulfilling it. A method correction changes how an order will ship. Workflow runs on the fulfillment page say whether Luma has since seen the order shipped or its work completed.
+
+You can reach a fulfillment from an order, an issue about a fulfillment, the Records explorer and search. Press G then F to open Fulfillment.

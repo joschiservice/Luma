@@ -60843,7 +60843,8 @@
                               "outcomes",
                               "operational-metrics",
                               "order-metrics",
-                              "catalog"
+                              "catalog",
+                              "fulfillment"
                             ]
                           },
                           "size": {
@@ -60854,7 +60855,7 @@
                         "required": ["id", "size"],
                         "additionalProperties": false
                       },
-                      "maxItems": 8,
+                      "maxItems": 9,
                       "nullable": true
                     },
                     "pinned": {
@@ -61257,7 +61258,8 @@
                             "outcomes",
                             "operational-metrics",
                             "order-metrics",
-                            "catalog"
+                            "catalog",
+                            "fulfillment"
                           ]
                         },
                         "size": {
@@ -61268,7 +61270,7 @@
                       "required": ["id", "size"],
                       "additionalProperties": false
                     },
-                    "maxItems": 8,
+                    "maxItems": 9,
                     "nullable": true
                   },
                   "pinned": {
@@ -61323,7 +61325,8 @@
                               "outcomes",
                               "operational-metrics",
                               "order-metrics",
-                              "catalog"
+                              "catalog",
+                              "fulfillment"
                             ]
                           },
                           "size": {
@@ -61334,7 +61337,7 @@
                         "required": ["id", "size"],
                         "additionalProperties": false
                       },
-                      "maxItems": 8,
+                      "maxItems": 9,
                       "nullable": true
                     },
                     "pinned": {
@@ -66976,7 +66979,8 @@
                                 "page",
                                 "record",
                                 "customers",
-                                "inventory"
+                                "inventory",
+                                "fulfillment"
                               ]
                             }
                           },
@@ -69998,6 +70002,1908 @@
           },
           "401": {
             "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/fulfillment": {
+      "get": {
+        "description": "Lists fulfillment orders and shipments as each connected source currently reports them. `attention` returns held, delayed and failed fulfillments; `held` returns open work stopped by a source hold; `delayed` returns open work past its fulfill-by date or without progress for `stalledAfterHours`, and shipments with a reported delivery problem or past their estimated delivery; `open` returns work still expected; `in_transit` returns shipped, undelivered shipments. Search matches order numbers, tracking numbers, location names and source order or fulfillment IDs. Mirrored work in different systems stays separate. Results contain up to `limit` fulfillments (at most 50) with counts per view; `nextCursor` continues the same filters, sort and evaluation time.",
+        "summary": "List fulfillment work and shipments",
+        "tags": ["fulfillment"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "default": "",
+              "type": "string",
+              "maxLength": 120
+            }
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "schema": {
+              "default": "attention",
+              "type": "string",
+              "enum": [
+                "attention",
+                "held",
+                "delayed",
+                "open",
+                "in_transit",
+                "all"
+              ]
+            }
+          },
+          {
+            "name": "connectionId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "locationId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["fulfillment_order", "shipment"]
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "default": "waiting",
+              "type": "string",
+              "enum": ["waiting", "recent", "deadline"]
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 8192
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          }
+        ],
+        "operationId": "fulfillment.list",
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "connectionId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "externalId": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": ["fulfillment_order", "shipment", "unknown"]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "processing",
+                              "completed",
+                              "shipped",
+                              "delivered",
+                              "cancelled",
+                              "failed",
+                              "unknown"
+                            ]
+                          },
+                          "deleted": {
+                            "type": "boolean"
+                          },
+                          "open": {
+                            "type": "boolean"
+                          },
+                          "signals": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "held",
+                                "overdue",
+                                "stalled",
+                                "delivery_issue",
+                                "late_delivery",
+                                "failed"
+                              ]
+                            }
+                          },
+                          "holds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "awaiting_payment",
+                                "high_risk_of_fraud",
+                                "incorrect_address",
+                                "inventory_out_of_stock",
+                                "unknown_delivery_date",
+                                "awaiting_return_items",
+                                "other"
+                              ]
+                            },
+                            "nullable": true
+                          },
+                          "location": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "nullable": true
+                              },
+                              "name": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": ["id", "name"],
+                            "nullable": true
+                          },
+                          "method": {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": ["type", "name"],
+                            "nullable": true
+                          },
+                          "fulfillAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "fulfillBy": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "estimatedDeliveryAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "lastProgressAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "progressAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "delivery": {
+                            "type": "string",
+                            "enum": [
+                              "label_created",
+                              "in_transit",
+                              "out_for_delivery",
+                              "attempted_delivery",
+                              "delayed",
+                              "ready_for_pickup",
+                              "delivered",
+                              "failed"
+                            ],
+                            "nullable": true
+                          },
+                          "failureCode": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "tracking": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "carrier": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "number": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "url": {
+                                  "type": "string",
+                                  "format": "uri",
+                                  "nullable": true
+                                }
+                              },
+                              "required": ["carrier", "number", "url"]
+                            }
+                          },
+                          "units": {
+                            "type": "string"
+                          },
+                          "unit": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "order": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "number": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "status": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "placedAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "nullable": true
+                              }
+                            },
+                            "required": ["id", "number", "status", "placedAt"]
+                          },
+                          "observedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "sourceUpdatedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "connectionId",
+                          "externalId",
+                          "kind",
+                          "status",
+                          "deleted",
+                          "open",
+                          "signals",
+                          "holds",
+                          "location",
+                          "method",
+                          "fulfillAt",
+                          "fulfillBy",
+                          "estimatedDeliveryAt",
+                          "lastProgressAt",
+                          "progressAt",
+                          "delivery",
+                          "failureCode",
+                          "tracking",
+                          "units",
+                          "unit",
+                          "order",
+                          "observedAt",
+                          "sourceUpdatedAt"
+                        ]
+                      }
+                    },
+                    "sources": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "connectionId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "system": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "appId": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "connectionId",
+                          "label",
+                          "system",
+                          "status",
+                          "appId"
+                        ]
+                      }
+                    },
+                    "locations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "name": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "open": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        },
+                        "required": ["id", "name", "open"]
+                      }
+                    },
+                    "counts": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    },
+                    "nextCursor": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "stalledAfterHours": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "exclusiveMinimum": 0
+                    },
+                    "asOf": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "sources",
+                    "locations",
+                    "counts",
+                    "nextCursor",
+                    "stalledAfterHours",
+                    "asOf"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/fulfillment/{fulfillmentId}": {
+      "get": {
+        "description": "Returns one fulfillment with its lines, order, up to 50 of the order’s other fulfillments, up to 50 observed source states (newest first), linked issues, workflow runs and recent Luma activity. A workflow run’s `progressObservedAt` is the first later read showing the order shipped or its work completed; a method correction or an accepted source request alone does not establish progress.",
+        "summary": "Inspect a fulfillment",
+        "tags": ["fulfillment"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fulfillmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "operationId": "fulfillment.get",
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "item": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "connectionId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "externalId": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": ["fulfillment_order", "shipment", "unknown"]
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "pending",
+                            "processing",
+                            "completed",
+                            "shipped",
+                            "delivered",
+                            "cancelled",
+                            "failed",
+                            "unknown"
+                          ]
+                        },
+                        "deleted": {
+                          "type": "boolean"
+                        },
+                        "open": {
+                          "type": "boolean"
+                        },
+                        "signals": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "held",
+                              "overdue",
+                              "stalled",
+                              "delivery_issue",
+                              "late_delivery",
+                              "failed"
+                            ]
+                          }
+                        },
+                        "holds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "awaiting_payment",
+                              "high_risk_of_fraud",
+                              "incorrect_address",
+                              "inventory_out_of_stock",
+                              "unknown_delivery_date",
+                              "awaiting_return_items",
+                              "other"
+                            ]
+                          },
+                          "nullable": true
+                        },
+                        "location": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "nullable": true
+                            },
+                            "name": {
+                              "type": "string",
+                              "nullable": true
+                            }
+                          },
+                          "required": ["id", "name"],
+                          "nullable": true
+                        },
+                        "method": {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string",
+                              "nullable": true
+                            }
+                          },
+                          "required": ["type", "name"],
+                          "nullable": true
+                        },
+                        "fulfillAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        },
+                        "fulfillBy": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        },
+                        "estimatedDeliveryAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        },
+                        "lastProgressAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        },
+                        "progressAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "delivery": {
+                          "type": "string",
+                          "enum": [
+                            "label_created",
+                            "in_transit",
+                            "out_for_delivery",
+                            "attempted_delivery",
+                            "delayed",
+                            "ready_for_pickup",
+                            "delivered",
+                            "failed"
+                          ],
+                          "nullable": true
+                        },
+                        "failureCode": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "tracking": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "carrier": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "number": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "url": {
+                                "type": "string",
+                                "format": "uri",
+                                "nullable": true
+                              }
+                            },
+                            "required": ["carrier", "number", "url"]
+                          }
+                        },
+                        "units": {
+                          "type": "string"
+                        },
+                        "unit": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "order": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "number": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "status": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "placedAt": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            }
+                          },
+                          "required": ["id", "number", "status", "placedAt"]
+                        },
+                        "observedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "sourceUpdatedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "connectionId",
+                        "externalId",
+                        "kind",
+                        "status",
+                        "deleted",
+                        "open",
+                        "signals",
+                        "holds",
+                        "location",
+                        "method",
+                        "fulfillAt",
+                        "fulfillBy",
+                        "estimatedDeliveryAt",
+                        "lastProgressAt",
+                        "progressAt",
+                        "delivery",
+                        "failureCode",
+                        "tracking",
+                        "units",
+                        "unit",
+                        "order",
+                        "observedAt",
+                        "sourceUpdatedAt"
+                      ]
+                    },
+                    "source": {
+                      "type": "object",
+                      "properties": {
+                        "connectionId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "system": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "status": {
+                          "type": "string"
+                        },
+                        "appId": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "connectionId",
+                        "label",
+                        "system",
+                        "status",
+                        "appId"
+                      ]
+                    },
+                    "lines": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "orderLineId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "quantity": {
+                            "type": "string"
+                          },
+                          "unit": {
+                            "type": "string"
+                          },
+                          "skuId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "nullable": true
+                          },
+                          "skuCode": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "title": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "ordered": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "orderLineId",
+                          "quantity",
+                          "unit",
+                          "skuId",
+                          "skuCode",
+                          "title",
+                          "ordered"
+                        ]
+                      }
+                    },
+                    "order": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "number": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "status": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "paymentStatus": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "placedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        },
+                        "externalId": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "fulfillment": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "number",
+                        "status",
+                        "paymentStatus",
+                        "placedAt",
+                        "externalId",
+                        "fulfillment"
+                      ]
+                    },
+                    "related": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "connectionId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "externalId": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": ["fulfillment_order", "shipment", "unknown"]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "processing",
+                              "completed",
+                              "shipped",
+                              "delivered",
+                              "cancelled",
+                              "failed",
+                              "unknown"
+                            ]
+                          },
+                          "deleted": {
+                            "type": "boolean"
+                          },
+                          "open": {
+                            "type": "boolean"
+                          },
+                          "signals": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "held",
+                                "overdue",
+                                "stalled",
+                                "delivery_issue",
+                                "late_delivery",
+                                "failed"
+                              ]
+                            }
+                          },
+                          "holds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "awaiting_payment",
+                                "high_risk_of_fraud",
+                                "incorrect_address",
+                                "inventory_out_of_stock",
+                                "unknown_delivery_date",
+                                "awaiting_return_items",
+                                "other"
+                              ]
+                            },
+                            "nullable": true
+                          },
+                          "location": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "nullable": true
+                              },
+                              "name": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": ["id", "name"],
+                            "nullable": true
+                          },
+                          "method": {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": ["type", "name"],
+                            "nullable": true
+                          },
+                          "fulfillAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "fulfillBy": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "estimatedDeliveryAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "lastProgressAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "progressAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "delivery": {
+                            "type": "string",
+                            "enum": [
+                              "label_created",
+                              "in_transit",
+                              "out_for_delivery",
+                              "attempted_delivery",
+                              "delayed",
+                              "ready_for_pickup",
+                              "delivered",
+                              "failed"
+                            ],
+                            "nullable": true
+                          },
+                          "failureCode": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "tracking": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "carrier": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "number": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "url": {
+                                  "type": "string",
+                                  "format": "uri",
+                                  "nullable": true
+                                }
+                              },
+                              "required": ["carrier", "number", "url"]
+                            }
+                          },
+                          "units": {
+                            "type": "string"
+                          },
+                          "unit": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "order": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "number": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "status": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "placedAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "nullable": true
+                              }
+                            },
+                            "required": ["id", "number", "status", "placedAt"]
+                          },
+                          "observedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "sourceUpdatedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "connectionId",
+                          "externalId",
+                          "kind",
+                          "status",
+                          "deleted",
+                          "open",
+                          "signals",
+                          "holds",
+                          "location",
+                          "method",
+                          "fulfillAt",
+                          "fulfillBy",
+                          "estimatedDeliveryAt",
+                          "lastProgressAt",
+                          "progressAt",
+                          "delivery",
+                          "failureCode",
+                          "tracking",
+                          "units",
+                          "unit",
+                          "order",
+                          "observedAt",
+                          "sourceUpdatedAt"
+                        ]
+                      }
+                    },
+                    "timeline": {
+                      "type": "object",
+                      "properties": {
+                        "entries": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "snapshotId": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "current": {
+                                "type": "boolean"
+                              },
+                              "deleted": {
+                                "type": "boolean"
+                              },
+                              "observedAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "sourceUpdatedAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "nullable": true
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "pending",
+                                  "processing",
+                                  "completed",
+                                  "shipped",
+                                  "delivered",
+                                  "cancelled",
+                                  "failed",
+                                  "unknown"
+                                ]
+                              },
+                              "holds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "enum": [
+                                    "awaiting_payment",
+                                    "high_risk_of_fraud",
+                                    "incorrect_address",
+                                    "inventory_out_of_stock",
+                                    "unknown_delivery_date",
+                                    "awaiting_return_items",
+                                    "other"
+                                  ]
+                                },
+                                "nullable": true
+                              },
+                              "delivery": {
+                                "type": "string",
+                                "enum": [
+                                  "label_created",
+                                  "in_transit",
+                                  "out_for_delivery",
+                                  "attempted_delivery",
+                                  "delayed",
+                                  "ready_for_pickup",
+                                  "delivered",
+                                  "failed"
+                                ],
+                                "nullable": true
+                              },
+                              "lastProgressAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "nullable": true
+                              },
+                              "locationName": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "fulfillBy": {
+                                "type": "string",
+                                "format": "date-time",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "snapshotId",
+                              "current",
+                              "deleted",
+                              "observedAt",
+                              "sourceUpdatedAt",
+                              "status",
+                              "holds",
+                              "delivery",
+                              "lastProgressAt",
+                              "locationName",
+                              "fulfillBy"
+                            ]
+                          }
+                        },
+                        "truncated": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": ["entries", "truncated"]
+                    },
+                    "issues": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "class": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string"
+                          },
+                          "severity": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "relationship": {
+                            "type": "string",
+                            "enum": ["order", "fulfillment", "sku"]
+                          },
+                          "needsYou": {
+                            "type": "boolean"
+                          },
+                          "lastDetectedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "class",
+                          "state",
+                          "severity",
+                          "relationship",
+                          "needsYou",
+                          "lastDetectedAt"
+                        ]
+                      }
+                    },
+                    "workflows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "definitionId": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "version": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "state": {
+                            "type": "string"
+                          },
+                          "relationship": {
+                            "type": "string",
+                            "enum": ["order", "issue"]
+                          },
+                          "purpose": {
+                            "type": "string",
+                            "enum": ["method_correction", "other"]
+                          },
+                          "progressObservedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "definitionId",
+                          "name",
+                          "version",
+                          "createdAt",
+                          "state",
+                          "relationship",
+                          "purpose",
+                          "progressObservedAt"
+                        ]
+                      }
+                    },
+                    "activity": {
+                      "type": "object",
+                      "properties": {
+                        "entries": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "recordedAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "action": {
+                                "type": "string"
+                              },
+                              "type": {
+                                "type": "string"
+                              },
+                              "outcome": {
+                                "type": "string"
+                              },
+                              "actorKind": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "exceptionId": {
+                                "type": "string",
+                                "format": "uuid",
+                                "nullable": true
+                              },
+                              "summary": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "recordedAt",
+                              "action",
+                              "type",
+                              "outcome",
+                              "actorKind",
+                              "exceptionId",
+                              "summary"
+                            ]
+                          }
+                        },
+                        "truncated": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": ["entries", "truncated"]
+                    },
+                    "stalledAfterHours": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "exclusiveMinimum": 0
+                    },
+                    "asOf": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "item",
+                    "source",
+                    "lines",
+                    "order",
+                    "related",
+                    "timeline",
+                    "issues",
+                    "workflows",
+                    "activity",
+                    "stalledAfterHours",
+                    "asOf"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
             "content": {
               "application/json": {
                 "schema": {

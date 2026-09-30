@@ -152,6 +152,7 @@ export function createApp(context: AppFactoryContext): AppDefinition {
         'record',
         'customers',
         'inventory',
+        'fulfillment',
       ],
       connectionTypes: [{ kind: 'shopify', name: 'Shopify' }],
     },
