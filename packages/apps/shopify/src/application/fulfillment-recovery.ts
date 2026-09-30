@@ -46,6 +46,8 @@ export interface RecoveryStore {
     id: string,
     decisionId: string,
   ): Promise<void>;
+  /** Lists the tenant's unexpired previews and those dispatched in the last seven days, newest first, at most 50. */
+  open(context: TenantContext): Promise<RecoveryRun[]>;
 }
 
 export interface RecoveryDependencies {
@@ -91,7 +93,8 @@ export function createFulfillmentRecovery(deps: RecoveryDependencies) {
     context: TenantContext,
     run: RecoveryRun,
     result?: ExecutionResult | null,
-    snapshot?: RecoverySnapshot,
+    // `null` evaluates persisted state only; the source is then not checked for changes.
+    snapshot?: RecoverySnapshot | null,
   ): Promise<RecoveryView> {
     const execution = result ?? (await deps.admission.get(context, run.id));
     const record = execution && 'record' in execution ? execution.record : null;
@@ -105,7 +108,7 @@ export function createFulfillmentRecovery(deps: RecoveryDependencies) {
       await deps.store.settle(context, run.id);
     const verified = record?.attempt.businessOutcome === 'satisfied';
     const current =
-      !record && !expired
+      !record && !expired && snapshot !== null
         ? (snapshot ?? (await deps.read(context, run.target)))
         : null;
     const changed =
@@ -171,6 +174,7 @@ export function createFulfillmentRecovery(deps: RecoveryDependencies) {
       expiresAt: run.action.expiresAt,
       decisionId: run.decisionId,
       state,
+      approved: decision?.approval?.outcome === 'approved',
       acceptance: accepted
         ? 'accepted'
         : record && !withheld
@@ -372,6 +376,29 @@ export function createFulfillmentRecovery(deps: RecoveryDependencies) {
         previous && 'record' in previous
           ? await deps.admission.reconcile(context, id)
           : previous,
+      );
+    },
+    /**
+     * Lists recoveries that wait on a person: an approval, a run by the requester, or a check of an
+     * accepted or uncertain write. Reads persisted state only, so an approvable preview may still
+     * prove stale when its review reads Shopify. Members, who can't respond, get none.
+     */
+    async pending(context: TenantContext): Promise<RecoveryView[]> {
+      const fresh = await deps.refreshContext(context);
+      requireTenant(fresh, context.tenantId);
+      if (fresh.actor.role === 'member' || fresh.actor.id !== context.actor.id)
+        return [];
+      const views = await Promise.all(
+        (await deps.store.open(fresh)).map((run) =>
+          view(fresh, run, undefined, null),
+        ),
+      );
+
+      return views.filter(
+        (item) =>
+          ['approval_required', 'uncertain', 'recovery_required'].includes(
+            item.state,
+          ) || item.canExecute,
       );
     },
     /** Rejects stale, altered or unrelated admission steps before the shared engine reserves a write. */

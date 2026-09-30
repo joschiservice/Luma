@@ -24,7 +24,10 @@ export type {
 
 export { createReplenishmentService } from './application/replenishment-workflow.js';
 
-export type { ReplenishmentTransport } from './application/replenishment-workflow.js';
+export type {
+  ReplenishmentDecision,
+  ReplenishmentTransport,
+} from './application/replenishment-workflow.js';
 
 export { createReplenishmentScenarios } from './application/replenishment-scenarios.js';
 

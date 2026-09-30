@@ -35,6 +35,22 @@ Tests are the Home and presentation unit tests, `settings.e2e.mjs`, the shell st
 and the browser journeys. See [shared frontend components](frontend-ui.md) and the
 [design workflow](design-workflow.md).
 
+## Needs you decision queue
+
+Start at `packages/read-models/src/application/decisions.ts` for the queue port and
+`infrastructure/decisions/queue.ts` for ranking, paging and record resolution. Case decisions
+come from `caseDecisionQuery` in `packages/exceptions/src/infrastructure/cases.ts`;
+replenishment from `pending` in `packages/procurement/src/application/replenishment-workflow.ts`;
+apps from `AppDefinition.decisions` (`packages/app-host/src/application/contracts.ts`), with
+Shopify's in `packages/apps/shopify/src/application/decisions.ts`. Assignments are
+`packages/resolution/src/application/decision-assignments.ts` with migration
+`0047_decision_queue.sql`. Contracts are `packages/api-contract/src/decisions.ts` and
+`contracts/decisions.ts`; routes are `packages/read-models/src/api/decisions.ts`. The web feature
+is `apps/web/src/features/decisions`, also used by Home's attention module and the sidebar count.
+Tests: `domain/decisions.test.ts`, the web `decisions` tests and stories,
+`apps/api/e2e/decisions.e2e.mjs`, `shopify-inventory.e2e.mjs` and `decisions.browser.mjs`. See
+[Needs you decision queue](needs-you.md).
+
 ## Documentation and contextual help
 
 Start at `apps/web/src/features/help/context-help.tsx` for the navbar drawer,

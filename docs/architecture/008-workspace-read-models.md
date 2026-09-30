@@ -20,7 +20,10 @@ projection would duplicate write paths before there is evidence that it is neede
 ## Decision
 
 `@luma/read-models` owns read-only workspace views: the record explorer, order and
-operational metrics composition, the operational summary and the Orders workspace.
+operational metrics composition, the operational summary, the Orders workspace and the
+Needs you decision queue. The queue also accepts owner-presented decisions from providers
+that the composition root injects (procurement replenishment and installed apps); responses
+stay with those owners.
 
 - It never writes. It runs each request in one read-only, repeatable-read transaction under
   the API login and relies on each table's tenant row security.

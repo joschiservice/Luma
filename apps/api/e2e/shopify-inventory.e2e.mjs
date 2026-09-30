@@ -50,9 +50,34 @@ test('ERP authority, separate approval, one dispatch, reconciliation and tenant 
   assert.ok(recovered.decisionId);
   assert.equal(recovered.id, preview.id);
   assert.equal(recovered.state, 'approval_required');
+  // Needs you projects the same app-owned decision for each reader.
+  const decision = async (user) =>
+    (await f.request(user, `${f.base}/decisions?domain=inventory`)).items.find(
+      (item) => item.id === `shopify:inventory_correction:${preview.id}`,
+    );
+  const pending = await decision(admin);
+  assert.equal(pending.reason, 'approval');
+  assert.equal(pending.response, 'decide');
+  assert.equal(pending.urgency, 'expiring');
+  assert.deepEqual(pending.owner, {
+    kind: 'app_inventory',
+    appId: 'shopify',
+    positionId: target.positionId,
+  });
+  assert.deepEqual(pending.record, {
+    kind: 'position',
+    id: target.positionId,
+  });
+  assert.ok(pending.change.some((fact) => fact.value === 'Set to 9 (-3)'));
+  assert.equal((await decision(f.owner)).response, 'awaiting_other');
+  assert.equal(await decision(f.member), undefined);
+  await f.request(f.outsider, `${f.base}/decisions`, 'GET', undefined, 404);
   await call(f.owner, 'execute', { id: preview.id }, 409);
   await call(f.owner, 'approve', { id: preview.id, outcome: 'approved' }, 409);
   await call(admin, 'approve', { id: preview.id, outcome: 'approved' });
+  await call(admin, 'approve', { id: preview.id, outcome: 'approved' }, 409);
+  assert.equal((await decision(f.owner)).response, 'run');
+  assert.equal((await decision(admin)).response, 'view_only');
   await call(admin, 'execute', { id: preview.id }, 403);
   delayVerification(true);
   await Promise.all([
@@ -63,6 +88,9 @@ test('ERP authority, separate approval, one dispatch, reconciliation and tenant 
   const accepted = await call(f.owner, 'check', { id: preview.id });
   assert.equal(accepted.acceptance, 'accepted');
   assert.equal(accepted.state, 'recovery_required');
+  const unverified = await decision(f.owner);
+  assert.equal(unverified.reason, 'recovery');
+  assert.equal(unverified.response, 'check');
   assert.deepEqual(mutations[0].variables.input.quantities, [
     {
       inventoryItemId: stockItem,
@@ -75,6 +103,7 @@ test('ERP authority, separate approval, one dispatch, reconciliation and tenant 
   delayVerification(false);
   const verified = await call(f.owner, 'check', { id: preview.id });
   assert.equal(verified.state, 'verified');
+  assert.equal(await decision(f.owner), undefined);
   assert.equal(mutations.length, 1);
   const stockDetail = await f.request(
     f.owner,

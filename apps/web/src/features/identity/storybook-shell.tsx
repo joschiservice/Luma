@@ -64,7 +64,7 @@ export function StoryShell({
           />
         )}
         <span className="sidebar-link-label">{item.label}</span>
-        {item.path === 'exceptions' && attention ? (
+        {item.path === 'needs-you' && attention ? (
           <span className="sidebar-link-count">
             {attention}
             <span className="sr-only"> need you</span>

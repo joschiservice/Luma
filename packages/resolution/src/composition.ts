@@ -3,6 +3,7 @@ import type { TenantDatabase } from '@luma/platform';
 import { compilePlaybook, playbookHash } from '@luma/workflows/composition';
 
 import { createActivityService } from './application/activity.js';
+import { createDecisionAssignmentService } from './application/decision-assignments.js';
 import type { LearningService, LearningStore } from './application/learning.js';
 import { createLearningService } from './application/learning.js';
 import { createMeasurementService } from './application/measurement.js';
@@ -10,6 +11,7 @@ import { createShadowService } from './application/shadow.js';
 import { learningBoundary } from './infrastructure/learning-validation.js';
 import { measurementCommandSchema } from './infrastructure/measurement-validation.js';
 import { createActivityStore } from './infrastructure/persistence/activity.js';
+import { createDecisionAssignmentStore } from './infrastructure/persistence/decision-assignments.js';
 import { createLearningStore } from './infrastructure/persistence/learning.js';
 import { createMeasurementStore } from './infrastructure/persistence/measurement.js';
 import { createShadowStore } from './infrastructure/persistence/shadow.js';
@@ -101,3 +103,22 @@ export {
 } from '@luma/workflows/composition';
 
 export { createActivityStore } from './infrastructure/persistence/activity.js';
+
+/**
+ * Composes Needs you assignments. `pending` must answer from the decision queue, and `members`
+ * from identity, both for the refreshed reader.
+ */
+export function createDecisionAssignments(
+  db: TenantDatabase,
+  deps: Omit<
+    Parameters<typeof createDecisionAssignmentService>[0],
+    'store' | 'now'
+  >,
+  now: () => Date = () => new Date(),
+) {
+  return createDecisionAssignmentService({
+    ...deps,
+    store: createDecisionAssignmentStore(db),
+    now,
+  });
+}
