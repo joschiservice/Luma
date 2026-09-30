@@ -10,3 +10,5 @@ export type {
 } from './application/orders.js';
 
 export type { InventoryWorkspace } from './application/inventory.js';
+
+export type { ProductWorkspace } from './application/products.js';

@@ -783,6 +783,7 @@ type LineItem implements Node {
 }
 
 type ProductVariant implements Node {
+  barcode: String
   id: ID!
   inventoryItem: InventoryItem!
   price: Money!
@@ -835,6 +836,8 @@ scalar Money
 
 type Product implements Node {
   id: ID!
+  priceRangeV2: ProductPriceRangeV2!
+  publishedAt: DateTime
   status: ProductStatus!
   title: String!
   updatedAt: DateTime!
@@ -846,6 +849,11 @@ type Product implements Node {
     reverse: Boolean = false
     sortKey: ProductVariantSortKeys = POSITION
   ): ProductVariantConnection!
+  vendor: String!
+}
+
+type ProductPriceRangeV2 {
+  minVariantPrice: MoneyV2!
 }
 
 enum ProductStatus {

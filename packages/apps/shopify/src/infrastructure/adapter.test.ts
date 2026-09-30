@@ -150,7 +150,7 @@ describe('Shopify read capabilities', () => {
         items: [
           {
             source: { provider: 'shopify', externalId: commerce.order.id },
-            adapterVersion: 'shopify/1',
+            adapterVersion: 'shopify/2',
             data: {
               paymentStatus: 'paid',
               placedAt: '2026-09-14T08:30:00Z',
@@ -176,7 +176,19 @@ describe('Shopify read capabilities', () => {
         items: [
           {
             data: {
-              skus: [{ id: ref(commerce.inventoryItem.id), code: 'MUG-Blue' }],
+              title: 'Blue mug',
+              status: 'active',
+              vendor: 'Harbor Ceramics',
+              published: true,
+              skus: [
+                {
+                  id: ref(commerce.inventoryItem.id),
+                  code: 'MUG-Blue',
+                  title: 'Blue',
+                  price: { amount: '14.50', currency: 'EUR' },
+                  barcode: '0012345678905',
+                },
+              ],
             },
           },
         ],
@@ -387,7 +399,7 @@ describe('Shopify read capabilities', () => {
     f.data.inventoryItem.tracked = false;
     f.data.order.displayFinancialStatus = 'constructor';
     f.data.work[0]!.status = 'UNRECOGNIZED';
-    f.data.product.status = 'DRAFT';
+    f.data.product.status = 'UNLISTED';
     expect(await f.read('inventory.read')).toMatchObject({
       ok: true,
       value: {
@@ -418,6 +430,43 @@ describe('Shopify read capabilities', () => {
         items: [
           { data: { status: 'unknown' } },
           { data: { status: 'shipped' } },
+        ],
+      },
+    });
+  });
+  it('reads draft products and treats missing catalog facts as unknown', async () => {
+    const f = fixture();
+    Object.assign(f.data.product, {
+      status: 'DRAFT',
+      publishedAt: null,
+      priceRangeV2: null,
+      vendor: ' ',
+    });
+    Object.assign(f.data.variants[0]!, {
+      title: 'Default Title',
+      price: 'not-a-price',
+      barcode: null,
+    });
+    expect(await f.read('products.read')).toMatchObject({
+      ok: true,
+      value: {
+        items: [
+          {
+            data: {
+              status: 'draft',
+              vendor: null,
+              published: false,
+              skus: [{ title: null, price: null, barcode: null }],
+            },
+          },
+        ],
+      },
+    });
+    f.data.variants[0]!.price = '14.50';
+    expect(await f.read('products.read')).toMatchObject({
+      value: {
+        items: [
+          { data: { skus: [{ price: { amount: '14.50', currency: null } }] } },
         ],
       },
     });

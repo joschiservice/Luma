@@ -268,15 +268,21 @@ export function WorkspaceSearch({
                     params: { organizationId, orderId: record.id },
                     search: { q: recordQuery },
                   }
-                : {
-                    to: '/app/$organizationId/records/$kind/$recordId' as const,
-                    params: {
-                      organizationId,
-                      kind: record.kind,
-                      recordId: record.id,
-                    },
-                    search: { q: recordQuery },
-                  })}
+                : record.kind === 'sku'
+                  ? {
+                      to: '/app/$organizationId/products/$skuId' as const,
+                      params: { organizationId, skuId: record.id },
+                      search: { q: recordQuery },
+                    }
+                  : {
+                      to: '/app/$organizationId/records/$kind/$recordId' as const,
+                      params: {
+                        organizationId,
+                        kind: record.kind,
+                        recordId: record.id,
+                      },
+                      search: { q: recordQuery },
+                    })}
               onClick={() => changeOpen(false)}
             >
               <span className="command-item-icon">

@@ -153,8 +153,9 @@ export async function syncFixture(t, origin = 'http://localhost:3000') {
       [f.org.id, product, connectionId, snapshot],
     );
     await f.db.owner.query(
-      "INSERT INTO inventory_product_skus(tenant_id,product_id,connection_id,sku_id,code) VALUES($1,$2,$3,$4,'LINEN-M')",
-      [f.org.id, product, connectionId, sku],
+      `INSERT INTO inventory_product_skus(tenant_id,product_id,connection_id,sku_id,code,snapshot_id,
+        product_title,product_status,unit,observed_at) VALUES($1,$2,$3,$4,'LINEN-M',$5,'Linen shirt','active','each',now())`,
+      [f.org.id, product, connectionId, sku, snapshot],
     );
   }
 

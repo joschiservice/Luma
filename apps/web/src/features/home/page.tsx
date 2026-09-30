@@ -52,6 +52,7 @@ import { OrderMetrics } from '../overview/order-metrics';
 import {
   ActivityModule,
   AttentionModule,
+  CatalogModule,
   ConnectionsModule,
   HandlingModule,
   OutcomesModule,
@@ -294,6 +295,8 @@ export function HomePage() {
         );
       case 'activity':
         return <ActivityModule organizationId={organizationId} />;
+      case 'catalog':
+        return <CatalogModule organizationId={organizationId} />;
     }
     if (!data)
       return (

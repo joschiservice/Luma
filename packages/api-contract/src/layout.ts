@@ -9,6 +9,7 @@ export const homeModuleIds = [
   'outcomes',
   'operational-metrics',
   'order-metrics',
+  'catalog',
 ] as const;
 
 export const homeModuleSchema = z

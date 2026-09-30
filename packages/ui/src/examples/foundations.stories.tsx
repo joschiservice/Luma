@@ -37,6 +37,7 @@ const states: [OperationalState, string][] = [
 const domains: Domain[] = [
   'orders',
   'inventory',
+  'products',
   'procurement',
   'suppliers',
   'fulfillment',

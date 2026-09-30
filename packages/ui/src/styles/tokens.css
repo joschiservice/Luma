@@ -55,6 +55,7 @@
   /* Domain wayfinding. Never used for full surfaces or states. */
   --domain-orders: #316bff;
   --domain-inventory: #0ea5a0;
+  --domain-products: #c2418f;
   --domain-procurement: #5457e8;
   --domain-suppliers: #e8930c;
   --domain-fulfillment: #3b8ff0;
@@ -150,6 +151,7 @@
 
   --domain-orders: #4a80ff;
   --domain-inventory: #14b8b2;
+  --domain-products: #dc5aa6;
   --domain-procurement: #6b6ef0;
   --domain-suppliers: #eb9d24;
   --domain-fulfillment: #54a3ff;

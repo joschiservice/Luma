@@ -20,6 +20,8 @@ import { useContext } from 'react';
 import { activityOptions } from '../activity/data';
 import { activityLabel, activityState } from '../activity/presentation';
 import { casesOptions } from '../exceptions/data';
+import { productSummaryOptions } from '../products/data';
+import { viewLabels } from '../products/presentation';
 
 type Connection = OperationsOverview['connections'][number];
 
@@ -405,5 +407,84 @@ export function OutcomesModule({ overview }: { overview: OperationsOverview }) {
         </p>
       </div>
     </div>
+  );
+}
+
+/** Counts SKUs whose listings differ, are missing from a source or have an unlinked match. */
+export function CatalogModule({ organizationId }: { organizationId: string }) {
+  const catalog = useQuery(productSummaryOptions(organizationId));
+  if (catalog.isPending) return <ModuleSkeleton />;
+  if (catalog.isError)
+    return (
+      <p className="home-note">
+        Catalog health couldn’t be loaded. Try again shortly.
+      </p>
+    );
+  const { counts, sources } = catalog.data;
+  const views = [
+    ['differs', 'attention'],
+    ['missing', 'waiting'],
+    ['unlinked', 'waiting'],
+  ] as const;
+
+  return (
+    <>
+      {counts.all ? (
+        <ul className="home-rows home-rows-compact">
+          {views.map(([view, state]) => (
+            <li key={view}>
+              <Link
+                className="home-row"
+                to="/app/$organizationId/products"
+                params={{ organizationId }}
+                search={{ view }}
+              >
+                <StateDot state={counts[view] ? state : 'idle'} />
+                <span className="home-row-main">
+                  <strong>{viewLabels[view]}</strong>
+                </span>
+                <span className="home-row-status">
+                  {counts[view]} {counts[view] === 1 ? 'SKU' : 'SKUs'}
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <div className="home-empty">
+          <span className="home-empty-icon" aria-hidden="true">
+            <Plus size={16} />
+          </span>
+          <div>
+            <strong>No product catalog yet</strong>
+            <p>
+              Products appear once a connected store or ERP shares its catalog.
+            </p>
+            <Link
+              className={buttonVariants({ variant: 'outline', size: 'sm' })}
+              to="/app/$organizationId/sync"
+              params={{ organizationId }}
+            >
+              Open Data sync
+            </Link>
+          </div>
+        </div>
+      )}
+      <footer className="home-module-footer">
+        <span>
+          {counts.all} {counts.all === 1 ? 'SKU' : 'SKUs'} across{' '}
+          {sources.length} {sources.length === 1 ? 'source' : 'sources'}
+        </span>
+        <span className="home-module-links">
+          <Link
+            className="home-module-link"
+            to="/app/$organizationId/products"
+            params={{ organizationId }}
+          >
+            <LinkLabel>Products</LinkLabel>
+          </Link>
+        </span>
+      </footer>
+    </>
   );
 }

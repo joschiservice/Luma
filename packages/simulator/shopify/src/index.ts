@@ -64,10 +64,23 @@ export function stock(state: ShopifyState, id = '1') {
 export function seed(time: number): ShopifyState {
   const updatedAt = new Date(time).toISOString();
   const nodes: Node[] = [
-    { id: gid('Product'), updatedAt, title: 'Canvas tote', status: 'ACTIVE' },
+    {
+      id: gid('Product'),
+      updatedAt,
+      title: 'Canvas tote',
+      status: 'ACTIVE',
+      vendor: 'Luma Goods',
+      publishedAt: updatedAt,
+      priceRangeV2: {
+        minVariantPrice: { amount: '24.0', currencyCode: 'EUR' },
+      },
+    },
     {
       id: gid('ProductVariant'),
       sku: 'LUMA-001',
+      title: 'Default Title',
+      price: '24.00',
+      barcode: '4006381333931',
       inventoryItem: { id: gid('InventoryItem') },
     },
     { id: gid('InventoryItem'), tracked: true },
@@ -107,10 +120,16 @@ export function provisionScenarioStock(state: ShopifyState, time: number) {
     updatedAt,
     title: 'Canvas tote · scenario',
     status: 'ACTIVE',
+    vendor: 'Luma Goods',
+    publishedAt: null,
+    priceRangeV2: { minVariantPrice: { amount: '24.0', currencyCode: 'EUR' } },
   };
   state.nodes[gid('ProductVariant', '2')] = {
     id: gid('ProductVariant', '2'),
     sku: 'LUMA-SCENARIO-001',
+    title: 'Default Title',
+    price: '24.00',
+    barcode: null,
     inventoryItem: { id: item },
   };
   state.nodes[item] = { id: item, tracked: true };

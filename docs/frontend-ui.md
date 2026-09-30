@@ -30,7 +30,7 @@ Choose states from `issueStatus` and `issueKind` in `components/issues/case-pres
 
 ## Workspace shell
 
-`WorkspaceLayout` renders a persistent sidebar on the canvas and an inset page surface. The sidebar holds the workspace switcher, search, core areas (Home, Issues, Records, Activity, Insights), pinned pages, operations domains (Orders, Workflows, Procurement), installed apps, and Apps and Settings. It collapses to an icon rail with `[` and moves into a drawer below 900px. The top bar shows breadcrumbs, page controls portaled through `WorkspaceHeaderSlot`, the pin control and contextual help.
+`WorkspaceLayout` renders a persistent sidebar on the canvas and an inset page surface. The sidebar holds the workspace switcher, search, core areas (Home, Issues, Records, Activity, Insights), pinned pages, operations domains (Orders, Customers, Products, Inventory, Workflows, Procurement), installed apps, and Apps and Settings. It collapses to an icon rail with `[` and moves into a drawer below 900px. The top bar shows breadcrumbs, page controls portaled through `WorkspaceHeaderSlot`, the pin control and contextual help.
 
 Search opens a command menu with ⌘K or Ctrl K. It lists pages and actions such as switching appearance. `G` followed by a letter jumps to a destination, for example G then I for Issues.
 
@@ -38,7 +38,7 @@ Pages set their own width. Working views such as the issue inbox use `page-full`
 
 ## Home and personal layouts
 
-Home answers what needs the reader's attention and what Luma is handling. It is built from modules: attention, handling, connected systems and activity by default, with resolution outcomes, operational pulse and order flow available. Each member arranges their own Home per workspace and can pin any page, including its filters, to the sidebar. Layouts are stored through `GET` and `PUT /v1/organizations/:organizationId/settings/layout` with revision checks; see `features/layout/data.ts` and **Settings → Home & sidebar**. Theme and sidebar width are device preferences stored locally.
+Home answers what needs the reader's attention and what Luma is handling. It is built from modules: attention, handling, connected systems and activity by default, with resolution outcomes, operational pulse, order flow and catalog health available. Each member arranges their own Home per workspace and can pin any page, including its filters, to the sidebar. Layouts are stored through `GET` and `PUT /v1/organizations/:organizationId/settings/layout` with revision checks; see `features/layout/data.ts` and **Settings → Home & sidebar**. Theme and sidebar width are device preferences stored locally.
 
 ## Composition
 

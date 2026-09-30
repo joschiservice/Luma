@@ -58,6 +58,7 @@ const fields = {
     'inventorySetQuantities',
   ],
   Shop: ['id', 'myshopifyDomain'],
+  ProductPriceRangeV2: ['minVariantPrice'],
   AppInstallation: ['id', 'accessScopes'],
   AccessScope: ['handle'],
   WebhookSubscriptionConnection: ['nodes'],
@@ -86,7 +87,16 @@ const fields = {
     'events',
   ],
   LineItem: ['id', 'name', 'quantity', 'sku', 'variant'],
-  Product: ['id', 'updatedAt', 'title', 'status', 'variants'],
+  Product: [
+    'id',
+    'updatedAt',
+    'title',
+    'status',
+    'variants',
+    'vendor',
+    'publishedAt',
+    'priceRangeV2',
+  ],
   ProductVariant: [
     'id',
     'sku',
@@ -95,6 +105,7 @@ const fields = {
     'price',
     'updatedAt',
     'product',
+    'barcode',
   ],
   InventoryItem: [
     'id',

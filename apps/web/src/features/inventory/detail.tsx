@@ -328,6 +328,12 @@ export function StockDetailView({
               <h2>SKU & locations</h2>
               <div className="inventory-record-links">
                 <Link
+                  to="/app/$organizationId/products/$skuId"
+                  params={{ organizationId, skuId: position.skuId }}
+                >
+                  Product listings for this SKU
+                </Link>
+                <Link
                   to="/app/$organizationId/records/$kind/$recordId"
                   params={{
                     organizationId,

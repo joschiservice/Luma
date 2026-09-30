@@ -292,6 +292,19 @@ Tests: `domain/inventory.test.ts`, `apps/api/e2e/inventory.e2e.mjs`,
 `inventory.browser.mjs` and `Inventory/Workspace` stories. See
 [Inventory workspace](inventory-workspace.md) for quantity and relationship semantics.
 
+## Products workspace
+
+Start at `packages/read-models/src/application/products.ts` for read contracts and
+`infrastructure/products` for the catalog comparison (`catalog.ts`) and related records
+(`detail.ts`). Inventory maintains the catalog rows in `refreshProductSkus`
+(`packages/inventory/src/infrastructure/projections.ts`, migration `0043`); adapters fill
+listing facts in their `products.read` handlers. API contracts are in
+`packages/api-contract/src/products.ts`; the frontend is `apps/web/src/features/products`,
+with the Catalog health module in `features/home/modules.tsx`.
+Tests: Shopify and JTL adapter tests, the web `products` unit tests,
+`apps/api/e2e/products.e2e.mjs`, `products.browser.mjs` and `Products/Workspace` stories.
+See [Products workspace](products-workspace.md).
+
 ## Shopify fulfillment recovery
 
 Start at `packages/apps/shopify/src/application/fulfillment-recovery.ts` for
