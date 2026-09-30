@@ -722,6 +722,16 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
     },
     async finishLink(tenantId, id, result) {
       await db.transaction(tenantId, async (tx) => {
+        if (result.state === 'completed')
+          await tx.query(
+            `UPDATE commerce_sync_items item SET entity_id=m.canonical_id
+            FROM connector_source_mappings m WHERE item.tenant_id=$1 AND m.tenant_id=item.tenant_id
+             AND m.connection_id=item.connection_id AND m.resource=item.resource AND m.scope_key=item.scope_key
+             AND m.external_id=item.external_id AND item.resource IN ('order','fulfillment','return','refund')
+             AND item.entity_id IS DISTINCT FROM m.canonical_id
+             AND EXISTS (SELECT 1 FROM commerce_identity_links WHERE tenant_id=$1 AND id=$2 AND kind='order')`,
+            [tenantId, id],
+          );
         await tx.query(
           `UPDATE commerce_identity_links SET state=$3,message=$4,lease_until=NULL,
             completed_at=CASE WHEN $3 IN ('completed','failed') THEN now() ELSE NULL END

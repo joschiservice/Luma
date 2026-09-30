@@ -29,6 +29,7 @@ export const decimal = z
 export const order = z.object({
   id,
   salesOrderNumber: z.string(),
+  externalSalesOrderNumber: z.string().nullable().optional().catch(null),
   isCancelled: z.boolean(),
   deliveryStatus: z.number().int(),
   paymentStatus: z.number().int(),

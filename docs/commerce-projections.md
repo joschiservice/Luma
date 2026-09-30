@@ -51,8 +51,8 @@ product and SKU with the SKU's normalized source code, which labels SKUs and sug
 links, and the listing facts the [Products workspace](products-workspace.md) compares.
 Inventory rewrites these rows with the projection pointer (migration `0043`).
 
-`ingestion.link(context, kind, targetId, otherId, reason)` confirms that another SKU
-or location is the same record. Every mapping of the other entity moves to the
+`ingestion.link(context, kind, targetId, otherId, reason)` confirms that another SKU,
+location or order is the same record. Every mapping of the other entity moves to the
 target through `sources.remap`, which appends a `connector_mapping_revisions` row;
 a trigger rejects mapping changes without one. Stock positions, product snapshots
 and order lines that still refer to the other entity are replayed from their stored
@@ -60,6 +60,13 @@ observations, and positions that moved are retired (`inventory_projection_retire
 keeping their snapshots as history. `unlink` moves one connection's source back to its
 own entity and replays the same way. Both operations are idempotent: repeating them
 finishes any remaining replay. Two entities that share a connection cannot be linked.
+
+Order links re-key each source child under the order mapping revision before replay. New
+lines, fulfillments, returns and refunds use that same generation. The immutable parent guard
+still rejects children bound to an unrelated order. Orders-owned retirements remove old current
+pointers and maintain redirects; snapshots remain immutable. Unlink restores a source-local
+order with another child generation. Runtime ingestion, including link/unlink, shares a tenant
+transaction and lock, so partial remappings are not visible to concurrent imports or reads.
 
 A replay can return to a snapshot that already exists, for example after unlinking.
 The owner then makes that snapshot current again when it re-normalizes the current

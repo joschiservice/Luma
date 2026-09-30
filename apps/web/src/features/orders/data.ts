@@ -67,6 +67,7 @@ export const ordersSearch = z.object({
   direction: z.enum(['asc', 'desc']).optional().catch(undefined),
   cursor: z.string().max(1024).optional().catch(undefined),
   page: z.coerce.number().int().min(1).max(100000).optional().catch(undefined),
+  linkedFrom: z.uuid().optional().catch(undefined),
   from: z.string().max(2048).optional().catch(undefined),
 });
 
@@ -106,6 +107,7 @@ export function orderFilters(search: OrdersSearch): OrdersSearch {
   delete filters.cursor;
   delete filters.page;
   delete filters.from;
+  delete filters.linkedFrom;
 
   return filters;
 }

@@ -15,10 +15,23 @@ import type {
 } from '@luma/connections';
 import { createReadChecks } from '@luma/connections/composition';
 import { createCustomerProfiles } from '@luma/customers/composition';
+import {
+  orderAttentionForOrders,
+  orderAttentionQuery,
+} from '@luma/exceptions/composition';
 import type { TenantContext } from '@luma/identity';
 import { makeTenantContext } from '@luma/identity/composition';
+import {
+  createOrderMetricReader,
+  orderStateQueries,
+} from '@luma/orders/composition';
 import type { TenantDatabase } from '@luma/platform';
 import { createTenantDatabase } from '@luma/platform/composition';
+import {
+  createOrderWorkspace,
+  createRecordExplorer,
+} from '@luma/read-models/composition';
+import { createActivityStore } from '@luma/resolution/composition';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -35,7 +48,7 @@ const reads = [
 type Item = Omit<Observation<unknown>, 'id' | 'observedAt'>;
 
 /** An in-memory source that pages like an installed adapter and can fail on demand. */
-function provider(tenantId: string) {
+function provider(tenantId: string, erpId: string) {
   const collections = new Map<string, Item[]>();
   const failures: {
     connectionId: string;
@@ -154,7 +167,7 @@ function provider(tenantId: string) {
       return {
         tenantId,
         connectionId,
-        provider: 'shopify',
+        provider: connectionId === erpId ? 'jtl' : 'shopify',
         resource,
         externalId,
         scopeKey,
@@ -207,6 +220,9 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
       placed?: string;
       status?: 'open' | 'completed';
       sku?: string;
+      number?: string;
+      externalNumber?: string;
+      extraLine?: boolean;
     } = {},
   ): Item => ({
     source: source.source(connectionId, 'order', id),
@@ -216,7 +232,10 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
     adapterVersion: 'fixture/1',
     schemaVersion: 1,
     data: {
-      displayNumber: `#${id}`,
+      displayNumber: options.number ?? `#${id}`,
+      ...(options.externalNumber === undefined
+        ? {}
+        : { externalOrderNumber: options.externalNumber }),
       placedAt: options.placed ?? '2026-08-15T10:00:00.000Z',
       total: { amount: '10.00', currency: 'EUR' },
       status: options.status ?? 'open',
@@ -230,6 +249,17 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
           skuCode: 'ABC-1',
           title: 'Mug',
         },
+        ...(options.extraLine
+          ? [
+              {
+                id: { externalId: `${id}-added`, scopeKey: id },
+                sku: null,
+                quantity: { amount: '1', unit: 'each' },
+                cancelledQuantity: null,
+                title: 'Shipping fee',
+              },
+            ]
+          : []),
       ],
     },
   });
@@ -388,7 +418,7 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
       `CREATE ROLE "${name}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`,
     );
     await admin.query(
-      `GRANT luma_connectors,luma_orders,luma_inventory,luma_case_reader,luma_commerce_sync,luma_customers TO "${name}"`,
+      `GRANT luma_connectors,luma_orders,luma_inventory,luma_case_reader,luma_desk,luma_commerce_sync,luma_customers TO "${name}"`,
     );
     url.username = name;
     url.password = password;
@@ -426,8 +456,8 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
             tenantId: tenant,
             version: 1,
             status: 'active',
-            provider: 'shopify',
-            target: { kind: 'shopify' },
+            provider: id === erp ? 'jtl' : 'shopify',
+            target: { kind: id === erp ? 'jtl' : 'shopify' },
             label,
             permissions: reads,
             granted: reads,
@@ -441,7 +471,7 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
         [tenant, id],
       );
     }
-    source = provider(tenant);
+    source = provider(tenant, erp);
     for (const connectionId of [shop, erp])
       for (const capability of reads) source.set(connectionId, capability, []);
     runner = createSyncRunner({
@@ -764,6 +794,404 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
       'Same mug',
       'Different size',
     ]);
+  });
+
+  async function canonical(
+    connectionId: string,
+    resource: string,
+    externalId: string,
+  ) {
+    return (
+      await owner.query<{ canonical_id: string }>(
+        'SELECT canonical_id FROM connector_source_mappings WHERE tenant_id=$1 AND connection_id=$2 AND resource=$3 AND external_id=$4',
+        [tenant, connectionId, resource, externalId],
+      )
+    ).rows[0]!.canonical_id;
+  }
+
+  const queries = {
+    state: orderStateQueries,
+    attention: orderAttentionQuery,
+    attentionFor: orderAttentionForOrders,
+  };
+
+  function workspace() {
+    return createOrderWorkspace(
+      db,
+      queries,
+      createActivityStore,
+      async (value) => value,
+    );
+  }
+
+  it('links imported orders with independent children, preserves old evidence and URLs, and unlinks with fresh children', async () => {
+    source.set(shop, 'orders.read', [order(shop, '1')]);
+    source.set(erp, 'orders.read', [
+      order(erp, '9', { externalNumber: '#1', number: 'SO-9' }),
+    ]);
+    source.set(erp, 'fulfillment.read', [shipment(erp, 'f9', '9')]);
+    await drain();
+    const a = await canonical(shop, 'order', '1'),
+      b = await canonical(erp, 'order', '9');
+    const oldLine = await canonical(erp, 'order_line', '9-line'),
+      oldShipment = await canonical(erp, 'fulfillment', 'f9');
+    const old = (await services.orders.current(context(), b))[0]!;
+    await expect(
+      services.orders.project(context(), {
+        ...old.snapshot,
+        entityId: a,
+        mappingVersion: 'a'.repeat(64),
+      }),
+    ).rejects.toThrow('Canonical child belongs to another order');
+    const issue = randomUUID();
+    await owner.query(
+      `INSERT INTO exceptions(id,tenant_id,fingerprint,state,document) VALUES($1,$2,$3,'escalated',$4)`,
+      [
+        issue,
+        tenant,
+        'f'.repeat(64),
+        {
+          id: issue,
+          tenantId: tenant,
+          fingerprint: 'f'.repeat(64),
+          occurrenceCount: 1,
+          firstDetectedAt: new Date().toISOString(),
+          state: 'escalated',
+          exceptionClass: 'stuck_fulfillment',
+          severity: 'high',
+          subject: {
+            ruleIdentity: 'fixture',
+            subjectKind: 'order',
+            subjectId: b,
+            scope: [],
+          },
+          lastDetectedAt: new Date().toISOString(),
+        },
+      ],
+    );
+    await owner.query(
+      'INSERT INTO exception_outbox(id,tenant_id,exception_id,document) VALUES($1,$2,$3,$4)',
+      [
+        randomUUID(),
+        tenant,
+        issue,
+        { type: 'exception.detected', occurredAt: new Date().toISOString() },
+      ],
+    );
+    const request = await service.requestLink(context(), {
+      operation: 'link',
+      kind: 'order',
+      entityId: a,
+      otherId: b,
+      reason: 'Shopify marketplace reference confirmed',
+    });
+    await drain();
+    expect(await service.linkRequest(context(), request.id)).toMatchObject({
+      state: 'completed',
+    });
+    expect(await canonical(erp, 'order', '9')).toBe(a);
+    const linkedLine = await canonical(erp, 'order_line', '9-line');
+    expect(linkedLine).not.toBe(oldLine);
+    expect(await canonical(erp, 'fulfillment', 'f9')).not.toBe(oldShipment);
+    const detail = await workspace().get(context(), b);
+    expect(detail).toMatchObject({
+      redirectedFrom: b,
+      order: { id: a },
+      sources: [expect.anything(), expect.anything()],
+    });
+    expect(detail?.issues.map((item) => item.id)).toContain(issue);
+    expect(detail?.activity.entries.map((item) => item.exceptionId)).toContain(
+      issue,
+    );
+    expect(detail?.history.entries.some((item) => item.entityId === b)).toBe(
+      true,
+    );
+    expect(detail?.fulfillments).toHaveLength(1);
+    expect(
+      (
+        await workspace().list(context(), {
+          q: 'SO-9',
+          view: 'all',
+          sort: 'updated',
+          direction: 'desc',
+          limit: 50,
+          count: 'exact',
+        })
+      ).items.map((item) => item.id),
+    ).toEqual([a]);
+    const metrics = await createOrderMetricReader(db, orderAttentionQuery)(
+      context(),
+      { asOf: new Date().toISOString(), scope: {}, limit: 50, offset: 0 },
+    );
+    expect(metrics.population).toBe(1);
+    const records = createRecordExplorer(db);
+    expect((await records.get(context(), 'order', b))?.record.id).toBe(a);
+    expect(
+      (await records.get(context(), 'fulfillment', oldShipment))?.record.id,
+    ).toBe(await canonical(erp, 'fulfillment', 'f9'));
+    expect(await services.orders.history(context(), b)).toHaveLength(1);
+    expect(await services.orders.current(context(), b)).toEqual([]);
+
+    // Reimport and reconciliation must retain the link and current child identities.
+    for (const command of ['reimport', 'reconcile'] as const) {
+      await service.command(
+        context(),
+        (await stream('orders', erp))!.id,
+        command,
+      );
+      await drain();
+      expect(await canonical(erp, 'order', '9')).toBe(a);
+      expect(await canonical(erp, 'order_line', '9-line')).toBe(linkedLine);
+      expect(
+        (
+          await workspace().list(context(), {
+            q: '',
+            view: 'all',
+            sort: 'updated',
+            direction: 'desc',
+            limit: 50,
+          })
+        ).items,
+      ).toHaveLength(1);
+    }
+    // A new shipment and a newer order arrive under the link; a later-delivered stale read cannot re-split it.
+    source.set(erp, 'fulfillment.read', [
+      shipment(erp, 'f9', '9'),
+      shipment(erp, 'f10', '9'),
+    ]);
+    await service.command(
+      context(),
+      (await stream('fulfillments', erp))!.id,
+      'reimport',
+    );
+    await drain();
+    expect((await workspace().get(context(), a))?.fulfillments).toHaveLength(2);
+    source.set(erp, 'orders.read', [
+      order(erp, '9', {
+        updated: '2026-10-01T10:00:00Z',
+        status: 'completed',
+        extraLine: true,
+      }),
+    ]);
+    await service.command(
+      context(),
+      (await stream('orders', erp))!.id,
+      'reimport',
+    );
+    await drain();
+    source.set(erp, 'orders.read', [
+      order(erp, '9', { updated: '2026-09-01T10:00:00Z', status: 'open' }),
+    ]);
+    await service.command(
+      context(),
+      (await stream('orders', erp))!.id,
+      'reimport',
+    );
+    await drain();
+    expect(
+      (await services.orders.current(context(), a)).find(
+        (item) => item.snapshot.connectionId === erp,
+      )?.snapshot.data,
+    ).toMatchObject({ status: 'completed' });
+    expect(await canonical(erp, 'order', '9')).toBe(a);
+    const addedLine = await canonical(erp, 'order_line', '9-added');
+    expect(await services.orders.childParent(context(), addedLine)).toBe(a);
+
+    const split = await service.requestLink(context(), {
+      operation: 'unlink',
+      kind: 'order',
+      entityId: a,
+      connectionId: erp,
+      reason: 'Source order is separate',
+    });
+    await drain();
+    expect(await service.linkRequest(context(), split.id)).toMatchObject({
+      state: 'completed',
+    });
+    expect(await canonical(erp, 'order', '9')).toBe(b);
+    const splitLine = await canonical(erp, 'order_line', '9-line');
+    expect([oldLine, linkedLine]).not.toContain(splitLine);
+    const splitAddedLine = await canonical(erp, 'order_line', '9-added');
+    expect(splitAddedLine).not.toBe(addedLine);
+    expect(await services.orders.childParent(context(), splitAddedLine)).toBe(
+      b,
+    );
+    expect(
+      (
+        await workspace().list(context(), {
+          q: '',
+          view: 'all',
+          sort: 'updated',
+          direction: 'desc',
+          limit: 50,
+        })
+      ).items,
+    ).toHaveLength(2);
+    expect(
+      (await workspace().get(context(), b))?.issues.map((item) => item.id),
+    ).toContain(issue);
+    expect((await workspace().get(context(), b))?.fulfillments).toHaveLength(2);
+    const audit = await owner.query<{ reason: string; actor_id: string }>(
+      "SELECT reason,actor_id FROM connector_mapping_revisions WHERE tenant_id=$1 AND resource='order' ORDER BY created_at",
+      [tenant],
+    );
+    expect(audit.rows).toEqual([
+      {
+        reason: 'Shopify marketplace reference confirmed',
+        actor_id: 'operator',
+      },
+      { reason: 'Source order is separate', actor_id: 'operator' },
+    ]);
+    // Repeated retries leave the split untouched.
+    await services.ingestion.unlink(
+      context(),
+      'order',
+      a,
+      erp,
+      'Source order is separate',
+    );
+    expect(await canonical(erp, 'order_line', '9-line')).toBe(splitLine);
+  });
+
+  it('rolls back a crash during a link and resumes an expired request without duplicate effects', async () => {
+    source.set(shop, 'orders.read', [order(shop, '1')]);
+    source.set(erp, 'orders.read', [order(erp, '9')]);
+    source.set(erp, 'fulfillment.read', [shipment(erp, 'f9', '9')]);
+    await drain();
+    const a = await canonical(shop, 'order', '1'),
+      b = await canonical(erp, 'order', '9');
+    const request = await service.requestLink(context(), {
+      operation: 'link',
+      kind: 'order',
+      entityId: a,
+      otherId: b,
+      reason: 'Confirmed reference',
+    });
+    await createSyncStore(db).claimLink(tenant, 60_000);
+    const interrupted = createCommerceServices({
+      transaction: (tenantId, next, options) =>
+        db.transaction(
+          tenantId,
+          (tx) =>
+            next({
+              query: async <Row extends Record<string, unknown>>(
+                sql: string,
+                values?: unknown[],
+              ) => {
+                if (sql.startsWith('INSERT INTO orders_projection_retirements'))
+                  throw new Error('Simulated worker crash');
+
+                return tx.query<Row>(sql, values);
+              },
+            }),
+          options,
+        ),
+    });
+    await expect(
+      interrupted.ingestion.link(
+        context(),
+        'order',
+        a,
+        b,
+        'Confirmed reference',
+      ),
+    ).rejects.toThrow('Simulated worker crash');
+    expect(await canonical(erp, 'order', '9')).toBe(b);
+    expect(await services.orders.current(context(), a)).toHaveLength(1);
+    expect(await services.orders.current(context(), b)).toHaveLength(1);
+    await owner.query(
+      "UPDATE commerce_identity_links SET lease_until=now()-interval '1 second' WHERE tenant_id=$1",
+      [tenant],
+    );
+    await drain();
+    expect(await service.linkRequest(context(), request.id)).toMatchObject({
+      state: 'completed',
+    });
+    const count = (
+      await owner.query(
+        'SELECT count(*) FROM orders_snapshots WHERE tenant_id=$1',
+        [tenant],
+      )
+    ).rows[0].count;
+    // Crash after the atomic link committed, but before the queue completion was written.
+    await owner.query(
+      "UPDATE commerce_identity_links SET state='running',lease_until=now()-interval '1 second' WHERE tenant_id=$1",
+      [tenant],
+    );
+    await drain();
+    expect(await service.linkRequest(context(), request.id)).toMatchObject({
+      state: 'completed',
+    });
+    expect(
+      (
+        await owner.query(
+          'SELECT count(*) FROM orders_snapshots WHERE tenant_id=$1',
+          [tenant],
+        )
+      ).rows[0].count,
+    ).toBe(count);
+    expect(await services.orders.current(context(), a)).toHaveLength(2);
+  });
+
+  it('keeps ambiguous suggestions unapplied and rejects unauthorized, same-connection and foreign links', async () => {
+    source.set(shop, 'orders.read', [order(shop, '1')]);
+    source.set(erp, 'orders.read', [
+      order(erp, '9', { externalNumber: '1' }),
+      order(erp, '10', { externalNumber: '#1' }),
+      order(erp, '11'),
+    ]);
+    await drain();
+    const a = await canonical(shop, 'order', '1'),
+      b = await canonical(erp, 'order', '9'),
+      c = await canonical(erp, 'order', '10');
+    const identity = await service.identity(context(), 'order', a);
+    expect(identity.suggestions.map((item) => item.id).sort()).toEqual(
+      [b, c].sort(),
+    );
+    expect(identity.sources[0]?.order?.total).toEqual({
+      amount: '10.00',
+      currency: 'EUR',
+    });
+    expect(await canonical(erp, 'order', '9')).toBe(b);
+    await expect(
+      service.requestLink(context('viewer'), {
+        operation: 'link',
+        kind: 'order',
+        entityId: a,
+        otherId: b,
+        reason: 'Confirmed',
+      }),
+    ).rejects.toThrow();
+    await expect(
+      service.requestLink(context(), {
+        operation: 'link',
+        kind: 'order',
+        entityId: b,
+        otherId: c,
+        reason: 'Confirmed',
+      }),
+    ).rejects.toThrow('same connection');
+    await expect(
+      service.requestLink(context(), {
+        operation: 'link',
+        kind: 'order',
+        entityId: a,
+        otherId: randomUUID(),
+        reason: 'Confirmed',
+      }),
+    ).rejects.toThrow('Record not found');
+    await expect(
+      service.identity({ ...context(), tenantId: randomUUID() }, 'order', a),
+    ).rejects.toThrow('Record not found');
+    await expect(
+      service.requestLink(context(), {
+        operation: 'link',
+        kind: 'order',
+        entityId: a,
+        otherId: b,
+        reason: ' ',
+      }),
+    ).rejects.toThrow('Give a reason');
   });
 
   it('leaves idle workspaces and connections without syncable reads unscheduled', async () => {

@@ -72,7 +72,7 @@ export async function sendSyncCommand(
 /** Query-key prefix for the sources behind one SKU or location. */
 export const identityKey = (
   organizationId: string,
-  kind: 'sku' | 'location',
+  kind: 'sku' | 'location' | 'order',
   entityId: string,
 ) =>
   [
@@ -90,7 +90,7 @@ export const identityKey = (
  */
 export const identityOptions = (
   organizationId: string,
-  kind: 'sku' | 'location',
+  kind: 'sku' | 'location' | 'order',
   entityId: string,
 ) =>
   queryOptions<

@@ -204,6 +204,7 @@ export const orderActivitySchema = z.object({
 });
 
 export const orderDetailSchema = z.object({
+  redirectedFrom: z.string().uuid().nullable().optional(),
   order: orderListItemSchema,
   sources: z.array(orderSourceFactsSchema),
   differences: z.array(orderDifferenceSchema),

@@ -36,6 +36,10 @@ export interface SourceMapping {
   createdAt: string;
   /** Latest remapping, when the source was moved from another canonical entity. */
   revisedAt: string | null;
+  /** Immutable identity of the latest remapping, used to re-key order children. */
+  revisionId: string | null;
+  /** The prior canonical identity of the latest remapping, for guarded child re-keying. */
+  previousCanonicalId: string | null;
 }
 
 export interface SourceRecords {

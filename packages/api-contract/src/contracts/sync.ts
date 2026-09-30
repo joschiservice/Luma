@@ -53,7 +53,7 @@ export const syncContract = c.router({
     responses: { 200: identityDetailSchema, ...errors },
     summary: 'Inspect linked source records',
     description:
-      'Lists the source records that represent one SKU or location, how each was linked, and possible matches in other sources. Suggestions share a SKU code; they are never linked automatically.',
+      'Lists the source records that represent one SKU, location or order, how each was linked, and possible matches in other sources. Suggestions share a SKU code or a JTL marketplace order reference; they are never linked automatically.',
   },
   requestLink: {
     method: 'POST',
@@ -68,7 +68,7 @@ export const syncContract = c.router({
     },
     summary: 'Link or unlink source records',
     description:
-      'Owners and admins can confirm that another SKU or location is the same record (`link`), or separate one connection’s source from it (`unlink`). Luma applies the change in the background, keeps the previous mapping as history and re-projects affected stock, products and order lines. Poll the returned request for its outcome.',
+      'Owners and admins can confirm that another SKU, location or order is the same record (`link`), or separate one connection’s source from it (`unlink`). Luma applies the change in the background, keeps the previous mapping as history and re-projects affected projections. Order links keep each source’s lines and shipments separate and preserve old references. Poll the returned request for its outcome.',
   },
   linkRequest: {
     method: 'GET',

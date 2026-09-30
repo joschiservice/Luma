@@ -3,6 +3,7 @@ import type { SqlTransaction } from '@luma/platform';
 
 import type { FulfillmentDetail } from '../../application/fulfillment.js';
 import type { OrderActivityReader } from '../../application/orders.js';
+import { resolveOrderEntity } from '../orders/identity-references.js';
 import {
   readDirectRunIds,
   readIssues,
@@ -173,6 +174,7 @@ export async function readFulfillment(
   fulfillmentId: string,
   asOf: string,
 ): Promise<FulfillmentDetail | null> {
+  fulfillmentId = await resolveOrderEntity(tx, context.tenantId, fulfillmentId);
   const tenantId = context.tenantId;
   const [item] = await readItems(tx, tenantId, asOf, 'f.entity_id=$4', [
     fulfillmentId,

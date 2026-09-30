@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { createCommerceServices } from '@luma/application-runtime';
+import { createCommerceSyncWorker } from '@luma/application-runtime/sync';
 import { makeTenantContext } from '@luma/identity';
 import { createOrderListRebuilder } from '@luma/orders/composition';
 import { createTenantDatabase } from '@luma/platform/composition';
@@ -57,6 +58,7 @@ export async function ordersFixture(t, f) {
     updatedAt = new Date().toISOString(),
     data,
     lines,
+    imported = false,
   }) {
     const source = {
       tenantId: f.org.id,
@@ -94,6 +96,17 @@ export async function ordersFixture(t, f) {
       },
     };
     const ingestKey = observation.observation.id;
+    if (imported) {
+      const outcome = await commerce.ingestion.import(
+        context,
+        ingestKey,
+        observation,
+      );
+      if (outcome.status === 'pending')
+        throw new Error('Fixture order import is pending');
+
+      return outcome.entityId;
+    }
     await commerce.ingestion.ingest(context, ingestKey, observation);
     const id = await commerce.ingestion.bind(
       context,
@@ -160,5 +173,21 @@ export async function ordersFixture(t, f) {
     } while (after);
   }
 
-  return { store, erp, order, importHistory };
+  const worker = createCommerceSyncWorker({
+    database: createTenantDatabase(f.db.owner),
+    identity: f.identity.service,
+    connections: {
+      activeKeyId: 'fixture',
+      keys: new Map([['fixture', new Uint8Array(32)]]),
+    },
+  });
+  t.onTestFinished(() => worker.close());
+
+  return {
+    store,
+    erp,
+    order,
+    importHistory,
+    applyLinks: () => worker.runner.tick(f.org.id),
+  };
 }

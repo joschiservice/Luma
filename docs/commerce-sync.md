@@ -88,10 +88,20 @@ customer IDs by digest so later reads skip them. Other retained data still follo
 
 ## Links
 
-SKU and location links are requested through the API (`commerce_identity_links`) and
+SKU, location and order links are requested through the API (`commerce_identity_links`) and
 applied by the runner with the requester's current permissions, because only the
 worker login may write projections. Suggestions come from equal normalized SKU codes
-in other connections; they are never applied automatically.
+in other connections. Order suggestions require a JTL external marketplace order number
+matching a Shopify order number. Dates and totals support review; neither establishes identity.
+Multiple candidates stay visible and are never applied automatically.
+
+Order link/unlink runs with ingestion in a shared transaction, serialized per tenant. Children
+receive canonical IDs keyed by the current order mapping revision; parent bindings remain
+immutable. Old pointers are retired by the orders owner, with snapshots and actor/reason history
+retained. Redirects preserve old order and child links, cases and activity. The order list, search,
+Home metrics and Insights read current projections and count the linked order once.
+A restart before commit rolls back the change; a restart after commit resumes the request
+without reapplying effects.
 
 ## Running it
 
@@ -111,6 +121,6 @@ coverage rules. `packages/application-runtime/src/commerce-sync.integration.test
 runs the store, runner, ingestion and customer profiles against PostgreSQL: paged
 import with checkpoints, re-import without duplicates, out-of-order updates, retry
 from a checkpoint, fulfillments after orders, missing-record detection, change
-notifications, customer erasure and suppression, SKU link/unlink and principal
-recovery. Shopify adapter tests validate the new queries against the 2026-07 schema.
+notifications, customer erasure and suppression, SKU and order link/unlink, stale replays, interrupted order linking, reference
+redirects, ambiguous suggestions, tenant isolation and principal recovery. Shopify adapter tests validate the new queries against the 2026-07 schema.
 The web Data sync page has `Data sync/Workspace` stories and presentation tests.

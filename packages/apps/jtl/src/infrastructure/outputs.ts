@@ -4,7 +4,7 @@ import { z } from 'zod';
  * Version of this adapter's normalized output, recorded as observation provenance. Bump it
  * whenever the same provider response would normalize differently.
  */
-export const adapterVersion = 'jtl/3';
+export const adapterVersion = 'jtl/4';
 
 const timestamp = z.string().datetime({ offset: true });
 
@@ -54,6 +54,7 @@ export const outputs = {
       'order',
       z.object({
         displayNumber: z.string().nullable(),
+        externalOrderNumber: z.string().nullable(),
         placedAt: timestamp.nullable(),
         total,
         status: z.enum(['open', 'completed', 'cancelled', 'unknown']),
