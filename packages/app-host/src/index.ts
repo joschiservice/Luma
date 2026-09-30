@@ -1,4 +1,5 @@
 export type {
+  AppDecision,
   AppDefinition,
   AppFactoryContext,
   AppFactory,

@@ -619,23 +619,36 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
     .getByRole('region', { name: 'Luma is handling' })
     .getByRole('term');
   await decisions.first().waitFor();
+  // Home's decisions and headline come from the Needs you queue.
   const authoritative = await context.request.get(
-    `/api/v1/organizations/${organizationId}/operations/overview`,
+    `/api/v1/organizations/${organizationId}/decisions?limit=5`,
   );
   expect(authoritative.status()).toBe(200);
   const summary = await authoritative.json();
+  // Apps that aren't installed have no decisions; they are not unavailable sources.
+  expect(summary.sources.every((source) => source.state === 'available')).toBe(
+    true,
+  );
   await page
     .getByText(
-      new RegExp(`^${summary.attentionCount} decisions? needs? you\\.`),
+      new RegExp(`^${summary.counts.views.all} decisions? needs? you\\.`),
     )
     .waitFor();
+  expect(await page.getByText('didn’t answer', { exact: false }).count()).toBe(
+    0,
+  );
   expect(await decisions.first().getAttribute('href')).toContain(
-    summary.prioritizedDecisions[0].id,
+    summary.items[0].owner.exceptionId,
   );
   await page.unroute('**/api/v1/organizations/*/exceptions?**');
   await decisions.first().click();
-  await page.getByRole('article', { name: 'Issue investigation' }).waitFor();
-  expect(new URL(page.url()).searchParams.get('view')).toBe('needs_you');
+  await page
+    .getByRole('region', { name: 'Selected decision' })
+    .getByRole('heading', { name: summary.items[0].title })
+    .waitFor();
+  expect(new URL(page.url()).searchParams.get('item')).toBe(
+    summary.items[0].id,
+  );
   await page.goto(`/app/${organizationId}/home`);
   await decisions.first().waitFor();
   expect(await handlingTotals.count()).toBeGreaterThan(0);

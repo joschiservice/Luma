@@ -1,5 +1,5 @@
 import type { ConnectionProvider } from '@luma/connections';
-import type { IdentityService } from '@luma/identity';
+import type { IdentityService, TenantContext } from '@luma/identity';
 import type { FastifyInstance } from 'fastify';
 
 import type { AppDefinition } from './contracts.js';
@@ -32,6 +32,19 @@ export function createAppRegistry(definitions: readonly AppDefinition[] = []) {
     /** Lists connector contributions for capability runtime composition. */
     providers: () =>
       [...apps.values()].flatMap((a) => (a.connector ? [a.connector] : [])),
+    /** Lists apps that contribute decisions to the Needs you queue. */
+    decisionSources: () =>
+      [...apps.values()].flatMap((a) =>
+        a.decisions
+          ? [
+              {
+                appId: a.manifest.id,
+                name: a.manifest.name,
+                decisions: (context: TenantContext) => a.decisions!(context),
+              },
+            ]
+          : [],
+      ),
     /** Registers app-owned routes after host identity guards are attached. */
     registerHttp(server: FastifyInstance, identity?: IdentityService) {
       for (const app of apps.values()) app.registerHttp?.(server, identity);

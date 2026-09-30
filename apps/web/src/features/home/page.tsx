@@ -44,6 +44,7 @@ import {
 } from 'lucide-react';
 import { type ReactNode, useContext, useState } from 'react';
 
+import { decisionsOptions } from '../decisions/data';
 import { sessionOptions } from '../identity/data';
 import { useWorkspaceLayout } from '../layout/data';
 import { overviewOptions } from '../overview/data';
@@ -264,6 +265,10 @@ export function HomePage() {
   const client = useQueryClient();
   const session = client.getQueryData(sessionOptions().queryKey);
   const overview = useQuery(overviewOptions(organizationId, window));
+  const waiting = useQuery({
+    ...decisionsOptions(organizationId, {}, 5),
+    select: (list) => list.counts.views.all,
+  });
   const workspace = useWorkspaceLayout(organizationId);
   const [editing, setEditing] = useState(false);
   const [dragged, setDragged] = useState<HomeModuleId | null>(null);
@@ -339,9 +344,9 @@ export function HomePage() {
           <p className="home-date">{today}</p>
           <h1>{greeting(timeZone, session?.user.name)}</h1>
           <p className="home-lead">
-            {data
-              ? data.attentionCount
-                ? `${data.attentionCount} ${data.attentionCount === 1 ? 'decision needs' : 'decisions need'} you. Luma is handling the rest.`
+            {waiting.data !== undefined
+              ? waiting.data
+                ? `${waiting.data} ${waiting.data === 1 ? 'decision needs' : 'decisions need'} you. Luma is handling the rest.`
                 : 'Nothing needs your decision right now. Here’s what Luma is handling.'
               : 'Here’s what needs you and what Luma is handling.'}
           </p>

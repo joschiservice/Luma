@@ -6,6 +6,7 @@ import {
 } from '@luma/connections/composition';
 import type { VerificationEvaluator } from '@luma/exceptions';
 import {
+  caseDecisionQuery,
   createCaseMetricReader,
   createOrderAttentionBoundaryReader,
   orderAttentionForOrders,
@@ -23,6 +24,8 @@ import {
   createProcurementMetricReader,
 } from '@luma/procurement/composition';
 import {
+  appDecisionProvider,
+  createDecisionQueue,
   createFulfillmentWorkspace,
   createInventoryWorkspace,
   createOperationalMetrics,
@@ -31,6 +34,7 @@ import {
   createProductWorkspace,
   createRecordExplorer,
   createReturnWorkspace,
+  replenishmentDecisionProvider,
 } from '@luma/read-models/composition';
 import {
   createShippingMethodTemplate,
@@ -39,6 +43,7 @@ import {
 } from '@luma/resolution';
 import {
   createActivityStore,
+  createDecisionAssignments,
   createOperationsOverview,
   createResolutionLearning,
   createResolutionMeasurements,
@@ -110,6 +115,8 @@ export interface ApplicationServices {
     fulfillment: ReturnType<typeof createFulfillmentWorkspace>;
     returns: ReturnType<typeof createReturnWorkspace>;
     orders: ReturnType<typeof createOrderWorkspace>;
+    decisions: ReturnType<typeof createDecisionQueue>;
+    decisionAssignments: ReturnType<typeof createDecisionAssignments>;
   };
 }
 
@@ -124,6 +131,8 @@ export interface ApplicationOptions {
   modelGateway?: ModelGateway;
   /** Whether the gateway has an EU zero-retention route for authoring, and why not. */
   authoring?: { available: boolean; reason: string | null };
+  /** Installed-app decision sources, such as `registry.decisionSources()`, for Needs you. */
+  decisionSources?: Parameters<typeof appDecisionProvider>[0][];
 }
 
 /**
@@ -240,6 +249,20 @@ export function createApplicationServices(
     codeProcesses,
     drafts.blockers,
   );
+  const decisions = createDecisionQueue(database, {
+    cases: caseDecisionQuery,
+    providers: [
+      replenishmentDecisionProvider(replenishment.pending),
+      ...(options.decisionSources ?? []).map(appDecisionProvider),
+    ],
+    refreshContext: identity.refreshContext,
+  });
+  const decisionAssignments = createDecisionAssignments(database, {
+    refreshContext: identity.refreshContext,
+    members: async (context) =>
+      (await identity.listMembers(context)).map((member) => member.userId),
+    pending: async (context, id) => !!(await decisions.find(context, id)),
+  });
   const orderQueries = {
     state: orderStateQueries,
     attention: orderAttentionQuery,
@@ -310,6 +333,8 @@ export function createApplicationServices(
         createActivityStore,
         identity.refreshContext,
       ),
+      decisions,
+      decisionAssignments,
     },
   };
 }

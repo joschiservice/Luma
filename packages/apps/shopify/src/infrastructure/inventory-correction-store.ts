@@ -122,6 +122,22 @@ export function createCorrectionStore(
           )
         ).rows.map((row) => ({ ...row.document, decisionId: row.decision_id })),
       ),
+    open: (context) =>
+      database.transaction(context.tenantId, async (tx) =>
+        (
+          await tx.query<{
+            document: CorrectionRun;
+            decision_id: string | null;
+          }>(
+            `SELECT r.document,r.decision_id FROM shopify_inventory_corrections r
+             WHERE r.tenant_id=$1 AND r.created_at>now()-interval '7 days'
+             AND ((r.document->'action'->>'expiresAt')::timestamptz>now()
+              OR EXISTS (SELECT 1 FROM shopify_inventory_claims c WHERE c.tenant_id=r.tenant_id AND c.run_id=r.id))
+             ORDER BY r.created_at DESC,r.id LIMIT 50`,
+            [context.tenantId],
+          )
+        ).rows.map((row) => ({ ...row.document, decisionId: row.decision_id })),
+      ),
     decision: (context, id, decisionId) =>
       database.transaction(context.tenantId, async (tx) => {
         await tx.query(

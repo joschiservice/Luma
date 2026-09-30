@@ -23,6 +23,8 @@ import type { ModelGateway, Observability, Observation } from '@luma/platform';
 import type { ProcurementService } from '@luma/procurement';
 import { procurementRoutes } from '@luma/procurement/http';
 import type {
+  DecisionAssignments,
+  DecisionQueue,
   FulfillmentWorkspace,
   InventoryWorkspace,
   OperationalMetrics,
@@ -33,6 +35,7 @@ import type {
   ReturnWorkspace,
 } from '@luma/read-models';
 import {
+  decisionRoutes,
   fulfillmentRoutes,
   inventoryRoutes,
   metricRoutes,
@@ -111,6 +114,8 @@ export interface AppDependencies {
   fulfillment?: FulfillmentWorkspace;
   returns?: ReturnWorkspace;
   orders?: OrderWorkspace;
+  decisions?: DecisionQueue;
+  decisionAssignments?: DecisionAssignments;
   sync?: SyncService;
   metricEvents?: MetricEvents;
   apps?: AppService;
@@ -368,6 +373,10 @@ export function buildApp(
         orders: orderRoutes(dependencies.orders),
         returns: returnRoutes(dependencies.returns),
         sync: syncRoutes(dependencies.sync),
+        decisions: decisionRoutes(
+          dependencies.decisions,
+          dependencies.decisionAssignments,
+        ),
       },
       routerApp,
       {

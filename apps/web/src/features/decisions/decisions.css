@@ -1,0 +1,275 @@
+/* Needs you: the shared decision queue. Frame, rows and inspector chrome reuse the inbox layout. */
+
+.decisions-heading-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.decisions-heading-copy p {
+  margin: 0;
+  color: var(--foreground-subtle);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.decisions-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--foreground-subtle);
+  font-size: 12px;
+}
+
+.decisions-live::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--state-neutral);
+}
+
+.decisions-live[data-state='live']::before {
+  background: var(--state-success);
+}
+
+.decisions-live[data-state='interrupted']::before {
+  background: var(--state-warning);
+}
+
+.decisions-toolbar {
+  padding: 0 20px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.decisions-grouping {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--foreground-muted);
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.decisions > .case-notice {
+  margin: 12px 20px 0;
+}
+
+.decisions-loading {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+}
+
+.decisions-loading .lu-skeleton {
+  height: 44px;
+}
+
+.decisions-groups {
+  display: grid;
+  gap: 4px;
+  padding-top: 4px;
+}
+
+.decisions-group-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 20px 2px;
+  color: var(--foreground-subtle);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.decisions-group-heading .lu-numeric {
+  color: var(--foreground-faint);
+  font-weight: 500;
+}
+
+.decisions-group-note {
+  margin: 4px 20px 12px;
+  color: var(--foreground-subtle);
+  font-size: 12px;
+}
+
+/* Rows: the reader's own next steps carry a stronger title than items waiting on others. */
+.decision-row:not([data-actionable]) .case-row-summary {
+  color: var(--foreground-muted);
+  font-weight: 450;
+}
+
+.decision-deadline {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--foreground-subtle);
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.decision-deadline[data-urgency='soon'] {
+  color: var(--state-warning-text);
+}
+
+.decision-deadline[data-urgency='expired'] {
+  color: var(--state-error-text);
+}
+
+/* Inspector */
+.decision-inspector {
+  display: grid;
+  align-content: start;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.decision-inspector > .case-notice {
+  margin: 12px 18px 0;
+}
+
+.decision-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--foreground-subtle);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.decision-brief {
+  display: grid;
+}
+
+.decision-section {
+  display: grid;
+  gap: 8px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.decision-section:first-child {
+  background: linear-gradient(180deg, var(--signal-soft) 0%, transparent 100%);
+}
+
+.decision-section h3,
+.decision-review h3 {
+  margin: 0;
+  color: var(--foreground-subtle);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.decision-section p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 21px;
+}
+
+.decision-section .decision-note,
+.decision-review .decision-note {
+  color: var(--foreground-subtle);
+  font-size: 13px;
+  line-height: 19px;
+}
+
+.decision-facts,
+.decision-consequences {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+
+.decision-facts > div,
+.decision-consequences > div {
+  display: grid;
+  grid-template-columns: minmax(96px, 34%) minmax(0, 1fr);
+  gap: 12px;
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  line-height: 19px;
+}
+
+.decision-facts > div:first-child,
+.decision-consequences > div:first-child {
+  border-top: 0;
+}
+
+.decision-facts dt,
+.decision-consequences dt {
+  color: var(--foreground-subtle);
+}
+
+.decision-consequences dt {
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+.decision-facts dd,
+.decision-consequences dd {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.decision-facts dd > span {
+  color: var(--foreground-subtle);
+}
+
+.decision-assignment {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+}
+
+.decision-assignment > span {
+  color: var(--foreground);
+  font-weight: 500;
+}
+
+.decision-assignee {
+  min-width: 150px;
+}
+
+.decision-error {
+  color: var(--state-error-text);
+  font-size: 13px;
+}
+
+.decision-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.decision-review {
+  display: grid;
+  gap: 10px;
+  padding: 16px 18px 32px;
+}
+
+.decision-review > p {
+  margin: 0;
+}
+
+@container (max-width: 480px) {
+  .decision-facts > div,
+  .decision-consequences > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+}

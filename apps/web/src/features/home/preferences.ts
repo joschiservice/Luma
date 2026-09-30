@@ -32,7 +32,8 @@ export const homeModules: Record<
 > = {
   attention: {
     title: 'Needs your attention',
-    description: 'Decisions and approvals waiting for you, most urgent first.',
+    description:
+      'Approvals, manual steps and outcome checks from issues, workflows and apps, most urgent first.',
     size: 'full',
     Icon: Inbox,
   },

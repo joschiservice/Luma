@@ -16,3 +16,12 @@ export type { ProductWorkspace } from './application/products.js';
 export type { FulfillmentWorkspace } from './application/fulfillment.js';
 
 export type { ReturnWorkspace } from './application/returns.js';
+
+export type {
+  AppOwnedDecision,
+  DecisionAssignment,
+  DecisionAssignments,
+  DecisionItem,
+  DecisionProvider,
+  DecisionQueue,
+} from './application/decisions.js';

@@ -86,3 +86,5 @@ export type {
   MetricEvents,
   MetricWakeup,
 } from './application/metric-events.js';
+
+export type { DecisionAssignmentService } from './application/decision-assignments.js';

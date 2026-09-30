@@ -29,10 +29,11 @@ type Row = {
 
 // Attention comes from persisted lifecycle, uncertainty escalation or deterministic manual steps.
 // Model-selected hypotheses and severity never create an attention request.
-// Inbox attention rules. Expects $1 tenant ID and $2 evaluation time.
-function caseQuery(filter = 'true') {
+// Inbox attention rules. Expects $1 tenant ID and $2 evaluation time. `columns` adds trusted
+// select-list entries, such as the current policy decision `pa.document` and `pa.proposal`.
+function caseQuery(filter = 'true', columns = '') {
   return `cases AS (
- SELECT e.document,e.version,d.document AS diagnosis,
+ SELECT e.document,e.version,d.document AS diagnosis${columns},
  CASE WHEN e.state='resolved' THEN NULL
  WHEN e.state='escalated' OR u.review_required THEN 'uncertainty'
  WHEN e.state='awaiting_approval' OR pa.document->>'outcome'='approval_required' THEN 'approval'
@@ -49,7 +50,7 @@ function caseQuery(filter = 'true') {
  LEFT JOIN exception_uncertainty u ON u.tenant_id=e.tenant_id AND u.fingerprint=e.fingerprint
  LEFT JOIN LATERAL (SELECT document->>'createdAt' AS at FROM case_commands WHERE tenant_id=e.tenant_id AND exception_id=e.id ORDER BY created_at DESC,id DESC LIMIT 1) command ON true
  LEFT JOIN LATERAL (
-   SELECT pd.document,
+   SELECT pd.document,p.document AS proposal,
      (SELECT min(first.document->>'evaluatedAt') FROM policy_decisions first
       WHERE first.tenant_id=p.tenant_id AND first.proposal_id=p.id AND first.action_hash=p.action_hash
       AND first.document->>'outcome'='approval_required'
@@ -94,6 +95,37 @@ function attentionQuery(
 
 /** Selects all unresolved order attention using the inbox rules at $2. */
 export const orderAttentionQuery = attentionQuery();
+
+/**
+ * Selects every unresolved case that needs a person under the inbox's attention rules, with the
+ * compact facts a decision queue presents: the current proposal and policy decision for
+ * approvals, the first manual step and the diagnosis evidence window. An approval whose current
+ * proposal already has a response under its latest policy version, or a rejection, is left out:
+ * the case stays `awaiting_approval` until its workflow observes the response, but nobody needs
+ * to decide again. Stale diagnoses keep their `summary` and `manual_step`; callers must check
+ * `valid_until`. Bind `$1` to the tenant ID and `$2` to the evaluation time.
+ */
+export const caseDecisionQuery = `WITH ${caseQuery("e.state<>'resolved'", ',pa.document AS policy,pa.proposal')}
+ SELECT (o.document->>'id')::uuid AS exception_id,o.attention_reason AS reason,
+  o.attention_at::timestamptz AS requested_at,o.document->>'severity' AS severity,
+  o.document->>'exceptionClass' AS class,o.document->>'state' AS state,o.document->'subject' AS subject,
+  o.diagnosis->>'status' AS diagnosis_status,o.diagnosis->>'summary' AS summary,
+  (o.diagnosis->'provenance'->>'validUntil')::timestamptz AS valid_until,
+  (SELECT min((ev->>'observedAt')::timestamptz) FROM jsonb_array_elements(o.diagnosis->'provenance'->'evidence') ev) AS observed_at,
+  (SELECT step->>'text' FROM jsonb_array_elements(o.diagnosis->'nextSteps') step
+    WHERE step->>'kind'='manual_intervention' LIMIT 1) AS manual_step,
+  o.diagnosis->'impact'->>'exposedQuantity' AS exposed_quantity,o.diagnosis->'impact'->>'unit' AS exposed_unit,
+  o.policy->>'actorId' AS requester_id,o.policy->>'id' AS decision_id,o.proposal
+ FROM ordered o WHERE o.attention_reason IS NOT NULL
+ AND NOT (o.attention_reason='approval' AND EXISTS (
+  SELECT 1 FROM case_proposals p
+  JOIN policy_approvals a ON a.tenant_id=p.tenant_id AND a.proposal_id=p.id AND a.action_hash=p.action_hash
+  WHERE p.tenant_id=$1 AND p.exception_id=(o.document->>'id')::uuid
+  AND p.diagnosis_revision=(o.diagnosis->>'revision')::integer
+  AND (a.document->>'outcome'='rejected' OR a.policy_version=(
+   SELECT d.document->>'policyVersion' FROM policy_decisions d
+   WHERE d.tenant_id=p.tenant_id AND d.proposal_id=p.id AND d.action_hash=p.action_hash
+   ORDER BY d.created_at DESC,d.id DESC LIMIT 1))))`;
 
 /**
  * Limits attention evaluation to the trusted SQL relation's entity_id column. The relation

@@ -6,6 +6,7 @@ import {
   ChartNoAxesColumn,
   Database,
   DatabaseZap,
+  Hand,
   House,
   Inbox,
   type LucideIcon,
@@ -25,6 +26,7 @@ export type DestinationGroup = 'core' | 'operations' | 'workspace';
 /** Workspace route segments that appear in navigation. */
 export type DestinationPath =
   | 'home'
+  | 'needs-you'
   | 'exceptions'
   | 'activity'
   | 'insights'
@@ -62,6 +64,15 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
     description: 'What needs your attention and what Luma is handling',
     group: 'core',
     shortcut: 'h',
+  },
+  {
+    path: 'needs-you',
+    label: 'Needs you',
+    Icon: Hand,
+    description:
+      'Approvals, manual steps and outcome checks waiting on a person',
+    group: 'core',
+    shortcut: 'n',
   },
   {
     path: 'exceptions',
