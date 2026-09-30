@@ -10,6 +10,7 @@ import { type ReactNode, useState } from 'react';
 import { expect, userEvent, within } from 'storybook/test';
 
 import appStyles from '../../styles.css?inline';
+import { returnItem } from '../returns/returns-fixtures';
 import type { OrdersError, OrdersSearch } from './data';
 import { OrderDetailView, type OrderError } from './detail';
 import { OrdersView } from './page';
@@ -168,6 +169,12 @@ const detail: OrderDetail = {
         },
       ],
     },
+  ],
+  returns: [
+    returnItem({
+      order: { id: list.items[0]!.id, displayNumber: '#1001' },
+      connectionId: shop,
+    }),
   ],
   issues: [
     {

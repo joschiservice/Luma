@@ -19,6 +19,7 @@ import { procurementContract } from './contracts/procurement.js';
 import { productsContract } from './contracts/products.js';
 import { connectorProvidersContract } from './contracts/providers.js';
 import { recordsContract } from './contracts/records.js';
+import { returnsContract } from './contracts/returns.js';
 import { settingsContract } from './contracts/settings.js';
 import { shadowContract } from './contracts/shadow.js';
 import { syncContract } from './contracts/sync.js';
@@ -54,6 +55,7 @@ const routes: {
   inventory: typeof inventoryContract;
   products: typeof productsContract;
   orders: typeof ordersContract;
+  returns: typeof returnsContract;
   sync: typeof syncContract;
 } = {
   shadow: shadowContract,
@@ -80,6 +82,7 @@ const routes: {
   inventory: inventoryContract,
   products: productsContract,
   orders: ordersContract,
+  returns: returnsContract,
   sync: syncContract,
 };
 const options = {
@@ -174,5 +177,7 @@ export * from './inventory.js';
 export * from './fulfillment.js';
 
 export * from './products.js';
+
+export * from './returns.js';
 
 export * from './sync.js';

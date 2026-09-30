@@ -24,7 +24,9 @@ export interface SourceIdentity extends ExternalId {
     | 'location'
     | 'fulfillment'
     | 'product'
-    | 'customer';
+    | 'customer'
+    | 'return'
+    | 'refund';
 }
 
 export interface Observation<T> {
@@ -264,6 +266,70 @@ export interface CustomerSnapshot {
   shared: { contact: boolean; address: boolean };
 }
 
+/**
+ * A return as the source reports it. Quantities are decimal strings. Receipt quantities are null
+ * when the source does not report what came back.
+ */
+export interface ReturnSnapshot {
+  type: 'return';
+  order: ExternalId;
+  /** Source return name, for example `#1001-R1`. */
+  name: string | null;
+  status:
+    'requested' | 'open' | 'closed' | 'declined' | 'cancelled' | 'unknown';
+  /** When the return was requested or created at the source. */
+  requestedAt: string | null;
+  approvedAt: string | null;
+  /** When the source closed, declined or cancelled the return. */
+  closedAt: string | null;
+  declineReason: 'return_period_ended' | 'final_sale' | 'other' | null;
+  /** Latest time the source recorded returned items as received. */
+  receivedAt: string | null;
+  lines: {
+    /** Null when the source line is not tied to an order line. */
+    orderLine: ExternalId | null;
+    quantity: Quantity;
+    /** Source reason label. Free-text notes are not read. */
+    reason: string | null;
+    /** Units received back, whether restocked or not. */
+    receivedQuantity: string | null;
+    restockedQuantity: string | null;
+    /** Units the source reports as refunded. */
+    refundedQuantity: string | null;
+    /** Value of the returned units after discounts, as reported by the source. */
+    value: Money | null;
+  }[];
+}
+
+/** A refund payment attempt. Only `success` means money was returned. */
+export interface RefundTransaction {
+  status: 'success' | 'pending' | 'failed' | 'unknown';
+  amount: Money;
+  processedAt: string | null;
+  /** Payment gateway name, for example `shopify_payments`; descriptive only. */
+  gateway: string | null;
+}
+
+/**
+ * A refund recorded at the source. `total` is the source-reported amount; the transactions
+ * establish whether money was actually returned.
+ */
+export interface RefundSnapshot {
+  type: 'refund';
+  order: ExternalId;
+  /** The return this refund settles, when the source links one. */
+  return: ExternalId | null;
+  createdAt: string | null;
+  total: Money | null;
+  lines: {
+    orderLine: ExternalId;
+    quantity: Quantity;
+    restock: 'return' | 'cancel' | 'no_restock' | 'unknown';
+    restocked: boolean;
+  }[];
+  transactions: RefundTransaction[];
+}
+
 /** Acceptance is not proof that the expected business state was reached. */
 export interface WriteReceipt {
   status: 'accepted';
@@ -344,6 +410,11 @@ export interface CapabilityContract {
   };
   'products.read': { input: PageQuery; output: Page<ProductSnapshot> };
   'customers.read': { input: PageQuery; output: Page<CustomerSnapshot> };
+  /** Returns and refunds per order; the observation resource is `return` or `refund`. */
+  'returns.read': {
+    input: PageQuery & { order?: ExternalId };
+    output: Page<ReturnSnapshot | RefundSnapshot>;
+  };
 }
 
 export type Capability = keyof CapabilityContract;

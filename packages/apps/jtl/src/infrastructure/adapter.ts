@@ -94,7 +94,7 @@ export function createJtlConnector(
   function handler<
     K extends Exclude<
       ReadCapability,
-      'orders.shipping-method.read' | 'customers.read'
+      'orders.shipping-method.read' | 'customers.read' | 'returns.read'
     >,
   >(capability: K): CapabilityHandler<K> {
     return {

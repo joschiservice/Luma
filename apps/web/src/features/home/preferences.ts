@@ -10,6 +10,7 @@ import {
   Plug,
   ShoppingBag,
   Truck,
+  Undo2,
 } from 'lucide-react';
 import { z } from 'zod';
 
@@ -88,6 +89,13 @@ export const homeModules: Record<
       'Fulfillment that is on hold, delayed or failed, and shipments in transit.',
     size: 'half',
     Icon: Truck,
+  },
+  returns: {
+    title: 'Returns',
+    description:
+      'Return requests to review, returns ready to refund or close, and failed refund payments.',
+    size: 'half',
+    Icon: Undo2,
   },
 };
 

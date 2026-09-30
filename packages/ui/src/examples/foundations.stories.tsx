@@ -38,6 +38,7 @@ const domains: Domain[] = [
   'orders',
   'inventory',
   'products',
+  'returns',
   'procurement',
   'suppliers',
   'fulfillment',

@@ -199,5 +199,137 @@
         "countryCodeV2": "GB"
       }
     }
+  ],
+  "returns": [
+    {
+      "id": "gid://shopify/Return/91",
+      "name": "#1001-R1",
+      "status": "OPEN",
+      "createdAt": "2026-09-18T09:00:00Z",
+      "requestApprovedAt": "2026-09-18T10:00:00Z",
+      "closedAt": null,
+      "decline": null
+    }
+  ],
+  "returnLines": [
+    {
+      "id": "gid://shopify/ReturnLineItem/92",
+      "quantity": 2,
+      "refundedQuantity": 1,
+      "returnReasonDefinition": {
+        "name": "Size too small"
+      },
+      "fulfillmentLineItem": {
+        "id": "gid://shopify/FulfillmentLineItem/81",
+        "lineItem": {
+          "id": "gid://shopify/LineItem/11"
+        }
+      },
+      "withCodeDiscountedTotalPriceSet": {
+        "shopMoney": {
+          "amount": "29.00",
+          "currencyCode": "EUR"
+        }
+      }
+    },
+    {
+      "id": "gid://shopify/UnverifiedReturnLineItem/93",
+      "quantity": 1,
+      "refundedQuantity": 0,
+      "returnReasonDefinition": null
+    }
+  ],
+  "reverseOrders": [
+    {
+      "id": "gid://shopify/ReverseFulfillmentOrder/94",
+      "status": "OPEN"
+    }
+  ],
+  "reverseLines": [
+    {
+      "id": "gid://shopify/ReverseFulfillmentOrderLineItem/95",
+      "fulfillmentLineItem": {
+        "id": "gid://shopify/FulfillmentLineItem/81"
+      },
+      "dispositions": [
+        {
+          "type": "RESTOCKED",
+          "quantity": 1,
+          "createdAt": "2026-09-19T08:00:00Z"
+        },
+        {
+          "type": "MISSING",
+          "quantity": 1,
+          "createdAt": "2026-09-19T09:00:00Z"
+        }
+      ]
+    }
+  ],
+  "refunds": [
+    {
+      "id": "gid://shopify/Refund/96",
+      "createdAt": "2026-09-19T10:00:00Z",
+      "updatedAt": "2026-09-19T10:05:00Z",
+      "totalRefundedSet": {
+        "shopMoney": {
+          "amount": "14.50",
+          "currencyCode": "EUR"
+        }
+      },
+      "return": {
+        "id": "gid://shopify/Return/91"
+      }
+    }
+  ],
+  "refundLines": [
+    {
+      "quantity": 1,
+      "restockType": "RETURN",
+      "restocked": true,
+      "lineItem": {
+        "id": "gid://shopify/LineItem/11"
+      }
+    }
+  ],
+  "refundTransactions": [
+    {
+      "id": "gid://shopify/OrderTransaction/97",
+      "kind": "REFUND",
+      "status": "FAILURE",
+      "processedAt": "2026-09-19T10:00:00Z",
+      "gateway": "shopify_payments",
+      "amountSet": {
+        "shopMoney": {
+          "amount": "14.50",
+          "currencyCode": "EUR"
+        }
+      }
+    },
+    {
+      "id": "gid://shopify/OrderTransaction/98",
+      "kind": "REFUND",
+      "status": "AWAITING_RESPONSE",
+      "processedAt": null,
+      "gateway": "shopify_payments",
+      "amountSet": {
+        "shopMoney": {
+          "amount": "14.50",
+          "currencyCode": "EUR"
+        }
+      }
+    },
+    {
+      "id": "gid://shopify/OrderTransaction/99",
+      "kind": "SALE",
+      "status": "SUCCESS",
+      "processedAt": "2026-09-14T08:30:00Z",
+      "gateway": "shopify_payments",
+      "amountSet": {
+        "shopMoney": {
+          "amount": "42.50",
+          "currencyCode": "EUR"
+        }
+      }
+    }
   ]
 }

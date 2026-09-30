@@ -30,6 +30,7 @@ import type {
   OrderWorkspace,
   ProductWorkspace,
   RecordExplorer,
+  ReturnWorkspace,
 } from '@luma/read-models';
 import {
   fulfillmentRoutes,
@@ -38,6 +39,7 @@ import {
   orderRoutes,
   productRoutes,
   recordRoutes,
+  returnRoutes,
 } from '@luma/read-models/http';
 import type {
   ActivityService,
@@ -105,6 +107,7 @@ export interface AppDependencies {
   inventory?: InventoryWorkspace;
   products?: ProductWorkspace;
   fulfillment?: FulfillmentWorkspace;
+  returns?: ReturnWorkspace;
   orders?: OrderWorkspace;
   sync?: SyncService;
   metricEvents?: MetricEvents;
@@ -358,6 +361,7 @@ export function buildApp(
         products: productRoutes(dependencies.products),
         fulfillment: fulfillmentRoutes(dependencies.fulfillment),
         orders: orderRoutes(dependencies.orders),
+        returns: returnRoutes(dependencies.returns),
         sync: syncRoutes(dependencies.sync),
       },
       routerApp,

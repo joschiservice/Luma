@@ -9,3 +9,5 @@ export { inventoryRoutes } from './api/inventory.js';
 export { productRoutes } from './api/products.js';
 
 export { fulfillmentRoutes } from './api/fulfillment.js';
+
+export { returnRoutes } from './api/returns.js';

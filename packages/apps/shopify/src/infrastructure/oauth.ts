@@ -66,6 +66,16 @@ const changeTopics = [
   'PRODUCTS_UPDATE',
   'PRODUCTS_DELETE',
   'INVENTORY_LEVELS_UPDATE',
+  'REFUNDS_CREATE',
+  'RETURNS_REQUEST',
+  'RETURNS_APPROVE',
+  'RETURNS_DECLINE',
+  'RETURNS_UPDATE',
+  'RETURNS_PROCESS',
+  'RETURNS_CLOSE',
+  'RETURNS_CANCEL',
+  'RETURNS_REOPEN',
+  'REVERSE_FULFILLMENT_ORDERS_DISPOSE',
 ] as const;
 
 const customerTopics = ['CUSTOMERS_CREATE', 'CUSTOMERS_UPDATE'] as const;
@@ -251,8 +261,10 @@ export function createShopifyOAuth(
     }
   }
 
+  // Returns are optional: a connection without them stays active and shows the missing access.
   const permissions = [
     ...shopifyReads,
+    'returns.read' as const,
     ...(config.protectedCustomerDataApproved
       ? ['customers.read' as const]
       : []),

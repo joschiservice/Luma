@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import type { SourceIdentity } from '../domain/capabilities.js';
+
 const uuid = z.string().uuid();
 
 const decimal = z.string().regex(/^-?\d{1,14}(\.\d{1,6})?$/);
@@ -36,6 +38,8 @@ export const sourceSchema = external
       'location',
       'product',
       'customer',
+      'return',
+      'refund',
     ]),
   })
   .strict();
@@ -134,15 +138,88 @@ const fulfillmentFacts = {
     .nullable()
     .optional(),
 };
+const count = decimal.refine((s) => !s.startsWith('-'));
+
+const returnData = z
+  .object({
+    type: z.literal('return'),
+    order: external,
+    name: text.nullable(),
+    status: z.enum([
+      'requested',
+      'open',
+      'closed',
+      'declined',
+      'cancelled',
+      'unknown',
+    ]),
+    requestedAt: timestamp.nullable(),
+    approvedAt: timestamp.nullable(),
+    closedAt: timestamp.nullable(),
+    declineReason: z
+      .enum(['return_period_ended', 'final_sale', 'other'])
+      .nullable(),
+    receivedAt: timestamp.nullable(),
+    lines: z
+      .array(
+        z
+          .object({
+            orderLine: external.nullable(),
+            quantity,
+            reason: text.nullable(),
+            receivedQuantity: count.nullable(),
+            restockedQuantity: count.nullable(),
+            refundedQuantity: count.nullable(),
+            value: money.nullable(),
+          })
+          .strict(),
+      )
+      .max(500),
+  })
+  .strict();
+
+const refundData = z
+  .object({
+    type: z.literal('refund'),
+    order: external,
+    return: external.nullable(),
+    createdAt: timestamp.nullable(),
+    total: money.nullable(),
+    lines: z
+      .array(
+        z
+          .object({
+            orderLine: external,
+            quantity,
+            restock: z.enum(['return', 'cancel', 'no_restock', 'unknown']),
+            restocked: z.boolean(),
+          })
+          .strict(),
+      )
+      .max(500),
+    transactions: z
+      .array(
+        z
+          .object({
+            status: z.enum(['success', 'pending', 'failed', 'unknown']),
+            amount: money,
+            processedAt: timestamp.nullable(),
+            gateway: text.nullable(),
+          })
+          .strict(),
+      )
+      .max(250),
+  })
+  .strict();
 
 const observation = <T extends z.ZodTypeAny>(
-  resource: 'order' | 'sku' | 'fulfillment' | 'product',
+  resource: z.ZodType<SourceIdentity['resource']>,
   data: T,
 ) =>
   z
     .object({
       id: uuid,
-      source: sourceSchema.extend({ resource: z.literal(resource) }),
+      source: sourceSchema.extend({ resource }),
       kind: z.enum(['snapshot', 'tombstone']),
       observedAt: timestamp,
       sourceUpdatedAt: timestamp.nullable(),
@@ -158,7 +235,7 @@ export const commerceSchema = z.discriminatedUnion('capability', [
     .object({
       capability: z.literal('orders.read'),
       observation: observation(
-        'order',
+        z.literal('order'),
         z
           .object({
             displayNumber: z.string().nullable(),
@@ -207,7 +284,7 @@ export const commerceSchema = z.discriminatedUnion('capability', [
     .object({
       capability: z.literal('inventory.read'),
       observation: observation(
-        'sku',
+        z.literal('sku'),
         z
           .object({
             sku: external,
@@ -230,7 +307,7 @@ export const commerceSchema = z.discriminatedUnion('capability', [
     .object({
       capability: z.literal('fulfillment.read'),
       observation: observation(
-        'fulfillment',
+        z.literal('fulfillment'),
         z
           .object({
             order: external,
@@ -262,7 +339,7 @@ export const commerceSchema = z.discriminatedUnion('capability', [
     .object({
       capability: z.literal('products.read'),
       observation: observation(
-        'product',
+        z.literal('product'),
         z
           .object({
             title: z.string().max(1024).nullable(),
@@ -284,6 +361,17 @@ export const commerceSchema = z.discriminatedUnion('capability', [
           })
           .strict(),
       ),
+    })
+    .strict(),
+  z
+    .object({
+      capability: z.literal('returns.read'),
+      observation: observation(
+        z.enum(['return', 'refund']),
+        z.discriminatedUnion('type', [returnData, refundData]),
+      ).refine((v) => v.source.resource === v.data.type, {
+        message: 'The source resource must match the record type',
+      }),
     })
     .strict(),
 ]);

@@ -1,6 +1,15 @@
 import type { TenantContext } from '@luma/identity';
 
-export type EntityKind = 'order' | 'order_line' | 'fulfillment';
+import type { RefundData, ReturnData } from '../domain/returns.js';
+
+export type {
+  CanonicalMoney,
+  RefundData,
+  ReturnData,
+} from '../domain/returns.js';
+
+export type EntityKind =
+  'order' | 'order_line' | 'fulfillment' | 'return' | 'refund';
 
 export type CommerceData =
   | {
@@ -48,14 +57,16 @@ export type CommerceData =
         url: string | null;
       }[];
       delivery?: string | null;
-    };
+    }
+  | ReturnData
+  | RefundData;
 
 export interface CanonicalSnapshot {
   /**
    * Document schema version. Order snapshots are written as 2 and may carry `dueAt`,
    * `placedAt`, `total` and line `skuCode`/`title`. Fulfillment snapshots are written as 2
    * and may carry kind, holds, location, dates, method, tracking and delivery state. Stored
-   * version 1 documents of both kinds remain readable.
+   * version 1 documents of both kinds remain readable. Return and refund snapshots use 1.
    */
   schemaVersion: 1 | 2;
   entityId: string;

@@ -7,7 +7,7 @@ capabilities and never writes to a source.
 ## Streams, scans and runs
 
 A **stream** exists per connection and record type (`orders`, `fulfillments`,
-`products`, `inventory`, `customers`) whose read capability the connection grants.
+`products`, `inventory`, `customers`, `returns`) whose read capability the connection grants.
 The runner creates streams for active connections, running as the person who first
 installed the connection. Each stream runs one **scan** at a time; every scan is a
 **run** in `commerce_sync_runs`.
@@ -22,8 +22,9 @@ Incremental reads send `updatedSince` (the previous scan's start minus a 10-minu
 overlap) only to handlers whose descriptor lists `filters: ['updatedSince']`. Other
 handlers are reread in full every 30 minutes. The overlap and daily full check cover
 clock skew and missed notifications; ordering of snapshots still follows the
-projection rules, not these times. Fulfillment history waits for the connection's
-order history.
+projection rules, not these times. Fulfillment and return history waits for the
+connection's order history. The returns stream stores both returns and refunds in its
+ledger.
 
 ## Pages, checkpoints and retries
 
@@ -66,8 +67,8 @@ each page outcome for connection freshness; only product pages keep their items.
 
 ## Change notifications
 
-Shopify connections subscribe to order, fulfillment, product, inventory-level and,
-when approved, customer topics at `/api/v1/shopify/changes/:organizationId/:connectionId`.
+Shopify connections subscribe to order, fulfillment, product, inventory-level, refund,
+return and, when approved, customer topics at `/api/v1/shopify/changes/:organizationId/:connectionId`.
 The route verifies the HMAC and shop, then inserts a `connector_refresh_hints` row
 (deduplicated by event) before acknowledging. The runner turns hints into stream
 `hint_at` times. Notification bodies are never imported. Existing connections

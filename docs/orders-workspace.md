@@ -80,7 +80,9 @@ come from the Shopify app's live read.
 
 Adapters populate optional canonical facts: `placedAt`, `total` and line `skuCode` and
 `title`. Existing snapshots keep working without them and gain them with the next source
-update. Customer, payment transaction, return and refund details are not stored.
+update. Returns and refunds are imported as order children and listed in **Returns and
+refunds** (see [Returns workspace](returns-workspace.md)). Customer and payment
+transaction details are not stored.
 
 For those, the web app mounts the owning app's `record` UI slot for each source
 connection (see [workspace apps](apps.md)). The Shopify app reads the order live

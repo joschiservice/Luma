@@ -30,6 +30,7 @@ import {
   createOrderWorkspace,
   createProductWorkspace,
   createRecordExplorer,
+  createReturnWorkspace,
 } from '@luma/read-models/composition';
 import {
   createShippingMethodTemplate,
@@ -104,6 +105,7 @@ export interface ApplicationServices {
     inventory: ReturnType<typeof createInventoryWorkspace>;
     products: ReturnType<typeof createProductWorkspace>;
     fulfillment: ReturnType<typeof createFulfillmentWorkspace>;
+    returns: ReturnType<typeof createReturnWorkspace>;
     orders: ReturnType<typeof createOrderWorkspace>;
   };
 }
@@ -284,6 +286,7 @@ export function createApplicationServices(
       ),
       inventory: createInventoryWorkspace(database),
       products: createProductWorkspace(database),
+      returns: createReturnWorkspace(database),
       records: createRecordExplorer(database),
       orders: createOrderWorkspace(
         database,

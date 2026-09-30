@@ -11,3 +11,5 @@ export { createInventoryWorkspace } from './infrastructure/inventory/workspace.j
 export { createProductWorkspace } from './infrastructure/products/workspace.js';
 
 export { createFulfillmentWorkspace } from './infrastructure/fulfillment/workspace.js';
+
+export { createReturnWorkspace } from './infrastructure/returns/workspace.js';

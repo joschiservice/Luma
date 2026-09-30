@@ -170,9 +170,86 @@ const fulfillment = z
   })
   .strict();
 
+const count = decimal.refine((s) => !s.startsWith('-'));
+
+const returnRecord = z
+  .object({
+    type: z.literal('return'),
+    orderId: uuid,
+    name: text.nullable(),
+    status: z.enum([
+      'requested',
+      'open',
+      'closed',
+      'declined',
+      'cancelled',
+      'unknown',
+    ]),
+    requestedAt: timestamp.nullable(),
+    approvedAt: timestamp.nullable(),
+    closedAt: timestamp.nullable(),
+    declineReason: z
+      .enum(['return_period_ended', 'final_sale', 'other'])
+      .nullable(),
+    receivedAt: timestamp.nullable(),
+    lines: z
+      .array(
+        z
+          .object({
+            orderLineId: uuid.nullable(),
+            quantity: positive,
+            unit,
+            reason: text.nullable(),
+            receivedQuantity: count.nullable(),
+            restockedQuantity: count.nullable(),
+            refundedQuantity: count.nullable(),
+            value: money.nullable(),
+          })
+          .strict(),
+      )
+      .max(500),
+  })
+  .strict();
+
+const refundRecord = z
+  .object({
+    type: z.literal('refund'),
+    orderId: uuid,
+    returnId: uuid.nullable(),
+    createdAt: timestamp.nullable(),
+    total: money.nullable(),
+    lines: z
+      .array(
+        z
+          .object({
+            orderLineId: uuid,
+            quantity: positive,
+            unit,
+            restock: z.enum(['return', 'cancel', 'no_restock', 'unknown']),
+            restocked: z.boolean(),
+          })
+          .strict(),
+      )
+      .max(500),
+    transactions: z
+      .array(
+        z
+          .object({
+            status: z.enum(['success', 'pending', 'failed', 'unknown']),
+            amount: money,
+            processedAt: timestamp.nullable(),
+            gateway: text.nullable(),
+          })
+          .strict(),
+      )
+      .max(250),
+  })
+  .strict();
+
 // Order snapshots use version 2 since they may carry dueAt, placedAt, total and line SKU
 // text and title. Fulfillment snapshots use version 2 since they may carry kind, holds,
 // location, dates, method, tracking and delivery state. Version 1 documents stay valid.
+// Return and refund snapshots use version 1.
 export const snapshotSchema = z.union([
   base
     .extend({
@@ -186,6 +263,20 @@ export const snapshotSchema = z.union([
       schemaVersion: z.union([z.literal(1), z.literal(2)]),
       kind: z.literal('fulfillment'),
       data: fulfillment,
+    })
+    .strict(),
+  base
+    .extend({
+      schemaVersion: z.literal(1),
+      kind: z.literal('return'),
+      data: returnRecord,
+    })
+    .strict(),
+  base
+    .extend({
+      schemaVersion: z.literal(1),
+      kind: z.literal('refund'),
+      data: refundRecord,
     })
     .strict(),
 ]);

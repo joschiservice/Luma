@@ -11,6 +11,7 @@ export const homeModuleIds = [
   'order-metrics',
   'catalog',
   'fulfillment',
+  'returns',
 ] as const;
 
 export const homeModuleSchema = z

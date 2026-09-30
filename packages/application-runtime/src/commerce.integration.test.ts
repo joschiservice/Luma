@@ -958,7 +958,9 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
       expect(
         current.data.type === 'fulfillment' && current.data.lines[0]!.quantity,
       ).toBe(quantity);
-      expect(current.data.status).toBe(status);
+      expect(current.data.type === 'fulfillment' && current.data.status).toBe(
+        status,
+      );
       const zero = structuredClone(shipment);
       zero.observation.id = randomUUID();
       zero.observation.data.lines[0]!.quantity.amount = '0';
@@ -1194,10 +1196,9 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
           )
         ).status,
       ).toBe('retained');
-      expect(
-        (await services.orders.current(context(), noteId))[0]?.snapshot.data
-          .status,
-      ).toBe('shipped');
+      const shipped = (await services.orders.current(context(), noteId))[0]
+        ?.snapshot.data;
+      expect(shipped?.type === 'fulfillment' && shipped.status).toBe('shipped');
     });
 
     it('settles equal observation times on the greater observation ID', async () => {

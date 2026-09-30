@@ -6,6 +6,7 @@ export type HelpTopic =
   | 'customers'
   | 'products'
   | 'fulfillment'
+  | 'returns'
   | 'data-sync'
   | 'workflows'
   | 'workflows/create';

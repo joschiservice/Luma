@@ -318,6 +318,21 @@ with source actions through the app `fulfillment` slot and the Fulfillment healt
 tests, `apps/api/e2e/fulfillment.e2e.mjs`, `fulfillment.browser.mjs` and
 `Fulfillment/Workspace` stories. See [Fulfillment workspace](fulfillment-workspace.md).
 
+## Returns workspace
+
+Returns and refunds are order children in `@luma/orders`: stage and money rules live in
+`packages/orders/src/domain/returns.ts`, and `infrastructure/return-list.ts` maintains
+`orders_returns` (migration `0045`) in the projection transaction. Shopify reads them in
+`returns.read` (`packages/apps/shopify/src/infrastructure/adapter.ts`); commerce sync runs a
+`returns` stream. Reads are `packages/read-models/src/infrastructure/returns`
+(`list.ts`, `detail.ts`, `workspace.ts`) with the port in `application/returns.ts`; contracts
+are `packages/api-contract/src/returns.ts` and `contracts/returns.ts`. The web feature is
+`apps/web/src/features/returns` (list `page.tsx`, `detail.tsx`, `order-returns.tsx` on the
+order page, `presentation.ts`), with the Returns Home module in `features/home/modules.tsx`.
+Tests: `returns.test.ts` in orders, Shopify adapter and simulator tests, the web `returns`
+unit tests, `Returns/Workspace` stories, `apps/api/e2e/returns.e2e.mjs` and
+`returns.browser.mjs`. See [Returns workspace](returns-workspace.md).
+
 ## Shopify fulfillment recovery
 
 Start at `packages/apps/shopify/src/application/fulfillment-recovery.ts` for

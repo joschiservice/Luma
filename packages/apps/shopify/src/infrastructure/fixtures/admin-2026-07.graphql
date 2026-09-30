@@ -1040,19 +1040,52 @@ type Refund implements Node {
   createdAt: DateTime
   id: ID!
   order: Order!
+  refundLineItems(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+  ): RefundLineItemConnection!
+  return: Return
   totalRefundedSet: MoneyBag!
+  transactions(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+  ): OrderTransactionConnection!
   updatedAt: DateTime!
 }
 
-type ReturnConnection {
-  nodes: [Return!]!
+type RefundLineItemConnection {
+  nodes: [RefundLineItem!]!
   pageInfo: PageInfo!
 }
 
+type RefundLineItem {
+  lineItem: LineItem!
+  quantity: Int!
+  restockType: RefundLineItemRestockType!
+  restocked: Boolean!
+}
+
+enum RefundLineItemRestockType {
+  RETURN
+  CANCEL
+  LEGACY_RESTOCK
+  NO_RESTOCK
+}
+
 type Return implements Node {
+  closedAt: DateTime
+  createdAt: DateTime!
+  decline: ReturnDecline
   id: ID!
   name: String!
   order: Order!
+  requestApprovedAt: DateTime
   returnLineItems(
     processingStatus: ReturnProcessingStatusFilterInput
     first: Int
@@ -1061,7 +1094,24 @@ type Return implements Node {
     before: String
     reverse: Boolean = false
   ): ReturnLineItemTypeConnection!
+  reverseFulfillmentOrders(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+  ): ReverseFulfillmentOrderConnection!
   status: ReturnStatus!
+}
+
+type ReturnDecline {
+  reason: ReturnDeclineReason!
+}
+
+enum ReturnDeclineReason {
+  RETURN_PERIOD_ENDED
+  FINAL_SALE
+  OTHER
 }
 
 enum ReturnProcessingStatusFilterInput {
@@ -1077,20 +1127,61 @@ type ReturnLineItemTypeConnection {
 interface ReturnLineItemType implements Node {
   id: ID!
   quantity: Int!
-  returnReason: ReturnReason!
+  refundedQuantity: Int!
+  returnReasonDefinition: ReturnReasonDefinition
 }
 
-enum ReturnReason {
-  SIZE_TOO_SMALL
-  SIZE_TOO_LARGE
-  UNWANTED
-  NOT_AS_DESCRIBED
-  WRONG_ITEM
-  DEFECTIVE
-  STYLE
-  COLOR
-  OTHER
-  UNKNOWN
+type ReturnReasonDefinition implements Node {
+  id: ID!
+  name: String!
+}
+
+type ReverseFulfillmentOrderConnection {
+  nodes: [ReverseFulfillmentOrder!]!
+  pageInfo: PageInfo!
+}
+
+type ReverseFulfillmentOrder implements Node {
+  id: ID!
+  lineItems(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+  ): ReverseFulfillmentOrderLineItemConnection!
+  status: ReverseFulfillmentOrderStatus!
+}
+
+type ReverseFulfillmentOrderLineItemConnection {
+  nodes: [ReverseFulfillmentOrderLineItem!]!
+  pageInfo: PageInfo!
+}
+
+type ReverseFulfillmentOrderLineItem implements Node {
+  dispositions: [ReverseFulfillmentOrderDisposition!]!
+  fulfillmentLineItem: FulfillmentLineItem
+  id: ID!
+}
+
+type ReverseFulfillmentOrderDisposition implements Node {
+  createdAt: DateTime!
+  id: ID!
+  quantity: Int!
+  type: ReverseFulfillmentOrderDispositionType!
+}
+
+enum ReverseFulfillmentOrderDispositionType {
+  RESTOCKED
+  PROCESSING_REQUIRED
+  NOT_RESTOCKED
+  MISSING
+}
+
+enum ReverseFulfillmentOrderStatus {
+  CANCELED
+  CLOSED
+  OPEN
 }
 
 enum ReturnStatus {
@@ -1099,6 +1190,11 @@ enum ReturnStatus {
   OPEN
   REQUESTED
   DECLINED
+}
+
+type OrderTransactionConnection {
+  nodes: [OrderTransaction!]!
+  pageInfo: PageInfo!
 }
 
 type OrderTransaction implements Node {
@@ -1130,6 +1226,11 @@ enum OrderTransactionStatus {
   ERROR
   AWAITING_RESPONSE
   UNKNOWN
+}
+
+type ReturnConnection {
+  nodes: [Return!]!
+  pageInfo: PageInfo!
 }
 
 enum CustomerState {
@@ -1555,7 +1656,9 @@ type ReturnLineItem implements Node & ReturnLineItemType {
   fulfillmentLineItem: FulfillmentLineItem!
   id: ID!
   quantity: Int!
-  returnReason: ReturnReason!
+  refundedQuantity: Int!
+  returnReasonDefinition: ReturnReasonDefinition
+  withCodeDiscountedTotalPriceSet: MoneyBag!
 }
 
 type BasicEvent implements Event & Node {

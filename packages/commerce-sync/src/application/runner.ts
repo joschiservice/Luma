@@ -462,13 +462,19 @@ function key(observation: Observation<unknown>): ItemKey {
 }
 
 function createdAt(recordType: RecordType, observation: Observation<unknown>) {
-  const data = observation.data as { placedAt?: unknown; createdAt?: unknown };
+  const data = observation.data as {
+    placedAt?: unknown;
+    createdAt?: unknown;
+    requestedAt?: unknown;
+  };
   const value =
     recordType === 'orders'
       ? data.placedAt
       : recordType === 'customers'
         ? data.createdAt
-        : null;
+        : recordType === 'returns'
+          ? (data.requestedAt ?? data.createdAt)
+          : null;
 
   return typeof value === 'string' ? value : null;
 }

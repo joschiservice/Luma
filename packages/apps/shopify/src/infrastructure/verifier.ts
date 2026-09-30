@@ -54,6 +54,7 @@ export function createInstallationVerifier(options: {
     if (scopes.has('write_inventory'))
       granted.push('inventory.available.reconcile');
     if (has('customers')) granted.push('customers.read');
+    if (has('orders') && has('returns')) granted.push('returns.read');
     if (
       has('orders') &&
       [

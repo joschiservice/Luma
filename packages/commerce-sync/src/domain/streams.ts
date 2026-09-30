@@ -4,6 +4,7 @@ export const recordTypes = [
   'products',
   'inventory',
   'customers',
+  'returns',
 ] as const;
 
 export type RecordType = (typeof recordTypes)[number];
@@ -15,7 +16,11 @@ export const recordCapabilities = {
   products: 'products.read',
   inventory: 'inventory.read',
   customers: 'customers.read',
+  returns: 'returns.read',
 } as const satisfies Record<RecordType, `${string}.read`>;
+
+/** Record types that refer to orders; their history import waits for the order history. */
+export const orderChildren: readonly RecordType[] = ['fulfillments', 'returns'];
 
 /** Returns the record type a read capability supplies, or null for other reads. */
 export function recordTypeFor(capability: string): RecordType | null {
