@@ -169,6 +169,9 @@ export async function seedPilot(
           ...(simulator
             ? [
                 'products.read',
+                ...(provider === 'shopify'
+                  ? ['inventory.available.reconcile']
+                  : []),
                 ...(provider === 'jtl'
                   ? [
                       'orders.shipping-method.read',

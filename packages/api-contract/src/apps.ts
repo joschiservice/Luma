@@ -14,6 +14,7 @@ export const appManifestSchema = z.object({
       'page',
       'record',
       'customers',
+      'inventory',
     ]),
   ),
   connectionTypes: z.array(z.object({ kind: z.string(), name: z.string() })),

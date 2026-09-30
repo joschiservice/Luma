@@ -229,6 +229,17 @@ export interface FulfillmentRecoveryInput {
 }
 
 export interface CapabilityContract {
+  /** Corrects one approved item/location's available stock using provider CAS and idempotency. */
+  'inventory.available.reconcile': {
+    input: {
+      inventoryItemId: string;
+      locationId: string;
+      expectedRevision: string;
+      expectedAvailable: number;
+      available: number;
+    };
+    output: WriteReceipt;
+  };
   'fulfillment.hold.release': {
     input: FulfillmentRecoveryInput;
     output: WriteReceipt;

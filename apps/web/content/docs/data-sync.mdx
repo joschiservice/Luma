@@ -62,3 +62,22 @@ Owners and admins can also choose **Sync now**, **Check all records** or **Re-im
 Luma keeps each source's records separate until a person confirms they are the same. On a stock position, **Linked sources** lists the source records behind the SKU and suggests possible matches that share a SKU code.
 
 Choose **Link**, say why the records match and confirm. Luma then groups stock, products and order lines from both sources under one SKU, while each source keeps its own quantities. **Unlink** separates a source again. Every link and unlink is recorded with who made it and why.
+
+## Correct a Shopify stock discrepancy
+
+Open the stock position in **Inventory**. In **Reconcile Shopify stock**, choose
+Shopify as the destination and the matching ERP source as authority. Review the
+location, evidence times and proposed available quantity, then select **Review
+correction**. A different owner or admin must approve it before the requester can
+select **Apply to Shopify**.
+
+Luma checks both sources again and refuses stale evidence, ambiguous mappings or
+concurrent Shopify changes. If ERP evidence is stale, run Data sync first.
+Reconnect Shopify when inventory write access is missing. ERP stock is never
+changed by this correction.
+
+**Shopify accepted** confirms the request, while **Quantity verified** confirms a
+separate read matched the approved quantity. Use **Verify stock** for an accepted
+or uncertain result. An uncertain correction is never resent. Inventory’s saved
+observations and related issue status update through their own sync and
+verification checks.

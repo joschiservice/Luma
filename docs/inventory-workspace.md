@@ -25,6 +25,12 @@ detail page lists the sources behind the SKU and lets owners and admins link or
 unlink matching SKUs from other sources. **Product listings for this SKU** opens the
 [Products workspace](products-workspace.md).
 
+Owners and admins can review an ERP-backed Shopify available-stock correction on
+stock detail. A different administrator approves the exact source, location and
+quantity. Writes require fresh evidence, unambiguous mappings and inventory write
+access. Acceptance and independently verified stock remain separate states; see
+[Shopify inventory corrections](shopify-inventory-corrections.md).
+
 Inventory can be reached from the sidebar (`G`, then `V`), stock metric drilldowns,
 SKU issues and record details. Search and list filters survive detail navigation.
 

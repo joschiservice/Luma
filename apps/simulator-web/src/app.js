@@ -288,7 +288,11 @@ $('#command').onsubmit = (event) => {
 $('#fault [name=kind]').onchange = (event) => {
   const operation = $('#fault [name=operation]');
   operation.disabled = event.target.value === 'response-loss';
-  if (operation.disabled) operation.value = 'orders.shipping-method.write';
+  if (operation.disabled)
+    operation.value =
+      $('#provider').value === 'shopify'
+        ? 'inventory.available.reconcile'
+        : 'orders.shipping-method.write';
 };
 $('#fault').onsubmit = (event) => {
   event.preventDefault();
@@ -298,7 +302,11 @@ $('#fault').onsubmit = (event) => {
     action: 'fault',
     rule: {
       instance: $('#provider').value,
-      operation: loss ? 'orders.shipping-method.write' : data.operation,
+      operation: loss
+        ? $('#provider').value === 'shopify'
+          ? 'inventory.available.reconcile'
+          : 'orders.shipping-method.write'
+        : data.operation,
       kind: data.kind,
       phase: loss ? 'after-commit' : 'before',
       occurrence: Number(data.occurrence),

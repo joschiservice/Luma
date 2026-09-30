@@ -13,6 +13,7 @@ import { IdentityError } from '@luma/identity';
 import { z } from 'zod';
 
 import { registerRecoveryRoutes } from './api/fulfillment-recovery.js';
+import { registerInventoryCorrectionRoutes } from './api/inventory-correction.js';
 import { registerRecordRoutes } from './api/records.js';
 import { registerShopifyRoutes } from './api/shopify.js';
 import type { ShopifyOAuth } from './application/oauth.js';
@@ -29,6 +30,7 @@ import { createShopifyOAuth } from './infrastructure/oauth.js';
 import { createPrivacyIntake } from './infrastructure/privacy.js';
 import { createShopifyRecordReader } from './infrastructure/records.js';
 import { createInstallationVerifier } from './infrastructure/verifier.js';
+import { createShopifyInventoryCorrection } from './inventory-correction.js';
 
 export {
   createShopifyConnector,
@@ -111,7 +113,7 @@ export function createApp(context: AppFactoryContext): AppDefinition {
     ? createShopifyOAuth(context.database, config, {
         cipher: context.cipher,
         refreshContext: context.refreshContext,
-        verify: createInstallationVerifier({}),
+        verify: createInstallationVerifier({ simulation: context.simulation }),
         requireInstalled: (ctx) => context.requireInstalled(ctx, 'shopify'),
       })
     : undefined;
@@ -120,7 +122,7 @@ export function createApp(context: AppFactoryContext): AppDefinition {
     repository: createInstallationRepository(context.database),
     cipher: context.cipher,
     refreshContext: context.refreshContext,
-    verify: createInstallationVerifier({}),
+    verify: createInstallationVerifier({ simulation: context.simulation }),
     ...(oauth ? { refreshCredential: oauth.credential } : {}),
     id: randomUUID,
     now: () => new Date(),
@@ -143,11 +145,19 @@ export function createApp(context: AppFactoryContext): AppDefinition {
         'Connect stores to read orders, products, inventory and fulfillment.',
       version: '1.0.0',
       category: 'storefront',
-      ui: ['connections', 'settings', 'page', 'record', 'customers'],
+      ui: [
+        'connections',
+        'settings',
+        'page',
+        'record',
+        'customers',
+        'inventory',
+      ],
       connectionTypes: [{ kind: 'shopify', name: 'Shopify' }],
     },
     connector: createShopifyProvider({
       ...(oauth ? { oauth } : {}),
+      ...(context.simulation ? { simulation: context.simulation } : {}),
       ...(context.env.SHOPIFY_PROTECTED_CUSTOMER_DATA_APPROVED === 'true'
         ? {
             customerAccess: {
@@ -193,6 +203,10 @@ export function createApp(context: AppFactoryContext): AppDefinition {
           : undefined,
       );
       registerRecordRoutes(server, records);
+      registerInventoryCorrectionRoutes(
+        server,
+        createShopifyInventoryCorrection(context, installations),
+      );
       registerRecoveryRoutes(
         server,
         createShopifyRecovery(context, installations),

@@ -93,6 +93,7 @@ export async function createPilot(
       ? createSimulationTransport(manifest.simulator)
       : undefined;
     const installations = createInstalledConnections(db, {
+      ...(simulation ? { simulation } : {}),
       refreshContext: identity.service.refreshContext,
       activeKeyId: env.CONNECTIONS_ACTIVE_KEY_ID,
       keys: new Map(

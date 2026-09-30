@@ -63,3 +63,11 @@ fulfillment order. Another administrator approves it before Action Admission
 executes it. Mutation acceptance and independently observed fulfillment progress
 remain distinct. See [Shopify fulfillment recovery](../../../docs/shopify-fulfillment-recovery.md)
 for claims, retries, scope requirements and validation.
+
+## Inventory corrections
+
+The Inventory stock detail hosts Shopify's governed ERP-to-Shopify available-stock
+review. Each exact item/location correction requires a fresh ERP observation,
+confirmed mappings, inventory write access and a different administrator's
+approval. Shopify CAS and provider idempotency protect dispatch; a separate read
+verifies the approved quantity. See [Shopify inventory corrections](../../../docs/shopify-inventory-corrections.md).

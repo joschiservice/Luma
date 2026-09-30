@@ -6,7 +6,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { expect, it } from 'vitest';
 
 import { createApp } from './app.js';
-import { advanceRun, createRun, dispatch, mutate } from './run.js';
+import { advanceRun, createRun, dispatch, faultSchema, mutate } from './run.js';
 
 it('reproduces seeded cross-provider propagation with explicit delay', () => {
   const a = createRun('a');
@@ -336,4 +336,66 @@ it('loads older saved runs with healthy providers and an isolated scenario stock
     await app.close();
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+it('journals Shopify inventory commit, consumes response loss, and retains provider idempotency on restart', () => {
+  const run = createRun('stock-correction');
+  run.clock.faults.push({
+    ...faultSchema.parse({
+      instance: 'shopify',
+      operation: 'inventory.available.reconcile',
+      kind: 'response-loss',
+      phase: 'after-commit',
+    }),
+    id: 'stock-response-loss',
+    matches: 0,
+    status: 'armed',
+  });
+  const level = run.shopify.nodes['gid://shopify/InventoryLevel/1']!;
+  const quantities = level.quantities as { name: string; quantity: number }[];
+  const available = quantities.find((q) => q.name === 'available')!.quantity;
+  const request = {
+    url: 'https://test.myshopify.com/admin/api/2026-07/graphql.json',
+    method: 'POST',
+    headers: { 'x-shopify-access-token': 'synthetic' },
+    body: JSON.stringify({
+      query: 'mutation LumaInventoryCorrection { inventorySetQuantities }',
+      variables: {
+        key: 'stock-once',
+        input: {
+          name: 'available',
+          reason: 'correction',
+          quantities: [
+            {
+              inventoryItemId: 'gid://shopify/InventoryItem/1',
+              locationId: 'gid://shopify/Location/1',
+              changeFromQuantity: available,
+              quantity: available - 3,
+            },
+          ],
+        },
+      },
+    }),
+  };
+  expect(dispatch(run, 'shopify', request)).toMatchObject({
+    committed: true,
+    lost: true,
+  });
+  const restored: ReturnType<typeof createRun> = JSON.parse(
+    JSON.stringify(run),
+  );
+  expect(dispatch(restored, 'shopify', request)).not.toHaveProperty(
+    'committed',
+  );
+  expect(
+    restored.clock.journal.filter((event) => event.kind === 'provider-write'),
+  ).toHaveLength(1);
+  expect(
+    (
+      restored.shopify.nodes['gid://shopify/InventoryLevel/1']!.quantities as {
+        name: string;
+        quantity: number;
+      }[]
+    ).find((q) => q.name === 'available')!.quantity,
+  ).toBe(available - 3);
 });

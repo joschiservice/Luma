@@ -33,6 +33,12 @@ Seeded randomness determines quantities; generated order IDs start at `11`. Use 
 
 Pause stops autonomous commerce. Provider reads and control requests remain available. **Advance 30s** advances scheduled events even while paused. Speed changes affect commerce time; HTTP cancellation and client timeouts use real time. The host runs without a browser. It advances by fixed 250 ms ticks, multiplied by speed, and does not catch up for process downtime or event-loop stalls.
 
+Shopify stock corrections use the same approved Inventory action path as live
+connections. Shopify's simulator implements exact available-quantity CAS and
+persistent idempotency receipts. Select Shopify and **Write commits, response
+lost** to exercise reconciliation without replay. Fresh ERP evidence and explicit
+SKU/location mappings remain required.
+
 ## Service health
 
 Choose a provider and set **Service health** in the control panel. Each run stores independent JTL and Shopify settings:

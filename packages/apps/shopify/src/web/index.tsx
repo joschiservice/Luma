@@ -9,12 +9,21 @@ import { z } from 'zod';
 
 import { ShopifyAccess } from './access.js';
 import { ShopifyCustomers } from './customers.js';
+import { ShopifyInventoryCorrection } from './inventory-correction.js';
 import { ShopifyOrderContext } from './order-context.js';
 import { ShopifyRecordPage } from './record-page.js';
 import { ShopifyRecords } from './records.js';
 
 /** Renders Shopify authorization, the record browser page or live context for a host record. */
 export default function ShopifySettings(props: AppUiProps) {
+  if (props.slot === 'inventory')
+    return props.inventory ? (
+      <ShopifyInventoryCorrection
+        key={props.inventory.positionId}
+        positionId={props.inventory.positionId}
+        services={props.services}
+      />
+    ) : null;
   if (props.slot === 'customers') return <ShopifyCustomers {...props} />;
   if (props.slot === 'record')
     return props.record ? (

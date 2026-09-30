@@ -319,6 +319,18 @@ Tests: provider recovery tests, `apps/api/e2e/shopify-fulfillment.e2e.mjs` and t
 `Orders/Shopify fulfillment recovery` stories. See [Shopify fulfillment
 recovery](shopify-fulfillment-recovery.md).
 
+## Shopify inventory corrections
+
+ERP-to-Shopify stock reconciliation starts at
+`packages/apps/shopify/src/application/inventory-correction.ts`; its fixed authority
+policy and verification rules are in `domain/inventory-correction.ts`. The query
+adapter checks canonical mappings; the provider uses Shopify CAS and idempotency.
+Composition is `src/inventory-correction.ts`, and the Inventory detail hosts the
+app's `inventory` slot with `web/inventory-correction.tsx`. Migration `0043` owns
+previews, exact-target claims and evidence. Tests: provider and simulator unit tests,
+`shopify-inventory.e2e.mjs`, `shopify-inventory.browser.mjs` and the Inventory correction
+stories. See [Shopify inventory corrections](shopify-inventory-corrections.md).
+
 ## Commerce sync and history import
 
 Start at `packages/commerce-sync/src/domain/streams.ts` for scan planning, retry and

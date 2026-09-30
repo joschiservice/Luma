@@ -18,7 +18,10 @@ export interface AppUiProps {
     | 'app-settings'
     | 'page'
     | 'record'
+    | 'inventory'
     | 'customers';
+  /** Canonical stock position whose provider corrections the host is showing. */
+  inventory?: { positionId: string } | undefined;
   connection?: InstalledConnection | undefined;
   /** Opens a source customer without inferring identity from contact fields. */
   customer?:

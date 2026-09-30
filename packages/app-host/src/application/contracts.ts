@@ -1,4 +1,8 @@
-import type { ConnectionProvider, SecretCipher } from '@luma/connections';
+import type {
+  ConnectionProvider,
+  InstalledConnection,
+  SecretCipher,
+} from '@luma/connections';
 import type { IdentityService, TenantContext } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
 import type { FastifyInstance } from 'fastify';
@@ -15,6 +19,7 @@ export interface AppManifest {
     | 'app-settings'
     | 'page'
     | 'record'
+    | 'inventory'
     | 'customers'
   )[];
   connectionTypes: { kind: string; name: string }[];
@@ -42,6 +47,8 @@ export interface AppFactoryContext {
   refreshContext(context: TenantContext): Promise<TenantContext>;
   /** Rejects calls for uninstalled or unavailable apps. */
   requireInstalled(context: TenantContext, appId: string): Promise<number>;
+  /** Routes synthetic connections through their trusted simulator binding. */
+  simulation?: (connection: InstalledConnection) => typeof fetch | undefined;
   env: Readonly<Record<string, string | undefined>>;
 }
 

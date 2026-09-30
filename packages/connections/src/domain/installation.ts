@@ -2,6 +2,7 @@ import type { ReadCapability } from './capabilities.js';
 
 export type InstallationCapability =
   | ReadCapability
+  | 'inventory.available.reconcile'
   | 'orders.shipping-method.write'
   | 'fulfillment.hold.release'
   | 'fulfillment.open'
