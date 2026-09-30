@@ -8,6 +8,7 @@ export const installationPermissions = z.enum([
   'fulfillment.hold.release',
   'fulfillment.open',
   'fulfillment.move',
+  'customers.read',
   'orders.shipping-method.read',
   'orders.shipping-method.write',
 ]);
@@ -29,7 +30,7 @@ export const installationInput = z
     permissions: z
       .array(installationPermissions)
       .min(1)
-      .max(9)
+      .max(10)
       .refine((v) => new Set(v).size === v.length),
     credentials: installationCredentials,
   })
@@ -39,5 +40,5 @@ export const installationBoundary = {
   input: (value: unknown) => installationInput.parse(value),
   credentials: (value: unknown) => installationCredentials.parse(value),
   permissions: (value: unknown) =>
-    z.array(installationPermissions).max(9).parse(value),
+    z.array(installationPermissions).max(10).parse(value),
 };

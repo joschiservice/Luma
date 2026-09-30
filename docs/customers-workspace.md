@@ -8,7 +8,9 @@ addresses never establish a canonical identity or merge records across stores.
 Multiple search matches remain visible for operator selection.
 
 Shopify reads customers, contact fields and order history live through the
-installation-gated `records` operation. Lists and order history use 20-row cursor
+installation-gated `records` operation. Data sync also imports customer profiles
+for approved deployments (see [Commerce sync](commerce-sync.md#customers)); the page
+states that coverage above the customer view. Lists and order history use 20-row cursor
 pages. Search text is sent in the request body, quoted as literal provider search
 text, and never stored in a URL or browser storage. Order search follows the
 order's customer relation. Guest orders without that relation produce no match.

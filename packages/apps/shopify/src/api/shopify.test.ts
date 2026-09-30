@@ -15,6 +15,7 @@ function oauth(): ShopifyOAuth {
     credential: vi.fn(),
     uninstall: vi.fn(),
     scopesUpdated: vi.fn(),
+    changed: vi.fn(),
     callbackTenant: () => tenant,
     callback: vi.fn(),
   };
@@ -75,6 +76,39 @@ it('passes the original webhook bytes to signature verification', async () => {
       'signature',
       'shop.myshopify.com',
       'app/uninstalled',
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+it('schedules record-change notifications from the original bytes', async () => {
+  const app = Fastify();
+  const service = oauth();
+  registerShopifyRoutes(app, service);
+  const body = '{ "id": 10 }';
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: `/v1/shopify/changes/${tenant}/${tenant}`,
+      headers: {
+        'content-type': 'application/json',
+        'x-shopify-hmac-sha256': 'signature',
+        'x-shopify-shop-domain': 'shop.myshopify.com',
+        'x-shopify-topic': 'orders/updated',
+        'x-shopify-event-id': 'event-1',
+      },
+      payload: body,
+    });
+    expect(response.statusCode).toBe(204);
+    expect(service.changed).toHaveBeenCalledWith(
+      tenant,
+      tenant,
+      Buffer.from(body),
+      'signature',
+      'shop.myshopify.com',
+      'orders/updated',
+      'event-1',
     );
   } finally {
     await app.close();

@@ -5,6 +5,7 @@ import {
   Boxes,
   ChartNoAxesColumn,
   Database,
+  DatabaseZap,
   House,
   Inbox,
   type LucideIcon,
@@ -30,6 +31,7 @@ export type DestinationPath =
   | 'workflows'
   | 'procurement'
   | 'apps'
+  | 'sync'
   | 'settings'
   | 'records';
 
@@ -138,6 +140,14 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
     description: 'Install apps and manage connected systems',
     group: 'workspace',
     shortcut: 'c',
+  },
+  {
+    path: 'sync',
+    label: 'Data sync',
+    Icon: DatabaseZap,
+    description: 'History imports, sync health and record coverage by source',
+    group: 'workspace',
+    shortcut: 'd',
   },
   {
     path: 'settings',

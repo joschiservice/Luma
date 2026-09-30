@@ -76,8 +76,10 @@ export async function recoveryFixture(t, origin = 'http://localhost:3000') {
     globalThis.fetch = originalFetch;
   });
   const f = await settingsFixture(t, origin, {
-    activeKeyId: 'test',
-    keys: new Map([['test', randomBytes(32)]]),
+    connections: {
+      activeKeyId: 'test',
+      keys: new Map([['test', randomBytes(32)]]),
+    },
   });
   await f.db.owner.query(
     `GRANT luma_connectors TO "${new URL(f.db.runtimeUrl).username}"`,

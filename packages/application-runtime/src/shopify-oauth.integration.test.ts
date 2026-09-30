@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { createHmac, randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -77,42 +77,23 @@ describe.skipIf(!databaseUrl)('Shopify OAuth on PostgreSQL', () => {
       await lock.query(
         "SELECT pg_advisory_lock(hashtext('luma_test_role_setup'))",
       );
-      await owner.query(
-        await readFile(
-          new URL(
-            '../migrations/0004_connector_installations.sql',
-            import.meta.url,
-          ),
-          'utf8',
-        ),
-      );
+      // Privacy intake erases imported customer data, so apply every migration.
+      for (const file of (
+        await readdir(new URL('../migrations/', import.meta.url))
+      ).sort())
+        if (file.endsWith('.sql'))
+          await owner.query(
+            await readFile(
+              new URL(`../migrations/${file}`, import.meta.url),
+              'utf8',
+            ),
+          );
     } finally {
       await lock.query(
         "SELECT pg_advisory_unlock(hashtext('luma_test_role_setup'))",
       );
       lock.release();
     }
-    await owner.query(
-      await readFile(
-        new URL('../migrations/0006_shopify_oauth.sql', import.meta.url),
-        'utf8',
-      ),
-    );
-    await owner.query(
-      await readFile(
-        new URL('../migrations/0024_workspace_apps.sql', import.meta.url),
-        'utf8',
-      ),
-    );
-    await owner.query(
-      await readFile(
-        new URL(
-          '../migrations/0038_shopify_privacy_requests.sql',
-          import.meta.url,
-        ),
-        'utf8',
-      ),
-    );
     const password = randomUUID();
     await admin.query(
       `CREATE ROLE "${name}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`,

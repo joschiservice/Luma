@@ -11,15 +11,23 @@ type PositionRow = {
   id: string;
   skuId: string;
   sku: string;
+  skuKey: string;
   locationId: string;
   location: string;
   unit: string;
   source: StockSource;
 };
 
+// Imported records use source-local keys; show the trailing part of the source ID instead.
+const readable = (key: string, noun: string) =>
+  `CASE WHEN left(${key},10)='["source",' THEN '${noun} '||regexp_replace((${key})::jsonb->>4,'^.*/','') ELSE ${key} END`;
+
 const sourceRows = `SELECT p.entity_id AS id,
  s.document->'data'->>'skuId' AS "skuId", s.document->'data'->>'locationId' AS "locationId",
- s.document->'data'->>'unit' AS unit, e.reconciliation_key AS sku, l.reconciliation_key AS location,
+ s.document->'data'->>'unit' AS unit, e.reconciliation_key AS "skuKey",
+ COALESCE((SELECT k.code FROM inventory_product_skus k WHERE k.tenant_id=p.tenant_id AND k.sku_id=e.id
+  AND k.code_key IS NOT NULL ORDER BY k.connection_id LIMIT 1),${readable('e.reconciliation_key', 'SKU')}) AS sku,
+ ${readable('l.reconciliation_key', 'Location')} AS location,
  jsonb_build_object('connectionId',p.connection_id,'label',COALESCE(c.document->>'label','Connected source'),
  'status',COALESCE(c.document->>'status','unknown'),
  'externalSku',sku.external_id,'externalLocation',location.external_id,'mappingMethod',sku.method,
@@ -35,7 +43,7 @@ const sourceRows = `SELECT p.entity_id AS id,
  AND m.connection_id=p.connection_id AND m.resource='sku' AND m.canonical_id=(s.document->'data'->>'skuId')::uuid ORDER BY external_id LIMIT 1) sku ON true
  LEFT JOIN LATERAL (SELECT external_id FROM connector_source_mappings m WHERE m.tenant_id=p.tenant_id
  AND m.connection_id=p.connection_id AND m.resource='location' AND m.canonical_id=(s.document->'data'->>'locationId')::uuid ORDER BY external_id LIMIT 1) location ON true
- WHERE p.tenant_id=$1 AND ($2::uuid IS NULL OR p.entity_id=$2)
+ WHERE p.tenant_id=$1 AND s.kind='position' AND ($2::uuid IS NULL OR p.entity_id=$2)
  AND ($3::uuid IS NULL OR s.document->'data'->>'skuId'=$3::text)
  AND ($4::uuid IS NULL OR s.document->'data'->>'locationId'=$4::text)
  AND ($5::uuid IS NULL OR p.entity_id>$5)`;
@@ -93,6 +101,7 @@ function position(rows: PositionRow[]): StockPosition {
     id: first.id,
     skuId: first.skuId,
     sku: first.sku,
+    skuKey: first.skuKey,
     locationId: first.locationId,
     location: first.location,
     unit: first.unit,

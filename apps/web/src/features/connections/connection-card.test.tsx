@@ -47,7 +47,8 @@ it('shows only the requested and granted intersection as permitted', () => {
   const readOnly = render({ ...fixture, permissions: ['orders.read'] });
   expect(readOnly).toContain('Read-only access');
   expect(readOnly).not.toContain('Correct shipping method');
-  expect(html).toContain('Observation freshness is unknown');
+  expect(html).toContain('Credentials and requested permissions validated.');
+  expect(html).not.toContain('View data sync');
   expect(html).not.toContain(fixture.updatedAt);
 });
 

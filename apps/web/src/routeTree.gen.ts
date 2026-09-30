@@ -26,6 +26,7 @@ import { Route as AppOrganizationIdExceptionsRouteImport } from './routes/app.$o
 import { Route as AppOrganizationIdHomeRouteImport } from './routes/app.$organizationId.home'
 import { Route as AppOrganizationIdInsightsRouteImport } from './routes/app.$organizationId.insights'
 import { Route as AppOrganizationIdOverviewRouteImport } from './routes/app.$organizationId.overview'
+import { Route as AppOrganizationIdSyncRouteImport } from './routes/app.$organizationId.sync'
 import { Route as AppWorkspacesIndexRouteImport } from './routes/app.workspaces.index'
 import { Route as AppWorkspacesNewRouteImport } from './routes/app.workspaces.new'
 import { Route as AppOrganizationIdAppsIndexRouteImport } from './routes/app.$organizationId.apps.index'
@@ -142,6 +143,11 @@ const AppOrganizationIdOverviewRoute =
     path: '/overview',
     getParentRoute: () => AppOrganizationIdRoute,
   } as any)
+const AppOrganizationIdSyncRoute = AppOrganizationIdSyncRouteImport.update({
+  id: '/sync',
+  path: '/sync',
+  getParentRoute: () => AppOrganizationIdRoute,
+} as any)
 const AppWorkspacesIndexRoute = AppWorkspacesIndexRouteImport.update({
   id: '/workspaces/',
   path: '/workspaces/',
@@ -303,6 +309,7 @@ export interface FileRoutesByFullPath {
   '/app/$organizationId/home': typeof AppOrganizationIdHomeRoute
   '/app/$organizationId/insights': typeof AppOrganizationIdInsightsRoute
   '/app/$organizationId/overview': typeof AppOrganizationIdOverviewRoute
+  '/app/$organizationId/sync': typeof AppOrganizationIdSyncRoute
   '/app/workspaces/new': typeof AppWorkspacesNewRoute
   '/app/workspaces/': typeof AppWorkspacesIndexRoute
   '/app/$organizationId/apps/$appId': typeof AppOrganizationIdAppsAppIdRoute
@@ -345,6 +352,7 @@ export interface FileRoutesByTo {
   '/app/$organizationId/home': typeof AppOrganizationIdHomeRoute
   '/app/$organizationId/insights': typeof AppOrganizationIdInsightsRoute
   '/app/$organizationId/overview': typeof AppOrganizationIdOverviewRoute
+  '/app/$organizationId/sync': typeof AppOrganizationIdSyncRoute
   '/app/workspaces/new': typeof AppWorkspacesNewRoute
   '/app/workspaces': typeof AppWorkspacesIndexRoute
   '/app/$organizationId/apps/$appId': typeof AppOrganizationIdAppsAppIdRoute
@@ -389,6 +397,7 @@ export interface FileRoutesById {
   '/app/$organizationId/home': typeof AppOrganizationIdHomeRoute
   '/app/$organizationId/insights': typeof AppOrganizationIdInsightsRoute
   '/app/$organizationId/overview': typeof AppOrganizationIdOverviewRoute
+  '/app/$organizationId/sync': typeof AppOrganizationIdSyncRoute
   '/app/workspaces/new': typeof AppWorkspacesNewRoute
   '/app/workspaces/': typeof AppWorkspacesIndexRoute
   '/app/$organizationId/apps/$appId': typeof AppOrganizationIdAppsAppIdRoute
@@ -434,6 +443,7 @@ export interface FileRouteTypes {
     | '/app/$organizationId/home'
     | '/app/$organizationId/insights'
     | '/app/$organizationId/overview'
+    | '/app/$organizationId/sync'
     | '/app/workspaces/new'
     | '/app/workspaces/'
     | '/app/$organizationId/apps/$appId'
@@ -476,6 +486,7 @@ export interface FileRouteTypes {
     | '/app/$organizationId/home'
     | '/app/$organizationId/insights'
     | '/app/$organizationId/overview'
+    | '/app/$organizationId/sync'
     | '/app/workspaces/new'
     | '/app/workspaces'
     | '/app/$organizationId/apps/$appId'
@@ -519,6 +530,7 @@ export interface FileRouteTypes {
     | '/app/$organizationId/home'
     | '/app/$organizationId/insights'
     | '/app/$organizationId/overview'
+    | '/app/$organizationId/sync'
     | '/app/workspaces/new'
     | '/app/workspaces/'
     | '/app/$organizationId/apps/$appId'
@@ -675,6 +687,13 @@ declare module '@tanstack/react-router' {
       path: '/overview'
       fullPath: '/app/$organizationId/overview'
       preLoaderRoute: typeof AppOrganizationIdOverviewRouteImport
+      parentRoute: typeof AppOrganizationIdRoute
+    }
+    '/app/$organizationId/sync': {
+      id: '/app/$organizationId/sync'
+      path: '/sync'
+      fullPath: '/app/$organizationId/sync'
+      preLoaderRoute: typeof AppOrganizationIdSyncRouteImport
       parentRoute: typeof AppOrganizationIdRoute
     }
     '/app/workspaces/': {
@@ -871,6 +890,7 @@ interface AppOrganizationIdRouteChildren {
   AppOrganizationIdHomeRoute: typeof AppOrganizationIdHomeRoute
   AppOrganizationIdInsightsRoute: typeof AppOrganizationIdInsightsRoute
   AppOrganizationIdOverviewRoute: typeof AppOrganizationIdOverviewRoute
+  AppOrganizationIdSyncRoute: typeof AppOrganizationIdSyncRoute
   AppOrganizationIdAppsAppIdRoute: typeof AppOrganizationIdAppsAppIdRoute
   AppOrganizationIdInventoryPositionIdRoute: typeof AppOrganizationIdInventoryPositionIdRoute
   AppOrganizationIdOrdersOrderIdRoute: typeof AppOrganizationIdOrdersOrderIdRoute
@@ -902,6 +922,7 @@ const AppOrganizationIdRouteChildren: AppOrganizationIdRouteChildren = {
   AppOrganizationIdHomeRoute: AppOrganizationIdHomeRoute,
   AppOrganizationIdInsightsRoute: AppOrganizationIdInsightsRoute,
   AppOrganizationIdOverviewRoute: AppOrganizationIdOverviewRoute,
+  AppOrganizationIdSyncRoute: AppOrganizationIdSyncRoute,
   AppOrganizationIdAppsAppIdRoute: AppOrganizationIdAppsAppIdRoute,
   AppOrganizationIdInventoryPositionIdRoute:
     AppOrganizationIdInventoryPositionIdRoute,

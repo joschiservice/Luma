@@ -8,7 +8,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "start": "node --env-file-if-exists=.env dist/bootstrap.js",
-    "dev:worker": "tsx watch --conditions=luma-source --include \"../../packages/*/src/**/*.ts\" --env-file-if-exists=.env src/bootstrap.ts"
+    "dev:worker": "tsx watch --conditions=luma-source --include \"../../packages/*/src/**/*.ts\" --env-file-if-exists=.env src/bootstrap.ts",
+    "start:sync": "node --env-file-if-exists=.env dist/sync-bootstrap.js",
+    "dev": "tsx watch --conditions=luma-source --include \"../../packages/*/src/**/*.ts\" --env-file-if-exists=../api/.env --env-file-if-exists=.env src/sync-bootstrap.ts"
   },
   "dependencies": {
     "@luma/application-runtime": "workspace:*",

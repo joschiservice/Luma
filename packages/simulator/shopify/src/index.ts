@@ -276,18 +276,40 @@ export function handle(state: ShopifyState, request: ProviderRequest) {
       'x-shopify-api-version': '2026-07',
     },
   });
+  const currentAppInstallation = {
+    accessScopes: [
+      'orders',
+      'products',
+      'inventory',
+      'merchant_managed_fulfillment_orders',
+    ].map((s) => ({ handle: `read_${s}` })),
+  };
   if (query.includes('VerifyInstallation'))
     return result({
       shop: { myshopifyDomain: new URL(request.url).hostname },
-      currentAppInstallation: {
-        accessScopes: [
-          'orders',
-          'products',
-          'inventory',
-          'merchant_managed_fulfillment_orders',
-        ].map((s) => ({ handle: `read_${s}` })),
-      },
+      currentAppInstallation,
     });
+  // Scans start by reading granted scopes and, for counted collections, the collection size.
+  if (query.includes('LumaScanStart')) {
+    const counted = /count:\s*(orders|products|customers)Count\(/.exec(
+      query,
+    )?.[1];
+
+    return result({
+      currentAppInstallation,
+      ...(counted
+        ? {
+            count: {
+              count:
+                counted === 'customers'
+                  ? 0
+                  : state.roots[counted as keyof ShopifyState['roots']].length,
+              precision: 'EXACT',
+            },
+          }
+        : {}),
+    });
+  }
   const page = (ids: string[], size: number) => {
     const offset = variables.after ? Number(variables.after) : 0;
     if (

@@ -41,6 +41,15 @@ function fixture(overrides: Partial<ShopifyConnectorOptions> = {}) {
       query: string;
       variables: { id?: string };
     };
+    if (query.includes('LumaScanStart'))
+      return response({
+        currentAppInstallation: { accessScopes: data.scopes },
+        ...(query.includes('Count(')
+          ? { count: { count: 1, precision: 'EXACT' } }
+          : {}),
+      });
+    if (query.includes('LumaCustomers'))
+      return response({ page: page(data.customers) });
     if (query.includes('LumaPage'))
       return response({
         page: page([
@@ -262,7 +271,8 @@ describe('Shopify read capabilities', () => {
     });
     const result = await f.read('orders.read');
     expect(result.ok && result.value.items[0]?.data.lines).toHaveLength(2);
-    expect(f.fetch).toHaveBeenCalledTimes(4);
+    // Scan start, root page, order node and two line pages.
+    expect(f.fetch).toHaveBeenCalledTimes(5);
   });
   it('binds pagination to the tenant, connection, capability and filters', async () => {
     const f = fixture();
@@ -680,6 +690,85 @@ describe('Shopify webhook refresh hints', () => {
   });
 });
 
+describe('Shopify history import reads', () => {
+  it('reports the 60-day order window, collection size and changed-record filters', async () => {
+    const f = fixture();
+    const first = await f.read('orders.read', {
+      limit: 10,
+      updatedSince: '2026-09-01T00:00:00.000Z',
+    } as { limit: number });
+    expect(first).toMatchObject({
+      ok: true,
+      value: {
+        total: 1,
+        history: {
+          availableFrom: '2026-07-19T01:00:00.000Z',
+          requirement: 'read_all_orders',
+        },
+      },
+    });
+    const request = f.fetch.mock.calls
+      .map(([, init]) => JSON.parse(String(init?.body)))
+      .find((body: { query: string }) => body.query.includes('LumaPage'));
+    expect(request.variables.query).toBe(
+      "updated_at:>='2026-09-01T00:00:00.000Z'",
+    );
+    expect(request.query).toContain('sortKey: UPDATED_AT');
+    expect(
+      (await f.runtime.discover(context, 'connection-a')).find(
+        (item) => item.capability === 'inventory.read',
+      )?.filters,
+    ).toBeUndefined();
+
+    f.data.scopes.push({ handle: 'read_all_orders' });
+    const full = await f.read('orders.read');
+    expect(full.ok && full.value.history).toBeNull();
+  });
+
+  it('reads customers only when approved and withholds unapproved fields', async () => {
+    expect(
+      (await fixture().runtime.discover(context, 'connection-a')).some(
+        (item) => item.capability === 'customers.read',
+      ),
+    ).toBe(false);
+    const contactOnly = fixture({
+      customerAccess: { contact: true, address: false },
+    });
+    const result = await contactOnly.read('customers.read');
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        total: 1,
+        items: [
+          {
+            source: {
+              resource: 'customer',
+              externalId: 'gid://shopify/Customer/7',
+            },
+            sourceUpdatedAt: '2026-09-10T09:00:00Z',
+            data: {
+              displayName: 'Ada Lovelace',
+              email: 'ada@example.test',
+              phone: null,
+              address: null,
+              state: 'enabled',
+              orderCount: 4,
+              amountSpent: { amount: '120.50', currency: 'EUR' },
+              tags: ['vip'],
+              shared: { contact: true, address: false },
+            },
+          },
+        ],
+      },
+    });
+    const query = contactOnly.fetch.mock.calls
+      .map(([, init]) => JSON.parse(String(init?.body)).query as string)
+      .find((text) => text.includes('LumaCustomers'));
+    expect(query).toContain('defaultEmailAddress');
+    expect(query).not.toContain('defaultAddress');
+  });
+});
+
 describe('Shopify query contract', () => {
   // Pin the fixture independently so changing the API version requires a schema refresh.
   const schemaVersion = '2026-07';
@@ -693,6 +782,9 @@ describe('Shopify query contract', () => {
   it('validates all emitted operations against the matching Shopify schema', async () => {
     expect(API_VERSION).toBe(schemaVersion);
     const f = fixture();
+    const customers = fixture({
+      customerAccess: { contact: true, address: true },
+    });
     for (const capability of [
       'orders.read',
       'products.read',
@@ -700,14 +792,23 @@ describe('Shopify query contract', () => {
       'fulfillment.read',
     ] as const) {
       expect(await f.read(capability)).toMatchObject({ ok: true });
+      expect(
+        await f.read(capability, {
+          limit: 10,
+          ...(capability === 'inventory.read'
+            ? {}
+            : { updatedSince: '2026-09-01T00:00:00.000Z' }),
+        }),
+      ).toMatchObject({ ok: true });
     }
+    expect(await customers.read('customers.read')).toMatchObject({ ok: true });
     const operations = new Set(
-      f.fetch.mock.calls.map(
+      [...f.fetch.mock.calls, ...customers.fetch.mock.calls].map(
         ([, init]) =>
           (JSON.parse(String(init?.body)) as { query: string }).query,
       ),
     );
-    expect(operations.size).toBe(13);
+    expect(operations.size).toBe(20);
     for (const query of operations) {
       expect(
         validate(schema, parse(query)).map((error) => error.message),

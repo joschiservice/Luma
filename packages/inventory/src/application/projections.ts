@@ -2,15 +2,31 @@ import type { TenantContext } from '@luma/identity';
 
 export type EntityKind = 'sku' | 'location' | 'product' | 'position';
 
-export type CommerceData = {
-  type: 'position';
-  skuId: string;
-  locationId: string;
-  unit: string;
-  onHand: string | null;
-  reserved: string | null;
-  available: string | null;
-  availabilityBasis: 'provider_reported' | 'derived' | 'unknown';
+export type CommerceData =
+  | {
+      type: 'position';
+      skuId: string;
+      locationId: string;
+      unit: string;
+      onHand: string | null;
+      reserved: string | null;
+      available: string | null;
+      availabilityBasis: 'provider_reported' | 'derived' | 'unknown';
+    }
+  | {
+      type: 'product';
+      title: string | null;
+      status: 'active' | 'archived' | 'unknown';
+      /** Variants as canonical SKUs. `code` is source text and never establishes identity. */
+      skus: { skuId: string; code: string | null; unit: string }[];
+    };
+
+/** A current source projection that refers to a SKU or location. */
+export type Dependent = {
+  entityId: string;
+  kind: 'position' | 'product';
+  connectionId: string;
+  observationId: string;
 };
 
 export interface CanonicalSnapshot {
@@ -50,4 +66,25 @@ export interface CommerceProjections {
     context: TenantContext,
     entityId: string,
   ): Promise<CanonicalSnapshot[]>;
+  /**
+   * Lists current source projections whose data refers to this SKU or location, optionally
+   * limited to one connection. Re-project them after the entity's mappings change.
+   */
+  dependents(
+    context: TenantContext,
+    kind: 'sku' | 'location',
+    id: string,
+    connectionId?: string,
+  ): Promise<Dependent[]>;
+  /**
+   * Removes one source's current projection of an entity after that source moved to another
+   * entity. Snapshots remain as history and the removal is recorded; requires an owner or
+   * admin. Returns false when no projection existed.
+   */
+  retire(
+    context: TenantContext,
+    entityId: string,
+    connectionId: string,
+    reason: string,
+  ): Promise<boolean>;
 }

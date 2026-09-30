@@ -19,6 +19,7 @@ import { connectorProvidersContract } from './contracts/providers.js';
 import { recordsContract } from './contracts/records.js';
 import { settingsContract } from './contracts/settings.js';
 import { shadowContract } from './contracts/shadow.js';
+import { syncContract } from './contracts/sync.js';
 import { systemContract } from './contracts/system.js';
 import { workflowDraftsContract } from './contracts/workflow-drafts.js';
 import { workflowGenerationContract } from './contracts/workflow-generation.js';
@@ -49,6 +50,7 @@ const routes: {
   records: typeof recordsContract;
   inventory: typeof inventoryContract;
   orders: typeof ordersContract;
+  sync: typeof syncContract;
 } = {
   shadow: shadowContract,
   activity: activityContract,
@@ -72,6 +74,7 @@ const routes: {
   records: recordsContract,
   inventory: inventoryContract,
   orders: ordersContract,
+  sync: syncContract,
 };
 const options = {
   strictStatusCodes: true as const,
@@ -161,3 +164,5 @@ export * from './records.js';
 export * from './orders.js';
 
 export * from './inventory.js';
+
+export * from './sync.js';

@@ -1,0 +1,64 @@
+---
+title: Import history and keep data in sync
+description: See what Luma has imported from each connected system, how current it is, and what to do when a sync needs you.
+---
+
+When you connect a store or ERP, Luma imports its history and then keeps it current. Luma only reads during a sync; it never changes records in your systems.
+
+## What Luma imports
+
+For each connection, Luma imports every record type the connection allows:
+
+- **Orders** with their lines, totals and placed dates.
+- **Fulfillments** such as fulfillment orders, shipments and delivery notes. They start once the order history is imported, because each fulfillment belongs to an order.
+- **Products** with their variants and SKU codes.
+- **Stock levels** per SKU and location.
+- **Customers**, when the connection is approved to share customer data. Contact details and addresses are imported only if that access is approved as well.
+
+A record type that isn't part of a connection, or that the source didn't grant, is listed as such. Open **Manage connection** to change what the connection allows.
+
+## Follow the import
+
+Open **Data sync** from the sidebar (`G`, then `D`). Each connection lists its record types with:
+
+- **Status**: importing history, reading changes, checking all records, up to date, retrying, failing, paused or waiting for someone.
+- **Progress**, while a read runs. When the source reports how many records it has, you see a count and a percentage.
+- **Coverage**: how many records Luma holds and the date range they cover.
+- **Last sync** and when the next check is due.
+
+You can use Luma while history imports. Orders, stock and customers appear as they arrive, and the Orders, Inventory and Customers pages show the same coverage at the top.
+
+## Understand coverage
+
+Coverage says exactly what Luma holds. Until the first import finishes, it shows how many records have arrived so far and never claims completeness.
+
+Some sources share only recent history. Shopify shares the last 60 days of orders unless the Luma app has the `read_all_orders` permission. In that case Data sync says which date the shared history starts from. Luma keeps every order it imports, so coverage grows over time. When older orders become available, Data sync offers to import them.
+
+A **full check** rereads every record once a day. Records the source no longer returns are counted as no longer found. Luma keeps them, so you can check whether they were deleted at the source.
+
+## How Luma stays current
+
+After the history import, Luma reads changes as they happen:
+
+- When a source sends change notifications, Luma reads the changed records within seconds.
+- Otherwise Luma checks for changes every few minutes. Sources that can't list recent changes are reread in full every 30 minutes.
+- Every record type gets a full check once a day.
+
+Luma recognizes records it already has. Importing the same history again, or receiving a change twice or out of order, never creates duplicates, and an older version never replaces a newer one.
+
+Observed history on an order shows the states Luma read. A record imported from history shows its state at import time. Earlier changes at the source are not reconstructed.
+
+## When a sync needs you
+
+- **Retrying** means a read failed and Luma will try again automatically, waiting a little longer each time.
+- **Failing** means it has failed several times in a row. The message explains why. Fix the cause, such as reconnecting the connection, and choose **Retry now**.
+- **Needs someone to resume** means the person the sync ran as no longer manages the workspace. An owner or admin chooses **Resume with my access**.
+- **Paused** means someone paused it. Records already imported stay available.
+
+Owners and admins can also choose **Sync now**, **Check all records** or **Re-import history** from the actions menu on each record type.
+
+## Link the same SKU across sources
+
+Luma keeps each source's records separate until a person confirms they are the same. On a stock position, **Linked sources** lists the source records behind the SKU and suggests possible matches that share a SKU code.
+
+Choose **Link**, say why the records match and confirm. Luma then groups stock, products and order lines from both sources under one SKU, while each source keeps its own quantities. **Unlink** separates a source again. Every link and unlink is recorded with who made it and why.

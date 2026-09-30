@@ -14,6 +14,7 @@ import { useState } from 'react';
 import { expect, within } from 'storybook/test';
 
 import appStyles from '../../styles.css?inline';
+import { IdentityLinksView } from '../sync/identity-links';
 import type { InventorySearch } from './data';
 import { StockDetailView } from './detail';
 import { InventoryView } from './page';
@@ -23,6 +24,7 @@ const position: StockPosition = {
   id: '11111111-1111-4111-8111-111111111111',
   skuId: '22222222-2222-4222-8222-222222222222',
   sku: 'LINEN-SHIRT-M',
+  skuKey: 'LINEN-SHIRT-M',
   locationId: '44444444-4444-4444-8444-444444444444',
   location: 'Tokyo warehouse',
   unit: 'each',
@@ -93,6 +95,53 @@ const detail: InventoryDetail = {
   issues: [],
 };
 
+const identity = (
+  <IdentityLinksView
+    submit={() => {}}
+    detail={{
+      entity: { id: position.skuId, kind: 'sku', label: 'LINEN-SHIRT-M' },
+      canManage: true,
+      requests: [],
+      sources: [
+        {
+          connectionId: position.sources[1]!.connectionId,
+          connectionLabel: 'Shopify · Japan',
+          provider: 'shopify',
+          externalId: 'gid://shopify/InventoryItem/4410',
+          scopeKey: '',
+          method:
+            'Imported source record; linked only to itself until a person links it to another source',
+          linkedAt: '2026-09-28T09:00:00Z',
+          revisedAt: null,
+          codes: ['LINEN-SHIRT-M'],
+          titles: ['Linen shirt'],
+        },
+      ],
+      suggestions: [
+        {
+          id: '88888888-8888-4888-8888-888888888888',
+          label: 'LINEN-SHIRT-M',
+          reason: 'Same SKU code “linen-shirt-m”',
+          sources: [
+            {
+              connectionId: position.sources[0]!.connectionId,
+              connectionLabel: 'JTL-Wawi',
+              provider: 'jtl',
+              externalId: '77',
+              scopeKey: '',
+              method: 'Imported source record',
+              linkedAt: '2026-09-28T09:00:00Z',
+              revisedAt: null,
+              codes: ['linen-shirt-m'],
+              titles: ['Leinenhemd M'],
+            },
+          ],
+        },
+      ],
+    }}
+  />
+);
+
 function Content({ state }: { state: string }) {
   const [search, change] = useState<InventorySearch>({});
   if (state === 'detail')
@@ -101,6 +150,7 @@ function Content({ state }: { state: string }) {
         organizationId={org}
         detail={detail}
         refresh={() => {}}
+        identity={identity}
       />
     );
 
@@ -164,7 +214,16 @@ export const Browse: Story = {
 
 export const Dark: Story = { globals: { theme: 'dark' } };
 
-export const Detail: Story = { args: { state: 'detail' } };
+export const Detail: Story = {
+  args: { state: 'detail' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByText('Possibly the same SKU'),
+    ).toBeVisible();
+    await expect(canvas.getByRole('button', { name: 'Link' })).toBeVisible();
+  },
+};
 
 export const DetailDark: Story = {
   args: { state: 'detail' },

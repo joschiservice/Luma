@@ -15,6 +15,7 @@ export const capabilities: Record<InstallationCapability, string> = {
   'fulfillment.hold.release': 'Release a fulfillment hold',
   'fulfillment.open': 'Reopen fulfillment',
   'fulfillment.move': 'Move fulfillment',
+  'customers.read': 'Read customers',
   'orders.shipping-method.read': 'Read shipping method',
   'orders.shipping-method.write': 'Correct shipping method',
 };

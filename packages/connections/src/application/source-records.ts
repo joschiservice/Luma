@@ -5,6 +5,7 @@ import type {
   InventorySnapshot,
   Observation,
   OrderSnapshot,
+  ProductSnapshot,
   SourceIdentity,
 } from '../domain/capabilities.js';
 
@@ -17,7 +18,19 @@ export type CommerceObservation =
   | {
       capability: 'fulfillment.read';
       observation: Observation<FulfillmentSnapshot>;
-    };
+    }
+  | { capability: 'products.read'; observation: Observation<ProductSnapshot> };
+
+/** A source identity's current mapping, with the evidence that established it. */
+export interface SourceMapping {
+  source: SourceIdentity;
+  canonicalId: string;
+  method: string;
+  actorId: string;
+  createdAt: string;
+  /** Latest remapping, when the source was moved from another canonical entity. */
+  revisedAt: string | null;
+}
 
 export interface SourceRecords {
   /** Stores an observation idempotently; an ingest key reused for different content is rejected. */
@@ -45,4 +58,38 @@ export interface SourceRecords {
     context: TenantContext,
     source: SourceIdentity,
   ): Promise<string | null>;
+  /**
+   * Resolves many identities in one read. The result maps
+   * `JSON.stringify([connectionId, resource, scopeKey, externalId])` to the canonical ID and
+   * omits unmapped identities.
+   */
+  resolveMany(
+    context: TenantContext,
+    sources: SourceIdentity[],
+  ): Promise<Map<string, string>>;
+  /** Reads a stored observation by ID in this tenant and connection, or null when absent. */
+  observation(
+    context: TenantContext,
+    connectionId: string,
+    observationId: string,
+  ): Promise<CommerceObservation | null>;
+  /** Lists the source identities currently mapped to one canonical entity. */
+  mappings(
+    context: TenantContext,
+    resource: SourceIdentity['resource'],
+    canonicalId: string,
+  ): Promise<SourceMapping[]>;
+  /**
+   * Moves a source mapping from `from` to `to` and appends a revision with the actor, method and
+   * reason; requires an owner or admin. Returns false without changes when the source no
+   * longer maps to `from`. Callers must re-project affected snapshots afterwards.
+   */
+  remap(
+    context: TenantContext,
+    source: SourceIdentity,
+    from: string,
+    to: string,
+    method: string,
+    reason: string,
+  ): Promise<boolean>;
 }

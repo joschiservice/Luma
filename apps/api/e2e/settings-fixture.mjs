@@ -9,7 +9,7 @@ import { database, secret } from './helpers.mjs';
 export async function settingsFixture(
   t,
   origin = 'http://localhost:3000',
-  connections,
+  { connections } = {},
 ) {
   const db = await database(t);
   await db.migrate();

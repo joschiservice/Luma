@@ -19,7 +19,7 @@ const base = z.object({
   deleted: z.boolean(),
 });
 
-export const snapshotSchema = base
+const position = base
   .extend({
     kind: z.literal('position'),
     data: z
@@ -36,3 +36,29 @@ export const snapshotSchema = base
       .strict(),
   })
   .strict();
+
+const product = base
+  .extend({
+    kind: z.literal('product'),
+    data: z
+      .object({
+        type: z.literal('product'),
+        title: z.string().max(1024).nullable(),
+        status: z.enum(['active', 'archived', 'unknown']),
+        skus: z
+          .array(
+            z
+              .object({
+                skuId: uuid,
+                code: z.string().max(1024).nullable(),
+                unit: z.string().min(1).max(64),
+              })
+              .strict(),
+          )
+          .max(5000),
+      })
+      .strict(),
+  })
+  .strict();
+
+export const snapshotSchema = z.discriminatedUnion('kind', [position, product]);

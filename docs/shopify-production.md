@@ -28,7 +28,10 @@ connections keep their read access and must reconnect to enable recovery.
 
 Publish the configuration version after changing URLs or scopes. The server
 registers connection-specific `app/uninstalled` and `app/scopes_update`
-subscriptions during authorization. Existing connections must reconnect once
+subscriptions during authorization, plus order, fulfillment, product,
+inventory-level and (when approved) customer change notifications at
+`/api/v1/shopify/changes/:organizationId/:connectionId`. Change subscriptions are
+best effort; scheduled reads still cover their records. Existing connections must reconnect once
 to install the new scope-change subscription.
 
 Example configuration (replace placeholders; no secrets belong in this file):
@@ -64,7 +67,9 @@ server and reconnect after changing either flag. These flags request access;
 they cannot grant it. The record reader checks actual grants for each request.
 
 Set `SHOPIFY_CUSTOMER_CONTACT_APPROVED=true` only after Shopify also approves
-name, email and phone access for this deployment. It defaults to false. Without
+name, email and phone access for this deployment. Set
+`SHOPIFY_CUSTOMER_ADDRESS_APPROVED=true` only after Shopify approves address access;
+Data sync then imports default addresses with customer profiles. It defaults to false. Without
 it, Customers shows source identities and authorized order history, and withholds
 contact fields and name/email search. Restart after changing this flag.
 
@@ -84,8 +89,9 @@ include their encrypted, restricted processing in the data-protection details.
 
 Suggested older-order rationale: “Merchants need to investigate unresolved
 orders, returns and fulfillment discrepancies older than 60 days and reconcile
-historical operational records.” Historical import scheduling is tracked in
-LUMA-96; granting the scope alone does not backfill records. LUMA-104 supplies
+historical operational records.” Granting the scope alone does not backfill
+records: Data sync reports that older orders are available and an operator
+re-imports order history (see [Commerce sync](commerce-sync.md)). LUMA-104 supplies
 live operational record reads.
 
 Shopify does not give a guaranteed approval date in the linked guides. Treat
@@ -129,7 +135,10 @@ For each request:
    workflow and issue evidence, logs and exports. Live customer-context reads are
    not persisted by the Shopify record reader. Provide the retained data (or a
    documented no-data result) to the verified merchant through a secure channel.
-3. For `customers/redact`, remove or anonymize the corresponding retained data
+3. For `customers/redact`, imported customer profiles for the verified shop are
+   erased automatically when the request is received and are not imported again;
+   `shop/redact` erases all of the shop's imported profiles. Remove or anonymize the
+   remaining corresponding retained data
    across those stores. Pause ingestion while doing so and ensure replay/backups
    cannot restore erased data. Preserve only any documented legal retention.
 4. For `shop/redact`, stop the installation's ingestion, erase its secrets and

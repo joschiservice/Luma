@@ -6,6 +6,8 @@ import { apiContract } from '@luma/api-contract';
 import { openApiDocument } from '@luma/api-contract/openapi';
 import type { AppRegistry, AppService } from '@luma/app-host';
 import { appRoutes } from '@luma/app-host/http';
+import type { SyncService } from '@luma/commerce-sync';
+import { syncRoutes } from '@luma/commerce-sync/http';
 import type { ConnectionManagement, ProviderCatalog } from '@luma/connections';
 import { connectionRoutes, createConnectors } from '@luma/connections/http';
 import type { CaseService } from '@luma/exceptions';
@@ -98,6 +100,7 @@ export interface AppDependencies {
   records?: RecordExplorer;
   inventory?: InventoryWorkspace;
   orders?: OrderWorkspace;
+  sync?: SyncService;
   metricEvents?: MetricEvents;
   apps?: AppService;
   appRegistry?: AppRegistry;
@@ -347,6 +350,7 @@ export function buildApp(
         records: recordRoutes(dependencies.records),
         inventory: inventoryRoutes(dependencies.inventory),
         orders: orderRoutes(dependencies.orders),
+        sync: syncRoutes(dependencies.sync),
       },
       routerApp,
       {

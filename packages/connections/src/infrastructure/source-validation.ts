@@ -35,6 +35,7 @@ export const sourceSchema = external
       'sku',
       'location',
       'product',
+      'customer',
     ]),
   })
   .strict();
@@ -48,7 +49,7 @@ const money = z
 const text = z.string().min(1).max(512);
 
 const observation = <T extends z.ZodTypeAny>(
-  resource: 'order' | 'sku' | 'fulfillment',
+  resource: 'order' | 'sku' | 'fulfillment' | 'product',
   data: T,
 ) =>
   z
@@ -164,6 +165,29 @@ export const commerceSchema = z.discriminatedUnion('capability', [
               .enum(['note_created_or_package_shipped', 'source_updated'])
               .optional(),
             failureCode: z.string().nullable(),
+          })
+          .strict(),
+      ),
+    })
+    .strict(),
+  z
+    .object({
+      capability: z.literal('products.read'),
+      observation: observation(
+        'product',
+        z
+          .object({
+            title: z.string().max(1024).nullable(),
+            status: z.enum(['active', 'archived', 'unknown']),
+            skus: z.array(
+              z
+                .object({
+                  id: external,
+                  code: z.string().max(1024).nullable(),
+                  unit,
+                })
+                .strict(),
+            ),
           })
           .strict(),
       ),

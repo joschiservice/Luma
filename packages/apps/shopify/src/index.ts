@@ -54,6 +54,8 @@ export { mapShopifyWebhook } from './infrastructure/webhooks.js';
 export function createShopifyProvider(
   options: Parameters<typeof createInstallationVerifier>[0] & {
     oauth?: ShopifyOAuth;
+    /** Offers customer reads; set only when Shopify approved protected customer data. */
+    customerAccess?: { contact: boolean; address: boolean };
   } = {},
 ): ConnectionProvider {
   return {
@@ -93,6 +95,9 @@ export function createShopifyProvider(
           (await runtime.installations.credential(context, id, capability))
             .credentials.token,
         recordObservations: runtime.recordObservations,
+        ...(options.customerAccess
+          ? { customerAccess: options.customerAccess }
+          : {}),
         ...(fetch ? { fetch } : {}),
       });
     },
@@ -141,7 +146,17 @@ export function createApp(context: AppFactoryContext): AppDefinition {
       ui: ['connections', 'settings', 'page', 'record', 'customers'],
       connectionTypes: [{ kind: 'shopify', name: 'Shopify' }],
     },
-    connector: createShopifyProvider(oauth ? { oauth } : {}),
+    connector: createShopifyProvider({
+      ...(oauth ? { oauth } : {}),
+      ...(context.env.SHOPIFY_PROTECTED_CUSTOMER_DATA_APPROVED === 'true'
+        ? {
+            customerAccess: {
+              contact: context.env.SHOPIFY_CUSTOMER_CONTACT_APPROVED === 'true',
+              address: context.env.SHOPIFY_CUSTOMER_ADDRESS_APPROVED === 'true',
+            },
+          }
+        : {}),
+    }),
     async uninstalled({ tenantId, transaction }) {
       if (config)
         await transaction.query(

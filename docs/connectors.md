@@ -15,6 +15,9 @@ The [installed connection guide](installed-connections.md) covers tenant setup, 
 | `fulfillment.read`  | Page query and optional order filter                             | Fulfillment lifecycle and line quantities      |
 | `fulfillment.retry` | Fulfillment external ID and expected revision                    | Accepted write receipt                         |
 | `products.read`     | Page query                                                       | Product status and SKU identities              |
+| `customers.read`    | Page query                                                       | Customer profile within approved field groups  |
+
+Handlers that list `filters: ['updatedSince']` in their descriptor accept `updatedSince` on page queries and return only records changed since then; others reject it. The first page of a scan may report `total`, the source's count of the whole collection (for progress only), and `history`, the earliest creation time the source shares with this connection and the permission that lifts the limit.
 
 Each key selects its own `CapabilityInput<K>` and `CapabilityOutput<K>`. V0 order writes cancel an order; they do not create orders or edit arbitrary provider fields. Adapters advertise only operations they can implement with these semantics. Adding a different operation requires a contract change.
 

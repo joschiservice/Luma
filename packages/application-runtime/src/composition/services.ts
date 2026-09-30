@@ -114,10 +114,12 @@ export function createCommerceServices(database: string | TenantDatabase) {
   const orders = createOrderProjections(db, (context, id) =>
     inventory.has(context, 'sku', id),
   );
-  const sources = createSourceRecords(db, (context, kind, id) =>
+  const sources = createSourceRecords(db, async (context, kind, id) =>
     kind === 'order' || kind === 'order_line' || kind === 'fulfillment'
       ? orders.has(context, kind, id)
-      : inventory.has(context, kind, id),
+      : kind === 'customer'
+        ? false
+        : inventory.has(context, kind, id),
   );
 
   return {
