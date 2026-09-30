@@ -234,7 +234,7 @@ order facts in their `infrastructure/adapter.ts`.
 
 Post-import order links use `apps/web/src/features/orders/identity-links.tsx` and the
 shared sync panel. `packages/commerce-ingestion/src/application/order-links.ts` re-keys
-children; orders owns retirement and redirects (migration `0047`). Read-model
+children; orders owns retirement and redirects (migration `0048`). Read-model
 `identity-references.ts` resolves retired order and child identities. See
 [Commerce sync](commerce-sync.md#links).
 
