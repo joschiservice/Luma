@@ -15,6 +15,9 @@ it('finds the destination that owns a workspace URL', () => {
   expect(destinationFor('/app/org/products/5a1d?view=differs').path).toBe(
     'products',
   );
+  expect(destinationFor('/app/org/returns/5a1d?stage=requested').path).toBe(
+    'returns',
+  );
   expect(destinationFor('/app/org/overview').path).toBe('home');
   expect(destinationFor('/app/org/connections').path).toBe('apps');
   expect(destinationFor('/app/org/unknown').path).toBe('home');

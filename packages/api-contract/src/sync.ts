@@ -8,6 +8,7 @@ export const syncRecordTypeSchema = z.enum([
   'products',
   'inventory',
   'customers',
+  'returns',
 ]);
 
 export const syncStatusSchema = z.enum([

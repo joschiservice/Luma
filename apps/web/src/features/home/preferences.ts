@@ -9,6 +9,7 @@ import {
   Package,
   Plug,
   ShoppingBag,
+  Undo2,
 } from 'lucide-react';
 import { z } from 'zod';
 
@@ -80,6 +81,13 @@ export const homeModules: Record<
       'SKUs whose store and ERP listings disagree, are missing or are not linked.',
     size: 'half',
     Icon: Package,
+  },
+  returns: {
+    title: 'Returns',
+    description:
+      'Return requests to review, returns ready to refund or close, and failed refund payments.',
+    size: 'half',
+    Icon: Undo2,
   },
 };
 

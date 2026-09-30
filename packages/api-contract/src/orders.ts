@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { returnListItemSchema } from './returns.js';
+
 const timestamp = z.string().datetime();
 
 export const orderStatusSchema = z.enum([
@@ -179,7 +181,7 @@ export const orderWorkflowRunSchema = z.object({
 
 export const orderHistoryEntrySchema = z.object({
   snapshotId: z.string().uuid(),
-  entityKind: z.enum(['order', 'fulfillment']),
+  entityKind: z.enum(['order', 'fulfillment', 'return', 'refund']),
   entityId: z.string().uuid(),
   connectionId: z.string().uuid(),
   status: z.string(),
@@ -206,6 +208,8 @@ export const orderDetailSchema = z.object({
   sources: z.array(orderSourceFactsSchema),
   differences: z.array(orderDifferenceSchema),
   fulfillments: z.array(orderFulfillmentSchema),
+  /** Returns, and refunds without a return, per source; money counts only from successful payments. */
+  returns: z.array(returnListItemSchema),
   issues: z.array(orderIssueSchema),
   workflows: z.array(orderWorkflowRunSchema),
   history: z.object({

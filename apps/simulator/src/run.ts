@@ -29,6 +29,17 @@ export const commandSchema = z.discriminatedUnion('kind', [
     id: orderId,
     shippingMethodId: z.enum(['7', '8', '9']),
   }),
+  z.object({ kind: z.literal('return'), id: orderId, quantity }),
+  z.object({ kind: z.literal('return-approve'), id: orderId }),
+  z.object({ kind: z.literal('return-decline'), id: orderId }),
+  z.object({ kind: z.literal('return-receive'), id: orderId }),
+  z.object({ kind: z.literal('return-close'), id: orderId }),
+  z.object({
+    kind: z.literal('refund'),
+    id: orderId,
+    outcome: z.enum(['success', 'pending', 'failure']),
+  }),
+  z.object({ kind: z.literal('refund-settle'), id: orderId }),
 ]);
 
 export const faultSchema = z
@@ -42,6 +53,7 @@ export const faultSchema = z
       'inventory.read',
       'inventory.available.reconcile',
       'fulfillment.read',
+      'returns.read',
       'orders.shipping-method.read',
       'orders.shipping-method.write',
     ]),
@@ -139,8 +151,16 @@ export function provisionOperationalStock(run: Run) {
 /** Applies the same provider command for manual inputs and scheduled merchant actions. */
 export function mutate(run: Run, instance: 'jtl' | 'shopify', input: unknown) {
   const command = commandSchema.parse(input);
-  if (instance === 'jtl') jtl.command(run.jtl, command, run.clock.now);
-  else {
+  if (instance === 'jtl') {
+    if (
+      command.kind !== 'order' &&
+      command.kind !== 'stock' &&
+      command.kind !== 'ship' &&
+      command.kind !== 'shipping-method'
+    )
+      throw new Error('JTL returns are not simulated');
+    jtl.command(run.jtl, command, run.clock.now);
+  } else {
     if (command.kind === 'shipping-method')
       throw new Error('Shopify shipping-method writes are unsupported');
     shopify.command(run.shopify, command, run.clock.now);

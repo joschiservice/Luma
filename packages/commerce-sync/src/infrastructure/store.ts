@@ -258,8 +258,8 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
               WHERE s.tenant_id=$1 AND NOT s.paused AND s.blocked IS NULL
                 AND (s.lease_until IS NULL OR s.lease_until < now())
                 AND (s.due_at <= now() OR s.hint_at <= now())
-                -- Fulfillments refer to orders, so their history waits for the order history.
-                AND NOT (s.record_type='fulfillments' AND s.phase='backfill' AND EXISTS (
+                -- Fulfillments and returns refer to orders, so their history waits for the order history.
+                AND NOT (s.record_type IN ('fulfillments','returns') AND s.phase='backfill' AND EXISTS (
                   SELECT 1 FROM commerce_sync_streams o WHERE o.tenant_id=s.tenant_id
                   AND o.connection_id=s.connection_id AND o.record_type='orders'
                   AND o.phase='backfill' AND o.blocked IS NULL))

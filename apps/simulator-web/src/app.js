@@ -276,9 +276,10 @@ $('#command').onsubmit = (event) => {
   const command = {
     kind: data.kind,
     ...(data.kind !== 'stock' ? { id: data.id } : {}),
-    ...(['stock', 'order'].includes(data.kind)
+    ...(['stock', 'order', 'return'].includes(data.kind)
       ? { quantity: Number(data.quantity) }
       : {}),
+    ...(data.kind === 'refund' ? { outcome: data.outcome } : {}),
     ...(data.kind === 'shipping-method'
       ? { shippingMethodId: data.shippingMethodId }
       : {}),

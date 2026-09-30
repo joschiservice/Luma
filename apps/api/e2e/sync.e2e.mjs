@@ -17,6 +17,7 @@ it('reports import progress and coverage, and lets only managers control syncs',
     'products',
     'inventory',
     'customers',
+    'returns',
   ]);
   expect(store.recordTypes[0]).toMatchObject({
     availability: 'granted',
@@ -30,6 +31,12 @@ it('reports import progress and coverage, and lets only managers control syncs',
   });
   expect(store.recordTypes[4]).toEqual({
     recordType: 'customers',
+    availability: 'not_requested',
+    stream: null,
+  });
+  // A connection set up before returns existed shows them as not requested.
+  expect(store.recordTypes[5]).toEqual({
+    recordType: 'returns',
     availability: 'not_requested',
     stream: null,
   });

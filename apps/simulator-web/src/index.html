@@ -140,6 +140,15 @@
                 <option value="shipping-method">
                   Change JTL shipping method
                 </option>
+                <optgroup label="Shopify returns">
+                  <option value="return">Request return</option>
+                  <option value="return-approve">Approve return</option>
+                  <option value="return-decline">Decline return</option>
+                  <option value="return-receive">Receive returned items</option>
+                  <option value="refund">Refund return</option>
+                  <option value="refund-settle">Settle pending refund</option>
+                  <option value="return-close">Close return</option>
+                </optgroup>
               </select></label
             ><label>Order ID<input name="id" value="100" required /></label
             ><label
@@ -153,6 +162,12 @@
                 <option value="7">Standard · 7</option>
                 <option value="8">Express · 8</option>
                 <option value="9">Pickup · 9</option>
+              </select></label
+            ><label
+              >Refund payment<select name="outcome">
+                <option value="success">Succeeds</option>
+                <option value="pending">Stays pending</option>
+                <option value="failure">Fails</option>
               </select></label
             ><button>Apply action</button>
           </form>
@@ -198,6 +213,7 @@
                 <option>inventory.read</option>
                 <option>inventory.available.reconcile</option>
                 <option>fulfillment.read</option>
+                <option>returns.read</option>
                 <option>orders.shipping-method.read</option>
                 <option>orders.shipping-method.write</option>
               </select></label

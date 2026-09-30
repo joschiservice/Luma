@@ -5,6 +5,8 @@ import type {
   OrderActivityReader,
   OrderDetail,
 } from '../../application/orders.js';
+import type { ReturnListItem } from '../../application/returns.js';
+import { itemColumns } from '../returns/list.js';
 import { readSourceFacts } from './detail-facts.js';
 import {
   readDirectRunIds,
@@ -123,6 +125,11 @@ export async function readDetail(
   const issueIds = issues.map((issue) => issue.id);
   const workflows = await readWorkflowRuns(tx, tenantId, refs, issueIds);
   const history = await readHistory(tx, tenantId, orderId);
+  const returns = await tx.query<ReturnListItem>(
+    `SELECT ${itemColumns} FROM orders_returns r WHERE r.tenant_id=$1 AND r.order_id=$2
+     ORDER BY r.requested_key DESC,r.entity_id LIMIT 50`,
+    [tenantId, orderId],
+  );
   const events = await activity.list(context, {
     from: new Date(Date.parse(asOf) - activityWindow).toISOString(),
     to: new Date(Date.parse(asOf) + 1).toISOString(),
@@ -167,6 +174,7 @@ export async function readDetail(
     sources,
     differences,
     fulfillments,
+    returns: returns.rows,
     issues,
     workflows,
     history,

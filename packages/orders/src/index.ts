@@ -4,7 +4,13 @@ export type {
   CommerceProjections,
   EntityKind,
   Projection,
+  RefundData,
+  ReturnData,
 } from './application/projections.js';
+
+export { stageGroups } from './domain/returns.js';
+
+export type { RefundState, ReturnStage, StageGroup } from './domain/returns.js';
 
 export { orderMetricDefinitions, orderMetricIds } from './domain/metrics.js';
 

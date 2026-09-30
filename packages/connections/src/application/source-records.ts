@@ -6,6 +6,8 @@ import type {
   Observation,
   OrderSnapshot,
   ProductSnapshot,
+  RefundSnapshot,
+  ReturnSnapshot,
   SourceIdentity,
 } from '../domain/capabilities.js';
 
@@ -19,7 +21,11 @@ export type CommerceObservation =
       capability: 'fulfillment.read';
       observation: Observation<FulfillmentSnapshot>;
     }
-  | { capability: 'products.read'; observation: Observation<ProductSnapshot> };
+  | { capability: 'products.read'; observation: Observation<ProductSnapshot> }
+  | {
+      capability: 'returns.read';
+      observation: Observation<ReturnSnapshot | RefundSnapshot>;
+    };
 
 /** A source identity's current mapping, with the evidence that established it. */
 export interface SourceMapping {

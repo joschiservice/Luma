@@ -83,3 +83,65 @@ it('persists inventory CAS receipts and refuses concurrent changes without overw
   });
   expect(stock(restored).available).toBe(90);
 });
+
+it('follows a return from request through receipt, refund attempts and close', () => {
+  const state = seed(0);
+  command(state, { kind: 'order', id: '5', quantity: 2 }, 1000);
+  expect(() =>
+    command(state, { kind: 'return', id: '5', quantity: 1 }, 1500),
+  ).toThrow('Ship the order first');
+  command(state, { kind: 'ship', id: '5' }, 2000);
+  command(state, { kind: 'return', id: '5', quantity: 1 }, 3000);
+  command(state, { kind: 'return-approve', id: '5' }, 4000);
+  command(state, { kind: 'return-receive', id: '5' }, 5000);
+  command(state, { kind: 'refund', id: '5', outcome: 'failure' }, 6000);
+  command(state, { kind: 'refund', id: '5', outcome: 'pending' }, 7000);
+  command(state, { kind: 'refund-settle', id: '5' }, 8000);
+  command(state, { kind: 'return-close', id: '5' }, 9000);
+  const read = (query: string, variables: Record<string, unknown>) =>
+    handle(state, {
+      url: 'https://test.myshopify.com/admin/api/2026-07/graphql.json',
+      method: 'POST',
+      headers: { 'x-shopify-access-token': 'synthetic' },
+      body: JSON.stringify({ query, variables }),
+    }).body as { data: Record<string, unknown> };
+  expect(
+    read(
+      'query LumaPage { page: orders(first: $first) { nodes { id returns(first: 1) { nodes { id } } refunds(first: 1) { id } } } }',
+      { first: 10 },
+    ).data,
+  ).toMatchObject({
+    page: {
+      nodes: [
+        {
+          id: 'gid://shopify/Order/5',
+          returns: { nodes: [{ id: 'gid://shopify/Return/5' }] },
+          refunds: [
+            { id: 'gid://shopify/Refund/501' },
+            { id: 'gid://shopify/Refund/502' },
+          ],
+        },
+      ],
+    },
+  });
+  expect(state.nodes['gid://shopify/Return/5']).toMatchObject({
+    status: 'CLOSED',
+    closedAt: new Date(9000).toISOString(),
+  });
+  const transactions = [
+    'gid://shopify/Refund/501',
+    'gid://shopify/Refund/502',
+  ].map(
+    (id) =>
+      read(
+        'query LumaChildren { node(id: $id) { ... on Refund { children: transactions(first: 100) { nodes { id } } } } }',
+        { id },
+      ).data,
+  );
+  expect(transactions).toMatchObject([
+    { node: { children: { nodes: [{ status: 'FAILURE' }] } } },
+    { node: { children: { nodes: [{ status: 'SUCCESS' }] } } },
+  ]);
+  // Received units return to stock.
+  expect(stock(state)).toMatchObject({ onHand: 99, available: 99 });
+});

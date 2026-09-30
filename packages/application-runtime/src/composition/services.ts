@@ -115,7 +115,11 @@ export function createCommerceServices(database: string | TenantDatabase) {
     inventory.has(context, 'sku', id),
   );
   const sources = createSourceRecords(db, async (context, kind, id) =>
-    kind === 'order' || kind === 'order_line' || kind === 'fulfillment'
+    kind === 'order' ||
+    kind === 'order_line' ||
+    kind === 'fulfillment' ||
+    kind === 'return' ||
+    kind === 'refund'
       ? orders.has(context, kind, id)
       : kind === 'customer'
         ? false

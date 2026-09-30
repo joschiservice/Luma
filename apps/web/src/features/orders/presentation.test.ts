@@ -70,6 +70,7 @@ const detail = (
   sources: [source()],
   differences: [],
   fulfillments: [],
+  returns: [],
   issues: [],
   ...overrides,
 });

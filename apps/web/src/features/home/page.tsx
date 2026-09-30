@@ -56,6 +56,7 @@ import {
   ConnectionsModule,
   HandlingModule,
   OutcomesModule,
+  ReturnsModule,
 } from './modules';
 import {
   defaultHome,
@@ -297,6 +298,8 @@ export function HomePage() {
         return <ActivityModule organizationId={organizationId} />;
       case 'catalog':
         return <CatalogModule organizationId={organizationId} />;
+      case 'returns':
+        return <ReturnsModule organizationId={organizationId} />;
     }
     if (!data)
       return (

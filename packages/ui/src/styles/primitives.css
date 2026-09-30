@@ -295,6 +295,10 @@
   --domain-color: var(--domain-products);
 }
 
+.lu-domain-icon[data-domain='returns'] {
+  --domain-color: var(--domain-returns);
+}
+
 .lu-domain-icon[data-domain='procurement'] {
   --domain-color: var(--domain-procurement);
 }

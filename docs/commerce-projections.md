@@ -8,7 +8,7 @@ ingestion and mapping require an owner or admin.
 
 ## Ingest and reconcile
 
-1. Pass an `orders.read`, `inventory.read` or `fulfillment.read` observation to
+1. Pass an `orders.read`, `inventory.read`, `fulfillment.read` or `returns.read` observation to
    `ingestion.ingest(context, ingestKey, input)`. Use a stable poll-run/page/item or
    provider event key on retries. A new poll uses a new key. The connection must
    belong to the tenant and be active or degraded.
@@ -64,6 +64,17 @@ finishes any remaining replay. Two entities that share a connection cannot be li
 A replay can return to a snapshot that already exists, for example after unlinking.
 The owner then makes that snapshot current again when it re-normalizes the current
 observation or when the source's projection was retired, and returns `applied`.
+
+## Returns and refunds
+
+`returns.read` observations carry a `return` or a `refund` (resource and `data.type` agree).
+Both project as orders-owner children of their order, with per-connection identities like
+fulfillments. Return lines refer to canonical order lines of the same connection, or to none
+for items the source did not tie to an order line; refund lines always refer to one. A
+refund's `returnId` must belong to the same order. Both use schema version 1 and normalizer
+`commerce/1`. The owner derives each return's stage and refund state and rebuilds the
+order's `orders_returns` rows in the projection transaction; see
+[Returns workspace](returns-workspace.md).
 
 ## Projection rules
 

@@ -170,7 +170,7 @@ export async function seedPilot(
             ? [
                 'products.read',
                 ...(provider === 'shopify'
-                  ? ['inventory.available.reconcile']
+                  ? ['inventory.available.reconcile', 'returns.read']
                   : []),
                 ...(provider === 'jtl'
                   ? [

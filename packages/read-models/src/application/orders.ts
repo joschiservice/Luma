@@ -1,5 +1,7 @@
 import type { TenantContext } from '@luma/identity';
 
+import type { ReturnListItem } from './returns.js';
+
 /** Fulfillment across an order's lines, from shipped, delivered or completed work of the same source. */
 export type FulfillmentState =
   'unfulfilled' | 'partial' | 'fulfilled' | 'not_required' | 'no_lines';
@@ -117,6 +119,8 @@ export interface OrderDetail {
     sourceUpdatedAt: string | null;
     lines: { orderLineId: string; quantity: string; unit: string }[];
   }[];
+  /** Returns, and refunds without a return, from every source of the order. */
+  returns: ReturnListItem[];
   issues: {
     id: string;
     class: string;
@@ -138,7 +142,7 @@ export interface OrderDetail {
   history: {
     entries: {
       snapshotId: string;
-      entityKind: 'order' | 'fulfillment';
+      entityKind: 'order' | 'fulfillment' | 'return' | 'refund';
       entityId: string;
       connectionId: string;
       status: string;

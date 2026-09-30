@@ -40,7 +40,39 @@ export function restoreTotalQuantities(state: ShopifyState): boolean {
 export type ShopifyCommand =
   | { kind: 'order'; id: string; quantity: number }
   | { kind: 'stock'; quantity: number; id?: string | undefined }
-  | { kind: 'ship'; id: string };
+  | { kind: 'ship'; id: string }
+  | ReturnCommand;
+
+/**
+ * Merchant and customer return steps for a shipped order. Each order has at most one
+ * return; every refund is a new Shopify refund with one payment attempt.
+ */
+type ReturnCommand =
+  | { kind: 'return'; id: string; quantity: number }
+  | {
+      kind:
+        | 'return-approve'
+        | 'return-decline'
+        | 'return-receive'
+        | 'return-close'
+        | 'refund-settle';
+      id: string;
+    }
+  | { kind: 'refund'; id: string; outcome: 'success' | 'pending' | 'failure' };
+
+const returnKinds = new Set<string>([
+  'return',
+  'return-approve',
+  'return-decline',
+  'return-receive',
+  'return-close',
+  'refund',
+  'refund-settle',
+]);
+
+/** Whether a command changes a return or refund rather than orders or stock. */
+const isReturnCommand = (value: ShopifyCommand): value is ReturnCommand =>
+  returnKinds.has(value.kind);
 const gid = (type: string, id = '1') => `gid://shopify/${type}/${id}`;
 
 // Simulated orders sell the seeded tote at a fixed shop-currency price.
@@ -156,6 +188,11 @@ export function command(
   command: ShopifyCommand,
   time: number,
 ) {
+  if (isReturnCommand(command)) {
+    returnCommand(state, command, time);
+
+    return;
+  }
   const updatedAt = new Date(time).toISOString();
   const level =
     state.nodes[
@@ -258,6 +295,179 @@ export function command(
   level.updatedAt = updatedAt;
 }
 
+/**
+ * Applies a return step with Shopify's return, reverse fulfillment and refund records.
+ * Receiving restocks the units at the order's location.
+ */
+function returnCommand(
+  state: ShopifyState,
+  command: ReturnCommand,
+  time: number,
+) {
+  const at = new Date(time).toISOString();
+  const orderId = gid('Order', command.id);
+  const order = state.nodes[orderId];
+  const shipmentLine = state.nodes[gid('FulfillmentLineItem', command.id)];
+  if (!order || !shipmentLine) throw new Error('Ship the order first');
+  const returnId = gid('Return', command.id);
+  const returned = state.nodes[returnId];
+  const returnLine = state.nodes[gid('ReturnLineItem', command.id)];
+  order.updatedAt = at;
+  if (command.kind === 'return') {
+    const shipped = shipmentLine.quantity as number;
+    if (returned) throw new Error('This order already has a return');
+    if (command.quantity < 1 || command.quantity > shipped)
+      throw new Error('Return at most the shipped quantity');
+    state.nodes[returnId] = {
+      id: returnId,
+      name: `${order.name as string}-R1`,
+      status: 'REQUESTED',
+      createdAt: at,
+      requestApprovedAt: null,
+      closedAt: null,
+      decline: null,
+    };
+    state.nodes[gid('ReturnLineItem', command.id)] = {
+      id: gid('ReturnLineItem', command.id),
+      quantity: command.quantity,
+      refundedQuantity: 0,
+      returnReasonDefinition: { name: 'Size too small' },
+      fulfillmentLineItem: {
+        id: shipmentLine.id,
+        lineItem: shipmentLine.lineItem,
+      },
+      withCodeDiscountedTotalPriceSet: {
+        shopMoney: {
+          amount: (command.quantity * unitPrice).toFixed(2),
+          currencyCode: 'EUR',
+        },
+      },
+    };
+    state.children[orderId] = {
+      ...state.children[orderId],
+      returns: [returnId],
+    };
+    state.children[returnId] = {
+      returnLineItems: [gid('ReturnLineItem', command.id)],
+      reverseFulfillmentOrders: [],
+    };
+
+    return;
+  }
+  if (!returned || !returnLine) throw new Error('Request a return first');
+  const quantity = returnLine.quantity as number;
+  if (command.kind === 'return-approve') {
+    if (returned.status !== 'REQUESTED')
+      throw new Error('Only a requested return can be approved');
+    returned.status = 'OPEN';
+    returned.requestApprovedAt = at;
+    const reverseId = gid('ReverseFulfillmentOrder', command.id);
+    const reverseLine = gid('ReverseFulfillmentOrderLineItem', command.id);
+    state.nodes[reverseId] = { id: reverseId, status: 'OPEN' };
+    state.nodes[reverseLine] = {
+      id: reverseLine,
+      totalQuantity: quantity,
+      fulfillmentLineItem: { id: shipmentLine.id },
+      dispositions: [],
+    };
+    state.children[returnId]!.reverseFulfillmentOrders = [reverseId];
+    state.children[reverseId] = { lineItems: [reverseLine] };
+  } else if (command.kind === 'return-decline') {
+    if (returned.status !== 'REQUESTED')
+      throw new Error('Only a requested return can be declined');
+    returned.status = 'DECLINED';
+    returned.decline = { reason: 'RETURN_PERIOD_ENDED' };
+    returned.closedAt = at;
+  } else if (command.kind === 'return-receive') {
+    const reverseLine =
+      state.nodes[gid('ReverseFulfillmentOrderLineItem', command.id)];
+    if (returned.status !== 'OPEN' || !reverseLine)
+      throw new Error('Approve the return first');
+    const dispositions = reverseLine.dispositions as unknown[];
+    if (dispositions.length) throw new Error('Items were already received');
+    dispositions.push({
+      id: gid('ReverseFulfillmentOrderDisposition', command.id),
+      type: 'RESTOCKED',
+      quantity,
+      createdAt: at,
+    });
+    state.nodes[gid('ReverseFulfillmentOrder', command.id)]!.status = 'CLOSED';
+    const level = state.nodes[gid('InventoryLevel')]!;
+    const values = level.quantities as { name: string; quantity: number }[];
+    for (const name of ['on_hand', 'available'])
+      values.find((value) => value.name === name)!.quantity += quantity;
+    level.updatedAt = at;
+  } else if (command.kind === 'return-close') {
+    if (returned.status !== 'OPEN')
+      throw new Error('Only an open return can be closed');
+    returned.status = 'CLOSED';
+    returned.closedAt = at;
+  } else if (command.kind === 'refund') {
+    if (returned.status === 'DECLINED' || returned.status === 'REQUESTED')
+      throw new Error('Approve the return before refunding it');
+    const refunds = (order.refunds ??= []) as Node[];
+    const refundId = gid('Refund', `${command.id}0${refunds.length + 1}`);
+    const amount = (quantity * unitPrice).toFixed(2);
+    const status = {
+      success: 'SUCCESS',
+      pending: 'PENDING',
+      failure: 'FAILURE',
+    }[command.outcome];
+    const refund = {
+      id: refundId,
+      createdAt: at,
+      updatedAt: at,
+      totalRefundedSet: {
+        shopMoney: {
+          amount: command.outcome === 'success' ? amount : '0.00',
+          currencyCode: 'EUR',
+        },
+      },
+      return: { id: returnId },
+    };
+    refunds.push(refund);
+    state.nodes[refundId] = refund;
+    const refundLine = gid('RefundLineItem', `${command.id}0${refunds.length}`);
+    const transaction = gid(
+      'OrderTransaction',
+      `${command.id}0${refunds.length}`,
+    );
+    state.nodes[refundLine] = {
+      id: refundLine,
+      quantity,
+      restockType: 'RETURN',
+      restocked: false,
+      lineItem: shipmentLine.lineItem,
+    };
+    state.nodes[transaction] = {
+      id: transaction,
+      kind: 'REFUND',
+      status,
+      processedAt: command.outcome === 'pending' ? null : at,
+      gateway: 'shopify_payments',
+      amountSet: { shopMoney: { amount, currencyCode: 'EUR' } },
+    };
+    state.children[refundId] = {
+      refundLineItems: [refundLine],
+      transactions: [transaction],
+    };
+    if (command.outcome !== 'failure') {
+      returnLine.refundedQuantity = quantity;
+      if (command.outcome === 'success')
+        order.displayFinancialStatus = 'REFUNDED';
+    }
+  } else {
+    const pending = ((order.refunds ?? []) as Node[])
+      .flatMap((refund) => state.children[refund.id]?.transactions ?? [])
+      .map((id) => state.nodes[id]!)
+      .find((transaction) => transaction.status === 'PENDING');
+    if (!pending) throw new Error('No refund payment is pending');
+    pending.status = 'SUCCESS';
+    pending.processedAt = at;
+    order.displayFinancialStatus = 'REFUNDED';
+  }
+}
+
 /** Identifies supported read operations and optional node targets. */
 export function identify(request: ProviderRequest) {
   const body = JSON.parse(request.body ?? '{}') as {
@@ -275,13 +485,17 @@ export function identify(request: ProviderRequest) {
   return {
     operation: query.includes('inventorySetQuantities')
       ? 'inventory.available.reconcile'
-      : /fulfillment|Fulfillment/.test(query)
-        ? 'fulfillment.read'
-        : /on Product|page:\s*products/.test(query)
-          ? 'products.read'
-          : /on InventoryItem|page:\s*inventoryItems/.test(query)
-            ? 'inventory.read'
-            : 'orders.read',
+      : /returns\(|refunds|on Return|on Refund|ReverseFulfillmentOrder/.test(
+            query,
+          )
+        ? 'returns.read'
+        : /fulfillment|Fulfillment/.test(query)
+          ? 'fulfillment.read'
+          : /on Product|page:\s*products/.test(query)
+            ? 'products.read'
+            : /on InventoryItem|page:\s*inventoryItems/.test(query)
+              ? 'inventory.read'
+              : 'orders.read',
     ...(resource ? { resource } : {}),
   };
 }
@@ -332,6 +546,7 @@ export function handle(
       'products',
       'inventory',
       'merchant_managed_fulfillment_orders',
+      'returns',
     ]
       .map((s) => ({ handle: `read_${s}` }))
       .concat([{ handle: 'write_inventory' }]),
@@ -387,9 +602,21 @@ export function handle(
       query,
     )?.[1] as keyof ShopifyState['roots'] | undefined;
 
-    return root
-      ? result({ page: page(state.roots[root], variables.first ?? 100) })
-      : json({ errors: [{ message: 'Unsupported query' }] }, 400);
+    if (!root) return json({ errors: [{ message: 'Unsupported query' }] }, 400);
+    const selected = page(state.roots[root], variables.first ?? 100);
+    // Order pages for returns report whether each order has returns or refunds.
+    if (root === 'orders' && query.includes('returns(first'))
+      selected.nodes = selected.nodes.map((order) => ({
+        ...order!,
+        returns: {
+          nodes: (state.children[order!.id]?.returns ?? []).map((id) => ({
+            id,
+          })),
+        },
+        refunds: (order!.refunds as Node[] | undefined) ?? [],
+      }));
+
+    return result({ page: selected });
   }
   if (query.includes('LumaInventoryCorrection')) {
     const error = (code: string) =>
@@ -510,7 +737,13 @@ export function handle(
       ? result({ node: { children: page(ids, 100) } })
       : json({ errors: [{ message: 'Unsupported field' }] }, 400);
   }
-  if (query.includes('LumaNode')) return result({ node });
+  if (query.includes('LumaNode'))
+    return result({
+      node:
+        node.id.startsWith('gid://shopify/Order/') && query.includes('refunds')
+          ? { ...node, refunds: node.refunds ?? [] }
+          : node,
+    });
 
   return json({ errors: [{ message: 'Unsupported query' }] }, 400);
 }

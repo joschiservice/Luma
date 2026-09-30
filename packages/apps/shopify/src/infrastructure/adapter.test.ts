@@ -50,6 +50,17 @@ function fixture(overrides: Partial<ShopifyConnectorOptions> = {}) {
       });
     if (query.includes('LumaCustomers'))
       return response({ page: page(data.customers) });
+    if (query.includes('LumaPage') && query.includes('returns(first: 1)'))
+      return response({
+        page: page([
+          {
+            id: data.order.id,
+            returns: { nodes: data.returns.map(({ id }) => ({ id })) },
+            refunds: data.refunds.map(({ id }) => ({ id })),
+          },
+          { id: 'gid://shopify/Order/2', returns: { nodes: [] }, refunds: [] },
+        ]),
+      });
     if (query.includes('LumaPage'))
       return response({
         page: page([
@@ -63,17 +74,29 @@ function fixture(overrides: Partial<ShopifyConnectorOptions> = {}) {
         ]),
       });
     if (query.includes('children:')) {
-      const nodes = query.includes('inventoryLevels(')
-        ? data.levels
-        : query.includes('variants(')
-          ? data.variants
-          : query.includes('fulfillmentOrders(')
-            ? data.work
-            : query.includes('fulfillmentLineItems(')
-              ? data.shipmentLines
-              : variables.id?.includes('/FulfillmentOrder/')
-                ? data.workLines
-                : data.orderLines;
+      const nodes = query.includes('children: returns(')
+        ? data.returns
+        : query.includes('returnLineItems(')
+          ? data.returnLines
+          : query.includes('reverseFulfillmentOrders(')
+            ? data.reverseOrders
+            : variables.id?.includes('/ReverseFulfillmentOrder/')
+              ? data.reverseLines
+              : query.includes('refundLineItems(')
+                ? data.refundLines
+                : query.includes('children: transactions(')
+                  ? data.refundTransactions
+                  : query.includes('inventoryLevels(')
+                    ? data.levels
+                    : query.includes('variants(')
+                      ? data.variants
+                      : query.includes('fulfillmentOrders(')
+                        ? data.work
+                        : query.includes('fulfillmentLineItems(')
+                          ? data.shipmentLines
+                          : variables.id?.includes('/FulfillmentOrder/')
+                            ? data.workLines
+                            : data.orderLines;
 
       return response({ node: { children: page(nodes) } });
     }
@@ -85,7 +108,9 @@ function fixture(overrides: Partial<ShopifyConnectorOptions> = {}) {
           ? data.product
           : query.includes('fulfillments {')
             ? { fulfillments: data.shipments }
-            : data.order,
+            : query.includes('refunds {')
+              ? { refunds: data.refunds }
+              : data.order,
     });
   });
   const accessToken = vi.fn().mockResolvedValue('private-token');
@@ -141,6 +166,7 @@ describe('Shopify read capabilities', () => {
       'products.read',
       'inventory.read',
       'fulfillment.read',
+      'returns.read',
     ]);
     const orders = await f.read('orders.read');
     expect(orders).toMatchObject({
@@ -716,7 +742,11 @@ describe('Shopify webhook refresh hints', () => {
   it('verifies original bytes and creates a scoped, stable refresh key without copying partial data', () => {
     const event = mapShopifyWebhook(options);
     expect(event).toEqual(mapShopifyWebhook(options));
-    expect(event?.capabilities).toEqual(['orders.read', 'fulfillment.read']);
+    expect(event?.capabilities).toEqual([
+      'orders.read',
+      'fulfillment.read',
+      'returns.read',
+    ]);
     expect(JSON.stringify(event)).not.toMatch(
       /private@example|9007199254740993/,
     );
@@ -736,6 +766,123 @@ describe('Shopify webhook refresh hints', () => {
     expect(() =>
       mapShopifyWebhook({ ...options, shop: 'other.myshopify.com' }),
     ).toThrow('authentication');
+  });
+});
+
+describe('Shopify returns and refunds', () => {
+  it('reads returns with receipts and refunds with payment outcomes, only for orders that have them', async () => {
+    const f = fixture();
+    const result = await f.read('returns.read');
+    expect(result).toMatchObject({ ok: true });
+    if (!result.ok) return;
+    const [returned, refund] = result.value.items;
+    expect(result.value.items).toHaveLength(2);
+    expect(returned).toMatchObject({
+      source: { resource: 'return', externalId: 'gid://shopify/Return/91' },
+      // Shopify reports no update time for returns; ordering uses the read time.
+      sourceUpdatedAt: null,
+      data: {
+        type: 'return',
+        order: ref(commerce.order.id),
+        name: '#1001-R1',
+        status: 'open',
+        requestedAt: '2026-09-18T09:00:00Z',
+        approvedAt: '2026-09-18T10:00:00Z',
+        declineReason: null,
+        receivedAt: '2026-09-19T08:00:00Z',
+        lines: [
+          {
+            orderLine: {
+              externalId: 'gid://shopify/LineItem/11',
+              scopeKey: commerce.order.id,
+            },
+            quantity: { amount: '2', unit: 'each' },
+            reason: 'Size too small',
+            // A missing unit was not received.
+            receivedQuantity: '1',
+            restockedQuantity: '1',
+            refundedQuantity: '1',
+            value: { amount: '29.00', currency: 'EUR' },
+          },
+          {
+            orderLine: null,
+            reason: null,
+            receivedQuantity: null,
+            restockedQuantity: null,
+            refundedQuantity: '0',
+            value: null,
+          },
+        ],
+      },
+    });
+    expect(refund).toMatchObject({
+      source: { resource: 'refund', externalId: 'gid://shopify/Refund/96' },
+      sourceUpdatedAt: '2026-09-19T10:05:00Z',
+      data: {
+        type: 'refund',
+        return: ref('gid://shopify/Return/91'),
+        total: { amount: '14.50', currency: 'EUR' },
+        lines: [
+          { quantity: { amount: '1' }, restock: 'return', restocked: true },
+        ],
+        // Sales are not refunds; awaiting a response is pending, not returned money.
+        transactions: [
+          { status: 'failed', amount: { amount: '14.50', currency: 'EUR' } },
+          { status: 'pending', processedAt: null },
+        ],
+      },
+    });
+    expect(
+      commerceSchema.safeParse({
+        capability: 'returns.read',
+        observation: {
+          ...returned,
+          source: {
+            ...returned!.source,
+            tenantId: crypto.randomUUID(),
+            connectionId: crypto.randomUUID(),
+          },
+          id: crypto.randomUUID(),
+        },
+      }).success,
+    ).toBe(true);
+    // The order without returns or refunds is not read further.
+    const bodies = f.fetch.mock.calls.map(([, init]) => String(init?.body));
+    expect(bodies.some((body) => body.includes('Order/2'))).toBe(false);
+  });
+
+  it('maps declined returns and unknown statuses without guessing', async () => {
+    const f = fixture();
+    const fallback = f.fetch.getMockImplementation()!;
+    const [returned] = commerce.returns;
+    f.fetch.mockImplementation(async (url, init) => {
+      const { query } = JSON.parse(String(init?.body));
+      if (query.includes('children: returns('))
+        return response({
+          node: {
+            children: page([
+              {
+                ...returned,
+                status: 'DECLINED',
+                decline: { reason: 'FINAL_SALE' },
+                closedAt: '2026-09-19T00:00:00Z',
+              },
+              { ...returned, id: 'gid://shopify/Return/90', status: 'NEW' },
+            ]),
+          },
+        });
+      if (query.includes('refunds {'))
+        return response({ node: { refunds: [] } });
+
+      return fallback(url, init);
+    });
+    const result = await f.read('returns.read');
+    expect(
+      result.ok && result.value.items.map((item) => item.data),
+    ).toMatchObject([
+      { status: 'declined', declineReason: 'final_sale' },
+      { status: 'unknown' },
+    ]);
   });
 });
 
@@ -839,6 +986,7 @@ describe('Shopify query contract', () => {
       'products.read',
       'inventory.read',
       'fulfillment.read',
+      'returns.read',
     ] as const) {
       expect(await f.read(capability)).toMatchObject({ ok: true });
       expect(
@@ -857,7 +1005,7 @@ describe('Shopify query contract', () => {
           (JSON.parse(String(init?.body)) as { query: string }).query,
       ),
     );
-    expect(operations.size).toBe(20);
+    expect(operations.size).toBe(29);
     for (const query of operations) {
       expect(
         validate(schema, parse(query)).map((error) => error.message),
