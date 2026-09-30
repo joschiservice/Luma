@@ -62,6 +62,82 @@ const listPrice = z
 
 const text = z.string().min(1).max(512);
 
+/** Optional fulfillment facts; each rule is repeated in the orders owner's snapshot schema. */
+const fulfillmentFacts = {
+  kind: z.enum(['fulfillment_order', 'shipment']).nullable().optional(),
+  holds: z
+    .array(
+      z
+        .object({
+          reason: z.enum([
+            'awaiting_payment',
+            'high_risk_of_fraud',
+            'incorrect_address',
+            'inventory_out_of_stock',
+            'unknown_delivery_date',
+            'awaiting_return_items',
+            'other',
+          ]),
+        })
+        .strict(),
+    )
+    .max(50)
+    .optional(),
+  location: z
+    .object({ id: external, name: text.nullable() })
+    .strict()
+    .nullable()
+    .optional(),
+  fulfillAt: timestamp.nullable().optional(),
+  fulfillBy: timestamp.nullable().optional(),
+  estimatedDeliveryAt: timestamp.nullable().optional(),
+  method: z
+    .object({
+      type: z.enum([
+        'shipping',
+        'pick_up',
+        'pickup_point',
+        'local',
+        'retail',
+        'none',
+        'unknown',
+      ]),
+      name: text.nullable(),
+    })
+    .strict()
+    .nullable()
+    .optional(),
+  tracking: z
+    .array(
+      z
+        .object({
+          carrier: text.nullable(),
+          number: text.nullable(),
+          url: z
+            .string()
+            .max(2048)
+            .url()
+            .regex(/^https?:\/\//i)
+            .nullable(),
+        })
+        .strict(),
+    )
+    .max(50)
+    .optional(),
+  delivery: z
+    .enum([
+      'label_created',
+      'in_transit',
+      'out_for_delivery',
+      'attempted_delivery',
+      'delayed',
+      'ready_for_pickup',
+      'delivered',
+      'failed',
+    ])
+    .nullable()
+    .optional(),
+};
 const count = decimal.refine((s) => !s.startsWith('-'));
 
 const returnData = z
@@ -253,6 +329,7 @@ export const commerceSchema = z.discriminatedUnion('capability', [
               .enum(['note_created_or_package_shipped', 'source_updated'])
               .optional(),
             failureCode: z.string().nullable(),
+            ...fulfillmentFacts,
           })
           .strict(),
       ),

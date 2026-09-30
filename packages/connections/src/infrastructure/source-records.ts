@@ -353,6 +353,9 @@ function evidenceIdentities(input: CommerceObservation) {
     });
     for (const line of input.observation.data.lines)
       refs.push({ ...source, ...line.orderLine, resource: 'order_line' });
+    const location = input.observation.data.location;
+    if (location)
+      refs.push({ ...source, ...location.id, resource: 'location' });
   }
   if (input.capability === 'returns.read') {
     const data = input.observation.data;

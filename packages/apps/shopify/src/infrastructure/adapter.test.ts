@@ -176,7 +176,7 @@ describe('Shopify read capabilities', () => {
         items: [
           {
             source: { provider: 'shopify', externalId: commerce.order.id },
-            adapterVersion: 'shopify/2',
+            adapterVersion: 'shopify/3',
             data: {
               paymentStatus: 'paid',
               placedAt: '2026-09-14T08:30:00Z',
@@ -232,6 +232,17 @@ describe('Shopify read capabilities', () => {
         ],
       },
     });
+    // A second fulfillment order is on hold, with one reason Luma does not name.
+    const work: Record<string, unknown>[] = f.data.work;
+    work.push({
+      ...commerce.work[0]!,
+      id: 'gid://shopify/FulfillmentOrder/52',
+      status: 'ON_HOLD',
+      fulfillmentHolds: [
+        { reason: 'INCORRECT_ADDRESS' },
+        { reason: 'ONLINE_STORE_POST_PURCHASE_CROSS_SELL' },
+      ],
+    });
     expect(await f.read('fulfillment.read')).toMatchObject({
       ok: true,
       value: {
@@ -240,13 +251,48 @@ describe('Shopify read capabilities', () => {
             source: { externalId: commerce.work[0]!.id },
             data: {
               status: 'processing',
+              kind: 'fulfillment_order',
+              holds: [],
+            },
+          },
+          {
+            source: { externalId: 'gid://shopify/FulfillmentOrder/52' },
+            data: {
+              status: 'pending',
+              kind: 'fulfillment_order',
               lines: [{ quantity: { amount: '2' } }],
               lastProgressAt: '2026-09-15T00:00:00Z',
+              holds: [{ reason: 'incorrect_address' }, { reason: 'other' }],
+              location: {
+                id: ref('gid://shopify/Location/41'),
+                name: 'Tokyo warehouse',
+              },
+              fulfillAt: null,
+              fulfillBy: '2026-09-18T00:00:00Z',
+              method: { type: 'shipping', name: 'Express' },
             },
           },
           {
             source: { externalId: commerce.shipments[0]!.id },
-            data: { status: 'shipped', lines: [{ quantity: { amount: '1' } }] },
+            data: {
+              status: 'shipped',
+              kind: 'shipment',
+              lines: [{ quantity: { amount: '1' } }],
+              location: {
+                id: ref('gid://shopify/Location/41'),
+                name: 'Tokyo warehouse',
+              },
+              estimatedDeliveryAt: '2026-09-17T00:00:00Z',
+              // Entries without a number or web link are not tracking.
+              tracking: [
+                {
+                  carrier: 'Yamato',
+                  number: '4521-8876-0012',
+                  url: 'https://tracking.example.test/4521-8876-0012',
+                },
+              ],
+              delivery: 'attempted_delivery',
+            },
           },
         ],
       },

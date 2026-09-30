@@ -103,7 +103,20 @@
     {
       "id": "gid://shopify/FulfillmentOrder/51",
       "updatedAt": "2026-09-15T00:00:00Z",
-      "status": "IN_PROGRESS"
+      "status": "IN_PROGRESS",
+      "fulfillAt": null,
+      "fulfillBy": "2026-09-18T00:00:00Z",
+      "fulfillmentHolds": [],
+      "assignedLocation": {
+        "name": "Tokyo warehouse",
+        "location": {
+          "id": "gid://shopify/Location/41"
+        }
+      },
+      "deliveryMethod": {
+        "methodType": "SHIPPING",
+        "presentedName": "Express"
+      }
     }
   ],
   "workLines": [
@@ -122,7 +135,25 @@
       "updatedAt": "2026-09-16T00:00:00Z",
       "status": "SUCCESS",
       "deliveredAt": null,
-      "inTransitAt": "2026-09-16T00:00:00Z"
+      "inTransitAt": "2026-09-16T00:00:00Z",
+      "displayStatus": "ATTEMPTED_DELIVERY",
+      "estimatedDeliveryAt": "2026-09-17T00:00:00Z",
+      "location": {
+        "id": "gid://shopify/Location/41",
+        "name": "Tokyo warehouse"
+      },
+      "trackingInfo": [
+        {
+          "company": "Yamato",
+          "number": "4521-8876-0012",
+          "url": "https://tracking.example.test/4521-8876-0012"
+        },
+        {
+          "company": "Yamato",
+          "number": null,
+          "url": "ftp://example.test"
+        }
+      ]
     }
   ],
   "shipmentLines": [

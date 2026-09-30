@@ -43,7 +43,13 @@ export interface JtlState {
     id: string;
     salesOrderId: string;
     deliveryNoteDate: string;
-    packages: { id: string; deliveryNoteId: string; shippingDate: string }[];
+    packages: {
+      id: string;
+      deliveryNoteId: string;
+      shippingDate: string;
+      trackingNumber?: string;
+      trackingUrl?: string;
+    }[];
   }[];
   noteLines: {
     id: string;
@@ -181,7 +187,13 @@ export function command(state: JtlState, command: JtlCommand, time: number) {
         salesOrderId: order.id,
         deliveryNoteDate: at,
         packages: [
-          { id: order.id, deliveryNoteId: order.id, shippingDate: at },
+          {
+            id: order.id,
+            deliveryNoteId: order.id,
+            shippingDate: at,
+            trackingNumber: `JJD${order.id.padStart(12, '0')}`,
+            trackingUrl: `https://tracking.example.test/JJD${order.id.padStart(12, '0')}`,
+          },
         ],
       });
       state.noteLines.push({

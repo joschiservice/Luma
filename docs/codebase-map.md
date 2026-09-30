@@ -305,11 +305,24 @@ Tests: Shopify and JTL adapter tests, the web `products` unit tests,
 `apps/api/e2e/products.e2e.mjs`, `products.browser.mjs` and `Products/Workspace` stories.
 See [Products workspace](products-workspace.md).
 
+## Fulfillment workspace
+
+Start at `packages/read-models/src/application/fulfillment.ts` for read contracts and
+`infrastructure/fulfillment` for the attention rules (`rules.ts`), list (`list.ts`) and detail
+(`detail.ts`). Orders maintains `orders_fulfillment_list` in `refreshFulfillmentList`
+(`packages/orders/src/infrastructure/fulfillment-list.ts`, migration `0044`); adapters fill
+fulfillment facts in their `fulfillment.read` handlers. API contracts are in
+`packages/api-contract/src/fulfillment.ts`; the frontend is `apps/web/src/features/fulfillment`,
+with source actions through the app `fulfillment` slot and the Fulfillment health module in
+`features/home/modules.tsx`. Tests: Shopify and JTL adapter tests, the web `fulfillment` unit
+tests, `apps/api/e2e/fulfillment.e2e.mjs`, `fulfillment.browser.mjs` and
+`Fulfillment/Workspace` stories. See [Fulfillment workspace](fulfillment-workspace.md).
+
 ## Returns workspace
 
 Returns and refunds are order children in `@luma/orders`: stage and money rules live in
 `packages/orders/src/domain/returns.ts`, and `infrastructure/return-list.ts` maintains
-`orders_returns` (migration `0044`) in the projection transaction. Shopify reads them in
+`orders_returns` (migration `0045`) in the projection transaction. Shopify reads them in
 `returns.read` (`packages/apps/shopify/src/infrastructure/adapter.ts`); commerce sync runs a
 `returns` stream. Reads are `packages/read-models/src/infrastructure/returns`
 (`list.ts`, `detail.ts`, `workspace.ts`) with the port in `application/returns.ts`; contracts
@@ -328,7 +341,7 @@ previews, approval and reference-only commands; composition is
 `infrastructure/fulfillment-recovery-provider.ts`; domain eligibility and progress
 rules are in `domain/fulfillment-recovery.ts`. Migration `0042` owns previews,
 revision claims and evidence. The UI is `web/fulfillment-recovery.tsx`, used by
-both the Shopify record browser and order context.
+the Shopify record browser, order context and the Fulfillment workspace's `fulfillment` slot.
 
 Tests: provider recovery tests, `apps/api/e2e/shopify-fulfillment.e2e.mjs` and the
 `Orders/Shopify fulfillment recovery` stories. See [Shopify fulfillment

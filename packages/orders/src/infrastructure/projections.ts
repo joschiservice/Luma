@@ -9,17 +9,22 @@ import type {
   CanonicalSnapshot,
   CommerceProjections,
 } from '../application/projections.js';
+import { refreshFulfillmentList } from './fulfillment-list.js';
 import { refreshOrderList } from './list-projection.js';
 import { refreshReturnList } from './return-list.js';
 import { snapshotSchema } from './validation.js';
 
 /**
- * Creates tenant-scoped order, fulfillment, return and refund projections, checking referenced SKUs through
- * the supplied lookup.
+ * Creates tenant-scoped order, fulfillment, return and refund projections, checking referenced
+ * SKUs and locations through the supplied inventory lookup.
  */
 export function createCommerceProjections(
   db: TenantDatabase,
-  skuExists: (context: TenantContext, id: string) => Promise<boolean>,
+  inventoryExists: (
+    context: TenantContext,
+    kind: 'sku' | 'location',
+    id: string,
+  ) => Promise<boolean>,
 ): CommerceProjections {
   return {
     async identify(context, kind, reconciliationKey) {
@@ -63,9 +68,21 @@ export function createCommerceProjections(
       const value = snapshotSchema.parse(input) as CanonicalSnapshot;
       if (value.data.type === 'order')
         for (const line of value.data.lines) {
-          if (line.skuId && !(await skuExists(context, line.skuId)))
+          if (
+            line.skuId &&
+            !(await inventoryExists(context, 'sku', line.skuId))
+          )
             throw new Error('Canonical SKU not found');
         }
+      const locationId =
+        value.data.type === 'fulfillment'
+          ? value.data.location?.locationId
+          : null;
+      if (
+        locationId &&
+        !(await inventoryExists(context, 'location', locationId))
+      )
+        throw new Error('Canonical location not found');
 
       return db.transaction(context.tenantId, async (tx) => {
         const tenant = context.tenantId;
@@ -266,6 +283,30 @@ export function createCommerceProjections(
           ).rows,
       );
     },
+    async locationDependents(context, locationId, connectionId) {
+      requireTenant(context, context.tenantId);
+      z.string().uuid().parse(locationId);
+      if (connectionId) z.string().uuid().parse(connectionId);
+
+      return db.transaction(
+        context.tenantId,
+        async (tx) =>
+          (
+            await tx.query<{
+              entityId: string;
+              connectionId: string;
+              observationId: string;
+            }>(
+              `SELECT f.entity_id AS "entityId",f.connection_id AS "connectionId",s.observation_id AS "observationId"
+              FROM orders_fulfillment_list f
+              JOIN orders_snapshots s ON s.tenant_id=f.tenant_id AND s.id=f.snapshot_id
+              WHERE f.tenant_id=$1 AND f.location_id=$2 AND ($3::uuid IS NULL OR f.connection_id=$3)
+              ORDER BY f.entity_id,f.connection_id`,
+              [context.tenantId, locationId, connectionId ?? null],
+            )
+          ).rows,
+      );
+    },
     async history(context, entityId) {
       requireTenant(context, context.tenantId);
 
@@ -350,12 +391,10 @@ async function refresh(
 
     return;
   }
-  await refreshOrderList(
-    tx,
-    tenantId,
-    [value.data.type === 'order' ? value.entityId : value.data.orderId],
-    value.data.type === 'order',
-  );
+  const orderId =
+    value.data.type === 'order' ? value.entityId : value.data.orderId;
+  await refreshOrderList(tx, tenantId, [orderId], value.data.type === 'order');
+  await refreshFulfillmentList(tx, tenantId, [orderId]);
   // Return rows show their order's number; keep it current when the order changes.
   if (value.data.type === 'order')
     await tx.query(

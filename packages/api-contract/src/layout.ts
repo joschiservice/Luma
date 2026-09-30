@@ -10,6 +10,7 @@ export const homeModuleIds = [
   'operational-metrics',
   'order-metrics',
   'catalog',
+  'fulfillment',
   'returns',
 ] as const;
 

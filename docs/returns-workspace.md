@@ -48,7 +48,7 @@ evidence only. Receipt that the source does not report stays null, and the UI sa
 
 ## Storage
 
-Migration `0044_returns_refunds.sql` allows the `return` and `refund` kinds, mappings and
+Migration `0045_returns_refunds.sql` allows the `return` and `refund` kinds, mappings and
 statuses, the `returns.read` read check and the `returns` sync record type, and adds
 `orders_returns`. The orders owner rebuilds an order's rows in that table in the same
 transaction as a return or refund projection pointer, and keeps each row's order number

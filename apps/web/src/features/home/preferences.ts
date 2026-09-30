@@ -9,6 +9,7 @@ import {
   Package,
   Plug,
   ShoppingBag,
+  Truck,
   Undo2,
 } from 'lucide-react';
 import { z } from 'zod';
@@ -81,6 +82,13 @@ export const homeModules: Record<
       'SKUs whose store and ERP listings disagree, are missing or are not linked.',
     size: 'half',
     Icon: Package,
+  },
+  fulfillment: {
+    title: 'Fulfillment health',
+    description:
+      'Fulfillment that is on hold, delayed or failed, and shipments in transit.',
+    size: 'half',
+    Icon: Truck,
   },
   returns: {
     title: 'Returns',

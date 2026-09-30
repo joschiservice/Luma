@@ -134,10 +134,19 @@ document; otherwise projection fails with `Snapshot identity conflict`.
   may carry `dueAt`, `placedAt`, `total` and line `skuCode`/`title`. Stored
   version 1 order documents stay valid and readable; they may already carry some
   of these fields. Product snapshots are version 2 and may carry listing facts.
-  Fulfillment and position snapshots are version 1.
+  Fulfillment snapshots are version 2 (normalizer `commerce/2`) and may carry kind,
+  holds, location, `fulfillAt`, `fulfillBy`, estimated delivery, delivery method,
+  tracking and carrier delivery state. Position snapshots are version 1.
 - Bump the normalizer version (`commerce/2` for orders) whenever the canonical
   document for an existing observation changes. Replay then stores a new snapshot
   beside the old one instead of conflicting with it.
+
+A fulfillment's location is an optional reference, like an order line's SKU: an unmapped
+source location stores its name with a null `locationId`, and linking locations replays the
+fulfillments assigned to them (`orders.locationDependents`). The orders owner keeps one
+`orders_fulfillment_list` row per current fulfillment projection with these facts in plain
+columns (migration `0044`), rewritten with the projection pointer; see the
+[Fulfillment workspace](fulfillment-workspace.md).
 
 Order lines and fulfillments have immutable canonical parent bindings. Fulfillment
 lines must occur in the same connection's order projection and use its units.

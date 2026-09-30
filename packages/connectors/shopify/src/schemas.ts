@@ -100,10 +100,31 @@ export const level = z.object({
   ),
 });
 
+const optionalTime = timestamp.nullable().optional().catch(null);
+
+const optionalText = z.string().nullable().optional().catch(null);
+
 export const fulfillmentOrder = z.object({
   id: gid('FulfillmentOrder'),
   updatedAt: timestamp,
   status: z.string(),
+  // Holds decide whether work is blocked, so a malformed list fails the read.
+  fulfillmentHolds: z.array(z.object({ reason: z.string() })).optional(),
+  assignedLocation: z
+    .object({
+      name: optionalText,
+      location: z.object({ id: gid('Location') }).nullable(),
+    })
+    .nullable()
+    .optional()
+    .catch(null),
+  fulfillAt: optionalTime,
+  fulfillBy: optionalTime,
+  deliveryMethod: z
+    .object({ methodType: z.string(), presentedName: optionalText })
+    .nullable()
+    .optional()
+    .catch(null),
 });
 
 export const fulfillmentOrderLine = z.object({
@@ -118,6 +139,23 @@ export const fulfillment = z.object({
   status: z.string(),
   deliveredAt: timestamp.nullable(),
   inTransitAt: timestamp.nullable(),
+  displayStatus: optionalText,
+  estimatedDeliveryAt: optionalTime,
+  location: z
+    .object({ id: gid('Location'), name: optionalText })
+    .nullable()
+    .optional()
+    .catch(null),
+  trackingInfo: z
+    .array(
+      z.object({
+        company: optionalText,
+        number: optionalText,
+        url: optionalText,
+      }),
+    )
+    .optional()
+    .catch([]),
 });
 
 export const fulfillmentLine = z.object({

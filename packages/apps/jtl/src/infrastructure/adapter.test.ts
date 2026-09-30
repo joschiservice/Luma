@@ -125,7 +125,7 @@ describe('JTL read adapter', () => {
             {
               source: { provider: 'jtl', externalId: key(10) },
               sourceUpdatedAt: null,
-              adapterVersion: 'jtl/2',
+              adapterVersion: 'jtl/3',
               data: {
                 status: 'open',
                 paymentStatus: 'paid',
@@ -188,14 +188,25 @@ describe('JTL read adapter', () => {
               sourceUpdatedAt: null,
               data: {
                 status: 'shipped',
+                kind: 'shipment',
                 lines: [{ quantity: { amount: '1.5', unit: 'each' } }],
+                tracking: [
+                  {
+                    carrier: null,
+                    number: '00340434161094042557',
+                    url: 'https://tracking.example.test/00340434161094042557',
+                  },
+                ],
               },
             },
             {
               sourceUpdatedAt: null,
+              // Blank numbers and non-web links are not tracking.
               data: {
                 status: 'processing',
+                kind: 'shipment',
                 lines: [{ quantity: { amount: '2' } }],
+                tracking: [],
               },
             },
           ],

@@ -145,6 +145,64 @@ export interface FulfillmentSnapshot {
   lastProgressAt: string | null;
   progressBasis?: 'note_created_or_package_shipped' | 'source_updated';
   failureCode: string | null;
+  /**
+   * Work to fulfill (such as a Shopify fulfillment order) or a shipment that left a location.
+   * Omit when the adapter does not distinguish them.
+   */
+  kind?: FulfillmentKind | null;
+  /** Holds that stop the work; empty when none. Omit when the adapter does not read holds. */
+  holds?: { reason: FulfillmentHoldReason }[];
+  /** The assigned or shipping location. The name is descriptive only. */
+  location?: { id: ExternalId; name: string | null } | null;
+  /** The source schedules the work to start at this time. */
+  fulfillAt?: string | null;
+  /** The source's deadline for fulfilling the work. */
+  fulfillBy?: string | null;
+  /** The carrier's or source's delivery estimate for a shipment. */
+  estimatedDeliveryAt?: string | null;
+  /** How the customer receives the items, with the method name shown at checkout. */
+  method?: { type: FulfillmentMethodType; name: string | null } | null;
+  /** Carrier tracking for a shipment. Entries may lack a number or link. */
+  tracking?: FulfillmentTracking[];
+  /** The latest carrier-reported delivery state of a shipment; null when none is reported. */
+  delivery?: FulfillmentDelivery | null;
+}
+
+export type FulfillmentKind = 'fulfillment_order' | 'shipment';
+
+export type FulfillmentHoldReason =
+  | 'awaiting_payment'
+  | 'high_risk_of_fraud'
+  | 'incorrect_address'
+  | 'inventory_out_of_stock'
+  | 'unknown_delivery_date'
+  | 'awaiting_return_items'
+  | 'other';
+
+export type FulfillmentMethodType =
+  | 'shipping'
+  | 'pick_up'
+  | 'pickup_point'
+  | 'local'
+  | 'retail'
+  | 'none'
+  | 'unknown';
+
+export type FulfillmentDelivery =
+  | 'label_created'
+  | 'in_transit'
+  | 'out_for_delivery'
+  | 'attempted_delivery'
+  | 'delayed'
+  | 'ready_for_pickup'
+  | 'delivered'
+  | 'failed';
+
+export interface FulfillmentTracking {
+  carrier: string | null;
+  number: string | null;
+  /** An absolute http(s) tracking link. */
+  url: string | null;
 }
 
 /**

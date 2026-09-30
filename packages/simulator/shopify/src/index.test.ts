@@ -43,6 +43,33 @@ it('maintains independent Shopify resources and cursor pages', () => {
   expect(other.roots.orders).toEqual([]);
 });
 
+it('holds and releases fulfillment work without changing stock', () => {
+  const state = seed(0);
+  command(state, { kind: 'order', id: '5', quantity: 1 }, 1000);
+  const before = structuredClone(state.nodes['gid://shopify/InventoryLevel/1']);
+  command(state, { kind: 'hold', id: '5', reason: 'INCORRECT_ADDRESS' }, 2000);
+  expect(state.nodes['gid://shopify/FulfillmentOrder/5']).toMatchObject({
+    status: 'ON_HOLD',
+    updatedAt: new Date(2000).toISOString(),
+    fulfillmentHolds: [{ reason: 'INCORRECT_ADDRESS' }],
+    assignedLocation: { location: { id: 'gid://shopify/Location/1' } },
+  });
+  expect(() => command(state, { kind: 'ship', id: '5' }, 2500)).toThrow(
+    'Release the fulfillment hold before shipping',
+  );
+  command(state, { kind: 'release', id: '5' }, 3000);
+  expect(state.nodes['gid://shopify/FulfillmentOrder/5']).toMatchObject({
+    status: 'OPEN',
+    fulfillmentHolds: [],
+  });
+  expect(state.nodes['gid://shopify/InventoryLevel/1']).toEqual(before);
+  command(state, { kind: 'ship', id: '5' }, 4000);
+  expect(state.nodes['gid://shopify/Fulfillment/5']).toMatchObject({
+    displayStatus: 'IN_TRANSIT',
+    trackingInfo: [{ company: 'DHL', number: '003404340000000005' }],
+  });
+});
+
 it('persists inventory CAS receipts and refuses concurrent changes without overwriting them', () => {
   const state = seed(Date.now());
   const input = {

@@ -7,7 +7,7 @@ export * from '@luma/connector-shopify/schemas';
  * Version of this adapter's normalized output, recorded as observation provenance. Bump it
  * whenever the same provider response would normalize differently.
  */
-export const adapterVersion = 'shopify/2';
+export const adapterVersion = 'shopify/3';
 
 const externalId = z
   .object({ externalId: z.string().min(1), scopeKey: z.string() })
@@ -243,6 +243,65 @@ export const outputs = {
           .enum(['note_created_or_package_shipped', 'source_updated'])
           .optional(),
         failureCode: z.string().nullable(),
+        kind: z.enum(['fulfillment_order', 'shipment']),
+        holds: z
+          .array(
+            z.object({
+              reason: z.enum([
+                'awaiting_payment',
+                'high_risk_of_fraud',
+                'incorrect_address',
+                'inventory_out_of_stock',
+                'unknown_delivery_date',
+                'awaiting_return_items',
+                'other',
+              ]),
+            }),
+          )
+          .optional(),
+        location: z
+          .object({ id: externalId, name: z.string().min(1).nullable() })
+          .nullable(),
+        fulfillAt: timestamp.nullable().optional(),
+        fulfillBy: timestamp.nullable().optional(),
+        estimatedDeliveryAt: timestamp.nullable().optional(),
+        method: z
+          .object({
+            type: z.enum([
+              'shipping',
+              'pick_up',
+              'pickup_point',
+              'local',
+              'retail',
+              'none',
+              'unknown',
+            ]),
+            name: z.string().min(1).nullable(),
+          })
+          .nullable()
+          .optional(),
+        tracking: z
+          .array(
+            z.object({
+              carrier: z.string().min(1).nullable(),
+              number: z.string().min(1).nullable(),
+              url: z.string().url().nullable(),
+            }),
+          )
+          .optional(),
+        delivery: z
+          .enum([
+            'label_created',
+            'in_transit',
+            'out_for_delivery',
+            'attempted_delivery',
+            'delayed',
+            'ready_for_pickup',
+            'delivered',
+            'failed',
+          ])
+          .nullable()
+          .optional(),
       }),
     ),
   ),

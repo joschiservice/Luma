@@ -111,8 +111,8 @@ export function createDetectionServices(
 export function createCommerceServices(database: string | TenantDatabase) {
   const { db, close } = serviceDatabase(database);
   const inventory = createInventoryProjections(db);
-  const orders = createOrderProjections(db, (context, id) =>
-    inventory.has(context, 'sku', id),
+  const orders = createOrderProjections(db, (context, kind, id) =>
+    inventory.has(context, kind, id),
   );
   const sources = createSourceRecords(db, async (context, kind, id) =>
     kind === 'order' ||

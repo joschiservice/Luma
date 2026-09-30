@@ -644,6 +644,14 @@ export function RecordDetailPage() {
                   >
                     Open in Orders <ArrowRight size={14} />
                   </Link>
+                ) : record.kind === 'fulfillment' ? (
+                  <Link
+                    to="/app/$organizationId/fulfillment/$fulfillmentId"
+                    params={{ organizationId, fulfillmentId: record.id }}
+                    className="record-action"
+                  >
+                    Open in Fulfillment <ArrowRight size={14} />
+                  </Link>
                 ) : null}
               </section>
             </aside>

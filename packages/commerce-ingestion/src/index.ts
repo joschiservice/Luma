@@ -20,7 +20,7 @@ const normalizers = {
   inventory: 'commerce/1',
   product: 'commerce/2',
   order: 'commerce/2',
-  fulfillment: 'commerce/1',
+  fulfillment: 'commerce/2',
   return: 'commerce/1',
   refund: 'commerce/1',
 } as const;
@@ -292,6 +292,10 @@ export function createCommerceIngestion(
           unit: line.quantity.unit,
         });
     }
+    // An unknown location does not prevent storing fulfillment facts.
+    const locationId = data.location
+      ? await lookup({ ...o.source, ...data.location.id, resource: 'location' })
+      : null;
     if (!entityId || !orderId || missing.length)
       return { status: 'pending', missing };
     const parent = (await orders.current(context, orderId)).find(
@@ -316,13 +320,21 @@ export function createCommerceIngestion(
       throw new Error(
         'Fulfillment line must belong to its order and use the same unit',
       );
+    const optional = <K extends keyof typeof data>(key: K) =>
+      data[key] === undefined ? {} : { [key]: data[key] };
     const status = await orders.project(context, {
       ...provenance,
+      schemaVersion: 2,
       normalizerVersion: normalizers.fulfillment,
       entityId,
       kind: 'fulfillment',
       mappingVersion: digest(
-        JSON.stringify([entityId, orderId, lines.map((l) => l.orderLineId)]),
+        JSON.stringify([
+          entityId,
+          orderId,
+          lines.map((l) => l.orderLineId),
+          locationId,
+        ]),
       ),
       data: {
         type: 'fulfillment',
@@ -331,6 +343,21 @@ export function createCommerceIngestion(
         lastProgressAt: data.lastProgressAt,
         failureCode: data.failureCode,
         lines,
+        ...optional('kind'),
+        ...optional('holds'),
+        ...(data.location === undefined
+          ? {}
+          : {
+              location: data.location
+                ? { locationId, name: data.location.name }
+                : null,
+            }),
+        ...optional('fulfillAt'),
+        ...optional('fulfillBy'),
+        ...optional('estimatedDeliveryAt'),
+        ...optional('method'),
+        ...optional('tracking'),
+        ...optional('delivery'),
       },
     });
 
@@ -531,6 +558,13 @@ export function createCommerceIngestion(
     if (kind === 'sku')
       for (const item of await orders.skuDependents(context, id, connectionId))
         await replay(item.connectionId, item.observationId);
+    if (kind === 'location')
+      for (const item of await orders.locationDependents(
+        context,
+        id,
+        connectionId,
+      ))
+        await replay(item.connectionId, item.observationId);
   }
 }
 
@@ -573,6 +607,8 @@ function identities(input: CommerceObservation): SourceIdentity[] {
     add('order', input.observation.data.order);
     for (const line of input.observation.data.lines)
       add('order_line', line.orderLine);
+    if (input.observation.data.location)
+      add('location', input.observation.data.location.id);
   }
   if (input.capability === 'returns.read') {
     const data = input.observation.data;

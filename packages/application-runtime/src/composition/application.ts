@@ -23,6 +23,7 @@ import {
   createProcurementMetricReader,
 } from '@luma/procurement/composition';
 import {
+  createFulfillmentWorkspace,
   createInventoryWorkspace,
   createOperationalMetrics,
   createOperationalSummary,
@@ -103,6 +104,7 @@ export interface ApplicationServices {
     records: ReturnType<typeof createRecordExplorer>;
     inventory: ReturnType<typeof createInventoryWorkspace>;
     products: ReturnType<typeof createProductWorkspace>;
+    fulfillment: ReturnType<typeof createFulfillmentWorkspace>;
     returns: ReturnType<typeof createReturnWorkspace>;
     orders: ReturnType<typeof createOrderWorkspace>;
   };
@@ -235,6 +237,11 @@ export function createApplicationServices(
     codeProcesses,
     drafts.blockers,
   );
+  const orderQueries = {
+    state: orderStateQueries,
+    attention: orderAttentionQuery,
+    attentionFor: orderAttentionForOrders,
+  };
 
   return {
     codeProcesses,
@@ -283,11 +290,13 @@ export function createApplicationServices(
       records: createRecordExplorer(database),
       orders: createOrderWorkspace(
         database,
-        {
-          state: orderStateQueries,
-          attention: orderAttentionQuery,
-          attentionFor: orderAttentionForOrders,
-        },
+        orderQueries,
+        createActivityStore,
+        identity.refreshContext,
+      ),
+      fulfillment: createFulfillmentWorkspace(
+        database,
+        orderQueries,
         createActivityStore,
         identity.refreshContext,
       ),

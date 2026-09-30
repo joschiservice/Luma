@@ -56,6 +56,7 @@ export async function readIssues(
       SELECT 'order',$2::text,NULL::text
       UNION ALL SELECT 'order',m.external_id,m.connection_id::text FROM connector_source_mappings m
        WHERE m.tenant_id=$1 AND m.resource='order' AND m.canonical_id=$2::uuid
+      UNION ALL SELECT 'fulfillment',id::text,NULL FROM unnest($3::uuid[]) id
       UNION ALL SELECT 'fulfillment',m.external_id,m.connection_id::text FROM connector_source_mappings m
        WHERE m.tenant_id=$1 AND m.resource='fulfillment' AND m.scope_key='' AND m.canonical_id=ANY($3::uuid[])
       UNION ALL SELECT 'sku',id,NULL FROM unnest($4::text[]) id

@@ -32,6 +32,8 @@ import { Route as AppWorkspacesNewRouteImport } from './routes/app.workspaces.ne
 import { Route as AppOrganizationIdAppsIndexRouteImport } from './routes/app.$organizationId.apps.index'
 import { Route as AppOrganizationIdAppsAppIdRouteImport } from './routes/app.$organizationId.apps.$appId'
 import { Route as AppOrganizationIdExceptionsExceptionIdRouteImport } from './routes/app.$organizationId.exceptions.$exceptionId'
+import { Route as AppOrganizationIdFulfillmentIndexRouteImport } from './routes/app.$organizationId.fulfillment.index'
+import { Route as AppOrganizationIdFulfillmentFulfillmentIdRouteImport } from './routes/app.$organizationId.fulfillment.$fulfillmentId'
 import { Route as AppOrganizationIdInventoryIndexRouteImport } from './routes/app.$organizationId.inventory.index'
 import { Route as AppOrganizationIdInventoryPositionIdRouteImport } from './routes/app.$organizationId.inventory.$positionId'
 import { Route as AppOrganizationIdOrdersIndexRouteImport } from './routes/app.$organizationId.orders.index'
@@ -179,6 +181,18 @@ const AppOrganizationIdExceptionsExceptionIdRoute =
     id: '/$exceptionId',
     path: '/$exceptionId',
     getParentRoute: () => AppOrganizationIdExceptionsRoute,
+  } as any)
+const AppOrganizationIdFulfillmentIndexRoute =
+  AppOrganizationIdFulfillmentIndexRouteImport.update({
+    id: '/fulfillment/',
+    path: '/fulfillment/',
+    getParentRoute: () => AppOrganizationIdRoute,
+  } as any)
+const AppOrganizationIdFulfillmentFulfillmentIdRoute =
+  AppOrganizationIdFulfillmentFulfillmentIdRouteImport.update({
+    id: '/fulfillment/$fulfillmentId',
+    path: '/fulfillment/$fulfillmentId',
+    getParentRoute: () => AppOrganizationIdRoute,
   } as any)
 const AppOrganizationIdInventoryIndexRoute =
   AppOrganizationIdInventoryIndexRouteImport.update({
@@ -342,6 +356,7 @@ export interface FileRoutesByFullPath {
   '/app/workspaces/': typeof AppWorkspacesIndexRoute
   '/app/$organizationId/apps/$appId': typeof AppOrganizationIdAppsAppIdRoute
   '/app/$organizationId/exceptions/$exceptionId': typeof AppOrganizationIdExceptionsExceptionIdRoute
+  '/app/$organizationId/fulfillment/$fulfillmentId': typeof AppOrganizationIdFulfillmentFulfillmentIdRoute
   '/app/$organizationId/inventory/$positionId': typeof AppOrganizationIdInventoryPositionIdRoute
   '/app/$organizationId/orders/$orderId': typeof AppOrganizationIdOrdersOrderIdRoute
   '/app/$organizationId/playbooks/$definitionId': typeof AppOrganizationIdPlaybooksDefinitionIdRoute
@@ -353,6 +368,7 @@ export interface FileRoutesByFullPath {
   '/app/$organizationId/workflows/new': typeof AppOrganizationIdWorkflowsNewRoute
   '/app/invitations/$organizationId/$invitationId': typeof AppInvitationsOrganizationIdInvitationIdRoute
   '/app/$organizationId/apps/': typeof AppOrganizationIdAppsIndexRoute
+  '/app/$organizationId/fulfillment/': typeof AppOrganizationIdFulfillmentIndexRoute
   '/app/$organizationId/inventory/': typeof AppOrganizationIdInventoryIndexRoute
   '/app/$organizationId/orders/': typeof AppOrganizationIdOrdersIndexRoute
   '/app/$organizationId/playbooks/': typeof AppOrganizationIdPlaybooksIndexRoute
@@ -389,6 +405,7 @@ export interface FileRoutesByTo {
   '/app/workspaces': typeof AppWorkspacesIndexRoute
   '/app/$organizationId/apps/$appId': typeof AppOrganizationIdAppsAppIdRoute
   '/app/$organizationId/exceptions/$exceptionId': typeof AppOrganizationIdExceptionsExceptionIdRoute
+  '/app/$organizationId/fulfillment/$fulfillmentId': typeof AppOrganizationIdFulfillmentFulfillmentIdRoute
   '/app/$organizationId/inventory/$positionId': typeof AppOrganizationIdInventoryPositionIdRoute
   '/app/$organizationId/orders/$orderId': typeof AppOrganizationIdOrdersOrderIdRoute
   '/app/$organizationId/playbooks/$definitionId': typeof AppOrganizationIdPlaybooksDefinitionIdRoute
@@ -400,6 +417,7 @@ export interface FileRoutesByTo {
   '/app/$organizationId/workflows/new': typeof AppOrganizationIdWorkflowsNewRoute
   '/app/invitations/$organizationId/$invitationId': typeof AppInvitationsOrganizationIdInvitationIdRoute
   '/app/$organizationId/apps': typeof AppOrganizationIdAppsIndexRoute
+  '/app/$organizationId/fulfillment': typeof AppOrganizationIdFulfillmentIndexRoute
   '/app/$organizationId/inventory': typeof AppOrganizationIdInventoryIndexRoute
   '/app/$organizationId/orders': typeof AppOrganizationIdOrdersIndexRoute
   '/app/$organizationId/playbooks': typeof AppOrganizationIdPlaybooksIndexRoute
@@ -438,6 +456,7 @@ export interface FileRoutesById {
   '/app/workspaces/': typeof AppWorkspacesIndexRoute
   '/app/$organizationId/apps/$appId': typeof AppOrganizationIdAppsAppIdRoute
   '/app/$organizationId/exceptions/$exceptionId': typeof AppOrganizationIdExceptionsExceptionIdRoute
+  '/app/$organizationId/fulfillment/$fulfillmentId': typeof AppOrganizationIdFulfillmentFulfillmentIdRoute
   '/app/$organizationId/inventory/$positionId': typeof AppOrganizationIdInventoryPositionIdRoute
   '/app/$organizationId/orders/$orderId': typeof AppOrganizationIdOrdersOrderIdRoute
   '/app/$organizationId/playbooks/$definitionId': typeof AppOrganizationIdPlaybooksDefinitionIdRoute
@@ -449,6 +468,7 @@ export interface FileRoutesById {
   '/app/$organizationId/workflows/new': typeof AppOrganizationIdWorkflowsNewRoute
   '/app/invitations/$organizationId/$invitationId': typeof AppInvitationsOrganizationIdInvitationIdRoute
   '/app/$organizationId/apps/': typeof AppOrganizationIdAppsIndexRoute
+  '/app/$organizationId/fulfillment/': typeof AppOrganizationIdFulfillmentIndexRoute
   '/app/$organizationId/inventory/': typeof AppOrganizationIdInventoryIndexRoute
   '/app/$organizationId/orders/': typeof AppOrganizationIdOrdersIndexRoute
   '/app/$organizationId/playbooks/': typeof AppOrganizationIdPlaybooksIndexRoute
@@ -488,6 +508,7 @@ export interface FileRouteTypes {
     | '/app/workspaces/'
     | '/app/$organizationId/apps/$appId'
     | '/app/$organizationId/exceptions/$exceptionId'
+    | '/app/$organizationId/fulfillment/$fulfillmentId'
     | '/app/$organizationId/inventory/$positionId'
     | '/app/$organizationId/orders/$orderId'
     | '/app/$organizationId/playbooks/$definitionId'
@@ -499,6 +520,7 @@ export interface FileRouteTypes {
     | '/app/$organizationId/workflows/new'
     | '/app/invitations/$organizationId/$invitationId'
     | '/app/$organizationId/apps/'
+    | '/app/$organizationId/fulfillment/'
     | '/app/$organizationId/inventory/'
     | '/app/$organizationId/orders/'
     | '/app/$organizationId/playbooks/'
@@ -535,6 +557,7 @@ export interface FileRouteTypes {
     | '/app/workspaces'
     | '/app/$organizationId/apps/$appId'
     | '/app/$organizationId/exceptions/$exceptionId'
+    | '/app/$organizationId/fulfillment/$fulfillmentId'
     | '/app/$organizationId/inventory/$positionId'
     | '/app/$organizationId/orders/$orderId'
     | '/app/$organizationId/playbooks/$definitionId'
@@ -546,6 +569,7 @@ export interface FileRouteTypes {
     | '/app/$organizationId/workflows/new'
     | '/app/invitations/$organizationId/$invitationId'
     | '/app/$organizationId/apps'
+    | '/app/$organizationId/fulfillment'
     | '/app/$organizationId/inventory'
     | '/app/$organizationId/orders'
     | '/app/$organizationId/playbooks'
@@ -583,6 +607,7 @@ export interface FileRouteTypes {
     | '/app/workspaces/'
     | '/app/$organizationId/apps/$appId'
     | '/app/$organizationId/exceptions/$exceptionId'
+    | '/app/$organizationId/fulfillment/$fulfillmentId'
     | '/app/$organizationId/inventory/$positionId'
     | '/app/$organizationId/orders/$orderId'
     | '/app/$organizationId/playbooks/$definitionId'
@@ -594,6 +619,7 @@ export interface FileRouteTypes {
     | '/app/$organizationId/workflows/new'
     | '/app/invitations/$organizationId/$invitationId'
     | '/app/$organizationId/apps/'
+    | '/app/$organizationId/fulfillment/'
     | '/app/$organizationId/inventory/'
     | '/app/$organizationId/orders/'
     | '/app/$organizationId/playbooks/'
@@ -782,6 +808,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/app/$organizationId/exceptions/$exceptionId'
       preLoaderRoute: typeof AppOrganizationIdExceptionsExceptionIdRouteImport
       parentRoute: typeof AppOrganizationIdExceptionsRoute
+    }
+    '/app/$organizationId/fulfillment/': {
+      id: '/app/$organizationId/fulfillment/'
+      path: '/fulfillment'
+      fullPath: '/app/$organizationId/fulfillment/'
+      preLoaderRoute: typeof AppOrganizationIdFulfillmentIndexRouteImport
+      parentRoute: typeof AppOrganizationIdRoute
+    }
+    '/app/$organizationId/fulfillment/$fulfillmentId': {
+      id: '/app/$organizationId/fulfillment/$fulfillmentId'
+      path: '/fulfillment/$fulfillmentId'
+      fullPath: '/app/$organizationId/fulfillment/$fulfillmentId'
+      preLoaderRoute: typeof AppOrganizationIdFulfillmentFulfillmentIdRouteImport
+      parentRoute: typeof AppOrganizationIdRoute
     }
     '/app/$organizationId/inventory/': {
       id: '/app/$organizationId/inventory/'
@@ -972,6 +1012,7 @@ interface AppOrganizationIdRouteChildren {
   AppOrganizationIdOverviewRoute: typeof AppOrganizationIdOverviewRoute
   AppOrganizationIdSyncRoute: typeof AppOrganizationIdSyncRoute
   AppOrganizationIdAppsAppIdRoute: typeof AppOrganizationIdAppsAppIdRoute
+  AppOrganizationIdFulfillmentFulfillmentIdRoute: typeof AppOrganizationIdFulfillmentFulfillmentIdRoute
   AppOrganizationIdInventoryPositionIdRoute: typeof AppOrganizationIdInventoryPositionIdRoute
   AppOrganizationIdOrdersOrderIdRoute: typeof AppOrganizationIdOrdersOrderIdRoute
   AppOrganizationIdPlaybooksDefinitionIdRoute: typeof AppOrganizationIdPlaybooksDefinitionIdRoute
@@ -982,6 +1023,7 @@ interface AppOrganizationIdRouteChildren {
   AppOrganizationIdWorkflowsDefinitionIdRoute: typeof AppOrganizationIdWorkflowsDefinitionIdRoute
   AppOrganizationIdWorkflowsNewRoute: typeof AppOrganizationIdWorkflowsNewRoute
   AppOrganizationIdAppsIndexRoute: typeof AppOrganizationIdAppsIndexRoute
+  AppOrganizationIdFulfillmentIndexRoute: typeof AppOrganizationIdFulfillmentIndexRoute
   AppOrganizationIdInventoryIndexRoute: typeof AppOrganizationIdInventoryIndexRoute
   AppOrganizationIdOrdersIndexRoute: typeof AppOrganizationIdOrdersIndexRoute
   AppOrganizationIdPlaybooksIndexRoute: typeof AppOrganizationIdPlaybooksIndexRoute
@@ -1008,6 +1050,8 @@ const AppOrganizationIdRouteChildren: AppOrganizationIdRouteChildren = {
   AppOrganizationIdOverviewRoute: AppOrganizationIdOverviewRoute,
   AppOrganizationIdSyncRoute: AppOrganizationIdSyncRoute,
   AppOrganizationIdAppsAppIdRoute: AppOrganizationIdAppsAppIdRoute,
+  AppOrganizationIdFulfillmentFulfillmentIdRoute:
+    AppOrganizationIdFulfillmentFulfillmentIdRoute,
   AppOrganizationIdInventoryPositionIdRoute:
     AppOrganizationIdInventoryPositionIdRoute,
   AppOrganizationIdOrdersOrderIdRoute: AppOrganizationIdOrdersOrderIdRoute,
@@ -1022,6 +1066,8 @@ const AppOrganizationIdRouteChildren: AppOrganizationIdRouteChildren = {
     AppOrganizationIdWorkflowsDefinitionIdRoute,
   AppOrganizationIdWorkflowsNewRoute: AppOrganizationIdWorkflowsNewRoute,
   AppOrganizationIdAppsIndexRoute: AppOrganizationIdAppsIndexRoute,
+  AppOrganizationIdFulfillmentIndexRoute:
+    AppOrganizationIdFulfillmentIndexRoute,
   AppOrganizationIdInventoryIndexRoute: AppOrganizationIdInventoryIndexRoute,
   AppOrganizationIdOrdersIndexRoute: AppOrganizationIdOrdersIndexRoute,
   AppOrganizationIdPlaybooksIndexRoute: AppOrganizationIdPlaybooksIndexRoute,
@@ -1077,3 +1123,12 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}

@@ -13,6 +13,7 @@ import {
   Receipt,
   Settings,
   ShoppingCart,
+  Truck,
   Undo2,
   Users,
   Workflow,
@@ -32,6 +33,7 @@ export type DestinationPath =
   | 'products'
   | 'returns'
   | 'inventory'
+  | 'fulfillment'
   | 'workflows'
   | 'procurement'
   | 'apps'
@@ -138,6 +140,16 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
     group: 'operations',
     domain: 'inventory',
     shortcut: 'v',
+  },
+  {
+    path: 'fulfillment',
+    label: 'Fulfillment',
+    Icon: Truck,
+    description:
+      'Held, delayed and in-transit fulfillment with the next safe step',
+    group: 'operations',
+    domain: 'fulfillment',
+    shortcut: 'f',
   },
   {
     path: 'workflows',
