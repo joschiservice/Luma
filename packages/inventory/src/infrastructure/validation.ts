@@ -37,14 +37,19 @@ const position = base
   })
   .strict();
 
+// Product snapshots use version 2 since they may carry vendor, listing, variant title, price
+// and barcode. Version 1 product documents stay valid without those facts.
 const product = base
   .extend({
+    schemaVersion: z.union([z.literal(1), z.literal(2)]),
     kind: z.literal('product'),
     data: z
       .object({
         type: z.literal('product'),
         title: z.string().max(1024).nullable(),
-        status: z.enum(['active', 'archived', 'unknown']),
+        status: z.enum(['active', 'draft', 'archived', 'unknown']),
+        vendor: z.string().max(1024).nullable().optional(),
+        published: z.boolean().nullable().optional(),
         skus: z
           .array(
             z
@@ -52,6 +57,19 @@ const product = base
                 skuId: uuid,
                 code: z.string().max(1024).nullable(),
                 unit: z.string().min(1).max(64),
+                title: z.string().max(1024).nullable().optional(),
+                price: z
+                  .object({
+                    amount: decimal,
+                    currency: z
+                      .string()
+                      .regex(/^[A-Z]{3}$/)
+                      .nullable(),
+                  })
+                  .strict()
+                  .nullable()
+                  .optional(),
+                barcode: z.string().max(512).nullable().optional(),
               })
               .strict(),
           )

@@ -64,6 +64,11 @@ export const item = z.object({
   stockTotal: decimal.nullable().optional(),
   stockReservedTotal: decimal.nullable().optional(),
   stockAvailable: decimal.nullable().optional(),
+  // Descriptive catalog facts become unknown when malformed; they never block the item read.
+  salesPriceGross: decimal.nullable().optional().catch(null),
+  gTIN: z.string().nullable().optional().catch(null),
+  manufacturerName: z.string().nullable().optional().catch(null),
+  isShopActive: z.boolean().nullable().optional().catch(null),
 });
 
 export const warehouseStock = z.object({

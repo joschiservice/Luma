@@ -40,6 +40,8 @@ import { Route as AppOrganizationIdPlaybooksIndexRouteImport } from './routes/ap
 import { Route as AppOrganizationIdPlaybooksDefinitionIdRouteImport } from './routes/app.$organizationId.playbooks.$definitionId'
 import { Route as AppOrganizationIdProcurementIndexRouteImport } from './routes/app.$organizationId.procurement.index'
 import { Route as AppOrganizationIdProcurementPurchaseOrderIdRouteImport } from './routes/app.$organizationId.procurement.$purchaseOrderId'
+import { Route as AppOrganizationIdProductsIndexRouteImport } from './routes/app.$organizationId.products.index'
+import { Route as AppOrganizationIdProductsSkuIdRouteImport } from './routes/app.$organizationId.products.$skuId'
 import { Route as AppOrganizationIdRecordsIndexRouteImport } from './routes/app.$organizationId.records.index'
 import { Route as AppOrganizationIdSettingsIndexRouteImport } from './routes/app.$organizationId.settings.index'
 import { Route as AppOrganizationIdSettingsSectionRouteImport } from './routes/app.$organizationId.settings.$section'
@@ -224,6 +226,18 @@ const AppOrganizationIdProcurementPurchaseOrderIdRoute =
     path: '/procurement/$purchaseOrderId',
     getParentRoute: () => AppOrganizationIdRoute,
   } as any)
+const AppOrganizationIdProductsIndexRoute =
+  AppOrganizationIdProductsIndexRouteImport.update({
+    id: '/products/',
+    path: '/products/',
+    getParentRoute: () => AppOrganizationIdRoute,
+  } as any)
+const AppOrganizationIdProductsSkuIdRoute =
+  AppOrganizationIdProductsSkuIdRouteImport.update({
+    id: '/products/$skuId',
+    path: '/products/$skuId',
+    getParentRoute: () => AppOrganizationIdRoute,
+  } as any)
 const AppOrganizationIdRecordsIndexRoute =
   AppOrganizationIdRecordsIndexRouteImport.update({
     id: '/records/',
@@ -318,6 +332,7 @@ export interface FileRoutesByFullPath {
   '/app/$organizationId/orders/$orderId': typeof AppOrganizationIdOrdersOrderIdRoute
   '/app/$organizationId/playbooks/$definitionId': typeof AppOrganizationIdPlaybooksDefinitionIdRoute
   '/app/$organizationId/procurement/$purchaseOrderId': typeof AppOrganizationIdProcurementPurchaseOrderIdRoute
+  '/app/$organizationId/products/$skuId': typeof AppOrganizationIdProductsSkuIdRoute
   '/app/$organizationId/settings/$section': typeof AppOrganizationIdSettingsSectionRoute
   '/app/$organizationId/workflows/$definitionId': typeof AppOrganizationIdWorkflowsDefinitionIdRoute
   '/app/$organizationId/workflows/new': typeof AppOrganizationIdWorkflowsNewRoute
@@ -327,6 +342,7 @@ export interface FileRoutesByFullPath {
   '/app/$organizationId/orders/': typeof AppOrganizationIdOrdersIndexRoute
   '/app/$organizationId/playbooks/': typeof AppOrganizationIdPlaybooksIndexRoute
   '/app/$organizationId/procurement/': typeof AppOrganizationIdProcurementIndexRoute
+  '/app/$organizationId/products/': typeof AppOrganizationIdProductsIndexRoute
   '/app/$organizationId/records/': typeof AppOrganizationIdRecordsIndexRoute
   '/app/$organizationId/settings/': typeof AppOrganizationIdSettingsIndexRoute
   '/app/$organizationId/workflows/': typeof AppOrganizationIdWorkflowsIndexRoute
@@ -361,6 +377,7 @@ export interface FileRoutesByTo {
   '/app/$organizationId/orders/$orderId': typeof AppOrganizationIdOrdersOrderIdRoute
   '/app/$organizationId/playbooks/$definitionId': typeof AppOrganizationIdPlaybooksDefinitionIdRoute
   '/app/$organizationId/procurement/$purchaseOrderId': typeof AppOrganizationIdProcurementPurchaseOrderIdRoute
+  '/app/$organizationId/products/$skuId': typeof AppOrganizationIdProductsSkuIdRoute
   '/app/$organizationId/settings/$section': typeof AppOrganizationIdSettingsSectionRoute
   '/app/$organizationId/workflows/$definitionId': typeof AppOrganizationIdWorkflowsDefinitionIdRoute
   '/app/$organizationId/workflows/new': typeof AppOrganizationIdWorkflowsNewRoute
@@ -370,6 +387,7 @@ export interface FileRoutesByTo {
   '/app/$organizationId/orders': typeof AppOrganizationIdOrdersIndexRoute
   '/app/$organizationId/playbooks': typeof AppOrganizationIdPlaybooksIndexRoute
   '/app/$organizationId/procurement': typeof AppOrganizationIdProcurementIndexRoute
+  '/app/$organizationId/products': typeof AppOrganizationIdProductsIndexRoute
   '/app/$organizationId/records': typeof AppOrganizationIdRecordsIndexRoute
   '/app/$organizationId/settings': typeof AppOrganizationIdSettingsIndexRoute
   '/app/$organizationId/workflows': typeof AppOrganizationIdWorkflowsIndexRoute
@@ -406,6 +424,7 @@ export interface FileRoutesById {
   '/app/$organizationId/orders/$orderId': typeof AppOrganizationIdOrdersOrderIdRoute
   '/app/$organizationId/playbooks/$definitionId': typeof AppOrganizationIdPlaybooksDefinitionIdRoute
   '/app/$organizationId/procurement/$purchaseOrderId': typeof AppOrganizationIdProcurementPurchaseOrderIdRoute
+  '/app/$organizationId/products/$skuId': typeof AppOrganizationIdProductsSkuIdRoute
   '/app/$organizationId/settings/$section': typeof AppOrganizationIdSettingsSectionRoute
   '/app/$organizationId/workflows/$definitionId': typeof AppOrganizationIdWorkflowsDefinitionIdRoute
   '/app/$organizationId/workflows/new': typeof AppOrganizationIdWorkflowsNewRoute
@@ -415,6 +434,7 @@ export interface FileRoutesById {
   '/app/$organizationId/orders/': typeof AppOrganizationIdOrdersIndexRoute
   '/app/$organizationId/playbooks/': typeof AppOrganizationIdPlaybooksIndexRoute
   '/app/$organizationId/procurement/': typeof AppOrganizationIdProcurementIndexRoute
+  '/app/$organizationId/products/': typeof AppOrganizationIdProductsIndexRoute
   '/app/$organizationId/records/': typeof AppOrganizationIdRecordsIndexRoute
   '/app/$organizationId/settings/': typeof AppOrganizationIdSettingsIndexRoute
   '/app/$organizationId/workflows/': typeof AppOrganizationIdWorkflowsIndexRoute
@@ -452,6 +472,7 @@ export interface FileRouteTypes {
     | '/app/$organizationId/orders/$orderId'
     | '/app/$organizationId/playbooks/$definitionId'
     | '/app/$organizationId/procurement/$purchaseOrderId'
+    | '/app/$organizationId/products/$skuId'
     | '/app/$organizationId/settings/$section'
     | '/app/$organizationId/workflows/$definitionId'
     | '/app/$organizationId/workflows/new'
@@ -461,6 +482,7 @@ export interface FileRouteTypes {
     | '/app/$organizationId/orders/'
     | '/app/$organizationId/playbooks/'
     | '/app/$organizationId/procurement/'
+    | '/app/$organizationId/products/'
     | '/app/$organizationId/records/'
     | '/app/$organizationId/settings/'
     | '/app/$organizationId/workflows/'
@@ -495,6 +517,7 @@ export interface FileRouteTypes {
     | '/app/$organizationId/orders/$orderId'
     | '/app/$organizationId/playbooks/$definitionId'
     | '/app/$organizationId/procurement/$purchaseOrderId'
+    | '/app/$organizationId/products/$skuId'
     | '/app/$organizationId/settings/$section'
     | '/app/$organizationId/workflows/$definitionId'
     | '/app/$organizationId/workflows/new'
@@ -504,6 +527,7 @@ export interface FileRouteTypes {
     | '/app/$organizationId/orders'
     | '/app/$organizationId/playbooks'
     | '/app/$organizationId/procurement'
+    | '/app/$organizationId/products'
     | '/app/$organizationId/records'
     | '/app/$organizationId/settings'
     | '/app/$organizationId/workflows'
@@ -539,6 +563,7 @@ export interface FileRouteTypes {
     | '/app/$organizationId/orders/$orderId'
     | '/app/$organizationId/playbooks/$definitionId'
     | '/app/$organizationId/procurement/$purchaseOrderId'
+    | '/app/$organizationId/products/$skuId'
     | '/app/$organizationId/settings/$section'
     | '/app/$organizationId/workflows/$definitionId'
     | '/app/$organizationId/workflows/new'
@@ -548,6 +573,7 @@ export interface FileRouteTypes {
     | '/app/$organizationId/orders/'
     | '/app/$organizationId/playbooks/'
     | '/app/$organizationId/procurement/'
+    | '/app/$organizationId/products/'
     | '/app/$organizationId/records/'
     | '/app/$organizationId/settings/'
     | '/app/$organizationId/workflows/'
@@ -787,6 +813,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOrganizationIdProcurementPurchaseOrderIdRouteImport
       parentRoute: typeof AppOrganizationIdRoute
     }
+    '/app/$organizationId/products/': {
+      id: '/app/$organizationId/products/'
+      path: '/products'
+      fullPath: '/app/$organizationId/products/'
+      preLoaderRoute: typeof AppOrganizationIdProductsIndexRouteImport
+      parentRoute: typeof AppOrganizationIdRoute
+    }
+    '/app/$organizationId/products/$skuId': {
+      id: '/app/$organizationId/products/$skuId'
+      path: '/products/$skuId'
+      fullPath: '/app/$organizationId/products/$skuId'
+      preLoaderRoute: typeof AppOrganizationIdProductsSkuIdRouteImport
+      parentRoute: typeof AppOrganizationIdRoute
+    }
     '/app/$organizationId/records/': {
       id: '/app/$organizationId/records/'
       path: '/records'
@@ -896,6 +936,7 @@ interface AppOrganizationIdRouteChildren {
   AppOrganizationIdOrdersOrderIdRoute: typeof AppOrganizationIdOrdersOrderIdRoute
   AppOrganizationIdPlaybooksDefinitionIdRoute: typeof AppOrganizationIdPlaybooksDefinitionIdRoute
   AppOrganizationIdProcurementPurchaseOrderIdRoute: typeof AppOrganizationIdProcurementPurchaseOrderIdRoute
+  AppOrganizationIdProductsSkuIdRoute: typeof AppOrganizationIdProductsSkuIdRoute
   AppOrganizationIdSettingsSectionRoute: typeof AppOrganizationIdSettingsSectionRoute
   AppOrganizationIdWorkflowsDefinitionIdRoute: typeof AppOrganizationIdWorkflowsDefinitionIdRoute
   AppOrganizationIdWorkflowsNewRoute: typeof AppOrganizationIdWorkflowsNewRoute
@@ -904,6 +945,7 @@ interface AppOrganizationIdRouteChildren {
   AppOrganizationIdOrdersIndexRoute: typeof AppOrganizationIdOrdersIndexRoute
   AppOrganizationIdPlaybooksIndexRoute: typeof AppOrganizationIdPlaybooksIndexRoute
   AppOrganizationIdProcurementIndexRoute: typeof AppOrganizationIdProcurementIndexRoute
+  AppOrganizationIdProductsIndexRoute: typeof AppOrganizationIdProductsIndexRoute
   AppOrganizationIdRecordsIndexRoute: typeof AppOrganizationIdRecordsIndexRoute
   AppOrganizationIdSettingsIndexRoute: typeof AppOrganizationIdSettingsIndexRoute
   AppOrganizationIdWorkflowsIndexRoute: typeof AppOrganizationIdWorkflowsIndexRoute
@@ -931,6 +973,7 @@ const AppOrganizationIdRouteChildren: AppOrganizationIdRouteChildren = {
     AppOrganizationIdPlaybooksDefinitionIdRoute,
   AppOrganizationIdProcurementPurchaseOrderIdRoute:
     AppOrganizationIdProcurementPurchaseOrderIdRoute,
+  AppOrganizationIdProductsSkuIdRoute: AppOrganizationIdProductsSkuIdRoute,
   AppOrganizationIdSettingsSectionRoute: AppOrganizationIdSettingsSectionRoute,
   AppOrganizationIdWorkflowsDefinitionIdRoute:
     AppOrganizationIdWorkflowsDefinitionIdRoute,
@@ -941,6 +984,7 @@ const AppOrganizationIdRouteChildren: AppOrganizationIdRouteChildren = {
   AppOrganizationIdPlaybooksIndexRoute: AppOrganizationIdPlaybooksIndexRoute,
   AppOrganizationIdProcurementIndexRoute:
     AppOrganizationIdProcurementIndexRoute,
+  AppOrganizationIdProductsIndexRoute: AppOrganizationIdProductsIndexRoute,
   AppOrganizationIdRecordsIndexRoute: AppOrganizationIdRecordsIndexRoute,
   AppOrganizationIdSettingsIndexRoute: AppOrganizationIdSettingsIndexRoute,
   AppOrganizationIdWorkflowsIndexRoute: AppOrganizationIdWorkflowsIndexRoute,

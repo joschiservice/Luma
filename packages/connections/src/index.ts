@@ -22,6 +22,7 @@ export type {
   FulfillmentSnapshot,
   HistoryLimit,
   InventorySnapshot,
+  ListPrice,
   Money,
   Observation,
   OrderSnapshot,

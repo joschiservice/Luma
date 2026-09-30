@@ -18,7 +18,7 @@ export type ProjectionOutcome =
 // conflicting with the stored one.
 const normalizers = {
   inventory: 'commerce/1',
-  product: 'commerce/1',
+  product: 'commerce/2',
   order: 'commerce/2',
   fulfillment: 'commerce/1',
 } as const;
@@ -116,18 +116,34 @@ export function createCommerceIngestion(
       const skus = [];
       for (const sku of data.skus) {
         const skuId = await resolve('sku', sku.id);
-        if (skuId) skus.push({ skuId, code: sku.code, unit: sku.unit });
+        if (skuId)
+          skus.push({
+            skuId,
+            code: sku.code,
+            unit: sku.unit,
+            ...(sku.title !== undefined && { title: sku.title }),
+            ...(sku.price !== undefined && { price: sku.price }),
+            ...(sku.barcode !== undefined && { barcode: sku.barcode }),
+          });
       }
       if (!entityId || missing.length) return { status: 'pending', missing };
       const status = await inventory.project(context, {
         ...provenance,
+        schemaVersion: 2,
         normalizerVersion: normalizers.product,
         entityId,
         kind: 'product',
         mappingVersion: digest(
           JSON.stringify([entityId, skus.map((sku) => sku.skuId)]),
         ),
-        data: { type: 'product', title: data.title, status: data.status, skus },
+        data: {
+          type: 'product',
+          title: data.title,
+          status: data.status,
+          ...(data.vendor !== undefined && { vendor: data.vendor }),
+          ...(data.published !== undefined && { published: data.published }),
+          skus,
+        },
       });
 
       return { status, entityId };

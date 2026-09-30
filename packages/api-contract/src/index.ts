@@ -15,6 +15,7 @@ import { ordersContract } from './contracts/orders.js';
 import { operationsContract } from './contracts/overview.js';
 import { playbooksContract } from './contracts/playbooks.js';
 import { procurementContract } from './contracts/procurement.js';
+import { productsContract } from './contracts/products.js';
 import { connectorProvidersContract } from './contracts/providers.js';
 import { recordsContract } from './contracts/records.js';
 import { settingsContract } from './contracts/settings.js';
@@ -49,6 +50,7 @@ const routes: {
   connectorProviders: typeof connectorProvidersContract;
   records: typeof recordsContract;
   inventory: typeof inventoryContract;
+  products: typeof productsContract;
   orders: typeof ordersContract;
   sync: typeof syncContract;
 } = {
@@ -73,6 +75,7 @@ const routes: {
   connectorProviders: connectorProvidersContract,
   records: recordsContract,
   inventory: inventoryContract,
+  products: productsContract,
   orders: ordersContract,
   sync: syncContract,
 };
@@ -164,5 +167,7 @@ export * from './records.js';
 export * from './orders.js';
 
 export * from './inventory.js';
+
+export * from './products.js';
 
 export * from './sync.js';

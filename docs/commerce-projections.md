@@ -43,8 +43,13 @@ mappings, including operator mappings made before the import, are reused. Import
 never merge records across connections; SKU text and display numbers stay descriptive.
 
 `products.read` observations project as inventory `product` snapshots with their
-variant SKUs. `inventory_product_skus` indexes the current product-to-SKU relation
-and each SKU's normalized source code, which labels SKUs and suggests links.
+variant SKUs. Product snapshots are version 2 (normalizer `commerce/2`) and may carry
+vendor, sales channel publication and, per SKU, variant title, list price and barcode.
+A price's currency is null when the source reports none; such prices are never compared.
+Version 1 product documents stay valid. `inventory_product_skus` holds one row per current
+product and SKU with the SKU's normalized source code, which labels SKUs and suggests
+links, and the listing facts the [Products workspace](products-workspace.md) compares.
+Inventory rewrites these rows with the projection pointer (migration `0043`).
 
 `ingestion.link(context, kind, targetId, otherId, reason)` confirms that another SKU
 or location is the same record. Every mapping of the other entity moves to the
@@ -117,7 +122,8 @@ document; otherwise projection fails with `Snapshot identity conflict`.
   changes, including added optional fields. Order snapshots are version 2 and
   may carry `dueAt`, `placedAt`, `total` and line `skuCode`/`title`. Stored
   version 1 order documents stay valid and readable; they may already carry some
-  of these fields. Fulfillment and inventory snapshots are version 1.
+  of these fields. Product snapshots are version 2 and may carry listing facts.
+  Fulfillment and position snapshots are version 1.
 - Bump the normalizer version (`commerce/2` for orders) whenever the canonical
   document for an existing observation changes. Replay then stores a new snapshot
   beside the old one instead of conflicting with it.

@@ -34,6 +34,10 @@ export interface JtlState {
     stockReservedTotal: string;
     stockAvailable: string;
     modifiedTimestamp?: string;
+    salesPriceGross?: string;
+    gTIN?: string;
+    manufacturerName?: string;
+    isShopActive?: boolean;
   }[];
   notes: {
     id: string;
@@ -75,6 +79,10 @@ export function seed(): JtlState {
         stockTotal: '100',
         stockReservedTotal: '0',
         stockAvailable: '100',
+        salesPriceGross: '24.00',
+        gTIN: '4006381333931',
+        manufacturerName: 'Luma Goods',
+        isShopActive: true,
       },
     ],
     notes: [],
@@ -95,6 +103,9 @@ export function provisionScenarioStock(state: JtlState, time: number) {
     sKU: 'LUMA-SCENARIO-001',
     name: 'Canvas tote · scenario',
     unit: 'each',
+    salesPriceGross: '24.00',
+    manufacturerName: 'Luma Goods',
+    isShopActive: false,
     isActive: true,
     isInventoryManagementActive: true,
     stockTotal: '100',

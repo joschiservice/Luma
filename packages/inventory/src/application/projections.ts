@@ -16,9 +16,21 @@ export type CommerceData =
   | {
       type: 'product';
       title: string | null;
-      status: 'active' | 'archived' | 'unknown';
+      status: 'active' | 'draft' | 'archived' | 'unknown';
+      /** Brand or manufacturer text; descriptive only. Absent in version 1 documents. */
+      vendor?: string | null;
+      /** Whether the source offers the product on its own sales channel. */
+      published?: boolean | null;
       /** Variants as canonical SKUs. `code` is source text and never establishes identity. */
-      skus: { skuId: string; code: string | null; unit: string }[];
+      skus: {
+        skuId: string;
+        code: string | null;
+        unit: string;
+        title?: string | null;
+        /** Source list price; a null currency means the source did not report one. */
+        price?: { amount: string; currency: string | null } | null;
+        barcode?: string | null;
+      }[];
     };
 
 /** A current source projection that refers to a SKU or location. */
@@ -30,7 +42,8 @@ export type Dependent = {
 };
 
 export interface CanonicalSnapshot {
-  schemaVersion: 1;
+  /** Product snapshots use version 2 since they may carry listing and price facts. */
+  schemaVersion: 1 | 2;
   entityId: string;
   kind: EntityKind;
   connectionId: string;

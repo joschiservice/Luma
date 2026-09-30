@@ -27,6 +27,7 @@ import {
   createOperationalMetrics,
   createOperationalSummary,
   createOrderWorkspace,
+  createProductWorkspace,
   createRecordExplorer,
 } from '@luma/read-models/composition';
 import {
@@ -100,6 +101,7 @@ export interface ApplicationServices {
     operationalSummary: ReturnType<typeof createOperationalSummary>;
     records: ReturnType<typeof createRecordExplorer>;
     inventory: ReturnType<typeof createInventoryWorkspace>;
+    products: ReturnType<typeof createProductWorkspace>;
     orders: ReturnType<typeof createOrderWorkspace>;
   };
 }
@@ -274,6 +276,7 @@ export function createApplicationServices(
         createConnectionCoverage(database),
       ),
       inventory: createInventoryWorkspace(database),
+      products: createProductWorkspace(database),
       records: createRecordExplorer(database),
       orders: createOrderWorkspace(
         database,

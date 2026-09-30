@@ -12,6 +12,7 @@ import {
   type Observation,
   type OrderSnapshot,
   type Page,
+  type ProductSnapshot,
   type ReadCapability,
   type SourceIdentity,
 } from '@luma/connections';
@@ -66,6 +67,13 @@ const workStatuses: Record<string, FulfillmentSnapshot['status']> = {
   CLOSED: 'completed',
   CANCELLED: 'cancelled',
   INCOMPLETE: 'failed',
+};
+
+// Unlisted products stay unknown: they sell by direct link but are hidden from the storefront.
+const productStatuses: Record<string, ProductSnapshot['status']> = {
+  ACTIVE: 'active',
+  DRAFT: 'draft',
+  ARCHIVED: 'archived',
 };
 
 const customerStates: Record<string, CustomerSnapshot['state']> = {
@@ -446,30 +454,40 @@ export function createShopifyConnector(
             const product = await node(
               parent.id,
               'Product',
-              'id updatedAt title status',
+              'id updatedAt title status vendor publishedAt priceRangeV2 { minVariantPrice { currencyCode } }',
               s.product,
             );
             const variants = await children(
               parent.id,
               'Product',
               'variants',
-              'id sku inventoryItem { id }',
+              'id sku title price barcode inventoryItem { id }',
               s.variant,
             );
+            const currency =
+              product.priceRangeV2?.minVariantPrice.currencyCode ?? null;
             emit('product', ref(product.id), product.updatedAt, {
               title: product.title,
-              status:
-                product.status === 'ACTIVE'
-                  ? 'active'
-                  : product.status === 'ARCHIVED'
-                    ? 'archived'
-                    : 'unknown',
+              status: statusFrom(productStatuses, product.status),
+              vendor: text(product.vendor),
+              // Only an Online Store publication has a publication time readable with read_products.
+              published: product.publishedAt != null,
               skus: variants.map((variant) => ({
                 id: ref(variant.inventoryItem.id),
                 code: variant.sku,
                 unit: 'each',
+                // Shopify names the only variant of a product "Default Title".
+                title:
+                  variant.title === 'Default Title'
+                    ? null
+                    : text(variant.title),
+                price:
+                  variant.price == null
+                    ? null
+                    : { amount: variant.price, currency },
+                barcode: text(variant.barcode),
               })),
-            });
+            } satisfies ProductSnapshot);
           } else if (capability === 'inventory.read') {
             const item = await node(
               parent.id,

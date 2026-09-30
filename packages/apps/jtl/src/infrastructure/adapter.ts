@@ -7,6 +7,7 @@ import {
   type ConnectorConnection,
   type ExternalId,
   type Observation,
+  type ProductSnapshot,
   type ReadCapability,
   type SourceIdentity,
 } from '@luma/connections';
@@ -319,10 +320,23 @@ export function createJtlConnector(
               emit('product', ref(item.id), item.modifiedTimestamp ?? null, {
                 title: item.name ?? null,
                 status: item.isActive ? 'active' : 'archived',
+                vendor: text(item.manufacturerName),
+                published: item.isShopActive ?? null,
                 skus: [
-                  { id: ref(item.id), code: item.sKU, unit: unit(item.unit) },
+                  {
+                    id: ref(item.id),
+                    code: item.sKU,
+                    unit: unit(item.unit),
+                    title: null,
+                    // Item prices carry no currency; the company currency is not readable here.
+                    price:
+                      item.salesPriceGross == null
+                        ? null
+                        : { amount: item.salesPriceGross, currency: null },
+                    barcode: text(item.gTIN),
+                  },
                 ],
-              });
+              } satisfies ProductSnapshot);
             } else {
               if (filters.sku && filters.sku.externalId !== String(item.id))
                 continue;

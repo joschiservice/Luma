@@ -125,7 +125,7 @@ describe('JTL read adapter', () => {
             {
               source: { provider: 'jtl', externalId: key(10) },
               sourceUpdatedAt: null,
-              adapterVersion: 'jtl/1',
+              adapterVersion: 'jtl/2',
               data: {
                 status: 'open',
                 paymentStatus: 'paid',
@@ -149,7 +149,23 @@ describe('JTL read adapter', () => {
         ok: true,
         value: {
           items: [
-            { data: { skus: [{ id: ref(key(20)), code: 'Mixed-Case-SKU' }] } },
+            {
+              data: {
+                title: 'Sample item',
+                status: 'active',
+                vendor: 'Harbor Ceramics',
+                published: false,
+                skus: [
+                  {
+                    id: ref(key(20)),
+                    code: 'Mixed-Case-SKU',
+                    title: null,
+                    price: { amount: '19.99', currency: null },
+                    barcode: '4006381333931',
+                  },
+                ],
+              },
+            },
           ],
         },
       });

@@ -4,7 +4,7 @@ import { z } from 'zod';
  * Version of this adapter's normalized output, recorded as observation provenance. Bump it
  * whenever the same provider response would normalize differently.
  */
-export const adapterVersion = 'jtl/1';
+export const adapterVersion = 'jtl/2';
 
 const timestamp = z.string().datetime({ offset: true });
 
@@ -84,12 +84,17 @@ export const outputs = {
       'product',
       z.object({
         title: z.string().nullable(),
-        status: z.enum(['active', 'archived', 'unknown']),
+        status: z.enum(['active', 'archived']),
+        vendor: text,
+        published: z.boolean().nullable(),
         skus: z.array(
           z.object({
             id: externalId,
             code: z.string().nullable(),
             unit: z.string().min(1),
+            title: z.null(),
+            price: z.object({ amount: decimal, currency: z.null() }).nullable(),
+            barcode: text,
           }),
         ),
       }),

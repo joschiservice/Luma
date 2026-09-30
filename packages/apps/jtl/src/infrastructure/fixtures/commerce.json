@@ -41,7 +41,11 @@
       "modifiedTimestamp": "2026-09-16T12:00:00Z",
       "stockTotal": 3.5,
       "stockReservedTotal": 5,
-      "stockAvailable": -1.5
+      "stockAvailable": -1.5,
+      "salesPriceGross": 19.99,
+      "gTIN": "4006381333931",
+      "manufacturerName": "Harbor Ceramics",
+      "isShopActive": false
     }
   ],
   "notes": [{ "id": 30 }, { "id": 31 }],

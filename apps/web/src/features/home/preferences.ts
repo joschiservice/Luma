@@ -6,6 +6,7 @@ import {
   Gauge,
   Inbox,
   type LucideIcon,
+  Package,
   Plug,
   ShoppingBag,
 } from 'lucide-react';
@@ -72,6 +73,13 @@ export const homeModules: Record<
     description: 'Order volume and fulfillment timing for a chosen period.',
     size: 'full',
     Icon: ShoppingBag,
+  },
+  catalog: {
+    title: 'Catalog health',
+    description:
+      'SKUs whose store and ERP listings disagree, are missing or are not linked.',
+    size: 'half',
+    Icon: Package,
   },
 };
 
