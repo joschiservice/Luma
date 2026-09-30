@@ -16,11 +16,17 @@ import {
   useSearch,
 } from '@tanstack/react-router';
 import { PackageSearch } from 'lucide-react';
-import { useContext, useState, useSyncExternalStore } from 'react';
+import {
+  type ReactNode,
+  useContext,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 
 import { connectionsOptions } from '../connections/data';
 import { SignInRedirect } from '../identity/common';
 import { IdentityError } from '../identity/data';
+import { SyncCoverage } from '../sync/coverage';
 import {
   orderFilters,
   orderListError,
@@ -83,6 +89,7 @@ export function OrdersPage() {
 
   return (
     <OrdersView
+      coverage={<SyncCoverage organizationId={organizationId} type="orders" />}
       organizationId={organizationId}
       search={search}
       list={error?.kind === 'access' ? undefined : list.data}
@@ -134,6 +141,7 @@ export function OrdersView({
   refresh,
   next,
   previous,
+  coverage,
 }: {
   organizationId: string;
   search: OrdersSearch;
@@ -147,6 +155,8 @@ export function OrdersView({
   refresh: () => void;
   next?: (() => void) | undefined;
   previous?: (() => void) | undefined;
+  /** Which sources and dates the list covers. */
+  coverage?: ReactNode;
 }) {
   const [draft, setDraft] = useState(search.q ?? '');
   const [shownQuery, setShownQuery] = useState(search.q);
@@ -190,6 +200,7 @@ export function OrdersView({
         source. Totals, placed dates and SKU text show once a source reports
         them.
       </p>
+      {coverage}
       {offline ? (
         <Alert role="status">
           You are offline. Reconnect to refresh orders.

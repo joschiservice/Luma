@@ -5,6 +5,7 @@ import type {
   WorkflowConfig,
 } from '@luma/config';
 import type { ConnectionManagement } from '@luma/connections';
+import { createInstallationRepository } from '@luma/connections/composition';
 import type { IdentityService } from '@luma/identity';
 import { createIdentity } from '@luma/identity/composition';
 import { registerIdentityHttp } from '@luma/identity/http';
@@ -23,6 +24,7 @@ import { Pool } from 'pg';
 import { createMetricListener } from '../infrastructure/metric-listener.js';
 import { createApplicationServices } from './application.js';
 import { authoringAvailability } from './authoring.js';
+import { createCommerceSyncService } from './commerce-sync.js';
 import { buildApp } from './http-app.js';
 import { createReadinessCheck } from './readiness.js';
 import { createResourceScope } from './resources.js';
@@ -79,6 +81,19 @@ export async function buildRuntimeApp(
           ? installedConnections.connections
           : undefined;
 
+    // Sync status only needs public connection summaries, so it stays available without a
+    // credential keyring.
+    const installations = createInstallationRepository(
+      createTenantDatabase(casePool),
+    );
+    const sync = createCommerceSyncService(
+      createTenantDatabase(casePool),
+      identity.service,
+      connectionService ?? {
+        list: (context) => installations.list(context.tenantId),
+      },
+    );
+
     const workflowReader = workflowSettings
       ? createDeskWorkflowReader(workflowSettings.temporal, identity.service)
       : undefined;
@@ -112,6 +127,7 @@ export async function buildRuntimeApp(
       ...(observability ? { observability } : {}),
       ...(modelGateway ? { modelGateway } : {}),
       ...(connectionService ? { connections: connectionService } : {}),
+      sync,
       ...(installedConnections
         ? {
             apps: installedConnections.apps,

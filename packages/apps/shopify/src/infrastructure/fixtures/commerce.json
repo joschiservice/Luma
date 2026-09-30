@@ -8,7 +8,10 @@
     "displayFinancialStatus": "PAID",
     "createdAt": "2026-09-14T08:30:00Z",
     "currentTotalPriceSet": {
-      "shopMoney": { "amount": "42.50", "currencyCode": "EUR" }
+      "shopMoney": {
+        "amount": "42.50",
+        "currencyCode": "EUR"
+      }
     }
   },
   "orderLines": [
@@ -17,7 +20,11 @@
       "quantity": 3,
       "name": "Blue mug",
       "sku": "MUG-Blue",
-      "variant": { "inventoryItem": { "id": "gid://shopify/InventoryItem/31" } }
+      "variant": {
+        "inventoryItem": {
+          "id": "gid://shopify/InventoryItem/31"
+        }
+      }
     },
     {
       "id": "gid://shopify/LineItem/12",
@@ -37,26 +44,49 @@
     {
       "id": "gid://shopify/ProductVariant/21",
       "sku": "MUG-Blue",
-      "inventoryItem": { "id": "gid://shopify/InventoryItem/31" }
+      "inventoryItem": {
+        "id": "gid://shopify/InventoryItem/31"
+      }
     }
   ],
-  "inventoryItem": { "id": "gid://shopify/InventoryItem/31", "tracked": true },
+  "inventoryItem": {
+    "id": "gid://shopify/InventoryItem/31",
+    "tracked": true
+  },
   "levels": [
     {
       "id": "gid://shopify/InventoryLevel/41?inventory_item_id=31",
       "updatedAt": "2026-09-17T00:00:00Z",
-      "location": { "id": "gid://shopify/Location/41" },
+      "location": {
+        "id": "gid://shopify/Location/41"
+      },
       "quantities": [
-        { "name": "on_hand", "quantity": 3 },
-        { "name": "committed", "quantity": 5 },
-        { "name": "available", "quantity": -2 }
+        {
+          "name": "on_hand",
+          "quantity": 3
+        },
+        {
+          "name": "committed",
+          "quantity": 5
+        },
+        {
+          "name": "available",
+          "quantity": -2
+        }
       ]
     },
     {
       "id": "gid://shopify/InventoryLevel/42?inventory_item_id=31",
       "updatedAt": "2026-09-17T00:00:00Z",
-      "location": { "id": "gid://shopify/Location/42" },
-      "quantities": [{ "name": "available", "quantity": 0 }]
+      "location": {
+        "id": "gid://shopify/Location/42"
+      },
+      "quantities": [
+        {
+          "name": "available",
+          "quantity": 0
+        }
+      ]
     }
   ],
   "work": [
@@ -71,7 +101,9 @@
       "id": "gid://shopify/FulfillmentOrderLineItem/61",
       "remainingQuantity": 2,
       "totalQuantity": 2,
-      "lineItem": { "id": "gid://shopify/LineItem/11" }
+      "lineItem": {
+        "id": "gid://shopify/LineItem/11"
+      }
     }
   ],
   "shipments": [
@@ -87,7 +119,44 @@
     {
       "id": "gid://shopify/FulfillmentLineItem/81",
       "quantity": 1,
-      "lineItem": { "id": "gid://shopify/LineItem/11" }
+      "lineItem": {
+        "id": "gid://shopify/LineItem/11"
+      }
+    }
+  ],
+  "scopes": [
+    {
+      "handle": "read_orders"
+    },
+    {
+      "handle": "read_products"
+    }
+  ],
+  "customers": [
+    {
+      "id": "gid://shopify/Customer/7",
+      "createdAt": "2025-02-01T09:00:00Z",
+      "updatedAt": "2026-09-10T09:00:00Z",
+      "state": "ENABLED",
+      "numberOfOrders": "4",
+      "amountSpent": {
+        "amount": "120.50",
+        "currencyCode": "EUR"
+      },
+      "tags": ["vip", " "],
+      "displayName": "Ada Lovelace",
+      "defaultEmailAddress": {
+        "emailAddress": "ada@example.test"
+      },
+      "defaultPhoneNumber": null,
+      "defaultAddress": {
+        "address1": "1 Analytical Way",
+        "address2": null,
+        "city": "London",
+        "province": null,
+        "zip": "N1",
+        "countryCodeV2": "GB"
+      }
     }
   ]
 }

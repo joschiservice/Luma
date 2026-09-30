@@ -83,11 +83,16 @@ and telemetry configuration, still use the existing app environment mechanism.
 Use `pnpm dev:manual` when you want to control the database and auth settings.
 
 The migration administrator connection is used only during initialization.
-`luma_api` inherits `luma_identity`, `luma_connectors`, `luma_case_reader` and
-`luma_desk`. The desk role includes policy and audit permissions for decisions.
+`luma_api` inherits `luma_identity`, `luma_connectors`, `luma_case_reader`,
+`luma_desk` and `luma_commerce_sync`. The desk role includes policy and audit permissions for decisions.
 `luma_worker` inherits `luma_exceptions`, `luma_policies`, `luma_execution`,
-`luma_audit`, `luma_connectors`, `luma_orders`, `luma_inventory` and `luma_desk`. Neither runtime login has
+`luma_audit`, `luma_connectors`, `luma_orders`, `luma_inventory`, `luma_desk`,
+`luma_commerce_sync` and `luma_customers`. Neither runtime login has
 superuser, database creation, role creation or RLS bypass privileges.
+
+`pnpm dev` also starts the commerce sync process (`apps/worker`), which imports
+history for active connections and keeps it current. It uses the worker login and
+reads Shopify approval flags from `apps/api/.env`. See [Commerce sync](commerce-sync.md).
 
 Temporal runs only when requested. Its development server persists workflow
 history in this checkout's Temporal volume. The command prints its Web UI URL.

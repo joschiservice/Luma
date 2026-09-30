@@ -587,3 +587,9 @@ a.home-row:hover {
     flex-wrap: wrap;
   }
 }
+
+.home-module-links {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}

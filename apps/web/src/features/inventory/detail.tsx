@@ -11,9 +11,11 @@ import { PageHeader } from '@luma/ui/components/workspace/page-header';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams, useSearch } from '@tanstack/react-router';
 import { ArrowLeft, RefreshCw } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 import { SignInRedirect } from '../identity/common';
 import { IdentityError } from '../identity/data';
+import { IdentityLinks } from '../sync/identity-links';
 import { type InventorySearch, stockOptions } from './data';
 import { stockFreshness, stockQuantity, StockState } from './presentation';
 
@@ -39,6 +41,15 @@ export function StockPage() {
       refreshing={query.isFetching}
       offline={query.isPaused}
       refresh={() => void query.refetch()}
+      identity={
+        query.data ? (
+          <IdentityLinks
+            organizationId={organizationId}
+            entityId={query.data.position.skuId}
+            onChanged={() => void query.refetch()}
+          />
+        ) : null
+      }
     />
   );
 }
@@ -53,6 +64,7 @@ export function StockDetailView({
   refreshing = false,
   offline = false,
   refresh,
+  identity,
 }: {
   organizationId: string;
   search?: InventorySearch;
@@ -62,6 +74,8 @@ export function StockDetailView({
   refreshing?: boolean;
   offline?: boolean;
   refresh: () => void;
+  /** The sources behind this SKU and link controls. */
+  identity?: ReactNode;
 }) {
   const position = detail?.position;
 
@@ -315,12 +329,9 @@ export function StockDetailView({
                   Other SKUs at this location
                 </Link>
               </div>
-              <p className="inventory-note">
-                A product relationship has not been reported for this stock
-                position.
-              </p>
             </Card>
           </div>
+          {identity}
           {detail.relatedTruncated ? (
             <Alert>
               Showing the first 50 entries per related record type. Open Orders

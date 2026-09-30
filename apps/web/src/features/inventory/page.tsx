@@ -18,12 +18,13 @@ import {
   useSearch,
 } from '@tanstack/react-router';
 import { Boxes, Search } from 'lucide-react';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 
 import { connectionsOptions } from '../connections/data';
 import { SignInRedirect } from '../identity/common';
 import { IdentityError } from '../identity/data';
 import { recordReturnPath } from '../records/data';
+import { SyncCoverage } from '../sync/coverage';
 import { inventoryOptions, type InventorySearch } from './data';
 import { stockFreshness, stockQuantity, StockState } from './presentation';
 
@@ -56,6 +57,9 @@ export function InventoryPage() {
 
   return (
     <InventoryView
+      coverage={
+        <SyncCoverage organizationId={organizationId} type="inventory" />
+      }
       organizationId={organizationId}
       search={search}
       list={query.isError ? undefined : query.data}
@@ -88,6 +92,7 @@ export function InventoryView({
   change,
   refresh,
   previous,
+  coverage,
 }: {
   organizationId: string;
   search: InventorySearch;
@@ -100,6 +105,8 @@ export function InventoryView({
   change: (search: InventorySearch) => void;
   refresh: () => void;
   previous?: (() => void) | undefined;
+  /** Which sources the list covers. */
+  coverage?: ReactNode;
 }) {
   const [draft, setDraft] = useState(search.q ?? '');
   const [shown, setShown] = useState(search.q);
@@ -285,6 +292,7 @@ export function InventoryView({
         One position per SKU, location and unit. Source quantities stay
         separate. Unknown means the source has not reported a value.
       </p>
+      {coverage}
       {offline ? (
         <Alert role="status">
           You are offline. Reconnect to refresh stock.
@@ -320,7 +328,7 @@ export function InventoryView({
                 <p>
                   {filtered
                     ? 'Try another SKU, location or source.'
-                    : 'Connect a source and map its SKUs and locations to see stock here.'}
+                    : 'Stock appears here once a connected store or ERP is imported. Check Data sync for progress.'}
                 </p>
                 {filtered ? (
                   <Button onClick={() => change({})} variant="outline">

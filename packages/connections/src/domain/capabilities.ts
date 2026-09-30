@@ -18,7 +18,13 @@ export interface SourceIdentity extends ExternalId {
   connectionId: string;
   provider: string;
   resource:
-    'order' | 'order_line' | 'sku' | 'location' | 'fulfillment' | 'product';
+    | 'order'
+    | 'order_line'
+    | 'sku'
+    | 'location'
+    | 'fulfillment'
+    | 'product'
+    | 'customer';
 }
 
 export interface Observation<T> {
@@ -39,6 +45,20 @@ export interface Observation<T> {
 export interface PageQuery {
   cursor?: string;
   limit: number;
+  /**
+   * Returns only records the source changed at or after this time, on the source's clock.
+   * Send it only to handlers whose descriptor lists `updatedSince`; others reject it.
+   */
+  updatedSince?: string;
+}
+
+/**
+ * The source limits reads to records created at or after `availableFrom`. `requirement`
+ * names the provider permission that removes the limit, when one exists.
+ */
+export interface HistoryLimit {
+  availableFrom: string;
+  requirement: string | null;
 }
 
 /** Only a complete successful scan can establish that an item is absent. */
@@ -46,6 +66,13 @@ export interface Page<T> {
   items: Observation<T>[];
   nextCursor: string | null;
   completeness: 'complete' | 'partial';
+  /**
+   * Source-reported number of records the whole query matches, when the source reports it.
+   * It is an estimate for progress, not a completeness check.
+   */
+  total?: number | null;
+  /** Present when the source hides older records from this connection. */
+  history?: HistoryLimit | null;
 }
 
 export interface Quantity {
@@ -124,6 +151,31 @@ export interface ProductSnapshot {
   skus: { id: ExternalId; code: string | null; unit: string }[];
 }
 
+/**
+ * A customer profile as the source reports it. Contact and address fields are null unless the
+ * source shared them; `shared` records which protected groups this read was allowed to include.
+ */
+export interface CustomerSnapshot {
+  displayName: string | null;
+  email: string | null;
+  phone: string | null;
+  address: {
+    line1: string | null;
+    line2: string | null;
+    city: string | null;
+    region: string | null;
+    postalCode: string | null;
+    country: string | null;
+  } | null;
+  state: 'enabled' | 'disabled' | 'invited' | 'declined' | 'unknown';
+  /** When the customer was created at the source. */
+  createdAt: string | null;
+  orderCount: number | null;
+  amountSpent: Money | null;
+  tags: string[];
+  shared: { contact: boolean; address: boolean };
+}
+
 /** Acceptance is not proof that the expected business state was reached. */
 export interface WriteReceipt {
   status: 'accepted';
@@ -177,6 +229,7 @@ export interface CapabilityContract {
     output: WriteReceipt;
   };
   'products.read': { input: PageQuery; output: Page<ProductSnapshot> };
+  'customers.read': { input: PageQuery; output: Page<CustomerSnapshot> };
 }
 
 export type Capability = keyof CapabilityContract;

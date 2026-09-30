@@ -1,0 +1,143 @@
+import type {
+  BlockReason,
+  RecordType,
+  ScanKind,
+  ScanTrigger,
+  StreamStatus,
+} from '../domain/streams.js';
+
+/** One record type's sync state as operators see it. */
+export interface SyncStreamView {
+  id: string;
+  status: StreamStatus;
+  phase: 'backfill' | 'incremental';
+  paused: boolean;
+  blocked: BlockReason | null;
+  scan: {
+    kind: ScanKind;
+    startedAt: string;
+    since: string | null;
+    pages: number;
+    records: number;
+    total: number | null;
+  } | null;
+  records: {
+    total: number;
+    current: number;
+    pending: number;
+    failed: number;
+    missing: number;
+  };
+  problems: string[];
+  coverage: {
+    oldest: string | null;
+    newest: string | null;
+    historyFrom: string | null;
+    historyRequirement: string | null;
+    olderHistoryAvailable: boolean;
+  };
+  lastSuccessAt: string | null;
+  lastCompleteAt: string | null;
+  lastFullScanAt: string | null;
+  backfillStartedAt: string | null;
+  backfillCompletedAt: string | null;
+  nextRunAt: string | null;
+  error: { code: string; message: string; at: string; attempts: number } | null;
+}
+
+export interface SyncConnectionView {
+  connectionId: string;
+  label: string;
+  provider: string;
+  appId: string | null;
+  status: 'pending' | 'active' | 'degraded' | 'disconnected' | 'revoked';
+  recordTypes: {
+    recordType: RecordType;
+    availability: 'granted' | 'not_granted' | 'not_requested';
+    stream: SyncStreamView | null;
+  }[];
+}
+
+export interface SyncRunView {
+  id: string;
+  connectionId: string;
+  recordType: RecordType;
+  kind: ScanKind;
+  trigger: ScanTrigger;
+  since: string | null;
+  fullScan: boolean;
+  startedAt: string;
+  finishedAt: string | null;
+  outcome: 'running' | 'completed' | 'cancelled';
+  pages: number;
+  records: number;
+  changed: number;
+  unchanged: number;
+  pending: number;
+  failed: number;
+  missing: number | null;
+  errors: number;
+}
+
+export interface SyncOverview {
+  connections: SyncConnectionView[];
+  runs: SyncRunView[];
+  canManage: boolean;
+  asOf: string;
+}
+
+export interface IdentitySource {
+  connectionId: string;
+  connectionLabel: string;
+  provider: string;
+  externalId: string;
+  scopeKey: string;
+  method: string;
+  linkedAt: string;
+  revisedAt: string | null;
+  codes: string[];
+  titles: string[];
+}
+
+export interface LinkRequestView {
+  id: string;
+  kind: 'sku' | 'location';
+  operation: 'link' | 'unlink';
+  entityId: string;
+  otherId: string | null;
+  connectionId: string | null;
+  reason: string;
+  state: 'requested' | 'running' | 'completed' | 'failed';
+  message: string | null;
+  createdAt: string;
+  completedAt: string | null;
+}
+
+export interface IdentityDetail {
+  entity: { id: string; kind: 'sku' | 'location'; label: string };
+  sources: IdentitySource[];
+  suggestions: {
+    id: string;
+    label: string;
+    reason: string;
+    sources: IdentitySource[];
+  }[];
+  requests: LinkRequestView[];
+  canManage: boolean;
+}
+
+export type LinkInput =
+  | {
+      operation: 'link';
+      kind: 'sku' | 'location';
+      entityId: string;
+      otherId: string;
+      reason: string;
+    }
+  | {
+      operation: 'unlink';
+      kind: 'sku' | 'location';
+      entityId: string;
+      connectionId: string;
+      reason: string;
+    };

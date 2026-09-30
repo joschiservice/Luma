@@ -9,8 +9,8 @@ import type { ShopifyOAuth } from '../application/oauth.js';
 import type { PrivacyIntake } from '../infrastructure/privacy.js';
 
 /**
- * Registers Shopify authorization callbacks and uninstall webhooks with signature and
- * session validation.
+ * Registers Shopify authorization callbacks, lifecycle webhooks and record-change
+ * notifications with signature and session validation.
  */
 export function registerShopifyRoutes(
   app: FastifyInstance,
@@ -74,6 +74,39 @@ export function registerShopifyRoutes(
           header('x-shopify-hmac-sha256'),
           header('x-shopify-shop-domain'),
           header('x-shopify-topic'),
+        );
+
+        return reply.status(204).send();
+      },
+    );
+    webhook.post(
+      '/v1/shopify/changes/:organizationId/:connectionId',
+      { config: { authentication: 'app' } },
+      async (request, reply) => {
+        if (!oauth)
+          throw new IdentityError(
+            503,
+            'SERVICE_UNAVAILABLE',
+            'Shopify is not configured',
+          );
+        const params = z
+          .object({
+            organizationId: z.string().uuid(),
+            connectionId: z.string().uuid(),
+          })
+          .parse(request.params);
+        const header = (name: string) =>
+          typeof request.headers[name] === 'string'
+            ? (request.headers[name] as string)
+            : '';
+        await oauth.changed(
+          params.organizationId,
+          params.connectionId,
+          request.body as Buffer,
+          header('x-shopify-hmac-sha256'),
+          header('x-shopify-shop-domain'),
+          header('x-shopify-topic'),
+          header('x-shopify-event-id') || header('x-shopify-webhook-id'),
         );
 
         return reply.status(204).send();

@@ -44,6 +44,7 @@ const page = <T extends z.ZodTypeAny>(item: T) =>
   z.object({
     items: z.array(item),
     nextCursor: z.string().nullable(),
+    total: z.number().int().nonnegative().optional(),
     completeness: z.enum(['complete', 'partial']),
   });
 

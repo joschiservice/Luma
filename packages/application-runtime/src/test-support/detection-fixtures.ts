@@ -85,7 +85,12 @@ export async function detectionFixtures(context: TenantContext, now: Date) {
         variables: { id?: string };
       };
       let data: unknown;
-      if (query.includes('LumaPage'))
+      if (query.includes('LumaScanStart'))
+        data = {
+          currentAppInstallation: { accessScopes: [] },
+          count: { count: 1, precision: 'EXACT' },
+        };
+      else if (query.includes('LumaPage'))
         data = {
           page: page([
             {

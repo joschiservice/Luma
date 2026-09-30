@@ -18,7 +18,10 @@ export interface StockSource {
 export interface StockPosition {
   id: string;
   skuId: string;
+  /** Readable SKU: a source SKU code when one is known, otherwise the canonical key. */
   sku: string;
+  /** Canonical SKU reconciliation key; purchase order lines refer to it. */
+  skuKey: string;
   locationId: string;
   location: string;
   unit: string;

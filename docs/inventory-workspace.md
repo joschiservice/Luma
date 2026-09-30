@@ -17,8 +17,12 @@ record type. Order lines use canonical SKU relationships and retain source and
 unit. Purchase orders match the canonical SKU ID or reconciliation key, which
 replenishment uses for its SKU field. They are commitments, not confirmed receipts
 or incoming stock; the current model has no receipt progress or location allocation.
-Product relationships and provider incoming quantities are not available in current
-canonical projections and are explicitly unknown in the UI.
+Provider incoming quantities are not available in current canonical projections and
+are explicitly unknown in the UI. SKUs are labeled with a source SKU code from the
+product catalog when one is known, otherwise with the canonical key (shortened for
+imported records). `skuKey` keeps the canonical key that purchase orders use. The
+detail page lists the sources behind the SKU and lets owners and admins link or
+unlink matching SKUs from other sources.
 
 Inventory can be reached from the sidebar (`G`, then `V`), stock metric drilldowns,
 SKU issues and record details. Search and list filters survive detail navigation.

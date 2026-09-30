@@ -88,8 +88,39 @@ export function createCommerceProjections(
           );
           if (!same.rows[0]?.matches)
             throw new Error('Snapshot identity conflict');
+          // Replaying after a SKU link change can return to an earlier snapshot of the
+          // current observation; make it current again.
+          const restored = await tx.query<{ snapshot_id: string }>(
+            `UPDATE orders_projections p SET snapshot_id=s.id,version=p.version+1,updated_at=now()
+            FROM orders_snapshots s, orders_snapshots c
+            WHERE p.tenant_id=$1 AND p.entity_id=$2 AND p.connection_id=$3
+              AND s.tenant_id=$1 AND s.entity_id=$2 AND s.observation_id=$4 AND s.normalizer_version=$5
+              AND s.mapping_version=$6 AND c.tenant_id=$1 AND c.id=p.snapshot_id AND c.observation_id=$4
+              AND p.snapshot_id<>s.id
+            RETURNING p.snapshot_id`,
+            [
+              tenant,
+              value.entityId,
+              value.connectionId,
+              value.observationId,
+              value.normalizerVersion,
+              value.mappingVersion,
+            ],
+          );
+          const snapshot = restored.rows[0]?.snapshot_id;
+          if (!snapshot) return 'duplicate';
+          await tx.query(
+            'INSERT INTO orders_projection_events(id,tenant_id,snapshot_id,actor_id) VALUES($1,$2,$3,$4)',
+            [randomUUID(), tenant, snapshot, context.actor.id],
+          );
+          await refreshOrderList(
+            tx,
+            tenant,
+            [value.data.type === 'order' ? value.entityId : value.data.orderId],
+            value.data.type === 'order',
+          );
 
-          return 'duplicate';
+          return 'applied';
         }
         for (const ref of references(value)) {
           const found = await tx.query(
@@ -202,6 +233,31 @@ export function createCommerceProjections(
      JOIN orders_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id
      WHERE p.tenant_id=$1 AND p.entity_id=$2 ORDER BY p.connection_id`,
               [context.tenantId, entityId],
+            )
+          ).rows,
+      );
+    },
+    async skuDependents(context, skuId, connectionId) {
+      requireTenant(context, context.tenantId);
+      z.string().uuid().parse(skuId);
+      if (connectionId) z.string().uuid().parse(connectionId);
+
+      return db.transaction(
+        context.tenantId,
+        async (tx) =>
+          (
+            await tx.query<{
+              entityId: string;
+              connectionId: string;
+              observationId: string;
+            }>(
+              `SELECT k.entity_id AS "entityId",k.connection_id AS "connectionId",s.observation_id AS "observationId"
+              FROM orders_list_skus k
+              JOIN orders_projections p ON p.tenant_id=k.tenant_id AND p.entity_id=k.entity_id AND p.connection_id=k.connection_id
+              JOIN orders_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id
+              WHERE k.tenant_id=$1 AND k.sku_id=$2 AND ($3::uuid IS NULL OR k.connection_id=$3)
+              ORDER BY k.entity_id,k.connection_id`,
+              [context.tenantId, skuId, connectionId ?? null],
             )
           ).rows,
       );

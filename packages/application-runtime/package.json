@@ -13,6 +13,11 @@
       "luma-source": "./src/composition/workflow-runtime.ts",
       "types": "./dist/composition/workflow-runtime.d.ts",
       "default": "./dist/composition/workflow-runtime.js"
+    },
+    "./sync": {
+      "luma-source": "./src/composition/commerce-sync.ts",
+      "types": "./dist/composition/commerce-sync.d.ts",
+      "default": "./dist/composition/commerce-sync.js"
     }
   },
   "scripts": {
@@ -44,7 +49,9 @@
     "@luma/app-host": "workspace:*",
     "@luma/app-catalog": "workspace:*",
     "@luma/workflows": "workspace:*",
-    "@luma/procurement": "workspace:*"
+    "@luma/procurement": "workspace:*",
+    "@luma/commerce-sync": "workspace:*",
+    "@luma/customers": "workspace:*"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",

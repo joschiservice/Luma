@@ -34,6 +34,32 @@ binding is rejected; mappings retain the confirming actor, method and observatio
 as immutable audit evidence. Corrections require a separately reviewed remapping
 operation rather than overwriting history.
 
+## Imports, products and links
+
+`ingestion.import(context, ingestKey, input)` is the history-import path. It records
+the observation, binds every unmapped identity it carries to its own canonical
+entity (`sourceLocalKey`, method `Imported source record…`) and projects. Existing
+mappings, including operator mappings made before the import, are reused. Imports
+never merge records across connections; SKU text and display numbers stay descriptive.
+
+`products.read` observations project as inventory `product` snapshots with their
+variant SKUs. `inventory_product_skus` indexes the current product-to-SKU relation
+and each SKU's normalized source code, which labels SKUs and suggests links.
+
+`ingestion.link(context, kind, targetId, otherId, reason)` confirms that another SKU
+or location is the same record. Every mapping of the other entity moves to the
+target through `sources.remap`, which appends a `connector_mapping_revisions` row;
+a trigger rejects mapping changes without one. Stock positions, product snapshots
+and order lines that still refer to the other entity are replayed from their stored
+observations, and positions that moved are retired (`inventory_projection_retirements`),
+keeping their snapshots as history. `unlink` moves one connection's source back to its
+own entity and replays the same way. Both operations are idempotent: repeating them
+finishes any remaining replay. Two entities that share a connection cannot be linked.
+
+A replay can return to a snapshot that already exists, for example after unlinking.
+The owner then makes that snapshot current again when it re-normalizes the current
+observation or when the source's projection was retired, and returns `applied`.
+
 ## Projection rules
 
 Order snapshots can also carry `dueAt`, `placedAt`, a source `total` with its
@@ -120,7 +146,9 @@ These are per-source projections, not a cross-source authority selection. Consum
 must explicitly select a source. The detection configuration continues to own
 comparison authority; these reads do not authorize corrections. ADR-002's future
 field-group authority publication and remapping workflow are not activated by this
-storage layer. Raw provider payloads and customer/address data are not retained.
+storage layer. Raw provider payloads are not retained, and observations never carry
+customer or address data; imported customer profiles are stored separately (see
+[Commerce sync](commerce-sync.md#customers)).
 
 `commerce.integration.test.ts` runs against PostgreSQL with restricted credentials.
 It covers pending/replay, concurrent delivery, immutable conflicts, isolation,

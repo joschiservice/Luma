@@ -25,6 +25,8 @@ export interface CapabilityDescriptor {
   idempotency: 'provider_key' | 'conditional_write' | 'none';
   /** Retry advice never authorizes replay of an uncertain write. */
   retry: { maxAttempts: number; initialDelayMs: number };
+  /** Optional read filters the handler honors; absent means none. */
+  filters?: 'updatedSince'[];
 }
 
 export interface InvocationContext {

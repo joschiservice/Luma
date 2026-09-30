@@ -20,11 +20,14 @@ export const dependencies = {
     'workflows',
   ],
   inventory: ['platform', 'identity'],
+  customers: ['platform', 'identity'],
   connectors: ['platform', 'identity'],
   policies: ['platform', 'identity'],
   execution: ['platform', 'identity', 'policies', 'connectors', 'audit'],
   exceptions: ['platform', 'identity', 'orders', 'inventory'],
   commerce: ['connectors', 'identity', 'orders', 'inventory'],
+  // Schedules reads through installed connections and projects through commerce owners.
+  sync: ['platform', 'identity', 'connectors', 'commerce', 'customers'],
   temporal: ['resolution', 'workflows', 'identity', 'platform'],
   workflows: ['platform', 'identity', 'policies', 'execution', 'connectors'],
   resolution: [
@@ -77,5 +80,7 @@ export const domainPackages = {
   'read-models': 'reads',
   workflows: 'workflows',
   'commerce-ingestion': 'commerce',
+  'commerce-sync': 'sync',
+  customers: 'customers',
   'workflow-temporal': 'temporal',
 };

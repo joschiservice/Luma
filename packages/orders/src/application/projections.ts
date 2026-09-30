@@ -76,4 +76,15 @@ export interface CommerceProjections {
     context: TenantContext,
     entityId: string,
   ): Promise<CanonicalSnapshot[]>;
+  /**
+   * Lists current order projections with a line mapped to this SKU, optionally limited to one
+   * connection. Re-project them after the SKU's mappings change.
+   */
+  skuDependents(
+    context: TenantContext,
+    skuId: string,
+    connectionId?: string,
+  ): Promise<
+    { entityId: string; connectionId: string; observationId: string }[]
+  >;
 }

@@ -18,6 +18,7 @@ import { useRef, useState } from 'react';
 import { ConnectionCard } from '../connections/connection-card';
 import { connectionError, connectionsOptions } from '../connections/data';
 import { contextOptions } from '../identity/data';
+import { syncOptions } from '../sync/data';
 import { appsOptions, changeApp } from './data';
 import { AppExtension } from './extension';
 
@@ -34,6 +35,7 @@ export function AppSettings({
   const apps = useQuery(appsOptions(organizationId));
   const connections = useQuery(connectionsOptions(organizationId));
   const access = useQuery(contextOptions(organizationId));
+  const sync = useQuery(syncOptions(organizationId));
   const client = useQueryClient();
   const navigate = useNavigate();
   const [dialog, setDialog] = useState<'add' | 'uninstall' | null>(null);
@@ -182,6 +184,10 @@ export function AppSettings({
                       appAvailable={available}
                       canManage={canManage}
                       refresh={refresh}
+                      sync={sync.data?.connections.find(
+                        (item) => item.connectionId === connection.id,
+                      )}
+                      syncAsOf={sync.data?.asOf}
                     />
                   ))}
                 </div>

@@ -54,6 +54,7 @@ export function readShopifyConfig(
   for (const name of [
     'SHOPIFY_PROTECTED_CUSTOMER_DATA_APPROVED',
     'SHOPIFY_CUSTOMER_CONTACT_APPROVED',
+    'SHOPIFY_CUSTOMER_ADDRESS_APPROVED',
     'SHOPIFY_ALL_ORDERS_APPROVED',
   ]) {
     if (env[name] !== undefined && !['true', 'false'].includes(env[name]!))

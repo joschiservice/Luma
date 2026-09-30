@@ -266,6 +266,8 @@ describe('installed connection lifecycle', () => {
           kind === 'shopify'
             ? {
                 data: {
+                  currentAppInstallation: { accessScopes: [] },
+                  count: { count: 0, precision: 'EXACT' },
                   page: {
                     nodes: [],
                     pageInfo: { hasNextPage: false, endCursor: null },

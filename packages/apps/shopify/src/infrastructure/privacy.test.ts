@@ -53,8 +53,12 @@ it.each([
   'durably stores encrypted %s requests, including large histories',
   async (topic, payload) => {
     const f = fixture();
+    const inserts = () =>
+      f.query.mock.calls.filter(([sql]) =>
+        String(sql).includes('INSERT INTO shopify_privacy_requests'),
+      );
     await f.send(topic, payload);
-    const values = f.query.mock.calls[0]![1];
+    const values = inserts()[0]![1];
     expect(values[4]).not.toContain('myshopify.com');
     const envelope = cipher.open(
       values[4],
@@ -62,10 +66,33 @@ it.each([
     );
     expect(envelope.request).toEqual(payload);
     await f.send(topic, payload);
-    expect(f.query.mock.calls[1]![1][2]).toBe(values[2]);
-    expect(f.query.mock.calls[0]![0]).toContain('ON CONFLICT DO NOTHING');
+    expect(inserts()[1]![1][2]).toBe(values[2]);
+    expect(inserts()[0]![0]).toContain('ON CONFLICT DO NOTHING');
   },
 );
+it('erases imported customer profiles with redaction intake', async () => {
+  const f = fixture();
+  const erasures = () =>
+    f.query.mock.calls
+      .filter(([sql]) => String(sql).includes('erase_shopify_customer_data'))
+      .map(([, values]) => values);
+  await f.send('customers/redact', {
+    ...base,
+    customer: { id: 456 },
+    orders_to_redact: [],
+  });
+  await f.send('shop/redact', base);
+  await f.send('customers/data_request', {
+    ...base,
+    customer: { id: 456 },
+    orders_requested: [],
+    data_request: { id: 1 },
+  });
+  expect(erasures()).toEqual([
+    ['development:client', shop, ['gid://shopify/Customer/456']],
+    ['development:client', shop, null],
+  ]);
+});
 it('rejects bad signatures before parsing or persistence', async () => {
   const f = fixture();
   await expect(
