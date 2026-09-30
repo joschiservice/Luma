@@ -102,6 +102,8 @@ test('real installed adapters read remote state, verify a lost write after resta
         'products.read',
         'inventory.read',
         'fulfillment.read',
+        'inventory.available.reconcile',
+        'returns.read',
       ],
     },
   ].map((c) => ({
@@ -194,7 +196,7 @@ test('real installed adapters read remote state, verify a lost write after resta
         },
       });
     await observe();
-    assert.equal(checks.length, 9);
+    assert.equal(checks.length, 10);
     assert.ok(
       checks.every((check) => check.result.ok),
       JSON.stringify(checks),
@@ -207,7 +209,7 @@ test('real installed adapters read remote state, verify a lost write after resta
         status,
       });
       await observe();
-      assert.equal(checks.length, 9);
+      assert.equal(checks.length, 10);
       assert.ok(
         checks
           .filter((check) => check.connectionId === connections[1].id)

@@ -10,6 +10,7 @@ export const installationPermissions = z.enum([
   'fulfillment.open',
   'fulfillment.move',
   'customers.read',
+  'returns.read',
   'orders.shipping-method.read',
   'orders.shipping-method.write',
 ]);

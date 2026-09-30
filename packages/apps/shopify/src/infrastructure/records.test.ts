@@ -156,7 +156,7 @@ function fixture(granted = scopes, approved = true, contactsApproved = false) {
                         {
                           id: gid('ReturnLineItem'),
                           quantity: 1,
-                          returnReason: 'DEFECTIVE',
+                          returnReasonDefinition: { name: 'Defective' },
                           fulfillmentLineItem: {
                             lineItem: { id: gid('LineItem') },
                           },

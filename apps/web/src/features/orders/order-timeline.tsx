@@ -67,15 +67,12 @@ export function OrderFulfillments({
                 </small>
               </span>
               <Link
-                to="/app/$organizationId/records/$kind/$recordId"
-                params={{
-                  organizationId,
-                  kind: 'fulfillment',
-                  recordId: item.id,
-                }}
+                to="/app/$organizationId/fulfillment/$fulfillmentId"
+                params={{ organizationId, fulfillmentId: item.id }}
                 search={{ from }}
+                aria-label={`Open ${shipmentLabels[item.status] ?? item.status} fulfillment`}
               >
-                Record <ArrowRight size={13} aria-hidden="true" />
+                Open <ArrowRight size={13} aria-hidden="true" />
               </Link>
             </li>
           ))}
@@ -89,7 +86,7 @@ export function OrderFulfillments({
   );
 }
 
-/** Lists the order and fulfillment states Luma read from each source, newest first. */
+/** Lists the order, fulfillment, return and refund states Luma read from each source, newest first. */
 export function ObservedHistory({ detail }: { detail: OrderDetail }) {
   return (
     <OrderSection
@@ -103,7 +100,11 @@ export function ObservedHistory({ detail }: { detail: OrderDetail }) {
               <strong>
                 {entry.entityKind === 'order'
                   ? `Order ${(statusLabels[entry.status] ?? entry.status).toLowerCase()}${entry.paymentStatus ? ` · ${(paymentLabels[entry.paymentStatus] ?? entry.paymentStatus).toLowerCase()}` : ''}`
-                  : `Fulfillment ${(shipmentLabels[entry.status] ?? entry.status).toLowerCase()}`}
+                  : entry.entityKind === 'fulfillment'
+                    ? `Fulfillment ${(shipmentLabels[entry.status] ?? entry.status).toLowerCase()}`
+                    : entry.entityKind === 'return'
+                      ? `Return ${entry.status}`
+                      : 'Refund recorded'}
                 {entry.deleted ? ' · removed' : ''}
               </strong>
               <small>

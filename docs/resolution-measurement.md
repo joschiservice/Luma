@@ -110,7 +110,7 @@ and their full counts; the ledger and issue detail provide the remainder. A ledg
 permits at most 1,000 immutable facts. These are workload bounds, not measured
 latency guarantees.
 
-Migration `0044_resolution_measurement.sql` grants RLS-scoped reads, append-only
+Migration `0046_resolution_measurement.sql` grants RLS-scoped reads, append-only
 owner writes and indexes. It adds committed notification triggers to measurement,
 learning, admission binding, incident inputs/evidence/source and disposition-outbox rows.
 Existing exception, policy approval and case-command triggers cover state and human

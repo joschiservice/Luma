@@ -2,23 +2,29 @@ import { randomUUID } from 'node:crypto';
 
 import type { TenantContext } from '@luma/identity';
 import { requireRole, requireTenant } from '@luma/identity';
-import type { TenantDatabase } from '@luma/platform';
+import type { SqlTransaction, TenantDatabase } from '@luma/platform';
 import { z } from 'zod';
 
 import type {
   CanonicalSnapshot,
   CommerceProjections,
 } from '../application/projections.js';
+import { refreshFulfillmentList } from './fulfillment-list.js';
 import { refreshOrderList } from './list-projection.js';
+import { refreshReturnList } from './return-list.js';
 import { snapshotSchema } from './validation.js';
 
 /**
- * Creates tenant-scoped order and fulfillment projections, checking referenced SKUs through
- * the supplied lookup.
+ * Creates tenant-scoped order, fulfillment, return and refund projections, checking referenced
+ * SKUs and locations through the supplied inventory lookup.
  */
 export function createCommerceProjections(
   db: TenantDatabase,
-  skuExists: (context: TenantContext, id: string) => Promise<boolean>,
+  inventoryExists: (
+    context: TenantContext,
+    kind: 'sku' | 'location',
+    id: string,
+  ) => Promise<boolean>,
 ): CommerceProjections {
   return {
     async identify(context, kind, reconciliationKey) {
@@ -62,9 +68,21 @@ export function createCommerceProjections(
       const value = snapshotSchema.parse(input) as CanonicalSnapshot;
       if (value.data.type === 'order')
         for (const line of value.data.lines) {
-          if (line.skuId && !(await skuExists(context, line.skuId)))
+          if (
+            line.skuId &&
+            !(await inventoryExists(context, 'sku', line.skuId))
+          )
             throw new Error('Canonical SKU not found');
         }
+      const locationId =
+        value.data.type === 'fulfillment'
+          ? value.data.location?.locationId
+          : null;
+      if (
+        locationId &&
+        !(await inventoryExists(context, 'location', locationId))
+      )
+        throw new Error('Canonical location not found');
 
       return db.transaction(context.tenantId, async (tx) => {
         const tenant = context.tenantId;
@@ -113,12 +131,7 @@ export function createCommerceProjections(
             'INSERT INTO orders_projection_events(id,tenant_id,snapshot_id,actor_id) VALUES($1,$2,$3,$4)',
             [randomUUID(), tenant, snapshot, context.actor.id],
           );
-          await refreshOrderList(
-            tx,
-            tenant,
-            [value.data.type === 'order' ? value.entityId : value.data.orderId],
-            value.data.type === 'order',
-          );
+          await refresh(tx, tenant, value);
 
           return 'applied';
         }
@@ -135,7 +148,13 @@ export function createCommerceProjections(
         const children =
           value.data.type === 'order'
             ? value.data.lines.map((l) => l.id)
-            : [value.entityId, ...value.data.lines.map((l) => l.orderLineId)];
+            : [
+                value.entityId,
+                ...lineIds(value),
+                ...(value.data.type === 'refund' && value.data.returnId
+                  ? [value.data.returnId]
+                  : []),
+              ];
         for (const child of children) {
           await tx.query(
             'INSERT INTO orders_relationships(tenant_id,child_id,order_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',
@@ -150,7 +169,7 @@ export function createCommerceProjections(
           if (parent?.order_id !== parentId)
             throw new Error('Canonical child belongs to another order');
         }
-        if (value.data.type === 'fulfillment') {
+        if (value.data.type !== 'order') {
           const parent = (
             await tx.query<{ document: CanonicalSnapshot }>(
               `SELECT s.document FROM orders_projections p JOIN orders_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id
@@ -161,15 +180,22 @@ export function createCommerceProjections(
           if (!parent || parent.deleted || parent.data.type !== 'order')
             throw new Error('Order projection not found');
           const lines = parent.data.lines;
+          const units = value.data.lines.flatMap((line) =>
+            line.orderLineId
+              ? [{ orderLineId: line.orderLineId, unit: line.unit }]
+              : [],
+          );
           if (
-            value.data.lines.some(
+            units.some(
               (line) =>
                 !lines.some(
                   (p) => p.id === line.orderLineId && p.unit === line.unit,
                 ),
             )
           )
-            throw new Error('Fulfillment line or unit mismatch');
+            throw new Error(
+              `${value.data.type === 'fulfillment' ? 'Fulfillment' : 'Return or refund'} line or unit mismatch`,
+            );
         }
         const id = randomUUID();
         await tx.query(
@@ -207,12 +233,7 @@ export function createCommerceProjections(
           [randomUUID(), tenant, id, context.actor.id],
         );
 
-        await refreshOrderList(
-          tx,
-          tenant,
-          [parentId],
-          value.data.type === 'order',
-        );
+        await refresh(tx, tenant, value);
 
         return 'applied';
       });
@@ -258,6 +279,30 @@ export function createCommerceProjections(
               WHERE k.tenant_id=$1 AND k.sku_id=$2 AND ($3::uuid IS NULL OR k.connection_id=$3)
               ORDER BY k.entity_id,k.connection_id`,
               [context.tenantId, skuId, connectionId ?? null],
+            )
+          ).rows,
+      );
+    },
+    async locationDependents(context, locationId, connectionId) {
+      requireTenant(context, context.tenantId);
+      z.string().uuid().parse(locationId);
+      if (connectionId) z.string().uuid().parse(connectionId);
+
+      return db.transaction(
+        context.tenantId,
+        async (tx) =>
+          (
+            await tx.query<{
+              entityId: string;
+              connectionId: string;
+              observationId: string;
+            }>(
+              `SELECT f.entity_id AS "entityId",f.connection_id AS "connectionId",s.observation_id AS "observationId"
+              FROM orders_fulfillment_list f
+              JOIN orders_snapshots s ON s.tenant_id=f.tenant_id AND s.id=f.snapshot_id
+              WHERE f.tenant_id=$1 AND f.location_id=$2 AND ($3::uuid IS NULL OR f.connection_id=$3)
+              ORDER BY f.entity_id,f.connection_id`,
+              [context.tenantId, locationId, connectionId ?? null],
             )
           ).rows,
       );
@@ -318,9 +363,43 @@ function references(value: CanonicalSnapshot): { kind: string; id: string }[] {
     ? value.data.lines.map((line) => ({ kind: 'order_line', id: line.id }))
     : [
         { kind: 'order', id: value.data.orderId },
-        ...value.data.lines.map((line) => ({
-          kind: 'order_line',
-          id: line.orderLineId,
-        })),
+        ...lineIds(value).map((id) => ({ kind: 'order_line', id })),
+        ...(value.data.type === 'refund' && value.data.returnId
+          ? [{ kind: 'return', id: value.data.returnId }]
+          : []),
       ];
+}
+
+/** Order lines a child record refers to; return lines without an order line are skipped. */
+function lineIds(value: CanonicalSnapshot): string[] {
+  if (value.data.type === 'order') return [];
+  const ids: string[] = [];
+  for (const line of value.data.lines)
+    if (line.orderLineId) ids.push(line.orderLineId);
+
+  return [...new Set(ids)];
+}
+
+/** Rebuilds the maintained reads that depend on a newly current snapshot, in its transaction. */
+async function refresh(
+  tx: SqlTransaction,
+  tenantId: string,
+  value: CanonicalSnapshot,
+) {
+  if (value.data.type === 'return' || value.data.type === 'refund') {
+    await refreshReturnList(tx, tenantId, value.data.orderId);
+
+    return;
+  }
+  const orderId =
+    value.data.type === 'order' ? value.entityId : value.data.orderId;
+  await refreshOrderList(tx, tenantId, [orderId], value.data.type === 'order');
+  await refreshFulfillmentList(tx, tenantId, [orderId]);
+  // Return rows show their order's number; keep it current when the order changes.
+  if (value.data.type === 'order')
+    await tx.query(
+      `UPDATE orders_returns SET order_number=$4 WHERE tenant_id=$1 AND order_id=$2 AND connection_id=$3
+       AND order_number IS DISTINCT FROM $4`,
+      [tenantId, value.entityId, value.connectionId, value.data.displayNumber],
+    );
 }

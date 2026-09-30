@@ -20,8 +20,12 @@ import { useContext } from 'react';
 import { activityOptions } from '../activity/data';
 import { activityLabel, activityState } from '../activity/presentation';
 import { casesOptions } from '../exceptions/data';
+import { fulfillmentsOptions } from '../fulfillment/data';
+import { viewLabels as fulfillmentViewLabels } from '../fulfillment/presentation';
 import { productSummaryOptions } from '../products/data';
 import { viewLabels } from '../products/presentation';
+import { returnSummaryOptions } from '../returns/data';
+import { stageLabels, stageStates, workStages } from '../returns/presentation';
 
 type Connection = OperationsOverview['connections'][number];
 
@@ -521,6 +525,179 @@ export function CatalogModule({ organizationId }: { organizationId: string }) {
             params={{ organizationId }}
           >
             <LinkLabel>Products</LinkLabel>
+          </Link>
+        </span>
+      </footer>
+    </>
+  );
+}
+
+/** Counts fulfillment that is held, delayed or failed, and shipments in transit. */
+export function FulfillmentModule({
+  organizationId,
+}: {
+  organizationId: string;
+}) {
+  const fulfillment = useQuery(
+    fulfillmentsOptions(organizationId, { view: 'all' }, 1),
+  );
+  if (fulfillment.isPending) return <ModuleSkeleton />;
+  if (fulfillment.isError)
+    return (
+      <p className="home-note">
+        Fulfillment health couldn’t be loaded. Try again shortly.
+      </p>
+    );
+  const { counts } = fulfillment.data;
+  const views = [
+    ['held', 'attention'],
+    ['delayed', 'attention'],
+    ['in_transit', 'running'],
+  ] as const;
+
+  return (
+    <>
+      {counts.all ? (
+        <ul className="home-rows home-rows-compact">
+          {views.map(([view, state]) => (
+            <li key={view}>
+              <Link
+                className="home-row"
+                to="/app/$organizationId/fulfillment"
+                params={{ organizationId }}
+                search={{ view }}
+              >
+                <StateDot state={counts[view] ? state : 'idle'} />
+                <span className="home-row-main">
+                  <strong>{fulfillmentViewLabels[view]}</strong>
+                </span>
+                <span className="home-row-status">
+                  {counts[view]}{' '}
+                  {counts[view] === 1 ? 'fulfillment' : 'fulfillments'}
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <div className="home-empty">
+          <span className="home-empty-icon" aria-hidden="true">
+            <Plus size={16} />
+          </span>
+          <div>
+            <strong>No fulfillment reported yet</strong>
+            <p>
+              Fulfillment work and shipments appear once a connected store or
+              ERP reports them.
+            </p>
+            <Link
+              className={buttonVariants({ variant: 'outline', size: 'sm' })}
+              to="/app/$organizationId/sync"
+              params={{ organizationId }}
+            >
+              Open Data sync
+            </Link>
+          </div>
+        </div>
+      )}
+      <footer className="home-module-footer">
+        <span>
+          {counts.attention} need{counts.attention === 1 ? 's' : ''} attention ·{' '}
+          {counts.open} open
+        </span>
+        <span className="home-module-links">
+          <Link
+            className="home-module-link"
+            to="/app/$organizationId/fulfillment"
+            params={{ organizationId }}
+          >
+            <LinkLabel>Fulfillment</LinkLabel>
+          </Link>
+        </span>
+      </footer>
+    </>
+  );
+}
+
+/** Counts returns by pending stage; each row opens the returns list filtered to that stage. */
+export function ReturnsModule({ organizationId }: { organizationId: string }) {
+  const returns = useQuery(returnSummaryOptions(organizationId));
+  if (returns.isPending) return <ModuleSkeleton />;
+  if (returns.isError)
+    return (
+      <p className="home-note">
+        Returns couldn’t be loaded. Try again shortly.
+      </p>
+    );
+  const { counts, sources } = returns.data;
+  const sharing = sources.filter((source) => source.access === 'granted');
+
+  return (
+    <>
+      {counts.views.all ? (
+        <ul className="home-rows home-rows-compact">
+          {workStages.map((stage) => {
+            const count = counts.stages[stage] ?? 0;
+
+            return (
+              <li key={stage}>
+                <Link
+                  className="home-row"
+                  to="/app/$organizationId/returns"
+                  params={{ organizationId }}
+                  search={{ view: 'all', stage }}
+                >
+                  <StateDot state={count ? stageStates[stage] : 'idle'} />
+                  <span className="home-row-main">
+                    <strong>{stageLabels[stage]}</strong>
+                  </span>
+                  <span className="home-row-status">
+                    {count} {count === 1 ? 'return' : 'returns'}
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <div className="home-empty">
+          <span className="home-empty-icon" aria-hidden="true">
+            <Plus size={16} />
+          </span>
+          <div>
+            <strong>
+              {sharing.length ? 'No returns yet' : 'Returns are not shared yet'}
+            </strong>
+            <p>
+              {sharing.length
+                ? 'Returns appear here when a connected store reports one.'
+                : 'Returns appear once a connected store shares returns and refunds with Luma.'}
+            </p>
+            <Link
+              className={buttonVariants({ variant: 'outline', size: 'sm' })}
+              to={
+                sharing.length
+                  ? '/app/$organizationId/sync'
+                  : '/app/$organizationId/connections'
+              }
+              params={{ organizationId }}
+            >
+              {sharing.length ? 'Open Data sync' : 'Review connections'}
+            </Link>
+          </div>
+        </div>
+      )}
+      <footer className="home-module-footer">
+        <span>
+          {counts.views.action} need action · {counts.views.waiting} waiting
+        </span>
+        <span className="home-module-links">
+          <Link
+            className="home-module-link"
+            to="/app/$organizationId/returns"
+            params={{ organizationId }}
+          >
+            <LinkLabel>Returns</LinkLabel>
           </Link>
         </span>
       </footer>

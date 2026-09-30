@@ -26,6 +26,17 @@ const text = (value: string | null | undefined) => {
   return trimmed && trimmed.length <= 512 ? trimmed : null;
 };
 
+// Only absolute web links are kept; anything else is treated as not provided.
+const trackingLink = (value: string | null | undefined) => {
+  const url = value?.trim();
+  if (!url || url.length > 2048) return null;
+  try {
+    return ['http:', 'https:'].includes(new URL(url).protocol) ? url : null;
+  } catch {
+    return null;
+  }
+};
+
 const ref = (id: number | string, scopeKey = ''): ExternalId => ({
   externalId: String(id),
   scopeKey,
@@ -83,7 +94,7 @@ export function createJtlConnector(
   function handler<
     K extends Exclude<
       ReadCapability,
-      'orders.shipping-method.read' | 'customers.read'
+      'orders.shipping-method.read' | 'customers.read' | 'returns.read'
     >,
   >(capability: K): CapabilityHandler<K> {
     return {
@@ -437,6 +448,15 @@ export function createJtlConnector(
               lastProgressAt: progress,
               progressBasis: 'note_created_or_package_shipped',
               failureCode: null,
+              kind: 'shipment',
+              // Packages name a shipping method key, not a carrier.
+              tracking: note.packages
+                .map((value) => ({
+                  carrier: null,
+                  number: text(value.trackingNumber ?? value.trackingID),
+                  url: trackingLink(value.trackingUrl),
+                }))
+                .filter((value) => value.number || value.url),
             });
           }
         }

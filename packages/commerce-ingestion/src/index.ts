@@ -20,7 +20,9 @@ const normalizers = {
   inventory: 'commerce/1',
   product: 'commerce/2',
   order: 'commerce/2',
-  fulfillment: 'commerce/1',
+  fulfillment: 'commerce/2',
+  return: 'commerce/1',
+  refund: 'commerce/1',
 } as const;
 
 /** Mapping method recorded for identities created by a history import or sync. */
@@ -193,6 +195,90 @@ export function createCommerceIngestion(
 
       return { status, entityId };
     }
+    if (input.capability === 'returns.read') {
+      const data = input.observation.data;
+      const entityId = await resolve(data.type, o.source),
+        orderId = await resolve('order', data.order);
+      const lineIds: (string | null)[] = [];
+      for (const line of data.lines)
+        lineIds.push(
+          line.orderLine ? await resolve('order_line', line.orderLine) : null,
+        );
+      const returnId =
+        data.type === 'refund' && data.return
+          ? await resolve('return', data.return)
+          : null;
+      if (!entityId || !orderId || missing.length)
+        return { status: 'pending', missing };
+      const parent = (await orders.current(context, orderId)).find(
+        (p) => p.snapshot.connectionId === o.source.connectionId,
+      );
+      if (
+        !parent ||
+        parent.snapshot.deleted ||
+        parent.snapshot.data.type !== 'order'
+      )
+        return {
+          status: 'pending',
+          missing: [{ ...o.source, ...data.order, resource: 'order' }],
+        };
+      const common = {
+        ...provenance,
+        normalizerVersion: normalizers[data.type],
+        entityId,
+        mappingVersion: digest(
+          JSON.stringify([entityId, orderId, lineIds, returnId]),
+        ),
+      };
+      const status =
+        data.type === 'return'
+          ? await orders.project(context, {
+              ...common,
+              kind: 'return',
+              data: {
+                type: 'return',
+                orderId,
+                name: data.name,
+                status: data.status,
+                requestedAt: data.requestedAt,
+                approvedAt: data.approvedAt,
+                closedAt: data.closedAt,
+                declineReason: data.declineReason,
+                receivedAt: data.receivedAt,
+                lines: data.lines.map((line, index) => ({
+                  orderLineId: lineIds[index] ?? null,
+                  quantity: line.quantity.amount,
+                  unit: line.quantity.unit,
+                  reason: line.reason,
+                  receivedQuantity: line.receivedQuantity,
+                  restockedQuantity: line.restockedQuantity,
+                  refundedQuantity: line.refundedQuantity,
+                  value: line.value,
+                })),
+              },
+            })
+          : await orders.project(context, {
+              ...common,
+              kind: 'refund',
+              data: {
+                type: 'refund',
+                orderId,
+                returnId,
+                createdAt: data.createdAt,
+                total: data.total,
+                lines: data.lines.map((line, index) => ({
+                  orderLineId: lineIds[index]!,
+                  quantity: line.quantity.amount,
+                  unit: line.quantity.unit,
+                  restock: line.restock,
+                  restocked: line.restocked,
+                })),
+                transactions: data.transactions,
+              },
+            });
+
+      return { status, entityId };
+    }
     const data = input.observation.data;
     const entityId = await resolve('fulfillment', o.source),
       orderId = await resolve('order', data.order);
@@ -206,6 +292,10 @@ export function createCommerceIngestion(
           unit: line.quantity.unit,
         });
     }
+    // An unknown location does not prevent storing fulfillment facts.
+    const locationId = data.location
+      ? await lookup({ ...o.source, ...data.location.id, resource: 'location' })
+      : null;
     if (!entityId || !orderId || missing.length)
       return { status: 'pending', missing };
     const parent = (await orders.current(context, orderId)).find(
@@ -230,13 +320,21 @@ export function createCommerceIngestion(
       throw new Error(
         'Fulfillment line must belong to its order and use the same unit',
       );
+    const optional = <K extends keyof typeof data>(key: K) =>
+      data[key] === undefined ? {} : { [key]: data[key] };
     const status = await orders.project(context, {
       ...provenance,
+      schemaVersion: 2,
       normalizerVersion: normalizers.fulfillment,
       entityId,
       kind: 'fulfillment',
       mappingVersion: digest(
-        JSON.stringify([entityId, orderId, lines.map((l) => l.orderLineId)]),
+        JSON.stringify([
+          entityId,
+          orderId,
+          lines.map((l) => l.orderLineId),
+          locationId,
+        ]),
       ),
       data: {
         type: 'fulfillment',
@@ -245,6 +343,21 @@ export function createCommerceIngestion(
         lastProgressAt: data.lastProgressAt,
         failureCode: data.failureCode,
         lines,
+        ...optional('kind'),
+        ...optional('holds'),
+        ...(data.location === undefined
+          ? {}
+          : {
+              location: data.location
+                ? { locationId, name: data.location.name }
+                : null,
+            }),
+        ...optional('fulfillAt'),
+        ...optional('fulfillBy'),
+        ...optional('estimatedDeliveryAt'),
+        ...optional('method'),
+        ...optional('tracking'),
+        ...optional('delivery'),
       },
     });
 
@@ -387,18 +500,20 @@ export function createCommerceIngestion(
     if (source.resource === 'customer')
       throw new Error('Customer profiles have no canonical mapping');
     // The key is explicit operator evidence, never an inferred SKU or display number.
+    const resource = source.resource;
     const id =
-      source.resource === 'order' ||
-      source.resource === 'order_line' ||
-      source.resource === 'fulfillment'
-        ? await orders.identify(
-            context,
-            source.resource,
-            source.resource === 'fulfillment'
-              ? JSON.stringify([source.connectionId, reconciliationKey])
-              : reconciliationKey,
-          )
-        : await inventory.identify(context, source.resource, reconciliationKey);
+      resource === 'order' || resource === 'order_line'
+        ? await orders.identify(context, resource, reconciliationKey)
+        : resource === 'fulfillment' ||
+            resource === 'return' ||
+            resource === 'refund'
+          ? // One source's operations; mirrored copies in other sources stay separate.
+            await orders.identify(
+              context,
+              resource,
+              JSON.stringify([source.connectionId, reconciliationKey]),
+            )
+          : await inventory.identify(context, resource, reconciliationKey);
     await sources.bind(context, source, id, observationId, method);
 
     return id;
@@ -443,6 +558,13 @@ export function createCommerceIngestion(
     if (kind === 'sku')
       for (const item of await orders.skuDependents(context, id, connectionId))
         await replay(item.connectionId, item.observationId);
+    if (kind === 'location')
+      for (const item of await orders.locationDependents(
+        context,
+        id,
+        connectionId,
+      ))
+        await replay(item.connectionId, item.observationId);
   }
 }
 
@@ -485,6 +607,15 @@ function identities(input: CommerceObservation): SourceIdentity[] {
     add('order', input.observation.data.order);
     for (const line of input.observation.data.lines)
       add('order_line', line.orderLine);
+    if (input.observation.data.location)
+      add('location', input.observation.data.location.id);
+  }
+  if (input.capability === 'returns.read') {
+    const data = input.observation.data;
+    add('order', data.order);
+    for (const line of data.lines)
+      if (line.orderLine) add('order_line', line.orderLine);
+    if (data.type === 'refund' && data.return) add('return', data.return);
   }
 
   return [...new Map(refs.map((ref) => [identityKey(ref), ref])).values()];

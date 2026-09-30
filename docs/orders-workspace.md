@@ -54,10 +54,10 @@ this option does not invalidate a cursor.
 ### Detail
 
 The detail read returns every source's facts, differences, fulfillments with source
-IDs, up to 100 snapshots of the order and its fulfillments, linked issues and workflow
+IDs (each opens in the [Fulfillment workspace](fulfillment-workspace.md)), up to 100 snapshots of the order and its fulfillments, linked issues and workflow
 runs, and the latest 25 activity events from the past year.
 
-- **Issues**: fulfillment issues through the fulfillment mapping, order issues through
+- **Issues**: fulfillment issues through the fulfillment ID or mapping, order issues through
   the order mapping or ID, SKU issues for any ordered SKU, and workflow-failure issues
   for runs on this order.
 - **Workflow runs**: Resolution runs whose target is this order (by Luma ID or any
@@ -80,7 +80,9 @@ come from the Shopify app's live read.
 
 Adapters populate optional canonical facts: `placedAt`, `total` and line `skuCode` and
 `title`. Existing snapshots keep working without them and gain them with the next source
-update. Customer, payment transaction, return and refund details are not stored.
+update. Returns and refunds are imported as order children and listed in **Returns and
+refunds** (see [Returns workspace](returns-workspace.md)). Customer and payment
+transaction details are not stored.
 
 For those, the web app mounts the owning app's `record` UI slot for each source
 connection (see [workspace apps](apps.md)). The Shopify app reads the order live

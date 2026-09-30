@@ -13,6 +13,8 @@ import {
   Receipt,
   Settings,
   ShoppingCart,
+  Truck,
+  Undo2,
   Users,
   Workflow,
 } from 'lucide-react';
@@ -29,7 +31,9 @@ export type DestinationPath =
   | 'orders'
   | 'customers'
   | 'products'
+  | 'returns'
   | 'inventory'
+  | 'fulfillment'
   | 'workflows'
   | 'procurement'
   | 'apps'
@@ -119,6 +123,16 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
     shortcut: 'k',
   },
   {
+    path: 'returns',
+    label: 'Returns',
+    Icon: Undo2,
+    description:
+      'Follow returns from request to refund, with pending work and money returned',
+    group: 'operations',
+    domain: 'returns',
+    shortcut: 't',
+  },
+  {
     path: 'inventory',
     label: 'Inventory',
     Icon: Boxes,
@@ -126,6 +140,16 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
     group: 'operations',
     domain: 'inventory',
     shortcut: 'v',
+  },
+  {
+    path: 'fulfillment',
+    label: 'Fulfillment',
+    Icon: Truck,
+    description:
+      'Held, delayed and in-transit fulfillment with the next safe step',
+    group: 'operations',
+    domain: 'fulfillment',
+    shortcut: 'f',
   },
   {
     path: 'workflows',

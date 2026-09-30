@@ -41,7 +41,7 @@ current snapshot ID, product title and status, vendor, publication, variant titl
 barcode, price, unit and read times, backfills them from current snapshots, and adds the
 comparison keys. The owner replaces a product's rows in the same transaction as its
 projection pointer, and removes them for tombstones and retired projections. Adapters
-populate the new facts at `shopify/2` and `jtl/2`; older product snapshots show them as
+populate the new facts from `shopify/2` and `jtl/2`; older product snapshots show them as
 not reported until the next import.
 
 ## Read model

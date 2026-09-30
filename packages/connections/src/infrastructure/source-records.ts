@@ -353,6 +353,18 @@ function evidenceIdentities(input: CommerceObservation) {
     });
     for (const line of input.observation.data.lines)
       refs.push({ ...source, ...line.orderLine, resource: 'order_line' });
+    const location = input.observation.data.location;
+    if (location)
+      refs.push({ ...source, ...location.id, resource: 'location' });
+  }
+  if (input.capability === 'returns.read') {
+    const data = input.observation.data;
+    refs.push({ ...source, ...data.order, resource: 'order' });
+    for (const line of data.lines)
+      if (line.orderLine)
+        refs.push({ ...source, ...line.orderLine, resource: 'order_line' });
+    if (data.type === 'refund' && data.return)
+      refs.push({ ...source, ...data.return, resource: 'return' });
   }
 
   return refs;

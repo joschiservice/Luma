@@ -1,4 +1,4 @@
-import { gid, timestamp } from '@luma/connector-shopify/schemas';
+import { count, gid, money, timestamp } from '@luma/connector-shopify/schemas';
 import { z } from 'zod';
 
 export * from '@luma/connector-shopify/schemas';
@@ -7,7 +7,7 @@ export * from '@luma/connector-shopify/schemas';
  * Version of this adapter's normalized output, recorded as observation provenance. Bump it
  * whenever the same provider response would normalize differently.
  */
-export const adapterVersion = 'shopify/2';
+export const adapterVersion = 'shopify/3';
 
 const externalId = z
   .object({ externalId: z.string().min(1), scopeKey: z.string() })
@@ -23,14 +23,17 @@ const total = z
 
 const text = z.string().min(1).max(512).nullable();
 
-const observation = <T extends z.ZodTypeAny>(resource: string, data: T) =>
+const observation = <T extends z.ZodTypeAny>(
+  resource: string | z.ZodTypeAny,
+  data: T,
+) =>
   z.object({
     id: z.string().uuid(),
     source: externalId.extend({
       tenantId: z.string().min(1),
       connectionId: z.string().min(1),
       provider: z.literal('shopify'),
-      resource: z.literal(resource),
+      resource: typeof resource === 'string' ? z.literal(resource) : resource,
     }),
     kind: z.literal('snapshot'),
     observedAt: timestamp,
@@ -54,6 +57,64 @@ const page = <T extends z.ZodTypeAny>(item: T) =>
   });
 
 const optionalText = (max: number) => z.string().min(1).max(max).nullable();
+
+const count6 = decimal.refine((value) => !value.startsWith('-'));
+
+const returnData = z.object({
+  type: z.literal('return'),
+  order: externalId,
+  name: text,
+  status: z.enum([
+    'requested',
+    'open',
+    'closed',
+    'declined',
+    'cancelled',
+    'unknown',
+  ]),
+  requestedAt: timestamp.nullable(),
+  approvedAt: timestamp.nullable(),
+  closedAt: timestamp.nullable(),
+  declineReason: z
+    .enum(['return_period_ended', 'final_sale', 'other'])
+    .nullable(),
+  receivedAt: timestamp.nullable(),
+  lines: z.array(
+    z.object({
+      orderLine: externalId.nullable(),
+      quantity,
+      reason: text,
+      receivedQuantity: count6.nullable(),
+      restockedQuantity: count6.nullable(),
+      refundedQuantity: count6.nullable(),
+      value: total,
+    }),
+  ),
+});
+
+const refundData = z.object({
+  type: z.literal('refund'),
+  order: externalId,
+  return: externalId.nullable(),
+  createdAt: timestamp.nullable(),
+  total,
+  lines: z.array(
+    z.object({
+      orderLine: externalId,
+      quantity,
+      restock: z.enum(['return', 'cancel', 'no_restock', 'unknown']),
+      restocked: z.boolean(),
+    }),
+  ),
+  transactions: z.array(
+    z.object({
+      status: z.enum(['success', 'pending', 'failed', 'unknown']),
+      amount: total.unwrap(),
+      processedAt: timestamp.nullable(),
+      gateway: text,
+    }),
+  ),
+});
 
 export const outputs = {
   'orders.read': page(
@@ -182,8 +243,73 @@ export const outputs = {
           .enum(['note_created_or_package_shipped', 'source_updated'])
           .optional(),
         failureCode: z.string().nullable(),
+        kind: z.enum(['fulfillment_order', 'shipment']),
+        holds: z
+          .array(
+            z.object({
+              reason: z.enum([
+                'awaiting_payment',
+                'high_risk_of_fraud',
+                'incorrect_address',
+                'inventory_out_of_stock',
+                'unknown_delivery_date',
+                'awaiting_return_items',
+                'other',
+              ]),
+            }),
+          )
+          .optional(),
+        location: z
+          .object({ id: externalId, name: z.string().min(1).nullable() })
+          .nullable(),
+        fulfillAt: timestamp.nullable().optional(),
+        fulfillBy: timestamp.nullable().optional(),
+        estimatedDeliveryAt: timestamp.nullable().optional(),
+        method: z
+          .object({
+            type: z.enum([
+              'shipping',
+              'pick_up',
+              'pickup_point',
+              'local',
+              'retail',
+              'none',
+              'unknown',
+            ]),
+            name: z.string().min(1).nullable(),
+          })
+          .nullable()
+          .optional(),
+        tracking: z
+          .array(
+            z.object({
+              carrier: z.string().min(1).nullable(),
+              number: z.string().min(1).nullable(),
+              url: z.string().url().nullable(),
+            }),
+          )
+          .optional(),
+        delivery: z
+          .enum([
+            'label_created',
+            'in_transit',
+            'out_for_delivery',
+            'attempted_delivery',
+            'delayed',
+            'ready_for_pickup',
+            'delivered',
+            'failed',
+          ])
+          .nullable()
+          .optional(),
       }),
     ),
+  ),
+  'returns.read': page(
+    observation(
+      z.enum(['return', 'refund']),
+      z.discriminatedUnion('type', [returnData, refundData]),
+    ).refine((item) => item.source.resource === item.data.type),
   ),
 };
 
@@ -210,7 +336,93 @@ export const inputs = {
   'fulfillment.read': changedInput.extend({
     order: scoped('Order').optional(),
   }),
+  'returns.read': changedInput.extend({
+    order: scoped('Order').optional(),
+  }),
 };
+
+// Provider records read for returns.read. Descriptive facts become unknown when malformed.
+const shopMoney = z
+  .object({ shopMoney: money })
+  .nullable()
+  .optional()
+  .catch(null);
+
+/** An order in a returns page, with whether it has any returns or refunds. */
+export const returnsPageOrder = z.object({
+  id: gid('Order'),
+  returns: z.object({ nodes: z.array(z.object({ id: gid('Return') })) }),
+  refunds: z.array(z.object({ id: gid('Refund') })),
+});
+
+export const returnNode = z.object({
+  id: gid('Return'),
+  name: z.string().nullable().optional().catch(null),
+  status: z.string(),
+  createdAt: timestamp.nullable().optional().catch(null),
+  requestApprovedAt: timestamp.nullable().optional().catch(null),
+  closedAt: timestamp.nullable().optional().catch(null),
+  decline: z.object({ reason: z.string() }).nullable().optional().catch(null),
+});
+
+export const returnLine = z.object({
+  id: z
+    .string()
+    .regex(/^gid:\/\/shopify\/(Unverified)?ReturnLineItem\/[0-9]+$/),
+  quantity: count,
+  refundedQuantity: count.nullable().optional().catch(null),
+  returnReasonDefinition: z
+    .object({ name: z.string() })
+    .nullable()
+    .optional()
+    .catch(null),
+  // Only verified lines are tied to a fulfilled order line.
+  fulfillmentLineItem: z
+    .object({
+      id: gid('FulfillmentLineItem'),
+      lineItem: z.object({ id: gid('LineItem') }),
+    })
+    .nullable()
+    .optional(),
+  withCodeDiscountedTotalPriceSet: shopMoney,
+});
+
+export const reverseFulfillmentOrder = z.object({
+  id: gid('ReverseFulfillmentOrder'),
+  status: z.string(),
+});
+
+export const reverseLine = z.object({
+  id: gid('ReverseFulfillmentOrderLineItem'),
+  fulfillmentLineItem: z.object({ id: gid('FulfillmentLineItem') }).nullable(),
+  dispositions: z.array(
+    z.object({ type: z.string(), quantity: count, createdAt: timestamp }),
+  ),
+});
+
+export const refundNode = z.object({
+  id: gid('Refund'),
+  createdAt: timestamp.nullable(),
+  updatedAt: timestamp,
+  totalRefundedSet: shopMoney,
+  return: z.object({ id: gid('Return') }).nullable(),
+});
+
+export const refundLine = z.object({
+  quantity: count,
+  restockType: z.string(),
+  restocked: z.boolean(),
+  lineItem: z.object({ id: gid('LineItem') }),
+});
+
+export const refundTransaction = z.object({
+  id: gid('OrderTransaction'),
+  kind: z.string(),
+  status: z.string(),
+  processedAt: timestamp.nullable(),
+  gateway: z.string().nullable().optional().catch(null),
+  amountSet: z.object({ shopMoney: money }),
+});
 
 export const customerNode = z.object({
   id: gid('Customer'),

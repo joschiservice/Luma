@@ -104,7 +104,7 @@ export const line = identity('LineItem').extend({
 export const returnLine = z.object({
   id: z.string(),
   quantity: z.number().int(),
-  returnReason: z.string(),
+  returnReasonDefinition: z.object({ name: z.string() }).nullable().optional(),
   fulfillmentLineItem: z.object({ lineItem: identity('LineItem') }).optional(),
 });
 

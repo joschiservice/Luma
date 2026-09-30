@@ -25,7 +25,9 @@ granted. Returned amounts retain their decimal representation and currency.
 
 OAuth requests `read_returns` and `read_locations` in addition to the existing
 required scopes. These additional scopes are optional for basic connection
-health. Set `SHOPIFY_PROTECTED_CUSTOMER_DATA_APPROVED=true` only after approval
+health. With `read_returns`, the connection grants `returns.read`, which imports
+returns and refunds into the [Returns workspace](../../../docs/returns-workspace.md).
+Connections authorized before `returns.read` existed must reconnect to grant it. Set `SHOPIFY_PROTECTED_CUSTOMER_DATA_APPROVED=true` only after approval
 for the deployed app in Shopify, then reconnect to request `read_customers`.
 The flag is an operator attestation, not proof of Shopify approval; provider
 denials remain visible. Customer context reads identity, update time, order

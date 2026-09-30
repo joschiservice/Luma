@@ -20,6 +20,7 @@ import { AppExtension } from '../apps/extension';
 import { SignInRedirect } from '../identity/common';
 import { IdentityError } from '../identity/data';
 import { recordReturnPath } from '../records/data';
+import { OrderReturns } from '../returns/order-returns';
 import { orderFilters, orderOptions, type OrdersSearch } from './data';
 import { OrderHeader } from './order-header';
 import { OrderInspector } from './order-inspector';
@@ -222,11 +223,16 @@ export function OrderDetailView({
                 organizationId={organizationId}
                 from={here}
               />
+              <OrderReturns
+                detail={detail}
+                organizationId={organizationId}
+                from={here}
+              />
               {contexts.map(({ source, content }) => (
                 <OrderSection
                   key={source.connectionId}
                   title={`${source.label} details`}
-                  description="Payments, customer, fulfillment holds, returns, refunds and source events, read live with this connection's permissions. Luma does not store these details."
+                  description="Payments, customer, fulfillment holds, returns, refunds and source events, read live with this connection's permissions. Luma stores returns and refunds shown above, but not these live details."
                 >
                   {content}
                 </OrderSection>

@@ -9,6 +9,7 @@ import {
   Receipt,
   ShoppingCart,
   Truck,
+  Undo2,
   Workflow,
 } from 'lucide-react';
 
@@ -19,6 +20,7 @@ export type Domain =
   | 'orders'
   | 'inventory'
   | 'products'
+  | 'returns'
   | 'procurement'
   | 'suppliers'
   | 'fulfillment'
@@ -31,6 +33,7 @@ const domainIcons: Record<Domain, LucideIcon> = {
   orders: Receipt,
   inventory: Boxes,
   products: Package,
+  returns: Undo2,
   procurement: ShoppingCart,
   suppliers: Factory,
   fulfillment: Truck,

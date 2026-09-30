@@ -85,6 +85,9 @@ export const note = z.object({
       id,
       deliveryNoteId: id,
       shippingDate: timestamp.nullable().optional(),
+      trackingNumber: z.string().nullable().optional().catch(null),
+      trackingID: z.string().nullable().optional().catch(null),
+      trackingUrl: z.string().nullable().optional().catch(null),
     }),
   ),
 });

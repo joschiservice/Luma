@@ -56,6 +56,7 @@ export async function readIssues(
       SELECT 'order',$2::text,NULL::text
       UNION ALL SELECT 'order',m.external_id,m.connection_id::text FROM connector_source_mappings m
        WHERE m.tenant_id=$1 AND m.resource='order' AND m.canonical_id=$2::uuid
+      UNION ALL SELECT 'fulfillment',id::text,NULL FROM unnest($3::uuid[]) id
       UNION ALL SELECT 'fulfillment',m.external_id,m.connection_id::text FROM connector_source_mappings m
        WHERE m.tenant_id=$1 AND m.resource='fulfillment' AND m.scope_key='' AND m.canonical_id=ANY($3::uuid[])
       UNION ALL SELECT 'sku',id,NULL FROM unnest($4::text[]) id
@@ -133,7 +134,10 @@ export async function readWorkflowRuns(
   return result.rows.map((row) => ({ ...row, createdAt: iso(row.createdAt) }));
 }
 
-/** Lists up to 100 observed snapshots of the order and its fulfillments, newest first. */
+/**
+ * Lists up to 100 observed snapshots of the order and its fulfillments, returns and refunds,
+ * newest first. Refunds have no status; they are reported as `recorded`.
+ */
 export async function readHistory(
   tx: SqlTransaction,
   tenantId: string,
@@ -141,7 +145,7 @@ export async function readHistory(
 ): Promise<OrderDetail['history']> {
   const result = await tx.query<{
     snapshotId: string;
-    entityKind: 'order' | 'fulfillment';
+    entityKind: 'order' | 'fulfillment' | 'return' | 'refund';
     entityId: string;
     connectionId: string;
     status: string | null;
@@ -166,7 +170,8 @@ export async function readHistory(
   return {
     entries: result.rows.slice(0, 100).map((row) => ({
       ...row,
-      status: row.status ?? 'unknown',
+      status:
+        row.status ?? (row.entityKind === 'refund' ? 'recorded' : 'unknown'),
       observedAt: row.observedAt.toISOString(),
       sourceUpdatedAt: iso(row.sourceUpdatedAt),
     })),

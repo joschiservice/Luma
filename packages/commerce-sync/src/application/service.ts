@@ -4,6 +4,7 @@ import { IdentityError, requireRole } from '@luma/identity';
 
 import {
   historyWindow,
+  orderChildren,
   recordCapabilities,
   recordTypes,
   streamStatus,
@@ -172,7 +173,7 @@ export function createSyncService(deps: SyncServiceDependencies) {
                   ? streamView(
                       stream,
                       coverage.get(stream.id),
-                      recordType === 'fulfillments' && ordersImporting,
+                      orderChildren.includes(recordType) && ordersImporting,
                     )
                   : null,
               };

@@ -12,6 +12,7 @@ import {
   Package,
   Receipt,
   Truck,
+  Undo2,
   Users,
 } from 'lucide-react';
 
@@ -43,6 +44,12 @@ export const recordTypes: Record<
     noun: 'customers',
     one: 'customer',
     Icon: Users,
+  },
+  returns: {
+    title: 'Returns and refunds',
+    noun: 'returns and refunds',
+    one: 'return or refund',
+    Icon: Undo2,
   },
 };
 

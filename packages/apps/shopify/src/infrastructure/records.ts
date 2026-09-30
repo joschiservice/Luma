@@ -633,13 +633,13 @@ export function createShopifyRecordReader(
         (
           await children(
             'returnLineItems',
-            'id quantity returnReason ... on ReturnLineItem { fulfillmentLineItem { lineItem { id } } }',
+            'id quantity returnReasonDefinition { name } ... on ReturnLineItem { fulfillmentLineItem { lineItem { id } } }',
             s.returnLine,
           )
         ).map((v) =>
           row(v.id, {
             Quantity: v.quantity,
-            Reason: v.returnReason,
+            Reason: v.returnReasonDefinition?.name ?? null,
             'Order line': v.fulfillmentLineItem?.lineItem.id ?? null,
           }),
         ),
