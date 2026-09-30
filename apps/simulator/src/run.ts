@@ -25,6 +25,12 @@ export const commandSchema = z.discriminatedUnion('kind', [
   }),
   z.object({ kind: z.literal('ship'), id: orderId }),
   z.object({
+    kind: z.literal('hold'),
+    id: orderId,
+    reason: z.enum(shopify.shopifyHoldReasons),
+  }),
+  z.object({ kind: z.literal('release'), id: orderId }),
+  z.object({
     kind: z.literal('shipping-method'),
     id: orderId,
     shippingMethodId: z.enum(['7', '8', '9']),
@@ -139,8 +145,11 @@ export function provisionOperationalStock(run: Run) {
 /** Applies the same provider command for manual inputs and scheduled merchant actions. */
 export function mutate(run: Run, instance: 'jtl' | 'shopify', input: unknown) {
   const command = commandSchema.parse(input);
-  if (instance === 'jtl') jtl.command(run.jtl, command, run.clock.now);
-  else {
+  if (instance === 'jtl') {
+    if (command.kind === 'hold' || command.kind === 'release')
+      throw new Error('JTL fulfillment holds are unsupported');
+    jtl.command(run.jtl, command, run.clock.now);
+  } else {
     if (command.kind === 'shipping-method')
       throw new Error('Shopify shipping-method writes are unsupported');
     shopify.command(run.shopify, command, run.clock.now);

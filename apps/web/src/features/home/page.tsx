@@ -54,6 +54,7 @@ import {
   AttentionModule,
   CatalogModule,
   ConnectionsModule,
+  FulfillmentModule,
   HandlingModule,
   OutcomesModule,
 } from './modules';
@@ -297,6 +298,8 @@ export function HomePage() {
         return <ActivityModule organizationId={organizationId} />;
       case 'catalog':
         return <CatalogModule organizationId={organizationId} />;
+      case 'fulfillment':
+        return <FulfillmentModule organizationId={organizationId} />;
     }
     if (!data)
       return (

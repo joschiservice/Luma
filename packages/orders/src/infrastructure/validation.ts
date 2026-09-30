@@ -94,12 +94,85 @@ const fulfillment = z
     lines: z
       .array(z.object({ orderLineId: uuid, quantity: positive, unit }).strict())
       .refine((v) => new Set(v.map((l) => l.orderLineId)).size === v.length),
+    kind: z.enum(['fulfillment_order', 'shipment']).nullable().optional(),
+    holds: z
+      .array(
+        z
+          .object({
+            reason: z.enum([
+              'awaiting_payment',
+              'high_risk_of_fraud',
+              'incorrect_address',
+              'inventory_out_of_stock',
+              'unknown_delivery_date',
+              'awaiting_return_items',
+              'other',
+            ]),
+          })
+          .strict(),
+      )
+      .max(50)
+      .optional(),
+    location: z
+      .object({ locationId: uuid.nullable(), name: text.nullable() })
+      .strict()
+      .nullable()
+      .optional(),
+    fulfillAt: timestamp.nullable().optional(),
+    fulfillBy: timestamp.nullable().optional(),
+    estimatedDeliveryAt: timestamp.nullable().optional(),
+    method: z
+      .object({
+        type: z.enum([
+          'shipping',
+          'pick_up',
+          'pickup_point',
+          'local',
+          'retail',
+          'none',
+          'unknown',
+        ]),
+        name: text.nullable(),
+      })
+      .strict()
+      .nullable()
+      .optional(),
+    tracking: z
+      .array(
+        z
+          .object({
+            carrier: text.nullable(),
+            number: text.nullable(),
+            url: z
+              .string()
+              .max(2048)
+              .url()
+              .regex(/^https?:\/\//i)
+              .nullable(),
+          })
+          .strict(),
+      )
+      .max(50)
+      .optional(),
+    delivery: z
+      .enum([
+        'label_created',
+        'in_transit',
+        'out_for_delivery',
+        'attempted_delivery',
+        'delayed',
+        'ready_for_pickup',
+        'delivered',
+        'failed',
+      ])
+      .nullable()
+      .optional(),
   })
   .strict();
 
 // Order snapshots use version 2 since they may carry dueAt, placedAt, total and line SKU
-// text and title. Version 1 order documents stay valid, including any of those optional
-// facts they already carry. Fulfillment snapshots are unchanged at version 1.
+// text and title. Fulfillment snapshots use version 2 since they may carry kind, holds,
+// location, dates, method, tracking and delivery state. Version 1 documents stay valid.
 export const snapshotSchema = z.union([
   base
     .extend({
@@ -110,7 +183,7 @@ export const snapshotSchema = z.union([
     .strict(),
   base
     .extend({
-      schemaVersion: z.literal(1),
+      schemaVersion: z.union([z.literal(1), z.literal(2)]),
       kind: z.literal('fulfillment'),
       data: fulfillment,
     })

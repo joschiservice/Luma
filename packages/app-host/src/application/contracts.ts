@@ -21,6 +21,7 @@ export interface AppManifest {
     | 'record'
     | 'inventory'
     | 'customers'
+    | 'fulfillment'
   )[];
   connectionTypes: { kind: string; name: string }[];
 }

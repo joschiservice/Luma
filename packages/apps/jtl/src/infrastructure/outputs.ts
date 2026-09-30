@@ -4,7 +4,7 @@ import { z } from 'zod';
  * Version of this adapter's normalized output, recorded as observation provenance. Bump it
  * whenever the same provider response would normalize differently.
  */
-export const adapterVersion = 'jtl/2';
+export const adapterVersion = 'jtl/3';
 
 const timestamp = z.string().datetime({ offset: true });
 
@@ -134,6 +134,14 @@ export const outputs = {
           .enum(['note_created_or_package_shipped', 'source_updated'])
           .optional(),
         failureCode: z.string().nullable(),
+        kind: z.literal('shipment'),
+        tracking: z.array(
+          z.object({
+            carrier: z.null(),
+            number: z.string().min(1).nullable(),
+            url: z.string().url().nullable(),
+          }),
+        ),
       }),
     ),
   ),

@@ -9,6 +9,7 @@ import { z } from 'zod';
 
 import { ShopifyAccess } from './access.js';
 import { ShopifyCustomers } from './customers.js';
+import { ShopifyFulfillmentRecovery } from './fulfillment-recovery.js';
 import { ShopifyInventoryCorrection } from './inventory-correction.js';
 import { ShopifyOrderContext } from './order-context.js';
 import { ShopifyRecordPage } from './record-page.js';
@@ -25,6 +26,17 @@ export default function ShopifySettings(props: AppUiProps) {
       />
     ) : null;
   if (props.slot === 'customers') return <ShopifyCustomers {...props} />;
+  if (props.slot === 'fulfillment')
+    return props.fulfillment ? (
+      <ShopifyFulfillmentRecovery
+        key={`${props.fulfillment.connectionId}:${props.fulfillment.fulfillmentId}`}
+        connectionId={props.fulfillment.connectionId}
+        orderId={props.fulfillment.orderId}
+        fulfillmentOrderId={props.fulfillment.fulfillmentId}
+        services={props.services}
+        headingLevel={3}
+      />
+    ) : null;
   if (props.slot === 'record')
     return props.record ? (
       <ShopifyOrderContext

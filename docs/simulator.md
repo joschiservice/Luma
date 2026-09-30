@@ -27,7 +27,7 @@ Provider truth lives in the simulator database, separately from the pilot's obse
 Both scenarios seed orders `1` and `10`, a canvas tote SKU, 100 units of initial stock, and JTL shipping methods `7` (Standard), `8` (Express), and `9` (Pickup).
 
 - **Autonomous commerce:** every 30 simulation seconds, a merchant order reserves Shopify stock. An explicit mapping propagates the order to JTL after five seconds. JTL ships after 20 seconds; Shopify receives shipment progress five seconds later. These are simulated merchant/integration actions, not work assigned to Luma. Luma's shipping-method correction is performed only through its real execution path.
-- **Manual sandbox:** no recurring events. Use merchant actions to create orders, set stock, ship an order, or change its JTL shipping method.
+- **Manual sandbox:** no recurring events. Use merchant actions to create orders, set stock, ship an order, change its JTL shipping method, or hold and release a Shopify fulfillment order. Shopify fulfillment orders carry a location, a fulfill-by date two days after the order and a delivery method; shipments carry tracking. The simulator does not implement Shopify's fulfillment mutations. Advance the clock between merchant actions: Luma only replaces a snapshot with a strictly newer Shopify update time.
 
 Seeded randomness determines quantities; generated order IDs start at `11`. Use IDs outside the scenario's generated sequence for manual orders. The journal records manual commands, scheduled events, requests, writes, responses, and faults with stable sequence numbers and affected resource IDs. Equal-time events run by insertion order.
 

@@ -282,6 +282,7 @@ $('#command').onsubmit = (event) => {
     ...(data.kind === 'shipping-method'
       ? { shippingMethodId: data.shippingMethodId }
       : {}),
+    ...(data.kind === 'hold' ? { reason: data.reason } : {}),
   };
   void control({ action: 'command', instance: $('#provider').value, command });
 };

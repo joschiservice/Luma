@@ -15,6 +15,7 @@ export const appManifestSchema = z.object({
       'record',
       'customers',
       'inventory',
+      'fulfillment',
     ]),
   ),
   connectionTypes: z.array(z.object({ kind: z.string(), name: z.string() })),

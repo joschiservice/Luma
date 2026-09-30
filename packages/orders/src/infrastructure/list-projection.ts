@@ -2,6 +2,7 @@ import type { TenantContext } from '@luma/identity';
 import { requireRole } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
 
+import { refreshFulfillmentList } from './fulfillment-list.js';
 import {
   currentOrderSources,
   orderProgress,
@@ -147,6 +148,11 @@ export function createOrderListRebuilder(db: TenantDatabase) {
         [context.tenantId, rows.map(({ id }) => id)],
       );
       await refreshOrderList(
+        tx,
+        context.tenantId,
+        rows.map(({ id }) => id),
+      );
+      await refreshFulfillmentList(
         tx,
         context.tenantId,
         rows.map(({ id }) => id),

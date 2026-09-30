@@ -58,7 +58,9 @@
         {
           "id": 40,
           "deliveryNoteId": 30,
-          "shippingDate": "2026-09-16T13:00:00Z"
+          "shippingDate": "2026-09-16T13:00:00Z",
+          "trackingNumber": "00340434161094042557",
+          "trackingUrl": "https://tracking.example.test/00340434161094042557"
         }
       ]
     },
@@ -66,7 +68,15 @@
       "id": 31,
       "salesOrderId": 10,
       "deliveryNoteDate": "2026-09-17T12:00:00Z",
-      "packages": [{ "id": 41, "deliveryNoteId": 31, "shippingDate": null }]
+      "packages": [
+        {
+          "id": 41,
+          "deliveryNoteId": 31,
+          "shippingDate": null,
+          "trackingID": "",
+          "trackingUrl": "javascript:alert(1)"
+        }
+      ]
     }
   ],
   "noteLines": [
