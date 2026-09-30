@@ -53,6 +53,15 @@ export const variant = z.object({
   id: gid('ProductVariant'),
   sku: z.string().nullable(),
   inventoryItem: z.object({ id: gid('InventoryItem') }),
+  // Descriptive facts become unknown when malformed; they never block the product read.
+  title: z.string().nullable().optional().catch(null),
+  price: z
+    .string()
+    .regex(/^-?\d{1,14}(\.\d{1,6})?$/)
+    .nullable()
+    .optional()
+    .catch(null),
+  barcode: z.string().nullable().optional().catch(null),
 });
 
 export const product = z.object({
@@ -60,6 +69,18 @@ export const product = z.object({
   updatedAt: timestamp,
   title: z.string(),
   status: z.string(),
+  vendor: z.string().nullable().optional().catch(null),
+  publishedAt: timestamp.nullable().optional().catch(null),
+  // Variant prices are in the shop currency, which the price range reports.
+  priceRangeV2: z
+    .object({
+      minVariantPrice: z.object({
+        currencyCode: z.string().regex(/^[A-Z]{3}$/),
+      }),
+    })
+    .nullable()
+    .optional()
+    .catch(null),
 });
 
 export const inventoryItem = z.object({

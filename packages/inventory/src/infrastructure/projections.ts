@@ -115,6 +115,7 @@ export function createCommerceProjections(
               tenant,
               value.entityId,
               value.connectionId,
+              snapshot,
               value,
             );
 
@@ -169,6 +170,7 @@ export function createCommerceProjections(
             tenant,
             value.entityId,
             value.connectionId,
+            id,
             value,
           );
 
@@ -323,6 +325,7 @@ async function refreshProductSkus(
   tenant: string,
   productId: string,
   connectionId: string,
+  snapshotId: string,
   value: CanonicalSnapshot,
 ) {
   await tx.query(
@@ -330,16 +333,39 @@ async function refreshProductSkus(
     [tenant, productId, connectionId],
   );
   if (value.deleted || value.data.type !== 'product') return;
+  const data = value.data;
+  // Each row repeats the product's listing facts so catalog reads use plain columns.
   await tx.query(
-    `INSERT INTO inventory_product_skus(tenant_id,product_id,connection_id,sku_id,code)
-    SELECT DISTINCT ON (sku_id) $1::uuid,$2::uuid,$3::uuid,sku_id,code
-    FROM unnest($4::uuid[],$5::text[]) AS s(sku_id,code) ORDER BY sku_id,code NULLS LAST`,
+    `INSERT INTO inventory_product_skus(tenant_id,product_id,connection_id,sku_id,code,snapshot_id,
+      product_title,product_status,vendor,published,variant_title,barcode,price_amount,price_currency,unit,
+      observed_at,source_updated_at)
+    SELECT DISTINCT ON (s.sku_id) $1::uuid,$2::uuid,$3::uuid,s.sku_id,s.code,$4::uuid,$5,$6,$7,$8,
+      s.title,s.barcode,s.amount::numeric,s.currency,s.unit,$9::timestamptz,$10::timestamptz
+    FROM jsonb_to_recordset($11::jsonb)
+      AS s(sku_id uuid,code text,title text,barcode text,amount text,currency text,unit text)
+    ORDER BY s.sku_id,s.code NULLS LAST`,
     [
       tenant,
       productId,
       connectionId,
-      value.data.skus.map((sku) => sku.skuId),
-      value.data.skus.map((sku) => sku.code),
+      snapshotId,
+      data.title,
+      data.status,
+      data.vendor ?? null,
+      data.published ?? null,
+      value.observedAt,
+      value.sourceUpdatedAt,
+      JSON.stringify(
+        data.skus.map((sku) => ({
+          sku_id: sku.skuId,
+          code: sku.code,
+          title: sku.title ?? null,
+          barcode: sku.barcode ?? null,
+          amount: sku.price?.amount ?? null,
+          currency: sku.price?.currency ?? null,
+          unit: sku.unit,
+        })),
+      ),
     ],
   );
 }

@@ -37,15 +37,11 @@ function lineColumns(
               <>
                 {' · '}
                 <Link
-                  to="/app/$organizationId/records/$kind/$recordId"
-                  params={{
-                    organizationId,
-                    kind: 'sku',
-                    recordId: line.skuId,
-                  }}
+                  to="/app/$organizationId/products/$skuId"
+                  params={{ organizationId, skuId: line.skuId }}
                   search={{ from }}
                 >
-                  Stock and product
+                  Product and stock
                 </Link>
               </>
             ) : (

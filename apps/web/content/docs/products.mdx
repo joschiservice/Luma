@@ -1,0 +1,45 @@
+---
+title: Compare products across systems
+description: Find a SKU, see how your store and ERP list it, and fix listings that are missing or disagree.
+---
+
+Products shows every SKU that a connected store or ERP shares in its catalog. Each SKU has one row, with every source side by side, so you can see at a glance how Shopify and your ERP describe the same item. Luma reads catalogs; it does not change listings.
+
+## Find a SKU
+
+Search by SKU code, product or variant title, barcode, vendor, or the product or SKU ID in a source system. The views narrow the list:
+
+- **Differs by source** shows SKUs whose sources disagree on title, status, sales channel, price or barcode.
+- **Not in every source** shows SKUs that at least one catalog does not list. Some items are meant to exist in one system only, such as packaging managed only in your ERP.
+- **Possible matches** shows SKUs with a SKU of the same code in another source that is not linked yet.
+
+Use **Listed in** and **Missing from** to answer questions such as "what is in the ERP but not in the store". Every filter is part of the address, so you can share it or pin it to the sidebar.
+
+## How sources are compared
+
+No system is treated as the authority. Luma compares what each source reports:
+
+- Titles are compared without regard to case, spacing and punctuation, so "Linen apron · Small" and "Linen apron Small" agree.
+- Prices are compared only within the same currency. JTL-Wawi item prices do not include a currency, so they are shown but not compared.
+- Barcodes are compared without leading zeros, so UPC and EAN forms of the same code agree.
+- **Sales channel** means publication to the Shopify Online Store, or activation for shops in JTL-Wawi.
+
+"Not in catalog" is only certain after Luma has read that source's full catalog. Until the first full read finishes, the product page says so.
+
+## Read a product
+
+The comparison table lines up each source's product, SKU code, status, sales channel, price, barcode, vendor, source IDs and read time. Fields that differ are marked.
+
+Below it you find what depends on the SKU:
+
+- **Stock by location** with each source's available quantity. Open a location to compare stock in Inventory.
+- **Sales in the last 30 days**, per source, as units ordered by placed date. Sales are not added across systems because the same order can exist in more than one.
+- **Orders with this SKU**, open orders first. **Search Orders** opens every order that mentions the SKU code.
+- **Supply commitments** from purchase orders, **Issues** for the SKU or its stock, and **Other variants** of the same product.
+- **Listing history** shows each catalog read, so you can see when a price or status changed.
+
+## Link the same item across sources
+
+When a store and an ERP use the same SKU code for one item, the product page offers the match. Owners and admins can link the SKUs in the sources section. After the link applies, both listings appear in one row, and stock and orders from both sources belong to the same SKU. Unlinking moves a source back to its own SKU.
+
+You can reach a product from an order line, a stock position, an issue about a SKU, the Records explorer and search. Press G then K to open Products.

@@ -76,6 +76,18 @@ function IssueWorkspace({
               Inspect inventory <ArrowRight size={14} />
             </Link>
           ) : null}
+          {item?.subject.kind === 'sku' ? (
+            <Link
+              to="/app/$organizationId/products"
+              params={{ organizationId }}
+              search={{
+                q: item.subject.id,
+                from: `${location.pathname}${location.searchStr}`,
+              }}
+            >
+              Inspect product <ArrowRight size={14} />
+            </Link>
+          ) : null}
           {item ? (
             <Link
               to="/app/$organizationId/records"

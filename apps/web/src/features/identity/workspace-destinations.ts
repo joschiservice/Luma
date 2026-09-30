@@ -9,6 +9,7 @@ import {
   House,
   Inbox,
   type LucideIcon,
+  Package,
   Receipt,
   Settings,
   ShoppingCart,
@@ -27,6 +28,7 @@ export type DestinationPath =
   | 'insights'
   | 'orders'
   | 'customers'
+  | 'products'
   | 'inventory'
   | 'workflows'
   | 'procurement'
@@ -105,6 +107,16 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
     description: 'Customer identity, order history and service context',
     group: 'operations',
     shortcut: 'u',
+  },
+  {
+    path: 'products',
+    label: 'Products',
+    Icon: Package,
+    description:
+      'Compare SKU listings, prices and status across your store and ERP',
+    group: 'operations',
+    domain: 'products',
+    shortcut: 'k',
   },
   {
     path: 'inventory',

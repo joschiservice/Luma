@@ -145,10 +145,40 @@ export interface FulfillmentSnapshot {
   failureCode: string | null;
 }
 
+/**
+ * A source list price. `currency` is null when the source reports an amount without its
+ * currency; such prices are shown but never compared.
+ */
+export interface ListPrice {
+  /** Decimal string with at most six fractional and fourteen integer digits. */
+  amount: string;
+  currency: string | null;
+}
+
+/**
+ * A product and its variants as the source reports them. Optional fields are omitted when the
+ * adapter does not read them; null means the source did not report a value.
+ */
 export interface ProductSnapshot {
   title: string | null;
-  status: 'active' | 'archived' | 'unknown';
-  skus: { id: ExternalId; code: string | null; unit: string }[];
+  status: 'active' | 'draft' | 'archived' | 'unknown';
+  /** Brand or manufacturer text; descriptive only. */
+  vendor?: string | null;
+  /**
+   * Whether the source offers the product on its own sales channel: Shopify's Online Store
+   * publication, JTL's shop activation.
+   */
+  published?: boolean | null;
+  skus: {
+    id: ExternalId;
+    code: string | null;
+    unit: string;
+    /** Variant title, for example a size or colour; null for a product's only variant. */
+    title?: string | null;
+    price?: ListPrice | null;
+    /** GTIN, EAN or UPC text; descriptive only. */
+    barcode?: string | null;
+  }[];
 }
 
 /**

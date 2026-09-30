@@ -46,6 +46,16 @@ const money = z
   .object({ amount: decimal, currency: z.string().regex(/^[A-Z]{3}$/) })
   .strict();
 
+const listPrice = z
+  .object({
+    amount: decimal,
+    currency: z
+      .string()
+      .regex(/^[A-Z]{3}$/)
+      .nullable(),
+  })
+  .strict();
+
 const text = z.string().min(1).max(512);
 
 const observation = <T extends z.ZodTypeAny>(
@@ -178,13 +188,18 @@ export const commerceSchema = z.discriminatedUnion('capability', [
         z
           .object({
             title: z.string().max(1024).nullable(),
-            status: z.enum(['active', 'archived', 'unknown']),
+            status: z.enum(['active', 'draft', 'archived', 'unknown']),
+            vendor: z.string().max(1024).nullable().optional(),
+            published: z.boolean().nullable().optional(),
             skus: z.array(
               z
                 .object({
                   id: external,
                   code: z.string().max(1024).nullable(),
                   unit,
+                  title: z.string().max(1024).nullable().optional(),
+                  price: listPrice.nullable().optional(),
+                  barcode: z.string().max(512).nullable().optional(),
                 })
                 .strict(),
             ),

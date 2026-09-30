@@ -5,6 +5,7 @@ import {
   Factory,
   Inbox,
   type LucideIcon,
+  Package,
   Receipt,
   ShoppingCart,
   Truck,
@@ -17,6 +18,7 @@ import { cn } from '../../lib/utils';
 export type Domain =
   | 'orders'
   | 'inventory'
+  | 'products'
   | 'procurement'
   | 'suppliers'
   | 'fulfillment'
@@ -28,6 +30,7 @@ export type Domain =
 const domainIcons: Record<Domain, LucideIcon> = {
   orders: Receipt,
   inventory: Boxes,
+  products: Package,
   procurement: ShoppingCart,
   suppliers: Factory,
   fulfillment: Truck,

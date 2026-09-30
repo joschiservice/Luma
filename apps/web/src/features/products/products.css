@@ -1,0 +1,240 @@
+.products-page {
+  display: grid;
+  gap: 16px;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+.products-page > .page-header {
+  margin-bottom: 0;
+}
+.products-page a {
+  color: var(--signal-text);
+}
+.products-views,
+.products-search,
+.products-detail-toolbar,
+.products-pagination,
+.products-pagination > div,
+.products-flags,
+.products-gap-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.products-views [aria-pressed='true'] {
+  background: var(--muted);
+  color: var(--foreground);
+}
+.products-views button {
+  gap: 6px;
+}
+.products-search {
+  flex: 1 1 300px;
+  flex-wrap: nowrap;
+  color: var(--muted-foreground);
+}
+.products-search input {
+  min-width: 0;
+}
+.products-cell,
+.products-listing,
+.products-source-header {
+  display: grid;
+  gap: 4px;
+  overflow-wrap: anywhere;
+}
+.products-flags {
+  gap: 6px;
+}
+.products-cell small,
+.products-listing small,
+.products-source-header small,
+.products-note,
+.products-muted,
+.products-pagination,
+.products-related small {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.products-source-header small {
+  font-weight: 400;
+}
+.products-listing {
+  min-width: 170px;
+}
+.products-listing-gap > span {
+  color: var(--muted-foreground);
+}
+.products-difference {
+  color: var(--foreground);
+  font-weight: 650;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 4px;
+}
+.products-note {
+  margin: 0;
+  line-height: 1.6;
+}
+.products-pagination,
+.products-detail-toolbar {
+  justify-content: space-between;
+}
+.products-loading {
+  display: grid;
+  gap: 8px;
+}
+.products-loading .lu-skeleton {
+  height: 74px;
+}
+.products-back {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  width: fit-content;
+  font-size: 13px;
+}
+.products-explanation {
+  border-left: 3px solid var(--domain-products);
+  padding: 4px 0 4px 16px;
+  max-width: 900px;
+}
+.products-explanation h2,
+.products-section h2,
+.products-gaps h2 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+}
+.products-explanation p {
+  color: var(--muted-foreground);
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 6px 0 0;
+}
+.products-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.products-gaps {
+  display: grid;
+  gap: 10px;
+}
+.products-gaps p {
+  margin: 0;
+}
+.products-gap-actions {
+  margin-top: 8px;
+  font-size: 13px;
+}
+.products-context-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.products-section {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 18px;
+  min-width: 0;
+}
+.products-related {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.products-related li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 12px;
+  font-size: 13px;
+}
+.products-related a {
+  overflow-wrap: anywhere;
+}
+.products-related small {
+  grid-column: 1/-1;
+}
+.products-sales {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+.products-sales figcaption {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+.products-sales figcaption strong {
+  font-weight: 500;
+}
+.products-sales figcaption span {
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+.products-sales-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 48px;
+  border-bottom: 1px solid var(--border);
+}
+.products-sales-bar {
+  flex: 1 1 0;
+  min-width: 2px;
+  border-radius: 4px 4px 0 0;
+  background: var(--domain-products);
+}
+.products-sales-bar:hover {
+  opacity: 0.8;
+}
+.products-sales-bar[data-empty] {
+  height: 0;
+}
+.products-sales-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: -4px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.products-sales-days {
+  font-size: 12px;
+}
+.products-sales-days table {
+  border-collapse: collapse;
+  margin-top: 6px;
+}
+.products-sales-days th,
+.products-sales-days td {
+  text-align: left;
+  padding: 2px 16px 2px 0;
+  font-variant-numeric: tabular-nums;
+}
+.products-sales-days th {
+  color: var(--muted-foreground);
+  font-weight: 500;
+}
+@media (max-width: 760px) {
+  .products-context-grid {
+    grid-template-columns: 1fr;
+  }
+  .products-section {
+    padding: 14px;
+  }
+}
+.products-comparison table {
+  min-width: 640px;
+}
+.products-list-table table {
+  min-width: 760px;
+}

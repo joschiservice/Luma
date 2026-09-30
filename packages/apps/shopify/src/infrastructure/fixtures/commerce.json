@@ -38,12 +38,22 @@
     "id": "gid://shopify/Product/2",
     "updatedAt": "2026-09-16T00:00:00Z",
     "title": "Blue mug",
-    "status": "ACTIVE"
+    "status": "ACTIVE",
+    "vendor": "Harbor Ceramics",
+    "publishedAt": "2026-09-01T00:00:00Z",
+    "priceRangeV2": {
+      "minVariantPrice": {
+        "currencyCode": "EUR"
+      }
+    }
   },
   "variants": [
     {
       "id": "gid://shopify/ProductVariant/21",
       "sku": "MUG-Blue",
+      "title": "Blue",
+      "price": "14.50",
+      "barcode": "0012345678905",
       "inventoryItem": {
         "id": "gid://shopify/InventoryItem/31"
       }
