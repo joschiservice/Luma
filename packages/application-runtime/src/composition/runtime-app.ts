@@ -5,7 +5,10 @@ import type {
   WorkflowConfig,
 } from '@luma/config';
 import type { ConnectionManagement } from '@luma/connections';
-import { createInstallationRepository } from '@luma/connections/composition';
+import {
+  createInstallationRepository,
+  createInstalledPurchaseOrderRuntime,
+} from '@luma/connections/composition';
 import type { IdentityService } from '@luma/identity';
 import { createIdentity } from '@luma/identity/composition';
 import { registerIdentityHttp } from '@luma/identity/http';
@@ -23,7 +26,10 @@ import { Pool } from 'pg';
 
 import { createMetricListener } from '../infrastructure/metric-listener.js';
 import { createApplicationServices } from './application.js';
-import { authoringAvailability } from './authoring.js';
+import {
+  authoringAvailability,
+  supplierExtractionAvailability,
+} from './authoring.js';
 import { createCommerceSyncService } from './commerce-sync.js';
 import { buildApp } from './http-app.js';
 import { createReadinessCheck } from './readiness.js';
@@ -121,6 +127,24 @@ export async function buildRuntimeApp(
         : {}),
       ...(modelGateway ? { modelGateway } : {}),
       authoring: authoringAvailability(modelSettings, !!modelGateway),
+      supplierExtraction: supplierExtractionAvailability(
+        modelSettings,
+        !!modelGateway,
+      ),
+      ...(connections && 'registry' in installedConnections
+        ? {
+            purchasing: {
+              runtime: createInstalledPurchaseOrderRuntime({
+                installations: installedConnections.connections,
+                providers: installedConnections.registry.providers(),
+                // Procurement stores the purchase-order observations it uses as evidence.
+                record: async () => undefined,
+                recordObservations: async () => undefined,
+              }),
+              installations: installedConnections.connections,
+            },
+          }
+        : {}),
     });
     const metricEvents = createMetricListener(settings.databaseUrl);
     resources.add(metricEvents.close);

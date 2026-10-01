@@ -1,3 +1,4 @@
+import type { TenantContext } from '@luma/identity';
 import { IdentityError } from '@luma/identity';
 
 import type {
@@ -7,6 +8,10 @@ import type {
 } from '../../application/capabilities.js';
 import { createCapabilityRuntime } from '../../application/capabilities.js';
 import type {
+  EffectIntent,
+  VerificationResult,
+} from '../../application/effects.js';
+import type {
   ConnectionProvider,
   ProviderRuntimeOptions,
 } from '../../application/provider.js';
@@ -14,6 +19,7 @@ import {
   createShippingMethodEffects,
   type ShippingMethodEffectBinding,
 } from '../../application/shipping-method-effects.js';
+import type { CapabilityInput } from '../../domain/capabilities.js';
 import { ConnectorError } from '../../domain/capabilities.js';
 import type { InstallationCapability } from '../../domain/installation.js';
 
@@ -125,3 +131,40 @@ export function createInstalledShippingMethodEffects(
 ) {
   return createShippingMethodEffects(installedRuntime(options), binding);
 }
+
+/** Maps, prechecks and verifies purchase-order submissions; the runtime fixes the capability. */
+export interface PurchaseOrderSubmissionBinding {
+  map(
+    context: TenantContext,
+    intent: EffectIntent,
+  ): Promise<CapabilityInput<'purchase-orders.submit'> | null>;
+  checkPreconditions(
+    context: TenantContext,
+    intent: EffectIntent,
+  ): Promise<boolean>;
+  verify(
+    context: TenantContext,
+    intent: EffectIntent,
+  ): Promise<VerificationResult>;
+}
+
+/**
+ * Supplies purchase-order reads and submission effects through the same installation-gated
+ * runtime. Submissions are dispatched only by execution adapters bound to Action Admission.
+ */
+export function createInstalledPurchaseOrderRuntime(
+  options: InstalledRuntimeOptions,
+) {
+  const runtime = installedRuntime(options);
+
+  return Object.freeze({
+    read: runtime.read,
+    discover: runtime.discover,
+    submissionEffects: (binding: PurchaseOrderSubmissionBinding) =>
+      runtime.effects({ capability: 'purchase-orders.submit', ...binding }),
+  });
+}
+
+export type InstalledPurchaseOrderRuntime = ReturnType<
+  typeof createInstalledPurchaseOrderRuntime
+>;

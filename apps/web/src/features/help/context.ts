@@ -8,6 +8,7 @@ export type HelpTopic =
   | 'products'
   | 'fulfillment'
   | 'returns'
+  | 'procurement'
   | 'data-sync'
   | 'workflows'
   | 'workflows/create';

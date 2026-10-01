@@ -181,6 +181,19 @@ Tests: procurement domain tests, `apps/api/e2e/procurement.e2e.mjs` and
 `procurement.browser.mjs`. See [Procurement records](procurement.md) for authority,
 provenance, transitions and retry semantics.
 
+Supplier commitments (submission, confirmations, receipts, messages, follow-ups) start at
+`packages/procurement/src/domain/commitments.ts` for progress and review rules and
+`application/commitments.ts` for use cases; extraction is `application/extraction.ts` and
+storage `infrastructure/commitment-store.ts` with migration `0049_supplier_commitments.sql`.
+Composition is `packages/application-runtime/src/composition/procurement-submissions.ts`
+(purchasing system port, submit effect, admission) and `supplier-follow-up.ts` (background
+pass in the sync worker). Order and supplier context reads are in
+`packages/read-models/src/infrastructure/procurement/context.ts`. The record pages are
+`apps/web/src/features/procurement/detail.tsx`, `supplier.tsx` and `record-dialogs.tsx`; the
+JTL adapter is `packages/apps/jtl/src/infrastructure/purchase-orders.ts`. Tests:
+`commitments.test.ts`, `extraction.test.ts`, `supplier-commitments.e2e.mjs` and
+`supplier-commitments.browser.mjs`. See [Supplier commitments](supplier-commitments.md).
+
 ## Replenishment workflow
 
 Start at `packages/procurement/src/domain/replenishment.ts` for the bounded stock

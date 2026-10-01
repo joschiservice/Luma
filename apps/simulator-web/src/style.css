@@ -244,6 +244,22 @@ pre {
 .event code {
   overflow-wrap: anywhere;
 }
+.purchasing {
+  margin-top: 20px;
+}
+.purchase-order {
+  border-top: 1px solid #c3cdbd;
+  margin-top: 16px;
+  padding-top: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 16px;
+}
+.purchase-order p {
+  margin: 4px 0 0;
+  font-size: 13px;
+}
 .fault {
   border-top: 1px solid #c3cdbd;
   margin-top: 20px;

@@ -4,6 +4,7 @@ export type InstallationCapability =
   | ReadCapability
   | 'inventory.available.reconcile'
   | 'orders.shipping-method.write'
+  | 'purchase-orders.submit'
   | 'fulfillment.hold.release'
   | 'fulfillment.open'
   | 'fulfillment.move';

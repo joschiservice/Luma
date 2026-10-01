@@ -3,7 +3,12 @@
 `@luma/procurement` owns suppliers and purchase orders. Connector commerce
 projections remain separate. A purchase order contains immutable line IDs, SKU,
 description, quantity and unit, plus a supplier name snapshot. It does not model
-prices, invoices, receipts or warehouse movements.
+prices, invoices or warehouse movements. Submission to a supplier's purchasing
+system, supplier confirmations and booked receipts are described in
+[Supplier commitments](supplier-commitments.md).
+
+A supplier can be linked to its record in one purchasing-system connection, with the
+hours it has to confirm a sent order. Link changes are revision-checked and audited.
 
 Owners and admins can create records and change order status. Members can read.
 Every use case refreshes membership before accessing the tenant store. The
@@ -35,7 +40,8 @@ All new orders start as drafts.
 | Closed / Cancelled | None                |
 
 Opening records an operational commitment; it does not send the order to a
-supplier. Closing records completion; it does not record goods received.
+supplier. Closing records completion; it does not record goods received. A verified
+submission moves a draft to open. Receipt is read from the purchasing system.
 Transitions require a reason and the current revision. Terminal orders retain
 all records and cannot reopen. Correct a draft by cancelling it and creating a
 new order.
@@ -95,7 +101,8 @@ scenario evaluation.
 - `application/procurement.ts`: membership, commands and business operations.
 - `infrastructure/store.ts`: transactional storage and audit composition.
 - `packages/api-contract/src/contracts/procurement.ts`: documented HTTP surface.
-- `apps/web/src/features/procurement`: directory, order list, details and forms.
+- `apps/web/src/features/procurement`: order list, purchase-order and supplier records,
+  and forms.
 
 Run `pnpm --filter @luma/procurement test`,
 `pnpm test:e2e procurement.e2e.mjs` and

@@ -176,6 +176,9 @@ export async function seedPilot(
                   ? [
                       'orders.shipping-method.read',
                       'orders.shipping-method.write',
+                      'suppliers.read',
+                      'purchase-orders.read',
+                      'purchase-orders.submit',
                     ]
                   : []),
               ]

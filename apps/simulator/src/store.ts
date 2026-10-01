@@ -3,6 +3,7 @@ import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
 import type { JournalEntry } from '@luma/simulator-core';
+import { ensurePurchasing } from '@luma/simulator-jtl';
 import { restoreTotalQuantities } from '@luma/simulator-shopify';
 
 import { type Measure, unmeasured } from './performance.js';
@@ -68,6 +69,7 @@ export async function openStore(path: string, measure: Measure = unmeasured) {
       for (const run of Object.values(runs)) {
         run.serviceHealth ??= { jtl: 'healthy', shopify: 'healthy' };
         run.operationalScenarios ??= [];
+        ensurePurchasing(run.jtl);
         provisionOperationalStock(run);
         persist(run);
       }
@@ -77,7 +79,9 @@ export async function openStore(path: string, measure: Measure = unmeasured) {
       .prepare('SELECT document FROM simulator_runs')
       .all()) {
       const run = JSON.parse(String(row.document)) as Run;
-      if (restoreTotalQuantities(run.shopify)) persist(run);
+      const purchasing = !run.jtl.purchaseOrders;
+      ensurePurchasing(run.jtl);
+      if (restoreTotalQuantities(run.shopify) || purchasing) persist(run);
     }
     database.exec('COMMIT');
   } catch (error) {

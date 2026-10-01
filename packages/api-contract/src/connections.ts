@@ -13,6 +13,9 @@ export const installationPermissions = z.enum([
   'returns.read',
   'orders.shipping-method.read',
   'orders.shipping-method.write',
+  'suppliers.read',
+  'purchase-orders.read',
+  'purchase-orders.submit',
 ]);
 
 const header = z

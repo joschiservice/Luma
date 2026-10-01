@@ -86,7 +86,25 @@ it('rejects other destinations, API roots, credentials and writes before opening
       fetch(`${endpoint.baseUrl}items`, { method, body: '{}' }),
     ).rejects.toThrow('not approved');
   }
+  await expect(
+    approvedJtlFetch(endpoint, { writeMethod: 'PATCH' })(
+      `${endpoint.baseUrl}purchase-orders`,
+      { method: 'POST', body: '{}' },
+    ),
+  ).rejects.toThrow('not approved');
   expect(request).not.toHaveBeenCalled();
+});
+
+it('sends the body only for the approved write method', async () => {
+  respond('{"purchaseOrderId":"1"}', 201);
+  const result = await approvedJtlFetch(endpoint, { writeMethod: 'POST' })(
+    `${endpoint.baseUrl}purchase-orders`,
+    { method: 'POST', body: '{"supplierId":"1"}' },
+  );
+  expect(result.status).toBe(201);
+  expect(vi.mocked(request).mock.calls[0]![1]).toMatchObject({
+    method: 'POST',
+  });
 });
 
 it('rejects oversized provider responses', async () => {

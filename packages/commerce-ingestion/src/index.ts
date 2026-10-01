@@ -496,6 +496,8 @@ export function createCommerceIngestion(
     requireTenant(context, source.tenantId);
     if (source.resource === 'customer')
       throw new Error('Customer profiles have no canonical mapping');
+    if (source.resource === 'supplier' || source.resource === 'purchase_order')
+      throw new Error('Procurement owns supplier and purchase-order records');
     // The key is explicit operator evidence, never an inferred SKU or display number.
     const resource = source.resource;
     const id =

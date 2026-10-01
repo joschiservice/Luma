@@ -7,10 +7,13 @@ export interface ApprovedJtlEndpoint {
   addresses: readonly string[];
 }
 
-/** Pin the socket address while retaining TLS hostname verification for the approved API root. */
+/**
+ * Pin the socket address while retaining TLS hostname verification for the approved API root.
+ * Only GET is allowed unless `writeMethod` names the single write method the capability needs.
+ */
 export function approvedJtlFetch(
   endpoint: ApprovedJtlEndpoint,
-  options: { allowWrites?: boolean } = {},
+  options: { writeMethod?: 'PATCH' | 'POST' } = {},
 ): typeof globalThis.fetch {
   const base = new URL(endpoint.baseUrl);
 
@@ -25,11 +28,7 @@ export function approvedJtlFetch(
       url.username ||
       url.password ||
       (method !== 'GET' &&
-        !(
-          options.allowWrites &&
-          method === 'PATCH' &&
-          typeof init?.body === 'string'
-        ))
+        !(method === options.writeMethod && typeof init?.body === 'string'))
     )
       throw new Error('JTL destination is not approved');
 
@@ -82,7 +81,7 @@ export function approvedJtlFetch(
         },
       );
       req.on('error', reject);
-      req.end(method === 'PATCH' ? init?.body : undefined);
+      req.end(method === 'GET' ? undefined : init?.body);
     });
   };
 }

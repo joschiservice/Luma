@@ -33,7 +33,13 @@ export async function observeProviders({
           capability,
           version: '0',
           input: {
-            limit: capability === 'orders.shipping-method.read' ? 1 : 100,
+            limit:
+              capability === 'orders.shipping-method.read'
+                ? 1
+                : // Each purchase order is a detail read; JTL pages are capped at 25.
+                  capability === 'purchase-orders.read'
+                  ? 25
+                  : 100,
             ...(progress.cursor ? { cursor: progress.cursor } : {}),
             ...(capability === 'orders.shipping-method.read'
               ? { order: { externalId: '10', scopeKey: '' } }

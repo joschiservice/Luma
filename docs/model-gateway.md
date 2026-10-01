@@ -54,6 +54,15 @@ Describing workflows ([Describe a workflow](workflows.md#describe-a-workflow)) i
 | Deadline reached or caller cancelled                                                         | `timeout` or `aborted`                                                 |
 | Truncated, filtered, refused or malformed output                                             | `invalid_output`                                                       |
 
+## Supplier extraction profile
+
+Reading supplier messages ([Supplier commitments](supplier-commitments.md)) uses profile
+`supplier-extraction` with the same sensitive, EU, zero-retention policy and the same route
+requirements as authoring (`supplierExtractionAvailability`). Without such a route, messages
+are stored and people record facts by selecting text; no model is called. Route it like
+authoring, for example `"supplier-extraction":{"adapter":"bedrock-eu",...}` in
+`MODEL_GATEWAY_ROUTES`. The processing-path review applies before sending tenant data.
+
 ## Data policy
 
 Applications assign `dataPolicy` after authorization. Classify the whole input, including system messages, retrieved context, tool definitions and tool results. Any tenant or personal data is `sensitive`, requires `region: 'EU'` and uses a route with zero data retention. Trace context is correlation metadata, not authorization. Never accept the classification or profile directly from an HTTP body.

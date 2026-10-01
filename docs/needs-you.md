@@ -6,11 +6,12 @@ through that owner's review. The queue never approves, rejects or runs anything.
 
 ## Sources
 
-| Source                           | Owner and rule                                                                                                                                                                                                                 | Responses                                                               |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
-| Cases (`case:<exceptionId>`)     | `caseDecisionQuery` in `@luma/exceptions`: the inbox attention rules (approval, manual step, uncertainty), minus approvals whose current proposal already has a response                                                       | Case desk review and decisions                                          |
-| Replenishment (`replenishment:`) | `pending` on the procurement replenishment service: runs awaiting a decision whose proposal is bound, unexpired and unanswered, with the same `canRespond` rule as the run review                                              | `decideReplenishment` on the workflow run                               |
-| Apps (`<appId>:<kind>:<id>`)     | `AppDefinition.decisions` in `@luma/app-host`. Shopify lists stock corrections and fulfillment recoveries awaiting approval, awaiting a run by their requester, or accepted/uncertain without a verified outcome (last 7 days) | The app's own commands through its `inventory` or `fulfillment` UI slot |
+| Source                           | Owner and rule                                                                                                                                                                                                                 | Responses                                                                  |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| Cases (`case:<exceptionId>`)     | `caseDecisionQuery` in `@luma/exceptions`: the inbox attention rules (approval, manual step, uncertainty), minus approvals whose current proposal already has a response                                                       | Case desk review and decisions                                             |
+| Replenishment (`replenishment:`) | `pending` on the procurement replenishment service: runs awaiting a decision whose proposal is bound, unexpired and unanswered, with the same `canRespond` rule as the run review                                              | `decideReplenishment` on the workflow run                                  |
+| Supplier orders (`supplier:`)    | `pending` on the procurement supplier-commitment service: attention from `orderProgress` (submission approvals, uncertain sends, facts to review, changed commitments, overdue confirmations and deliveries)                   | The order's own review (`PurchaseOrderReview`) with owner `purchase_order` |
+| Apps (`<appId>:<kind>:<id>`)     | `AppDefinition.decisions` in `@luma/app-host`. Shopify lists stock corrections and fulfillment recoveries awaiting approval, awaiting a run by their requester, or accepted/uncertain without a verified outcome (last 7 days) | The app's own commands through its `inventory` or `fulfillment` UI slot    |
 
 Owners present their decisions: `why`, `consequences` (what each response causes), `change`
 (the exact source, record, location and quantities) and evidence validity. Case and
@@ -50,8 +51,9 @@ approval authority.
 ## Live refresh
 
 Migration 0047 adds `luma_metrics` notification triggers to assignments, workflow process
-steps, replenishment claims, executed actions and the Shopify preview and claim tables. Case,
-proposal and policy tables already notify. The web queue subscribes to the shared workspace
+steps, replenishment claims, executed actions and the Shopify preview and claim tables.
+Migration 0049 adds the supplier-commitment tables. Case, proposal, policy and purchase-order
+tables already notify. The web queue subscribes to the shared workspace
 metric stream and refetches on every `refetch` event, and polls every 30 seconds while the
 stream is interrupted.
 

@@ -40,11 +40,15 @@ export function createInstallationService(
 export { createSecretCipher, createInstallationRepository };
 
 export {
+  createInstalledPurchaseOrderRuntime,
   createInstalledRuntime,
   createInstalledShippingMethodEffects,
 } from './infrastructure/installations/runtime.js';
 
-export type { InstalledRuntimeOptions } from './infrastructure/installations/runtime.js';
+export type {
+  InstalledPurchaseOrderRuntime,
+  InstalledRuntimeOptions,
+} from './infrastructure/installations/runtime.js';
 
 export type { StoredInstallation } from './application/installations.js';
 

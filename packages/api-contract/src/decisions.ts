@@ -10,6 +10,7 @@ export const decisionKindSchema = z.enum([
   'replenishment',
   'fulfillment_recovery',
   'inventory_correction',
+  'supplier_commitment',
 ]);
 
 /**
@@ -68,6 +69,10 @@ export const decisionOwnerSchema = z.discriminatedUnion('kind', [
     kind: z.literal('app_inventory'),
     appId: z.string().min(1),
     positionId: z.string().uuid(),
+  }),
+  z.object({
+    kind: z.literal('purchase_order'),
+    purchaseOrderId: z.string().uuid(),
   }),
 ]);
 

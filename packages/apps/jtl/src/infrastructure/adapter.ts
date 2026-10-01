@@ -16,6 +16,7 @@ import { API_VERSION, createClient, fail, parse } from '@luma/connector-jtl';
 import { z } from 'zod';
 
 import { adapterVersion, outputs } from './outputs.js';
+import { createJtlPurchaseOrderCapabilities } from './purchase-orders.js';
 import * as s from './schemas.js';
 import { createJtlShippingMethodCapabilities } from './shipping-method.js';
 
@@ -60,6 +61,8 @@ export interface JtlConnectorOptions extends JtlTransportOptions {
   rawRetentionMs?: number;
   /** Enable only after confirming sales-order read/write grants and endpoint support. */
   shippingMethodActions?: boolean;
+  /** Enable only after confirming purchase-order write and item read grants and endpoint support. */
+  purchaseOrderActions?: boolean;
   /** Map configured JTL unit labels to canonical units without converting quantities. */
   units?: Record<string, string>;
   now?: () => Date;
@@ -94,7 +97,11 @@ export function createJtlConnector(
   function handler<
     K extends Exclude<
       ReadCapability,
-      'orders.shipping-method.read' | 'customers.read' | 'returns.read'
+      | 'orders.shipping-method.read'
+      | 'customers.read'
+      | 'returns.read'
+      | 'suppliers.read'
+      | 'purchase-orders.read'
     >,
   >(capability: K): CapabilityHandler<K> {
     return {
@@ -515,6 +522,7 @@ export function createJtlConnector(
       ...(options.shippingMethodActions
         ? createJtlShippingMethodCapabilities(options)
         : {}),
+      ...createJtlPurchaseOrderCapabilities(options),
       'orders.read': handler('orders.read'),
       'products.read': handler('products.read'),
       'inventory.read': handler('inventory.read'),

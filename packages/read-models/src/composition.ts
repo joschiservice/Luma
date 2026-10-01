@@ -19,4 +19,7 @@ export { createDecisionQueue } from './infrastructure/decisions/queue.js';
 export {
   appDecisionProvider,
   replenishmentDecisionProvider,
+  supplierCommitmentDecisionProvider,
 } from './infrastructure/decisions/providers.js';
+
+export { createProcurementContext } from './infrastructure/procurement/context.js';

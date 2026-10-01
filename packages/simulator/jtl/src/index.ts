@@ -1,7 +1,34 @@
 import type { ProviderRequest } from '@luma/simulator-core';
 import { json } from '@luma/simulator-core';
 
-export interface JtlState {
+import {
+  createPurchaseOrder,
+  type JtlPurchasing,
+  readPurchasing,
+  seedPurchasing,
+} from './purchasing.js';
+
+export {
+  ensurePurchasing,
+  purchasingCommand,
+  purchaseOrderDetail,
+  seedPurchasing,
+  supplierEvents,
+  supplierProfiles,
+} from './purchasing.js';
+
+export type {
+  JtlItemSupplier,
+  JtlPurchaseOrder,
+  JtlPurchaseOrderLine,
+  JtlPurchasing,
+  JtlSupplier,
+  PurchasingCommand,
+  SupplierEvent,
+  SupplierProfile,
+} from './purchasing.js';
+
+export interface JtlState extends JtlPurchasing {
   orders: {
     id: string;
     salesOrderNumber: string;
@@ -104,6 +131,7 @@ export function seed(): JtlState {
       { id: '8', name: 'Express' },
       { id: '9', name: 'Pickup' },
     ],
+    ...seedPurchasing(),
   };
 }
 
@@ -232,6 +260,23 @@ export function command(state: JtlState, command: JtlCommand, time: number) {
 /** Identifies a JTL request for fault targeting and journal links. */
 export function identify(request: ProviderRequest) {
   const path = new URL(request.url).pathname;
+  const itemSuppliers = /\/items\/([^/]+)\/suppliers$/.exec(path);
+  if (itemSuppliers)
+    return { operation: 'items.read', resource: itemSuppliers[1]! };
+  const purchasing = /\/(suppliers|purchase-orders)(?:\/([^/]+))?$/.exec(path);
+  if (purchasing) {
+    const [, root, id] = purchasing;
+    if (root === 'suppliers')
+      return { operation: 'suppliers.read', ...(id ? { resource: id } : {}) };
+
+    return {
+      operation:
+        request.method === 'POST'
+          ? 'purchase-orders.submit'
+          : 'purchase-orders.read',
+      ...(id ? { resource: id } : {}),
+    };
+  }
   const order = /sales-orders\/([^/]+)(?:\/line-items)?$/.exec(path);
 
   const resource =
@@ -254,15 +299,19 @@ export function identify(request: ProviderRequest) {
   };
 }
 
-/** Serves the JTL surface consumed by the real connector, including nested pages. */
+/**
+ * Serves the JTL surface consumed by the real connector, including nested pages. `wallTime`
+ * stamps purchase-order creation, which Luma looks up by its own clock; it defaults to `time`.
+ */
 export function handle(
   state: JtlState,
   request: ProviderRequest,
   time: number,
+  wallTime = time,
 ) {
   const url = new URL(request.url);
   const match =
-    /\/(sales-orders|items|delivery-notes|warehouses|shipping-methods)(?:\/(.*))?$/.exec(
+    /\/(sales-orders|items|delivery-notes|warehouses|shipping-methods|suppliers|purchase-orders)(?:\/(.*))?$/.exec(
       url.pathname,
     );
   if (!match) return json({}, 404);
@@ -294,6 +343,13 @@ export function handle(
 
     return { ...json({ salesOrderId: id }), committed: true };
   }
+  if (request.method === 'POST' && root === 'purchase-orders' && !rest)
+    return createPurchaseOrder(
+      state,
+      request.body,
+      request.headers['idempotency-key'],
+      wallTime,
+    );
   if (request.method !== 'GET') return json({}, 405);
   const page = (rows: unknown[]) => {
     const number = Number(url.searchParams.get('pageNumber') ?? 1);
@@ -316,6 +372,8 @@ export function handle(
       nextPageNumber: number + 1,
     });
   };
+  const purchasing = readPurchasing(state, root!, id, child, url, page);
+  if (purchasing) return purchasing;
   if (root === 'shipping-methods') return page(state.shippingMethods);
   if (root === 'warehouses')
     return id === '1' && child === 'items' && rest?.endsWith('/1/stocks')

@@ -13,3 +13,5 @@ export { fulfillmentRoutes } from './api/fulfillment.js';
 export { returnRoutes } from './api/returns.js';
 
 export { decisionRoutes } from './api/decisions.js';
+
+export { procurementContextRoutes } from './api/procurement.js';

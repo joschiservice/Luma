@@ -28,7 +28,11 @@ import {
 } from './data';
 import { statusLabels } from './presentation';
 
-function useCommand<T, R>(
+/**
+ * Runs a procurement command and keeps an uncertain request's body for an exact retry. The
+ * form locks while a request is pending or its outcome is unknown.
+ */
+export function useCommand<T, R>(
   organizationId: string,
   save: (body: T) => Promise<R>,
   saved: (value: R) => void,

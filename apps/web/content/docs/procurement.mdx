@@ -1,0 +1,51 @@
+---
+title: Track purchase orders from draft to goods received
+description: Send approved purchase orders through your ERP, follow supplier confirmations and receipts, and answer changes and missed deadlines.
+---
+
+Procurement shows your suppliers and purchase orders and where each order stands. Every order moves through four separate milestones, so a draft is never mistaken for goods on the way:
+
+- **Drafted**: the order exists in Luma. Replenishment drafts say whether Luma verified them.
+- **Sent to supplier**: the order was placed in your purchasing system (JTL-Wawi) and found there again by a separate read. Your purchasing system sends it to the supplier.
+- **Supplier confirmed**: the supplier confirmed quantities and dates, read from your purchasing system or recorded from a supplier message.
+- **Goods received**: units were booked as received in your purchasing system. Only that booking counts. A supplier saying goods were shipped, or closing the order in Luma, does not.
+
+## Find an order
+
+The list shows each order's stage, its next expected delivery and who acts next. Use the tiles to see orders that **need a response**, orders **waiting on the supplier** and **drafts not sent**, or filter by stage. Search by reference, supplier or SKU. You can also find suppliers and orders from search with ⌘K.
+
+## Link a supplier
+
+To send orders from Luma, link the supplier to the same supplier in your purchasing system. Open the supplier and choose **Link to purchasing system**, then pick the connection and the supplier. The connection needs supplier and purchase-order access; reconnect it in Apps if it doesn't have them.
+
+Set how many hours the supplier has to confirm a sent order. After that, an unconfirmed order appears in [Needs you](/docs/needs-you).
+
+Every item on the order must also be linked to an item in the purchasing system. If one isn't, the order page names the SKU to link first. Prices and tax come from your purchasing system's supplier terms; Luma doesn't set them.
+
+## Send an order
+
+On a draft or open order, choose **Send to supplier**, check the lines and pick a requested delivery date. Sending is an external commitment, so a different owner or admin approves it. They see the request in Needs you and on the order. After approval, Luma places the order once and checks with a separate read that it exists with the right supplier and lines.
+
+If the purchasing system doesn't confirm the request, the order shows **Sending** and Luma checks whether it was created. It never sends the same order twice. Approval requests expire after 24 hours.
+
+## Follow the supplier
+
+Luma reads the order in your purchasing system regularly and records each new confirmation and goods receipt. Choose **Check for updates** to read it now. Each line shows what was ordered, confirmed and received, when it's expected and the current stock for the item.
+
+When a supplier confirms fewer units or a later date, the order asks you to **accept the change** or **follow up** with the supplier. A follow-up records what you did and when Luma should check again. Missed confirmations and overdue deliveries come back the same way until they are resolved.
+
+## Record supplier messages
+
+Choose **Add message** to paste a supplier's email, portal note or phone notes. The same message is recorded once, even if you add it again.
+
+If your workspace reads messages automatically, Luma lists what the supplier states, such as confirmed quantities, delivery dates, shipments and conditions. Each fact is highlighted in the message. Facts that change the order, conditions and anything unclear wait for your review: confirm or reject them on the order or in Needs you.
+
+You can always record facts yourself: select the words in the message that state them and choose **Record what this says**. To fix a recorded fact, choose **Correct** and give a reason. Corrections are added to the history; nothing is overwritten.
+
+Message text is removed after one year. Owners and admins can remove it sooner from **Message details**. The recorded facts stay.
+
+## Supplier records
+
+A supplier's page shows its open commitments, what's awaiting confirmation or overdue, every order with its stage, and the items you buy from it with current stock and units still on order. Units on order are not confirmed incoming stock.
+
+Owners and admins can link suppliers, send and approve orders and record messages. Members can view everything.

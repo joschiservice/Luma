@@ -55,6 +55,9 @@ export default function JtlSettings({
         suppliedConnection?.permissions.includes(
           'orders.shipping-method.write',
         ) ?? false,
+      purchasing:
+        suppliedConnection?.permissions.includes('purchase-orders.submit') ??
+        false,
     },
     onSubmit: async ({ value }) => {
       if (lock.current || uncertain) return;
@@ -83,6 +86,13 @@ export default function JtlSettings({
             ? ([
                 'orders.shipping-method.read',
                 'orders.shipping-method.write',
+              ] as const)
+            : []),
+          ...(value.purchasing
+            ? ([
+                'suppliers.read',
+                'purchase-orders.read',
+                'purchase-orders.submit',
               ] as const)
             : []),
         ],
@@ -224,6 +234,21 @@ export default function JtlSettings({
               )}
             </form.Field>
           }
+          <form.Field name="purchasing">
+            {(field) => (
+              <label className="connection-checkbox">
+                <input
+                  type="checkbox"
+                  checked={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.checked)}
+                  disabled={pending}
+                />
+                Permit submitting approved purchase orders (requires
+                suppliers.read, purchaseorders.read, purchaseorders.write and
+                items.read)
+              </label>
+            )}
+          </form.Field>
         </>
       ) : null}
       <p id="connection-result" role="alert" ref={result} tabIndex={-1}>
