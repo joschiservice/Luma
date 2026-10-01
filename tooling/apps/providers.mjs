@@ -2,6 +2,7 @@ import { createAppHost } from '@luma/app-catalog';
 import { createApp as jtl, createJtlProvider } from '@luma/app-jtl';
 import { createApp as shopify, createShopifyProvider } from '@luma/app-shopify';
 import {
+  createInstalledPurchaseOrderRuntime as purchaseOrders,
   createInstalledRuntime as runtime,
   createInstalledShippingMethodEffects as effects,
 } from '@luma/connections/composition';
@@ -59,4 +60,9 @@ export function createInstalledRuntime(options) {
 /** Builds simulator effects with explicit provider contributions. */
 export function createInstalledShippingMethodEffects(options, binding) {
   return effects({ ...options, providers: fixtureProviders(options) }, binding);
+}
+
+/** Builds simulator purchase-order reads and submission effects with explicit providers. */
+export function createInstalledPurchaseOrderRuntime(options) {
+  return purchaseOrders({ ...options, providers: fixtureProviders(options) });
 }

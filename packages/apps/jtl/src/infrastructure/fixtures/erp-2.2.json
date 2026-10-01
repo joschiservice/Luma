@@ -1,6 +1,6 @@
 {
   "sourceUrl": "https://developer.jtl-software.com/openapi/erp/2.2.json",
-  "sourceSha256": "e6e48c4046dfbd1136b54ccba59074d9a02175a9f26525944c922ff883c8ee5e",
+  "sourceSha256": "9afa86ef23b99c07389fd7deedd55eb9c257cc2d0f5e3a5ee576b144a05f579c",
   "version": "2.2",
   "paths": {
     "/v2/sales-orders": {
@@ -98,6 +98,7 @@
           "in": "header"
         }
       ],
+      "scopes": ["salesorders.read"],
       "response": {
         "$ref": "#/components/schemas/JTL.Framework.Api.Abstraction.Models.PagedListOfJTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.SalesOrderListItem"
       }
@@ -117,6 +118,7 @@
           "in": "header"
         }
       ],
+      "scopes": ["salesorders.read", "all.read"],
       "response": {
         "type": "array",
         "items": {
@@ -203,6 +205,7 @@
           "in": "header"
         }
       ],
+      "scopes": ["items.read"],
       "response": {
         "$ref": "#/components/schemas/JTL.Framework.Api.Abstraction.Models.PagedListOfJTL.Wawi.Item.PublicApi.DataTransferObjects.V2.ItemOverview.ItemListItem"
       }
@@ -222,6 +225,7 @@
           "in": "header"
         }
       ],
+      "scopes": ["inventory.read"],
       "response": {
         "$ref": "#/components/schemas/JTL.Wawi.Warenlagerverwaltung.PublicApi.DataTransferObjects.V2.Stocks.WarehouseItemStock"
       }
@@ -261,6 +265,7 @@
           "in": "header"
         }
       ],
+      "scopes": ["deliverynotes.read"],
       "response": {
         "$ref": "#/components/schemas/JTL.Wawi.Rest.Contracts.Models.PagedListOfJTL.Wawi.Rest.Contracts.Models.V1.DeliveryNote.DeliveryNote"
       }
@@ -276,6 +281,7 @@
           "in": "header"
         }
       ],
+      "scopes": ["deliverynotes.read"],
       "response": {
         "$ref": "#/components/schemas/JTL.Wawi.Delivery.PublicApi.DataTransferObjects.V2.Delivery.DeliveryNote"
       }
@@ -307,6 +313,7 @@
           "in": "header"
         }
       ],
+      "scopes": ["deliverynotes.read"],
       "response": {
         "$ref": "#/components/schemas/JTL.Framework.Api.Abstraction.Models.PagedListOfJTL.Wawi.Delivery.PublicApi.DataTransferObjects.V2.Delivery.DeliveryNoteLineItem"
       }
@@ -326,8 +333,169 @@
           "in": "header"
         }
       ],
+      "scopes": ["salesorders.read"],
       "response": {
         "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.SalesOrder"
+      }
+    },
+    "/v2/suppliers": {
+      "parameters": [
+        {
+          "name": "pageNumber",
+          "in": "query"
+        },
+        {
+          "name": "pageSize",
+          "in": "query"
+        },
+        {
+          "name": "sortBy",
+          "in": "query"
+        },
+        {
+          "name": "sortDescending",
+          "in": "query"
+        },
+        {
+          "name": "createdAtAfter",
+          "in": "query"
+        },
+        {
+          "name": "createdAtBefore",
+          "in": "query"
+        },
+        {
+          "name": "changedAtAfter",
+          "in": "query"
+        },
+        {
+          "name": "changedAtBefore",
+          "in": "query"
+        },
+        {
+          "name": "x-tenant-id",
+          "in": "header"
+        }
+      ],
+      "scopes": ["suppliers.read"],
+      "response": {
+        "$ref": "#/components/schemas/JTL.Framework.Api.Abstraction.Models.PagedListOfJTL.Wawi.Suppliers.PublicApi.DataTransferObjects.V2.SupplierDomain.Supplier"
+      }
+    },
+    "/v2/suppliers/{supplierId}": {
+      "parameters": [
+        {
+          "name": "supplierId",
+          "in": "path"
+        },
+        {
+          "name": "x-tenant-id",
+          "in": "header"
+        }
+      ],
+      "scopes": ["suppliers.read"],
+      "response": {
+        "$ref": "#/components/schemas/JTL.Wawi.Suppliers.PublicApi.DataTransferObjects.V2.SupplierDomain.SupplierDetail"
+      }
+    },
+    "/v2/items/{itemId}/suppliers": {
+      "parameters": [
+        {
+          "name": "itemId",
+          "in": "path"
+        },
+        {
+          "name": "pageNumber",
+          "in": "query"
+        },
+        {
+          "name": "pageSize",
+          "in": "query"
+        },
+        {
+          "name": "sortBy",
+          "in": "query"
+        },
+        {
+          "name": "sortDescending",
+          "in": "query"
+        },
+        {
+          "name": "stockLevelLastModifiedAfter",
+          "in": "query"
+        },
+        {
+          "name": "stockLevelLastModifiedBefore",
+          "in": "query"
+        },
+        {
+          "name": "x-tenant-id",
+          "in": "header"
+        }
+      ],
+      "scopes": ["items.read"],
+      "response": {
+        "$ref": "#/components/schemas/JTL.Framework.Api.Abstraction.Models.PagedListOfJTL.Wawi.Item.PublicApi.DataTransferObjects.V2.ItemSupplierOverview.ItemSupplierListItem"
+      }
+    },
+    "/v2/purchase-orders": {
+      "parameters": [
+        {
+          "name": "pageNumber",
+          "in": "query"
+        },
+        {
+          "name": "pageSize",
+          "in": "query"
+        },
+        {
+          "name": "sortBy",
+          "in": "query"
+        },
+        {
+          "name": "sortDescending",
+          "in": "query"
+        },
+        {
+          "name": "createdAtAfter",
+          "in": "query"
+        },
+        {
+          "name": "createdAtBefore",
+          "in": "query"
+        },
+        {
+          "name": "requestedDeliveryDateAfter",
+          "in": "query"
+        },
+        {
+          "name": "requestedDeliveryDateBefore",
+          "in": "query"
+        },
+        {
+          "name": "x-tenant-id",
+          "in": "header"
+        }
+      ],
+      "scopes": ["purchaseorders.read"],
+      "response": {
+        "$ref": "#/components/schemas/JTL.Framework.Api.Abstraction.Models.PagedListOfJTL.Wawi.PurchaseOrders.PublicApi.DataTransferObjects.V2.PurchaseOrderDomain.PurchaseOrderListItem"
+      }
+    },
+    "/v2/purchase-orders/{purchaseOrderId}": {
+      "parameters": [
+        {
+          "name": "purchaseOrderId",
+          "in": "path"
+        },
+        {
+          "name": "x-tenant-id",
+          "in": "header"
+        }
+      ],
+      "scopes": ["purchaseorders.read"],
+      "response": {
+        "$ref": "#/components/schemas/JTL.Wawi.PurchaseOrders.PublicApi.DataTransferObjects.V2.PurchaseOrderDomain.PurchaseOrder"
       }
     }
   },
@@ -355,6 +523,25 @@
     },
     "response": {
       "$ref": "#/components/schemas/JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.UpdateSalesOrderCommandResponse"
+    }
+  },
+  "purchaseOrderCreate": {
+    "parameters": [
+      {
+        "name": "Idempotency-Key",
+        "in": "header"
+      },
+      {
+        "name": "x-tenant-id",
+        "in": "header"
+      }
+    ],
+    "scopes": ["purchaseorders.write"],
+    "request": {
+      "$ref": "#/components/schemas/JTL.Wawi.PurchaseOrders.PublicApi.Endpoints.V2.PurchaseOrderDomain.CreatePurchaseOrderRequest"
+    },
+    "response": {
+      "$ref": "#/components/schemas/JTL.Wawi.PurchaseOrders.PublicApi.DataTransferObjects.V2.PurchaseOrderDomain.CreatePurchaseOrderCommandResponse"
     }
   },
   "schemas": {
@@ -2519,6 +2706,857 @@
       "format": "uuid",
       "additionalProperties": false
     },
+    "JTL.Framework.Api.Abstraction.Models.PagedListOfJTL.Wawi.Suppliers.PublicApi.DataTransferObjects.V2.SupplierDomain.Supplier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["totalItems", "pageNumber", "pageSize", "items"],
+      "properties": {
+        "totalItems": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "pageNumber": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "pageSize": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/JTL.Wawi.Suppliers.PublicApi.DataTransferObjects.V2.SupplierDomain.Supplier"
+          }
+        },
+        "totalPages": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "hasPreviousPage": {
+          "type": "boolean"
+        },
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "nextPageNumber": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "previousPageNumber": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "JTL.Wawi.Suppliers.PublicApi.DataTransferObjects.V2.SupplierDomain.Supplier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "canDropship", "currencyIso", "name"],
+      "properties": {
+        "id": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.LieferantKey"
+        },
+        "canDropship": {
+          "type": "boolean"
+        },
+        "currencyIso": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "companyName": {
+          "type": "string"
+        },
+        "supplierNumber": {
+          "type": "string"
+        },
+        "city": {
+          "type": "string"
+        },
+        "countryIso": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "changedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "JTL.Wawi.Suppliers.PublicApi.DataTransferObjects.V2.SupplierDomain.SupplierDetail": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "canDropship",
+        "isActive",
+        "address",
+        "isVatExempt",
+        "isExcludedFromPurchaseList",
+        "allowsDropshipCashOnDelivery",
+        "allowsDropshipFreeLineItems"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.LieferantKey"
+        },
+        "supplierNumber": {
+          "type": "string"
+        },
+        "companyName": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "canDropship": {
+          "type": "boolean"
+        },
+        "currencyIso": {
+          "type": "string"
+        },
+        "isActive": {
+          "type": "boolean"
+        },
+        "address": {
+          "$ref": "#/components/schemas/JTL.Wawi.Suppliers.PublicApi.DataTransferObjects.V2.SupplierDomain.SupplierAddress"
+        },
+        "contact": {
+          "$ref": "#/components/schemas/JTL.Wawi.Suppliers.PublicApi.DataTransferObjects.V2.SupplierDomain.SupplierContact"
+        },
+        "languageIso": {
+          "type": "string"
+        },
+        "supplierAccountNumber": {
+          "type": "string"
+        },
+        "creditorNumber": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "vatId": {
+          "type": "string"
+        },
+        "freightCostAmount": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "minimumOrderValueAmount": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "smallQuantitySurchargeAmount": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "cashDiscountPercentage": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "cashDiscountDays": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "paymentTermInDays": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "freeShippingThresholdAmount": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "deliveryTimeInDays": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "website": {
+          "type": "string"
+        },
+        "deliveryConditionNote": {
+          "type": "string"
+        },
+        "comment": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "changedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "defaultCompanyId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.FirmaKey"
+        },
+        "defaultWarehouseId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.WarenlagerKey"
+        },
+        "isVatExempt": {
+          "type": "boolean"
+        },
+        "isExcludedFromPurchaseList": {
+          "type": "boolean"
+        },
+        "allowsDropshipCashOnDelivery": {
+          "type": "boolean"
+        },
+        "allowsDropshipFreeLineItems": {
+          "type": "boolean"
+        },
+        "vatFreePositionThresholdAmount": {
+          "type": "number",
+          "format": "decimal"
+        }
+      }
+    },
+    "JTL.Wawi.Suppliers.PublicApi.DataTransferObjects.V2.SupplierDomain.SupplierAddress": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "salutation": {
+          "type": "string"
+        },
+        "firstName": {
+          "type": "string"
+        },
+        "lastName": {
+          "type": "string"
+        },
+        "additionalCompanyLine": {
+          "type": "string"
+        },
+        "street": {
+          "type": "string"
+        },
+        "additionalAddressLine": {
+          "type": "string"
+        },
+        "postalCode": {
+          "type": "string"
+        },
+        "city": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "countryIso": {
+          "type": "string"
+        }
+      }
+    },
+    "JTL.Wawi.Suppliers.PublicApi.DataTransferObjects.V2.SupplierDomain.SupplierContact": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "emailAddress": {
+          "type": "string"
+        },
+        "phoneNumber": {
+          "type": "string"
+        },
+        "phoneExtension": {
+          "type": "string"
+        },
+        "faxNumber": {
+          "type": "string"
+        },
+        "contactName": {
+          "type": "string"
+        }
+      }
+    },
+    "JTL.Data.Contracts.Keys.WarenlagerKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
+    "JTL.Framework.Api.Abstraction.Models.PagedListOfJTL.Wawi.Item.PublicApi.DataTransferObjects.V2.ItemSupplierOverview.ItemSupplierListItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["totalItems", "pageNumber", "pageSize", "items"],
+      "properties": {
+        "totalItems": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "pageNumber": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "pageSize": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/JTL.Wawi.Item.PublicApi.DataTransferObjects.V2.ItemSupplierOverview.ItemSupplierListItem"
+          }
+        },
+        "totalPages": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "hasPreviousPage": {
+          "type": "boolean"
+        },
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "nextPageNumber": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "previousPageNumber": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "JTL.Wawi.Item.PublicApi.DataTransferObjects.V2.ItemSupplierOverview.ItemSupplierListItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "itemId", "supplierId"],
+      "properties": {
+        "id": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.LieferantenArtikelKey"
+        },
+        "itemId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.ArtikelKey"
+        },
+        "supplierId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.LieferantKey"
+        },
+        "supplierName": {
+          "type": "string"
+        },
+        "supplierItemName": {
+          "type": "string"
+        },
+        "supplierItemNumber": {
+          "type": "string"
+        },
+        "deliveryPeriod": {
+          "type": "string"
+        },
+        "supplierCurrency": {
+          "type": "string"
+        },
+        "isDropshippingSupported": {
+          "type": "boolean"
+        },
+        "isDropshippingActive": {
+          "type": "boolean"
+        },
+        "isDefaultSupplier": {
+          "type": "boolean"
+        },
+        "isDefaultDropshippingSupplier": {
+          "type": "boolean"
+        },
+        "minimumPurchaseQuantity": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "stockLevel": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "averageDeliveryTime": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "stockLevelLastModified": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "includeSupplierStock": {
+          "type": "boolean"
+        },
+        "supplierDeliveryTimeInDays": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "deliveryTimeInDays": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "useSupplierDeliveryTime": {
+          "type": "boolean"
+        },
+        "packageUnitDescription": {
+          "type": "string"
+        },
+        "packageUnitQuantity": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "notes": {
+          "type": "string"
+        },
+        "purchaseInterval": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "netPurchasePrice": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "vatRate": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "scalePrices": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/JTL.Wawi.Item.PublicApi.DataTransferObjects.V2.ItemSupplierOverview.ItemSupplierPriceListItem"
+          }
+        }
+      }
+    },
+    "JTL.Data.Contracts.Keys.LieferantenArtikelKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
+    "JTL.Wawi.Item.PublicApi.DataTransferObjects.V2.ItemSupplierOverview.ItemSupplierPriceListItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fromQuantity", "usePercentageDiscount"],
+      "properties": {
+        "fromQuantity": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "netPrice": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "usePercentageDiscount": {
+          "type": "boolean"
+        },
+        "percentageDiscount": {
+          "type": "number",
+          "format": "decimal"
+        }
+      }
+    },
+    "JTL.Framework.Api.Abstraction.Models.PagedListOfJTL.Wawi.PurchaseOrders.PublicApi.DataTransferObjects.V2.PurchaseOrderDomain.PurchaseOrderListItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["totalItems", "pageNumber", "pageSize", "items"],
+      "properties": {
+        "totalItems": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "pageNumber": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "pageSize": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/JTL.Wawi.PurchaseOrders.PublicApi.DataTransferObjects.V2.PurchaseOrderDomain.PurchaseOrderListItem"
+          }
+        },
+        "totalPages": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "hasPreviousPage": {
+          "type": "boolean"
+        },
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "nextPageNumber": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "previousPageNumber": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "JTL.Wawi.PurchaseOrders.PublicApi.DataTransferObjects.V2.PurchaseOrderDomain.PurchaseOrderListItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["purchaseOrderId", "supplierId", "status"],
+      "properties": {
+        "purchaseOrderId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.LieferantenBestellungKey"
+        },
+        "supplierId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.LieferantKey"
+        },
+        "supplierName": {
+          "type": "string"
+        },
+        "orderNumber": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/components/schemas/JTL.Wawi.PurchaseOrders.PublicApi.DataTransferObjects.V2.PurchaseOrderDomain.PurchaseOrderStatus"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "requestedDeliveryDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "warehouseId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.WarenlagerKey"
+        }
+      }
+    },
+    "JTL.Data.Contracts.Keys.LieferantenBestellungKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
+    "JTL.Wawi.PurchaseOrders.PublicApi.DataTransferObjects.V2.PurchaseOrderDomain.PurchaseOrderStatus": {
+      "type": "integer",
+      "format": "int32",
+      "enum": [0, 5, 20, 30, 50, 500]
+    },
+    "JTL.Wawi.PurchaseOrders.PublicApi.DataTransferObjects.V2.PurchaseOrderDomain.PurchaseOrder": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "purchaseOrderId",
+        "supplierId",
+        "status",
+        "currencyIso",
+        "currencyFactor",
+        "isConfirmed",
+        "lineItems",
+        "allowancesAndCharges"
+      ],
+      "properties": {
+        "purchaseOrderId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.LieferantenBestellungKey"
+        },
+        "supplierId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.LieferantKey"
+        },
+        "supplierName": {
+          "type": "string"
+        },
+        "orderNumber": {
+          "type": "string"
+        },
+        "externalOrderNumber": {
+          "type": "string"
+        },
+        "referenceOrderNumber": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/components/schemas/JTL.Wawi.PurchaseOrders.PublicApi.DataTransferObjects.V2.PurchaseOrderDomain.PurchaseOrderStatus"
+        },
+        "currencyIso": {
+          "type": "string"
+        },
+        "currencyFactor": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "requestedDeliveryDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "isConfirmed": {
+          "type": "boolean"
+        },
+        "warehouseId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.WarenlagerKey"
+        },
+        "companyId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.FirmaKey"
+        },
+        "internalComment": {
+          "type": "string"
+        },
+        "lineItems": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/JTL.Wawi.PurchaseOrders.PublicApi.DataTransferObjects.V2.PurchaseOrderDomain.PurchaseOrderLineItem"
+          }
+        },
+        "allowancesAndCharges": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/JTL.Wawi.PurchaseOrders.PublicApi.DataTransferObjects.V2.PurchaseOrderDomain.PurchaseOrderAllowanceAndCharge"
+          }
+        },
+        "deliveryAddress": {
+          "$ref": "#/components/schemas/JTL.Wawi.PurchaseOrders.PublicApi.DataTransferObjects.V2.PurchaseOrderDomain.PurchaseOrderAddress"
+        },
+        "billingAddress": {
+          "$ref": "#/components/schemas/JTL.Wawi.PurchaseOrders.PublicApi.DataTransferObjects.V2.PurchaseOrderDomain.PurchaseOrderAddress"
+        },
+        "supplier": {
+          "$ref": "#/components/schemas/JTL.Wawi.PurchaseOrders.PublicApi.DataTransferObjects.V2.PurchaseOrderDomain.PurchaseOrderSupplierSnapshot"
+        }
+      }
+    },
+    "JTL.Wawi.PurchaseOrders.PublicApi.DataTransferObjects.V2.PurchaseOrderDomain.PurchaseOrderLineItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lineItemId",
+        "lineItemType",
+        "quantity",
+        "deliveredQuantity",
+        "openQuantity",
+        "netPurchasePriceAmount",
+        "vatRatePercentage",
+        "sortOrder"
+      ],
+      "properties": {
+        "lineItemId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.LieferantenBestellungPosKey"
+        },
+        "lineItemType": {
+          "$ref": "#/components/schemas/JTL.Wawi.PurchaseOrders.PublicApi.DataTransferObjects.V2.PurchaseOrderDomain.PurchaseOrderLineItemType"
+        },
+        "itemId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.ArtikelKey"
+        },
+        "itemNumber": {
+          "type": "string"
+        },
+        "supplierItemNumber": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "supplierItemName": {
+          "type": "string"
+        },
+        "quantity": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "deliveredQuantity": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "openQuantity": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "netPurchasePriceAmount": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "vatRatePercentage": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "deliveryTimeInDays": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "deliveryDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "note": {
+          "type": "string"
+        },
+        "sortOrder": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "packagingUnit": {
+          "type": "string"
+        },
+        "packagingQuantity": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "confirmedQuantity": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "confirmedDeliveryDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "confirmedPrice": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "isLineItemConfirmed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "JTL.Data.Contracts.Keys.LieferantenBestellungPosKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
+    "JTL.Wawi.PurchaseOrders.PublicApi.DataTransferObjects.V2.PurchaseOrderDomain.PurchaseOrderLineItemType": {
+      "type": "integer",
+      "format": "int32",
+      "enum": [0, 1, 6, 10, 11]
+    },
+    "JTL.Wawi.PurchaseOrders.PublicApi.DataTransferObjects.V2.PurchaseOrderDomain.PurchaseOrderAllowanceAndCharge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "vatRatePercentage", "netAmount"],
+      "properties": {
+        "type": {
+          "$ref": "#/components/schemas/JTL.Wawi.PurchaseOrders.PublicApi.DataTransferObjects.V2.PurchaseOrderDomain.PurchaseOrderAllowanceAndChargeType"
+        },
+        "vatRatePercentage": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "netAmount": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "JTL.Wawi.PurchaseOrders.PublicApi.DataTransferObjects.V2.PurchaseOrderDomain.PurchaseOrderAllowanceAndChargeType": {
+      "type": "integer",
+      "format": "int32",
+      "enum": [6, 10, 11]
+    },
+    "JTL.Wawi.PurchaseOrders.PublicApi.DataTransferObjects.V2.PurchaseOrderDomain.PurchaseOrderAddress": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "salutation": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "firstName": {
+          "type": "string"
+        },
+        "lastName": {
+          "type": "string"
+        },
+        "companyName": {
+          "type": "string"
+        },
+        "additionalCompanyLine": {
+          "type": "string"
+        },
+        "street": {
+          "type": "string"
+        },
+        "additionalAddressLine": {
+          "type": "string"
+        },
+        "postalCode": {
+          "type": "string"
+        },
+        "city": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "countryIso": {
+          "type": "string"
+        },
+        "phoneNumber": {
+          "type": "string"
+        },
+        "faxNumber": {
+          "type": "string"
+        },
+        "mobilePhoneNumber": {
+          "type": "string"
+        },
+        "emailAddress": {
+          "type": "string"
+        }
+      }
+    },
+    "JTL.Wawi.PurchaseOrders.PublicApi.DataTransferObjects.V2.PurchaseOrderDomain.PurchaseOrderSupplierSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "companyName": {
+          "type": "string"
+        },
+        "additionalCompanyLine": {
+          "type": "string"
+        },
+        "street": {
+          "type": "string"
+        },
+        "additionalAddressLine": {
+          "type": "string"
+        },
+        "postalCode": {
+          "type": "string"
+        },
+        "city": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "countryIso": {
+          "type": "string"
+        },
+        "phoneNumber": {
+          "type": "string"
+        },
+        "faxNumber": {
+          "type": "string"
+        },
+        "mobilePhoneNumber": {
+          "type": "string"
+        },
+        "emailAddress": {
+          "type": "string"
+        },
+        "contactSalutation": {
+          "type": "string"
+        },
+        "contactFirstName": {
+          "type": "string"
+        },
+        "contactLastName": {
+          "type": "string"
+        }
+      }
+    },
     "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.UpdateSalesOrderCommandRequest": {
       "type": "object",
       "additionalProperties": false,
@@ -2976,6 +4014,148 @@
       "properties": {
         "salesOrderId": {
           "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.VerkaufAuftragKey"
+        }
+      }
+    },
+    "JTL.Wawi.PurchaseOrders.PublicApi.Endpoints.V2.PurchaseOrderDomain.CreatePurchaseOrderRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["supplierId", "requestedDeliveryDate", "items"],
+      "properties": {
+        "supplierId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.LieferantKey"
+        },
+        "requestedDeliveryDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/JTL.Wawi.PurchaseOrders.PublicApi.DataTransferObjects.V2.PurchaseOrderDomain.CreateCreatePurchaseOrderItem"
+          }
+        },
+        "deliveryAddress": {
+          "$ref": "#/components/schemas/JTL.Wawi.PurchaseOrders.PublicApi.DataTransferObjects.V2.PurchaseOrderDomain.CreatePurchaseOrderAddress"
+        },
+        "billingAddress": {
+          "$ref": "#/components/schemas/JTL.Wawi.PurchaseOrders.PublicApi.DataTransferObjects.V2.PurchaseOrderDomain.CreatePurchaseOrderAddress"
+        },
+        "externalOrderNumber": {
+          "type": "string"
+        },
+        "referenceOrderNumber": {
+          "type": "string"
+        },
+        "internalComment": {
+          "type": "string"
+        },
+        "warehouseId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.WarenlagerKey"
+        },
+        "disableAutomaticWorkflows": {
+          "type": "boolean"
+        }
+      }
+    },
+    "JTL.Wawi.PurchaseOrders.PublicApi.DataTransferObjects.V2.PurchaseOrderDomain.CreateCreatePurchaseOrderItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "itemId",
+        "quantity",
+        "netPurchasePriceAmount",
+        "vatRatePercentage"
+      ],
+      "properties": {
+        "itemId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.ArtikelKey"
+        },
+        "quantity": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "netPurchasePriceAmount": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "vatRatePercentage": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "note": {
+          "type": "string"
+        },
+        "supplierItemNumber": {
+          "type": "string"
+        },
+        "deliveryDate": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "JTL.Wawi.PurchaseOrders.PublicApi.DataTransferObjects.V2.PurchaseOrderDomain.CreatePurchaseOrderAddress": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "salutation": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "firstName": {
+          "type": "string"
+        },
+        "lastName": {
+          "type": "string"
+        },
+        "companyName": {
+          "type": "string"
+        },
+        "additionalCompanyLine": {
+          "type": "string"
+        },
+        "street": {
+          "type": "string"
+        },
+        "additionalAddressLine": {
+          "type": "string"
+        },
+        "postalCode": {
+          "type": "string"
+        },
+        "city": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "countryIso": {
+          "type": "string"
+        },
+        "phoneNumber": {
+          "type": "string"
+        },
+        "faxNumber": {
+          "type": "string"
+        },
+        "mobilePhoneNumber": {
+          "type": "string"
+        },
+        "emailAddress": {
+          "type": "string"
+        }
+      }
+    },
+    "JTL.Wawi.PurchaseOrders.PublicApi.DataTransferObjects.V2.PurchaseOrderDomain.CreatePurchaseOrderCommandResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["purchaseOrderId"],
+      "properties": {
+        "purchaseOrderId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.LieferantenBestellungKey"
         }
       }
     }

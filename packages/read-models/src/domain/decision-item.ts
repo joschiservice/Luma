@@ -1,7 +1,11 @@
 /** Types of the Needs you queue items, shared by presentation rules and the application port. */
 
 export type DecisionKind =
-  'case' | 'replenishment' | 'fulfillment_recovery' | 'inventory_correction';
+  | 'case'
+  | 'replenishment'
+  | 'fulfillment_recovery'
+  | 'inventory_correction'
+  | 'supplier_commitment';
 
 export type DecisionReason =
   'approval' | 'run' | 'recovery' | 'manual_intervention' | 'uncertainty';
@@ -27,7 +31,8 @@ export type DecisionOwner =
       orderId: string;
       fulfillmentId: string;
     }
-  | { kind: 'app_inventory'; appId: string; positionId: string };
+  | { kind: 'app_inventory'; appId: string; positionId: string }
+  | { kind: 'purchase_order'; purchaseOrderId: string };
 
 export interface DecisionAssignment {
   assigneeId: string | null;

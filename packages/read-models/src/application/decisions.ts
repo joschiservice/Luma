@@ -10,6 +10,9 @@ import type {
   DecisionReason,
   DecisionView,
 } from '../domain/decision-item.js';
+import type { SupplierCommitmentDecision } from '../domain/decisions.js';
+
+export type { SupplierCommitmentDecision } from '../domain/decisions.js';
 
 export type {
   DecisionAssignment,
@@ -67,6 +70,11 @@ export type AppOwnedDecision = Omit<DecisionCandidate, 'owner'> & {
       : never
     : never;
 };
+
+/** Lists supplier-lifecycle items that need a person; see the procurement owner. */
+export type SupplierCommitmentDecisionReader = (
+  context: TenantContext,
+) => Promise<SupplierCommitmentDecision[]>;
 
 /** Lists the replenishment proposals that wait for approval; see the procurement owner. */
 export type ReplenishmentDecisionReader = (

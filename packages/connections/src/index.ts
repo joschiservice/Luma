@@ -34,6 +34,7 @@ export type {
   Page,
   PageQuery,
   ProductSnapshot,
+  PurchaseOrderSubmission,
   Quantity,
   ReadCapability,
   RefundSnapshot,
@@ -41,6 +42,9 @@ export type {
   ReturnSnapshot,
   ShippingMethodSnapshot,
   SourceIdentity,
+  SupplierOrderSnapshot,
+  SupplierOrderStatus,
+  SupplierSnapshot,
   WriteCapability,
   WriteReceipt,
 } from './domain/capabilities.js';

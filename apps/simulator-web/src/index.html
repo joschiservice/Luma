@@ -119,6 +119,24 @@
           resolves the case only after independently verifying both systems.
         </p>
       </section>
+      <section class="panel purchasing" aria-labelledby="purchasing-title">
+        <div class="section-title">
+          <div>
+            <p class="eyebrow">JTL PURCHASING</p>
+            <h2 id="purchasing-title">Purchase orders</h2>
+          </div>
+          <span id="purchase-count" class="badge">Select a run</span>
+        </div>
+        <p class="scenario-description">
+          Suppliers answer orders submitted to JTL. A profile applies to orders
+          placed after it is chosen. Record a confirmation or goods receipt to
+          move an order on immediately; receipts add stock in JTL.
+        </p>
+        <div id="supplier-profiles" class="fields"></div>
+        <div id="purchase-orders">
+          <p class="muted">No purchase orders yet.</p>
+        </div>
+      </section>
       <div class="columns">
         <section class="panel">
           <div class="section-title">
@@ -229,6 +247,9 @@
                 <option>returns.read</option>
                 <option>orders.shipping-method.read</option>
                 <option>orders.shipping-method.write</option>
+                <option>suppliers.read</option>
+                <option>purchase-orders.read</option>
+                <option>purchase-orders.submit</option>
               </select></label
             ><label
               >Resource ID (optional)<input

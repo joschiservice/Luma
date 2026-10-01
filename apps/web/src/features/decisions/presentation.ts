@@ -35,6 +35,7 @@ export const kindLabels: Record<DecisionKind, string> = {
   replenishment: 'Replenishment',
   fulfillment_recovery: 'Fulfillment recovery',
   inventory_correction: 'Stock correction',
+  supplier_commitment: 'Supplier order',
 };
 
 /** The landmark shown for a decision's operational area. */

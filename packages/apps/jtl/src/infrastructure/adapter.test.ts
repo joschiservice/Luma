@@ -233,7 +233,14 @@ describe('JTL read adapter', () => {
       expect(kind === 'cloud' ? accessToken : f.apiKey).toHaveBeenCalledTimes(
         f.fetch.mock.calls.length,
       );
-      expect(Object.keys(f.connection.capabilities)).toHaveLength(4);
+      expect(Object.keys(f.connection.capabilities).sort()).toEqual([
+        'fulfillment.read',
+        'inventory.read',
+        'orders.read',
+        'products.read',
+        'purchase-orders.read',
+        'suppliers.read',
+      ]);
     },
   );
 

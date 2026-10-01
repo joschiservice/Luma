@@ -31,6 +31,7 @@ import {
 
 import { usesCommandKey } from '../../lib/keyboard';
 import { setThemePreference, type ThemePreference } from '../../lib/theme';
+import { ordersOptions, suppliersOptions } from '../procurement/data';
 import { recordsOptions } from '../records/data';
 import { workspaceDestinations } from './workspace-destinations';
 
@@ -156,6 +157,45 @@ export function WorkspaceSearch({
     enabled: open && recordQuery.length >= 2,
   });
 
+  // Procurement records are Luma-owned, so they are searched here rather than in Records.
+  const purchasing = open && recordQuery.length >= 2;
+  const procurementOrders = useQuery({
+    ...ordersOptions(organizationId),
+    enabled: purchasing,
+  });
+  const procurementSuppliers = useQuery({
+    ...suppliersOptions(organizationId),
+    enabled: purchasing,
+  });
+  const purchaseResults = purchasing
+    ? [
+        ...(procurementSuppliers.data?.items ?? [])
+          .filter((s) => matches(recordQuery, s.name))
+          .slice(0, 3)
+          .map((s) => ({
+            key: `supplier:${s.id}`,
+            label: s.name,
+            detail: 'Supplier',
+            supplierId: s.id,
+          })),
+        ...(procurementOrders.data?.items ?? [])
+          .filter((o) =>
+            matches(
+              recordQuery,
+              [o.reference, o.supplierName, ...o.lines.map((l) => l.sku)].join(
+                ' ',
+              ),
+            ),
+          )
+          .slice(0, 5)
+          .map((o) => ({
+            key: `purchase_order:${o.id}`,
+            label: o.reference,
+            detail: `Purchase order · ${o.supplierName}`,
+            purchaseOrderId: o.id,
+          })),
+      ]
+    : [];
   const pages = workspaceDestinations.filter((item) =>
     matches(query, `${item.label} ${item.description}`),
   );
@@ -307,6 +347,38 @@ export function WorkspaceSearch({
               />
             </Link>
           ))}
+          {purchaseResults.map((item) => (
+            <Link
+              key={item.key}
+              className="command-item"
+              {...('supplierId' in item
+                ? {
+                    to: '/app/$organizationId/procurement/suppliers/$supplierId' as const,
+                    params: { organizationId, supplierId: item.supplierId },
+                  }
+                : {
+                    to: '/app/$organizationId/procurement/$purchaseOrderId' as const,
+                    params: {
+                      organizationId,
+                      purchaseOrderId: item.purchaseOrderId,
+                    },
+                  })}
+              onClick={() => changeOpen(false)}
+            >
+              <span className="command-item-icon">
+                <DomainIcon domain="procurement" size="sm" />
+              </span>
+              <span className="command-item-copy">
+                <strong>{item.label}</strong>
+                <span>{item.detail}</span>
+              </span>
+              <CornerDownLeft
+                className="command-item-enter"
+                size={14}
+                aria-hidden="true"
+              />
+            </Link>
+          ))}
           {recordQuery.length >= 2 && records.isPending ? (
             <p className="command-section-label" role="status">
               Searching records…
@@ -355,7 +427,10 @@ export function WorkspaceSearch({
               </span>
             );
           })}
-          {!pages.length && !actions.length && !records.data?.items.length ? (
+          {!pages.length &&
+          !actions.length &&
+          !records.data?.items.length &&
+          !purchaseResults.length ? (
             <div className="command-empty" role="status">
               <Search size={20} aria-hidden="true" />
               <strong>No pages found</strong>

@@ -20,6 +20,9 @@ export const capabilities: Record<InstallationCapability, string> = {
   'returns.read': 'Read returns and refunds',
   'orders.shipping-method.read': 'Read shipping method',
   'orders.shipping-method.write': 'Correct shipping method',
+  'suppliers.read': 'Read suppliers',
+  'purchase-orders.read': 'Read purchase orders and goods receipts',
+  'purchase-orders.submit': 'Place approved purchase orders',
 };
 
 export const statuses = {

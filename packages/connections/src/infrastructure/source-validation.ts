@@ -40,6 +40,8 @@ export const sourceSchema = external
       'customer',
       'return',
       'refund',
+      'supplier',
+      'purchase_order',
     ]),
   })
   .strict();

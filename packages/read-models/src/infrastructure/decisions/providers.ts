@@ -4,8 +4,12 @@ import type {
   AppOwnedDecision,
   DecisionProvider,
   ReplenishmentDecisionReader,
+  SupplierCommitmentDecisionReader,
 } from '../../application/decisions.js';
-import { presentReplenishment } from '../../domain/decisions.js';
+import {
+  presentReplenishment,
+  presentSupplierCommitment,
+} from '../../domain/decisions.js';
 
 /** Adapts the procurement owner's pending purchase-order proposals to the queue. */
 export function replenishmentDecisionProvider(
@@ -35,5 +39,19 @@ export function appDecisionProvider(app: {
         ...item,
         owner: { ...item.owner, appId: app.appId },
       })),
+  };
+}
+
+/** Adapts the procurement owner's supplier-lifecycle items to the queue. */
+export function supplierCommitmentDecisionProvider(
+  pending: SupplierCommitmentDecisionReader,
+): DecisionProvider {
+  return {
+    id: 'supplier-commitments',
+    label: 'Supplier orders',
+    pending: async (context) =>
+      (await pending(context)).map((item) =>
+        presentSupplierCommitment(item, context.actor.id),
+      ),
   };
 }

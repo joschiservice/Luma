@@ -39,6 +39,7 @@ import { Pool } from 'pg';
 import {
   createInstallationVerifier,
   createInstalledConnections,
+  createInstalledPurchaseOrderRuntime,
   createInstalledRuntime,
   createInstalledShippingMethodEffects,
 } from '../apps/providers.mjs';
@@ -377,6 +378,14 @@ export async function createPilot(
       execution: { kind: 'enabled', effects },
       verifier,
       decisionSources: installations.registry.decisionSources(),
+      ...(simulation
+        ? {
+            purchasing: {
+              runtime: createInstalledPurchaseOrderRuntime(installedOptions),
+              installations,
+            },
+          }
+        : {}),
       desk: {
         capability: supported,
         notifyDecision: async (actor, exceptionId) => {
@@ -677,12 +686,39 @@ export async function createPilot(
       };
     }
 
+    /** Runs one supplier follow-up pass, as the background worker does. */
+    const followUp = async () => {
+      await pool.query('SELECT purge_expired_procurement_communications(200)');
+      const { rows } = await pool.query(
+        'SELECT tenant_id,principal_id FROM procurement_submission_scopes()',
+      );
+      for (const row of rows)
+        await application.commitments.tick(
+          await identity.service.resolveWorkflowContext(
+            row.principal_id,
+            row.tenant_id,
+            'supplier-follow-up',
+          ),
+        );
+    };
+    if (role === 'worker' && simulation) {
+      const timer = setInterval(() => {
+        followUp().catch((error) =>
+          console.error('Supplier follow-up failed; retrying.', error),
+        );
+      }, 10_000);
+      resources.add(() => clearInterval(timer));
+    }
+
     return {
       app,
       runtime,
       replenishment: application.replenishment,
       procurement: application.procurement,
+      commitments: application.commitments,
+      procurementContext: application.http.procurementContext,
       decisions: application.http.decisions,
+      followUp,
       context,
       operator,
       detection,

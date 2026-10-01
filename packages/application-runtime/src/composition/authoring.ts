@@ -1,5 +1,6 @@
 import type { ModelGatewayConfig } from '@luma/config';
 import { authoringModelProfile } from '@luma/platform';
+import { supplierExtractionProfile } from '@luma/procurement/composition';
 
 const needed =
   'Describing workflows needs an EU model route with zero data retention.';
@@ -13,16 +14,49 @@ export function authoringAvailability(
   settings: ModelGatewayConfig | undefined,
   gatewayInstalled: boolean,
 ): { available: boolean; reason: string | null } {
-  const route = settings?.routes[authoringModelProfile];
+  return euAvailability(
+    settings,
+    gatewayInstalled,
+    authoringModelProfile,
+    needed,
+    'authoring',
+  );
+}
+
+/**
+ * Decides whether supplier messages may be read by a model. Messages contain tenant and
+ * personal data, so the same EU zero-retention Bedrock requirement applies.
+ */
+export function supplierExtractionAvailability(
+  settings: ModelGatewayConfig | undefined,
+  gatewayInstalled: boolean,
+) {
+  return euAvailability(
+    settings,
+    gatewayInstalled,
+    supplierExtractionProfile,
+    'Reading supplier messages needs an EU model route with zero data retention.',
+    'supplier-extraction',
+  );
+}
+
+function euAvailability(
+  settings: ModelGatewayConfig | undefined,
+  gatewayInstalled: boolean,
+  profile: string,
+  needed: string,
+  name: string,
+): { available: boolean; reason: string | null } {
+  const route = settings?.routes[profile];
   const reason =
     !settings || !gatewayInstalled
       ? `${needed} Model routes aren’t configured on this server.`
       : !route
-        ? `${needed} Whoever runs this Luma server needs to configure the authoring route.`
+        ? `${needed} Whoever runs this Luma server needs to configure the ${name} route.`
         : route.adapter !== 'bedrock-eu'
-          ? `${needed} The authoring route doesn’t process data in the EU. Whoever runs this Luma server needs to route it to Bedrock in the EU.`
+          ? `${needed} The ${name} route doesn’t process data in the EU. Whoever runs this Luma server needs to route it to Bedrock in the EU.`
           : !route.zeroDataRetention
-            ? `${needed} The authoring route keeps data. Whoever runs this Luma server needs to turn on zero data retention.`
+            ? `${needed} The ${name} route keeps data. Whoever runs this Luma server needs to turn on zero data retention.`
             : !settings.bedrock
               ? `${needed} Bedrock isn’t configured. Whoever runs this Luma server needs to add the Bedrock settings.`
               : null;

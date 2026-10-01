@@ -7,5 +7,6 @@ import {
 
 export const Route = createFileRoute('/app/$organizationId/procurement/')({
   validateSearch: parseProcurementSearch,
+  staticData: { help: 'procurement' },
   component: ProcurementPage,
 });

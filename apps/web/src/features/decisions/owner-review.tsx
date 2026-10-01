@@ -7,6 +7,7 @@ import { AppExtension } from '../apps/extension';
 import { connectionsOptions } from '../connections/data';
 import { useCaseObservation } from '../exceptions/observation';
 import { CaseResolution } from '../exceptions/resolution';
+import { PurchaseOrderReview } from '../procurement/detail';
 import { workflowRunsOptions } from '../workflows/data';
 import { ReplenishmentRunReview } from '../workflows/replenishment';
 
@@ -63,6 +64,14 @@ export function OwnerReview({
           slot="inventory"
           inventory={{ positionId: owner.positionId }}
           done={onChange}
+        />
+      );
+    case 'purchase_order':
+      return (
+        <PurchaseOrderReview
+          key={owner.purchaseOrderId}
+          organizationId={organizationId}
+          purchaseOrderId={owner.purchaseOrderId}
         />
       );
   }

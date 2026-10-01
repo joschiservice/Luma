@@ -41,6 +41,34 @@ persistent idempotency receipts. Select Shopify and **Write commits, response
 lost** to exercise reconciliation without replay. Fresh ERP evidence and explicit
 SKU/location mappings remain required.
 
+## JTL purchase orders and suppliers
+
+Each run seeds JTL suppliers `1` (Nordwind Textil GmbH) and `2` (Baltic Packaging AB). Item `1` is assigned to both suppliers; item `2` to supplier `1`. Assignments carry the net purchase price and 19% VAT. JTL serves the supplier overview (active suppliers only), supplier detail, item supplier assignments, and purchase-order create, list (`createdAtAfter`, `createdAtBefore`) and detail. Creating an order requires an active supplier and items assigned to it. A repeated `Idempotency-Key` returns the recorded order ID without creating another order. Order creation time is the later of simulation and wall-clock time, because Luma looks orders up by its own clock.
+
+When JTL records an order, the supplier's profile plans its answers in simulation time. Profiles apply to orders placed after they are chosen:
+
+| Profile            | Confirmation after 20 s               | Goods receipt                                         |
+| ------------------ | ------------------------------------- | ----------------------------------------------------- |
+| `full` _(default)_ | Full quantity, requested date         | Full quantity after 60 s                              |
+| `partial`          | 60% of each line, requested date +3 d | The confirmed quantity in two bookings, 60 s and 90 s |
+| `delayed`          | Full quantity, requested date +7 d    | Full quantity after 180 s                             |
+| `short`            | Full quantity, requested date         | Half of each line after 60 s                          |
+| `silent`           | None                                  | None                                                  |
+
+A confirmation sets the order's `isConfirmed` and each line's confirmed quantity, date and flag. A goods receipt raises delivered quantities, lowers open quantities, sets the order to partially delivered (30) or completed (500), and adds the units to the item's JTL stock. Planned answers that no longer apply, because the order is completed or nothing is open, are journaled as `supplier-skipped`.
+
+The **Purchase orders** panel sets profiles and records a full confirmation or receipt of all open quantities. Tests drive the same transitions through `POST /api/runs/:id/control` with `action: "command"` and `instance: "jtl"`:
+
+```json
+{ "kind": "supplier-profile", "supplierId": "1", "profile": "partial" }
+{ "kind": "purchase-order-confirm", "orderId": "1", "lines": [{ "lineItemId": "1001", "quantity": 6, "deliveryDate": "2026-10-15" }] }
+{ "kind": "purchase-order-receive", "orderId": "1", "lines": [{ "lineItemId": "1001", "quantity": 3 }] }
+```
+
+Newly provisioned simulated JTL connections request and are granted `suppliers.read`, `purchase-orders.read` and `purchase-orders.submit`. Workspaces provisioned earlier keep their original permissions.
+
+Omit `lines` to confirm every line in full for its requested date. Line IDs are the order ID times 1,000 plus the line position. Receipts above the open quantity and changes to completed orders are rejected.
+
 ## Service health
 
 Choose a provider and set **Service health** in the control panel. Each run stores independent JTL and Shopify settings:
@@ -63,9 +91,9 @@ Select a provider, fault, operation, optional resource, occurrence, count, and l
 
 - **Outage:** returns HTTP 503 with retry advice.
 - **Rate limit:** returns HTTP 429 with `Retry-After: 1`.
-- **Response lost:** applies only to JTL `orders.shipping-method.write`, after commit. The mutation, journal entry, and fault consumption commit in one SQLite transaction before transport failure is reported.
+- **Response lost:** applies only to JTL `orders.shipping-method.write` or `purchase-orders.submit`, or Shopify `inventory.available.reconcile`, after commit. The mutation, journal entry, and fault consumption commit in one SQLite transaction before transport failure is reported.
 
-JTL products and inventory share the `items.read` provider operation. Shopify operations are identified from the connector's GraphQL queries. JTL resource targets use numeric sales-order, delivery-note, or item IDs for detail and nested requests; Shopify uses global IDs.
+JTL products, inventory and item supplier assignments share the `items.read` provider operation. Supplier reads are `suppliers.read`; purchase-order reads and creation are `purchase-orders.read` and `purchase-orders.submit`. Shopify operations are identified from the connector's GraphQL queries. JTL resource targets use numeric sales-order, delivery-note, or item IDs for detail and nested requests; Shopify uses global IDs.
 
 To reproduce an uncertain write, arm response loss for JTL order `10` before approving the pilot correction. The connector reports an unknown effect requiring reconciliation. A fresh authoritative read can prove the shipping method changed; the existing execution path must not blindly redispatch. `pnpm test:simulator` proves this through the installed runtime across a service restart and asserts there is only one provider write.
 

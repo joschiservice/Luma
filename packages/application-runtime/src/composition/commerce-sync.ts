@@ -22,6 +22,7 @@ import { Pool } from 'pg';
 
 import { createResourceScope } from './resources.js';
 import { createCommerceServices } from './services.js';
+import { createSupplierFollowUpWorker } from './supplier-follow-up.js';
 
 const digest = (value: string) =>
   createHash('sha256').update(value).digest('hex');
@@ -153,10 +154,22 @@ export async function createDefaultCommerceSyncWorker(
       concurrency: settings.concurrency,
     });
     resources.add(worker.close);
+    const followUp = createSupplierFollowUpWorker({
+      database: createTenantDatabase(pool),
+      pool,
+      identity: identity.service,
+      connections: settings.connections,
+      env,
+    });
 
     return {
-      run: worker.run,
-      shutdown: worker.shutdown,
+      run: async () => {
+        await Promise.all([worker.run(), followUp.run()]);
+      },
+      shutdown: () => {
+        worker.shutdown();
+        followUp.shutdown();
+      },
       close: resources.close,
     };
   } catch (error) {

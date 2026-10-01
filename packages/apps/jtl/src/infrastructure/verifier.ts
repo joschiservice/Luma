@@ -76,14 +76,24 @@ export function createInstallationVerifier(options: {
         schema: jtl.note,
         capabilities: ['fulfillment.read'],
       },
+      {
+        path: 'suppliers',
+        schema: jtl.supplier,
+        capabilities: ['suppliers.read'],
+      },
+      {
+        path: 'purchase-orders',
+        schema: jtl.purchaseOrderListItem,
+        capabilities: ['purchase-orders.read'],
+      },
     ];
-    for (const probe of probes) {
-      if (!probe.capabilities.some((c) => connection.permissions.includes(c)))
-        continue;
+
+    // Reads one overview page; missing grants or endpoints mean the capability stays unavailable.
+    async function readable(path: string, schema: z.ZodTypeAny) {
       try {
         const page = jtlParse(
-          jtl.page(probe.schema),
-          await client.request(probe.path, { pageNumber: '1', pageSize: '1' }),
+          jtl.page(schema),
+          await client.request(path, { pageNumber: '1', pageSize: '1' }),
         );
         if (
           page.pageNumber !== 1 ||
@@ -91,14 +101,24 @@ export function createInstallationVerifier(options: {
           page.items.length !== Math.min(1, page.totalItems)
         )
           throw new Error('Invalid JTL verification response');
-        granted.push(...probe.capabilities);
+
+        return true;
       } catch (error) {
         if (
           !(error instanceof ConnectorError) ||
           !['permission_denied', 'not_found'].includes(error.failure.code)
         )
           throw error;
+
+        return false;
       }
+    }
+
+    for (const probe of probes) {
+      if (!probe.capabilities.some((c) => connection.permissions.includes(c)))
+        continue;
+      if (await readable(probe.path, probe.schema))
+        granted.push(...probe.capabilities);
     }
 
     // Local synthetic bindings have known write grants; live read probes cannot establish them.
@@ -107,6 +127,14 @@ export function createInstallationVerifier(options: {
         'orders.shipping-method.read',
         'orders.shipping-method.write',
       );
+    // Submission prices lines from item supplier assignments, so it also needs item reads.
+    if (
+      simulated &&
+      connection.permissions.includes('purchase-orders.submit') &&
+      granted.includes('purchase-orders.read') &&
+      (await readable('items', jtl.item))
+    )
+      granted.push('purchase-orders.submit');
 
     return granted;
   };

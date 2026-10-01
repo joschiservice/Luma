@@ -7,6 +7,9 @@ export const installationPermissions = z.enum([
   'fulfillment.read',
   'orders.shipping-method.read',
   'orders.shipping-method.write',
+  'suppliers.read',
+  'purchase-orders.read',
+  'purchase-orders.submit',
 ]);
 
 const header = z
@@ -58,7 +61,7 @@ export const installationInput = z
     permissions: z
       .array(installationPermissions)
       .min(1)
-      .max(6)
+      .max(9)
       .refine((v) => new Set(v).size === v.length),
     credentials: installationCredentials,
   })
@@ -71,4 +74,10 @@ export const installationInput = z
     (v) =>
       !v.permissions.includes('orders.shipping-method.write') ||
       v.permissions.includes('orders.shipping-method.read'),
+  )
+  // Submission re-reads purchase orders before it writes.
+  .refine(
+    (v) =>
+      !v.permissions.includes('purchase-orders.submit') ||
+      v.permissions.includes('purchase-orders.read'),
   );

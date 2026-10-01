@@ -396,3 +396,267 @@ export function presentReplenishment(
     },
   };
 }
+
+/** Something about a sent or sending purchase order that needs a person, from the procurement owner. */
+export interface SupplierCommitmentDecision {
+  key: string;
+  kind:
+    | 'submission_approval'
+    | 'submission_uncertain'
+    | 'review_commitment'
+    | 'commitment_changed'
+    | 'confirmation_overdue'
+    | 'delivery_overdue';
+  purchaseOrderId: string;
+  reference: string;
+  supplierName: string;
+  summary: string;
+  /** When it became due or was raised. */
+  dueAt: string;
+  /** Approval requests expire; other items have no deadline. */
+  expiresAt: string | null;
+  requesterId: string | null;
+  canRespond: boolean;
+  requestedDeliveryDate: string | null;
+  lines: { sku: string; quantity: number; unit: string }[];
+  line: { sku: string; quantity: number; unit: string } | null;
+  commitment: {
+    kind: string;
+    quantity: number | null;
+    date: string | null;
+    text: string | null;
+    reasons: string[];
+  } | null;
+}
+
+const reasonText: Record<string, string> = {
+  low_confidence: 'the wording is ambiguous',
+  quantity_changed: 'the quantity differs from the order',
+  date_later: 'the date is later than requested',
+  unmatched_line: 'it could not be matched to an order line',
+  supplier_condition: 'the supplier added a condition',
+};
+
+const said = (
+  c: NonNullable<SupplierCommitmentDecision['commitment']>,
+  unit: string | null,
+) =>
+  c.kind === 'confirmed_quantity'
+    ? `Confirms ${c.quantity ?? '?'}${unit ? ` ${unit}` : ''}`
+    : c.kind === 'promised_date'
+      ? `Promises delivery on ${c.date ?? 'an unclear date'}`
+      : c.kind === 'shipped'
+        ? `Says goods were shipped${c.date ? ` on ${c.date}` : ''}`
+        : (c.text ?? 'States a condition');
+
+/** Presents a supplier-lifecycle item with what each response causes. */
+export function presentSupplierCommitment(
+  item: SupplierCommitmentDecision,
+  readerId: string,
+): DecisionCandidate {
+  const order = { label: 'Purchase order', value: item.reference };
+  const supplier = { label: 'Supplier', value: item.supplierName };
+  const lines = item.lines
+    .map((l) => `${l.quantity} ${l.unit} ${l.sku}`)
+    .join(', ');
+  const base = {
+    id: `supplier:${item.key}`,
+    kind: 'supplier_commitment' as const,
+    domain: 'procurement' as const,
+    requestedAt: item.dueAt,
+    requesterId: item.requesterId,
+    subject: { label: item.reference, detail: `Supplier ${item.supplierName}` },
+    record: null,
+    owner: {
+      kind: 'purchase_order' as const,
+      purchaseOrderId: item.purchaseOrderId,
+    },
+  };
+  const respond = item.canRespond
+    ? ('decide' as const)
+    : ('view_only' as const);
+  switch (item.kind) {
+    case 'submission_approval':
+      return {
+        ...base,
+        reason: 'approval',
+        title: `Approve sending ${item.reference} to ${item.supplierName}`,
+        why: 'Placing an order with a supplier is an external commitment. A different owner or admin than the requester approves the exact order first.',
+        consequences: [
+          {
+            response: 'Approve',
+            text: 'Luma checks the order and supplier link again, places it once in the purchasing system and verifies it with a separate read. The purchasing system sends it to the supplier.',
+          },
+          {
+            response: 'Reject',
+            text: 'Nothing is sent. The order stays in Luma.',
+          },
+        ],
+        change: [
+          order,
+          supplier,
+          { label: 'Lines', value: lines },
+          ...(item.requestedDeliveryDate
+            ? [
+                {
+                  label: 'Requested delivery',
+                  value: item.requestedDeliveryDate,
+                },
+              ]
+            : []),
+          { label: 'Result', value: 'Order placed with the supplier' },
+        ],
+        impact: {
+          level: 'high',
+          text: 'Commits the business to a supplier order',
+        },
+        deadline: item.expiresAt,
+        evidence: { observedAt: item.dueAt, validUntil: item.expiresAt },
+        response: item.canRespond
+          ? 'decide'
+          : item.requesterId === readerId
+            ? 'awaiting_other'
+            : 'view_only',
+        group: {
+          key: 'supplier:submission_approval',
+          label: 'Orders waiting to be sent',
+        },
+      };
+    case 'submission_uncertain':
+      return {
+        ...base,
+        reason: 'recovery',
+        title: `Check whether ${item.reference} reached the purchasing system`,
+        why: 'The purchasing system did not confirm the request. Luma will not send it again until a read settles whether the order exists.',
+        consequences: [
+          {
+            response: 'Check',
+            text: 'Luma reads the purchasing system. If the order is there it counts as sent; otherwise it stays unresolved.',
+          },
+        ],
+        change: [order, supplier, { label: 'Lines', value: lines }],
+        impact: { level: 'high', text: 'Sending state unknown' },
+        deadline: null,
+        evidence: { observedAt: item.dueAt, validUntil: null },
+        response: item.canRespond ? 'check' : 'view_only',
+        group: {
+          key: 'supplier:submission_uncertain',
+          label: 'Orders with an uncertain send',
+        },
+      };
+    case 'review_commitment':
+      return {
+        ...base,
+        reason: 'uncertainty',
+        title: `Review what ${item.supplierName} said about ${item.reference}`,
+        why: `Luma read this from a supplier message but won’t count it until a person checks it, because ${
+          item.commitment?.reasons
+            .map((r) => reasonText[r] ?? r)
+            .join(' and ') || 'it needs review'
+        }.`,
+        consequences: [
+          {
+            response: 'Confirm',
+            text: 'It counts as the supplier’s commitment for this order.',
+          },
+          {
+            response: 'Reject',
+            text: 'It stays in the history but does not count.',
+          },
+        ],
+        change: [
+          order,
+          ...(item.line ? [{ label: 'Line', value: item.line.sku }] : []),
+          ...(item.commitment
+            ? [
+                {
+                  label: 'Supplier says',
+                  value: said(item.commitment, item.line?.unit ?? null),
+                },
+              ]
+            : []),
+        ],
+        impact: { level: 'medium', text: null },
+        deadline: null,
+        evidence: { observedAt: item.dueAt, validUntil: null },
+        response: respond,
+        group: { key: 'supplier:review', label: 'Supplier messages to review' },
+      };
+    case 'commitment_changed':
+      return {
+        ...base,
+        reason: 'approval',
+        title: item.summary,
+        why: 'The supplier’s commitment differs from the order. Accept it so it becomes the expected delivery, or follow up with the supplier.',
+        consequences: [
+          {
+            response: 'Accept',
+            text: 'The changed quantity or date becomes what Luma expects.',
+          },
+          {
+            response: 'Follow up',
+            text: 'Record what you asked the supplier and when Luma should check again.',
+          },
+        ],
+        change: [
+          order,
+          supplier,
+          ...(item.line
+            ? [
+                {
+                  label: 'Ordered',
+                  value: `${item.line.quantity} ${item.line.unit} ${item.line.sku}`,
+                },
+              ]
+            : []),
+          ...(item.commitment
+            ? [
+                {
+                  label: 'Supplier says',
+                  value: said(item.commitment, item.line?.unit ?? null),
+                },
+              ]
+            : []),
+        ],
+        impact: { level: 'medium', text: null },
+        deadline: null,
+        evidence: { observedAt: item.dueAt, validUntil: null },
+        response: respond,
+        group: { key: 'supplier:changed', label: 'Supplier changes to accept' },
+      };
+    case 'confirmation_overdue':
+    case 'delivery_overdue':
+      return {
+        ...base,
+        reason: 'manual_intervention',
+        title: item.summary,
+        why:
+          item.kind === 'confirmation_overdue'
+            ? 'The supplier has not confirmed the order within the agreed time. Luma cannot chase the supplier itself.'
+            : 'Units the supplier committed to are not booked as received by their expected date.',
+        consequences: [
+          {
+            response: 'Follow up',
+            text: 'Record what you did and when Luma should check again. It returns here if nothing changes by then.',
+          },
+        ],
+        change: [
+          order,
+          supplier,
+          ...(item.line ? [{ label: 'Line', value: `${item.line.sku}` }] : []),
+          { label: 'Due', value: item.dueAt.slice(0, 10) },
+        ],
+        impact: { level: 'high', text: 'Stock may run short' },
+        deadline: item.dueAt,
+        evidence: { observedAt: null, validUntil: null },
+        response: item.canRespond ? 'investigate' : 'view_only',
+        group: {
+          key: `supplier:${item.kind}`,
+          label:
+            item.kind === 'confirmation_overdue'
+              ? 'Supplier confirmations overdue'
+              : 'Deliveries overdue',
+        },
+      };
+  }
+}

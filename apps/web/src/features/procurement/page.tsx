@@ -1,7 +1,13 @@
 import './procurement.css';
 
-import type { PurchaseOrder, Supplier } from '@luma/api-contract';
+import type {
+  OrderStage,
+  OrderSummary,
+  PurchaseOrder,
+  Supplier,
+} from '@luma/api-contract';
 import { Alert } from '@luma/ui/components/primitives/alert';
+import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
 import { CollectionToolbar } from '@luma/ui/components/primitives/collection-toolbar';
 import {
@@ -13,6 +19,7 @@ import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { Empty } from '@luma/ui/components/primitives/empty';
 import { Input } from '@luma/ui/components/primitives/input';
 import { Select } from '@luma/ui/components/primitives/select';
+import { StatePill } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { PageHeader } from '@luma/ui/components/workspace/page-header';
 import { useQuery } from '@tanstack/react-query';
@@ -34,28 +41,49 @@ import { useState } from 'react';
 
 import { SignInRedirect } from '../identity/common';
 import { IdentityError } from '../identity/data';
-import { ordersOptions, procurementError, suppliersOptions } from './data';
+import {
+  ordersOptions,
+  procurementError,
+  progressOptions,
+  suppliersOptions,
+} from './data';
 import { OrderDialog, SupplierDialog } from './forms';
-import { OrderStatus, statusLabels } from './presentation';
+import {
+  calendarDate,
+  OrderStatus,
+  ownerLabels,
+  StagePill,
+  stages,
+  statusLabels,
+} from './presentation';
 
 function orderColumns(
   organizationId: string,
+  progress: Map<string, OrderSummary> | undefined,
 ): DataTableColumn<PurchaseOrder>[] {
   return [
     {
       key: 'reference',
       header: 'Purchase order',
       cell: (order) => (
-        <DataTableRowLink
-          render={
-            <Link
-              to="/app/$organizationId/procurement/$purchaseOrderId"
-              params={{ organizationId, purchaseOrderId: order.id }}
-            />
-          }
-        >
-          {order.reference}
-        </DataTableRowLink>
+        <span className="procurement-cell">
+          <DataTableRowLink
+            render={
+              <Link
+                to="/app/$organizationId/procurement/$purchaseOrderId"
+                params={{ organizationId, purchaseOrderId: order.id }}
+              />
+            }
+          >
+            {order.reference}
+          </DataTableRowLink>
+          <small>
+            {order.lines.length} {order.lines.length === 1 ? 'line' : 'lines'}
+            {progress?.get(order.id)?.externalOrderNumber
+              ? ` · ERP ${progress.get(order.id)!.externalOrderNumber}`
+              : ''}
+          </small>
+        </span>
       ),
     },
     {
@@ -64,39 +92,95 @@ function orderColumns(
       cell: (order) => order.supplierName,
     },
     {
-      key: 'lines',
-      header: 'Lines',
-      numeric: true,
-      hideOnNarrow: true,
-      cell: (order) => order.lines.length,
+      key: 'stage',
+      header: 'Stage',
+      cell: (order) => {
+        const summary = progress?.get(order.id);
+
+        return summary ? (
+          <span className="procurement-flags">
+            <StagePill stage={summary.stage} />
+            {summary.attention ? (
+              <Badge tone={summary.overdue ? 'danger' : 'warning'}>
+                {summary.overdue ? 'Overdue' : `${summary.attention} to answer`}
+              </Badge>
+            ) : null}
+          </span>
+        ) : (
+          <OrderStatus status={order.status} />
+        );
+      },
     },
     {
-      key: 'status',
-      header: 'Status',
-      cell: (order) => <OrderStatus status={order.status} />,
+      key: 'expected',
+      header: 'Expected',
+      hideOnNarrow: true,
+      cell: (order) => {
+        const date = progress?.get(order.id)?.expectedDate;
+
+        return date ? (
+          calendarDate(date)
+        ) : (
+          <span className="procurement-muted">—</span>
+        );
+      },
     },
     {
-      key: 'ownership',
-      header: 'Ownership',
+      key: 'next',
+      header: 'Who’s next',
       hideOnNarrow: true,
-      cell: (order) =>
-        order.authority === 'luma' ? 'Luma-owned' : 'Externally owned',
+      cell: (order) => {
+        const owner = progress?.get(order.id)?.nextOwner;
+
+        return owner ? ownerLabels[owner] : '—';
+      },
     },
   ];
 }
 
 function supplierColumns({
+  organizationId,
   orderCount,
   showOrders,
 }: {
+  organizationId: string;
   orderCount: (supplier: Supplier) => number | undefined;
   showOrders: (supplier: Supplier) => void;
 }): DataTableColumn<Supplier>[] {
   return [
-    { key: 'name', header: 'Supplier', cell: (supplier) => supplier.name },
+    {
+      key: 'name',
+      header: 'Supplier',
+      cell: (supplier) => (
+        <DataTableRowLink
+          render={
+            <Link
+              to="/app/$organizationId/procurement/suppliers/$supplierId"
+              params={{ organizationId, supplierId: supplier.id }}
+            />
+          }
+        >
+          {supplier.name}
+        </DataTableRowLink>
+      ),
+    },
+    {
+      key: 'link',
+      header: 'Purchasing link',
+      hideOnNarrow: true,
+      cell: (supplier) =>
+        supplier.link ? (
+          <StatePill state="verified">
+            {supplier.link.name ?? `Supplier ${supplier.link.externalId}`}
+          </StatePill>
+        ) : (
+          <span className="procurement-muted">Not linked</span>
+        ),
+    },
     {
       key: 'references',
       header: 'External references',
+      hideOnNarrow: true,
       cell: (supplier) =>
         supplier.externalReferences.length
           ? supplier.externalReferences
@@ -139,7 +223,14 @@ export function parseProcurementSearch(value: Record<string, unknown>): {
   view: 'orders' | 'suppliers';
   q: string;
   status: string;
+  stage?: OrderStage | 'attention';
 } {
+  const stage =
+    typeof value.stage === 'string' &&
+    (value.stage === 'attention' || Object.hasOwn(stages, value.stage))
+      ? (value.stage as OrderStage | 'attention')
+      : undefined;
+
   return {
     view: value.view === 'suppliers' ? 'suppliers' : 'orders',
     q: typeof value.q === 'string' ? value.q.slice(0, 200) : '',
@@ -148,6 +239,7 @@ export function parseProcurementSearch(value: Record<string, unknown>): {
       Object.hasOwn(statusLabels, value.status)
         ? value.status
         : '',
+    ...(stage ? { stage } : {}),
   };
 }
 
@@ -157,6 +249,10 @@ export function ProcurementPage() {
   const filters = useSearch({ from: '/app/$organizationId/procurement/' });
   const navigate = useNavigate({ from: '/app/$organizationId/procurement/' });
   const orders = useQuery(ordersOptions(organizationId));
+  const progress = useQuery(progressOptions(organizationId));
+  const summaries = progress.data
+    ? new Map(progress.data.items.map((item) => [item.id, item]))
+    : undefined;
   const suppliers = useQuery(suppliersOptions(organizationId));
   const [dialog, setDialog] = useState<'supplier' | 'order' | null>(null);
   const selected = filters.view === 'orders' ? orders : suppliers;
@@ -164,6 +260,10 @@ export function ProcurementPage() {
   const visibleOrders = orders.data?.items.filter(
     (o) =>
       (!filters.status || o.status === filters.status) &&
+      (!filters.stage ||
+        (filters.stage === 'attention'
+          ? (summaries?.get(o.id)?.attention ?? 0) > 0
+          : summaries?.get(o.id)?.stage === filters.stage)) &&
       [o.reference, o.supplierName, ...o.lines.map((line) => line.sku)]
         .join(' ')
         .toLowerCase()
@@ -185,14 +285,26 @@ export function ProcurementPage() {
       (orderCounts.get(order.supplierId) ?? 0) + 1,
     );
   const canManage = selected.data?.canManage && !selected.error;
-  const openCount = orders.data?.items.filter(
-    (order) => order.status === 'open',
+  const waitingCount = progress.data?.items.filter(
+    (item) => item.stage === 'awaiting_confirmation',
   ).length;
-  const draftCount = orders.data?.items.filter(
-    (order) => order.status === 'draft',
+  const attentionCount = progress.data?.items.filter(
+    (item) => item.attention > 0,
   ).length;
-  const change = (next: Partial<typeof filters>) =>
-    void navigate({ search: { ...filters, ...next }, replace: true });
+  const draftCount = progress.data?.items.filter(
+    (item) => item.stage === 'draft',
+  ).length;
+  const change = (
+    next: Partial<Omit<typeof filters, 'stage'>> & {
+      stage?: typeof filters.stage | undefined;
+    },
+  ) => {
+    const { stage, ...rest } = { ...filters, ...next };
+    void navigate({
+      search: { ...rest, ...(stage ? { stage } : {}) },
+      replace: true,
+    });
+  };
   if (selected.error instanceof IdentityError && selected.error.status === 401)
     return <SignInRedirect />;
 
@@ -201,7 +313,7 @@ export function ProcurementPage() {
       <PageHeader
         icon={<DomainIcon domain="procurement" size="lg" />}
         title="Procurement"
-        description="Suppliers and purchase orders, with ownership and status history in one place."
+        description="Suppliers and purchase orders, from draft to goods received, with every supplier commitment and its evidence."
         actions={
           canManage ? (
             <Button
@@ -224,52 +336,61 @@ export function ProcurementPage() {
       />
       <section
         className="procurement-overview"
-        aria-label="Replenishment context"
+        aria-label="Supplier commitments"
       >
         <div className="procurement-overview-heading">
           <PackageCheck size={17} aria-hidden="true" />
           <div>
-            <h2>Replenishment context</h2>
+            <h2>Supplier commitments</h2>
             <p>
-              Find supplier and order state before creating another commitment.
+              What’s drafted, sent, confirmed and received, and what needs a
+              response.
             </p>
           </div>
         </div>
         <div className="procurement-overview-actions">
-          <Button
-            variant="ghost"
-            aria-label="Show open purchase orders"
-            aria-pressed={
-              filters.view === 'orders' && filters.status === 'open'
-            }
-            onClick={() => change({ view: 'orders', q: '', status: 'open' })}
-          >
-            <strong>{openCount ?? '—'}</strong>
-            <span>Open orders</span>
-            <ArrowUpRight size={14} aria-hidden="true" />
-          </Button>
-          <Button
-            variant="ghost"
-            aria-label="Show draft purchase orders"
-            aria-pressed={
-              filters.view === 'orders' && filters.status === 'draft'
-            }
-            onClick={() => change({ view: 'orders', q: '', status: 'draft' })}
-          >
-            <strong>{draftCount ?? '—'}</strong>
-            <span>Drafts to review</span>
-            <ArrowUpRight size={14} aria-hidden="true" />
-          </Button>
-          <Button
-            variant="ghost"
-            aria-label="Show suppliers"
-            aria-pressed={filters.view === 'suppliers'}
-            onClick={() => change({ view: 'suppliers', q: '', status: '' })}
-          >
-            <strong>{suppliers.data?.items.length ?? '—'}</strong>
-            <span>Suppliers</span>
-            <ArrowUpRight size={14} aria-hidden="true" />
-          </Button>
+          {(
+            [
+              [
+                'attention',
+                attentionCount,
+                'Need a response',
+                'Show orders that need a response',
+              ],
+              [
+                'awaiting_confirmation',
+                waitingCount,
+                'Waiting on supplier',
+                'Show orders waiting for supplier confirmation',
+              ],
+              [
+                'draft',
+                draftCount,
+                'Drafts not sent',
+                'Show draft purchase orders',
+              ],
+            ] as const
+          ).map(([stage, count, label, aria]) => (
+            <Button
+              key={stage}
+              variant="ghost"
+              aria-label={aria}
+              aria-pressed={
+                filters.view === 'orders' && filters.stage === stage
+              }
+              onClick={() =>
+                change(
+                  filters.stage === stage
+                    ? { view: 'orders', stage: undefined }
+                    : { view: 'orders', q: '', status: '', stage },
+                )
+              }
+            >
+              <strong>{count ?? '—'}</strong>
+              <span>{label}</span>
+              <ArrowUpRight size={14} aria-hidden="true" />
+            </Button>
+          ))}
         </div>
       </section>
       <div className="procurement-collection">
@@ -327,16 +448,26 @@ export function ProcurementPage() {
               </div>
               {filters.view === 'orders' && (
                 <Select
-                  aria-label="Order status"
-                  value={filters.status}
+                  aria-label="Order stage"
+                  className="procurement-stage-filter"
+                  value={
+                    filters.stage ??
+                    (filters.status ? `status:${filters.status}` : '')
+                  }
                   options={[
-                    { value: '', label: 'All statuses' },
-                    ...Object.entries(statusLabels).map(([value, label]) => ({
+                    { value: '', label: 'All stages' },
+                    { value: 'attention', label: 'Needs a response' },
+                    ...Object.entries(stages).map(([value, stage]) => ({
                       value,
-                      label,
+                      label: stage.label,
                     })),
                   ]}
-                  onValueChange={(value) => change({ status: value ?? '' })}
+                  onValueChange={(value) =>
+                    change({
+                      status: '',
+                      stage: (value || undefined) as typeof filters.stage,
+                    })
+                  }
                 />
               )}
             </div>
@@ -370,10 +501,12 @@ export function ProcurementPage() {
                     ? 'Try a different search or status.'
                     : 'Add a supplier, create a draft, then track every status change here.'}
                 </p>
-                {filters.q || filters.status ? (
+                {filters.q || filters.status || filters.stage ? (
                   <Button
                     variant="outline"
-                    onClick={() => change({ q: '', status: '' })}
+                    onClick={() =>
+                      change({ q: '', status: '', stage: undefined })
+                    }
                   >
                     Clear filters
                   </Button>
@@ -399,7 +532,7 @@ export function ProcurementPage() {
               <DataTable
                 caption="Purchase orders"
                 variant="plain"
-                columns={orderColumns(organizationId)}
+                columns={orderColumns(organizationId, summaries)}
                 rows={visibleOrders}
                 rowKey={(order) => order.id}
               />
@@ -435,6 +568,7 @@ export function ProcurementPage() {
             caption="Suppliers"
             variant="plain"
             columns={supplierColumns({
+              organizationId,
               orderCount: (supplier) =>
                 orders.data ? (orderCounts.get(supplier.id) ?? 0) : undefined,
               showOrders: (supplier) =>

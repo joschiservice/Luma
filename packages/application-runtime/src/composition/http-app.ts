@@ -21,6 +21,7 @@ import {
 } from '@luma/identity/http';
 import type { ModelGateway, Observability, Observation } from '@luma/platform';
 import type { ProcurementService } from '@luma/procurement';
+import type { SupplierCommitments } from '@luma/procurement/composition';
 import { procurementRoutes } from '@luma/procurement/http';
 import type {
   DecisionAssignments,
@@ -30,6 +31,7 @@ import type {
   OperationalMetrics,
   OperationalSummary,
   OrderWorkspace,
+  ProcurementContextReader,
   ProductWorkspace,
   RecordExplorer,
   ReturnWorkspace,
@@ -40,6 +42,7 @@ import {
   inventoryRoutes,
   metricRoutes,
   orderRoutes,
+  procurementContextRoutes,
   productRoutes,
   recordRoutes,
   returnRoutes,
@@ -101,6 +104,7 @@ export interface AppDependencies {
   draftTests?: DraftTests;
   workflowGeneration?: DraftGeneration;
   procurement?: ProcurementService;
+  commitments?: SupplierCommitments;
   learning?: LearningService;
   measurements?: MeasurementService;
   desk?: DeskService;
@@ -111,6 +115,7 @@ export interface AppDependencies {
   records?: RecordExplorer;
   inventory?: InventoryWorkspace;
   products?: ProductWorkspace;
+  procurementContext?: ProcurementContextReader;
   fulfillment?: FulfillmentWorkspace;
   returns?: ReturnWorkspace;
   orders?: OrderWorkspace;
@@ -309,7 +314,10 @@ export function buildApp(
         workflowGeneration: workflowGenerationRoutes(
           dependencies.workflowGeneration,
         ),
-        procurement: procurementRoutes(dependencies.procurement),
+        procurement: procurementRoutes(
+          dependencies.procurement,
+          dependencies.commitments,
+        ),
         exceptions: caseRoutes(dependencies.cases),
         caseDesk: deskRoutes(dependencies.desk),
         resolutionLearning: learningRoutes(dependencies.learning),
@@ -369,6 +377,9 @@ export function buildApp(
         records: recordRoutes(dependencies.records),
         inventory: inventoryRoutes(dependencies.inventory),
         products: productRoutes(dependencies.products),
+        procurementContext: procurementContextRoutes(
+          dependencies.procurementContext,
+        ),
         fulfillment: fulfillmentRoutes(dependencies.fulfillment),
         orders: orderRoutes(dependencies.orders),
         returns: returnRoutes(dependencies.returns),

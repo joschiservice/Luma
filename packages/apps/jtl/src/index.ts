@@ -1,5 +1,9 @@
 import type { AppDefinition, AppFactoryContext } from '@luma/app-host';
-import { type ConnectionProvider, ConnectorError } from '@luma/connections';
+import {
+  type ConnectionProvider,
+  ConnectorError,
+  type InstallationCapability,
+} from '@luma/connections';
 import { simulationTransport } from '@luma/connections/adapters';
 import { z } from 'zod';
 
@@ -25,6 +29,21 @@ export type { JtlConnection } from '@luma/connector-jtl';
 export { readJtlEndpoints, createInstallationVerifier };
 
 export type { JtlEndpoint };
+
+// Each write capability may send exactly one HTTP method through the pinned on-premise transport.
+const writeMethods: Partial<
+  Record<InstallationCapability, { writeMethod: 'PATCH' | 'POST' }>
+> = {
+  'orders.shipping-method.write': { writeMethod: 'PATCH' },
+  'purchase-orders.submit': { writeMethod: 'POST' },
+};
+
+const writeReads: Partial<
+  Record<InstallationCapability, InstallationCapability>
+> = {
+  'orders.shipping-method.write': 'orders.shipping-method.read',
+  'purchase-orders.submit': 'purchase-orders.read',
+};
 
 /** Creates the JTL connector contribution with deployment-approved network destinations. */
 export function createJtlProvider(options: {
@@ -66,12 +85,9 @@ export function createJtlProvider(options: {
       const token = async () => {
         if (target.kind === 'jtl-onprem' && !simulated)
           await options.approveJtlEndpoint?.(context, target.baseUrl);
-        if (capability === 'orders.shipping-method.write')
-          await runtime.installations.credential(
-            context,
-            id,
-            'orders.shipping-method.read',
-          );
+        // A write re-reads current provider state, so it also needs its read grant.
+        const read = writeReads[capability];
+        if (read) await runtime.installations.credential(context, id, read);
         const latest = await runtime.installations.credential(
           context,
           id,
@@ -103,9 +119,7 @@ export function createJtlProvider(options: {
               retry: 'never',
             });
 
-          return approvedJtlFetch(endpoint, {
-            allowWrites: capability === 'orders.shipping-method.write',
-          })(...args);
+          return approvedJtlFetch(endpoint, writeMethods[capability])(...args);
         };
       }
 
@@ -115,6 +129,7 @@ export function createJtlProvider(options: {
         recordObservations: runtime.recordObservations,
         ...(fetch ? { fetch } : {}),
         shippingMethodActions: true,
+        purchaseOrderActions: true,
         connection:
           target.kind === 'jtl-cloud'
             ? {
@@ -144,7 +159,7 @@ export function createApp(context: AppFactoryContext): AppDefinition {
       id: 'jtl',
       name: 'JTL',
       description:
-        'Connect JTL Cloud and JTL-Wawi to read commerce data and manage permitted shipping corrections.',
+        'Connect JTL Cloud and JTL-Wawi to read commerce data, manage permitted shipping corrections and submit approved purchase orders.',
       version: '1.0.0',
       category: 'erp',
       ui: ['connections', 'settings'],

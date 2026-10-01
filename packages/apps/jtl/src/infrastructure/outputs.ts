@@ -48,7 +48,61 @@ const page = <T extends z.ZodTypeAny>(item: T) =>
     completeness: z.enum(['complete', 'partial']),
   });
 
+const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
 export const outputs = {
+  'suppliers.read': page(
+    observation(
+      'supplier',
+      z
+        .object({
+          name: text,
+          number: text,
+          active: z.boolean().nullable(),
+          email: z.string().min(3).max(320).nullable(),
+        })
+        .strict(),
+    ),
+  ),
+  'purchase-orders.read': page(
+    observation(
+      'purchase_order',
+      z
+        .object({
+          supplier: externalId,
+          orderNumber: text,
+          lumaOrderId: z.string().min(1).max(128).nullable(),
+          status: z.enum([
+            'open',
+            'released',
+            'in_progress',
+            'partially_delivered',
+            'overdue',
+            'completed',
+            'unknown',
+          ]),
+          requestedDeliveryDate: date.nullable(),
+          confirmed: z.boolean().nullable(),
+          createdAt: timestamp.nullable(),
+          lines: z.array(
+            z
+              .object({
+                id: externalId,
+                sku: externalId.nullable(),
+                itemNumber: text,
+                quantity,
+                deliveredQuantity: decimal.nullable(),
+                confirmedQuantity: decimal.nullable(),
+                confirmedDeliveryDate: date.nullable(),
+                confirmed: z.boolean().nullable(),
+                requestedDeliveryDate: date.nullable(),
+              })
+              .strict(),
+          ),
+        })
+        .strict(),
+    ),
+  ),
   'orders.read': page(
     observation(
       'order',

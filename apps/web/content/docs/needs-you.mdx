@@ -7,11 +7,11 @@ description: Find every approval, manual step and outcome check waiting on a per
 
 ## What appears here
 
-- **Approvals**: a proposed change that a second owner or admin must approve, such as an issue fix, a purchase-order draft from replenishment, a Shopify stock correction or a fulfillment recovery.
+- **Approvals**: a proposed change that a second owner or admin must approve, such as an issue fix, a purchase-order draft from replenishment, sending a purchase order to a supplier, a Shopify stock correction or a fulfillment recovery. A supplier's changed quantity or date waits here too, to be accepted or followed up.
 - **Ready to run**: an approved Shopify change that only its requester can run before it expires.
 - **Outcome checks**: a change the source system accepted, or whose outcome is unknown, that no fresh read has confirmed yet. An accepted change is not a verified one.
-- **Manual steps**: work Luma can't do itself, such as a correction in your ERP.
-- **Reviews**: evidence that is incomplete or conflicting, or an issue someone escalated.
+- **Manual steps**: work Luma can't do itself, such as a correction in your ERP or chasing a supplier whose confirmation or delivery is overdue. See [Procurement](/docs/procurement).
+- **Reviews**: evidence that is incomplete or conflicting, an issue someone escalated, or a fact Luma read from a supplier message that needs checking.
 
 Decisions leave the queue as soon as they're answered, expire or no longer apply. An empty queue means nothing is waiting on a person. It doesn't mean every connection is healthy; Home shows connection health.
 

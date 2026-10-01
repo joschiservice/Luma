@@ -6,6 +6,7 @@ import { createJtlConnector } from './adapter.js';
 import { cloudPayload } from './fixtures/cloud.js';
 import commerce from './fixtures/commerce.json' with { type: 'json' };
 import api from './fixtures/erp-2.2.json' with { type: 'json' };
+import { acceptanceId } from './purchase-orders.js';
 import * as s from './schemas.js';
 import {
   shippingMethodResponse,
@@ -219,6 +220,172 @@ describe('JTL 2.2 published contract', () => {
         { name: 'pageNumber', in: 'query' },
         { name: 'pageSize', in: 'query' },
       ]),
+    );
+  });
+
+  it('pins the consumed supplier and purchase-order projections and scopes', () => {
+    const id = cloudIdForContract;
+    validate(
+      s.supplier.parse({
+        id,
+        name: 'Legacy',
+        companyName: 'Nordwind Textil GmbH',
+        supplierNumber: 'L-1',
+      }),
+      response('/v2/suppliers', true),
+    );
+    validate(
+      s.supplierDetail.parse({
+        id,
+        companyName: 'Nordwind Textil GmbH',
+        isActive: true,
+        contact: { emailAddress: 'orders@example.test' },
+      }),
+      response('/v2/suppliers/{supplierId}'),
+    );
+    validate(
+      s.itemSupplier.parse({
+        id,
+        itemId: id,
+        supplierId: id,
+        netPurchasePrice: '3.75',
+        vatRate: 19,
+      }),
+      response('/v2/items/{itemId}/suppliers', true),
+    );
+    validate(
+      s.purchaseOrderListItem.parse({ purchaseOrderId: id }),
+      response('/v2/purchase-orders', true),
+    );
+    const { lumaOrderIds, ...order } = s.purchaseOrder.parse({
+      purchaseOrderId: id,
+      supplierId: id,
+      orderNumber: 'PO-1',
+      status: 30,
+      isConfirmed: true,
+      requestedDeliveryDate: '2026-10-07T00:00:00Z',
+      createdAt: '2026-10-01T08:00:00Z',
+      internalComment: 'luma-po:abc',
+      lineItems: [
+        {
+          lineItemId: id,
+          lineItemType: 1,
+          itemId: id,
+          itemNumber: 'SKU',
+          quantity: 10,
+          deliveredQuantity: 4,
+          openQuantity: 6,
+          confirmedQuantity: 10,
+          confirmedDeliveryDate: '2026-10-08T00:00:00Z',
+          isLineItemConfirmed: true,
+          deliveryDate: '2026-10-07T00:00:00Z',
+        },
+      ],
+    });
+    expect(lumaOrderIds).toEqual(['abc']);
+    const detail = response('/v2/purchase-orders/{purchaseOrderId}');
+    validate(order, detail);
+    expect(resolve(detail.properties!.internalComment!).type).toBe('string');
+    expect(
+      resolve(resolve(detail.properties!.lineItems!).items!).properties,
+    ).toHaveProperty('lineItemType');
+    expect(api.paths['/v2/purchase-orders'].parameters).toEqual(
+      expect.arrayContaining([
+        { name: 'createdAtAfter', in: 'query' },
+        { name: 'pageNumber', in: 'query' },
+        { name: 'pageSize', in: 'query' },
+      ]),
+    );
+    // Installation probes map these provider scopes to Luma capabilities.
+    expect(api.paths['/v2/suppliers'].scopes).toEqual(['suppliers.read']);
+    expect(api.paths['/v2/purchase-orders'].scopes).toEqual([
+      'purchaseorders.read',
+    ]);
+    expect(api.paths['/v2/items/{itemId}/suppliers'].scopes).toEqual([
+      'items.read',
+    ]);
+    expect(api.purchaseOrderCreate.scopes).toEqual(['purchaseorders.write']);
+  });
+
+  it('sends a schema-valid purchase-order create with the provider idempotency header', async () => {
+    const id = cloudIdForContract;
+    let body: unknown;
+    const fetch = vi.fn<typeof globalThis.fetch>(async (url, init) => {
+      const path = new URL(String(url)).pathname;
+      if (init?.method === 'POST') {
+        body = JSON.parse(String(init.body));
+
+        return Response.json({ purchaseOrderId: id }, { status: 201 });
+      }
+      if (path.endsWith('/suppliers'))
+        return Response.json({
+          items: [
+            {
+              id,
+              itemId: id,
+              supplierId: id,
+              netPurchasePrice: 3.75,
+              vatRate: 19,
+            },
+          ],
+          totalItems: 1,
+          pageNumber: 1,
+          pageSize: 100,
+        });
+
+      return Response.json({
+        items: [],
+        totalItems: 0,
+        pageNumber: 1,
+        pageSize: 100,
+      });
+    });
+    const connector = createJtlConnector({
+      tenantId: 'tenant-a',
+      connectionId: 'connection-a',
+      purchaseOrderActions: true,
+      recordObservations: async () => {},
+      fetch,
+      connection: {
+        kind: 'cloud',
+        jtlTenantId: id,
+        accessToken: async () => 'token',
+      },
+    });
+    const receipt = await connector.capabilities['purchase-orders.submit']!.run(
+      {
+        tenant: { tenantId: 'tenant-a' } as TenantContext,
+        connectionId: 'connection-a',
+        provider: 'jtl',
+        idempotencyKey: 'key',
+      },
+      {
+        lumaOrderId: 'po-1',
+        reference: 'PO-1',
+        supplier: { externalId: id, scopeKey: '' },
+        requestedDeliveryDate: '2026-10-12',
+        lines: [
+          {
+            sku: { externalId: id, scopeKey: '' },
+            quantity: { amount: '5', unit: 'each' },
+          },
+        ],
+      },
+    );
+    validate(body, api.purchaseOrderCreate.request);
+    validate(
+      s.purchaseOrderCreated.parse({ purchaseOrderId: id }),
+      api.purchaseOrderCreate.response,
+    );
+    expect(receipt.evidenceRefs).toEqual([
+      acceptanceId('tenant-a', 'connection-a', id),
+    ]);
+    expect(api.purchaseOrderCreate.parameters).toContainEqual({
+      name: 'Idempotency-Key',
+      in: 'header',
+    });
+    expect(resolve(api.purchaseOrderCreate.request).required).toEqual(
+      expect.arrayContaining(['supplierId', 'requestedDeliveryDate', 'items']),
     );
   });
 });

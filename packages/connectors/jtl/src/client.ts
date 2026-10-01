@@ -82,6 +82,8 @@ export function createClient(options: JtlTransportOptions) {
       path: string,
       query: Record<string, string> = {},
       write?: {
+        /** Defaults to PATCH. */
+        method?: 'PATCH' | 'POST';
         body: unknown;
         idempotencyKey: string;
         receipt?(requestId: string | null): void;
@@ -120,7 +122,7 @@ export function createClient(options: JtlTransportOptions) {
       let providerRequestId: string | null = null;
       try {
         const response = await (options.fetch ?? globalThis.fetch)(url, {
-          method: write ? 'PATCH' : 'GET',
+          method: write ? (write.method ?? 'PATCH') : 'GET',
           ...(write ? { body: JSON.stringify(write.body) } : {}),
           headers,
           redirect: 'error',

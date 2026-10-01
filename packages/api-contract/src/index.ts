@@ -17,6 +17,7 @@ import { ordersContract } from './contracts/orders.js';
 import { operationsContract } from './contracts/overview.js';
 import { playbooksContract } from './contracts/playbooks.js';
 import { procurementContract } from './contracts/procurement.js';
+import { procurementContextContract } from './contracts/procurement-context.js';
 import { productsContract } from './contracts/products.js';
 import { connectorProvidersContract } from './contracts/providers.js';
 import { recordsContract } from './contracts/records.js';
@@ -40,6 +41,7 @@ const routes: {
   workflowGeneration: typeof workflowGenerationContract;
   draftTests: typeof draftTestsContract;
   procurement: typeof procurementContract;
+  procurementContext: typeof procurementContextContract;
   resolutionLearning: typeof resolutionLearningContract;
   caseDesk: typeof caseDeskContract;
   operations: typeof operationsContract;
@@ -68,6 +70,7 @@ const routes: {
   workflowGeneration: workflowGenerationContract,
   draftTests: draftTestsContract,
   procurement: procurementContract,
+  procurementContext: procurementContextContract,
   resolutionLearning: resolutionLearningContract,
   caseDesk: caseDeskContract,
   operations: operationsContract,

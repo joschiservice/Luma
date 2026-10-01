@@ -1,8 +1,11 @@
+import { randomBytes } from 'node:crypto';
+
 import { createAuditLog } from '@luma/audit/composition';
-import type { EffectRegistry } from '@luma/connections';
+import type { ConnectionManagement, EffectRegistry } from '@luma/connections';
 import {
   createConnectionCoverage,
   createPlaybookGrantReader,
+  type InstalledPurchaseOrderRuntime,
 } from '@luma/connections/composition';
 import type { VerificationEvaluator } from '@luma/exceptions';
 import {
@@ -22,6 +25,8 @@ import { createReplenishmentScenarios } from '@luma/procurement';
 import {
   createProcurement,
   createProcurementMetricReader,
+  createSupplierCommitmentService,
+  type SupplierCommitments,
 } from '@luma/procurement/composition';
 import {
   appDecisionProvider,
@@ -31,10 +36,12 @@ import {
   createOperationalMetrics,
   createOperationalSummary,
   createOrderWorkspace,
+  createProcurementContext,
   createProductWorkspace,
   createRecordExplorer,
   createReturnWorkspace,
   replenishmentDecisionProvider,
+  supplierCommitmentDecisionProvider,
 } from '@luma/read-models/composition';
 import {
   createShippingMethodTemplate,
@@ -65,6 +72,11 @@ import { createAdmissionEligibility } from './admission.js';
 import { createPersistentPlaybookLibrary } from './playbook-library.js';
 import { createProcurementEffects } from './procurement-effects.js';
 import {
+  createPurchasingSystem,
+  createSubmissionAdmission,
+  createSubmissionEffects,
+} from './procurement-submissions.js';
+import {
   createReplenishmentRuntime,
   type ReplenishmentTransport,
 } from './replenishment.js';
@@ -74,6 +86,15 @@ import {
   createResolutionPlaybooks,
   createSafetyServices,
 } from './services.js';
+
+/** Correlates supplier-message model calls with the request that made them. */
+function supplierTrace(requestId: string) {
+  return {
+    requestId,
+    traceId: randomBytes(16).toString('hex'),
+    spanId: randomBytes(8).toString('hex'),
+  };
+}
 
 export type ExecutionConfiguration =
   { kind: 'disabled' } | { kind: 'enabled'; effects: EffectRegistry };
@@ -91,6 +112,7 @@ export interface ApplicationServices {
   replenishment: ReturnType<typeof createReplenishmentRuntime>;
   codeProcesses: ReturnType<typeof createCodeProcesses>;
   procurement: ReturnType<typeof createProcurement>;
+  commitments: SupplierCommitments;
   library: ReturnType<typeof createPersistentPlaybookLibrary>;
   http: {
     shadow: ReturnType<typeof createShadowEvaluations>;
@@ -102,6 +124,7 @@ export interface ApplicationServices {
     workflowGeneration: ReturnType<typeof createDraftGenerations>;
     workflowTemplates: ReturnType<typeof createWorkflowTemplates>;
     procurement: ReturnType<typeof createProcurement>;
+    commitments: SupplierCommitments;
     playbooks: ReturnType<typeof createPersistentPlaybookLibrary>;
     activity: ReturnType<typeof createWorkspaceActivity>;
     measurements: ReturnType<typeof createResolutionMeasurements>;
@@ -112,6 +135,7 @@ export interface ApplicationServices {
     records: ReturnType<typeof createRecordExplorer>;
     inventory: ReturnType<typeof createInventoryWorkspace>;
     products: ReturnType<typeof createProductWorkspace>;
+    procurementContext: ReturnType<typeof createProcurementContext>;
     fulfillment: ReturnType<typeof createFulfillmentWorkspace>;
     returns: ReturnType<typeof createReturnWorkspace>;
     orders: ReturnType<typeof createOrderWorkspace>;
@@ -133,6 +157,15 @@ export interface ApplicationOptions {
   authoring?: { available: boolean; reason: string | null };
   /** Installed-app decision sources, such as `registry.decisionSources()`, for Needs you. */
   decisionSources?: Parameters<typeof appDecisionProvider>[0][];
+  /** Installed purchasing-system connections. Without them, orders cannot be sent from Luma. */
+  purchasing?: {
+    runtime: InstalledPurchaseOrderRuntime;
+    installations: Pick<ConnectionManagement, 'list'>;
+  };
+  /** Whether the gateway has an EU zero-retention route for reading supplier messages. */
+  supplierExtraction?: { available: boolean; reason: string | null };
+  /** Days supplier message text is kept; defaults to 365. */
+  supplierMessageRetentionDays?: number;
 }
 
 /**
@@ -161,18 +194,63 @@ export function createApplicationServices(
     options.execution.kind === 'enabled'
       ? createProcurementEffects(procurement)
       : { resolve: async () => null };
+  // Sending purchase orders is an external effect, so it needs enabled execution.
+  const submissionEffects =
+    options.execution.kind === 'enabled' && options.purchasing
+      ? createSubmissionEffects(options.purchasing.runtime, () => commitments)
+      : { resolve: async () => null };
   const combinedEffects: EffectRegistry = {
     resolve: async (context, intent) =>
       (await procurementEffects.resolve(context, intent)) ??
+      (await submissionEffects.resolve(context, intent)) ??
       effects.resolve(context, intent),
   };
   const resolutionEligible = createAdmissionEligibility(detection.diagnoses);
   const safety = createSafetyServices(database, identity, combinedEffects, {
     eligible: (context, step) =>
-      step.subject
-        ? replenishment.eligible(context, step)
-        : resolutionEligible(context, step),
+      step.subject?.kind === 'purchase_order_submission'
+        ? commitments.eligible(context, step)
+        : step.subject
+          ? replenishment.eligible(context, step)
+          : resolutionEligible(context, step),
   });
+  const commitments: SupplierCommitments = createSupplierCommitmentService(
+    database,
+    createAuditLog,
+    {
+      purchasing: options.purchasing
+        ? createPurchasingSystem(
+            options.purchasing.runtime,
+            options.purchasing.installations,
+          )
+        : null,
+      admission:
+        options.execution.kind === 'enabled' && options.purchasing
+          ? createSubmissionAdmission(safety, combinedEffects)
+          : null,
+      refreshContext: identity.refreshContext,
+      principal: identity.resolveWorkflowContext,
+      openOrder: async (context, order, commandId, reason) => {
+        await procurement.transition(context, order.id, {
+          id: commandId,
+          expectedRevision: order.revision,
+          status: 'open',
+          reason,
+        });
+      },
+      model: {
+        gateway: options.modelGateway ?? null,
+        available: options.supplierExtraction?.available ?? false,
+        reason:
+          options.supplierExtraction?.reason ??
+          'Reading supplier messages isn’t set up on this server.',
+      },
+      trace: (context) => supplierTrace(context.requestId),
+      ...(options.supplierMessageRetentionDays
+        ? { retentionDays: options.supplierMessageRetentionDays }
+        : {}),
+    },
+  );
   const desk = createDeskServices(
     database,
     identity,
@@ -253,6 +331,46 @@ export function createApplicationServices(
     cases: caseDecisionQuery,
     providers: [
       replenishmentDecisionProvider(replenishment.pending),
+      supplierCommitmentDecisionProvider(async (context) =>
+        (await commitments.pending(context)).map((item) => ({
+          key: item.attention.key,
+          kind: item.attention.kind,
+          purchaseOrderId: item.order.id,
+          reference: item.order.reference,
+          supplierName: item.supplierName,
+          summary: item.attention.summary,
+          dueAt: item.attention.dueAt,
+          expiresAt:
+            item.attention.kind === 'submission_approval'
+              ? (item.submission?.expiresAt ?? null)
+              : null,
+          requesterId: item.submission?.requestedBy ?? null,
+          canRespond: item.canRespond,
+          requestedDeliveryDate: item.submission?.requestedDeliveryDate ?? null,
+          // Descriptions read better than canonical SKU keys in a decision.
+          lines: item.order.lines.map((l) => ({
+            sku: l.description,
+            quantity: l.quantity,
+            unit: l.unit,
+          })),
+          line: item.line
+            ? {
+                sku: item.line.description,
+                quantity: item.line.quantity,
+                unit: item.line.unit,
+              }
+            : null,
+          commitment: item.commitment
+            ? {
+                kind: item.commitment.kind,
+                quantity: item.commitment.quantity,
+                date: item.commitment.date,
+                text: item.commitment.text,
+                reasons: item.commitment.reviewReasons,
+              }
+            : null,
+        })),
+      ),
       ...(options.decisionSources ?? []).map(appDecisionProvider),
     ],
     refreshContext: identity.refreshContext,
@@ -278,6 +396,7 @@ export function createApplicationServices(
     generation,
     templates,
     procurement,
+    commitments,
     detection,
     safety,
     desk,
@@ -290,6 +409,7 @@ export function createApplicationServices(
       workflowGeneration: generation,
       workflowTemplates: templates,
       procurement,
+      commitments,
       shadow: createShadowEvaluations(database, identity.refreshContext),
       cases: detection.cases,
       desk,
@@ -319,6 +439,7 @@ export function createApplicationServices(
       ),
       inventory: createInventoryWorkspace(database),
       products: createProductWorkspace(database),
+      procurementContext: createProcurementContext(database),
       returns: createReturnWorkspace(database),
       records: createRecordExplorer(database),
       orders: createOrderWorkspace(

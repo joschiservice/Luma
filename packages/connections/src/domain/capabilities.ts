@@ -26,7 +26,9 @@ export interface SourceIdentity extends ExternalId {
     | 'product'
     | 'customer'
     | 'return'
-    | 'refund';
+    | 'refund'
+    | 'supplier'
+    | 'purchase_order';
 }
 
 export interface Observation<T> {
@@ -337,6 +339,69 @@ export interface WriteReceipt {
   providerRequestId: string | null;
 }
 
+/** A supplier in the merchant's purchasing system. Contact details are descriptive only. */
+export interface SupplierSnapshot {
+  name: string | null;
+  /** Merchant-assigned supplier number. */
+  number: string | null;
+  active: boolean | null;
+  email: string | null;
+}
+
+export type SupplierOrderStatus =
+  | 'open'
+  | 'released'
+  | 'in_progress'
+  | 'partially_delivered'
+  | 'overdue'
+  | 'completed'
+  | 'unknown';
+
+/**
+ * A purchase order as the purchasing system records it. Confirmation fields are what the
+ * system holds about the supplier's confirmation; delivered quantities are booked goods
+ * receipts. Null means the source holds no value.
+ */
+export interface SupplierOrderSnapshot {
+  supplier: ExternalId;
+  /** The source's own order number. */
+  orderNumber: string | null;
+  /** The Luma purchase-order ID this order was created for, when Luma created it. */
+  lumaOrderId: string | null;
+  status: SupplierOrderStatus;
+  /** Calendar date (YYYY-MM-DD) requested from the supplier. */
+  requestedDeliveryDate: string | null;
+  /** Whether the order as a whole is recorded as confirmed by the supplier. */
+  confirmed: boolean | null;
+  createdAt: string | null;
+  lines: {
+    id: ExternalId;
+    sku: ExternalId | null;
+    /** Source item number text; descriptive only. */
+    itemNumber: string | null;
+    quantity: Quantity;
+    /** Units booked as received at the warehouse. */
+    deliveredQuantity: string | null;
+    confirmedQuantity: string | null;
+    /** Calendar date (YYYY-MM-DD) the supplier confirmed. */
+    confirmedDeliveryDate: string | null;
+    confirmed: boolean | null;
+    requestedDeliveryDate: string | null;
+  }[];
+}
+
+/** Creates one purchase order in the purchasing system for an approved Luma order. */
+export interface PurchaseOrderSubmission {
+  /** The Luma purchase-order ID; the adapter stores it so the order can be found again. */
+  lumaOrderId: string;
+  /** Buyer reference shown to the supplier. */
+  reference: string;
+  supplier: ExternalId;
+  /** Calendar date (YYYY-MM-DD). */
+  requestedDeliveryDate: string;
+  lines: { sku: ExternalId; quantity: Quantity }[];
+}
+
 export interface ShippingMethodSnapshot {
   orderStatus: 'open' | 'shipped' | 'cancelled' | 'unknown';
   shippingMethod: ExternalId;
@@ -383,6 +448,26 @@ export interface CapabilityContract {
     output: WriteReceipt;
   };
   'orders.read': { input: PageQuery; output: Page<OrderSnapshot> };
+  'suppliers.read': {
+    input: PageQuery & { supplier?: ExternalId };
+    output: Page<SupplierSnapshot>;
+  };
+  /**
+   * Reads purchase orders by source ID, or finds the orders created for a Luma purchase order
+   * at or after `createdSince`. Resource `purchase_order`.
+   */
+  'purchase-orders.read': {
+    input: PageQuery & {
+      order?: ExternalId;
+      created?: { lumaOrderId: string; createdSince: string };
+    };
+    output: Page<SupplierOrderSnapshot>;
+  };
+  /** Acceptance means the purchasing system recorded the order, not that a supplier saw it. */
+  'purchase-orders.submit': {
+    input: PurchaseOrderSubmission;
+    output: WriteReceipt;
+  };
   'orders.write': {
     input: { order: ExternalId; operation: 'cancel'; expectedRevision: string };
     output: WriteReceipt;

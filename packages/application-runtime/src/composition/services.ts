@@ -121,7 +121,7 @@ export function createCommerceServices(database: string | TenantDatabase) {
     kind === 'return' ||
     kind === 'refund'
       ? orders.has(context, kind, id)
-      : kind === 'customer'
+      : kind === 'customer' || kind === 'supplier' || kind === 'purchase_order'
         ? false
         : inventory.has(context, kind, id),
   );

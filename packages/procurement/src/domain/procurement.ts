@@ -13,6 +13,28 @@ export interface SupplierInput {
 export interface Supplier extends SupplierInput {
   tenantId: string;
   createdAt: string;
+  /** Increments with each link or terms change; absent on suppliers created before links existed. */
+  revision?: number | undefined;
+  /** The supplier's record in a purchasing system Luma can submit orders through. */
+  link?: SupplierLink | null | undefined;
+  /** Hours after submission by which the supplier should confirm. */
+  confirmationHours?: number | undefined;
+}
+
+export interface SupplierLink {
+  connectionId: string;
+  externalId: string;
+  scopeKey: string;
+  /** Name in the purchasing system when linked; descriptive only. */
+  name: string | null;
+  linkedBy: string;
+  linkedAt: string;
+}
+
+export interface SupplierLinkInput {
+  expectedRevision: number;
+  link: { connectionId: string; externalId: string; scopeKey: string } | null;
+  confirmationHours: number;
 }
 
 export interface PurchaseOrderLine {

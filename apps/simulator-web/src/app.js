@@ -45,6 +45,7 @@ function render() {
   );
   $('#runs').value = selected;
   renderInventory();
+  renderPurchasing();
   if (!run) return;
   $('#clock').textContent = new Date(run.clock.now).toISOString();
   $('#status').textContent =
@@ -174,6 +175,128 @@ function renderInventory() {
               : `Last checked ${new Date(check.at).toLocaleTimeString()} · ${check.outcome === 'detect' ? 'Mismatch detected' : 'Stock agrees'}`;
 }
 
+const purchaseStatuses = {
+  0: 'Open',
+  5: 'Released',
+  20: 'In progress',
+  30: 'Partially delivered',
+  50: 'Overdue',
+  500: 'Completed',
+};
+const profileLabels = {
+  full: 'Confirms and delivers in full',
+  partial: 'Confirms 60%, +3 days, two deliveries',
+  delayed: 'Confirms +7 days, delivers late',
+  short: 'Confirms in full, delivers half',
+  silent: 'Never answers',
+};
+
+function purchaseCommand(command) {
+  return control({ action: 'command', instance: 'jtl', command });
+}
+
+let purchasingView = '';
+
+function renderPurchasing() {
+  const run = current();
+  const jtl = run?.jtl;
+  const orders = jtl?.purchaseOrders ?? [];
+  // Rebuild controls only when purchasing state changes, so polling keeps focus and open menus.
+  const view = JSON.stringify([
+    run?.id,
+    jtl?.suppliers,
+    jtl?.supplierProfiles,
+    orders,
+  ]);
+  if (view === purchasingView) return;
+  purchasingView = view;
+  $('#purchase-count').textContent = run
+    ? `${orders.length} purchase order${orders.length === 1 ? '' : 's'}`
+    : 'Select a run';
+  $('#supplier-profiles').replaceChildren(
+    ...(jtl?.suppliers ?? []).map((supplier) => {
+      const label = element('label', supplier.companyName);
+      const select = document.createElement('select');
+      select.setAttribute('aria-label', `${supplier.companyName} profile`);
+      for (const [value, text] of Object.entries(profileLabels)) {
+        const option = element('option', text);
+        option.value = value;
+        select.append(option);
+      }
+      select.value = jtl.supplierProfiles[supplier.id] ?? 'full';
+      select.onchange = () =>
+        void purchaseCommand({
+          kind: 'supplier-profile',
+          supplierId: supplier.id,
+          profile: select.value,
+        });
+      label.append(select);
+
+      return label;
+    }),
+  );
+  if (!orders.length) {
+    $('#purchase-orders').replaceChildren(
+      element('p', run ? 'No purchase orders yet.' : ''),
+    );
+    $('#purchase-orders').firstChild.className = 'muted';
+
+    return;
+  }
+  $('#purchase-orders').replaceChildren(
+    ...orders.map((order) => {
+      const supplier = jtl.suppliers.find((s) => s.id === order.supplierId);
+      const row = element('div', '');
+      row.className = 'purchase-order';
+      const details = element('div', '');
+      details.append(
+        element(
+          'strong',
+          `${order.orderNumber} · ${supplier?.companyName ?? order.supplierId}`,
+        ),
+        element(
+          'p',
+          `${purchaseStatuses[order.status] ?? order.status} · ${order.isConfirmed ? 'Confirmed' : 'Not confirmed'} · requested ${order.requestedDeliveryDate.slice(0, 10)}`,
+        ),
+        ...order.lineItems.map((line) =>
+          element(
+            'p',
+            `${line.itemNumber}: ordered ${line.quantity} · confirmed ${line.confirmedQuantity ?? '—'}${line.confirmedDeliveryDate ? ` for ${line.confirmedDeliveryDate.slice(0, 10)}` : ''} · received ${line.deliveredQuantity}`,
+          ),
+        ),
+      );
+      const buttons = element('div', '');
+      buttons.className = 'buttons';
+      const confirm = element('button', 'Confirm in full');
+      confirm.className = 'secondary';
+      confirm.disabled = order.status === 500;
+      confirm.onclick = () =>
+        void purchaseCommand({
+          kind: 'purchase-order-confirm',
+          orderId: order.purchaseOrderId,
+        });
+      const receive = element('button', 'Receive open quantity');
+      receive.className = 'secondary';
+      receive.disabled = order.status === 500;
+      receive.onclick = () =>
+        void purchaseCommand({
+          kind: 'purchase-order-receive',
+          orderId: order.purchaseOrderId,
+          lines: order.lineItems
+            .filter((line) => line.openQuantity > 0)
+            .map((line) => ({
+              lineItemId: line.lineItemId,
+              quantity: line.openQuantity,
+            })),
+        });
+      buttons.append(confirm, receive);
+      row.append(details, buttons);
+
+      return row;
+    }),
+  );
+}
+
 function scenarioAction(action) {
   const runId = selected;
   const scenarioId = current()?.operationalScenarios?.at(-1)?.id;
@@ -287,14 +410,22 @@ $('#command').onsubmit = (event) => {
   };
   void control({ action: 'command', instance: $('#provider').value, command });
 };
+
+// Response loss applies only to writes; JTL has two, Shopify one.
+function lossOperation(selected) {
+  if ($('#provider').value === 'shopify')
+    return 'inventory.available.reconcile';
+
+  return selected === 'purchase-orders.submit'
+    ? selected
+    : 'orders.shipping-method.write';
+}
+
 $('#fault [name=kind]').onchange = (event) => {
   const operation = $('#fault [name=operation]');
-  operation.disabled = event.target.value === 'response-loss';
-  if (operation.disabled)
-    operation.value =
-      $('#provider').value === 'shopify'
-        ? 'inventory.available.reconcile'
-        : 'orders.shipping-method.write';
+  const loss = event.target.value === 'response-loss';
+  operation.disabled = loss && $('#provider').value === 'shopify';
+  if (loss) operation.value = lossOperation(operation.value);
 };
 $('#fault').onsubmit = (event) => {
   event.preventDefault();
@@ -305,9 +436,7 @@ $('#fault').onsubmit = (event) => {
     rule: {
       instance: $('#provider').value,
       operation: loss
-        ? $('#provider').value === 'shopify'
-          ? 'inventory.available.reconcile'
-          : 'orders.shipping-method.write'
+        ? lossOperation($('#fault [name=operation]').value)
         : data.operation,
       kind: data.kind,
       phase: loss ? 'after-commit' : 'before',

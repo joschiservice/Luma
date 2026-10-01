@@ -49,7 +49,9 @@ A successful capability receipt is not the business outcome. An independent
 read checks Luma ownership, draft status, revision, supplier, immutable lines,
 origin and command audit. Failed or unavailable verification remains visible;
 it cannot become verified success. The outcome is a **purchase-order draft**,
-not a supplier submission or receipt of goods.
+not a supplier submission or receipt of goods. The order's record traces the run's
+stock check, approval and verification, and sending it is a separate approved step;
+see [Supplier commitments](supplier-commitments.md).
 
 Migration `0028_replenishment.sql` adds tenant-isolated rules and claims. Worker
 scope discovery exposes routing identities only. Application, approval and

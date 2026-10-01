@@ -25,3 +25,5 @@ export type {
   DecisionProvider,
   DecisionQueue,
 } from './application/decisions.js';
+
+export type { ProcurementContextReader } from './application/procurement.js';

@@ -96,7 +96,12 @@ export function createProcurementStore(
           audit: (entry) => log.append(entry),
           history: async (id) =>
             (await log.list(tenantId, id))
-              .filter((e) => e.eventType.startsWith('purchase_order.'))
+              .filter((e) =>
+                [
+                  'purchase_order.created',
+                  'purchase_order.status_changed',
+                ].includes(e.eventType),
+              )
               .map((e) => ({
                 id: e.id,
                 commandId: e.details.commandId,

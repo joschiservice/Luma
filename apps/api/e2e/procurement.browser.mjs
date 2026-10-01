@@ -97,18 +97,14 @@ test('creates and reviews procurement records with safe retries on desktop and m
     .getByRole('dialog')
     .getByRole('button', { name: 'Open order', exact: true })
     .click();
-  await page
-    .getByRole('heading', { name: 'Draft → Open', exact: true })
-    .waitFor();
+  await page.getByText('Draft → Open', { exact: true }).waitFor();
   const detailUrl = page.url();
   await page.screenshot({
     path: '/tmp/luma69-order-desktop.png',
     fullPage: true,
   });
   await page.reload();
-  await page
-    .getByRole('heading', { name: 'Draft → Open', exact: true })
-    .waitFor();
+  await page.getByText('Draft → Open', { exact: true }).waitFor();
   await page
     .getByRole('link', { name: 'Purchase orders', exact: true })
     .click();
@@ -163,9 +159,7 @@ test('creates and reviews procurement records with safe retries on desktop and m
     .getByRole('dialog')
     .getByRole('button', { name: 'Cancel order', exact: true })
     .click();
-  await page
-    .getByRole('heading', { name: 'Open → Cancelled', exact: true })
-    .waitFor();
+  await page.getByText('Open → Cancelled', { exact: true }).waitFor();
   expect(
     await page.getByRole('button', { name: 'Open order', exact: true }).count(),
   ).toBe(0);

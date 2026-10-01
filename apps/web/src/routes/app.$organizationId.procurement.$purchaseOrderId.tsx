@@ -4,4 +4,4 @@ import { PurchaseOrderPage } from '../features/procurement/detail';
 
 export const Route = createFileRoute(
   '/app/$organizationId/procurement/$purchaseOrderId',
-)({ component: PurchaseOrderPage });
+)({ staticData: { help: 'procurement' }, component: PurchaseOrderPage });
