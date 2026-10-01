@@ -104,6 +104,24 @@ export interface CommerceProjections {
     context: TenantContext,
     entityId: string,
   ): Promise<CanonicalSnapshot[]>;
+  /** Reads an existing immutable child-parent binding, or null for a new child. */
+  childParent(context: TenantContext, childId: string): Promise<string | null>;
+  /** Current order and child observations, parent first, for replay after an order link. */
+  orderDependents(
+    context: TenantContext,
+    orderId: string,
+    connectionId?: string,
+  ): Promise<
+    { entityId: string; connectionId: string; observationId: string }[]
+  >;
+  /** Retires one source pointer, keeps its snapshots, and redirects retired identities. */
+  retire(
+    context: TenantContext,
+    entityId: string,
+    connectionId: string,
+    targetId: string,
+    reason: string,
+  ): Promise<boolean>;
   /**
    * Lists current order projections with a line mapped to this SKU, optionally limited to one
    * connection. Re-project them after the SKU's mappings change.

@@ -90172,6 +90172,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "redirectedFrom": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    },
                     "order": {
                       "type": "object",
                       "properties": {
@@ -94385,7 +94390,7 @@
     },
     "/v1/organizations/{organizationId}/identities/{kind}/{entityId}": {
       "get": {
-        "description": "Lists the source records that represent one SKU or location, how each was linked, and possible matches in other sources. Suggestions share a SKU code; they are never linked automatically.",
+        "description": "Lists the source records that represent one SKU, location or order, how each was linked, and possible matches in other sources. Suggestions share a SKU code or a JTL marketplace order reference; they are never linked automatically.",
         "summary": "Inspect linked source records",
         "tags": ["sync"],
         "parameters": [
@@ -94404,7 +94409,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": ["sku", "location"]
+              "enum": ["sku", "location", "order"]
             }
           },
           {
@@ -94435,7 +94440,7 @@
                         },
                         "kind": {
                           "type": "string",
-                          "enum": ["sku", "location"]
+                          "enum": ["sku", "location", "order"]
                         },
                         "label": {
                           "type": "string"
@@ -94475,6 +94480,43 @@
                             "type": "string",
                             "format": "date-time",
                             "nullable": true
+                          },
+                          "order": {
+                            "type": "object",
+                            "properties": {
+                              "number": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "externalNumber": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "placedAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "nullable": true
+                              },
+                              "total": {
+                                "type": "object",
+                                "properties": {
+                                  "amount": {
+                                    "type": "string"
+                                  },
+                                  "currency": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": ["amount", "currency"],
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "number",
+                              "externalNumber",
+                              "placedAt",
+                              "total"
+                            ]
                           },
                           "codes": {
                             "type": "array",
@@ -94551,6 +94593,43 @@
                                   "format": "date-time",
                                   "nullable": true
                                 },
+                                "order": {
+                                  "type": "object",
+                                  "properties": {
+                                    "number": {
+                                      "type": "string",
+                                      "nullable": true
+                                    },
+                                    "externalNumber": {
+                                      "type": "string",
+                                      "nullable": true
+                                    },
+                                    "placedAt": {
+                                      "type": "string",
+                                      "format": "date-time",
+                                      "nullable": true
+                                    },
+                                    "total": {
+                                      "type": "object",
+                                      "properties": {
+                                        "amount": {
+                                          "type": "string"
+                                        },
+                                        "currency": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": ["amount", "currency"],
+                                      "nullable": true
+                                    }
+                                  },
+                                  "required": [
+                                    "number",
+                                    "externalNumber",
+                                    "placedAt",
+                                    "total"
+                                  ]
+                                },
                                 "codes": {
                                   "type": "array",
                                   "items": {
@@ -94593,7 +94672,7 @@
                           },
                           "kind": {
                             "type": "string",
-                            "enum": ["sku", "location"]
+                            "enum": ["sku", "location", "order"]
                           },
                           "operation": {
                             "type": "string",
@@ -94962,7 +95041,7 @@
     },
     "/v1/organizations/{organizationId}/identities/links": {
       "post": {
-        "description": "Owners and admins can confirm that another SKU or location is the same record (`link`), or separate one connection’s source from it (`unlink`). Luma applies the change in the background, keeps the previous mapping as history and re-projects affected stock, products and order lines. Poll the returned request for its outcome.",
+        "description": "Owners and admins can confirm that another SKU, location or order is the same record (`link`), or separate one connection’s source from it (`unlink`). Luma applies the change in the background, keeps the previous mapping as history and re-projects affected projections. Order links keep each source’s lines and shipments separate and preserve old references. Poll the returned request for its outcome.",
         "summary": "Link or unlink source records",
         "tags": ["sync"],
         "parameters": [
@@ -94995,7 +95074,7 @@
                       },
                       "kind": {
                         "type": "string",
-                        "enum": ["sku", "location"]
+                        "enum": ["sku", "location", "order"]
                       },
                       "entityId": {
                         "type": "string",
@@ -95029,7 +95108,7 @@
                       },
                       "kind": {
                         "type": "string",
-                        "enum": ["sku", "location"]
+                        "enum": ["sku", "location", "order"]
                       },
                       "entityId": {
                         "type": "string",
@@ -95073,7 +95152,7 @@
                     },
                     "kind": {
                       "type": "string",
-                      "enum": ["sku", "location"]
+                      "enum": ["sku", "location", "order"]
                     },
                     "operation": {
                       "type": "string",
@@ -95498,7 +95577,7 @@
                     },
                     "kind": {
                       "type": "string",
-                      "enum": ["sku", "location"]
+                      "enum": ["sku", "location", "order"]
                     },
                     "operation": {
                       "type": "string",

@@ -32,6 +32,7 @@ export interface JtlState extends JtlPurchasing {
   orders: {
     id: string;
     salesOrderNumber: string;
+    externalSalesOrderNumber?: string;
     isCancelled: boolean;
     deliveryStatus: number;
     paymentStatus: number;
@@ -88,7 +89,12 @@ export interface JtlState extends JtlPurchasing {
 }
 
 export type JtlCommand =
-  | { kind: 'order'; id: string; quantity: number }
+  | {
+      kind: 'order';
+      id: string;
+      quantity: number;
+      externalOrderNumber?: string;
+    }
   | { kind: 'stock'; quantity: number; id?: string | undefined }
   | { kind: 'ship'; id: string }
   | { kind: 'shipping-method'; id: string; shippingMethodId: string };
@@ -167,6 +173,9 @@ export function command(state: JtlState, command: JtlCommand, time: number) {
     state.orders.push({
       id: command.id,
       salesOrderNumber: `SIM-${command.id}`,
+      ...(command.externalOrderNumber === undefined
+        ? {}
+        : { externalSalesOrderNumber: command.externalOrderNumber }),
       isCancelled: false,
       deliveryStatus: 1,
       paymentStatus: 2,

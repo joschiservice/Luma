@@ -3,6 +3,7 @@
     {
       "id": 10,
       "salesOrderNumber": "SO-10",
+      "externalSalesOrderNumber": "#1001",
       "isCancelled": false,
       "deliveryStatus": 4,
       "paymentStatus": 2,

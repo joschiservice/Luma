@@ -11,6 +11,8 @@ import { iso } from './values.js';
 /** Identities that other records use to refer to one order. */
 export interface OrderReferences {
   orderId: string;
+  /** Active order plus retired aliases, when available. */
+  orderIds?: string[];
   /** The Luma order ID followed by every source order ID. */
   orderRefs: string[];
   fulfillmentIds: string[];
@@ -53,9 +55,9 @@ export async function readIssues(
     subjectKind: string;
   }>(
     `WITH subjects(kind,subject_id,scope) AS (
-      SELECT 'order',$2::text,NULL::text
+      SELECT 'order',id::text,NULL::text FROM unnest($2::uuid[]) id
       UNION ALL SELECT 'order',m.external_id,m.connection_id::text FROM connector_source_mappings m
-       WHERE m.tenant_id=$1 AND m.resource='order' AND m.canonical_id=$2::uuid
+       WHERE m.tenant_id=$1 AND m.resource='order' AND m.canonical_id=ANY($2::uuid[])
       UNION ALL SELECT 'fulfillment',id::text,NULL FROM unnest($3::uuid[]) id
       UNION ALL SELECT 'fulfillment',m.external_id,m.connection_id::text FROM connector_source_mappings m
        WHERE m.tenant_id=$1 AND m.resource='fulfillment' AND m.scope_key='' AND m.canonical_id=ANY($3::uuid[])
@@ -72,7 +74,13 @@ export async function readIssues(
      e.document->>'lastDetectedAt' AS "lastDetectedAt",e.subject_kind AS "subjectKind"
      FROM linked JOIN exceptions e ON e.tenant_id=$1 AND e.id=linked.id
      ORDER BY e.state='resolved',e.document->>'lastDetectedAt' DESC,e.id LIMIT 50`,
-    [tenantId, refs.orderId, refs.fulfillmentIds, refs.skuIds, runIds],
+    [
+      tenantId,
+      refs.orderIds ?? [refs.orderId],
+      refs.fulfillmentIds,
+      refs.skuIds,
+      runIds,
+    ],
   );
 
   return result.rows.map((row) => ({
@@ -141,7 +149,7 @@ export async function readWorkflowRuns(
 export async function readHistory(
   tx: SqlTransaction,
   tenantId: string,
-  orderId: string,
+  orderIds: string[],
 ): Promise<OrderDetail['history']> {
   const result = await tx.query<{
     snapshotId: string;
@@ -155,16 +163,22 @@ export async function readHistory(
     observedAt: Date;
     sourceUpdatedAt: Date | null;
   }>(
-    `SELECT s.id AS "snapshotId",s.kind AS "entityKind",s.entity_id AS "entityId",s.connection_id AS "connectionId",
+    `WITH RECURSIVE origins(entity_id,connection_id) AS (
+      SELECT DISTINCT entity_id,connection_id FROM orders_snapshots
+       WHERE tenant_id=$1 AND kind='order' AND entity_id=ANY($2::uuid[])
+      UNION SELECT r.entity_id,r.connection_id FROM origins o
+       JOIN orders_projection_retirements r ON r.tenant_id=$1 AND r.target_entity_id=o.entity_id AND r.connection_id=o.connection_id
+       JOIN orders_entities e ON e.tenant_id=r.tenant_id AND e.id=r.entity_id AND e.kind='order'
+     ) SELECT s.id AS "snapshotId",s.kind AS "entityKind",s.entity_id AS "entityId",s.connection_id AS "connectionId",
      s.status,s.payment_status AS "paymentStatus",(s.document->>'deleted')::boolean AS deleted,
      EXISTS (SELECT 1 FROM orders_projections p WHERE p.tenant_id=s.tenant_id AND p.entity_id=s.entity_id
       AND p.connection_id=s.connection_id AND p.snapshot_id=s.id) AS current,
      s.observed_at AS "observedAt",s.source_updated_at AS "sourceUpdatedAt"
      FROM orders_snapshots s
-     WHERE s.tenant_id=$1 AND (s.entity_id=$2 OR s.entity_id IN (
-      SELECT child_id FROM orders_relationships WHERE tenant_id=$1 AND order_id=$2))
+     WHERE s.tenant_id=$1 AND EXISTS (SELECT 1 FROM origins o WHERE o.connection_id=s.connection_id
+       AND (o.entity_id=s.entity_id OR o.entity_id=s.order_id))
      ORDER BY s.observed_at DESC,s.created_at DESC,s.id DESC LIMIT 101`,
-    [tenantId, orderId],
+    [tenantId, orderIds],
   );
 
   return {

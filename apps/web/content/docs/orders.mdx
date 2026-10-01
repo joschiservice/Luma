@@ -3,7 +3,7 @@ title: Work with orders
 description: Find an order, see what still needs work, and check the source facts behind it.
 ---
 
-Orders lists every current order Luma has read from your connected stores and ERPs. When the same order exists in more than one system, Luma shows it once and keeps each system's facts separate.
+Orders lists every current order Luma has read from your connected stores and ERPs. Orders imported from different systems start as separate records. After you link them as the same order, Luma shows one order and keeps each system’s facts separate.
 
 ## Find an order
 
@@ -31,6 +31,23 @@ Every filter, sort and page is part of the address, so you can share it or pin i
 **Observed history** lists each state Luma read from a source. It shows what the source reported at that time, not every change the source made.
 
 For Shopify orders, the Shopify details section reads payments, customer, fulfillment holds, returns, refunds and source events live from your store. Customer details appear only when your Shopify app is approved for protected customer data.
+
+## Link source orders
+
+Open an order’s **Linked sources** panel. Owners and admins can link an imported Shopify
+order to its JTL sales order. Suggestions use JTL’s external order number; they are never
+applied automatically. Dates and totals help you review a match. If several orders share
+that reference, check each source record before choosing.
+
+Choose **Link**, compare the source IDs, dates and totals, then explain why they represent
+the same order. Without a suggestion, use **Find another order** and **Review link**.
+Luma shows progress while it applies the request. Once complete, both source versions appear
+on this order, with separate lines and shipments. Old order links open the combined order;
+existing issues, activity and observed history remain reachable.
+
+To separate them again, choose **Unlink** beside a source and give a reason. That source
+becomes its own order with its lines and shipments. Every link and unlink records who
+requested it and why. Linking does not change either provider’s records.
 
 ## Act on an order
 

@@ -9,6 +9,11 @@ import { requireRole, requireTenant } from '@luma/identity';
 import type { CommerceProjections as Inventory } from '@luma/inventory';
 import type { CommerceProjections as Orders } from '@luma/orders';
 
+import { prepareOrderChildren } from './application/order-links.js';
+import { sourceLocalKey } from './application/source-local.js';
+
+export { sourceLocalKey } from './application/source-local.js';
+
 export type ProjectionOutcome =
   | { status: 'pending'; missing: SourceIdentity[] }
   | { status: 'applied' | 'retained' | 'duplicate'; entityId: string };
@@ -29,20 +34,6 @@ const normalizers = {
 export const sourceLocalMethod =
   'Imported source record; linked only to itself until a person links it to another source';
 
-/**
- * The reconciliation key of a canonical entity that represents exactly one source record.
- * Another source joins it only through an explicit link.
- */
-export function sourceLocalKey(source: SourceIdentity) {
-  return JSON.stringify([
-    'source',
-    source.connectionId,
-    source.resource,
-    source.scopeKey,
-    source.externalId,
-  ]);
-}
-
 /** Coordinates idempotent owner transactions; replay resumes after a partial failure. */
 export function createCommerceIngestion(
   sources: SourceRecords,
@@ -54,6 +45,7 @@ export function createCommerceIngestion(
     context: TenantContext,
     input: CommerceObservation,
   ): Promise<ProjectionOutcome> {
+    await prepareOrderChildren(context, input, sources, orders);
     const o = input.observation;
     const missing: SourceIdentity[] = [];
     const known = await sources.resolveMany(context, identities(input));
@@ -441,6 +433,11 @@ export function createCommerceIngestion(
           linkedMethod,
           reason,
         );
+      if (kind === 'order') {
+        await reprojectOrder(context, otherId, undefined, reason);
+
+        return { moved: other.length };
+      }
       // Anything still referring to the other record is stale after its sources moved.
       await reproject(context, kind, otherId, undefined, reason);
 
@@ -461,16 +458,14 @@ export function createCommerceIngestion(
       if (own.length && own.length === mappings.length)
         throw new LinkError('This record is not linked to another source');
       for (const item of own) {
-        let target = await inventory.identify(
-          context,
-          kind,
-          sourceLocalKey(item.source),
-        );
+        const identify = (key: string) =>
+          kind === 'order'
+            ? orders.identify(context, kind, key)
+            : inventory.identify(context, kind, key);
+        let target = await identify(sourceLocalKey(item.source));
         // The source may have been this record's origin; give it a new record instead.
         if (target === entityId)
-          target = await inventory.identify(
-            context,
-            kind,
+          target = await identify(
             JSON.stringify(['split', sourceLocalKey(item.source), entityId]),
           );
         await sources.remap(
@@ -482,7 +477,9 @@ export function createCommerceIngestion(
           reason,
         );
       }
-      await reproject(context, kind, entityId, connectionId, reason);
+      if (kind === 'order')
+        await reprojectOrder(context, entityId, connectionId, reason);
+      else await reproject(context, kind, entityId, connectionId, reason);
 
       return { moved: own.length };
     },
@@ -521,13 +518,43 @@ export function createCommerceIngestion(
     return id;
   }
 
+  async function reprojectOrder(
+    context: TenantContext,
+    id: string,
+    connectionId: string | undefined,
+    reason: string,
+  ) {
+    const affected = await orders.orderDependents(context, id, connectionId);
+    for (const item of affected) {
+      const stored = await sources.observation(
+        context,
+        item.connectionId,
+        item.observationId,
+      );
+      if (!stored) throw new Error('Observation not found');
+      const outcome = await project(context, stored);
+      if (outcome.status === 'pending')
+        throw new LinkError(
+          'Related order records are not ready. Import the order and try again.',
+        );
+      if (outcome.entityId !== item.entityId)
+        await orders.retire(
+          context,
+          item.entityId,
+          item.connectionId,
+          outcome.entityId,
+          reason,
+        );
+    }
+  }
+
   /**
    * Re-projects current snapshots that still refer to `id` after its mappings changed, then
    * removes each source's projection from the record it no longer belongs to.
    */
   async function reproject(
     context: TenantContext,
-    kind: LinkableKind,
+    kind: Exclude<LinkableKind, 'order'>,
     id: string,
     connectionId: string | undefined,
     reason: string,
@@ -570,7 +597,7 @@ export function createCommerceIngestion(
   }
 }
 
-export type LinkableKind = 'sku' | 'location';
+export type LinkableKind = 'sku' | 'location' | 'order';
 
 /** A link request that cannot be applied as asked; the message is written for the requester. */
 export class LinkError extends Error {}

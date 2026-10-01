@@ -58,6 +58,7 @@ const suites = {
       '@luma/api',
       'test:browser',
       'orders.browser.mjs',
+      'order-links.browser.mjs',
       'records.browser.mjs',
     ],
   ],

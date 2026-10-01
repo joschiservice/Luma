@@ -10,6 +10,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { JtlConnectorOptions } from './adapter.js';
 import { createJtlConnector } from './adapter.js';
 import { cloudId } from './fixtures/cloud.js';
+import { adapterVersion } from './outputs.js';
 import { acceptanceId } from './purchase-orders.js';
 
 vi.mock('@luma/identity', () => ({
@@ -382,7 +383,7 @@ describe('JTL purchase-order reads', () => {
             observedAt: now.toISOString(),
             sourceUpdatedAt: null,
             sourceRevision: null,
-            adapterVersion: 'jtl/3',
+            adapterVersion,
             schemaVersion: 1,
             data: {
               supplier: ref('1'),

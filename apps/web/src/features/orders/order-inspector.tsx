@@ -190,7 +190,13 @@ function OrderSources({ sources }: { sources: OrderDetail['sources'] }) {
             <small>Source ID {source.externalId ?? 'not mapped'}</small>
             <small>
               {source.mappingMethod
-                ? `Linked by ${source.mappingMethod.replaceAll('-', ' ')}`
+                ? source.mappingMethod.startsWith('Imported')
+                  ? 'Imported from this source'
+                  : source.mappingMethod.startsWith('Linked')
+                    ? 'Linked by a person'
+                    : source.mappingMethod.startsWith('Unlinked')
+                      ? 'Unlinked by a person'
+                      : `Link confirmed: ${source.mappingMethod.replaceAll('-', ' ')}`
                 : 'Link method not recorded'}
             </small>
             <small>

@@ -25,10 +25,10 @@ import type {
   SyncStreamView,
 } from './views.js';
 
-/** Reads the source records behind a canonical SKU or location, with link suggestions. */
+/** Reads a canonical record's sources and suggestions for a person to review. */
 export type IdentityReader = (
   tenantId: string,
-  kind: 'sku' | 'location',
+  kind: 'sku' | 'location' | 'order',
   entityId: string,
 ) => Promise<Omit<IdentityDetail, 'requests' | 'canManage'> | null>;
 
@@ -231,10 +231,10 @@ export function createSyncService(deps: SyncServiceDependencies) {
 
       return view;
     },
-    /** Reads the sources behind a SKU or location with suggestions and recent link requests. */
+    /** Reads source identity, suggestions and recent link requests with current access. */
     async identity(
       context: TenantContext,
-      kind: 'sku' | 'location',
+      kind: 'sku' | 'location' | 'order',
       entityId: string,
     ): Promise<IdentityDetail> {
       const fresh = await deps.refreshContext(context);
@@ -264,6 +264,18 @@ export function createSyncService(deps: SyncServiceDependencies) {
       );
       if (!detail)
         throw new IdentityError(404, 'NOT_FOUND', 'Record not found');
+      if (!input.reason.trim() || input.reason.trim().length > 2000)
+        throw new IdentityError(
+          422,
+          'CONFLICT',
+          'Give a reason of 1 to 2000 characters',
+        );
+      if (!detail.sources.length)
+        throw new IdentityError(
+          422,
+          'CONFLICT',
+          'This record has no current source',
+        );
       if (input.operation === 'link') {
         if (input.otherId === input.entityId)
           throw new IdentityError(
@@ -276,7 +288,7 @@ export function createSyncService(deps: SyncServiceDependencies) {
           input.kind,
           input.otherId,
         );
-        if (!other)
+        if (!other || !other.sources.length)
           throw new IdentityError(404, 'NOT_FOUND', 'Record not found');
         if (
           other.sources.some((source) =>

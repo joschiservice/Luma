@@ -5,7 +5,12 @@ import { command, handle, seed } from './index.js';
 it('preserves stock, fulfillment relationships, pagination and isolation', () => {
   const state = seed();
   const other = seed();
-  command(state, { kind: 'order', id: '1', quantity: 3 }, 0);
+  command(
+    state,
+    { kind: 'order', id: '1', quantity: 3, externalOrderNumber: '#1001' },
+    0,
+  );
+  expect(state.orders[0]?.externalSalesOrderNumber).toBe('#1001');
   command(state, { kind: 'order', id: '2', quantity: 1 }, 0);
   command(state, { kind: 'ship', id: '1' }, 1000);
   expect(state.items[0]).toMatchObject({

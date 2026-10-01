@@ -125,8 +125,9 @@ describe('JTL read adapter', () => {
             {
               source: { provider: 'jtl', externalId: key(10) },
               sourceUpdatedAt: null,
-              adapterVersion: 'jtl/3',
+              adapterVersion: 'jtl/4',
               data: {
+                externalOrderNumber: '#1001',
                 status: 'open',
                 paymentStatus: 'paid',
                 placedAt: '2026-09-12T09:15:00+02:00',

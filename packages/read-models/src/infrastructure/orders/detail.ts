@@ -9,6 +9,10 @@ import type { ReturnListItem } from '../../application/returns.js';
 import { itemColumns } from '../returns/list.js';
 import { readSourceFacts } from './detail-facts.js';
 import {
+  orderEntityAliases,
+  resolveOrderEntity,
+} from './identity-references.js';
+import {
   readDirectRunIds,
   readHistory,
   readIssues,
@@ -86,6 +90,9 @@ export async function readDetail(
   asOf: string,
 ): Promise<OrderDetail | null> {
   const tenantId = context.tenantId;
+  const requestedId = orderId;
+  orderId = await resolveOrderEntity(tx, tenantId, orderId);
+  const orderIds = await orderEntityAliases(tx, tenantId, [orderId]);
   const facts = await readSourceFacts(tx, queries, tenantId, orderId, asOf);
   if (!facts) return null;
   const { sources, differences, overdue } = facts;
@@ -93,11 +100,14 @@ export async function readDetail(
   const fulfillments = await readFulfillments(tx, tenantId, orderId);
   const refs = {
     orderId,
+    orderIds,
     orderRefs: [
-      orderId,
+      ...orderIds,
       ...sources.flatMap((item) => (item.externalId ? [item.externalId] : [])),
     ],
-    fulfillmentIds: [...new Set(fulfillments.map((item) => item.id))],
+    fulfillmentIds: await orderEntityAliases(tx, tenantId, [
+      ...new Set(fulfillments.map((item) => item.id)),
+    ]),
     skuIds: [
       ...new Set(
         sources.flatMap((item) =>
@@ -124,7 +134,7 @@ export async function readDetail(
   );
   const issueIds = issues.map((issue) => issue.id);
   const workflows = await readWorkflowRuns(tx, tenantId, refs, issueIds);
-  const history = await readHistory(tx, tenantId, orderId);
+  const history = await readHistory(tx, tenantId, orderIds);
   const returns = await tx.query<ReturnListItem>(
     `SELECT ${itemColumns} FROM orders_returns r WHERE r.tenant_id=$1 AND r.order_id=$2
      ORDER BY r.requested_key DESC,r.entity_id LIMIT 50`,
@@ -142,6 +152,7 @@ export async function readDetail(
   });
 
   return {
+    redirectedFrom: requestedId === orderId ? null : requestedId,
     order: {
       id: orderId,
       displayNumber: selected.displayNumber,

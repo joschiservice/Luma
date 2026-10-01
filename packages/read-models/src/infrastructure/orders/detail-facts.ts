@@ -39,9 +39,11 @@ JOIN orders_snapshots s ON s.tenant_id=$1 AND s.id=o.snapshot_id
 LEFT JOIN source_values v ON v.entity_id=o.entity_id AND v.connection_id=o.connection_id
 LEFT JOIN source_differences d ON d.entity_id=o.entity_id
 LEFT JOIN connector_installations ci ON ci.tenant_id=$1 AND ci.id=o.connection_id
-LEFT JOIN LATERAL (SELECT external_id,method FROM connector_source_mappings WHERE tenant_id=$1
- AND connection_id=o.connection_id AND resource='order' AND canonical_id=o.entity_id
- ORDER BY created_at,id LIMIT 1) m ON true
+LEFT JOIN LATERAL (SELECT mapping.external_id,COALESCE(revision.method,mapping.method) AS method
+ FROM connector_source_mappings mapping LEFT JOIN LATERAL (SELECT method FROM connector_mapping_revisions
+  WHERE tenant_id=mapping.tenant_id AND mapping_id=mapping.id ORDER BY created_at DESC,id DESC LIMIT 1) revision ON true
+ WHERE mapping.tenant_id=$1 AND mapping.connection_id=o.connection_id AND resource='order' AND canonical_id=o.entity_id
+ ORDER BY mapping.created_at,mapping.id LIMIT 1) m ON true
 ORDER BY o.connection_id`;
 }
 

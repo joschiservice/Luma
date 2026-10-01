@@ -42,7 +42,7 @@ export async function refreshOrderList(
     winners AS (SELECT DISTINCT ON(entity_id) entity_id,connection_id FROM sources ORDER BY entity_id,${sourceSelectionOrder})
     INSERT INTO orders_list(tenant_id,entity_id,connection_id,snapshot_id,selected,status,payment_status,display_number,
       observed_at,source_updated_at,placed_at,due_at,deleted,line_count,fulfillment,open,state_valid_from,differs,
-      updated_key,placed_key,placed_rank,number_key,number_rank,due_key,due_rank)
+      updated_key,placed_key,placed_rank,number_key,number_rank,due_key,due_rank,external_order_number)
     SELECT $1,o.entity_id,o.connection_id,o.snapshot_id,w.connection_id=o.connection_id,o.status,o.payment_status,o.display_number,
       o.observed_at,o.source_updated_at,o.placed_at,o.due_at,o.deleted,o.line_count,o.fulfillment,o.open,
       GREATEST(o.observed_at,COALESCE((SELECT max(s.observed_at) FROM orders_snapshots s
@@ -53,7 +53,10 @@ export async function refreshOrderList(
       ${timestampKey('COALESCE(o.source_updated_at,o.observed_at)')},
       COALESCE(${timestampKey('o.placed_at')},''),(o.placed_at IS NULL)::int,
       COALESCE(lpad(length(o.display_number)::text,6,'0')||left(lower(o.display_number),120),''),(o.display_number IS NULL)::int,
-      COALESCE(${timestampKey('o.due_at')},''),(o.due_at IS NULL)::int
+      COALESCE(${timestampKey('o.due_at')},''),(o.due_at IS NULL)::int,
+      (SELECT obs.document->'observation'->'data'->>'externalOrderNumber' FROM orders_snapshots snap
+       JOIN connector_observations obs ON obs.tenant_id=snap.tenant_id AND obs.id=snap.observation_id
+       WHERE snap.tenant_id=$1 AND snap.id=o.snapshot_id)
     FROM order_state o JOIN winners w USING(entity_id) LEFT JOIN source_differences d USING(entity_id)
     ON CONFLICT(tenant_id,entity_id,connection_id) DO UPDATE SET
       snapshot_id=EXCLUDED.snapshot_id,selected=EXCLUDED.selected,status=EXCLUDED.status,payment_status=EXCLUDED.payment_status,
@@ -61,7 +64,7 @@ export async function refreshOrderList(
       placed_at=EXCLUDED.placed_at,due_at=EXCLUDED.due_at,deleted=EXCLUDED.deleted,line_count=EXCLUDED.line_count,
       fulfillment=EXCLUDED.fulfillment,open=EXCLUDED.open,state_valid_from=EXCLUDED.state_valid_from,differs=EXCLUDED.differs,
       updated_key=EXCLUDED.updated_key,placed_key=EXCLUDED.placed_key,placed_rank=EXCLUDED.placed_rank,
-      number_key=EXCLUDED.number_key,number_rank=EXCLUDED.number_rank,due_key=EXCLUDED.due_key,due_rank=EXCLUDED.due_rank`,
+      number_key=EXCLUDED.number_key,number_rank=EXCLUDED.number_rank,due_key=EXCLUDED.due_key,due_rank=EXCLUDED.due_rank,external_order_number=EXCLUDED.external_order_number`,
     [tenant, 'infinity', ids],
   );
   if (!refreshSearch) return;

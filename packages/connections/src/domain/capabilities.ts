@@ -93,6 +93,8 @@ export interface Money {
 }
 
 export interface OrderSnapshot {
+  /** Marketplace order number reported by an ERP; a suggestion signal, never identity. */
+  externalOrderNumber?: string | null;
   displayNumber: string | null;
   /** Source-provided fulfillment deadline; omit when the source does not provide one. */
   dueAt?: string | null;
