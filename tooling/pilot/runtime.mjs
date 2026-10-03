@@ -13,6 +13,7 @@ import {
   createReplenishmentWorker,
   createResourceScope,
 } from '@luma/application-runtime';
+import { createCommerceSyncService } from '@luma/application-runtime/sync';
 import { ConnectorError } from '@luma/connections';
 import { createCapabilityRuntime } from '@luma/connections/adapters';
 import {
@@ -459,6 +460,11 @@ export async function createPilot(
               desk,
               playbooks: library,
               connections,
+              sync: createCommerceSyncService(
+                db,
+                identity.service,
+                connections,
+              ),
               apps: installations.apps,
               appRegistry: installations.registry,
               providerCatalog: installations.providerCatalog,

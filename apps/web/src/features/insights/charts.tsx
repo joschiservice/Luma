@@ -14,7 +14,6 @@ import { RefreshCw } from 'lucide-react';
 import { useContext, useEffect, useId } from 'react';
 
 import { connectionsOptions } from '../connections/data';
-import { subscribeToWorkspaceMetrics } from '../overview/metric-subscription';
 import { ChartCard, type Selection } from './chart-card';
 import {
   insightChartOptions,
@@ -25,6 +24,7 @@ import {
   insightsKey,
   type InsightsSearch,
 } from './data';
+import { subscribeToInsightChanges } from './live';
 import { rangeLabels } from './presentation';
 import { RecordsSheet } from './records';
 
@@ -78,16 +78,7 @@ export function OperationalCharts({
   const refreshing = charts.some((chart) => chart.isFetching);
 
   useEffect(
-    () =>
-      subscribeToWorkspaceMetrics(organizationId, {
-        onResync: (event) => {
-          if (event.refetch)
-            void client.invalidateQueries({
-              queryKey: insightsKey(organizationId),
-            });
-        },
-        onError: () => undefined,
-      }),
+    () => subscribeToInsightChanges(organizationId, client),
     [client, organizationId],
   );
 
