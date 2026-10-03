@@ -43,17 +43,27 @@ function DialogOverlay({
   );
 }
 
+const placements = {
+  center:
+    'top-1/2 left-1/2 w-[calc(100%-2rem)] max-w-md max-h-[calc(100dvh-2rem)] -translate-x-1/2 -translate-y-1/2 rounded-[14px]',
+  sheet:
+    'top-0 right-0 h-dvh w-full max-w-[min(560px,100vw)] content-start rounded-l-[14px] data-[starting-style]:translate-x-4 data-[ending-style]:translate-x-4 motion-reduce:data-[starting-style]:translate-x-0 motion-reduce:data-[ending-style]:translate-x-0',
+};
+
 /**
  * Renders portalled dialog content with an overlay and optional close button; supply a
- * DialogTitle for its accessible name.
+ * DialogTitle for its accessible name. `sheet` slides in at the right edge at full height,
+ * for inspecting a list beside the page that opened it.
  */
 function DialogContent({
   className,
   children,
   showCloseButton = true,
+  placement = 'center',
   ...props
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean;
+  placement?: keyof typeof placements;
 }) {
   return (
     <DialogPortal>
@@ -62,7 +72,8 @@ function DialogContent({
         data-slot="dialog-content"
         className={(state) =>
           cn(
-            'fixed top-1/2 left-1/2 z-50 grid w-[calc(100%-2rem)] max-w-md max-h-[calc(100dvh-2rem)] -translate-x-1/2 -translate-y-1/2 gap-5 overflow-y-auto rounded-[14px] bg-popover p-5 font-sans text-[13px] text-popover-foreground shadow-[var(--shadow-dialog)] outline-none transition-opacity duration-200 ease-[var(--ease-standard)] data-[starting-style]:opacity-0 data-[ending-style]:opacity-0 motion-reduce:transition-none',
+            'fixed z-50 grid gap-5 overflow-y-auto bg-popover p-5 font-sans text-[13px] text-popover-foreground shadow-[var(--shadow-dialog)] outline-none transition-[opacity,translate] duration-200 ease-[var(--ease-standard)] data-[starting-style]:opacity-0 data-[ending-style]:opacity-0 motion-reduce:transition-none',
+            placements[placement],
             typeof className === 'function' ? className(state) : className,
           )
         }

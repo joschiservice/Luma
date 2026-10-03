@@ -10,6 +10,7 @@ export type HelpTopic =
   | 'returns'
   | 'procurement'
   | 'data-sync'
+  | 'insights'
   | 'workflows'
   | 'workflows/create';
 

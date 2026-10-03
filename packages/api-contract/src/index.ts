@@ -10,6 +10,7 @@ import { caseDeskContract } from './contracts/desk.js';
 import { draftTestsContract } from './contracts/draft-tests.js';
 import { fulfillmentContract } from './contracts/fulfillment.js';
 import { identityContract } from './contracts/identity.js';
+import { insightsContract } from './contracts/insights.js';
 import { inventoryContract } from './contracts/inventory.js';
 import { resolutionLearningContract } from './contracts/learning.js';
 import { metricsContract } from './contracts/metrics.js';
@@ -61,6 +62,7 @@ const routes: {
   returns: typeof returnsContract;
   sync: typeof syncContract;
   decisions: typeof decisionsContract;
+  insights: typeof insightsContract;
 } = {
   shadow: shadowContract,
   activity: activityContract,
@@ -90,6 +92,7 @@ const routes: {
   returns: returnsContract,
   sync: syncContract,
   decisions: decisionsContract,
+  insights: insightsContract,
 };
 const options = {
   strictStatusCodes: true as const,
@@ -191,3 +194,5 @@ export * from './returns.js';
 export * from './sync.js';
 
 export * from './decisions.js';
+
+export * from './insights.js';

@@ -19,6 +19,7 @@ Feature compositions live separately in `components/issues` and `components/work
 | Empty collections                    | `Empty`                                                                           | Lists with nothing to show; describe this view, not the whole business                       |
 | Expandable supporting content        | `Disclosure`                                                                      | Evidence, audit events, metadata and technical details                                       |
 | Record lists and fact tables         | `DataTable`, `DataTableRowLink`                                                   | Sortable lists whose rows open a record, and numeric fact tables inside record sections      |
+| Counts over time or by category      | `BarChart`, `ChartLegend`                                                         | Stacked bars whose bars open their records; pair each chart with a table of the same values  |
 
 `Button`, `Input`, `Textarea`, `Select`, `SearchableSelect`, `Field`, `Switch`, `Dialog`, `DropdownMenu`, `Tabs`, `Pagination` and `SectionNavigation` remain the interaction primitives. `Pagination` omits the total when a source doesn't report one. `Button` has default (Cobalt), outline, ghost and destructive variants in default, `sm`, `lg` and `icon` sizes; coarse pointers receive 44px targets. Link-styled buttons use `buttonVariants()` on the link itself so link semantics are preserved.
 
@@ -27,6 +28,17 @@ Choose states from `issueStatus` and `issueKind` in `components/issues/case-pres
 ## Tables
 
 `DataTable` takes column definitions and rows. Every table needs a `caption`; it is visually hidden and names the table for assistive technology. The first column labels each row unless `rowHeader` names another. Mark quantities, amounts and counts `numeric` for right alignment and tabular figures, and `hideOnNarrow` for secondary columns. Sortable columns set `sortKey`; the caller owns the sort state through `sort` and `onSortChange`. Put one `DataTableRowLink` in a row to make the whole row open the record; pass a router link through `render`. Use `density="compact"` and `variant="plain"` for tables inside cards. A table wider than its container scrolls horizontally and becomes a focusable region.
+
+## Charts
+
+`BarChart` draws stacked bars from one baseline, vertically for calendar buckets and
+horizontally for named categories. Assign series the `chart-1` to `chart-5` slots in order;
+use state colors only when the color means good or bad, and `muted` for unknown values. A
+category with `unknown` set is hatched so it never reads as zero, and `note` marks an
+incomplete period. The chart is one tab stop with arrow-key navigation; every bar has a spoken
+summary. Add `ChartLegend` for two or more series and offer a `DataTable` view of the same
+values. The palette was validated for color-vision deficiencies on the card surface in both
+themes; validate again when changing `--chart-*` tokens.
 
 ## Workspace shell
 

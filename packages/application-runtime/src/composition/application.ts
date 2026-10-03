@@ -10,6 +10,7 @@ import {
 import type { VerificationEvaluator } from '@luma/exceptions';
 import {
   caseDecisionQuery,
+  caseTimelineQuery,
   createCaseMetricReader,
   createOrderAttentionBoundaryReader,
   orderAttentionForOrders,
@@ -25,6 +26,7 @@ import { createReplenishmentScenarios } from '@luma/procurement';
 import {
   createProcurement,
   createProcurementMetricReader,
+  createStockRiskReader,
   createSupplierCommitmentService,
   type SupplierCommitments,
 } from '@luma/procurement/composition';
@@ -32,6 +34,7 @@ import {
   appDecisionProvider,
   createDecisionQueue,
   createFulfillmentWorkspace,
+  createInsights,
   createInventoryWorkspace,
   createOperationalMetrics,
   createOperationalSummary,
@@ -141,6 +144,7 @@ export interface ApplicationServices {
     orders: ReturnType<typeof createOrderWorkspace>;
     decisions: ReturnType<typeof createDecisionQueue>;
     decisionAssignments: ReturnType<typeof createDecisionAssignments>;
+    insights: ReturnType<typeof createInsights>;
   };
 }
 
@@ -456,6 +460,40 @@ export function createApplicationServices(
       ),
       decisions,
       decisionAssignments,
+      insights: createInsights(database, {
+        orders: orderQueries,
+        cases: caseTimelineQuery,
+        stock: createStockRiskReader,
+        procurement: async (context) => {
+          const [summaries, { items }] = await Promise.all([
+            commitments.summaries(context),
+            procurement.orders(context),
+          ]);
+          const orders = new Map(items.map((order) => [order.id, order]));
+
+          // Orders created between the two reads are left for the next refresh.
+          return summaries.flatMap((summary) => {
+            const order = orders.get(summary.id);
+
+            return order
+              ? [
+                  {
+                    id: summary.id,
+                    reference: order.reference,
+                    supplierName: order.supplierName,
+                    stage: summary.stage,
+                    expectedDate: summary.expectedDate,
+                    overdue: summary.overdue,
+                    attention: summary.attention,
+                    nextOwner: summary.nextOwner,
+                    createdAt: order.createdAt,
+                  },
+                ]
+              : [];
+          });
+        },
+        refreshContext: identity.refreshContext,
+      }),
     },
   };
 }

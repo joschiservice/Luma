@@ -27,6 +27,7 @@ import type {
   DecisionAssignments,
   DecisionQueue,
   FulfillmentWorkspace,
+  Insights,
   InventoryWorkspace,
   OperationalMetrics,
   OperationalSummary,
@@ -39,6 +40,7 @@ import type {
 import {
   decisionRoutes,
   fulfillmentRoutes,
+  insightRoutes,
   inventoryRoutes,
   metricRoutes,
   orderRoutes,
@@ -121,6 +123,7 @@ export interface AppDependencies {
   orders?: OrderWorkspace;
   decisions?: DecisionQueue;
   decisionAssignments?: DecisionAssignments;
+  insights?: Insights;
   sync?: SyncService;
   metricEvents?: MetricEvents;
   apps?: AppService;
@@ -388,6 +391,7 @@ export function buildApp(
           dependencies.decisions,
           dependencies.decisionAssignments,
         ),
+        insights: insightRoutes(dependencies.insights),
       },
       routerApp,
       {

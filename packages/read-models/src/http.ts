@@ -15,3 +15,5 @@ export { returnRoutes } from './api/returns.js';
 export { decisionRoutes } from './api/decisions.js';
 
 export { procurementContextRoutes } from './api/procurement.js';
+
+export { insightRoutes } from './api/insights.js';

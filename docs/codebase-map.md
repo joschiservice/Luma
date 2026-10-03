@@ -273,6 +273,15 @@ Tests: `packages/application-runtime/src/commerce.integration.test.ts` and
 `apps/api/e2e/metrics.browser.mjs`. See [Shared metrics](operational-metrics.md)
 and [query measurements](operational-metrics-performance.md).
 
+Operational trend charts and their record drilldowns start at
+`packages/read-models/src/infrastructure/insights/workspace.ts`, with rules in
+`domain/insights.ts`, owner inputs `caseTimelineQuery` (exceptions) and `createStockRiskReader`
+(procurement), contracts in `packages/api-contract/src/insights.ts`, and the web feature in
+`apps/web/src/features/insights` on the Insights page. The shared chart is `BarChart` in
+`packages/ui/src/components/primitives/bar-chart.tsx`. Tests: `domain/insights.test.ts`,
+`apps/api/e2e/insights.e2e.mjs`, `insights.browser.mjs`, the web `insights` tests and the
+`UI/Bar chart` stories. See [Operational insights charts](operational-insights.md).
+
 Live metrics use `0031_metric_notifications.sql`, the process listener in
 `packages/application-runtime/src/infrastructure/metric-listener.ts`, and the
 bounded SSE route in `packages/resolution/src/api/metric-events.ts`. The browser

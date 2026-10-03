@@ -128,6 +128,24 @@ export const caseDecisionQuery = `WITH ${caseQuery("e.state<>'resolved'", ',pa.d
    ORDER BY d.created_at DESC,d.id DESC LIMIT 1))))`;
 
 /**
+ * Selects every issue with its class, severity, state, first detection, current resolution and
+ * why it needs a person under the inbox's attention rules. A reopened issue keeps its first
+ * detection; `resolved_at` and `resolution` describe only a currently resolved issue. Missing or
+ * malformed detection times are null. Bind `$1` to the tenant ID and `$2` to the evaluation time.
+ */
+export const caseTimelineQuery = `WITH ${caseCtes}
+ SELECT DISTINCT ON (document->>'id') (document->>'id')::uuid AS id,document->>'exceptionClass' AS class,
+  document->>'severity' AS severity,document->>'state' AS state,
+  CASE WHEN document->>'firstDetectedAt' ~ '^\\d{4}-\\d{2}-\\d{2}T' THEN (document->>'firstDetectedAt')::timestamptz END AS detected_at,
+  CASE WHEN document->>'state'='resolved' AND document->'resolution'->>'at' ~ '^\\d{4}-\\d{2}-\\d{2}T'
+   THEN (document->'resolution'->>'at')::timestamptz END AS resolved_at,
+  CASE WHEN document->>'state'<>'resolved' THEN NULL
+   WHEN document->'resolution'->>'kind'='verification' THEN 'verified'
+   WHEN document->'resolution'->>'kind'='human_disposition' THEN 'human_disposition' END AS resolution,
+  attention_reason AS attention
+ FROM ordered ORDER BY document->>'id'`;
+
+/**
  * Limits attention evaluation to the trusted SQL relation's entity_id column. The relation
  * must contain tenant-scoped order IDs; values remain bound through $1 and $2.
  */

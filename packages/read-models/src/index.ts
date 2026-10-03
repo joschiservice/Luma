@@ -27,3 +27,9 @@ export type {
 } from './application/decisions.js';
 
 export type { ProcurementContextReader } from './application/procurement.js';
+
+export type {
+  Insights,
+  PurchaseOrderStage,
+  StockRiskPosition,
+} from './application/insights.js';

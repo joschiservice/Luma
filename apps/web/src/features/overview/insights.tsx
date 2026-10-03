@@ -1,25 +1,50 @@
 import { PageHeader } from '@luma/ui/components/workspace/page-header';
-import { useParams } from '@tanstack/react-router';
+import {
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearch,
+} from '@tanstack/react-router';
 
+import { OperationalCharts } from '../insights/charts';
+import type { InsightsSearch } from '../insights/data';
 import { OperationalMetrics } from './operational-metrics';
 import { OrderMetrics } from './order-metrics';
 import { ResolutionOutcomes } from './resolution-outcomes';
 
-/** Shows live operational metrics and order flow, with drill-downs into matching records. */
+/**
+ * Shows live operational metrics, trends over time and order flow, with drill-downs into the
+ * matching records.
+ */
 export function InsightsPage() {
   const { organizationId } = useParams({
     from: '/app/$organizationId/insights',
   });
+  const search = useSearch({ from: '/app/$organizationId/insights' });
+  const navigate = useNavigate({ from: '/app/$organizationId/insights' });
+  const location = useLocation();
 
   return (
     <div className="insights">
       <PageHeader
         title="Insights"
-        description="Live counts across your operations and how orders move through them. Select a metric to see the records behind it."
+        description="Live counts and trends across your operations. Select a metric or a bar to see the records behind it."
       />
       <OperationalMetrics
         key={`summary-${organizationId}`}
         organizationId={organizationId}
+      />
+      <OperationalCharts
+        key={`charts-${organizationId}`}
+        organizationId={organizationId}
+        search={search}
+        returnPath={location.href}
+        onSearch={(patch: Partial<InsightsSearch>) =>
+          void navigate({
+            search: (previous) => ({ ...previous, ...patch }),
+            resetScroll: false,
+          })
+        }
       />
       <ResolutionOutcomes
         key={`resolution-${organizationId}`}

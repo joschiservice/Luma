@@ -76,6 +76,7 @@ export function createCaseEscalation(db: TenantDatabase) {
 
 export {
   caseDecisionQuery,
+  caseTimelineQuery,
   orderAttentionQuery,
   orderAttentionForOrders,
 } from './infrastructure/cases.js';

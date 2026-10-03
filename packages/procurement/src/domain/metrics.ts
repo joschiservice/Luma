@@ -160,13 +160,16 @@ type Stock = {
   deleted: boolean;
 };
 
-/** Classifies every active-rule position, including absent configured-source projections. */
-export function summarizeStockMetrics(
+/**
+ * Classifies every active-rule position, including absent configured-source projections, with
+ * whether its usable stock is below the rule minimum and the times at which the result changes.
+ */
+export function classifyStockPositions(
   rules: Rule[],
   stocks: Stock[],
   orders: PurchaseOrder[],
   asOf: string,
-): OperationalMetricRead<StockMetricItem>[] {
+) {
   const now = Date.parse(asOf);
   const sources = new Map(
     stocks.map((stock) => [`${stock.positionId}:${stock.connectionId}`, stock]),
@@ -223,6 +226,23 @@ export function summarizeStockMetrics(
 
     return { item, below };
   });
+
+  return { classified, positions, boundaries };
+}
+
+/** Summarizes the stock metrics from `classifyStockPositions`. */
+export function summarizeStockMetrics(
+  rules: Rule[],
+  stocks: Stock[],
+  orders: PurchaseOrder[],
+  asOf: string,
+): OperationalMetricRead<StockMetricItem>[] {
+  const { classified, positions, boundaries } = classifyStockPositions(
+    rules,
+    stocks,
+    orders,
+    asOf,
+  );
   const unknown = classified.filter((row) => row.item.reason !== null).length;
   const observed = classified
     .flatMap((row) => (row.item.observedAt ? [row.item.observedAt] : []))

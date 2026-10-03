@@ -52,6 +52,20 @@
   --state-error-text: #c62f35;
   --state-neutral: #8a92a3;
 
+  /*
+   * Data visualization. Categorical slots are assigned to series in this fixed order and were
+   * validated for lightness, chroma, color-vision-deficiency and adjacent separation on the
+   * card surface. Muted marks unknown or unclassified values; it always carries a label.
+   */
+  --chart-1: #316bff;
+  --chart-2: #0ea5a0;
+  --chart-3: #eb6834;
+  --chart-4: #7b61ff;
+  --chart-5: #c2418f;
+  --chart-muted: #aab1c0;
+  --chart-grid: #15171c12;
+  --chart-axis: #15171c33;
+
   /* Domain wayfinding. Never used for full surfaces or states. */
   --domain-orders: #316bff;
   --domain-inventory: #0ea5a0;
@@ -149,6 +163,15 @@
   --state-error: #ff5c61;
   --state-error-text: #ff8286;
   --state-neutral: #6f7a91;
+
+  --chart-1: #4a8df5;
+  --chart-2: #12a19b;
+  --chart-3: #e66a30;
+  --chart-4: #8b74ff;
+  --chart-5: #d9579f;
+  --chart-muted: #56607a;
+  --chart-grid: #ffffff10;
+  --chart-axis: #ffffff2e;
 
   --domain-orders: #4a80ff;
   --domain-inventory: #14b8b2;

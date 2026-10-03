@@ -1,0 +1,53 @@
+---
+title: Read operational trends and open the records behind them
+description: See how orders, fulfillment work, stock risk, issues and purchase orders develop, and open the exact records behind any bar.
+---
+
+**Insights** shows live counts at the top and, under **Operational trends**, charts of your operations. Every bar opens the records it counts, so you can go from a pattern to the order, fulfillment, stock position, issue or purchase order that needs you.
+
+## Choose a time range and source
+
+Use the filters above the charts:
+
+- **Time range**: the last 7 or 30 days by day, or the last 13 weeks by week. Days and weeks follow your workspace time zone, and weeks start on Monday. The current day or week is still filling up and is marked as such.
+- **Source**: all connected sources, or one connection. Charts of Luma's own records, such as issues and purchase orders, aren't split by source.
+
+Both filters are part of the address, so you can share a view, pin it to the sidebar or come back to it later.
+
+## What each chart counts
+
+- **Orders placed**: orders by the day their source says they were placed, colored by their status now. An order linked across Shopify and JTL counts once. With one source selected, that source's own orders count. Orders without a placed time are listed below the chart instead.
+- **Fulfillment backlog**: open fulfillment work by how long ago its source last reported progress. Each item counts under its first signal: on hold, then past fulfill-by, then no progress for 48 hours. When a store and an ERP both report the same work, each system's work counts separately.
+- **Stock risk**: positions with an active replenishment rule, compared with the rule's minimum. Stock is compared only when its source read is under five minutes old; anything else is **Stock unknown**. A recorded purchase order doesn't mean the supplier confirmed it or that enough stock is on its way.
+- **Issues detected**: issues by the day Luma first detected them, by kind. A reopened issue stays on its first day.
+- **Purchase orders**: purchase orders that aren't closed or cancelled, by the stage their evidence supports. **Received** means a goods receipt was booked in your purchasing system. **Overdue** means a supplier confirmation or delivery is late.
+
+The fulfillment backlog, stock risk and purchase orders show the state right now. Luma doesn't rebuild past states it never observed, so these charts have no history.
+
+## Tell unknown from zero
+
+Each chart states its **window**, its **sources** and how current the data is:
+
+- **Data through** is the time of the oldest complete read across the sources. Changes at a source after that time may not be counted yet.
+- A source marked **Observed records only** sends individual records but hasn't completed an import, so records it never sent can't be ruled out.
+- A hatched bar marked **Not imported** lies before a source's imported history. Its count is unknown, not zero.
+- A small ring under a day or week marks an **incomplete period**, such as today.
+- **No source in scope** or **No active rules** means nothing can report these records yet. The chart shows no numbers rather than zeros.
+
+Open **What this chart doesn't show** on any chart to see its limits.
+
+## Open the records behind a bar
+
+Select a bar, a segment of a bar, a legend entry or a value in the table view. A panel lists the exact records counted there, evaluated at the same moment as the chart. The panel says when its total matches the chart. If records changed since the chart was read, it says so and offers **Refresh chart**.
+
+From the panel you can:
+
+- Open each order, fulfillment, stock position, issue or purchase order. Its page links back to these records.
+- Open **Decide in Needs you** when a decision on the record is waiting.
+- Open the matching view of the Orders, Fulfillment, Issues or Procurement workspace.
+
+Use the browser's back button to return to the chart with the same panel open.
+
+## Use the charts with a keyboard or screen reader
+
+Each chart is one stop in the tab order. Use the arrow keys to move between bars, Home and End to jump to the first and last, and Enter to open a bar's records. Each bar is announced with its period, total and parts. Switch any chart to **Table** for the same values as a table, with each value opening its records.

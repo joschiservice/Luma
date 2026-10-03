@@ -4,6 +4,7 @@
 @import './tokens.css';
 @import './base.css';
 @import './primitives.css';
+@import './charts.css';
 @import './workspace.css';
 @import './issues.css';
 @source "../components";
