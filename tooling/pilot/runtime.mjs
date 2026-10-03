@@ -14,6 +14,8 @@ import {
   createResourceScope,
 } from '@luma/application-runtime';
 import { createCommerceSyncService } from '@luma/application-runtime/sync';
+import { createSyncRunner } from '@luma/commerce-sync';
+import { createSyncStore } from '@luma/commerce-sync/composition';
 import { ConnectorError } from '@luma/connections';
 import { createCapabilityRuntime } from '@luma/connections/adapters';
 import {
@@ -21,6 +23,7 @@ import {
   createShippingMethodEffects,
   createSimulationTransport,
 } from '@luma/connections/composition';
+import { createCustomerProfiles } from '@luma/customers/composition';
 import { parseAction } from '@luma/execution/composition';
 import { IdentityError } from '@luma/identity';
 import { createIdentity } from '@luma/identity/composition';
@@ -44,9 +47,9 @@ import {
   createInstalledRuntime,
   createInstalledShippingMethodEffects,
 } from '../apps/providers.mjs';
-import { recordSimulatorCommerce } from '../simulator/commerce.mjs';
+import { lumaCases } from '../simulator/cases.mjs';
 import { createInventoryScenario } from '../simulator/inventory.mjs';
-import { observeProviders } from '../simulator/observations.mjs';
+import { simulatorShopifyEnv } from '../simulator/shopify-app.mjs';
 import { detectionRequest, readJson } from './fixtures.mjs';
 import { mutateProviderState } from './provider-state.mjs';
 import { identitySettings } from './seed.mjs';
@@ -95,7 +98,14 @@ export async function createPilot(
       ? createSimulationTransport(manifest.simulator)
       : undefined;
     const installations = createInstalledConnections(db, {
-      ...(simulation ? { simulation } : {}),
+      ...(simulation
+        ? {
+            simulation,
+            // Signed simulator webhooks reach the real Shopify change route.
+            env: simulatorShopifyEnv(manifest.simulator.webhookSecret),
+            customerAccess: { contact: true, address: true },
+          }
+        : {}),
       refreshContext: identity.service.refreshContext,
       activeKeyId: env.CONNECTIONS_ACTIVE_KEY_ID,
       keys: new Map(
@@ -217,12 +227,11 @@ export async function createPilot(
       },
     });
     const commerce = simulation ? createCommerceServices(db) : undefined;
-    const observationCursors = new Map();
-    const recordRead = createReadChecks(db);
     const installedOptions = {
       installations,
       simulation,
       jtlEndpoints: [],
+      customerAccess: { contact: true, address: true },
       approveJtlEndpoint: async () => {
         throw new Error('Synthetic connection has no production destination');
       },
@@ -231,27 +240,26 @@ export async function createPilot(
           (state.capabilityEvents ??= []).push(entry);
         });
       },
-      recordObservations: async ({ capability, observations }) => {
-        if (
-          commerce &&
-          ['orders.read', 'inventory.read', 'fulfillment.read'].includes(
-            capability,
-          )
-        ) {
-          const actor = await context();
-          await recordSimulatorCommerce({
-            commerce,
-            context: actor,
-            manifest,
-            capability,
-            observations,
-          });
-        }
-        await mutate((state) => {
-          state.observations.push(...observations);
-        });
-      },
+      // Simulated history is imported by the commerce sync runner, as for live connections.
+      recordObservations: async () => undefined,
     };
+    const syncStore = simulation ? createSyncStore(db) : undefined;
+    const syncRunner = simulation
+      ? createSyncRunner({
+          store: syncStore,
+          reader: createInstalledRuntime({
+            ...installedOptions,
+            record: async () => undefined,
+          }),
+          ingestion: commerce.ingestion,
+          customers: createCustomerProfiles(db),
+          recordRead: createReadChecks(db),
+          resolveContext: identity.service.resolveWorkflowContext,
+          digest: (value) => createHash('sha256').update(value).digest('hex'),
+          log: (message, error) =>
+            console.error(message, error instanceof Error ? error.message : ''),
+        })
+      : undefined;
     const capabilities = simulation
       ? createInstalledRuntime(installedOptions)
       : createCapabilityRuntime({
@@ -497,6 +505,15 @@ export async function createPilot(
         app.post(`${base}/check`, (request) =>
           inventory.check(request.tenantContext, detection),
         );
+        app.get(
+          '/v1/organizations/:organizationId/simulator/cases',
+          (request) =>
+            lumaCases(request.tenantContext, {
+              detection,
+              manifest,
+              webOrigin: settings.baseURL,
+            }),
+        );
       }
     }
     const runtime = temporal
@@ -732,20 +749,26 @@ export async function createPilot(
       safety,
       playbooks,
       provider: () => readJson(path),
-      observe: async () => {
-        if (simulation) {
-          await observeProviders({
-            context,
-            installations,
-            capabilities,
-            recordRead,
-            manifest,
-            cursors: observationCursors,
-            onError: (error) =>
-              app ? app.log.error(error) : console.error(error),
-          });
-          await inventory.check(await operator(), detection);
+      /**
+       * Runs commerce sync passes like the sync worker, then the inventory check. `refresh`
+       * makes every stream due now instead of waiting for its next scheduled read.
+       */
+      observe: async ({ passes = 30, refresh = true, check = true } = {}) => {
+        if (!simulation) return;
+        if (refresh)
+          for (const stream of await syncStore.streams(manifest.organizationId))
+            await syncStore.command(
+              manifest.organizationId,
+              stream.id,
+              { kind: 'resume' },
+              stream.principalId,
+            );
+        for (let pass = 0; pass < passes; pass++) {
+          const scopes = await syncRunner.scopes();
+          if (!scopes.includes(manifest.organizationId)) break;
+          await syncRunner.tick(manifest.organizationId);
         }
+        if (check) await inventory.check(await operator(), detection);
       },
       close: resources.close,
     };

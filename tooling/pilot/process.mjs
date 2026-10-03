@@ -1,9 +1,34 @@
 import { join } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 
 import { startTelemetry } from '../observability/runtime.mjs';
-import { startObservations } from '../simulator/observations.mjs';
 import { readJson } from './fixtures.mjs';
 import { startJourney } from './journey.mjs';
+
+/**
+ * Runs commerce sync in the background like the sync worker, one pass at a time and briefly
+ * idle between passes. The inventory check runs once a minute: JTL has no SKU filter, so each
+ * check pages through every item. Returns a function that stops after the current pass.
+ */
+function startSync(pilot) {
+  let stopped = false;
+  let checkedAt = 0;
+  const loop = (async () => {
+    while (!stopped) {
+      const check = Date.now() - checkedAt >= 60_000;
+      if (check) checkedAt = Date.now();
+      await pilot
+        .observe({ passes: 1, refresh: false, check })
+        .catch((error) => pilot.app.log.error(error));
+      await delay(2_000);
+    }
+  })();
+
+  return async () => {
+    stopped = true;
+    await loop;
+  };
+}
 
 const directory = process.env.LUMA_PILOT_DIRECTORY;
 if (!directory || process.env.NODE_ENV === 'production')
@@ -68,10 +93,7 @@ try {
       port: Number(process.env.PORT),
     });
     console.log(`Synthetic pilot API: ${address}`);
-    if (manifest.simulator)
-      stopObservations = startObservations(pilot.observe, (error) =>
-        pilot.app.log.error(error),
-      );
+    if (manifest.simulator) stopObservations = startSync(pilot);
   }
 } catch (error) {
   console.error(error);

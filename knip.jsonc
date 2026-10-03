@@ -26,7 +26,7 @@
       ],
     },
     "apps/simulator": { "entry": ["src/server.ts"] },
-    "apps/simulator-web": { "entry": ["src/app.js"] },
+    "apps/simulator-web": { "entry": ["src/main.tsx"] },
     "packages/api-contract": { "entry": ["src/generate-openapi.ts"] },
     // Public subpaths resolve to compiled output; retain their source entry points.
     "packages/connectors/*": { "entry": ["src/index.ts", "src/schemas.ts"] },

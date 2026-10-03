@@ -1,4 +1,7 @@
-/** Connects a provisioned simulator run to authenticated Luma checks; other runs remain provider-only sandboxes. */
+/**
+ * Connects a provisioned simulator run to authenticated Luma routes: inventory checks for the
+ * panel and cases for the scorecard. Other runs remain provider-only sandboxes.
+ */
 export function createOperationsClient({
   apiOrigin,
   webOrigin,
@@ -23,29 +26,48 @@ export function createOperationsClient({
       .join('; ');
   }
 
-  return async (id, action) => {
-    if (id !== runId) return { connected: false };
+  async function request(path, method = 'GET') {
     if (!cookie) await login();
-    const path = `/v1/organizations/${organizationId}/simulator/inventory${action === 'check' ? '/check' : ''}`;
-    const request = () =>
-      fetch(`${apiOrigin}${path}`, {
-        method: action === 'check' ? 'POST' : 'GET',
-        headers: { origin: webOrigin, cookie },
-        signal: AbortSignal.timeout(30000),
-      });
-    let response = await request();
+    const send = () =>
+      fetch(
+        `${apiOrigin}/v1/organizations/${organizationId}/simulator/${path}`,
+        {
+          method,
+          headers: { origin: webOrigin, cookie },
+          signal: AbortSignal.timeout(30000),
+        },
+      );
+    let response = await send();
     if (response.status === 401) {
       await login();
-      response = await request();
+      response = await send();
     }
-    if (!response.ok) throw new Error('Luma inventory checks are unavailable');
-    const result = await response.json();
+    if (!response.ok) throw new Error('Luma is unavailable');
 
-    return {
-      ...result,
-      caseUrl: result.incident
-        ? `${webOrigin}/app/${organizationId}/exceptions/${result.incident.id}`
-        : null,
-    };
+    return response.json();
+  }
+
+  return {
+    /** Reads or runs the inventory check for the bound run. */
+    async operations(id, action) {
+      if (id !== runId) return { connected: false };
+      const result = await request(
+        action === 'check' ? 'inventory/check' : 'inventory',
+        action === 'check' ? 'POST' : 'GET',
+      );
+
+      return {
+        ...result,
+        caseUrl: result.incident
+          ? `${webOrigin}/app/${organizationId}/exceptions/${result.incident.id}`
+          : null,
+      };
+    },
+    /** Lists Luma's cases for the scorecard; other runs have none. */
+    async cases(id) {
+      if (id !== runId) throw new Error('This run is not connected to Luma.');
+
+      return request('cases');
+    },
   };
 }

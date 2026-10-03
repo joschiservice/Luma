@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -48,7 +49,13 @@ export async function seedPilot(
     }
   }
   const manifest = newManifest(scenario);
-  if (simulator) manifest.simulator = { ...simulator, bindings: [] };
+  if (simulator)
+    manifest.simulator = {
+      ...simulator,
+      bindings: [],
+      // Signs simulated Shopify webhooks; local synthetic value, never a real app secret.
+      webhookSecret: randomBytes(24).toString('hex'),
+    };
   const settings = identitySettings(env);
   const app = await buildRuntimeApp(settings);
   const identity = createIdentity(settings);
@@ -134,22 +141,30 @@ export async function seedPilot(
       role: 'admin',
     });
     manifest.connections = {};
-    for (const [provider, target] of [
-      [
-        'jtl',
-        {
-          kind: 'jtl-onprem',
-          baseUrl: 'https://jtl.synthetic.invalid/api/eazybusiness/',
-          appId: 'LumaSyntheticPilot',
-          appVersion: '1',
-        },
-      ],
-      [
-        'shopify',
-        { kind: 'shopify', shop: 'luma-synthetic-pilot.myshopify.com' },
-      ],
-    ]) {
-      const appId = target.kind === 'shopify' ? 'shopify' : 'jtl';
+    // Simulator runs describe their own instances; the plain pilot uses one ERP and one shop.
+    const instances = simulator?.instances ?? [
+      { name: 'jtl', kind: 'jtl', label: 'JTL' },
+      {
+        name: 'shopify',
+        kind: 'shopify',
+        label: 'Shopify',
+        shop: 'luma-synthetic-pilot.myshopify.com',
+      },
+    ];
+    manifest.primaryShop = instances.find(
+      (item) => item.kind === 'shopify',
+    ).name;
+    for (const instance of instances) {
+      const target =
+        instance.kind === 'jtl'
+          ? {
+              kind: 'jtl-onprem',
+              baseUrl: 'https://jtl.synthetic.invalid/api/eazybusiness/',
+              appId: 'LumaSyntheticPilot',
+              appVersion: '1',
+            }
+          : { kind: 'shopify', shop: instance.shop };
+      const appId = instance.kind;
       const appState = (
         await connections.apps.list(context)
       ).installations.find((app) => app.appId === appId);
@@ -160,7 +175,7 @@ export async function seedPilot(
           appState?.version ?? null,
         );
       const connection = await connections.install(context, {
-        label: `SIMULATED ${provider.toUpperCase()} · no live health`,
+        label: `SIMULATED ${instance.label.toUpperCase()} · no live health`,
         target,
         permissions: [
           'orders.read',
@@ -169,18 +184,22 @@ export async function seedPilot(
           ...(simulator
             ? [
                 'products.read',
-                ...(provider === 'shopify'
-                  ? ['inventory.available.reconcile', 'returns.read']
-                  : []),
-                ...(provider === 'jtl'
+                ...(instance.kind === 'shopify'
                   ? [
+                      'inventory.available.reconcile',
+                      'returns.read',
+                      'customers.read',
+                      'fulfillment.hold.release',
+                      'fulfillment.open',
+                      'fulfillment.move',
+                    ]
+                  : [
                       'orders.shipping-method.read',
                       'orders.shipping-method.write',
                       'suppliers.read',
                       'purchase-orders.read',
                       'purchase-orders.submit',
-                    ]
-                  : []),
+                    ]),
               ]
             : []),
         ],
@@ -189,14 +208,15 @@ export async function seedPilot(
           challengeCode: 'synthetic',
         },
       });
-      manifest.connections[provider] = connection.id;
+      manifest.connections[instance.name] = connection.id;
       if (simulator) {
         manifest.simulator.bindings.push({
           tenantId: manifest.organizationId,
           connectionId: connection.id,
           target,
           runId: simulator.runId,
-          instance: provider,
+          instance: instance.name,
+          provider: instance.kind,
         });
         await connections.check(context, connection.id, connection.version);
       }

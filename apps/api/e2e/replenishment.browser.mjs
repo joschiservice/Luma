@@ -47,6 +47,7 @@ test('reviews replenishment scope, recovers a lost response, approves and opens 
   await page
     .getByRole('option')
     .filter({ hasText: f.position.connectionId.slice(0, 8) })
+    .filter({ hasText: `${f.position.sku} ·` })
     .click();
   await page.getByRole('combobox', { name: 'Supplier', exact: true }).click();
   await page.getByRole('option', { name: 'Northstar Supply' }).click();

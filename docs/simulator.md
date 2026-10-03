@@ -1,150 +1,138 @@
-# Stateful commerce simulator
+# Commerce simulator
 
-`pnpm simulator` includes local Grafana diagnostics for the pilot API, worker, and simulator, including SQLite and simulation timings. See [local performance diagnostics](local-observability.md#pilot-and-simulator).
+The simulator plays a merchant's commerce systems: several Shopify stores and one JTL-Wawi ERP, the integration between them, a warehouse, carriers, customers and suppliers. Luma connects to it through its real installed adapters, the commerce sync runner and the Shopify webhook route. It never reads simulator data any other way. The simulator also records ground truth about the incidents it causes, so it can score what Luma detected.
 
-Run `mise exec -- pnpm simulator` from the repository root. It starts local PostgreSQL and Temporal, builds the packages, provisions synthetic installations, and starts the simulator, control panel, Luma API, worker, and web app. The command prints the Luma URL and manifest path. Docker and the repository's Node 24 / pnpm toolchain are required.
+`pnpm simulator` includes local Grafana diagnostics for the pilot API, worker and simulator. See [local performance diagnostics](local-observability.md#pilot-and-simulator).
 
-Open <http://127.0.0.1:5890> and click **Connect**. The default local token is prefilled. Select `pilot-44`. New workspaces start healthy in a manual sandbox. Credentials for Luma are in `.luma/simulator-login.json`.
+## Start it
 
-Under **Operational issues**, click **Create mismatch**. The simulator pauses commerce and sets Shopify's available stock ten units above JTL's available stock for a dedicated canvas tote test stock pool. Autonomous orders use a separate stock pool. Luma reads both providers, detects the mismatch, and records its evidence. **Open case in Luma** opens that case.
+Run `mise exec -- pnpm simulator` from the repository root. It starts PostgreSQL, Temporal and Grafana, builds the packages and the control panel, provisions the `luma_simulator` database, creates the run `pilot-44`, provisions a Luma workspace with one connection per simulated system, and starts the simulator, Luma API, worker and web app. Docker and the repository's Node 24 / pnpm toolchain are required.
 
-Click **Match stock** to set Shopify availability to JTL's current availability while preserving reservations. The panel shows **Problem removed** separately from **Case resolved**. **Check now** runs detection and, when the stock agrees, independent verification. Background checks also run every ten seconds. A provider outage, incomplete read, stale evidence, or conflicting mapping leaves the case open. After resolution, **Create mismatch** starts another occurrence linked to the previous case; no reset is needed.
+| Flag                  | Default     | Effect                                                                                |
+| --------------------- | ----------- | ------------------------------------------------------------------------------------- |
+| `--profile`           | `large`     | Merchant profile for a new run: `test`, `small`, `mid-market` or `large`.             |
+| `--chaos`             | `realistic` | Failure preset for a new run: `calm`, `realistic`, `bad-day` or `outage-drill`.       |
+| `--seed`              | `44`        | Seed for a new run. The same profile, chaos and seed produce the same merchant.       |
+| `--approval-required` | off         | Adds the synthetic shipping-method approval example to a newly provisioned workspace. |
 
-Existing workspaces retain their data and startup scenario. To provision the shipping approval example in a new workspace, use `pnpm simulator --approval-required`. The approval review refreshes expired evidence on the same case. Before approval it rereads the order; changed methods, cancelled or shipped orders, and unknown states stop the correction. Use **Retry checks** after a temporary read failure.
+Flags only apply when the run does not exist yet. Open <http://127.0.0.1:5890> for the control panel. Credentials for Luma are in `.luma/simulator-login.json`.
 
-For the simulator and panel alone, use `mise exec -- pnpm simulator:service`. Create a run in the panel. This command does not provision Luma installations. Optional service settings are `LUMA_SIMULATOR_PORT`, `LUMA_SIMULATOR_TOKEN`, and `LUMA_SIMULATOR_STORE`.
+The large profile generates about 40,000 SKUs and two days of order history, so the first start takes a few minutes; the console reports progress. Luma then imports the full history through commerce sync. That is deliberate: it exercises the platform at the size of a real customer. Use `--profile small` for a faster loop.
 
-## Connections and provider state
+`mise exec -- pnpm simulator:service` starts only the simulator and its panel, without Luma. Optional settings are `LUMA_SIMULATOR_PORT` and `LUMA_SIMULATOR_TOKEN`. The panel's local token is a public development value.
 
-The provisioned connections are labeled `SIMULATED`. `.luma/simulator/pilot.json` records their tenant, connection, run, provider instance, and exact provider target. `transport.json` contains the same routing configuration. Synthetic credentials are encrypted through the existing installation service. The API and worker load the same manifest; they use the existing installed capability runtime, provider clients, adapters, evidence recording, execution, and verification paths.
+## Merchant profiles
 
-The transport selector checks tenant, connection ID, provider, and target. Missing bindings for marked synthetic installations fail closed. Simulation is rejected in production. Production JTL address pinning remains in place. No provider connector depends on simulator code. The simulation service binds to loopback and requires its token for every data/control endpoint.
+Profiles live in `packages/simulator/commerce/src/profiles.ts`. The world generated from a profile and seed is deterministic.
 
-Provider truth lives in the simulator database, separately from the pilot's observation/evidence file and Luma's PostgreSQL data. Inspection shows provider-shaped records, including order lines, stock quantities, fulfillment relationships, and JTL shipping methods. The simulated provider instances are `jtl` and `shopify` within each run. Runs have separate state, clocks, queues, rules, journals, and ID mappings.
+| Profile      | Shops                       | Warehouses | SKUs    | Orders/day | History |
+| ------------ | --------------------------- | ---------- | ------- | ---------- | ------- |
+| `test`       | 1                           | 1          | 2       | manual     | none    |
+| `small`      | 1                           | 1          | ~600    | 200        | 3 days  |
+| `mid-market` | 2 (DE, AT)                  | 2          | ~6,000  | 1,000      | 2 days  |
+| `large`      | 3 (DE, AT, CH; EUR and CHF) | 3          | ~40,000 | 5,000      | 2 days  |
 
-## Scenarios and time
+The world works like a real merchant setup:
 
-Both scenarios seed orders `1` and `10`, a canvas tote SKU, 100 units of initial stock, and JTL shipping methods `7` (Standard), `8` (Express), and `9` (Pickup).
+- **Demand:** orders arrive per shop following its local time of day and weekday. The large profile adds a weekly tenfold flash sale. Baskets have several lines and follow a long-tail popularity curve, so a few SKUs sell often and most rarely. Some payments stay pending or fail, a few orders go to a fraud check, and customers cancel some orders.
+- **Integration:** a middleware imports paid shop orders into JTL after a lag, with the shop order name as JTL's external order number. It pushes JTL availability to every shop that lists an item every few minutes, and books JTL shipments into the shop after a lag. Shop locations mirror JTL's total availability.
+- **Warehouse:** each warehouse picks the oldest orders within its staffed hours and hourly capacity. Lines without stock wait as backorders, and lines in stock ship separately.
+- **Carriers and returns:** parcels are delivered after a carrier-specific transit time. Delivered lines come back at category-specific rates (fashion about 25 %), and returns move through approval, receipt, refund and closing. Received units return to JTL stock.
+- **Suppliers:** the merchant reorders low items in JTL. Suppliers answer purchase orders by their profile: `full`, `partial`, `delayed`, `short` or `silent`. Purchase orders Luma submits get the same answers.
 
-- **Autonomous commerce:** every 30 simulation seconds, a merchant order reserves Shopify stock. An explicit mapping propagates the order to JTL after five seconds. JTL ships after 20 seconds; Shopify receives shipment progress five seconds later. These are simulated merchant/integration actions, not work assigned to Luma. Luma's shipping-method correction is performed only through its real execution path.
-- **Manual sandbox:** no recurring events. Use merchant actions to create orders, set stock, ship an order, change its JTL shipping method, or hold and release a Shopify fulfillment order. Shopify fulfillment orders carry a location, a fulfill-by date two days after the order and a delivery method; shipments carry tracking. The simulator does not implement Shopify's fulfillment mutations. Advance the clock between merchant actions: Luma only replaces a snapshot with a strictly newer Shopify update time.
+The `test` profile keeps the fixed fixtures that platform tests use: the canvas tote `LUMA-001` (item 1), the unpublished scenario tote `LUMA-SCENARIO-001` (item 2), open orders `1` and `10` in both systems with JTL shipping method `7`, and suppliers `Nordwind Textil GmbH` (1) and `Baltic Packaging AB` (2). Nothing happens on its own. Orders, shipments and stock change only through controls.
 
-In either scenario, the Shopify merchant actions under **Shopify returns** move a shipped order through a return: request, approve or decline, receive (restocks the units), refund with a payment that succeeds, stays pending or fails, settle a pending refund, and close. Each order has at most one return; every refund adds a new Shopify refund. Simulated Shopify connections grant `returns.read`, so the sync worker imports the results into Returns.
+## Time
 
-Seeded randomness determines quantities; generated order IDs start at `11`. Use IDs outside the scenario's generated sequence for manual orders. The journal records manual commands, scheduled events, requests, writes, responses, and faults with stable sequence numbers and affected resource IDs. Equal-time events run by insertion order.
+Runs keep real time: the simulation clock follows the wall clock at speed 1, and provider timestamps are current. Luma's freshness, stuck-fulfillment and detection rules use real time, so this is the only mode in which timing rules behave as in production. After downtime, and when a paused run resumes at real-time speed, the clock catches up in five-minute steps, up to one day; longer gaps are skipped. The panel shows when a run is behind or ahead of real time.
 
-Pause stops autonomous commerce. Provider reads and control requests remain available. **Advance 30s** advances scheduled events even while paused. Speed changes affect commerce time; HTTP cancellation and client timeouts use real time. The host runs without a browser. It advances by fixed 250 ms ticks, multiplied by speed, and does not catch up for process downtime or event-loop stalls.
+**Advance** and speeds above 1× move the run ahead of real time. The panel shows how far ahead it is. Use this to create volume quickly, but don't read timing-based results from Luma while the run is ahead.
 
-Shopify stock corrections use the same approved Inventory action path as live
-connections. Shopify's simulator implements exact available-quantity CAS and
-persistent idempotency receipts. Select Shopify and **Write commits, response
-lost** to exercise reconciliation without replay. Fresh ERP evidence and explicit
-SKU/location mappings remain required.
+## Failures
 
-## JTL purchase orders and suppliers
+A run's chaos profile describes three kinds of failure separately. Presets are in `packages/simulator/core/src/presets.ts`; the panel's **Chaos** tab edits every field.
 
-Each run seeds JTL suppliers `1` (Nordwind Textil GmbH) and `2` (Baltic Packaging AB). Item `1` is assigned to both suppliers; item `2` to supplier `1`. Assignments carry the net purchase price and 19% VAT. JTL serves the supplier overview (active suppliers only), supplier detail, item supplier assignments, and purchase-order create, list (`createdAtAfter`, `createdAtBefore`) and detail. Creating an order requires an active supplier and items assigned to it. A repeated `Idempotency-Key` returns the recorded order ID without creating another order. Order creation time is the later of simulation and wall-clock time, because Luma looks orders up by its own clock.
+- **Transport:** a share of provider requests fails as unavailable (503), rate limited (429), server error (500), timeout, connection reset, malformed JSON or schema drift. Each kind has a weight. Requests have log-normal latency. A share of committed writes loses its response. Search-backed Shopify list queries lag behind writes. Overrides change the rate for one instance or operation, and timed windows, which may repeat, model outages and degraded periods.
+- **Webhooks:** a share is dropped, duplicated or delivered late, out of order.
+- **Operational incidents:** the rate per kind, per thousand orders or per day (see the next section).
 
-When JTL records an order, the supplier's profile plans its answers in simulation time. Profiles apply to orders placed after they are chosen:
+Except in `calm`, Shopify also enforces its cost-based leaky bucket and answers with `THROTTLED` and cost details, and JTL enforces a request budget with `Retry-After`, so heavy reads are throttled the way real stores throttle them.
 
-| Profile            | Confirmation after 20 s               | Goods receipt                                         |
-| ------------------ | ------------------------------------- | ----------------------------------------------------- |
-| `full` _(default)_ | Full quantity, requested date         | Full quantity after 60 s                              |
-| `partial`          | 60% of each line, requested date +3 d | The confirmed quantity in two bookings, 60 s and 90 s |
-| `delayed`          | Full quantity, requested date +7 d    | Full quantity after 180 s                             |
-| `short`            | Full quantity, requested date         | Half of each line after 60 s                          |
-| `silent`           | None                                  | None                                                  |
+Failure decisions are hash-based on the seed, the request identity and how often that request was sent before. Retrying a failed request gets a new decision. The same run fails the same requests even when Luma's workers send them in another order.
 
-A confirmation sets the order's `isConfirmed` and each line's confirmed quantity, date and flag. A goods receipt raises delivered quantities, lowers open quantities, sets the order to partially delivered (30) or completed (500), and adds the units to the item's JTL stock. Planned answers that no longer apply, because the order is completed or nothing is open, are journaled as `supplier-skipped`.
+| Preset         | Transport errors | Latency median / p99 | Notes                                                      |
+| -------------- | ---------------- | -------------------- | ---------------------------------------------------------- |
+| `calm`         | none             | 5 ms / 30 ms         | No incidents, perfect webhooks. Used by platform tests.    |
+| `realistic`    | 0.3 %, JTL 1 %   | 120 ms / 1.5 s       | Default. Occasional incidents and duplicate webhooks.      |
+| `bad-day`      | 8 %              | 400 ms / 6 s         | Shops degraded 15 minutes every three hours; 3× incidents. |
+| `outage-drill` | 0.3 %, JTL 1 %   | 120 ms / 1.5 s       | Every provider unavailable 10 minutes every hour.          |
 
-The **Purchase orders** panel sets profiles and records a full confirmation or receipt of all open quantities. Tests drive the same transitions through `POST /api/runs/:id/control` with `action: "command"` and `instance: "jtl"`:
+**Service health** forces one instance to rate-limited, unavailable or unauthorized until changed. **Fault rules** reproduce one failure precisely: an instance, an operation (or `*`), an optional resource, the matching request that triggers it, a count and a lifetime in simulation time. Response loss applies after a write commits; every other kind replaces the response. Rules fire in creation order, and their consumption is persisted with the request.
 
-```json
-{ "kind": "supplier-profile", "supplierId": "1", "profile": "partial" }
-{ "kind": "purchase-order-confirm", "orderId": "1", "lines": [{ "lineItemId": "1001", "quantity": 6, "deliveryDate": "2026-10-15" }] }
-{ "kind": "purchase-order-receive", "orderId": "1", "lines": [{ "lineItemId": "1001", "quantity": 3 }] }
-```
+## Incidents and the scorecard
 
-Newly provisioned simulated JTL connections request and are granted `suppliers.read`, `purchase-orders.read` and `purchase-orders.submit`. Workspaces provisioned earlier keep their original permissions.
+Incident kinds are listed in `packages/simulator/core/src/incidents.ts` with their unit, the Luma exception class that should open a case, and where Luma should show them:
 
-Omit `lines` to confirm every line in full for its requested date. Line IDs are the order ID times 1,000 plus the line position. Receipts above the open quantity and changes to completed orders are rejected.
+| Incident                                          | Expected case        | What happens                                                       |
+| ------------------------------------------------- | -------------------- | ------------------------------------------------------------------ |
+| Stock sync drift                                  | `inventory_mismatch` | Stock push stops for one shop SKU; shop stock moves away from JTL. |
+| Oversell risk                                     | `inventory_mismatch` | Shop shows stock JTL does not have.                                |
+| Warehouse stall                                   | `stuck_fulfillment`  | The warehouse never picks an order.                                |
+| Shipment not synced                               | `stuck_fulfillment`  | JTL shipped; the shop never receives the shipment.                 |
+| Unreleased fraud hold                             | `stuck_fulfillment`  | A fraud hold is never released.                                    |
+| Provider outage                                   | `sync_failure`       | One provider is unavailable for 20 to 40 minutes.                  |
+| Access revoked                                    | `sync_failure`       | One provider rejects Luma's credentials for an hour.               |
+| Order not imported                                | none yet             | The integration drops an order.                                    |
+| Shipping method lost                              | none yet             | An express order is imported with standard shipping.               |
+| Carrier delay, lost parcel, refund payment failed | none yet             | Shown in Fulfillment or Returns.                                   |
 
-## Service health
+Incidents emerge at the chaos profile's rates, or are injected from the **Incidents** tab or `POST /api/runs/:id/incidents`. Stock and provider incidents start immediately. Order incidents place a new order that carries the incident; it shows as **planned** until the order reaches the affected step. **Recover** repairs the cause the way the merchant would: the stock sync resumes, a dropped order is imported, a stalled pick continues, a hold is released, a shipment is booked, or a shipping method is corrected. Drift incidents also end on their own when the shop matches JTL again, for example after Luma's governed stock correction.
 
-Choose a provider and set **Service health** in the control panel. Each run stores independent JTL and Shopify settings:
+Ground truth stays in the simulator database. The **Scorecard** compares it with Luma's cases, which the local pilot lists through `GET /v1/organizations/:id/simulator/cases`:
 
-- **Healthy:** requests use normal provider behavior and any armed faults.
-- **Rate limited:** every request returns HTTP 429 with `Retry-After: 1`.
-- **Unavailable:** every request returns HTTP 503 with `Retry-After: 1`.
+- **Detected:** a case of the expected class with the incident's provider records or connection in its evidence. Time to detect is measured from when the incident started.
+- **Pending:** no case yet, but still within the rule's detection window.
+- **Missed:** no case after that window.
+- **Not covered:** no detection rule exists for that kind yet.
+- **Cases without ground truth:** false positives, or real problems the simulator didn't label, such as backorders that genuinely stall.
+- **Closed without verification:** cases resolved by a verification that wasn't passed, complete and authoritative.
+- **Repeated writes:** provider writes committed more than once for the same idempotency key, or the same body when no key was sent.
 
-Health settings persist across restarts, pause, and clock advances until changed. **Reset run** restores both providers to healthy. Existing runs without health settings start healthy. Blocked requests do not read or change provider records or consume fault rules. Fault lifetimes still advance with simulation time. Merchant actions and scheduled commerce continue independently of provider API health. Health changes and blocked responses appear in the journal.
+Luma currently runs the inventory monitor for one linked SKU pair only (see below). Its other detectors are not scheduled outside tests, so most kinds report as missed or not covered. That is the platform gap the scorecard is meant to show.
 
-The full-stack simulator reads each permitted provider capability when its API starts and every ten real-time seconds after the previous pass finishes. Reads continue while commerce is paused. Commerce observations go through Luma's ingestion service; read outcomes, including empty results, are stored for Overview coverage. Provider failures show the connection as degraded in Overview until a later read succeeds. Healthy means that recent reads succeeded; it does not clear existing cases or operator decisions. The control panel alone does not collect Luma observations.
+## Luma wiring
 
-Restart `pnpm simulator` after updating the code to apply the database migration and start the observation collector. Overview refreshes automatically; allow one collection pass and a UI refresh after changing health.
+The pilot provisions one connection per instance (`jtl`, then one per shop) with all read capabilities and the write capabilities each provider supports. The simulation manifest `.luma/simulator/pilot.json` binds each connection to its run and instance. The transport selector checks tenant, connection, provider and target, and fails closed for unbound synthetic installations. Simulation is rejected in production.
 
-The control API accepts `{ "action": "service-health", "instance": "jtl", "status": "unavailable" }` at `POST /api/runs/:id/control`. Instances are `jtl` and `shopify`; statuses are `healthy`, `rate-limited`, and `unavailable`.
+- **Sync:** the pilot API runs the real commerce sync runner, which imports every capability with its normal backfill, incremental and reconcile schedule. Orders are imported source-local; Luma suggests cross-source order links from the shop order name, but people confirm them.
+- **Webhooks:** the simulator delivers signed Shopify webhooks for every change to Luma's real change route (`/v1/shopify/changes/:org/:connection`). The pilot configures a synthetic Shopify app whose client secret is the run's webhook secret. Those settings point to an `.invalid` origin that is never contacted.
+- **Inventory monitor:** the pilot links JTL item 2 (all warehouses) to the first shop's inventory item 2 at its location, and runs the inventory monitor with fresh verification for that pair. Inject **Stock sync drift** for `LUMA-SCENARIO-001` (test profile) or the first shop's SKU of item 2 to follow a case through detection and verified resolution. **Check now** in the Incidents tab runs the check immediately.
 
-## Faults and uncertain writes
+## Storage and API
 
-Select a provider, fault, operation, optional resource, occurrence, count, and lifetime. Rules move from **armed** to **triggered**, **expired**, or **disabled**. Lifetimes use simulation time. Occurrence counts matching requests; count controls how many faults follow that occurrence. Rules are evaluated in creation order and the first eligible rule wins per request phase.
+Provider records, engine state and ground truth live in the PostgreSQL database `luma_simulator`, on the same server as Luma's database but never in it. Luma's runtime roles have no access to it, so Luma can only learn about provider data through the adapters. The `luma_simulator` role reads and writes data; migrations in `apps/simulator/migrations` run with the owner connection. `pnpm db:reset` drops both databases, and the next `pnpm simulator` provisions a new run and workspace. Simulator workspaces created before the PostgreSQL store are archived to `.luma/backups/simulator-legacy-*` on the next start.
 
-- **Outage:** returns HTTP 503 with retry advice.
-- **Rate limit:** returns HTTP 429 with `Retry-After: 1`.
-- **Response lost:** applies only to JTL `orders.shipping-method.write` or `purchase-orders.submit`, or Shopify `inventory.available.reconcile`, after commit. The mutation, journal entry, and fault consumption commit in one SQLite transaction before transport failure is reported.
+Each provider owns a record table (`sim_shopify_records`, `sim_jtl_records`) with one row per provider record and indexes for keyset paging, parents, lookup keys and modification time. Provider writes and clock ticks lock the run row, so they serialize per run. Reads use their own short transactions. Request metrics and journal entries are written in batches.
 
-JTL products, inventory and item supplier assignments share the `items.read` provider operation. Supplier reads are `suppliers.read`; purchase-order reads and creation are `purchase-orders.read` and `purchase-orders.submit`. Shopify operations are identified from the connector's GraphQL queries. JTL resource targets use numeric sales-order, delivery-note, or item IDs for detail and nested requests; Shopify uses global IDs.
+The control API at `/api` requires the bearer token. `@luma/simulator-contract` defines its schemas; the panel, pilot and tests use them.
 
-To reproduce an uncertain write, arm response loss for JTL order `10` before approving the pilot correction. The connector reports an unknown effect requiring reconciliation. A fresh authoritative read can prove the shipping method changed; the existing execution path must not blindly redispatch. `pnpm test:simulator` proves this through the installed runtime across a service restart and asserts there is only one provider write.
-
-A merchant action can change the shipping method while Luma is running. The integration suite also places an external change precisely between preflight and PATCH. The simulator deliberately does not invent compare-and-swap or idempotency guarantees; the PATCH can overwrite that external change.
-
-## Persistence, reset, and reproduction
-
-Stop the simulator before running `pnpm db:reset`. The reset archives pilot and simulator state under `.luma/backups/database-reset-*`. The next `pnpm simulator` launch creates a new run and provisions its installations in the new database.
-
-The full-stack command stores provider runs in `.luma/simulator/runs.sqlite` using SQLite WAL and full synchronous commits. Write requests and active clock ticks load the affected runs and commit provider state, pending events, rule consumption, and new journal entries together. Journal entries live in a separate indexed table; reads do not take a write lock or load historical entries. Paused runs do not perform clock transactions. Existing single-document stores migrate atomically on startup without losing history. Stop the old simulator process before starting the updated version against the same database. Failed transactions roll back. A crash before commit leaves the event pending; a crash after commit leaves it consumed. Restart preserves running/paused state without replaying committed transitions. Run only one service runner per database. A failed scheduled transition rolls back that tick, pauses the affected run, and records a scenario error; other runs continue. Fix the conflicting provider state or reset before resuming.
-
-**Reset run** replaces provider state, scheduled events, scenario instances, journal, and faults using the original seed and scenario; it pauses the run. Its clock starts after the previous run time and JTL item timestamps so provider changes remain ordered and Luma can accept the reset stock as a new observation. Luma retains its cases, evidence, and execution records. **Check now** can verify an open inventory case against the reset stock. To provision a fresh workspace, stop the stack, move `.luma/simulator` aside, and restart `pnpm simulator` (or `pnpm simulator --approval-required` for the shipping example); a new isolated organization is provisioned. Keep the old directory when retaining reproduction evidence.
-
-To reproduce provider behavior, create the same seed/scenario, replay journaled manual controls in sequence, and advance the clock by the recorded amounts. Request ordering matters for occurrence-based faults; replay those requests in journal order. Run state, scenario request IDs, and journals are local development data and grow until reset.
-
-## Reading runs and journal history
-
-`GET /api/runs` returns run summaries: IDs, seeds, scenarios, clock time, running state, speed, scheduled-event counts, service health, and operational scenarios. `GET /api/runs/:id` returns one run's provider state, scheduled events, and faults. Run responses have an empty `clock.journal`; read history through `GET /api/runs/:id/journal`.
-
-Journal pages contain `items` in newest-first order and a `nextCursor`. The default and maximum `limit` is 100. Pass `before=<nextCursor>` to fetch the next older page; `nextCursor: null` marks the end. Entries added while paging do not shift older pages. Resetting a run clears its history and restarts its sequence, so restart pagination after a reset. The control panel fetches state only for the selected run and displays its latest 100 journal entries.
-
-## Operational scenario API and platform tests
-
-The panel and automated tests share the same authenticated simulator API:
-
-| Request                                            | Behavior                                                                                                                                                                                                                                     |
-| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST /api/runs/:id/scenarios`                     | Accepts `{ "id": "<UUID>", "kind": "inventory-mismatch" }`. Persists the scenario and provider mutation together. Reusing the UUID returns the existing scenario without another mutation. Only one injected mismatch can be active per run. |
-| `POST /api/runs/:id/scenarios/:scenarioId/recover` | Matches Shopify stock to current JTL availability. Repeating recovery is a no-op, including after a later scenario starts.                                                                                                                   |
-| `GET /api/runs/:id/operations`                     | Returns the latest Luma check, case state, and case link. Runs without provisioned bindings return `connected: false`.                                                                                                                       |
-| `POST /api/runs/:id/operations/check`              | Runs a complete inventory check through Luma's authenticated application route, then verifies an existing case if the detection result is clear.                                                                                             |
-
-All simulator requests require its bearer token. The host signs in as the provisioned local operator to call the tenant-scoped Luma routes. The browser never receives the operator password or session. Application routes are registered only by the local pilot runtime and retain the normal session, tenant, origin, and role checks.
-
-`apps/simulator/src/operational-scenarios.ts` owns provider mutations and retry-safe scenario instances. `tooling/simulator/inventory.mjs` provisions explicit canonical SKU and stock-pool bindings: JTL item `2` / `all-warehouses` and Shopify inventory item `2` / location `2`. These records are provisioned for new and existing runs and are separate from the merchant stock used by autonomous commerce. It composes the reusable `createInventoryMonitor` application service from `@luma/resolution`. The monitor completes pagination, reads the mapped records, checks projection currency, and uses the existing inventory rule for detection and independent verification. The simulator stores no copy of Luma's case lifecycle.
-
-Inventory checks use the adapters' observation clock and Luma's evaluation clock, both real time. The simulator clock timestamps provider changes; advancing it does not bypass freshness or detection rules. The inventory scenario needs no timing threshold. Stuck fulfillment and sync failure remain future operational scenarios; the existing service-health and fault controls remain available for provider testing.
-
-The platform suites use an isolated PostgreSQL database, temporary simulator store, healthy workspace, and the same seed and HTTP bridge as the local stack. They assert detection, replay safety, independent verification, recovery during outages, recurrence, reset behavior, and the visible panel journey. Failed tests write provider journals and case evidence to a temporary JSON artifact.
-
-```sh
-mise exec -- pnpm test:e2e simulator.e2e.mjs
-mise exec -- pnpm test:browser simulator.browser.mjs
-```
+| Request                                                    | Purpose                                                                                         |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `GET /api/profiles`                                        | Merchant profiles, chaos presets and incident kinds.                                            |
+| `GET, POST /api/runs`; `GET, DELETE /api/runs/:id`         | Runs. Creation returns immediately and provisions in the background.                            |
+| `POST /api/runs/:id/control`                               | Pause, resume, reset, advance, speed, chaos, health, fault rules, orders and provider commands. |
+| `GET /api/runs/:id/journal`, `metrics`, `scorecard`        | Activity, per-minute series and the scorecard.                                                  |
+| `GET, POST /api/runs/:id/incidents`; `…/:incident/recover` | Ground-truth incidents.                                                                         |
+| `GET /api/runs/:id/records/:instance[/kinds]`              | Provider records, newest first.                                                                 |
+| `GET /api/runs/:id/skus?q=`, `…/skus/:sku`                 | SKU search and ERP-to-shop stock comparison.                                                    |
+| `PUT /api/runs/:id/webhooks`                               | Webhook targets and secrets per shop.                                                           |
+| `GET, POST /api/runs/:id/operations[/check]`               | Luma's inventory check for the bound run.                                                       |
+| `POST /api/runs/:id/providers/:instance/request`           | The provider transport used by Luma's simulation binding.                                       |
 
 ## Extending and checking
 
-Use the [operational scenario recipe](adding-operational-scenarios.md) to add another issue using the inventory implementation and shared test fixture. Run `pnpm verify:feature simulator` for focused validation with saved logs; see [test tiers](development.md#feature-validation).
+- **Provider behavior** belongs to `packages/simulator/shopify` and `packages/simulator/jtl`. Shopify serves GraphQL through a schema built for the queries Luma sends, so unknown fields fail validation like the real API. Each provider has contract tests through the real adapters in `tooling/simulator/*-contract.test.mjs`. Simulator compatibility doesn't prove live-provider compatibility.
+- **Merchant behavior** belongs to `apps/simulator/src/engine`, profile data to `@luma/simulator-commerce`, and failure decisions to `@luma/simulator-core`.
+- **New incident kinds** need their kind entry, where they start in the engine, a recovery, and an expected exception class once a detector exists. Use the [operational scenario recipe](adding-operational-scenarios.md).
 
-`@luma/simulator-core` owns scheduling, fault lifecycle, journal contracts, and the in-process fetch transport. Each provider package owns its own records, commands, protocol handler, and response construction. Providers depend only on core; the host coordinates them through public commands and explicit mappings.
-
-Add provider operations in the owning package and test them through the real client/adapter. Add scenario transitions in `apps/simulator/src/run.ts`. New fault kinds should define their phase, matching fields, validation, response behavior, and durable consumption. Future delayed reads and transport delays must not use the commerce clock for HTTP deadlines. Independent connector schema contract tests remain necessary; simulator compatibility alone does not establish live-provider compatibility.
-
-Run `pnpm test:simulator` for package tests, restart/isolation checks, installed-adapter integration tests, and Playwright control-panel checks. Playwright Chromium must be installed (`pnpm --filter @luma/api exec playwright install chromium`). Run repository checks with `pnpm check`. The simulator does not emulate OAuth, webhooks, or provider operations outside Luma's current adapter surface.
+Run `mise exec -- pnpm test:simulator` for package tests, the database-backed host tests, adapter contracts and the panel. `pnpm verify:feature simulator` adds the platform journeys. Platform tests reuse `setupSimulator(t)`, which creates a disposable simulator database, a paused `test` run with `calm` failures, and a workspace. They advance time and call `pilot.observe()` explicitly.

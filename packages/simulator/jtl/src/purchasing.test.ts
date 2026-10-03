@@ -1,36 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  ensurePurchasing,
-  handle,
-  identify,
-  purchasingCommand,
-  seed,
-  supplierEvents,
-} from './index.js';
-
-const base = 'https://jtl.invalid/api/eazybusiness';
+import { jtl, readItemStock, supplierEvents } from './index.js';
+import type { PurchaseOrderRecord } from './records.js';
+import { call, request, seeded, start } from './test-support/fixture.js';
 
 const created = Date.parse('2026-10-01T10:00:00Z');
 
-function request(
-  path: string,
-  method = 'GET',
-  body: unknown = null,
-  key?: string,
-) {
-  return {
-    url: `${base}/${path}`,
-    method,
-    headers: {
-      authorization: 'Wawi synthetic',
-      ...(key ? { 'idempotency-key': key } : {}),
-    },
-    body: body === null ? null : JSON.stringify(body),
-  };
-}
-
-const order = {
+const body = {
   supplierId: '1',
   requestedDeliveryDate: '2026-10-12T12:00:00Z',
   items: [
@@ -45,60 +21,78 @@ const order = {
   internalComment: 'Created by Luma · luma-po:po-7',
 };
 
-describe('JTL purchasing simulator', () => {
-  it('creates orders once per idempotency key and serves list and detail', () => {
-    const state = seed();
-    const first = handle(
-      state,
-      request('purchase-orders', 'POST', order, 'k'),
-      0,
-      created,
-    );
-    expect(first).toMatchObject({
+describe('JTL purchasing', () => {
+  it('creates orders once per idempotency key and serves list and detail', async () => {
+    const { context, events } = await seeded();
+    context.wallTime = created;
+    const post = (key: string) =>
+      call(context, 'purchase-orders', 'POST', body, {
+        'idempotency-key': key,
+      });
+    expect(await post('k')).toMatchObject({
       status: 201,
-      body: { purchaseOrderId: '1' },
+      body: { purchaseOrderId: 1 },
       committed: true,
     });
-    const replay = handle(
-      state,
-      request('purchase-orders', 'POST', order, 'k'),
-      0,
-      created,
-    );
-    expect(replay).toEqual({
+    expect(events).toEqual([
+      {
+        topic: 'purchase-orders/create',
+        resource: '1',
+        payload: {
+          purchaseOrderId: '1',
+          supplierEvents: [
+            expect.objectContaining({ delay: 20000 }),
+            expect.objectContaining({ delay: 60000 }),
+          ],
+        },
+      },
+    ]);
+    expect(await post('k')).toEqual({
       status: 201,
-      body: { purchaseOrderId: '1' },
+      body: { purchaseOrderId: 1 },
       headers: { 'content-type': 'application/json' },
     });
-    expect(state.purchaseOrders).toHaveLength(1);
-    handle(
-      state,
-      request('purchase-orders', 'POST', order, 'other'),
-      0,
-      created + 5000,
-    );
+    expect(events).toHaveLength(1);
+    context.wallTime = created + 5000;
+    await post('other');
 
+    const list = await call(
+      context,
+      'purchase-orders?createdAtAfter=2026-10-01T10:00:00Z&pageNumber=1&pageSize=10',
+    );
+    expect(list.body).toMatchObject({
+      totalItems: 1,
+      items: [
+        {
+          purchaseOrderId: 2,
+          supplierName: 'Nordwind Textil GmbH',
+          createdAt: '2026-10-01T10:00:05.000Z',
+          warehouseId: 1,
+        },
+      ],
+    });
     expect(
-      handle(
-        state,
-        request(
-          'purchase-orders?createdAtAfter=2026-10-01T10:00:00Z&pageNumber=1&pageSize=10',
-        ),
-        0,
+      (
+        await call(
+          context,
+          'purchase-orders?createdAtBefore=2026-10-01T10:00:01Z',
+        )
       ).body,
-    ).toMatchObject({ totalItems: 1, items: [{ purchaseOrderId: '2' }] });
-    expect(handle(state, request('purchase-orders/1'), 0).body).toMatchObject({
-      purchaseOrderId: '1',
-      supplierId: '1',
+    ).toMatchObject({ totalItems: 1, items: [{ purchaseOrderId: 1 }] });
+    expect((await call(context, 'purchase-orders/1')).body).toMatchObject({
+      purchaseOrderId: 1,
+      supplierId: 1,
+      supplierName: 'Nordwind Textil GmbH',
+      orderNumber: 'BE-00001',
       status: 0,
       isConfirmed: false,
       createdAt: '2026-10-01T10:00:00.000Z',
       internalComment: 'Created by Luma · luma-po:po-7',
       lineItems: [
         {
-          lineItemId: '1001',
+          lineItemId: 1001,
           lineItemType: 1,
-          itemId: '1',
+          itemId: 1,
           itemNumber: 'LUMA-001',
           quantity: 10,
           deliveredQuantity: 0,
@@ -107,70 +101,105 @@ describe('JTL purchasing simulator', () => {
         },
       ],
     });
-    expect(handle(state, request('purchase-orders/9'), 0).status).toBe(404);
+    expect((await call(context, 'purchase-orders/9')).status).toBe(404);
+    expect(
+      (await call(context, 'purchase-orders?createdAtAfter=soon')).status,
+    ).toBe(400);
   });
 
-  it('rejects unknown suppliers, unassigned items and invalid bodies', () => {
-    const state = seed();
-    for (const body of [
-      { ...order, supplierId: '9' },
-      {
-        ...order,
-        supplierId: '2',
-        items: [{ ...order.items[0], itemId: '2' }],
-      },
-      { ...order, items: [] },
-      { ...order, requestedDeliveryDate: 'soon' },
-      { ...order, items: [{ ...order.items[0], quantity: 0 }] },
+  it('stamps creation with simulation time when it is ahead of the wall clock', async () => {
+    const { context } = await seeded();
+    context.wallTime = start - 60000;
+    await call(context, 'purchase-orders', 'POST', body);
+    expect((await call(context, 'purchase-orders/1')).body).toMatchObject({
+      createdAt: new Date(start).toISOString(),
+    });
+  });
+
+  it('rejects unknown suppliers, unassigned items and invalid bodies', async () => {
+    const { context, events } = await seeded();
+    for (const value of [
+      { ...body, supplierId: '9' },
+      { ...body, supplierId: '2', items: [{ ...body.items[0], itemId: '2' }] },
+      { ...body, items: [] },
+      { ...body, requestedDeliveryDate: 'soon' },
+      { ...body, items: [{ ...body.items[0], quantity: 0 }] },
+      { ...body, internalComment: 7 },
     ])
       expect(
-        handle(state, request('purchase-orders', 'POST', body, 'k'), 0).status,
+        (
+          await call(context, 'purchase-orders', 'POST', value, {
+            'idempotency-key': 'k',
+          })
+        ).status,
       ).toBe(400);
-    expect(state.purchaseOrders).toEqual([]);
-    expect(state.purchaseOrderKeys).toEqual([]);
+    const malformed = await jtl.handle(context, {
+      ...request('purchase-orders', 'POST'),
+      body: '{',
+    });
+    expect(malformed.status).toBe(400);
+    expect(
+      (await call(context, 'purchase-orders?pageNumber=1&pageSize=10')).body,
+    ).toMatchObject({ totalItems: 0 });
+    expect(events).toEqual([]);
+    // The rejected key was not recorded, so a valid retry creates the order.
+    expect(
+      await call(context, 'purchase-orders', 'POST', body, {
+        'idempotency-key': 'k',
+      }),
+    ).toMatchObject({ status: 201, committed: true });
   });
 
-  it('serves active suppliers, supplier detail and item assignments', () => {
-    const state = seed();
-    state.suppliers[1]!.isActive = false;
+  it('serves active suppliers, supplier detail and item assignments', async () => {
+    const { context } = await seeded();
     expect(
-      handle(state, request('suppliers?pageNumber=1&pageSize=10'), 0).body,
-    ).toMatchObject({
-      totalItems: 1,
-      items: [{ id: '1', companyName: 'Nordwind Textil GmbH' }],
-    });
-    expect(handle(state, request('suppliers/2'), 0).body).toMatchObject({
-      id: '2',
-      isActive: false,
-      contact: { emailAddress: 'purchasing@baltic-packaging.example' },
-    });
-    expect(
-      handle(state, request('items/1/suppliers?pageNumber=1&pageSize=10'), 0)
-        .body,
+      (await call(context, 'suppliers?pageNumber=1&pageSize=10')).body,
     ).toMatchObject({
       totalItems: 2,
       items: [
-        { supplierId: '1', netPurchasePrice: 9.5, vatRate: 19 },
-        { supplierId: '2', netPurchasePrice: 10.2 },
+        {
+          id: 1,
+          companyName: 'Nordwind Textil GmbH',
+          supplierNumber: 'L-1001',
+        },
+        { id: 2 },
       ],
     });
+    expect((await call(context, 'suppliers/2')).body).toMatchObject({
+      id: 2,
+      isActive: true,
+      contact: { emailAddress: 'purchasing@baltic-packaging.example' },
+    });
+    expect(
+      (await call(context, 'items/1/suppliers?pageNumber=1&pageSize=10')).body,
+    ).toMatchObject({
+      totalItems: 2,
+      items: [
+        {
+          id: 1,
+          itemId: 1,
+          supplierId: 1,
+          supplierName: 'Nordwind Textil GmbH',
+          netPurchasePrice: 9.5,
+          vatRate: 19,
+          isDefaultSupplier: true,
+        },
+        { id: 2, supplierId: 2, netPurchasePrice: 10.2 },
+      ],
+    });
+    expect((await call(context, 'items/9/suppliers')).status).toBe(404);
+    expect((await call(context, 'suppliers/9')).status).toBe(404);
   });
 
-  it('records confirmations and goods receipts, adding received stock', () => {
-    const state = seed();
-    handle(state, request('purchase-orders', 'POST', order, 'k'), 0, created);
-    purchasingCommand(
-      state,
-      {
-        kind: 'purchase-order-confirm',
-        orderId: '1',
-        lines: [
-          { lineItemId: '1001', quantity: 8, deliveryDate: '2026-10-15' },
-        ],
-      },
-      1000,
-    );
-    expect(state.purchaseOrders[0]).toMatchObject({
+  it('records confirmations and goods receipts, adding stock to the warehouse', async () => {
+    const { context, events } = await seeded();
+    await call(context, 'purchase-orders', 'POST', body);
+    await jtl.command(context, {
+      kind: 'purchase-order-confirm',
+      orderId: '1',
+      lines: [{ lineItemId: '1001', quantity: 8, deliveryDate: '2026-10-15' }],
+    });
+    expect((await call(context, 'purchase-orders/1')).body).toMatchObject({
       isConfirmed: true,
       lineItems: [
         {
@@ -180,37 +209,102 @@ describe('JTL purchasing simulator', () => {
         },
       ],
     });
-    const receive = (quantity: number) =>
-      purchasingCommand(
-        state,
-        {
-          kind: 'purchase-order-receive',
-          orderId: '1',
-          lines: [{ lineItemId: '1001', quantity }],
-        },
-        2000,
-      );
-    receive(4);
-    expect(state.purchaseOrders[0]).toMatchObject({
+    const receive = (quantity: number, warehouse?: string) =>
+      jtl.command(context, {
+        kind: 'purchase-order-receive',
+        orderId: '1',
+        ...(warehouse ? { warehouse } : {}),
+        lines: [{ lineItemId: '1001', quantity }],
+      });
+    context.now += 2000;
+    await receive(4);
+    expect((await call(context, 'purchase-orders/1')).body).toMatchObject({
       status: 30,
       lineItems: [{ deliveredQuantity: 4, openQuantity: 6 }],
     });
-    expect(state.items[0]).toMatchObject({
-      stockTotal: '104',
-      stockAvailable: '104',
-      modifiedTimestamp: new Date(2000).toISOString(),
+    expect(await readItemStock(context, '1')).toMatchObject({
+      total: 124,
+      warehouses: { '1': 104, '2': 20 },
     });
-    expect(() => receive(7)).toThrow('Invalid goods receipt');
-    receive(6);
-    expect(state.purchaseOrders[0]!.status).toBe(500);
-    expect(state.items[0]!.stockTotal).toBe('110');
-    expect(() => receive(1)).toThrow('completed');
+    expect(events.at(-1)).toMatchObject({
+      topic: 'items/stock',
+      resource: '1',
+    });
+    await expect(receive(7)).rejects.toThrow('Invalid goods receipt');
+    await receive(6, '2');
+    expect((await call(context, 'purchase-orders/1')).body).toMatchObject({
+      status: 500,
+    });
+    expect((await readItemStock(context, '1'))?.warehouses).toEqual({
+      '1': 104,
+      '2': 26,
+    });
+    await expect(receive(1)).rejects.toThrow('completed');
   });
 
-  it('plans supplier answers per profile', () => {
-    const state = seed();
-    handle(state, request('purchase-orders', 'POST', order, 'k'), 0, created);
-    const placed = state.purchaseOrders[0]!;
+  it('places merchant orders priced from assignments under the supplier profile', async () => {
+    const { context } = await seeded();
+    await jtl.command(context, {
+      kind: 'supplier-profile',
+      supplierId: '1',
+      profile: 'silent',
+    });
+    const result = await jtl.command(context, {
+      kind: 'purchase-order',
+      supplierId: '1',
+      deliveryDate: '2026-10-20',
+      lines: [
+        { itemId: '1', quantity: 12 },
+        { itemId: '2', quantity: 3 },
+      ],
+    });
+    expect(result).toEqual({
+      id: '1',
+      lines: [
+        { id: '1001', itemId: '1', quantity: 12 },
+        { id: '1002', itemId: '2', quantity: 3 },
+      ],
+      supplierEvents: [],
+    });
+    expect((await call(context, 'purchase-orders/1')).body).toMatchObject({
+      externalOrderNumber: null,
+      internalComment: null,
+      lineItems: [
+        { netPurchasePriceAmount: 9.5, vatRatePercentage: 19 },
+        { netPurchasePriceAmount: 21 },
+      ],
+    });
+    await jtl.command(context, {
+      kind: 'supplier-profile',
+      supplierId: '1',
+      profile: 'delayed',
+    });
+    const delayed = await jtl.command(context, {
+      kind: 'purchase-order',
+      supplierId: '1',
+      deliveryDate: '2026-10-20',
+      lines: [{ itemId: '1', quantity: 1 }],
+    });
+    expect(delayed.supplierEvents?.map((event) => event.delay)).toEqual([
+      20000, 180000,
+    ]);
+    await expect(
+      jtl.command(context, {
+        kind: 'purchase-order',
+        supplierId: '2',
+        deliveryDate: '2026-10-20',
+        lines: [{ itemId: '2', quantity: 1 }],
+      }),
+    ).rejects.toThrow('not assigned');
+  });
+
+  it('plans supplier answers per profile', async () => {
+    const { context } = await seeded();
+    await call(context, 'purchase-orders', 'POST', body);
+    const placed = (await context.store.get<PurchaseOrderRecord>(
+      'purchase-order',
+      '1',
+    ))!.data;
     const plan = (profile: Parameters<typeof supplierEvents>[1]) =>
       supplierEvents(placed, profile).map(({ delay, command }) => ({
         delay,
@@ -259,39 +353,5 @@ describe('JTL purchasing simulator', () => {
       { delay: 60000, lines: [{ quantity: 5 }] },
     ]);
     expect(plan('silent')).toEqual([]);
-  });
-
-  it('names purchasing operations for fault targeting', () => {
-    expect(identify(request('purchase-orders', 'POST'))).toEqual({
-      operation: 'purchase-orders.submit',
-    });
-    expect(identify(request('purchase-orders/4'))).toEqual({
-      operation: 'purchase-orders.read',
-      resource: '4',
-    });
-    expect(identify(request('suppliers/2'))).toEqual({
-      operation: 'suppliers.read',
-      resource: '2',
-    });
-    expect(identify(request('items/1/suppliers'))).toEqual({
-      operation: 'items.read',
-      resource: '1',
-    });
-  });
-
-  it('backfills purchasing for state saved before it was simulated', () => {
-    const legacy: Partial<ReturnType<typeof seed>> = seed();
-    delete legacy.suppliers;
-    delete legacy.itemSuppliers;
-    delete legacy.purchaseOrders;
-    delete legacy.purchaseOrderKeys;
-    delete legacy.supplierProfiles;
-    ensurePurchasing(legacy);
-    expect(legacy).toMatchObject({
-      suppliers: [{ id: '1' }, { id: '2' }],
-      purchaseOrders: [],
-      purchaseOrderKeys: [],
-      supplierProfiles: {},
-    });
   });
 });

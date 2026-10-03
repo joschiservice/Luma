@@ -1,8 +1,8 @@
-import { mkdtemp, open, readdir, readFile } from 'node:fs/promises';
+import { mkdtemp, open, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { fail, root, run } from './process.mjs';
+import { fail, run } from './process.mjs';
 
 try {
   const feature = process.argv[2];
@@ -33,10 +33,6 @@ try {
 
   const directory = await mkdtemp(join(tmpdir(), `luma-verify-${feature}-`));
   console.log(`Logs: ${directory}`);
-  const simulatorTests = (await readdir(join(root, 'tooling/simulator')))
-    .filter((name) => name.endsWith('.test.mjs'))
-    .sort()
-    .map((name) => `tooling/simulator/${name}`);
   const filters = packages[feature].map((name) => `--filter=@luma/${name}`);
   const steps = [
     ['Code runtime', 'pnpm', ['setup:code']],
@@ -52,6 +48,7 @@ try {
         'build',
         '--filter=@luma/api...',
         '--filter=@luma/simulator...',
+        '--filter=@luma/simulator-web',
         '--filter=@luma/worker...',
       ],
     ],
@@ -64,9 +61,9 @@ try {
     ...(feature === 'simulator'
       ? [
           [
-            'Simulator integration and panel',
+            'Simulator host, adapters and panel',
             process.execPath,
-            ['--test', ...simulatorTests],
+            ['tooling/dev/test.mjs', 'simulator-tooling'],
           ],
         ]
       : []),

@@ -9,20 +9,28 @@ import { database, secret } from './helpers.mjs';
 /** Provisions and cleans an isolated database-backed simulator workspace for platform tests. */
 export async function setupSimulator(
   t,
-  { temporal, origin = 'http://127.0.0.1:3000' } = {},
+  {
+    temporal,
+    origin = 'http://127.0.0.1:3000',
+    profile = 'test',
+    chaos = 'calm',
+  } = {},
 ) {
   const db = await database(t);
   await db.migrate();
   await db.grantRuntime();
   const role = new URL(db.runtimeUrl).username;
   await db.owner.query(
-    `GRANT luma_exceptions,luma_connectors,luma_inventory,luma_orders TO "${role}"`,
+    `GRANT luma_exceptions,luma_connectors,luma_inventory,luma_orders,luma_customers,luma_commerce_sync TO "${role}"`,
   );
   const directory = await mkdtemp(join(tmpdir(), 'luma-operations-e2e-'));
   t.onTestFinished(() => rm(directory, { recursive: true, force: true }));
   const fixture = await createSimulatorEnvironment({
+    t,
     directory,
     temporal,
+    profile,
+    chaos,
     env: {
       IDENTITY_DATABASE_URL: db.runtimeUrl,
       WORKFLOW_DATABASE_URL: db.runtimeUrl,
@@ -59,10 +67,13 @@ export async function setupSimulator(
                   );
                   entries.push(...page.items);
                   before = page.nextCursor;
-                } while (before);
-                run.clock.journal = entries.reverse();
+                } while (before && entries.length < 5_000);
 
-                return run;
+                return {
+                  ...run,
+                  journal: entries.reverse(),
+                  incidents: await fixture.call(`runs/${id}/incidents`),
+                };
               }),
             ),
             incidents,

@@ -1,54 +1,77 @@
 import { createApp } from '../../apps/simulator/dist/app.js';
 import { createPilot } from '../pilot/runtime.mjs';
 import { seedPilot } from '../pilot/seed.mjs';
+import {
+  registerWebhooks,
+  simulatorInstances,
+  waitForRun,
+} from './connect.mjs';
+import { testSimulatorDatabase } from './database.mjs';
 import { createOperationsClient } from './platform-client.mjs';
 
-/** Starts an isolated healthy Luma workspace and simulator using the same provisioning and HTTP bridge as the local stack. */
+/**
+ * Starts an isolated healthy Luma workspace and simulator using the same provisioning, HTTP
+ * bridge and sync runner as the local stack. The run uses the deterministic `test` profile and
+ * `calm` failures unless options choose otherwise; its clock only moves when tests advance it.
+ */
 export async function createSimulatorEnvironment({
+  t,
   directory,
   env,
   saved,
   temporal = null,
+  profile = 'test',
+  chaos = 'calm',
 }) {
   const token = 'operational-simulator-test-token';
-  let operations;
-  const simulator = await createApp(
-    `${directory}/runs.sqlite`,
+  const databaseUrl = await testSimulatorDatabase(t);
+  let client;
+  const simulator = await createApp({
+    databaseUrl,
     token,
-    false,
-    undefined,
-    (runId, action) => operations(runId, action),
-  );
+    autonomous: false,
+    operations: (runId, action) => client.operations(runId, action),
+    luma: (runId) => client.cases(runId),
+  });
   let pilot;
   try {
     const simulatorOrigin = await simulator.listen({
       host: '127.0.0.1',
       port: 0,
     });
-    const call = async (path, body) => {
+    const call = async (path, body, method) => {
       const response = await fetch(`${simulatorOrigin}/api/${path}`, {
-        method: body ? 'POST' : 'GET',
+        method: method ?? (body ? 'POST' : 'GET'),
         headers: {
           authorization: `Bearer ${token}`,
           ...(body ? { 'content-type': 'application/json' } : {}),
         },
         ...(body ? { body: JSON.stringify(body) } : {}),
       });
-      const result = await response.json();
+      const result = response.status === 204 ? null : await response.json();
       if (!response.ok)
         throw new Error(`${response.status}: ${JSON.stringify(result)}`);
 
       return result;
     };
-    await call('runs', { id: 'operations', scenario: 'manual', seed: 44 });
+    await call('runs', {
+      id: 'operations',
+      profile,
+      chaos,
+      seed: 44,
+      running: false,
+    });
+    const run = await waitForRun(call, 'operations');
     const manifest = await seedPilot(saved, env, directory, 'healthy', false, {
       endpoint: simulatorOrigin,
       token,
       runId: 'operations',
+      ...simulatorInstances(run),
     });
     pilot = await createPilot(env, directory, manifest, temporal);
     const apiOrigin = await pilot.app.listen({ host: '127.0.0.1', port: 0 });
-    operations = createOperationsClient({
+    await registerWebhooks(call, manifest, apiOrigin);
+    client = createOperationsClient({
       apiOrigin,
       webOrigin: env.BETTER_AUTH_URL,
       password: saved.seedPassword,
@@ -65,6 +88,8 @@ export async function createSimulatorEnvironment({
       simulatorOrigin,
       apiOrigin,
       token,
+      /** Waits until the run is ready again, for example after a reset. */
+      ready: () => waitForRun(call, 'operations'),
       async close() {
         await pilot.close();
         await simulator.close();

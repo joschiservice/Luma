@@ -21,9 +21,9 @@ import {
   parsePlaybookSnapshot,
   playbookHash,
 } from '@luma/resolution/composition';
+import { createTransport } from '@luma/simulator-core';
 
-import { advanceRun, dispatch, mutate } from '../../apps/simulator/dist/run.js';
-import { createTransport } from '../../packages/simulator/core/dist/index.js';
+import { advance, command, dispatch } from './provider.mjs';
 import { createState } from './state.mjs';
 
 /** Builds the production interpreter and adapters around a serialized evaluation checkpoint. */
@@ -38,7 +38,7 @@ export function createWorker(
   const { action } = incident;
   const state = createState(checkpoint.persistence);
   const provider = checkpoint.provider;
-  const now = () => new Date(provider.clock.now);
+  const now = () => new Date(provider.now);
   const id = () =>
     `00000000-0000-4000-8000-${String(++checkpoint.sequence).padStart(12, '0')}`;
   const context = (tenant = action.tenantId, user = action.proposedBy.id) =>
@@ -153,9 +153,9 @@ export function createWorker(
           !checkpoint.verificationFaultApplied
         ) {
           checkpoint.verificationFaultApplied = true;
-          advanceRun(provider, fixture.controls.verificationDelayMs ?? 0);
+          advance(provider, fixture.controls.verificationDelayMs ?? 0);
           if (fixture.controls.changeBeforeVerification)
-            mutate(provider, 'jtl', {
+            await command(provider, 'jtl', {
               kind: 'shipping-method',
               id: incident.mapping.order.externalId,
               shippingMethodId: '9',

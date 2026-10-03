@@ -63,8 +63,10 @@ export async function replenishmentFixture(
     name: 'Northstar Supply',
   });
   const setup = await request('/replenishment');
+  // Sync imports both fixture SKUs; the scenarios replenish the canvas tote.
   const position = setup.positions.find(
-    (p) => p.connectionId === f.manifest.connections.jtl,
+    (p) =>
+      p.connectionId === f.manifest.connections.jtl && p.sku === 'LUMA-001',
   );
   assert.ok(position);
   const detail = await request('');

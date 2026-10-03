@@ -163,9 +163,11 @@ test('sends an order with a second approver, follows the supplier to receipt and
     'order sent',
     20000,
   );
-  const placed = (await f.call('runs/operations')).jtl.purchaseOrders.filter(
-    (o) => String(o.internalComment ?? '').includes(order.id),
-  );
+  const placed = (
+    await f.call('runs/operations/records/jtl?kind=purchase-order&limit=100')
+  ).items
+    .map((item) => item.data)
+    .filter((o) => String(o.internalComment ?? '').includes(order.id));
   expect(placed).toHaveLength(1);
 
   // The supplier confirms fewer units in JTL; the buyer accepts the change.

@@ -46,7 +46,7 @@ export default tseslint.config(
     files: [
       'apps/web/**/*.{ts,tsx}',
       'packages/ui/**/*.{ts,tsx}',
-      'apps/simulator-web/**/*.js',
+      'apps/simulator-web/**/*.{ts,tsx}',
     ],
     languageOptions: { globals: globals.browser },
     plugins: { 'react-hooks': reactHooks },

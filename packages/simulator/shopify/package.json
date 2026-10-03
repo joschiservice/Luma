@@ -19,6 +19,7 @@
     }
   },
   "dependencies": {
-    "@luma/simulator-core": "workspace:*"
+    "@luma/simulator-core": "workspace:*",
+    "graphql": "catalog:"
   }
 }

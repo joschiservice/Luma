@@ -6,7 +6,7 @@ import { createInventoryMonitor } from '@luma/resolution';
 
 const ref = (externalId, scopeKey = '') => ({ externalId, scopeKey });
 
-/** Provisions the simulator's explicit SKU/pool mapping and connects real inventory detection and verification. */
+/** Provisions the simulator's explicit SKU/location mapping and connects real inventory detection and verification. */
 export async function createInventoryScenario({
   commerce,
   capabilities,
@@ -14,6 +14,8 @@ export async function createInventoryScenario({
   manifest,
 }) {
   const actor = await operator();
+  // The run names the SKU pair a merchant would have linked: ERP item 2 and its shop listing.
+  const scenario = manifest.simulator.inventory;
   const prefix = `simulator:${manifest.simulator.runId}:inventory`;
   const skuId = await commerce.inventory.identify(
     actor,
@@ -25,10 +27,10 @@ export async function createInventoryScenario({
     'location',
     `${prefix}:pool`,
   );
-  const side = (provider, sku, location) => ({
+  const side = (instance, provider, sku, location) => ({
     source: {
       tenantId: manifest.organizationId,
-      connectionId: manifest.connections[provider],
+      connectionId: manifest.connections[instance],
       provider,
       resource: 'sku',
       ...ref(sku, location),
@@ -42,11 +44,12 @@ export async function createInventoryScenario({
     publishedAt: manifest.epoch,
     skuId,
     locationId,
-    left: side('jtl', '2', 'all-warehouses'),
+    left: side('jtl', 'jtl', scenario.erpItem, 'all-warehouses'),
     right: side(
+      scenario.shop,
       'shopify',
-      'gid://shopify/InventoryItem/2',
-      'gid://shopify/Location/2',
+      scenario.inventoryItem,
+      scenario.location,
     ),
     authority: 'left',
     sellingSource: 'right',

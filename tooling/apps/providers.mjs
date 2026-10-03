@@ -30,7 +30,7 @@ export function createInstalledConnections(db, options) {
   const providers = fixtureProviders(options);
   const host = createAppHost(db, {
     ...options,
-    env: {},
+    env: options.env ?? {},
     factories: [jtl, shopify].map((factory, index) => (context) => {
       const definition = factory(context);
 

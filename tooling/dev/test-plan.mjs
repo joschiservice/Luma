@@ -62,6 +62,27 @@ const suites = {
       'records.browser.mjs',
     ],
   ],
+  // Simulator packages, host and installed-adapter contracts; the host needs PostgreSQL.
+  'simulator-tooling': [
+    [
+      'exec',
+      'turbo',
+      'run',
+      'build',
+      '--filter=@luma/api...',
+      '--filter=@luma/simulator...',
+      '--filter=@luma/simulator-web',
+    ],
+    [
+      'exec',
+      'turbo',
+      'run',
+      'test',
+      '--filter=@luma/simulator',
+      '--filter=@luma/simulator-*',
+    ],
+    ['exec', 'node', '--test', 'tooling/simulator/*.test.mjs'],
+  ],
   // Prebuilt platform suites used by verify:feature after its single build step.
   simulator: [
     ['--filter', '@luma/api', 'test:e2e', 'simulator.e2e.mjs'],

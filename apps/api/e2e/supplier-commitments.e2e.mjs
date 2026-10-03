@@ -167,8 +167,10 @@ it('places an approved order once, follows supplier confirmation and receipt, an
   );
   expect(approved.state).toBe('submitted');
   expect(approved.externalOrder?.externalId).toBeTruthy();
-  const provider = await f.call('runs/operations');
-  const placed = provider.jtl.purchaseOrders.filter((o) =>
+  const purchaseOrders = (
+    await f.call('runs/operations/records/jtl?kind=purchase-order&limit=100')
+  ).items.map((item) => item.data);
+  const placed = purchaseOrders.filter((o) =>
     String(o.internalComment ?? '').includes(order.id),
   );
   expect(placed).toHaveLength(1);
