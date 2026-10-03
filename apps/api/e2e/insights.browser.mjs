@@ -42,6 +42,32 @@ test('opens the exact records behind a chart point and returns to them', async (
     name: 'Orders placed, last 7 days',
   });
   await orders.waitFor();
+  // Hidden chart instructions and table captions must stay inside the content scroller.
+  const checkScroll = async () => {
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => document.documentElement.scrollHeight <= window.innerHeight,
+        ),
+      )
+      .toBe(true);
+    await page.evaluate(() => window.scrollTo(0, 1600));
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    const content = page.locator('#workspace-content');
+    await content.evaluate(
+      (element) => (element.scrollTop = element.scrollHeight),
+    );
+    await expect
+      .poll(() => content.evaluate((element) => element.scrollTop))
+      .toBeGreaterThan(0);
+    expect(
+      await page
+        .locator('.desk-header')
+        .evaluate((element) => element.getBoundingClientRect().top),
+    ).toBeGreaterThanOrEqual(0);
+    await content.evaluate((element) => (element.scrollTop = 0));
+  };
+  await checkScroll();
   // Sources without an import are named, and unknown history is never shown as complete.
   const card = page.locator('section[data-chart="orders"]');
   await expect(card).toContainText('Partial coverage');
@@ -103,11 +129,13 @@ test('opens the exact records behind a chart point and returns to them', async (
   await expect(sheet.getByRole('link', { name: /^#201/ })).toBeVisible();
   await page.evaluate(() => document.documentElement.classList.add('dark'));
   await page.screenshot({ path: '/tmp/luma107-sheet-dark.png' });
-  await page.evaluate(() => document.documentElement.classList.remove('dark'));
   await page.keyboard.press('Escape');
+  await checkScroll();
+  await page.evaluate(() => document.documentElement.classList.remove('dark'));
 
   await page.setViewportSize({ width: 390, height: 844 });
   await orders.waitFor();
+  await checkScroll();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,

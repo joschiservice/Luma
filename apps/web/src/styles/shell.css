@@ -650,6 +650,8 @@
 }
 
 .desk-content {
+  /* Contain absolute elements, including hidden captions, within this scroller. */
+  position: relative;
   flex: 1;
   min-height: 0;
   overflow: auto;
