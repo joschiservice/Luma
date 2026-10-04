@@ -42,6 +42,32 @@ test('opens the exact records behind a chart point and returns to them', async (
     name: 'Orders placed, last 7 days',
   });
   await orders.waitFor();
+  // Hidden chart instructions and table captions must stay inside the content scroller.
+  const checkScroll = async () => {
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => document.documentElement.scrollHeight <= window.innerHeight,
+        ),
+      )
+      .toBe(true);
+    await page.evaluate(() => window.scrollTo(0, 1600));
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    const content = page.locator('#workspace-content');
+    await content.evaluate(
+      (element) => (element.scrollTop = element.scrollHeight),
+    );
+    await expect
+      .poll(() => content.evaluate((element) => element.scrollTop))
+      .toBeGreaterThan(0);
+    expect(
+      await page
+        .locator('.desk-header')
+        .evaluate((element) => element.getBoundingClientRect().top),
+    ).toBeGreaterThanOrEqual(0);
+    await content.evaluate((element) => (element.scrollTop = 0));
+  };
+  await checkScroll();
   // Sources without an import are named, and unknown history is never shown as complete.
   const card = page.locator('section[data-chart="orders"]');
   await expect(card).toContainText('Partial coverage');
@@ -56,7 +82,7 @@ test('opens the exact records behind a chart point and returns to them', async (
   const names = await bars.evaluateAll((elements) =>
     elements.map((element) => element.getAttribute('aria-label')),
   );
-  const day = names.findLastIndex((name) => !/: 0 orders\.$/.test(name));
+  const day = names.findLastIndex((name) => /: [1-9]\d* orders?\b/.test(name));
   expect(day).toBeGreaterThanOrEqual(0);
   await bars.first().focus();
   await page.keyboard.press('End');
@@ -103,11 +129,13 @@ test('opens the exact records behind a chart point and returns to them', async (
   await expect(sheet.getByRole('link', { name: /^#201/ })).toBeVisible();
   await page.evaluate(() => document.documentElement.classList.add('dark'));
   await page.screenshot({ path: '/tmp/luma107-sheet-dark.png' });
-  await page.evaluate(() => document.documentElement.classList.remove('dark'));
   await page.keyboard.press('Escape');
+  await checkScroll();
+  await page.evaluate(() => document.documentElement.classList.remove('dark'));
 
   await page.setViewportSize({ width: 390, height: 844 });
   await orders.waitFor();
+  await checkScroll();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -115,4 +143,101 @@ test('opens the exact records behind a chart point and returns to them', async (
   ).toBe(true);
   await page.screenshot({ path: '/tmp/luma107-narrow.png', fullPage: true });
   expect(errors).toEqual([]);
+});
+
+test('keeps a 503 chart stable during live import events and supports explicit recovery', async ({
+  resources: t,
+}) => {
+  const port = await availablePort();
+  const origin = `http://127.0.0.1:${port}`;
+  const f = await settingsFixture(t, origin);
+  const apiOrigin = await f.app.listen({ host: '127.0.0.1', port: 0 });
+  const web = startProcess(
+    t,
+    'e2e/web-server.mjs',
+    { TEST_API_ORIGIN: apiOrigin, TEST_WEB_PORT: String(port) },
+    true,
+  );
+  await web.message('listening');
+  const context = await t.newContext({ baseURL: origin });
+  await context.addCookies(
+    f.member.cookie.split('; ').map((value) => {
+      const [name, ...rest] = value.split('=');
+
+      return { name, value: rest.join('='), url: origin };
+    }),
+  );
+  const page = await context.newPage();
+  await page.addInitScript(
+    ({ organizationId }) => {
+      window.EventSource = class extends EventTarget {
+        constructor() {
+          super();
+          this.change = () =>
+            this.dispatchEvent(
+              new MessageEvent('resync', {
+                data: JSON.stringify({
+                  schemaVersion: 1,
+                  organizationId,
+                  scope: 'order-metrics',
+                  connected: true,
+                  refetch: true,
+                  sentAt: new Date().toISOString(),
+                }),
+              }),
+            );
+          window.addEventListener('test-metric-change', this.change);
+          queueMicrotask(this.change);
+        }
+        close() {
+          window.removeEventListener('test-metric-change', this.change);
+        }
+      };
+    },
+    { organizationId: f.org.id },
+  );
+  let requests = 0;
+  let failing = true;
+  await page.route('**/insights/orders?**', async (route) => {
+    requests++;
+    if (!failing) return route.continue();
+    await route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Order history is being prepared for charts.',
+        requestId: 'test',
+      }),
+    });
+  });
+  await page.clock.install();
+  await page.goto(`/app/${f.org.id}/insights`);
+  const card = page.locator('section[data-chart="orders"]');
+  await expect(card.getByRole('alert')).toContainText(
+    'Order history is being prepared',
+  );
+  await page.clock.runFor(1000);
+  await expect(
+    page.getByRole('button', { name: 'Refresh charts' }),
+  ).toBeEnabled();
+  const initialRequests = requests;
+  for (let index = 0; index < 10; index++) {
+    await page.evaluate(() =>
+      window.dispatchEvent(new Event('test-metric-change')),
+    );
+    await page.clock.runFor(1000);
+    await expect(
+      page.getByRole('button', { name: 'Refresh charts' }),
+    ).toBeEnabled();
+    await expect(card.getByRole('alert')).toContainText(
+      'Order history is being prepared',
+    );
+  }
+  expect(requests).toBe(initialRequests);
+  failing = false;
+  await card.getByRole('button', { name: 'Try again' }).click();
+  await expect(card.getByRole('alert')).toBeHidden();
+  await expect(card).toContainText('Nothing can report orders yet');
+  expect(requests).toBe(initialRequests + 1);
 });

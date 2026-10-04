@@ -22,6 +22,13 @@ test('pilot projects observed orders, serves live metrics and releases its liste
   const cookie = signIn.cookies
     .map(({ name, value }) => `${name}=${value}`)
     .join('; ');
+  const sync = await f.pilot.app.inject({
+    method: 'GET',
+    url: `${base}/sync`,
+    headers: { cookie },
+  });
+  expect(sync.statusCode).toBe(200);
+  expect(sync.json().connections).toHaveLength(2);
   const streams = await Promise.all(
     Array.from({ length: 2 }, () =>
       metricStream(t, f.apiOrigin, {
