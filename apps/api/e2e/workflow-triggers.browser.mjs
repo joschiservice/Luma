@@ -149,7 +149,7 @@ test('starts a scoped native workflow, preserves uncertain retries and cancels a
     .waitFor();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('combobox', { name: 'Workflow sections' }).click();
-  await page.getByRole('option', { name: 'Triggers', exact: true }).click();
+  await page.getByRole('option', { name: 'Rules', exact: true }).click();
   await form.getByLabel('order ID').fill('order-2042');
   await form.getByLabel('shippingMethodId').fill('standard');
   for (const field of ['diagnosisReady', 'methodMapped']) {
@@ -324,9 +324,10 @@ test('starts a scoped native workflow, preserves uncertain retries and cancels a
     .first()
     .waitFor();
   await page.getByRole('combobox', { name: 'Workflow sections' }).click();
-  await page.getByRole('option', { name: 'Recent runs' }).click();
+  await page.getByRole('option', { name: 'Activity' }).click();
   const timeline = page.getByRole('list', { name: 'Step progress' });
-  await timeline.getByText('refresh', { exact: true }).waitFor();
+  // Steps read by their business title, not their ID.
+  await timeline.getByText('Refresh context', { exact: true }).waitFor();
   expect(await timeline.getByRole('listitem').count()).toBe(3);
   await page.screenshot({ path: '/tmp/luma67-browser/process-mobile.png' });
   expect(

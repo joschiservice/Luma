@@ -85,7 +85,15 @@ export function ActivationForm({
         <strong>
           {detail.summary.name} · v{version}
         </strong>
-        <p>{selected.approval}</p>
+        <p>
+          <strong>Approval: </strong>
+          {detail.summary.readiness.approval.summary}
+        </p>
+        <ul>
+          {detail.summary.readiness.approval.details.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
       </div>
       <fieldset disabled={pending || request !== null}>
         <legend>Connection and order scope</legend>

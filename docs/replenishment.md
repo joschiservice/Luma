@@ -2,8 +2,9 @@
 
 `inventory-replenishment@1.0.0` replenishes a mapped inventory position through
 an ordinary `workflow/2` process. It needs no Exception. Operators configure and
-review it in Workflows, inspect its evidence in Recent runs and Activity, and
-open the resulting draft in Procurement.
+review it in Workflows, Procurement or a stock position, inspect its evidence in
+the workflow's Activity and in Activity search, and open the resulting draft in
+Procurement.
 
 ## Rule and authority
 
@@ -19,6 +20,19 @@ inventory must be complete enough to provide a numeric available quantity and
 must be less than five minutes old. Deleted, missing, future and stale stock
 cannot authorize an order. Draft and open orders for the same SKU stop
 replenishment, across suppliers and inventory sources.
+
+### Bulk setup
+
+`POST …/replenishment/previews` checks up to 25 positions against current stock and
+rules and changes nothing. Each item reports `ready`, `covered` (an active rule
+exists and stays unchanged), `unavailable` or `invalid`, what the first check would
+propose, and the effective approval. `POST …/replenishment/activations/batch`
+activates up to 25 reviewed rules, each through the single-rule `configure` path
+and each for exactly one position. Items succeed or fail on their own. A position
+covered by another active rule fails as `covered`; unexpected errors are
+`uncertain`. Resending the same items returns activated rules unchanged, so a
+retry never duplicates or widens a grant. A position can have several sources,
+but a request may name each position once.
 
 The risk threshold makes larger proposals high risk. Smaller drafts retain the
 Procurement capability's medium-risk floor. Current workspace policy requires a
@@ -80,7 +94,12 @@ viewport. Unit coverage is colocated with the quantity rule and process compiler
 
 For interactive local use, start the simulator stack, let it collect mapped
 inventory, add a supplier in Procurement, and open **Workflows → Replenish low
-stock → Stock rules**. Activate a rule with a minimum above current stock, then
-use **Check stock now** or let the worker detect the condition. Sign in as the
-other workspace admin to approve the exact proposal in Recent runs or in
+stock → Rules → Add stock rules**. Activate a rule with a minimum above current
+stock, then use **Check stock now** or let the worker detect the condition. Sign
+in as the other workspace admin to approve the exact proposal in Activity or in
 [Needs you](needs-you.md), which lists the same decision until it expires.
+
+Readiness follows [the workflow model](workflows.md#readiness). A rule whose stock
+is missing, deleted, unreadable or older than five minutes is blocked, using the
+same `stockUnusableReason` as the Insights stock chart. It degrades the workflow
+while other rules still have usable stock and blocks it when none do.

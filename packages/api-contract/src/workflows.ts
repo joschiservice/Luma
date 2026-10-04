@@ -70,9 +70,85 @@ export const workflowVersionViewSchema = z.union([
   }),
 ]);
 
+/** Where an operator repairs an issue. `server` means only whoever runs Luma can fix it. */
+export const readinessRepairSchema = z.object({
+  label: text,
+  destination: z.enum([
+    'connections',
+    'suppliers',
+    'inventory',
+    'inventory_position',
+    'purchase_order',
+    'workflow_rules',
+    'workflow_activity',
+    'needs_you',
+    'server',
+  ]),
+  /** The exact connection, record, run or decision to open. */
+  recordId: text.optional(),
+});
+
+export const readinessIssueSchema = z.object({
+  code: text,
+  /** `blocking` stops the workflow; `degrading` stops part of its coverage. */
+  severity: z.enum(['blocking', 'degrading']),
+  message: text,
+  /** The affected record, when the issue isn't workflow-wide. */
+  scope: text.nullable(),
+  repair: readinessRepairSchema.nullable(),
+});
+
+export const approvalBehaviorSchema = z.object({
+  mode: z.enum(['every_action', 'risk_based', 'no_actions']),
+  summary: text,
+  details: z.array(text),
+});
+
+/**
+ * Whether a workflow is turned on, whether it can run, what it covers and what needs to happen
+ * next. Unknown coverage and untracked decisions are null, never zero.
+ */
+export const workflowReadinessSchema = z.object({
+  enablement: z.enum(['enabled', 'paused', 'not_enabled']),
+  state: z.enum(['ready', 'degraded', 'blocked']),
+  issues: z.array(readinessIssueSchema),
+  coverage: z.object({
+    unit: text,
+    covered: z.number().int().nonnegative().nullable(),
+    ready: z.number().int().nonnegative().nullable(),
+    explanation: text,
+  }),
+  approval: approvalBehaviorSchema,
+  waiting: z.object({
+    count: z.number().int().nonnegative().nullable(),
+    repair: readinessRepairSchema.nullable(),
+  }),
+  outcomes: z
+    .object({
+      runs: z.number().int().nonnegative(),
+      verified: z.number().int().nonnegative(),
+      unresolved: z.number().int().nonnegative(),
+      inProgress: z.number().int().nonnegative(),
+      latest: z
+        .object({
+          runId: text,
+          state: z.enum(['verified', 'unresolved', 'in_progress', 'ended']),
+          at: z.string().datetime(),
+          summary: text,
+        })
+        .nullable(),
+    })
+    .nullable(),
+  nextAction: z.object({
+    label: text,
+    description: text,
+    repair: readinessRepairSchema.nullable(),
+  }),
+});
+
 export const workflowSummarySchema = playbookSummarySchema
   .omit({ issueType: true })
-  .extend({ category: text });
+  .extend({ category: text, readiness: workflowReadinessSchema });
 
 export const workflowDetailSchema = playbookDetailSchema.extend({
   /** Selects an optional domain view; unknown keys use the standard workflow view. */
@@ -174,6 +250,10 @@ export const workflowActivationSchema = playbookActivationSchema;
 export { activatePlaybookSchema as activateWorkflowSchema } from './playbooks.js';
 
 export type WorkflowSummary = z.infer<typeof workflowSummarySchema>;
+
+export type WorkflowReadiness = z.infer<typeof workflowReadinessSchema>;
+
+export type ReadinessRepair = z.infer<typeof readinessRepairSchema>;
 
 export type WorkflowDetail = z.infer<typeof workflowDetailSchema>;
 

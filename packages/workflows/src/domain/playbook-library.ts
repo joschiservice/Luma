@@ -1,5 +1,6 @@
 import type { PlaybookActivation } from './playbook.js';
 import type { presentPlaybook } from './playbook-presentation.js';
+import type { WorkflowReadiness } from './readiness.js';
 
 export interface ActivatePlaybook {
   id: string;
@@ -29,6 +30,8 @@ export interface PlaybookSummary {
   status: 'active' | 'inactive' | 'revoked' | 'unavailable';
   blockers: string[];
   activeVersions: string[];
+  /** Enablement, readiness and the next action, derived from current grants and runs. */
+  readiness: WorkflowReadiness;
 }
 
 export interface PlaybookDetail {

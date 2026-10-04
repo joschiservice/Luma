@@ -40,40 +40,58 @@ test('reviews replenishment scope, recovers a lost response, approves and opens 
   page.on('pageerror', (error) => errors.push(error.message));
   const path = `/app/${f.manifest.organizationId}/workflows/inventory-replenishment`;
   await page.goto(path);
+  await page.getByRole('heading', { name: 'Ready to set up' }).waitFor();
   await page
-    .getByRole('button', { name: 'Add stock rule', exact: true })
+    .getByRole('button', { name: 'Add stock rules', exact: true })
     .click();
-  await page.getByRole('combobox', { name: 'Stock position' }).click();
-  await page
-    .getByRole('option')
-    .filter({ hasText: f.position.connectionId.slice(0, 8) })
-    .click();
-  await page.getByRole('combobox', { name: 'Supplier', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('combobox', { name: 'Supplier', exact: true }).click();
   await page.getByRole('option', { name: 'Northstar Supply' }).click();
-  await page
+  await dialog.getByLabel('Filter stock positions').fill(f.position.sku);
+  // A SKU can come from several sources; pick the configured connection's position.
+  const sku = new RegExp(f.position.sku.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const choices = dialog.getByRole('checkbox', { name: sku });
+  await (
+    (await choices.count()) > 1
+      ? dialog.getByRole('checkbox', {
+          name: new RegExp(f.position.connectionId.slice(0, 8)),
+        })
+      : choices
+  ).check();
+  await dialog
     .getByLabel('Minimum stock', { exact: true })
     .fill(String(f.position.available + 10));
-  await page
+  await dialog
     .getByLabel('Target stock', { exact: true })
     .fill(String(f.position.available + 50));
-  await page.getByLabel('High-risk quantity threshold').fill('20');
+  await dialog.getByLabel('High-risk quantity threshold').fill('20');
+  await dialog.getByRole('button', { name: 'Preview 1 rule' }).click();
+  await dialog.getByText('Will activate', { exact: true }).waitFor();
+  await dialog
+    .getByText(
+      'A different owner or admin approves every purchase-order draft before Luma acts.',
+    )
+    .waitFor();
+  await page.screenshot({
+    path: '/tmp/luma76-setup-preview.png',
+    fullPage: false,
+  });
   await page.route(
-    '**/replenishment/activations',
+    '**/replenishment/activations/batch',
     async (route) => {
       await route.fetch();
       await route.abort('failed');
     },
     { times: 1 },
   );
-  await page.getByRole('button', { name: 'Activate reviewed rule' }).click();
-  await page.getByRole('button', { name: 'Retry activation' }).waitFor();
-  expect(
-    await page.getByLabel('Minimum stock', { exact: true }).isDisabled(),
-  ).toBe(true);
-  await page.getByRole('button', { name: 'Retry activation' }).click();
-  await page.getByRole('dialog').waitFor({ state: 'hidden' });
+  await dialog.getByRole('button', { name: 'Activate 1 rule' }).click();
+  await dialog.getByRole('button', { name: 'Retry activation' }).click();
+  await dialog.getByText('1 activated', { exact: true }).waitFor();
   expect((await f.request('/replenishment')).rules).toHaveLength(1);
-  await page.getByRole('button', { name: 'Stock rules', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Done', exact: true }).click();
+  await dialog.waitFor({ state: 'hidden' });
+  await page.getByRole('heading', { name: 'Running' }).waitFor();
+  await page.getByText('Watching', { exact: true }).waitFor();
   await page.screenshot({
     path: '/tmp/luma71-replenishment-desktop.png',
     fullPage: true,
@@ -82,7 +100,7 @@ test('reviews replenishment scope, recovers a lost response, approves and opens 
   await page.getByText('Stock checked.', { exact: false }).waitFor();
   const run = (await f.request('/runs')).items[0];
   await f.waitFor(run.id, 'awaiting_decision');
-  await page.getByRole('button', { name: 'Recent runs', exact: true }).click();
+  await page.getByRole('button', { name: 'Activity', exact: true }).click();
   await page.getByRole('heading', { name: `50 × ${f.position.sku}` }).waitFor();
   expect(
     await page.getByRole('button', { name: 'Approve 50 units' }).count(),
@@ -90,9 +108,17 @@ test('reviews replenishment scope, recovers a lost response, approves and opens 
   const approver = await contextFor(f.approverCookie);
   const review = await approver.newPage();
   await review.goto(path);
+  // The waiting decision is the next action on the overview.
   await review
-    .getByRole('button', { name: 'Recent runs', exact: true })
-    .click();
+    .getByText('Review 1 waiting decision', { exact: true })
+    .waitFor();
+  expect(
+    await review
+      .getByRole('link', { name: 'Review the waiting decision' })
+      .first()
+      .getAttribute('href'),
+  ).toContain(`item=replenishment%3A${run.id}`);
+  await review.getByRole('button', { name: 'Activity', exact: true }).click();
   await review.getByRole('button', { name: 'Approve 50 units' }).click();
   await review.getByText('Decision recorded.', { exact: false }).waitFor();
   await f.temporal.client.workflow
@@ -135,9 +161,20 @@ test('reviews replenishment scope, recovers a lost response, approves and opens 
   await review.goBack();
   await review.getByRole('link', { name: 'Inspect purchase order' }).click();
   await review.getByText('Northstar Supply', { exact: true }).first().waitFor();
+  // The stock record shows the same readiness and returns to the original context.
+  await page.getByRole('link', { name: 'Stock record' }).first().click();
+  const coverage = page.getByRole('region', { name: 'Replenishment' });
+  await coverage.getByText('Running', { exact: true }).waitFor();
+  await coverage.getByText('Northstar Supply', { exact: true }).waitFor();
+  await page.screenshot({
+    path: '/tmp/luma76-stock-record.png',
+    fullPage: true,
+  });
+  await page.getByRole('link', { name: 'Back to context' }).click();
+  await page.waitForURL(`**${path}*`);
   await page.setViewportSize({ width: 375, height: 812 });
   await page
-    .getByRole('region', { name: 'Stock rules', exact: true })
+    .getByRole('region', { name: 'Rules', exact: true })
     .scrollIntoViewIfNeeded();
   await page.screenshot({
     path: '/tmp/luma71-replenishment-mobile.png',

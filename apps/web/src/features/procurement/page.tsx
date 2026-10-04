@@ -56,6 +56,7 @@ import {
   stages,
   statusLabels,
 } from './presentation';
+import { ReplenishmentOverview } from './replenishment-overview';
 
 function orderColumns(
   organizationId: string,
@@ -393,6 +394,7 @@ export function ProcurementPage() {
           ))}
         </div>
       </section>
+      <ReplenishmentOverview organizationId={organizationId} />
       <div className="procurement-collection">
         <CollectionToolbar
           views={

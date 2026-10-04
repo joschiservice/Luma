@@ -9,7 +9,7 @@ import type {
   ProposedAction,
 } from '../domain/action.js';
 import { workspacePolicyVersion } from '../domain/action.js';
-import { evaluatePolicy } from '../domain/evaluate.js';
+import { approvalRequirement, evaluatePolicy } from '../domain/evaluate.js';
 
 export interface PolicyRepository {
   /** Reads the current workspace approval requirement and its revision. */
@@ -77,6 +77,24 @@ export function createPolicyService(deps: PolicyDependencies) {
     },
     /** Reads the effective policy version for a fresh admission check. */
     currentVersion: version,
+    /**
+     * States whether every proposal for an action needs a person under the current workspace
+     * policy. It reads policy only; admission still evaluates each proposal.
+     */
+    async approvalRequirement(
+      tenantId: string,
+      action: {
+        minimumRisk: ProposedAction['risk'];
+        workflowRequired?: boolean;
+      },
+    ) {
+      const workspace = await deps.repository.workspacePolicy(tenantId);
+
+      return approvalRequirement({
+        ...action,
+        workspaceRequired: workspace.required,
+      });
+    },
     async evaluate(
       context: TenantContext,
       action: ProposedAction,

@@ -181,6 +181,7 @@ function Unavailable({
         <Link
           to="/app/$organizationId/workflows/$definitionId"
           params={{ organizationId, definitionId: 'inventory-replenishment' }}
+          hash="rules"
         >
           Set up replenishment rules
         </Link>

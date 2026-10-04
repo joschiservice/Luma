@@ -60,6 +60,7 @@ export function presentPlaybook(version: PlaybookVersion) {
     steps: [
       {
         id: ir.eligibility.id,
+        reference: `${ir.eligibility.id} · eligibility`,
         title: 'Check eligibility',
         description: `Apply only when every condition holds, using evidence less than ${ir.evidence.maxAgeSeconds} seconds old.`,
         details: ir.eligibility.all.map((check) =>
@@ -72,6 +73,7 @@ export function presentPlaybook(version: PlaybookVersion) {
       },
       {
         id: ir.action.id,
+        reference: `${ir.action.id} · ${ir.action.capability}@${ir.action.capabilityVersion} on ${ir.action.targetKind} · minimum risk ${ir.action.minimumRisk}`,
         title: 'Propose the change',
         description:
           ir.action.capability === 'orders.shipping-method.write'
@@ -89,6 +91,7 @@ export function presentPlaybook(version: PlaybookVersion) {
       },
       {
         id: ir.approval.id,
+        reference: `${ir.approval.id} · approval ${ir.approval.mode}`,
         title: 'Obtain approval',
         description: approval,
         details: [
@@ -97,6 +100,7 @@ export function presentPlaybook(version: PlaybookVersion) {
       },
       {
         id: ir.verification.id,
+        reference: `${ir.verification.id} · ${ir.verification.evaluatorVersion} within ${ir.verification.maxDurationSeconds}s`,
         title: 'Verify the result',
         description: `Read the authoritative ${ir.action.targetKind} and check the expected result within ${ir.verification.maxDurationSeconds} seconds. Provider acceptance alone is not verified success.`,
         details: [
@@ -110,6 +114,7 @@ export function presentPlaybook(version: PlaybookVersion) {
       },
       {
         id: ir.recovery.id,
+        reference: `${ir.recovery.id} · read-only recovery`,
         title: 'Recover or escalate',
         description:
           'Reconcile an uncertain change with reads only. Escalate for operator review when the expected result cannot be established.',

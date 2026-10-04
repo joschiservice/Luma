@@ -12,6 +12,30 @@ const names: Record<ProcessStep['kind'], string> = {
   end: 'Finish',
 };
 
+/** The exact technical identity of a step, kept inspectable beside business descriptions. */
+function reference(step: ProcessStep): string {
+  switch (step.kind) {
+    case 'code':
+      return `code step · ${step.grants.length} granted capabilities`;
+    case 'read':
+      return `read ${step.source}`;
+    case 'condition':
+      return `condition ${step.field} = ${JSON.stringify(step.equals)}, otherwise ${step.onFalse}`;
+    case 'capability':
+      return `${step.capability}@${step.capabilityVersion} on ${step.targetKind} · minimum risk ${step.minimumRisk}`;
+    case 'approval':
+      return `approval for ${step.forStep}`;
+    case 'wait':
+      return `wait ${step.seconds}s`;
+    case 'verification':
+      return `verification ${step.evaluatorVersion} for ${step.forStep} within ${step.maxDurationSeconds}s`;
+    case 'escalation':
+      return 'escalation';
+    case 'end':
+      return 'end';
+  }
+}
+
 /** Describes a native process without treating dispatch as verified success. */
 export function presentProcessVersion(version: ProcessWorkflowVersion) {
   const actions = version.steps.filter((step) => step.kind === 'capability');
@@ -41,6 +65,7 @@ export function presentProcessVersion(version: ProcessWorkflowVersion) {
     codeSteps: version.steps.filter((step) => step.kind === 'code'),
     steps: version.steps.map((step) => ({
       id: step.id,
+      reference: `${step.id} · ${reference(step)}`,
       title: names[step.kind],
       description:
         step.kind === 'code'

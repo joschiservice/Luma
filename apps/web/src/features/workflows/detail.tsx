@@ -3,34 +3,33 @@ import './workflows.css';
 import type {
   WorkflowActivationView,
   WorkflowDetail,
-  WorkflowRunView,
 } from '@luma/api-contract';
 import { Alert } from '@luma/ui/components/primitives/alert';
-import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
-import { Card, CardHeader } from '@luma/ui/components/primitives/card';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogTitle,
 } from '@luma/ui/components/primitives/dialog';
-import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import { Select } from '@luma/ui/components/primitives/select';
-import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { SectionWorkspace } from '@luma/ui/components/workspace/section-workspace';
 import { WorkspaceBreadcrumb } from '@luma/ui/components/workspace/workspace-breadcrumb';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useParams, useSearch } from '@tanstack/react-router';
+import {
+  Link,
+  useLocation,
+  useParams,
+  useSearch,
+} from '@tanstack/react-router';
 import { ArrowLeft, ChevronRight, RefreshCw, Workflow } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 
 import { SignInRedirect } from '../identity/common';
 import { contextOptions, IdentityError } from '../identity/data';
 import { ShadowReport } from '../shadow/report';
 import { ActivationForm } from './activation';
 import { EditWorkflowButton } from './authoring/edit-workflow';
-import { CodeRunDetails } from './code-run';
 import { WorkflowCodeSteps } from './code-steps';
 import {
   revokeWorkflow,
@@ -41,74 +40,22 @@ import {
 } from './data';
 import {
   WorkflowActivations,
-  WorkflowCompatibility,
   WorkflowOverview,
-  WorkflowSteps,
-  WorkflowVersions,
+  WorkflowTechnical,
 } from './detail-sections';
 import { workflowDomainView } from './domain-views';
-import { statusNames, type WorkflowFilters, WorkflowLoading } from './library';
+import { type WorkflowFilters, WorkflowLoading } from './library';
 import { OfflineNotice } from './offline';
-import { workflowTriggerLabel } from './presentation';
-import { CancelScheduledStart, WorkflowTriggers } from './triggers';
-
-function processStepDescription(
-  step: NonNullable<WorkflowRunView['processSteps']>[number],
-) {
-  if (
-    step.reason &&
-    !['condition_not_met', 'policy_approval_required'].includes(step.reason)
-  )
-    return step.reason.replaceAll('_', ' ');
-
-  switch (step.kind) {
-    case 'code':
-      return step.state === 'completed'
-        ? 'The code returned its declared outputs.'
-        : step.state === 'waiting'
-          ? 'A requested capability needs approval.'
-          : 'The code stopped. Review its execution details.';
-    case 'read':
-      return 'Current context refreshed.';
-    case 'condition':
-      return step.values.matched
-        ? 'The observed conditions matched.'
-        : 'The observed conditions did not match.';
-    case 'approval':
-      return step.state === 'waiting'
-        ? 'Waiting for a decision.'
-        : 'Decision recorded.';
-    case 'capability':
-      return step.state === 'waiting'
-        ? 'Waiting for policy approval.'
-        : step.state === 'completed'
-          ? 'Action accepted. Verification is still required.'
-          : 'The action did not proceed. Review the recorded reason.';
-    case 'wait':
-      return step.state === 'waiting'
-        ? 'Waiting before the next step.'
-        : 'Wait finished.';
-    case 'verification':
-      return step.state === 'completed'
-        ? 'Expected result confirmed.'
-        : step.state === 'failed'
-          ? 'The result differs from the expected outcome.'
-          : 'The result could not be confirmed.';
-    case 'escalation':
-      return 'This run needs attention.';
-    case 'end':
-      return typeof step.values.outcome === 'string'
-        ? step.values.outcome
-        : 'Process finished.';
-  }
-}
+import { ReadinessPills } from './readiness';
+import { WorkflowRuns } from './runs';
+import { WorkflowTriggers } from './triggers';
 
 /** Loads a shareable workflow, resetting private form state when the workspace or workflow changes. */
 export function WorkflowPage() {
   const { organizationId, definitionId } = useParams({
     from: '/app/$organizationId/workflows/$definitionId',
   });
-  const filters = useSearch({
+  const { setup, ...filters } = useSearch({
     from: '/app/$organizationId/workflows/$definitionId',
   });
 
@@ -118,8 +65,24 @@ export function WorkflowPage() {
       organizationId={organizationId}
       definitionId={definitionId}
       filters={filters}
+      setup={setup}
     />
   );
+}
+
+/**
+ * Scrolls to and focuses the element named by the URL hash, such as `rules` or `run-<id>`, once
+ * it has rendered.
+ */
+function useHashTarget(ready: unknown) {
+  const hash = useLocation({ select: (location) => location.hash });
+  useEffect(() => {
+    if (!hash) return;
+    const target = document.getElementById(hash);
+    if (!target) return;
+    target.focus({ preventScroll: true });
+    target.scrollIntoView({ block: 'start' });
+  }, [hash, ready]);
 }
 
 /** Reads current workflow controls and history independently and hides private content after access loss. */
@@ -127,18 +90,20 @@ export function WorkflowDetailPage({
   organizationId,
   definitionId,
   filters = {},
+  setup,
 }: {
   organizationId: string;
   definitionId: string;
   filters?: WorkflowFilters;
+  setup?: string | undefined;
 }) {
   const query = useQuery(workflowOptions(organizationId, definitionId));
   const runs = useQuery({
     ...workflowRunsOptions(organizationId, definitionId),
     refetchInterval: 5000,
   });
+  useHashTarget(`${!!query.data}:${!!runs.data}`);
   const domainView = query.data ? workflowDomainView(query.data) : undefined;
-  const RunContext = domainView?.RunContext;
   const client = useQueryClient();
   const refresh = async () => {
     await client.invalidateQueries({ queryKey: workflowsKey(organizationId) });
@@ -185,6 +150,7 @@ export function WorkflowDetailPage({
           detail={query.data}
           organizationId={organizationId}
           filters={filters}
+          setup={setup}
           refresh={refresh}
           refreshing={query.isFetching || !!query.error}
           accessLost={accessLost}
@@ -199,251 +165,17 @@ export function WorkflowDetailPage({
             ) : null
           }
           runs={
-            <Card
-              as="section"
-              className="workflow-section"
-              aria-labelledby="runs-title"
-            >
-              <CardHeader className="workflows-heading">
-                <h2 id="runs-title">Recent runs</h2>
-                <Button
-                  variant="outline"
-                  disabled={runs.isFetching}
-                  onClick={() => void runs.refetch()}
-                >
-                  Refresh runs
-                </Button>
-              </CardHeader>
-              <p>
-                {query.data.versions.every(
-                  (version) => version.format === 'workflow/2',
-                )
-                  ? 'Follow each decision, action and check through the run. An accepted action still needs verification.'
-                  : 'Execution acceptance and verified correction are separate results. Pilot, simulation and shadow evidence are not live verified success.'}
-              </p>
-              {runs.error ? (
-                <p role="alert">
-                  Run history is unavailable. {workflowError(runs.error)}
-                </p>
-              ) : runs.isPending ? (
-                <p role="status">Loading runs…</p>
-              ) : !runs.data?.length ? (
-                <p>No runs recorded for this workflow.</p>
-              ) : (
-                <div className="workflow-runs">
-                  {runs.data.map((run) => (
-                    <article key={run.id}>
-                      <div className="workflows-heading">
-                        {run.resolution ? (
-                          <Link
-                            to="/app/$organizationId/exceptions/$exceptionId"
-                            params={{
-                              organizationId,
-                              exceptionId: run.resolution.incidentId,
-                            }}
-                          >
-                            Open issue
-                          </Link>
-                        ) : (
-                          <span>{run.subject.kind.replaceAll('_', ' ')}</span>
-                        )}
-                        <time dateTime={run.createdAt}>
-                          <WorkspaceDate value={run.createdAt} />
-                        </time>
-                      </div>
-                      <p>
-                        Version {run.version} ·{' '}
-                        <strong>
-                          {run.processSteps?.length
-                            ? 'Process evidence'
-                            : run.evidenceKind === 'pilot'
-                              ? 'Pilot evidence'
-                              : run.evidenceKind === 'unclassified'
-                                ? 'Unclassified evidence — live success not established'
-                                : `${run.evidenceKind} evidence`}
-                        </strong>
-                      </p>
-                      <p className="workflow-run-trigger">
-                        <strong>Triggered by: </strong>
-                        {workflowTriggerLabel(run.trigger)}
-                      </p>
-                      {run.processState ? (
-                        <div className="workflow-process-status" role="status">
-                          <Badge
-                            tone={
-                              run.processState === 'verified'
-                                ? 'success'
-                                : [
-                                      'failed_verification',
-                                      'inconclusive_verification',
-                                      'escalated',
-                                      'denied',
-                                    ].includes(run.processState)
-                                  ? 'warning'
-                                  : 'neutral'
-                            }
-                          >
-                            {run.processState.replaceAll('_', ' ')}
-                          </Badge>
-                          <span>{run.reason}</span>
-                        </div>
-                      ) : null}
-                      {run.triggerState ? (
-                        <Alert
-                          tone={
-                            run.triggerState === 'scheduled'
-                              ? 'neutral'
-                              : 'warning'
-                          }
-                        >
-                          {run.reason}
-                        </Alert>
-                      ) : null}
-                      {run.triggerState === 'scheduled' &&
-                      query.data.canManage ? (
-                        <CancelScheduledStart
-                          organizationId={organizationId}
-                          definitionId={definitionId}
-                          runId={run.id}
-                          refresh={refresh}
-                        />
-                      ) : null}
-                      {RunContext ? (
-                        <RunContext organizationId={organizationId} run={run} />
-                      ) : null}
-                      <CodeRunDetails
-                        run={run}
-                        version={query.data.versions.find(
-                          (version) => version.digest === run.versionDigest,
-                        )}
-                        organizationId={organizationId}
-                        definitionId={definitionId}
-                        canManage={query.data.canManage}
-                        refresh={refresh}
-                      />
-                      {run.processSteps?.length ? (
-                        <ol
-                          className="workflow-process-timeline"
-                          aria-label="Step progress"
-                        >
-                          {run.processSteps.map((step) => (
-                            <li key={`${step.stepId}:${step.state}`}>
-                              <span
-                                className={`workflow-process-dot workflow-process-dot--${step.state}`}
-                                aria-hidden="true"
-                              />
-                              <div>
-                                <div className="workflow-process-step-heading">
-                                  <strong>
-                                    {step.stepId.replaceAll('_', ' ')}
-                                  </strong>
-                                  <span>{step.state.replaceAll('_', ' ')}</span>
-                                  <WorkspaceDate value={step.recordedAt} />
-                                </div>
-                                <p>{processStepDescription(step)}</p>
-                                {step.evidenceRefs.length ? (
-                                  <p>
-                                    {step.evidenceRefs.length} evidence{' '}
-                                    {step.evidenceRefs.length === 1
-                                      ? 'reference'
-                                      : 'references'}
-                                  </p>
-                                ) : null}
-                              </div>
-                            </li>
-                          ))}
-                        </ol>
-                      ) : null}
-                      {!run.processSteps?.length ? (
-                        <>
-                          <dl className="workflow-run-story">
-                            <div>
-                              <dt>Investigation</dt>
-                              <dd>{run.story.context}</dd>
-                            </div>
-                            <div>
-                              <dt>Decision & human input</dt>
-                              <dd>{run.story.decision}</dd>
-                            </div>
-                            <div>
-                              <dt>Proposed action</dt>
-                              <dd>{run.story.action}</dd>
-                            </div>
-                          </dl>
-                          <dl>
-                            <div>
-                              <dt>Execution</dt>
-                              <dd>{run.execution.replaceAll('_', ' ')}</dd>
-                            </div>
-                            <div>
-                              <dt>Verification</dt>
-                              <dd>{run.verification.replaceAll('_', ' ')}</dd>
-                            </div>
-                          </dl>
-                          <p className="workflow-run-result">
-                            {run.story.verification}
-                          </p>
-                        </>
-                      ) : null}
-                      <Disclosure>
-                        <summary>Run evidence references</summary>
-                        <p>Run: {run.id}</p>
-                        <p>Activation: {run.activationId ?? 'Not granted'}</p>
-                        {run.triggerEvidence ? (
-                          <p>
-                            Source: {run.triggerEvidence.sourceId} ·{' '}
-                            <WorkspaceDate
-                              value={run.triggerEvidence.occurredAt}
-                            />
-                          </p>
-                        ) : null}
-                        <p>
-                          Started by: {run.actor.kind} · {run.actor.id}
-                        </p>
-                        <p>
-                          Subject: {run.subject.kind} · {run.subject.id}
-                        </p>
-                        <p>
-                          Trigger:{' '}
-                          {run.trigger.kind === 'exception'
-                            ? run.trigger.issueType.replaceAll('_', ' ')
-                            : run.trigger.kind}
-                        </p>
-                        <p>
-                          Input snapshot: <code>{run.contextDigest}</code>
-                        </p>
-                        {run.steps.length ? (
-                          <ol>
-                            {run.steps.map((step, index) => (
-                              <li key={`${step.stepId}:${index}`}>
-                                {step.stepId} ·{' '}
-                                {step.state.replaceAll('_', ' ')} ·{' '}
-                                {step.reason.replaceAll('_', ' ')}
-                              </li>
-                            ))}
-                          </ol>
-                        ) : !run.processSteps?.length ? (
-                          <p>No step outcome recorded.</p>
-                        ) : null}
-                        {run.processSteps?.length ? (
-                          <ol>
-                            {run.processSteps.map((step) => (
-                              <li key={`${step.stepId}:${step.state}`}>
-                                {step.stepId} · {step.kind} · {step.state}
-                                {step.evidenceRefs.length
-                                  ? ` · ${step.evidenceRefs.join(', ')}`
-                                  : ''}
-                              </li>
-                            ))}
-                          </ol>
-                        ) : null}
-                        <code>{run.versionDigest}</code>
-                      </Disclosure>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </Card>
+            <WorkflowRuns
+              detail={query.data}
+              organizationId={organizationId}
+              runs={runs.data}
+              loading={runs.isPending}
+              error={runs.error ? workflowError(runs.error) : undefined}
+              refreshing={runs.isFetching}
+              refetch={() => void runs.refetch()}
+              refresh={refresh}
+              RunContext={domainView?.RunContext}
+            />
           }
         />
       ) : null}
@@ -451,7 +183,10 @@ export function WorkflowDetailPage({
   );
 }
 
-/** Presents readable steps, version history, prerequisites and exact activation grants. */
+/**
+ * Groups a workflow into Overview, Activity, Rules and Technical details. Readiness and the next
+ * action come first; identifiers and artifacts stay one level down.
+ */
 export function WorkflowDetailView({
   detail,
   organizationId,
@@ -459,11 +194,14 @@ export function WorkflowDetailView({
   refreshing,
   accessLost,
   filters = {},
+  setup,
   evaluation,
   runs,
 }: {
   detail: WorkflowDetail;
   filters?: WorkflowFilters;
+  /** A stock position to preselect in stock-rule setup. */
+  setup?: string | undefined;
   evaluation?: ReactNode;
   runs?: ReactNode;
   organizationId: string;
@@ -481,6 +219,8 @@ export function WorkflowDetailView({
   const [error, setError] = useState('');
   const version =
     detail.versions.find((v) => v.version === selected) ?? detail.versions[0]!;
+  const computation =
+    version.format === 'workflow/2' && version.executionMode === 'computation';
   const canActivate =
     detail.canManage &&
     version.compatible &&
@@ -516,6 +256,18 @@ export function WorkflowDetailView({
       setPending(false);
     }
   };
+  const activation =
+    !DomainControls && !computation ? (
+      <Button
+        disabled={!canActivate || refreshing}
+        aria-describedby={
+          !canActivate ? 'workflow-activation-reason' : undefined
+        }
+        onClick={() => setActivate(true)}
+      >
+        Review activation
+      </Button>
+    ) : null;
 
   return (
     <>
@@ -543,17 +295,7 @@ export function WorkflowDetailView({
         >
           <ArrowLeft size={15} aria-hidden="true" /> All workflows
         </Link>
-        <Badge
-          tone={
-            detail.summary.status === 'active'
-              ? 'success'
-              : detail.summary.status === 'unavailable'
-                ? 'warning'
-                : 'neutral'
-          }
-        >
-          {statusNames[detail.summary.status]}
-        </Badge>
+        <ReadinessPills readiness={detail.summary.readiness} />
         <Button
           variant="ghost"
           aria-label="Refresh workflow"
@@ -585,41 +327,8 @@ export function WorkflowDetailView({
               label: `v${v.version}${v.version === detail.summary.availableVersion ? ' · Latest' : ''}`,
             }))}
           />
-          {!DomainControls &&
-          !(
-            version.format === 'workflow/2' &&
-            version.executionMode === 'computation'
-          ) ? (
-            <Button
-              disabled={!canActivate || refreshing}
-              aria-describedby={
-                !canActivate ? 'workflow-activation-reason' : undefined
-              }
-              onClick={() => setActivate(true)}
-            >
-              Review activation
-            </Button>
-          ) : null}
         </div>
       </div>
-      {!canActivate &&
-      !DomainControls &&
-      !(
-        version.format === 'workflow/2' &&
-        version.executionMode === 'computation'
-      ) ? (
-        <Alert
-          id="workflow-activation-reason"
-          tone={detail.canManage ? 'warning' : 'neutral'}
-          className="workflow-notice"
-        >
-          {!detail.canManage
-            ? 'You can inspect workflows. Only workspace owners and admins can activate or revoke them.'
-            : !version.compatible
-              ? 'This version cannot be activated. Review the compatibility requirements below.'
-              : 'No eligible connections. Resolve the connection requirements below before activating.'}
-        </Alert>
-      ) : null}
       {message ? (
         <Alert tone="success" role="status" className="workflow-notice">
           {message}
@@ -631,88 +340,101 @@ export function WorkflowDetailView({
           {
             value: 'overview',
             label: 'Overview',
-            content: <WorkflowOverview detail={detail} version={version} />,
-          },
-          {
-            value: 'triggers',
-            label: domainView?.triggerLabel ?? 'Triggers',
-            content: DomainControls ? (
-              <DomainControls organizationId={organizationId} detail={detail} />
-            ) : (
-              <WorkflowTriggers
-                key={version.digest}
-                detail={detail}
-                version={version}
-                organizationId={organizationId}
-                refresh={refresh}
-                accessLost={accessLost}
-              />
+            content: (
+              <div id="overview" tabIndex={-1}>
+                <WorkflowOverview
+                  detail={detail}
+                  version={version}
+                  organizationId={organizationId}
+                />
+              </div>
             ),
           },
           {
-            value: 'steps',
-            label: 'How it works',
-            content: <WorkflowSteps version={version} />,
+            value: 'activity',
+            label: 'Activity',
+            content: (
+              <div id="activity" tabIndex={-1} className="workflow-stack">
+                {runs}
+                {evaluation}
+              </div>
+            ),
           },
-          ...(version.format === 'workflow/2' && version.codeSteps?.length
-            ? [
-                {
-                  value: 'code',
-                  label: 'Code Steps',
-                  content: (
-                    <WorkflowCodeSteps
+          {
+            value: 'rules',
+            label: 'Rules',
+            content: (
+              <div id="rules" tabIndex={-1} className="workflow-stack">
+                {DomainControls ? (
+                  <DomainControls
+                    organizationId={organizationId}
+                    detail={detail}
+                    setup={setup}
+                  />
+                ) : (
+                  <>
+                    {activation && !canActivate ? (
+                      <Alert
+                        id="workflow-activation-reason"
+                        tone={detail.canManage ? 'warning' : 'neutral'}
+                        className="workflow-notice"
+                      >
+                        {!detail.canManage
+                          ? 'You can inspect workflows. Only workspace owners and admins can activate or revoke them.'
+                          : !version.compatible
+                            ? 'This version can’t be activated. Technical details list the requirements.'
+                            : 'No connection can run this workflow yet. Repair access in Connections, then review the activation.'}
+                      </Alert>
+                    ) : null}
+                    {!computation ? (
+                      <WorkflowActivations
+                        detail={detail}
+                        refreshing={refreshing}
+                        action={activation}
+                        onRevoke={(item) => {
+                          setRevoke(item);
+                          setError('');
+                        }}
+                      />
+                    ) : null}
+                    <WorkflowTriggers
                       key={version.digest}
+                      detail={detail}
                       version={version}
                       organizationId={organizationId}
-                      definitionId={detail.summary.id}
-                      canManage={detail.canManage}
+                      refresh={refresh}
                       accessLost={accessLost}
                     />
-                  ),
-                },
-              ]
-            : []),
-          {
-            value: 'compatibility',
-            label: 'Compatibility',
-            content: (
-              <WorkflowCompatibility
-                detail={detail}
-                version={version}
-                organizationId={organizationId}
-              />
+                  </>
+                )}
+              </div>
             ),
           },
           {
-            value: 'activations',
-            label: 'Activations',
+            value: 'technical',
+            label: 'Technical details',
             content: (
-              <WorkflowActivations
-                detail={detail}
-                refreshing={refreshing}
-                onRevoke={(activation) => {
-                  setRevoke(activation);
-                  setError('');
-                }}
-              />
+              <div id="technical" tabIndex={-1}>
+                <WorkflowTechnical
+                  detail={detail}
+                  version={version}
+                  organizationId={organizationId}
+                  code={
+                    version.format === 'workflow/2' &&
+                    version.codeSteps?.length ? (
+                      <WorkflowCodeSteps
+                        key={version.digest}
+                        version={version}
+                        organizationId={organizationId}
+                        definitionId={detail.summary.id}
+                        canManage={detail.canManage}
+                        accessLost={accessLost}
+                      />
+                    ) : null
+                  }
+                />
+              </div>
             ),
-          },
-          ...(runs
-            ? [{ value: 'runs', label: 'Recent runs', content: runs }]
-            : []),
-          ...(evaluation
-            ? [
-                {
-                  value: 'evaluation',
-                  label: 'Evaluation',
-                  content: evaluation,
-                },
-              ]
-            : []),
-          {
-            value: 'versions',
-            label: 'Version history',
-            content: <WorkflowVersions detail={detail} />,
           },
         ]}
       />

@@ -17,7 +17,9 @@ import { appsOptions } from '../apps/data';
 import { AppExtension } from '../apps/extension';
 import { SignInRedirect } from '../identity/common';
 import { IdentityError } from '../identity/data';
+import { recordReturnPath } from '../records/data';
 import { IdentityLinks } from '../sync/identity-links';
+import { WorkflowCoverageCard } from '../workflows/coverage';
 import { type InventorySearch, stockOptions } from './data';
 import { stockFreshness, stockQuantity, StockState } from './presentation';
 
@@ -60,6 +62,15 @@ export function StockPage() {
           />
         ) : null
       }
+      replenishment={
+        query.data ? (
+          <WorkflowCoverageCard
+            organizationId={organizationId}
+            positionId={positionId}
+            className="inventory-section"
+          />
+        ) : null
+      }
       identity={
         query.data ? (
           <IdentityLinks
@@ -85,6 +96,7 @@ export function StockDetailView({
   refresh,
   identity,
   correction,
+  replenishment,
 }: {
   organizationId: string;
   search?: InventorySearch;
@@ -98,20 +110,31 @@ export function StockDetailView({
   identity?: ReactNode;
   /** Installed provider correction controls for this stock position. */
   correction?: ReactNode;
+  /** Workflow coverage and readiness for this stock position. */
+  replenishment?: ReactNode;
 }) {
   const position = detail?.position;
+  const { from: returnTo, ...listSearch } = search;
+  const back = recordReturnPath(organizationId, returnTo);
 
   return (
     <main className="inventory-page">
-      <Link
-        className="inventory-back"
-        to="/app/$organizationId/inventory"
-        params={{ organizationId }}
-        search={search}
-      >
-        <ArrowLeft size={14} />
-        Back to inventory
-      </Link>
+      {back ? (
+        <Link className="inventory-back" to={back}>
+          <ArrowLeft size={14} />
+          Back to context
+        </Link>
+      ) : (
+        <Link
+          className="inventory-back"
+          to="/app/$organizationId/inventory"
+          params={{ organizationId }}
+          search={listSearch}
+        >
+          <ArrowLeft size={14} />
+          Back to inventory
+        </Link>
+      )}
       <PageHeader
         title={position?.sku ?? 'Stock position'}
         icon={<DomainIcon domain="inventory" size="md" />}
@@ -242,6 +265,7 @@ export function StockDetailView({
             ]}
           />
           {correction}
+          {replenishment}
           <div className="inventory-context-grid">
             <Card className="inventory-section">
               <h2>Orders with this SKU</h2>

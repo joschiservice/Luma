@@ -73,7 +73,7 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
   await page.getByRole('combobox', { name: 'System' }).click();
   await page.getByRole('option', { name: 'All systems' }).click();
   await page.getByRole('link', { name }).waitFor();
-  await page.getByRole('button', { name: /^Active 0$/ }).click();
+  await page.getByRole('button', { name: /^Enabled 0$/ }).click();
   await page.getByRole('heading', { name: 'No matching workflows' }).waitFor();
   await page.getByRole('button', { name: /^All workflows 1$/ }).click();
   await page.getByRole('link', { name }).waitFor();
@@ -82,9 +82,8 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
   await page.getByRole('button', { name: 'Clear filters' }).click();
   await page.getByLabel('Search workflows').fill('shipping');
   await page.getByRole('link', { name }).click();
-  await page
-    .getByRole('heading', { name: 'How this workflow works' })
-    .waitFor();
+  await page.getByRole('heading', { name: 'How it works' }).waitFor();
+  await page.getByRole('heading', { name: 'Ready to set up' }).waitFor();
   await mkdir('/tmp/luma72-browser', { recursive: true });
   await page.screenshot({
     path: '/tmp/luma72-browser/overview-desktop.png',
@@ -154,6 +153,34 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
     .click();
   await dialog.getByRole('button', { name: 'Retry same activation' }).click();
   await page.getByText('Version 0.1.0 · Active', { exact: true }).waitFor();
+  await page.getByRole('heading', { name: 'Running' }).waitFor();
+  // Losing write access keeps the workflow enabled but visibly blocked, with the repair.
+  await db.owner.query(
+    `UPDATE connector_installations SET document=jsonb_set(document,'{granted}','["orders.read"]') WHERE id=$1`,
+    [connectionId],
+  );
+  await page.reload();
+  await page.getByRole('heading', { name: 'Can’t run right now' }).waitFor();
+  const repair = page
+    .getByRole('link', { name: 'Repair access in Connections' })
+    .first();
+  expect(await repair.getAttribute('href')).toContain(
+    `#connection-${connectionId}`,
+  );
+  await page.screenshot({
+    path: '/tmp/luma72-browser/blocked-desktop.png',
+    fullPage: false,
+  });
+  await page.getByRole('link', { name: 'All workflows' }).click();
+  await page.getByRole('button', { name: /^Needs attention 1$/ }).click();
+  await page.getByRole('link', { name }).waitFor();
+  await page.getByText('Blocked', { exact: true }).first().waitFor();
+  await db.owner.query(
+    `UPDATE connector_installations SET document=jsonb_set(document,'{granted}','["orders.read","orders.shipping-method.write"]') WHERE id=$1`,
+    [connectionId],
+  );
+  await page.getByRole('link', { name }).click();
+  await page.getByRole('heading', { name: 'Running' }).waitFor();
   expect(
     (
       await db.owner.query(
@@ -278,9 +305,7 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
   await page.getByRole('link', { name }).click();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload();
-  await page
-    .getByRole('heading', { name: 'How this workflow works' })
-    .waitFor();
+  await page.getByRole('heading', { name: 'How it works' }).waitFor();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -291,7 +316,7 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
     fullPage: false,
   });
   await page.getByRole('combobox', { name: 'Workflow sections' }).click();
-  await page.getByRole('option', { name: 'Recent runs', exact: true }).click();
+  await page.getByRole('option', { name: 'Activity', exact: true }).click();
   await page.screenshot({ path: '/tmp/luma72-browser/runs-mobile.png' });
   expect(
     await page.evaluate(
@@ -299,17 +324,14 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
     ),
   ).toBe(true);
   await page.getByRole('combobox', { name: 'Workflow sections' }).click();
-  await page
-    .getByRole('option', { name: 'Compatibility', exact: true })
-    .click();
+  await page.getByRole('option', { name: 'Rules', exact: true }).click();
   await expect
     .poll(() =>
       page
-        .getByRole('region', { name: 'Compatibility', exact: true })
+        .getByRole('region', { name: 'Rules', exact: true })
         .evaluate((node) => node === document.activeElement),
     )
     .toBe(true);
-  await page.getByLabel('Version', { exact: true }).focus();
   await page.keyboard.press('Tab');
   expect(
     await page

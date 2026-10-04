@@ -161,6 +161,32 @@ type Stock = {
 };
 
 /**
+ * Explains why configured-source stock can't support a replenishment decision at `now`, or null
+ * when it is usable. Accepted stock is numeric, present at the source and less than five minutes
+ * old.
+ */
+export function stockUnusableReason(
+  stock: Pick<Stock, 'available' | 'observedAt' | 'deleted'> | undefined,
+  now: number,
+): StockMetricItem['reason'] {
+  const age = stock ? now - Date.parse(stock.observedAt) : NaN;
+
+  return !stock
+    ? 'missing'
+    : stock.deleted
+      ? 'deleted'
+      : stock.available === null || !Number.isFinite(stock.available)
+        ? 'nonnumeric'
+        : !Number.isFinite(age)
+          ? 'invalid_time'
+          : age < 0
+            ? 'future'
+            : age >= 300_000
+              ? 'expired'
+              : null;
+}
+
+/**
  * Classifies every active-rule position, including absent configured-source projections, with
  * whether its usable stock is below the rule minimum and the times at which the result changes.
  */
@@ -185,19 +211,7 @@ export function classifyStockPositions(
   const classified = positions.map((rule) => {
     const stock = sources.get(`${rule.positionId}:${rule.connectionId}`);
     const age = stock ? now - Date.parse(stock.observedAt) : NaN;
-    const reason: StockMetricItem['reason'] = !stock
-      ? 'missing'
-      : stock.deleted
-        ? 'deleted'
-        : stock.available === null || !Number.isFinite(stock.available)
-          ? 'nonnumeric'
-          : !Number.isFinite(age)
-            ? 'invalid_time'
-            : age < 0
-              ? 'future'
-              : age >= 300_000
-                ? 'expired'
-                : null;
+    const reason = stockUnusableReason(stock, now);
     if (stock && Number.isFinite(age)) {
       if (age < 0) boundaries.push(Date.parse(stock.observedAt));
       if (age < 300_000)
