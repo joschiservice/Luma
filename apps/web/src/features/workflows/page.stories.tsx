@@ -1,4 +1,8 @@
-import type { WorkflowDetail, WorkflowSummary } from '@luma/api-contract';
+import type {
+  WorkflowDetail,
+  WorkflowReadiness,
+  WorkflowSummary,
+} from '@luma/api-contract';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import {
   createMemoryHistory,
@@ -14,6 +18,96 @@ import { WorkflowDetailView } from './detail';
 import { type WorkflowFilters, WorkflowLibraryView } from './library';
 
 const organizationId = '22222222-2222-4222-8222-222222222222';
+const connectionId = '33333333-3333-4333-8333-333333333333';
+const approval: WorkflowReadiness['approval'] = {
+  mode: 'every_action',
+  summary:
+    'A different owner or admin approves every shipping-method correction before Luma acts.',
+  details: [
+    'This action is medium risk or higher, so workspace policy always requires approval.',
+    'The person who started a run can’t approve it. Approval doesn’t extend expired evidence.',
+  ],
+};
+const readiness = (
+  overrides: Partial<WorkflowReadiness> = {},
+): WorkflowReadiness => ({
+  enablement: 'not_enabled',
+  state: 'ready',
+  issues: [],
+  coverage: {
+    unit: 'order',
+    covered: 0,
+    ready: 0,
+    explanation:
+      'No order is granted yet. An activation names the exact orders Luma may correct.',
+  },
+  approval,
+  waiting: {
+    count: 0,
+    repair: { label: 'Open Needs you', destination: 'needs_you' },
+  },
+  outcomes: {
+    runs: 0,
+    verified: 0,
+    unresolved: 0,
+    inProgress: 0,
+    latest: null,
+  },
+  nextAction: {
+    label: 'Review activation',
+    description:
+      'Nothing runs until an owner or admin reviews the exact scope and turns it on.',
+    repair: { label: 'Review activation', destination: 'workflow_rules' },
+  },
+  ...overrides,
+});
+const accessLost = readiness({
+  enablement: 'enabled',
+  state: 'blocked',
+  issues: [
+    {
+      code: 'connection_access',
+      severity: 'blocking',
+      message:
+        'Grant orders.shipping-method.write in Connections and validate access.',
+      scope: 'JTL warehouse',
+      repair: {
+        label: 'Repair access in Connections',
+        destination: 'connections',
+        recordId: connectionId,
+      },
+    },
+  ],
+  coverage: {
+    unit: 'order',
+    covered: 2,
+    ready: 0,
+    explanation:
+      '2 orders are granted. 0 can be corrected with current access.',
+  },
+  outcomes: {
+    runs: 3,
+    verified: 2,
+    unresolved: 0,
+    inProgress: 1,
+    latest: {
+      runId: '66666666-6666-4666-8666-666666666666',
+      state: 'in_progress',
+      at: '2026-10-03T07:40:00.000Z',
+      summary: 'The correction is in progress.',
+    },
+  },
+  nextAction: {
+    label: 'Repair access in Connections',
+    description:
+      'JTL warehouse: Grant orders.shipping-method.write in Connections and validate access.',
+    repair: {
+      label: 'Repair access in Connections',
+      destination: 'connections',
+      recordId: connectionId,
+    },
+  },
+});
 const summary: WorkflowSummary = {
   id: 'shipping-method-correction',
   name: 'Correct an order shipping method',
@@ -26,6 +120,7 @@ const summary: WorkflowSummary = {
   activeVersions: [],
   status: 'inactive',
   blockers: [],
+  readiness: readiness(),
 };
 const detail: WorkflowDetail = {
   summary,
@@ -144,9 +239,13 @@ function Preview({
                   : {
                       ...detail,
                       canManage: true,
+                      summary:
+                        state === 'blocked'
+                          ? { ...summary, readiness: accessLost }
+                          : summary,
                       connections: [
                         {
-                          id: '33333333-3333-4333-8333-333333333333',
+                          id: connectionId,
                           label: 'JTL warehouse',
                           system: 'jtl-cloud',
                           version: 1,
@@ -191,38 +290,81 @@ function Preview({
                             ? 'unavailable'
                             : state === 'revoked'
                               ? 'revoked'
-                              : 'inactive',
-                        blockers:
-                          state === 'unavailable'
-                            ? [
-                                'Validate JTL permissions and ingest mapped orders before activation.',
-                              ]
-                            : [],
+                              : 'active',
+                        readiness:
+                          state === 'revoked'
+                            ? readiness({
+                                enablement: 'paused',
+                                nextAction: {
+                                  label: 'Review a new activation',
+                                  description:
+                                    'Every activation was revoked, so no new runs start. Earlier history stays available.',
+                                  repair: {
+                                    label: 'Review a new activation',
+                                    destination: 'workflow_rules',
+                                  },
+                                },
+                              })
+                            : accessLost,
                       },
                       ...(state === 'ready'
                         ? [
                             {
                               ...summary,
-                              id: 'inventory-correction',
-                              name: 'Reconcile available inventory',
+                              id: 'inventory-replenishment',
+                              name: 'Replenish low stock',
                               purpose:
-                                'Compare authoritative stock and verify the quantity published to Shopify.',
-                              systems: ['jtl-cloud', 'shopify'],
-                              category: 'resolution',
+                                'Check low stock, review existing commitments, and create a verified purchase-order draft.',
+                              systems: ['luma'],
+                              category: 'procurement',
                               status: 'active' as const,
-                              activeVersions: ['0.1.0'],
-                            },
-                            {
-                              ...summary,
-                              id: 'order-recovery',
-                              name: 'Recover a failed order transfer',
-                              purpose:
-                                'Check a failed transfer and confirm the order reaches the warehouse.',
-                              systems: ['shopify', 'jtl-cloud'],
-                              status: 'unavailable' as const,
-                              blockers: [
-                                'Validate JTL permissions before activation.',
-                              ],
+                              activeVersions: ['1.0.0'],
+                              readiness: readiness({
+                                enablement: 'enabled',
+                                state: 'degraded',
+                                issues: [
+                                  {
+                                    code: 'stock_expired',
+                                    severity: 'degrading',
+                                    message:
+                                      'The latest stock read is older than five minutes, so Luma won’t propose an order. Check that the source is syncing.',
+                                    scope: 'SKU-BLUE-M',
+                                    repair: {
+                                      label: 'Review stock for SKU-BLUE-M',
+                                      destination: 'inventory_position',
+                                      recordId:
+                                        '77777777-7777-4777-8777-777777777777',
+                                    },
+                                  },
+                                ],
+                                coverage: {
+                                  unit: 'stock position',
+                                  covered: 3,
+                                  ready: 2,
+                                  explanation:
+                                    '3 stock positions have an active rule. 2 with fresh stock.',
+                                },
+                                waiting: {
+                                  count: 1,
+                                  repair: {
+                                    label: 'Review the waiting decision',
+                                    destination: 'needs_you',
+                                    recordId:
+                                      'replenishment:88888888-8888-4888-8888-888888888888',
+                                  },
+                                },
+                                nextAction: {
+                                  label: 'Review 1 waiting decision',
+                                  description:
+                                    'Proposals wait for a person before Luma acts. They expire when their evidence gets old.',
+                                  repair: {
+                                    label: 'Review the waiting decision',
+                                    destination: 'needs_you',
+                                    recordId:
+                                      'replenishment:88888888-8888-4888-8888-888888888888',
+                                  },
+                                },
+                              }),
                             },
                             {
                               ...summary,
@@ -231,7 +373,45 @@ function Preview({
                               purpose:
                                 'Review an address correction before updating the warehouse order.',
                               systems: ['jtl-onprem'],
-                              status: 'revoked' as const,
+                              status: 'inactive' as const,
+                              readiness: readiness(),
+                            },
+                            {
+                              ...summary,
+                              id: 'quantity-calculation',
+                              name: 'Calculate replenishment quantity',
+                              purpose:
+                                'Calculate the quantity needed to restore stock.',
+                              systems: [],
+                              category: 'procurement',
+                              status: 'unavailable' as const,
+                              readiness: readiness({
+                                state: 'blocked',
+                                coverage: {
+                                  unit: 'run',
+                                  covered: null,
+                                  ready: null,
+                                  explanation:
+                                    'This workflow has no scoped records. It runs on the evidence supplied when someone starts it.',
+                                },
+                                waiting: { count: null, repair: null },
+                                issues: [
+                                  {
+                                    code: 'no_adapter',
+                                    severity: 'blocking',
+                                    message:
+                                      'No installed adapter runs this workflow. Custom workflows run when they contain a Code Step and only computation steps.',
+                                    scope: null,
+                                    repair: null,
+                                  },
+                                ],
+                                nextAction: {
+                                  label: 'Review the requirement',
+                                  description:
+                                    'No installed adapter runs this workflow. Custom workflows run when they contain a Code Step and only computation steps.',
+                                  repair: null,
+                                },
+                              }),
                             },
                           ]
                         : []),
@@ -325,6 +505,9 @@ export const MemberDetail: Story = {
     await expect(
       canvas.getByRole('heading', { name: 'Verify the result' }),
     ).toBeVisible();
+    await expect(
+      canvas.getByRole('heading', { name: 'Ready to set up' }),
+    ).toBeVisible();
   },
 };
 
@@ -370,41 +553,70 @@ export const AdminDetail: Story = {
   },
 };
 
-export const BlockedDetail: Story = { args: { state: 'blocked' } };
+/** An enabled workflow whose connection lost access shows Blocked and links to the repair. */
+export const BlockedDetail: Story = {
+  args: { state: 'blocked' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByRole('heading', { name: 'Can’t run right now' }),
+    ).toBeVisible();
+    await expect(canvas.getAllByText('Enabled')[0]).toBeVisible();
+    await expect(
+      canvas.getByRole('link', { name: 'Repair access in Connections' }),
+    ).toHaveAttribute(
+      'href',
+      expect.stringContaining(`#connection-${connectionId}`),
+    );
+    await expect(canvas.getByText('0 of 2 orders ready')).toBeVisible();
+  },
+};
 
 export const Filters: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const body = within(canvasElement.ownerDocument.body);
-    await userEvent.click(canvas.getByRole('button', { name: 'Active 1' }));
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Needs attention 3' }),
+    );
     await expect(
-      canvas.getByRole('link', { name: 'Reconcile available inventory' }),
+      canvas.getByRole('link', { name: 'Replenish low stock' }),
     ).toBeVisible();
+    await expect(
+      canvas.queryByRole('link', { name: 'Correct a delivery address' }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(canvas.getByRole('button', { name: 'Enabled 2' }));
+    await expect(
+      canvas.getByRole('link', { name: summary.name }),
+    ).toBeVisible();
+    await expect(
+      canvas.getByRole('link', { name: 'Review 1 waiting decision' }),
+    ).toBeVisible();
+    await userEvent.click(canvas.getByRole('combobox', { name: 'System' }));
+    await userEvent.click(await body.findByRole('option', { name: 'Luma' }));
     await expect(
       canvas.queryByRole('link', { name: summary.name }),
     ).not.toBeInTheDocument();
-    await userEvent.click(canvas.getByRole('combobox', { name: 'System' }));
-    await userEvent.click(
-      await body.findByRole('option', { name: 'JTL-Wawi' }),
-    );
+    await userEvent.type(canvas.getByLabelText('Search workflows'), 'address');
     await expect(
       canvas.getByRole('heading', { name: 'No matching workflows' }),
     ).toBeVisible();
+    await userEvent.click(canvas.getByRole('button', { name: 'Clear search' }));
     await userEvent.click(
-      canvas.getByRole('button', { name: 'Remove JTL-Wawi filter' }),
+      canvas.getByRole('button', { name: 'Remove Luma filter' }),
     );
     await expect(
-      canvas.getByRole('link', { name: 'Reconcile available inventory' }),
+      canvas.getByRole('link', { name: summary.name }),
     ).toBeVisible();
     await userEvent.click(
       canvas.getByRole('button', { name: 'Clear filters' }),
     );
     await userEvent.type(
       canvas.getByLabelText('Search workflows'),
-      'authoritative',
+      'commitments',
     );
     await expect(
-      canvas.getByRole('link', { name: 'Reconcile available inventory' }),
+      canvas.getByRole('link', { name: 'Replenish low stock' }),
     ).toBeVisible();
     await expect(
       canvas.queryByRole('link', { name: summary.name }),
@@ -417,13 +629,13 @@ export const DetailNavigation: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(
-      canvas.getByRole('button', { name: 'Compatibility' }),
+      canvas.getByRole('button', { name: 'Technical details' }),
     );
     await expect(
-      canvas.getByRole('region', { name: 'Compatibility' }),
+      canvas.getByRole('region', { name: 'Technical details' }),
     ).toHaveFocus();
     await expect(
-      canvas.getByRole('button', { name: 'Compatibility' }),
+      canvas.getByRole('button', { name: 'Technical details' }),
     ).toHaveAttribute('aria-current', 'location');
     await userEvent.click(canvas.getByRole('button', { name: 'Overview' }));
   },

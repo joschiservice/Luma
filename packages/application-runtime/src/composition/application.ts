@@ -261,7 +261,11 @@ export function createApplicationServices(
     combinedEffects,
     options.desk,
   );
-  const library = createPersistentPlaybookLibrary(database, identity);
+  const library = createPersistentPlaybookLibrary(
+    database,
+    identity,
+    safety.policies,
+  );
 
   const replenishment = createReplenishmentRuntime({
     db: database,
@@ -327,6 +331,7 @@ export function createApplicationServices(
     database,
     library,
     identity.refreshContext,
+    safety.policies,
     replenishment.api,
     codeProcesses,
     drafts.blockers,

@@ -167,6 +167,68 @@
   outline-offset: -2px;
 }
 
+/* Library rows are list items; the title link covers the row so it stays one target. */
+li.workflow-row {
+  position: relative;
+}
+
+.workflow-row-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.workflow-row-link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-control);
+}
+
+.workflow-row-link:focus-visible {
+  outline: none;
+}
+
+.workflow-row-link:focus-visible::after {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+
+.workflow-row-repair,
+.workflow-row .workflow-repair-note {
+  position: relative;
+  z-index: 1;
+}
+
+.workflow-row-next {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  margin-top: 8px;
+  font-size: 12.5px;
+}
+
+.workflow-row-next-label {
+  color: var(--foreground-subtle);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.workflow-row .workflow-row-reason {
+  flex-basis: 100%;
+  color: var(--foreground-subtle);
+}
+
+.workflow-row-next[data-state='blocked'] .workflow-row-next-label {
+  color: var(--state-error-text);
+}
+
+.workflow-row-next[data-state='degraded'] .workflow-row-next-label {
+  color: var(--state-warning-text);
+}
+
 .workflow-row-content {
   display: grid;
   gap: 2px;
@@ -220,8 +282,13 @@
   background: var(--state-approval);
 }
 
-.workflow-row > [data-slot='badge'] {
+.workflow-row > [data-slot='badge'],
+.workflow-row > .workflow-readiness-pills {
   margin-top: 1px;
+}
+
+.workflow-row > .workflow-readiness-pills {
+  justify-content: flex-end;
 }
 
 .workflow-row-chevron {
@@ -362,6 +429,10 @@
 .workflows-page .workflow-caption {
   color: var(--foreground-subtle);
   font-size: 12px;
+}
+
+.workflow-steps + .workflow-caption {
+  margin-top: 14px;
 }
 
 .workflows-page details,
@@ -827,7 +898,8 @@
     gap: 10px;
   }
 
-  .workflow-row > [data-slot='badge'] {
+  .workflow-row > [data-slot='badge'],
+  .workflow-row > .workflow-readiness-pills {
     grid-column: 2;
     justify-self: start;
   }
@@ -871,4 +943,26 @@
   .workflow-run-story {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+.workflow-stack {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.workflow-technical {
+  display: grid;
+  gap: 16px;
+}
+
+.workflow-technical-step {
+  display: block;
+  font-weight: 600;
+}
+
+.workflow-technical .workflow-steps code {
+  display: inline-block;
+  margin-top: 2px;
+  color: var(--foreground-subtle);
 }

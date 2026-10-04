@@ -34,6 +34,8 @@ export const playbookVersionViewSchema = z.object({
   steps: z.array(
     z.object({
       id: text,
+      /** The step's exact technical identity, such as its capability and version. */
+      reference: text.optional(),
       title: text,
       description: text,
       details: z.array(text),

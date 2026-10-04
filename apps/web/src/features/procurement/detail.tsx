@@ -25,7 +25,7 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import { Link, useParams } from '@tanstack/react-router';
+import { Link, useLocation, useParams } from '@tanstack/react-router';
 import {
   ArrowLeft,
   ArrowRight,
@@ -40,6 +40,7 @@ import { type ReactNode, useRef, useState, useSyncExternalStore } from 'react';
 import { SignInRedirect } from '../identity/common';
 import { IdentityError } from '../identity/data';
 import { stockQuantity } from '../inventory/presentation';
+import { WorkflowCoverageCard } from '../workflows/coverage';
 import {
   checkSubmission,
   decideSubmission,
@@ -1381,130 +1382,143 @@ function TraceCard({
   context?: PurchaseOrderContext | undefined;
 }) {
   const trace = context?.replenishment;
+  const here = useLocation({ select: (location) => location.href });
   if (!trace) return null;
   const unit = trace.stock.unit ?? '';
 
   return (
-    <Card
-      as="section"
-      className="procurement-side"
-      aria-labelledby="side-trace"
-    >
-      <h2 id="side-trace">
-        <Workflow size={14} aria-hidden="true" /> Why it was ordered
-      </h2>
-      <ol className="procurement-trace">
-        <li>
-          <StateDot state="verified" />
-          <span className="procurement-cell">
-            <strong>
-              Stock{' '}
-              {trace.stock.available === null
-                ? 'unknown'
-                : `${quantity(trace.stock.available)} ${unit}`}
-              {trace.minimum !== null
-                ? `, below ${quantity(trace.minimum)}`
-                : ''}
-            </strong>
-            <small>
-              {trace.location ?? 'Stock position'}
-              {trace.stock.checkedAt ? (
-                <>
-                  {' · checked '}
-                  <WorkspaceDate value={trace.stock.checkedAt} />
-                </>
+    <>
+      <Card
+        as="section"
+        className="procurement-side"
+        aria-labelledby="side-trace"
+      >
+        <h2 id="side-trace">
+          <Workflow size={14} aria-hidden="true" /> Why it was ordered
+        </h2>
+        <ol className="procurement-trace">
+          <li>
+            <StateDot state="verified" />
+            <span className="procurement-cell">
+              <strong>
+                Stock{' '}
+                {trace.stock.available === null
+                  ? 'unknown'
+                  : `${quantity(trace.stock.available)} ${unit}`}
+                {trace.minimum !== null
+                  ? `, below ${quantity(trace.minimum)}`
+                  : ''}
+              </strong>
+              <small>
+                {trace.location ?? 'Stock position'}
+                {trace.stock.checkedAt ? (
+                  <>
+                    {' · checked '}
+                    <WorkspaceDate value={trace.stock.checkedAt} />
+                  </>
+                ) : null}
+              </small>
+            </span>
+          </li>
+          <li>
+            <StateDot state="verified" />
+            <span className="procurement-cell">
+              <strong>
+                Proposed{' '}
+                {trace.proposedQuantity === null
+                  ? '—'
+                  : quantity(trace.proposedQuantity)}{' '}
+                {unit}
+              </strong>
+              <small>
+                Refill to {trace.target === null ? '—' : quantity(trace.target)}{' '}
+                {unit}
+              </small>
+            </span>
+          </li>
+          <li>
+            <StateDot
+              state={
+                trace.approval === 'approved'
+                  ? 'verified'
+                  : trace.approval === 'rejected'
+                    ? 'error'
+                    : 'approval'
+              }
+            />
+            <span className="procurement-cell">
+              <strong>
+                {trace.approval === 'approved'
+                  ? 'Approved by a second person'
+                  : trace.approval === 'rejected'
+                    ? 'Rejected'
+                    : trace.approval === 'pending'
+                      ? 'Waiting for approval'
+                      : 'Approval not recorded'}
+              </strong>
+              {trace.approvedAt ? (
+                <small>
+                  <WorkspaceDate value={trace.approvedAt} />
+                </small>
               ) : null}
-            </small>
-          </span>
-        </li>
-        <li>
-          <StateDot state="verified" />
-          <span className="procurement-cell">
-            <strong>
-              Proposed{' '}
-              {trace.proposedQuantity === null
-                ? '—'
-                : quantity(trace.proposedQuantity)}{' '}
-              {unit}
-            </strong>
-            <small>
-              Refill to {trace.target === null ? '—' : quantity(trace.target)}{' '}
-              {unit}
-            </small>
-          </span>
-        </li>
-        <li>
-          <StateDot
-            state={
-              trace.approval === 'approved'
-                ? 'verified'
-                : trace.approval === 'rejected'
-                  ? 'error'
-                  : 'approval'
-            }
-          />
-          <span className="procurement-cell">
-            <strong>
-              {trace.approval === 'approved'
-                ? 'Approved by a second person'
-                : trace.approval === 'rejected'
-                  ? 'Rejected'
-                  : trace.approval === 'pending'
-                    ? 'Waiting for approval'
-                    : 'Approval not recorded'}
-            </strong>
-            {trace.approvedAt ? (
-              <small>
-                <WorkspaceDate value={trace.approvedAt} />
-              </small>
-            ) : null}
-          </span>
-        </li>
-        <li>
-          <StateDot
-            state={
-              trace.verification === 'verified'
-                ? 'verified'
-                : trace.verification === 'failed'
-                  ? 'error'
-                  : 'waiting'
-            }
-          />
-          <span className="procurement-cell">
-            <strong>
-              {trace.verification === 'verified'
-                ? 'Draft verified by a separate read'
-                : trace.verification === 'failed'
-                  ? 'Draft verification failed'
-                  : trace.verification === 'inconclusive'
-                    ? 'Draft verification inconclusive'
-                    : 'Draft not verified yet'}
-            </strong>
-            {trace.verifiedAt ? (
-              <small>
-                <WorkspaceDate value={trace.verifiedAt} />
-              </small>
-            ) : null}
-          </span>
-        </li>
-      </ol>
-      <div className="procurement-side-links">
-        {trace.positionId ? (
+            </span>
+          </li>
+          <li>
+            <StateDot
+              state={
+                trace.verification === 'verified'
+                  ? 'verified'
+                  : trace.verification === 'failed'
+                    ? 'error'
+                    : 'waiting'
+              }
+            />
+            <span className="procurement-cell">
+              <strong>
+                {trace.verification === 'verified'
+                  ? 'Draft verified by a separate read'
+                  : trace.verification === 'failed'
+                    ? 'Draft verification failed'
+                    : trace.verification === 'inconclusive'
+                      ? 'Draft verification inconclusive'
+                      : 'Draft not verified yet'}
+              </strong>
+              {trace.verifiedAt ? (
+                <small>
+                  <WorkspaceDate value={trace.verifiedAt} />
+                </small>
+              ) : null}
+            </span>
+          </li>
+        </ol>
+        <div className="procurement-side-links">
+          {trace.positionId ? (
+            <Link
+              to="/app/$organizationId/inventory/$positionId"
+              params={{ organizationId, positionId: trace.positionId }}
+              search={{ from: here }}
+            >
+              Stock position <ArrowRight size={13} aria-hidden="true" />
+            </Link>
+          ) : null}
           <Link
-            to="/app/$organizationId/inventory/$positionId"
-            params={{ organizationId, positionId: trace.positionId }}
+            to="/app/$organizationId/workflows/$definitionId"
+            params={{ organizationId, definitionId: trace.definitionId }}
+            search={{}}
+            hash={`run-${trace.runId}`}
           >
-            Stock position <ArrowRight size={13} aria-hidden="true" />
+            Workflow run <ArrowRight size={13} aria-hidden="true" />
           </Link>
-        ) : null}
-        <Link
-          to="/app/$organizationId/workflows/$definitionId"
-          params={{ organizationId, definitionId: trace.definitionId }}
-        >
-          Workflow run <ArrowRight size={13} aria-hidden="true" />
-        </Link>
-      </div>
-    </Card>
+        </div>
+      </Card>
+      {trace.positionId ? (
+        <WorkflowCoverageCard
+          organizationId={organizationId}
+          positionId={trace.positionId}
+          className="procurement-side"
+        />
+      ) : null}
+    </>
   );
 }
 

@@ -1,12 +1,10 @@
 import './replenishment.css';
 
 import type {
-  ReplenishmentRuleInput,
   ReplenishmentSetup,
   WorkflowDetail,
   WorkflowRunView,
 } from '@luma/api-contract';
-import { replenishmentRuleSchema } from '@luma/api-contract';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -17,9 +15,12 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@luma/ui/components/primitives/dialog';
+import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import { Empty } from '@luma/ui/components/primitives/empty';
-import { Input } from '@luma/ui/components/primitives/input';
-import { Select } from '@luma/ui/components/primitives/select';
+import {
+  type OperationalState,
+  StatePill,
+} from '@luma/ui/components/primitives/state';
 import {
   WorkspaceDate,
   WorkspaceTimezone,
@@ -32,7 +33,6 @@ import { useContext, useEffect, useState } from 'react';
 
 import { IdentityError } from '../identity/data';
 import {
-  configureReplenishment,
   decideReplenishment,
   replenishmentOptions,
   replenishmentReviewOptions,
@@ -40,21 +40,47 @@ import {
   workflowError,
   workflowsKey,
 } from './data';
+import { RepairLink } from './readiness';
+import { ReplenishmentSetupFlow, setupLimit } from './replenishment-setup';
 
-/** Shows scoped stock rules with explicit thresholds, fresh evidence and retryable starts. */
+type Rule = ReplenishmentSetup['rules'][number];
+
+function ruleStatus(rule: Rule): [string, OperationalState] {
+  if (!rule.active) return ['Revoked', 'idle'];
+  if (rule.status.state === 'blocked') return ['Stock not usable', 'error'];
+  if (rule.waitingRunId) return ['Waiting for approval', 'approval'];
+
+  return ['Watching', 'running'];
+}
+
+/**
+ * Shows stock rules with their readiness, waiting decisions and latest result, and sets up new
+ * rules for up to 25 positions at a time.
+ */
 export function ReplenishmentPanel({
   organizationId,
   detail,
+  setup: initial,
 }: {
   organizationId: string;
   detail: WorkflowDetail;
+  /** A stock position to preselect in setup, from a record link. */
+  setup?: string | undefined;
 }) {
   const query = useQuery({
     ...replenishmentOptions(organizationId),
     refetchInterval: 30000,
   });
   const client = useQueryClient();
-  const [open, setOpen] = useState(false);
+  // A record link that preselects a position opens setup until that position is dismissed,
+  // even when the page is already open.
+  const [manual, setManual] = useState(false);
+  const [dismissed, setDismissed] = useState<string | undefined>();
+  const open = manual || (!!initial && dismissed !== initial);
+  const setOpen = (value: boolean) => {
+    setManual(value);
+    if (!value) setDismissed(initial);
+  };
   const [locked, setLocked] = useState(false);
   const [notice, setNotice] = useState('');
   const refresh = () =>
@@ -63,9 +89,7 @@ export function ReplenishmentPanel({
     mutationFn: (body: { id: string; activationId: string }) =>
       startReplenishment(organizationId, body),
     onSuccess: async () => {
-      setNotice(
-        'Stock checked. Follow the proposal and outcome in Recent runs.',
-      );
+      setNotice('Stock checked. Follow the proposal and outcome in Activity.');
       await refresh();
     },
   });
@@ -83,30 +107,69 @@ export function ReplenishmentPanel({
     target?.focus({ preventScroll: true });
     target?.scrollIntoView({ block: 'center' });
   }, [linkedRuleId]);
+  const active = data?.rules.filter((rule) => rule.active) ?? [];
+  const revoked = data?.rules.filter((rule) => !rule.active) ?? [];
+  const blocked = active.filter((rule) => rule.status.state === 'blocked');
+  const waiting = active.filter((rule) => rule.waitingRunId);
+  const canSetUp = !!data?.canManage && data.available;
+  const card = (rule: Rule) => (
+    <RuleCard
+      key={rule.id}
+      organizationId={organizationId}
+      definitionId={detail.summary.id}
+      rule={rule}
+      stock={data?.positions.find(
+        (p) =>
+          p.positionId === rule.positionId &&
+          p.connectionId === rule.connectionId,
+      )}
+      canStart={
+        rule.active &&
+        rule.principalId === detail.principalId &&
+        !!data?.canManage
+      }
+      starting={start.isPending && start.variables?.activationId === rule.id}
+      startDisabled={!data?.available || start.isPending || uncertain}
+      start={() =>
+        start.mutate({ id: crypto.randomUUID(), activationId: rule.id })
+      }
+    />
+  );
 
   return (
     <Card as="section" className="workflow-section replenishment-panel">
       <div className="workflows-heading">
         <div>
-          <p className="workflow-eyebrow">STOCK → PURCHASE ORDER</p>
-          <CardTitle as="h2">Replenishment rules</CardTitle>
+          <p className="workflow-eyebrow">Stock → purchase order</p>
+          <CardTitle as="h2">Stock rules</CardTitle>
         </div>
         <Button
-          disabled={!data?.canManage || !data.available}
+          disabled={!canSetUp}
+          aria-describedby={
+            data && !canSetUp ? 'replenishment-setup-reason' : undefined
+          }
           onClick={() => setOpen(true)}
         >
-          <Plus size={15} aria-hidden="true" /> Add stock rule
+          <Plus size={15} aria-hidden="true" /> Add stock rules
         </Button>
       </div>
       <p>
-        Monitor a stock position, replenish to a target, and verify the
-        purchase-order draft. Draft and open orders prevent duplicate
-        replenishment.
+        Each rule watches one stock position. When available stock falls below
+        its minimum, Luma proposes a purchase-order draft that reaches the
+        target, waits for approval and verifies the draft. Draft and open orders
+        for the same SKU prevent duplicates.
       </p>
+      {data && !canSetUp ? (
+        <p id="replenishment-setup-reason" className="workflow-caption">
+          {!data.available
+            ? 'Setup is unavailable while the workflow worker is disconnected.'
+            : 'Only owners and admins can add or revoke stock rules.'}
+        </p>
+      ) : null}
       {query.isPending ? (
         <p role="status">Loading stock and suppliers…</p>
       ) : query.error ? (
-        <Alert tone="danger">
+        <Alert tone="danger" role="alert">
           {workflowError(query.error)}{' '}
           <Button variant="ghost" onClick={() => void query.refetch()}>
             Retry
@@ -115,7 +178,8 @@ export function ReplenishmentPanel({
       ) : null}
       {data && !data.available ? (
         <Alert tone="warning">
-          Execution is unavailable. Check the workflow worker connection.
+          The workflow worker isn’t connected, so Luma can’t check stock or
+          create orders. Whoever runs this Luma server needs to start it.
         </Alert>
       ) : null}
       {notice ? (
@@ -136,13 +200,28 @@ export function ReplenishmentPanel({
           ) : null}
         </Alert>
       ) : null}
-      {data?.rules.length === 0 ? (
-        <Empty>
+      {data && active.length ? (
+        <p className="replenishment-summary" aria-live="polite">
+          <strong>
+            {active.length} active {active.length === 1 ? 'rule' : 'rules'}
+          </strong>
+          {blocked.length ? (
+            <span data-tone="error">{blocked.length} with unusable stock</span>
+          ) : null}
+          {waiting.length ? (
+            <span data-tone="approval">
+              {waiting.length} waiting for approval
+            </span>
+          ) : null}
+        </p>
+      ) : null}
+      {data && !active.length ? (
+        <Empty className="workflow-section-empty">
           <PackageCheck size={26} aria-hidden="true" />
-          <h3>Keep replenishment deliberate</h3>
+          <h3>{revoked.length ? 'No active rules' : 'No stock rules yet'}</h3>
           <p>
-            Choose the inventory source, supplier, minimum stock and target.
-            Each proposal keeps its evidence and approval history.
+            Choose up to {setupLimit} stock positions, a supplier, a minimum and
+            a target. Each proposal keeps its evidence and approval history.
           </p>
           {!data.suppliers.length ? (
             <Link
@@ -153,125 +232,59 @@ export function ReplenishmentPanel({
               Add a supplier in Procurement <ArrowRight size={14} />
             </Link>
           ) : !data.positions.length ? (
-            <p>
-              Connect and map an inventory source to make stock positions
-              available.
-            </p>
+            <Link to="/app/$organizationId/apps" params={{ organizationId }}>
+              Connect an inventory source <ArrowRight size={14} />
+            </Link>
           ) : null}
         </Empty>
       ) : null}
-      <div className="replenishment-rules">
-        {data?.rules.map((rule) => {
-          const stock = data.positions.find(
-            (p) =>
-              p.positionId === rule.positionId &&
-              p.connectionId === rule.connectionId,
-          );
-          const fresh =
-            !!stock &&
-            query.dataUpdatedAt - Date.parse(stock.observedAt) < 300000 &&
-            stock.available !== null;
-
-          return (
-            <article
-              key={rule.id}
-              id={`rule-${rule.id}`}
-              tabIndex={-1}
-              className="replenishment-rule"
-            >
-              <div className="workflows-heading">
-                <div>
-                  <h3>{rule.sku}</h3>
-                  <p>{rule.supplier}</p>
-                </div>
-                <Badge tone={rule.active ? 'success' : 'neutral'}>
-                  {rule.active ? 'Monitoring' : 'Revoked'}
-                </Badge>
-              </div>
-              <dl className="replenishment-metrics">
-                <div>
-                  <dt>Available</dt>
-                  <dd>
-                    {stock?.available ?? '—'} <small>{stock?.unit}</small>
-                  </dd>
-                </div>
-                <div>
-                  <dt>Below minimum</dt>
-                  <dd>{rule.minimum}</dd>
-                </div>
-                <div>
-                  <dt>Replenish to</dt>
-                  <dd>{rule.target}</dd>
-                </div>
-                <div>
-                  <dt>High risk above</dt>
-                  <dd>{rule.approvalQuantity}</dd>
-                </div>
-              </dl>
-              <div className="replenishment-rule-footer">
-                <span>
-                  {stock ? (
-                    <>
-                      Observed <WorkspaceDate value={stock.observedAt} /> ·{' '}
-                      {fresh ? 'Fresh' : 'Refresh required'}
-                    </>
-                  ) : (
-                    'Inventory unavailable'
-                  )}
-                </span>
-                {rule.active &&
-                rule.principalId === detail.principalId &&
-                data.canManage ? (
-                  <Button
-                    variant="outline"
-                    disabled={!data.available || start.isPending || uncertain}
-                    onClick={() =>
-                      start.mutate({
-                        id: crypto.randomUUID(),
-                        activationId: rule.id,
-                      })
-                    }
-                  >
-                    {start.isPending &&
-                    start.variables?.activationId === rule.id
-                      ? 'Checking stock…'
-                      : 'Check stock now'}
-                  </Button>
-                ) : null}
-              </div>
-            </article>
-          );
-        })}
-      </div>
+      <div className="replenishment-rules">{active.map(card)}</div>
+      {revoked.length ? (
+        <Disclosure>
+          <summary>
+            Revoked rules ({revoked.length}). Kept for history; they never run.
+          </summary>
+          <div className="replenishment-rules">{revoked.map(card)}</div>
+        </Disclosure>
+      ) : null}
       <div className="workflow-approval-note">
         <ShieldCheck size={17} aria-hidden="true" />
         <p>
-          A different owner or admin reviews each draft. Approval never bypasses
-          fresh inventory, active grants or duplicate-order checks.
+          {detail.summary.readiness.approval.summary} Approval never bypasses
+          fresh stock, active rules or duplicate-order checks.
         </p>
       </div>
       <Dialog
-        open={open}
+        open={open && canSetUp}
         onOpenChange={(value) => {
           if (!locked) setOpen(value);
         }}
       >
-        <DialogContent className="workflow-dialog" showCloseButton={!locked}>
-          <DialogTitle>Activate a stock rule</DialogTitle>
+        <DialogContent
+          className="workflow-dialog replenishment-setup-dialog"
+          showCloseButton={!locked}
+        >
+          <DialogTitle>Add stock rules</DialogTitle>
           <DialogDescription>
-            Review the exact stock source and quantity limits. Monitoring starts
-            after activation.
+            Choose up to {setupLimit} stock positions and review exactly what
+            each rule would do before Luma starts watching them.
           </DialogDescription>
           {data ? (
-            <ReplenishmentRuleForm
-              key={String(open)}
+            <ReplenishmentSetupFlow
+              key={`${open}:${initial ?? ''}`}
               organizationId={organizationId}
               detail={detail}
               setup={data}
+              initial={initial}
               onLock={setLocked}
-              done={async () => {
+              done={(changed) => {
                 setOpen(false);
-                await refresh();
+                if (changed) {
+                  setNotice(
+                    'Stock rules saved. Luma now watches the activated positions.',
+                  );
+                  void refresh();
+                }
               }}
             />
           ) : null}
@@ -281,174 +294,143 @@ export function ReplenishmentPanel({
   );
 }
 
-/** Reviews one stock position, supplier and quantity limits, then activates a retry-safe rule. */
-export function ReplenishmentRuleForm({
+function RuleCard({
   organizationId,
-  detail,
-  setup,
-  done,
-  onLock,
+  definitionId,
+  rule,
+  stock,
+  canStart,
+  starting,
+  startDisabled,
+  start,
 }: {
   organizationId: string;
-  detail: WorkflowDetail;
-  setup: ReplenishmentSetup;
-  done(): Promise<void>;
-  onLock(value: boolean): void;
+  definitionId: string;
+  rule: Rule;
+  stock: ReplenishmentSetup['positions'][number] | undefined;
+  canStart: boolean;
+  starting: boolean;
+  startDisabled: boolean;
+  start(): void;
 }) {
-  const [position, setPosition] = useState('');
-  const [supplier, setSupplier] = useState('');
-  const [minimum, setMinimum] = useState('10');
-  const [target, setTarget] = useState('50');
-  const [limit, setLimit] = useState('100');
-  const [error, setError] = useState('');
-  const mutation = useMutation({
-    mutationFn: (body: ReplenishmentRuleInput) =>
-      configureReplenishment(organizationId, body),
-    onMutate: () => onLock(true),
-    onSuccess: async () => {
-      onLock(false);
-      await done();
-    },
-    onError: (error) =>
-      onLock(!(error instanceof IdentityError) || error.status >= 500),
-  });
-  const uncertain =
-    mutation.isError &&
-    (!(mutation.error instanceof IdentityError) ||
-      mutation.error.status >= 500);
-  const locked = mutation.isPending || uncertain;
-  const selected = setup.positions.find(
-    (p) => `${p.positionId}:${p.connectionId}` === position,
-  );
-  const units = selected?.unit ?? 'units';
+  const [label, state] = ruleStatus(rule);
+  const here = useLocation({ select: (location) => location.href });
 
   return (
-    <form
-      className="replenishment-form"
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (uncertain) {
-          mutation.mutate(mutation.variables!);
-
-          return;
-        }
-        const parsed = replenishmentRuleSchema.safeParse({
-          id: crypto.randomUUID(),
-          positionId: selected?.positionId,
-          connectionId: selected?.connectionId,
-          supplierId: supplier,
-          minimum: minimum.trim() ? Number(minimum) : NaN,
-          target: target.trim() ? Number(target) : NaN,
-          approvalQuantity: limit.trim() ? Number(limit) : NaN,
-          reviewedDigest: detail.versions[0]!.digest,
-        });
-        if (!parsed.success) {
-          setError(
-            'Select a stock position and supplier. Use whole quantities, with target stock above the minimum.',
-          );
-
-          return;
-        }
-        setError('');
-        mutation.mutate(parsed.data);
-      }}
+    <article
+      id={`rule-${rule.id}`}
+      tabIndex={-1}
+      className="replenishment-rule"
+      data-state={rule.status.state}
     >
-      <label>
-        Stock position
-        <Select
-          aria-label="Stock position"
-          disabled={locked}
-          value={position}
-          onValueChange={(value) => setPosition(value ?? '')}
-          placeholder="Choose inventory"
-          options={setup.positions.map((p) => ({
-            value: `${p.positionId}:${p.connectionId}`,
-            label: `${p.sku} · ${p.available ?? 'Unknown'} ${p.unit} · ${p.connectionId.slice(0, 8)}`,
-          }))}
-        />
-      </label>
-      <label>
-        Supplier
-        <Select
-          aria-label="Supplier"
-          disabled={locked}
-          value={supplier}
-          onValueChange={(value) => setSupplier(value ?? '')}
-          placeholder="Choose supplier"
-          options={setup.suppliers.map((s) => ({ value: s.id, label: s.name }))}
-        />
-      </label>
-      <div className="replenishment-form-pair">
-        <label>
-          Minimum stock
-          <Input
-            type="number"
-            min="0"
-            max="999999"
-            step="1"
-            required
-            disabled={locked}
-            value={minimum}
-            onChange={(e) => setMinimum(e.target.value)}
-          />
-        </label>
-        <label>
-          Target stock
-          <Input
-            type="number"
-            min="1"
-            max="1000000"
-            step="1"
-            required
-            disabled={locked}
-            value={target}
-            onChange={(e) => setTarget(e.target.value)}
-          />
-        </label>
+      <div className="workflows-heading">
+        <div>
+          <h3>{rule.sku}</h3>
+          <p>{rule.supplier}</p>
+        </div>
+        <StatePill state={state}>{label}</StatePill>
       </div>
-      <label>
-        High-risk quantity threshold
-        <Input
-          type="number"
-          min="0"
-          max="1000000"
-          step="1"
-          required
-          disabled={locked}
-          value={limit}
-          onChange={(e) => setLimit(e.target.value)}
-        />
-      </label>
-      <div className="replenishment-preview">
-        <strong>
-          When stock falls below {minimum || '—'} {units}
-        </strong>
-        <p>
-          Propose enough to reach {target || '—'} {units}. Above {limit || '—'}{' '}
-          {units}, classify the proposal as high risk. Current workspace policy
-          also requires approval for smaller drafts.
-        </p>
-      </div>
-      {error || mutation.error ? (
-        <Alert tone="danger" role="alert">
-          {error || workflowError(mutation.error)}
-        </Alert>
+      <dl className="replenishment-metrics">
+        <div>
+          <dt>Available</dt>
+          <dd>
+            {stock?.available ?? '—'} <small>{stock?.unit}</small>
+          </dd>
+        </div>
+        <div>
+          <dt>Below minimum</dt>
+          <dd>{rule.minimum}</dd>
+        </div>
+        <div>
+          <dt>Replenish to</dt>
+          <dd>{rule.target}</dd>
+        </div>
+        <div>
+          <dt>High risk above</dt>
+          <dd>{rule.approvalQuantity}</dd>
+        </div>
+      </dl>
+      {rule.active && rule.status.state === 'blocked' ? (
+        <p className="replenishment-rule-issue">{rule.status.message}</p>
       ) : null}
-      <Button
-        type="submit"
-        disabled={
-          mutation.isPending ||
-          !setup.positions.length ||
-          !setup.suppliers.length
-        }
-      >
-        {mutation.isPending
-          ? 'Activating…'
-          : uncertain
-            ? 'Retry activation'
-            : 'Activate reviewed rule'}
-      </Button>
-    </form>
+      {rule.latestRun ? (
+        <p className="replenishment-rule-latest">
+          <Badge
+            tone={
+              rule.latestRun.state === 'verified'
+                ? 'success'
+                : [
+                      'failed_verification',
+                      'inconclusive_verification',
+                      'escalated',
+                      'denied',
+                    ].includes(rule.latestRun.state ?? '')
+                  ? 'warning'
+                  : 'neutral'
+            }
+          >
+            Latest run
+          </Badge>{' '}
+          {rule.latestRun.summary} <WorkspaceDate value={rule.latestRun.at} />
+        </p>
+      ) : null}
+      <div className="replenishment-rule-footer">
+        <span>
+          {stock ? (
+            <>
+              Stock read <WorkspaceDate value={stock.observedAt} />
+            </>
+          ) : (
+            'No stock read from the source'
+          )}
+        </span>
+        <div className="replenishment-rule-actions">
+          <Link
+            className="workflow-repair-link"
+            to="/app/$organizationId/inventory/$positionId"
+            params={{ organizationId, positionId: rule.positionId }}
+            search={{ from: here }}
+          >
+            Stock record <ArrowRight size={13} aria-hidden="true" />
+          </Link>
+          {rule.waitingRunId ? (
+            <RepairLink
+              organizationId={organizationId}
+              definitionId={definitionId}
+              repair={{
+                label: 'Review decision',
+                destination: 'needs_you',
+                recordId: `replenishment:${rule.waitingRunId}`,
+              }}
+            />
+          ) : null}
+          {rule.latestRun?.purchaseOrderId ? (
+            <RepairLink
+              organizationId={organizationId}
+              definitionId={definitionId}
+              repair={{
+                label: 'Purchase order',
+                destination: 'purchase_order',
+                recordId: rule.latestRun.purchaseOrderId,
+              }}
+            />
+          ) : null}
+          {canStart ? (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={startDisabled || rule.status.state !== 'ready'}
+              title={
+                rule.status.state !== 'ready' ? rule.status.message : undefined
+              }
+              onClick={start}
+            >
+              {starting ? 'Checking stock…' : 'Check stock now'}
+            </Button>
+          ) : null}
+        </div>
+      </div>
+    </article>
   );
 }
 

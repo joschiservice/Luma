@@ -173,10 +173,12 @@ it('evaluates published code in Wasmtime, persists replay and isolates actors an
       version.steps[1],
     ],
   });
-  await createWorkflows(tenantDb, {}, async () => context).publish(
-    context,
-    loop,
-  );
+  await createWorkflows(tenantDb, {}, async () => context, {
+    approvalRequirement: async () => ({
+      mode: 'every_action',
+      reason: 'minimum_risk',
+    }),
+  }).publish(context, loop);
   const cancelled = {
     ...body,
     id: randomUUID(),

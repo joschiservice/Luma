@@ -204,7 +204,7 @@ policy, approval, evidence freshness, restart and uncertain-write coverage.
 
 ### Resolution journey acceptance (LUMA-72 / LUMA-37)
 
-Recent runs show the trigger, recorded investigation findings, decision and human
+Activity shows the trigger, recorded investigation findings, decision and human
 input, proposed action, execution status, and verification result. The Workflow
 API supplies these readable summaries in `story`; raw references remain available
 for inspection. Missing findings fall back to the linked diagnosis revision.
@@ -255,10 +255,48 @@ never cross-tenant payloads, and cannot dispatch actions. The worker retries
 failures. Cancellation races with firing on the same row lock and succeeds only
 while pending. Run `pnpm dev:workflows` to process local schedules.
 
-The Triggers section displays the exact contract and offers typed submission,
-retry and resource controls. Recent runs shows evidence references and scheduled
+The Rules section displays the exact trigger contract and offers typed submission,
+retry and resource controls. Activity shows evidence references and scheduled
 start cancellation. Schedule times display in the workspace timezone; observation
 entry explicitly uses the browser's local timezone.
+
+## Readiness
+
+Every workflow summary carries `readiness` (`workflowReadinessSchema`). It answers
+whether a workflow is on, whether it can run, what it covers and what should happen
+next, without the reader interpreting grants or versions.
+
+- `enablement` (`enabled`, `paused`, `not_enabled`) is whether people turned it on:
+  an active activation or stock rule, only revoked ones, or none. `state` (`ready`,
+  `degraded`, `blocked`) is whether it can run. They are independent: an enabled
+  workflow whose connection lost access is enabled and blocked. Never derive one
+  from the other, and never relax authority to make a state look healthy.
+- `issues` carry a severity, an affected record (`scope`) and a `repair` with a
+  closed `destination` (`connections`, `suppliers`, `inventory_position`,
+  `needs_you`, `workflow_rules`, …, or `server` when only the operator of the Luma
+  server can fix it). `blocking` stops the workflow; `degrading` stops part of its
+  coverage.
+- `coverage.covered` and `waiting.count` are `null` when Luma can't establish them.
+  The UI shows Unknown, never zero.
+- `approval` comes from `approvalRequirement` in `@luma/policies`, which applies
+  the same rules as admission (`evaluatePolicy`) with the current workspace setting.
+  A capability floor of medium risk means every action waits for a person; quantity
+  thresholds only raise risk.
+- `outcomes` summarize the 50 most recent runs. Only a verified result counts as
+  verified; runs that ended without acting are neither verified nor unresolved.
+- `nextAction` comes from `assessReadiness`: the first blocking issue, then waiting
+  decisions, partial coverage, setup, and the latest unresolved run.
+
+Owners compute their facts: the shipping-method library from connection access,
+active grants and mapped orders (`playbook-library.ts`); replenishment from the
+worker, suppliers, rule stock freshness, pending decisions and runs
+(`replenishment-workflow.ts`, with copy in `domain/replenishment-readiness.ts`);
+custom versions from adapter blockers (`catalog.ts`).
+
+`GET /workflow-coverage?subjectKind=inventory_position&subjectId=…` returns the
+same readiness scoped to one record, so stock and purchase-order pages show what
+the workflow overview shows. It returns 404 for records outside the workspace.
+Record links carry `from` so their Back link returns to the original context.
 
 ## Domain views
 

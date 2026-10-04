@@ -4,9 +4,14 @@ import { z } from 'zod';
 import { codeEvaluationSchema, evaluateCodeSchema } from '../code-steps.js';
 import { apiErrorSchema, organizationParamsSchema } from '../common.js';
 import {
+  replenishmentBatchRequestSchema,
+  replenishmentBatchResultSchema,
+  replenishmentPreviewRequestSchema,
+  replenishmentPreviewSchema,
   replenishmentReviewSchema,
   replenishmentRuleSchema,
   replenishmentSetupSchema,
+  workflowCoverageSchema,
 } from '../replenishment.js';
 import {
   activateWorkflowSchema,
@@ -79,6 +84,39 @@ export const workflowsContract = c.router(
       summary: 'Activate a replenishment rule',
       description:
         'Owners and admins review a stock position, supplier and quantity limits. Target stock must exceed the minimum. Reuse the exact ID and body when retrying.',
+    },
+    previewReplenishment: {
+      method: 'POST',
+      path: `${path}/:definitionId/replenishment/previews`,
+      pathParams: params,
+      body: replenishmentPreviewRequestSchema,
+      responses: { 200: replenishmentPreviewSchema },
+      summary: 'Preview replenishment rules',
+      description:
+        'Owners and admins check up to 25 stock positions before activating rules. Each position shows current stock, whether an active rule already covers it, what the first check would propose and who approves. Nothing changes.',
+    },
+    configureReplenishmentBatch: {
+      method: 'POST',
+      path: `${path}/:definitionId/replenishment/activations/batch`,
+      pathParams: params,
+      body: replenishmentBatchRequestSchema,
+      responses: { 200: replenishmentBatchResultSchema },
+      summary: 'Activate several replenishment rules',
+      description:
+        'Owners and admins activate up to 25 reviewed rules, each for exactly one stock position. Each rule succeeds or fails on its own; an existing rule is never replaced. Resend the same items to retry: activated rules are returned unchanged and never duplicated.',
+    },
+    coverage: {
+      method: 'GET',
+      path: '/v1/organizations/:organizationId/workflow-coverage',
+      pathParams: organizationParamsSchema,
+      query: z.object({
+        subjectKind: z.literal('inventory_position'),
+        subjectId: z.string().uuid(),
+      }),
+      responses: { 200: workflowCoverageSchema },
+      summary: 'Read workflow coverage for a record',
+      description:
+        'Returns the workflows that can cover a stock position, with the same readiness, blockers and next action as the workflow itself, scoped to that record.',
     },
     startReplenishment: {
       method: 'POST',

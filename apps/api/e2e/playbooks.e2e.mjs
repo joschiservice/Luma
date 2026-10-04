@@ -122,6 +122,32 @@ for (const transport of ['playbooks', 'workflows']) {
     });
     expect(first.body.reviewedBy).toBe(owner.userId);
     expect((await read()).body.activations).toHaveLength(1);
+    if (transport === 'workflows') {
+      expect((await read()).body.summary.readiness).toMatchObject({
+        enablement: 'enabled',
+        state: 'ready',
+        coverage: { unit: 'order', covered: 1, ready: 1 },
+      });
+      // Losing access keeps the workflow enabled but blocked, with the exact repair.
+      await db.owner.query(
+        `UPDATE connector_installations SET document=jsonb_set(document,'{granted}','["orders.read"]') WHERE id=$1`,
+        [connectionId],
+      );
+      const blocked = (await read()).body.summary;
+      expect(blocked.readiness).toMatchObject({
+        enablement: 'enabled',
+        state: 'blocked',
+        coverage: { covered: 1, ready: 0 },
+        nextAction: {
+          repair: { destination: 'connections', recordId: connectionId },
+        },
+      });
+      expect(blocked.readiness.issues[0].code).toBe('connection_access');
+      await db.owner.query(
+        `UPDATE connector_installations SET document=jsonb_set(document,'{granted}','["orders.read","orders.shipping-method.write"]') WHERE id=$1`,
+        [connectionId],
+      );
+    }
     await activate({ ...command, targetIds: [randomUUID()] }, 409);
     await activate({ ...command, id: randomUUID() }, 409);
     const newer = compilePlaybook({

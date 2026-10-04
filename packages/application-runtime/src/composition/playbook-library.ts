@@ -3,6 +3,7 @@ import { createAdmissionStore } from '@luma/execution/composition';
 import type { IdentityService } from '@luma/identity';
 import { requireTenant } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
+import type { PolicyService } from '@luma/policies';
 import type { PlaybookLibrary } from '@luma/workflows';
 import {
   activationRequestSchema,
@@ -16,6 +17,7 @@ import {
 export function createPersistentPlaybookLibrary(
   db: TenantDatabase,
   identity: Pick<IdentityService, 'refreshContext'>,
+  approvalPolicy: Pick<PolicyService, 'approvalRequirement'>,
 ): PlaybookLibrary {
   const scope = (database: TenantDatabase) => ({
     store: createPlaybookLibraryStore(database),
@@ -31,6 +33,7 @@ export function createPersistentPlaybookLibrary(
   return createPlaybookLibrary({
     ...scope(db),
     refreshContext: identity.refreshContext,
+    approvalPolicy,
     transaction: (context, operation) =>
       db.transaction(context.tenantId, async (tx) => {
         await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [

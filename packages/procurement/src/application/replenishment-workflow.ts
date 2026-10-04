@@ -13,25 +13,42 @@ import type {
   ProcessRun,
   ProcessStepOutput,
   ProcessWorkflowVersion,
+  ReadinessIssue,
+  ReplenishmentBatchResult,
+  ReplenishmentRunSummary,
   ReplenishmentWorkflow,
   TemplateRequirement,
   TemplateSource,
   VocabularyContribution,
   WorkflowCatalogStore,
+  WorkflowReadiness,
   WorkflowTriggerRequest,
   WorkflowTriggerRun,
   WorkflowTriggerStore,
 } from '@luma/workflows';
 import {
+  assessReadiness,
   createProcessActivities,
+  describeApproval,
   draftFromVersion,
   presentProcessVersion,
   presentTriggerRun,
+  summarizeOutcomes,
   templateReadiness,
 } from '@luma/workflows';
 
-import { replenishmentCommitments } from '../domain/metrics.js';
+import {
+  replenishmentCommitments,
+  stockUnusableReason,
+} from '../domain/metrics.js';
 import { planReplenishment } from '../domain/replenishment.js';
+import {
+  replenishmentOutcome,
+  replenishmentStepCopy,
+  ruleState,
+  type StockReason,
+  stockReasonMessage,
+} from '../domain/replenishment-readiness.js';
 import type { ProcurementService } from './procurement.js';
 import type {
   ReplenishmentActivation,
@@ -272,28 +289,351 @@ export function createReplenishmentService(deps: {
     !!validUntil &&
     Date.parse(validUntil) > Date.now();
 
+  const plural = (count: number, one: string, many = `${one}s`) =>
+    `${count} ${count === 1 ? one : many}`;
+  const action = version.steps.find((step) => step.kind === 'capability');
+  const findStock = (
+    stocks: ReplenishmentStock[],
+    rule: Pick<ReplenishmentActivation, 'positionId' | 'connectionId'>,
+  ) =>
+    stocks.find(
+      (s) =>
+        s.positionId === rule.positionId &&
+        s.connectionId === rule.connectionId,
+    );
+
+  /** Lists unexpired proposals waiting for approval; callers authorize first. */
+  async function listPending(
+    context: TenantContext,
+  ): Promise<ReplenishmentDecision[]> {
+    const existing = await runs.pending(context, definitionId);
+    if (!existing.length) return [];
+    const [evidence, rules] = await Promise.all([
+      steps.list(
+        context,
+        existing.map((r) => r.id),
+      ),
+      store.list(context),
+    ]);
+    const items: ReplenishmentDecision[] = [];
+    for (const run of existing) {
+      const outputs = evidence.get(run.id) ?? [];
+      if (presentTriggerRun(run, outputs).processState !== 'awaiting_decision')
+        continue;
+      const waiting = outputs.find(
+        (step) => step.kind === 'capability' && step.state === 'waiting',
+      );
+      const rule = rules.find(
+        (r) => r.id === String(run.context.inputs.activationId),
+      );
+      if (!waiting?.evidenceRefs[0] || !rule) continue;
+      const [binding, decision] = await Promise.all([
+        deps.safety.provisioning.step(context, run.id, 'create-order'),
+        deps.safety.policies.decision(context, waiting.evidenceRefs[0]),
+      ]);
+      if (
+        !binding ||
+        decision?.outcome !== 'approval_required' ||
+        decision.approval ||
+        decision.proposalId !== binding.action.id ||
+        Date.parse(binding.action.preconditions.validUntil) <= Date.now()
+      )
+        continue;
+      const line = JSON.parse(String(binding.action.parameters.lines))[0];
+      const inventory = outputs.find((step) => step.stepId === 'inventory');
+      items.push({
+        runId: run.id,
+        definitionId,
+        positionId: rule.positionId,
+        connectionId: rule.connectionId,
+        sku: rule.sku,
+        supplier: rule.supplier,
+        quantity: Number(line.quantity),
+        unit: typeof line.unit === 'string' ? line.unit : null,
+        available:
+          typeof inventory?.values.available === 'number'
+            ? inventory.values.available
+            : null,
+        minimum: rule.minimum,
+        target: rule.target,
+        approvalQuantity: rule.approvalQuantity,
+        reference:
+          typeof binding.action.parameters.reference === 'string'
+            ? binding.action.parameters.reference
+            : null,
+        checkedAt: inventory?.observedAt ?? null,
+        requestedAt: waiting.recordedAt,
+        requesterId: run.actor.id,
+        expiresAt: binding.action.preconditions.validUntil,
+        risk: binding.action.risk,
+        canRespond: respondable(
+          context,
+          run,
+          rule,
+          binding.action.preconditions.validUntil,
+        ),
+      });
+    }
+
+    return items;
+  }
+
+  /** Reads the 50 most recent runs with their state and verified order, newest first. */
+  async function recentRuns(context: TenantContext) {
+    const list = await runs.list(context, definitionId);
+    const evidence = await steps.list(
+      context,
+      list.map((run) => run.id),
+    );
+
+    return list.map((run) => {
+      const outputs = evidence.get(run.id) ?? [];
+      const order = outputs.find((step) => step.kind === 'verification')?.values
+        .purchaseOrderId;
+
+      return {
+        id: run.id,
+        createdAt: run.createdAt,
+        positionId:
+          run.subject.kind === 'inventory_position' ? run.subject.id : null,
+        state: presentTriggerRun(run, outputs).processState,
+        purchaseOrderId: typeof order === 'string' ? order : null,
+      };
+    });
+  }
+
+  type RecentRun = Awaited<ReturnType<typeof recentRuns>>[number];
+
+  const runSummary = (run: RecentRun): ReplenishmentRunSummary => ({
+    runId: run.id,
+    state: run.state ?? null,
+    summary: replenishmentOutcome(run.state),
+    at: run.createdAt,
+    purchaseOrderId: run.purchaseOrderId,
+  });
+
+  const outcomes = (recent: RecentRun[]) =>
+    summarizeOutcomes(
+      recent.map((run) => ({
+        id: run.id,
+        createdAt: run.createdAt,
+        state: run.state,
+      })),
+      replenishmentOutcome,
+    );
+
+  /** States who approves drafts under current policy; thresholds never remove approval. */
+  async function approval(
+    context: TenantContext,
+  ): Promise<WorkflowReadiness['approval']> {
+    const behavior = describeApproval(
+      await deps.safety.policies.approvalRequirement(context.tenantId, {
+        minimumRisk:
+          action?.kind === 'capability' ? action.minimumRisk : 'medium',
+      }),
+      'purchase-order draft',
+    );
+
+    return {
+      ...behavior,
+      details: [
+        ...behavior.details,
+        'A rule’s high-risk quantity marks larger drafts as high risk. It never removes approval.',
+      ],
+    };
+  }
+
+  const workerIssue: ReadinessIssue = {
+    code: 'worker_unavailable',
+    severity: 'blocking',
+    message:
+      'The workflow worker isn’t connected, so Luma can’t check stock or create orders.',
+    scope: null,
+    repair: {
+      label: 'Ask whoever runs Luma to start the workflow worker',
+      destination: 'server',
+    },
+  };
+  const supplierIssue: ReadinessIssue = {
+    code: 'no_supplier',
+    severity: 'blocking',
+    message:
+      'Add the supplier you reorder from before setting up a stock rule.',
+    scope: null,
+    repair: { label: 'Add a supplier', destination: 'suppliers' },
+  };
+
+  /** Groups unusable stock by reason. It blocks when no covered position has usable stock. */
+  function stockIssues(
+    active: ReplenishmentActivation[],
+    stocks: ReplenishmentStock[],
+    now: number,
+  ): ReadinessIssue[] {
+    const groups = new Map<StockReason, ReplenishmentActivation[]>();
+    for (const rule of active) {
+      const reason = stockUnusableReason(findStock(stocks, rule), now);
+      if (reason) groups.set(reason, [...(groups.get(reason) ?? []), rule]);
+    }
+    const unusable = [...groups.values()].flat().length;
+
+    return [...groups].map(([reason, affected]) => {
+      const [first] = affected as [ReplenishmentActivation];
+      const connections = new Set(affected.map((rule) => rule.connectionId));
+
+      return {
+        code: `stock_${reason}`,
+        severity: unusable === active.length ? 'blocking' : 'degrading',
+        message: stockReasonMessage(reason),
+        scope:
+          affected.length <= 3
+            ? affected.map((rule) => rule.sku).join(', ')
+            : `${affected
+                .slice(0, 2)
+                .map((rule) => rule.sku)
+                .join(', ')} and ${affected.length - 2} more`,
+        repair:
+          reason === 'missing'
+            ? {
+                label: 'Check the inventory connection',
+                destination: 'connections',
+                ...(connections.size === 1
+                  ? { recordId: first.connectionId }
+                  : {}),
+              }
+            : affected.length === 1
+              ? {
+                  label: `Review stock for ${first.sku}`,
+                  destination: 'inventory_position',
+                  recordId: first.positionId,
+                }
+              : {
+                  label: 'Review stock in Inventory',
+                  destination: 'inventory',
+                },
+      };
+    });
+  }
+
+  /** Combines worker, setup, stock, decision and run facts into workflow readiness. */
+  async function readiness(
+    context: TenantContext,
+    facts: {
+      rules: ReplenishmentActivation[];
+      stocks: ReplenishmentStock[];
+      suppliers: number;
+      waiting: ReplenishmentDecision[];
+      recent: RecentRun[];
+    },
+  ) {
+    const now = Date.now();
+    const active = facts.rules.filter((rule) => rule.active);
+    const ready = active.filter(
+      (rule) => !stockUnusableReason(findStock(facts.stocks, rule), now),
+    ).length;
+    const issues: ReadinessIssue[] = available ? [] : [workerIssue];
+    if (!active.length) {
+      if (!facts.suppliers) issues.push(supplierIssue);
+      if (!facts.stocks.some((stock) => !stock.deleted))
+        issues.push({
+          code: 'no_stock',
+          severity: 'blocking',
+          message: 'No inventory source has reported stock positions yet.',
+          scope: null,
+          repair: {
+            label: 'Connect an inventory source',
+            destination: 'connections',
+          },
+        });
+    }
+    issues.push(...stockIssues(active, facts.stocks, now));
+    const [single] = facts.waiting;
+
+    return assessReadiness({
+      enablement: active.length
+        ? 'enabled'
+        : facts.rules.length
+          ? 'paused'
+          : 'not_enabled',
+      issues,
+      coverage: {
+        unit: 'stock position',
+        covered: active.length,
+        ready,
+        explanation: active.length
+          ? `${plural(active.length, 'stock position')} ${active.length === 1 ? 'has' : 'have'} an active rule. ${ready} with fresh stock.`
+          : 'No stock position has an active rule. Stock risk for positions without a rule is unknown, not zero.',
+      },
+      approval: await approval(context),
+      waiting: {
+        count: facts.waiting.length,
+        repair:
+          facts.waiting.length === 1 && single
+            ? {
+                label: 'Review the waiting decision',
+                destination: 'needs_you',
+                recordId: `replenishment:${single.runId}`,
+              }
+            : facts.waiting.length
+              ? { label: 'Open Needs you', destination: 'needs_you' }
+              : null,
+      },
+      outcomes: outcomes(facts.recent),
+      enable: {
+        label: facts.rules.length ? 'Add a stock rule' : 'Set up stock rules',
+        destination: 'workflow_rules',
+      },
+      idle: `Luma checks ${plural(active.length, 'stock position')} and proposes a purchase-order draft when stock falls below the minimum.`,
+    });
+  }
+
   const api: ReplenishmentWorkflow = {
     definitionId,
     async setup(context) {
       context = await authorize(context);
-      const [positions, suppliers, rules] = await Promise.all([
+      const [positions, suppliers, rules, waiting, recent] = await Promise.all([
         store.stocks(context),
         deps.procurement.suppliers(context),
         store.list(context),
+        listPending(context),
+        recentRuns(context),
       ]);
+      const now = Date.now();
 
       return {
         available,
         canManage: context.actor.role !== 'member',
         positions: positions.filter((s) => !s.deleted),
         suppliers: suppliers.items,
-        rules,
+        rules: rules.map((rule) => {
+          const latest = recent.find(
+            (run) => run.positionId === rule.positionId,
+          );
+
+          return {
+            ...rule,
+            status: ruleState(
+              rule.active,
+              stockUnusableReason(findStock(positions, rule), now),
+            ),
+            waitingRunId:
+              waiting.find((item) => item.positionId === rule.positionId)
+                ?.runId ?? null,
+            latestRun: latest ? runSummary(latest) : null,
+          };
+        }),
       };
     },
     async detail(context): ReturnType<ReplenishmentWorkflow['detail']> {
       context = await authorize(context);
-      const rules = await store.list(context);
+      const [rules, stocks, suppliers, waiting, recent] = await Promise.all([
+        store.list(context),
+        store.stocks(context),
+        deps.procurement.suppliers(context),
+        listPending(context),
+        recentRuns(context),
+      ]);
       const active = rules.filter((r) => r.active);
+      const presented = presentProcessVersion(version);
       const blockers = available
         ? []
         : [
@@ -319,10 +659,21 @@ export function createReplenishmentService(deps: {
                 : 'inactive',
           blockers,
           activeVersions: active.length ? [version.version] : [],
+          readiness: await readiness(context, {
+            rules,
+            stocks,
+            suppliers: suppliers.items.length,
+            waiting,
+            recent,
+          }),
         },
         versions: [
           {
-            ...presentProcessVersion(version),
+            ...presented,
+            steps: presented.steps.map((step) => ({
+              ...step,
+              ...replenishmentStepCopy[step.id],
+            })),
             compatible: available,
             blockers,
             category: 'procurement',
@@ -427,6 +778,265 @@ export function createReplenishmentService(deps: {
       await recordAudit(context, saved);
 
       return view(saved);
+    },
+    async preview(context, input) {
+      context = await authorize(context, true);
+      const [stocks, rules, supplier, orders] = await Promise.all([
+        store.stocks(context),
+        store.list(context),
+        deps.procurement.supplier(context, input.supplierId),
+        deps.procurement.orders(context),
+      ]);
+      if (!supplier) conflict('Choose a supplier in this workspace.');
+      const now = Date.now();
+
+      return {
+        approval: await approval(context),
+        supplier: { id: supplier.id, name: supplier.name },
+        items: input.items.map((item) => {
+          const stock = findStock(stocks, item);
+          const existing = rules.find(
+            (rule) => rule.active && rule.positionId === item.positionId,
+          );
+          const base = {
+            positionId: item.positionId,
+            connectionId: item.connectionId,
+            sku: stock?.sku ?? existing?.sku ?? null,
+            unit: stock?.unit ?? null,
+            available: stock?.available ?? null,
+            observedAt: stock?.observedAt ?? null,
+            existingRule: existing
+              ? {
+                  id: existing.id,
+                  supplier: existing.supplier,
+                  minimum: existing.minimum,
+                  target: existing.target,
+                }
+              : null,
+            belowMinimum: false,
+            proposedQuantity: null,
+            risk: null,
+          };
+          if (existing)
+            return {
+              ...base,
+              outcome: 'covered' as const,
+              message: `An active rule already covers this position. It stays unchanged; revoke it first to replace it.`,
+            };
+          if (!stock || stock.deleted)
+            return {
+              ...base,
+              outcome: 'unavailable' as const,
+              message: 'The source doesn’t list this stock position.',
+            };
+          if (stock.sku.length > 200 || stock.unit.length > 40)
+            return {
+              ...base,
+              outcome: 'unavailable' as const,
+              message:
+                'The SKU or unit is too long for a purchase order. Update its mapping first.',
+            };
+          if (item.target <= item.minimum)
+            return {
+              ...base,
+              outcome: 'invalid' as const,
+              message: 'Target stock must be above the minimum.',
+            };
+          const plan = planReplenishment(
+            item,
+            stock,
+            replenishmentCommitments(orders.items, stock.sku).length > 0,
+            now,
+          );
+
+          return {
+            ...base,
+            outcome: 'ready' as const,
+            belowMinimum: plan.belowMinimum,
+            proposedQuantity: plan.eligible ? plan.quantity : null,
+            risk: plan.eligible
+              ? plan.approvalRequired
+                ? ('high' as const)
+                : ('medium' as const)
+              : null,
+            message: !plan.fresh
+              ? 'Stock is older than five minutes. The rule activates, but Luma waits for a fresh read before proposing anything.'
+              : !plan.belowMinimum
+                ? 'Stock is at or above the minimum. Luma proposes a draft only after it falls below.'
+                : plan.committed
+                  ? 'Stock is below the minimum, but an existing draft or open order covers this SKU. No new draft would be proposed.'
+                  : `Stock is below the minimum. The first check would propose ${plan.quantity} ${stock.unit} for approval.`,
+          };
+        }),
+      };
+    },
+    async configureMany(context, items) {
+      context = await authorize(context, true);
+      assertAvailable();
+      const results: ReplenishmentBatchResult[] = [];
+      for (const item of items) {
+        const result = (
+          status: ReplenishmentBatchResult['status'],
+          code: ReplenishmentBatchResult['code'],
+          message: string,
+          activation: ReplenishmentBatchResult['activation'] = null,
+        ) =>
+          results.push({
+            id: item.id,
+            positionId: item.positionId,
+            status,
+            code,
+            message,
+            activation,
+          });
+        // Another rule for the position is never replaced; a replay of this item still succeeds.
+        const covering = (await store.list(context)).find(
+          (rule) =>
+            rule.active &&
+            rule.positionId === item.positionId &&
+            rule.id !== item.id,
+        );
+        if (covering) {
+          result(
+            'failed',
+            'covered',
+            'An active rule already covers this position. It was left unchanged.',
+          );
+          continue;
+        }
+        try {
+          result(
+            'activated',
+            'activated',
+            'Activated. Luma now checks this position.',
+            await api.configure(context, item),
+          );
+        } catch (error) {
+          if (
+            error instanceof IdentityError &&
+            (error.statusCode === 401 || error.statusCode === 403)
+          )
+            throw error;
+          if (error instanceof IdentityError && error.statusCode < 500)
+            result('failed', 'rejected', error.message);
+          else
+            result(
+              'uncertain',
+              'uncertain',
+              'Luma couldn’t confirm this activation. Retry it unchanged; the same request never creates a second rule.',
+            );
+        }
+      }
+
+      return results;
+    },
+    async coverage(context, positionId) {
+      context = await authorize(context);
+      const [rules, stocks, suppliers, waiting, recent] = await Promise.all([
+        store.list(context),
+        store.stocks(context),
+        deps.procurement.suppliers(context),
+        listPending(context),
+        recentRuns(context),
+      ]);
+      const mine = rules.filter((rule) => rule.positionId === positionId);
+      const rule = mine.find((item) => item.active) ?? mine[0] ?? null;
+      const stock = rule
+        ? findStock(stocks, rule)
+        : (stocks.find((s) => s.positionId === positionId && !s.deleted) ??
+          stocks.find((s) => s.positionId === positionId));
+      if (!rule && !stock)
+        throw new IdentityError(404, 'NOT_FOUND', 'Stock position not found.');
+      const active = rule?.active ? rule : null;
+      const now = Date.now();
+      const reason = active ? stockUnusableReason(stock, now) : null;
+      const sku = rule?.sku ?? stock?.sku ?? 'this position';
+      const unit = stock?.unit ?? 'units';
+      const issues: ReadinessIssue[] = available ? [] : [workerIssue];
+      if (active && reason)
+        issues.push({
+          code: `stock_${reason}`,
+          severity: 'blocking',
+          message: stockReasonMessage(reason),
+          scope: sku,
+          repair:
+            reason === 'missing'
+              ? {
+                  label: 'Check the inventory connection',
+                  destination: 'connections',
+                  recordId: active.connectionId,
+                }
+              : {
+                  label: `Review stock for ${sku}`,
+                  destination: 'inventory_position',
+                  recordId: positionId,
+                },
+        });
+      if (!active && !suppliers.items.length) issues.push(supplierIssue);
+      const pending = waiting.filter((item) => item.positionId === positionId);
+      const history = recent.filter((run) => run.positionId === positionId);
+      const [first] = pending;
+      const [latest] = history;
+
+      return {
+        definitionId,
+        name: version.definition.name,
+        purpose: version.definition.intent,
+        canManage: context.actor.role !== 'member',
+        readiness: assessReadiness({
+          enablement: active ? 'enabled' : rule ? 'paused' : 'not_enabled',
+          issues,
+          coverage: {
+            unit: 'stock position',
+            covered: active ? 1 : 0,
+            ready: active && !reason ? 1 : 0,
+            explanation: active
+              ? `Luma checks ${sku} against a minimum of ${active.minimum} ${unit} and proposes enough to reach ${active.target}.`
+              : 'No active rule covers this position, so Luma doesn’t watch its stock.',
+          },
+          approval: await approval(context),
+          waiting: {
+            count: pending.length,
+            repair: first
+              ? {
+                  label: 'Review the waiting decision',
+                  destination: 'needs_you',
+                  recordId: `replenishment:${first.runId}`,
+                }
+              : null,
+          },
+          outcomes: outcomes(history),
+          enable: {
+            label: rule
+              ? 'Set up a new rule for this position'
+              : 'Set up replenishment for this position',
+            destination: 'workflow_rules',
+            recordId: positionId,
+          },
+          idle: active
+            ? `Luma checks this position and proposes a draft when stock falls below ${active.minimum} ${unit}.`
+            : 'Luma doesn’t watch this position.',
+        }),
+        rule: rule
+          ? {
+              id: rule.id,
+              supplier: rule.supplier,
+              minimum: rule.minimum,
+              target: rule.target,
+              approvalQuantity: rule.approvalQuantity,
+              active: rule.active,
+            }
+          : null,
+        stock: stock
+          ? {
+              sku: stock.sku,
+              unit: stock.unit,
+              available: stock.available,
+              observedAt: stock.observedAt,
+            }
+          : null,
+        latestRun: latest ? runSummary(latest) : null,
+      };
     },
     async revoke(context, id, digest) {
       context = await authorize(context, true);
@@ -1048,79 +1658,7 @@ export function createReplenishmentService(deps: {
      * only. It reads no provider and starts nothing; approval still goes through `api.decide`.
      */
     async pending(context: TenantContext): Promise<ReplenishmentDecision[]> {
-      context = await authorize(context);
-      const existing = await runs.pending(context, definitionId);
-      if (!existing.length) return [];
-      const [evidence, rules] = await Promise.all([
-        steps.list(
-          context,
-          existing.map((r) => r.id),
-        ),
-        store.list(context),
-      ]);
-      const items: ReplenishmentDecision[] = [];
-      for (const run of existing) {
-        const outputs = evidence.get(run.id) ?? [];
-        if (
-          presentTriggerRun(run, outputs).processState !== 'awaiting_decision'
-        )
-          continue;
-        const waiting = outputs.find(
-          (step) => step.kind === 'capability' && step.state === 'waiting',
-        );
-        const rule = rules.find(
-          (r) => r.id === String(run.context.inputs.activationId),
-        );
-        if (!waiting?.evidenceRefs[0] || !rule) continue;
-        const [binding, decision] = await Promise.all([
-          deps.safety.provisioning.step(context, run.id, 'create-order'),
-          deps.safety.policies.decision(context, waiting.evidenceRefs[0]),
-        ]);
-        if (
-          !binding ||
-          decision?.outcome !== 'approval_required' ||
-          decision.approval ||
-          decision.proposalId !== binding.action.id ||
-          Date.parse(binding.action.preconditions.validUntil) <= Date.now()
-        )
-          continue;
-        const line = JSON.parse(String(binding.action.parameters.lines))[0];
-        const inventory = outputs.find((step) => step.stepId === 'inventory');
-        items.push({
-          runId: run.id,
-          definitionId,
-          positionId: rule.positionId,
-          connectionId: rule.connectionId,
-          sku: rule.sku,
-          supplier: rule.supplier,
-          quantity: Number(line.quantity),
-          unit: typeof line.unit === 'string' ? line.unit : null,
-          available:
-            typeof inventory?.values.available === 'number'
-              ? inventory.values.available
-              : null,
-          minimum: rule.minimum,
-          target: rule.target,
-          approvalQuantity: rule.approvalQuantity,
-          reference:
-            typeof binding.action.parameters.reference === 'string'
-              ? binding.action.parameters.reference
-              : null,
-          checkedAt: inventory?.observedAt ?? null,
-          requestedAt: waiting.recordedAt,
-          requesterId: run.actor.id,
-          expiresAt: binding.action.preconditions.validUntil,
-          risk: binding.action.risk,
-          canRespond: respondable(
-            context,
-            run,
-            rule,
-            binding.action.preconditions.validUntil,
-          ),
-        });
-      }
-
-      return items;
+      return listPending(await authorize(context));
     },
     /** Recovers committed starts and evaluates active stock conditions with observation deduplication. */
     async tick(context: TenantContext) {

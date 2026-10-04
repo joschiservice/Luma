@@ -35,6 +35,12 @@ export async function seedCodeSteps(db, tenantId) {
       createTenantDatabase(pool),
       {},
       async () => context,
+      {
+        approvalRequirement: async () => ({
+          mode: 'every_action',
+          reason: 'minimum_risk',
+        }),
+      },
     );
     const version = compileProcessWorkflow({
       schemaVersion: 2,

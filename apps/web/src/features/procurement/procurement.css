@@ -91,6 +91,18 @@
 .procurement-overview-actions span {
   font-size: 12px;
 }
+.procurement-replenishment-state {
+  color: var(--muted-foreground);
+  font-weight: 500;
+}
+.procurement-replenishment-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px 16px;
+  flex: none;
+}
 .procurement-collection {
   overflow: hidden;
   border-radius: var(--radius-panel);
@@ -414,6 +426,9 @@
   }
   .procurement-overview-actions {
     flex-wrap: wrap;
+  }
+  .procurement-replenishment-actions {
+    justify-content: flex-start;
   }
   .procurement-page {
     padding: 24px 20px 48px;

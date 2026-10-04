@@ -45,3 +45,27 @@ export function evaluatePolicy(
 
   return { outcome, reason };
 }
+
+/**
+ * States whether every proposal for an action needs a person, before any proposal exists. It
+ * applies the same rules as `evaluatePolicy`: risk below the capability's minimum never lowers it,
+ * and quantity-based risk can only add approval, never remove it.
+ */
+export function approvalRequirement(input: {
+  minimumRisk: ProposedAction['risk'];
+  /** A workflow version that requires approval for every action. */
+  workflowRequired?: boolean;
+  workspaceRequired: boolean;
+}): {
+  mode: 'every_action' | 'risk_based';
+  reason: 'minimum_risk' | 'workspace_policy' | 'workflow' | 'risk';
+} {
+  if (input.minimumRisk !== 'low')
+    return { mode: 'every_action', reason: 'minimum_risk' };
+  if (input.workspaceRequired)
+    return { mode: 'every_action', reason: 'workspace_policy' };
+  if (input.workflowRequired)
+    return { mode: 'every_action', reason: 'workflow' };
+
+  return { mode: 'risk_based', reason: 'risk' };
+}
