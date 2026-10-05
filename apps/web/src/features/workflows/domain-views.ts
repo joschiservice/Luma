@@ -4,14 +4,17 @@ import type { ComponentType } from 'react';
 import { ReplenishmentPanel, ReplenishmentRunReview } from './replenishment';
 
 interface WorkflowDomainView {
-  triggerLabel: string;
-  Controls: ComponentType<{ organizationId: string; detail: WorkflowDetail }>;
+  /** Rule controls; `setup` preselects a record when another page links to setup. */
+  Controls: ComponentType<{
+    organizationId: string;
+    detail: WorkflowDetail;
+    setup?: string | undefined;
+  }>;
   RunContext: ComponentType<{ organizationId: string; run: WorkflowRunView }>;
 }
 
 const views: Record<string, WorkflowDomainView> = {
   'procurement.replenishment': {
-    triggerLabel: 'Stock rules',
     Controls: ReplenishmentPanel,
     RunContext: ReplenishmentRunReview,
   },

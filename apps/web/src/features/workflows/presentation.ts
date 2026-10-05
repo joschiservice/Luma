@@ -31,3 +31,11 @@ export function workflowTriggerLabel(
         : `${trigger.field} is ${String(trigger.equals)}`;
   }
 }
+
+/** Names a workflow's operational area; resolution workflows fix detected issues. */
+export function workflowCategoryLabel(category: string): string {
+  if (category === 'resolution') return 'Issue resolution';
+  if (category === 'procurement') return 'Procurement';
+
+  return category.charAt(0).toUpperCase() + category.slice(1);
+}

@@ -26,6 +26,12 @@ Set the three required Bedrock variables together. Startup fails when a `bedrock
 
 `ModelRoutingPolicy` can choose another configured profile or return `null` to deny a request. It sees the profile and data policy, not the prompt. Selected routes must still satisfy mandatory residency and retention checks. Routes and provider lists are copied and frozen at composition. Credentials, destination URLs and provider options are not request parameters.
 
+## Local development
+
+Managed commands do not generate model settings; put them in `apps/api/.env`. Until a `bedrock-eu` route and Bedrock settings exist, describing workflows and reading supplier messages report why they are unavailable and call no model. Local seeded and simulator data is synthetic, so the processing-path review does not block local use.
+
+To enable both features, get credentials for a dedicated IAM principal with the permissions listed under [Bedrock EU adapter](#bedrock-eu-adapter) and set the account's retention mode to `none` in the configured region. Copy the Bedrock variables and the two-profile `MODEL_GATEWAY_ROUTES` example from `apps/api/.env.example`, fill in the credentials and restart `pnpm dev`. Startup fails on partial or non-EU settings. `pnpm evaluate:authoring` reads the same file and makes synthetic calls through the `authoring` route.
+
 ## Workflow authoring profile
 
 Natural-language workflow authoring sends workflow descriptions, field names, supplier names and example records to the model. These are tenant data. Authoring services use `authoringModelProfile` (`'authoring'`, exported by `@luma/platform`) with `dataPolicy: { classification: 'sensitive', region: 'EU', zeroDataRetention: true }`. Route this profile to Bedrock in the EU:

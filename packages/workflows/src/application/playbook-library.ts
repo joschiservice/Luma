@@ -4,6 +4,7 @@ import type {
 } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
 import { IdentityError, requireRole, requireTenant } from '@luma/identity';
+import type { PolicyService } from '@luma/policies';
 import { currentPolicyVersion } from '@luma/policies';
 
 import type { PlaybookVersion } from '../domain/playbook.js';
@@ -15,6 +16,12 @@ import type {
   PlaybookSummary,
 } from '../domain/playbook-library.js';
 import { presentPlaybook } from '../domain/playbook-presentation.js';
+import type { ReadinessIssue } from '../domain/readiness.js';
+import {
+  assessReadiness,
+  describeApproval,
+  summarizeOutcomes,
+} from '../domain/readiness.js';
 import type { PlaybookService } from './playbook.js';
 
 export interface PlaybookLibraryStore {
@@ -63,6 +70,8 @@ export interface PlaybookLibraryDependencies extends PlaybookLibraryScope {
     operation: (scope: PlaybookLibraryScope) => Promise<T>,
   ): Promise<T>;
   refreshContext(context: TenantContext): Promise<TenantContext>;
+  /** Reads the workspace approval setting so approval is described as admission applies it. */
+  approvalPolicy: Pick<PolicyService, 'approvalRequirement'>;
 }
 const conflict = (message: string): never => {
   throw new IdentityError(409, 'CONFLICT', message);
@@ -103,6 +112,146 @@ export function connectionBlockers({
   return blockers;
 }
 
+const runState = (run: PlaybookRunView) =>
+  run.verification === 'verified'
+    ? 'verified'
+    : run.verification === 'failed'
+      ? 'failed_verification'
+      : run.verification === 'inconclusive'
+        ? 'inconclusive_verification'
+        : run.execution === 'denied'
+          ? 'denied'
+          : run.execution === 'awaiting_approval'
+            ? 'awaiting_decision'
+            : 'running';
+
+const runSummary = (state: string | undefined) =>
+  state === 'verified'
+    ? 'The order’s shipping method was independently verified.'
+    : state === 'failed_verification'
+      ? 'The expected shipping method wasn’t observed on the order.'
+      : state === 'inconclusive_verification'
+        ? 'The correction couldn’t be confirmed.'
+        : state === 'denied'
+          ? 'The proposed correction was rejected or wasn’t allowed.'
+          : state === 'awaiting_decision'
+            ? 'The proposed correction is waiting for approval.'
+            : 'The correction is in progress.';
+
+/**
+ * Derives readiness from current connection access and active grants. An active grant on a
+ * connection that lost access blocks that scope; it never counts as ready.
+ */
+function playbookReadiness(input: {
+  versionBlockers: string[];
+  connections: PlaybookDetail['connections'];
+  activations: PlaybookActivationView[];
+  runs: PlaybookRunView[];
+  approval: PlaybookDetail['summary']['readiness']['approval'];
+}) {
+  const active = input.activations.filter((a) => a.active);
+  const issues: ReadinessIssue[] = input.versionBlockers.map((message) => ({
+    code: 'version_unsupported',
+    severity: 'blocking',
+    message,
+    scope: null,
+    repair: null,
+  }));
+  const covered = new Set(active.flatMap((a) => a.grants.targetIds));
+  const ready = new Set<string>();
+  const granted = [...new Set(active.flatMap((a) => a.grants.connectionIds))];
+  const broken = granted.filter((id) => {
+    const connection = input.connections.find((c) => c.id === id);
+
+    return !connection || connection.blockers.length > 0;
+  });
+  for (const activation of active)
+    for (const id of activation.grants.connectionIds) {
+      const connection = input.connections.find((c) => c.id === id);
+      if (!connection || connection.blockers.length) continue;
+      for (const target of activation.grants.targetIds)
+        if (connection.targets.some((t) => t.id === target)) ready.add(target);
+    }
+  for (const id of broken) {
+    const connection = input.connections.find((c) => c.id === id);
+    issues.push({
+      code: connection ? 'connection_access' : 'connection_removed',
+      severity: broken.length === granted.length ? 'blocking' : 'degrading',
+      message: connection
+        ? connection.blockers.join(' ')
+        : 'The granted connection was removed. Revoke this activation and review a new scope.',
+      scope: connection?.label ?? null,
+      repair: {
+        label: 'Repair access in Connections',
+        destination: 'connections',
+        recordId: id,
+      },
+    });
+  }
+  const unmapped = [...covered].filter((id) => !ready.has(id)).length;
+  if (!broken.length && unmapped)
+    issues.push({
+      code: 'targets_unmapped',
+      severity: unmapped === covered.size ? 'blocking' : 'degrading',
+      message: `${unmapped} granted ${unmapped === 1 ? 'order is' : 'orders are'} no longer mapped on the connection, so Luma won’t change ${unmapped === 1 ? 'it' : 'them'}.`,
+      scope: null,
+      repair: { label: 'Check order mappings', destination: 'connections' },
+    });
+  const eligible = input.connections.find((c) => !c.blockers.length);
+  if (!active.length && !eligible) {
+    const [first] = input.connections;
+    issues.push({
+      code: 'no_connection',
+      severity: 'blocking',
+      message: first
+        ? first.blockers.join(' ')
+        : 'No connection is installed. Connect the shop or ERP that holds the orders.',
+      scope: first?.label ?? null,
+      repair: {
+        label: first ? 'Repair access in Connections' : 'Connect a source',
+        destination: 'connections',
+        ...(first ? { recordId: first.id } : {}),
+      },
+    });
+  }
+  const states = input.runs.map((run) => ({
+    id: run.id,
+    createdAt: run.createdAt,
+    state: runState(run),
+  }));
+
+  return assessReadiness({
+    enablement: active.length
+      ? 'enabled'
+      : input.activations.length
+        ? 'paused'
+        : 'not_enabled',
+    issues,
+    coverage: {
+      unit: 'order',
+      covered: covered.size,
+      ready: ready.size,
+      explanation: covered.size
+        ? `${covered.size} ${covered.size === 1 ? 'order is' : 'orders are'} granted. ${ready.size} can be corrected with current access.`
+        : 'No order is granted yet. An activation names the exact orders Luma may correct.',
+    },
+    approval: input.approval,
+    // Needs you owns case decisions; a run's last outcome can outlive an expired approval.
+    waiting: {
+      count: null,
+      repair: { label: 'Open Needs you', destination: 'needs_you' },
+    },
+    outcomes: summarizeOutcomes(states, runSummary),
+    enable: {
+      label: input.activations.length
+        ? 'Review a new activation'
+        : 'Review activation',
+      destination: 'workflow_rules',
+    },
+    idle: `Luma can correct the shipping method on ${covered.size} granted ${covered.size === 1 ? 'order' : 'orders'} when the issue is detected.`,
+  });
+}
+
 /** Provides member-readable playbooks and atomic administrator activation commands. */
 export function createPlaybookLibrary(deps: PlaybookLibraryDependencies) {
   async function authorize(context: TenantContext, write = false) {
@@ -124,10 +273,11 @@ export function createPlaybookLibrary(deps: PlaybookLibraryDependencies) {
     scope: PlaybookLibraryScope,
     lock = false,
   ): Promise<PlaybookDetail> {
-    const [published, activations, sources] = await Promise.all([
+    const [published, activations, sources, runs] = await Promise.all([
       scope.store.versions(context, definitionId),
       scope.store.activations(context, definitionId),
       scope.grants(context, lock),
+      lock ? [] : scope.store.runs(context, definitionId),
     ]);
     if (!published.length) return missing();
     published.sort((a, b) => {
@@ -172,6 +322,14 @@ export function createPlaybookLibrary(deps: PlaybookLibraryDependencies) {
     const activeVersions = [
       ...new Set(activations.filter((a) => a.active).map((a) => a.version)),
     ];
+    const action = published[0]!.ir.action;
+    const requirement = await deps.approvalPolicy.approvalRequirement(
+      context.tenantId,
+      {
+        minimumRisk: action.minimumRisk,
+        workflowRequired: published[0]!.ir.approval.mode === 'required',
+      },
+    );
     const summary: PlaybookSummary = {
       id: definitionId,
       name: published[0]!.definition.name,
@@ -189,6 +347,13 @@ export function createPlaybookLibrary(deps: PlaybookLibraryDependencies) {
           : activations.length
             ? 'revoked'
             : 'inactive',
+      readiness: playbookReadiness({
+        versionBlockers: latest.blockers,
+        connections,
+        activations,
+        runs,
+        approval: describeApproval(requirement, 'shipping-method correction'),
+      }),
     };
 
     return {

@@ -95,6 +95,45 @@ export function workflowRoutes(service?: WorkflowCatalog) {
         ),
       };
     },
+    previewReplenishment: async ({ request, params, body }) => {
+      const s = use(request);
+
+      return {
+        status: 200,
+        body: await s.service.previewReplenishment(
+          s.context,
+          params.definitionId,
+          body,
+        ),
+      };
+    },
+    configureReplenishmentBatch: async ({ request, params, body }) => {
+      const s = use(request);
+
+      return {
+        status: 200,
+        body: {
+          results: await s.service.configureReplenishmentMany(
+            s.context,
+            params.definitionId,
+            body.items,
+          ),
+        },
+      };
+    },
+    coverage: async ({ request, query }) => {
+      const s = use(request);
+
+      return {
+        status: 200,
+        body: {
+          items: await s.service.coverage(s.context, {
+            kind: query.subjectKind,
+            id: query.subjectId,
+          }),
+        },
+      };
+    },
     startReplenishment: async ({ request, params, body }) => {
       const s = use(request);
 

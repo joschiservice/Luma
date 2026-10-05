@@ -1,22 +1,48 @@
 ---
 title: Understand workflows
-description: See what each workflow does, whether it can run here, and what happens in each run.
+description: See what each workflow does, whether it can run here, what it covers and what to do next.
 ---
 
 A workflow reacts to something — a person starting it, an event, a condition such as low stock, or a detected issue — and runs a fixed list of steps. Every action it takes passes workspace policy and approval before it runs, and a separate check confirms the result.
 
 ## Read the library
 
-The library lists published workflows and your drafts.
+Each workflow shows two separate labels:
 
-- **Active** workflows have an approved scope and run when their trigger happens.
-- **Inactive** workflows are published but not switched on yet.
-- **Prerequisites missing** means something must change first. The first reason is shown on the row; open the workflow for the full list.
-- **Drafts** are workflows being written. Drafts never run.
+- **Enabled**, **Paused** or **Not set up** says whether someone turned it on. Paused means every activation or stock rule was revoked.
+- **Ready**, **Partly blocked** or **Blocked** says whether it can run now. An enabled workflow can still be blocked, for example when a connection lost access or stock stopped updating.
+
+Below the purpose, **Next** names the one thing to do, with a link to the place that fixes it. Use the views to find what needs you:
+
+- **Needs attention** shows blocked or partly blocked workflows, workflows with decisions waiting and workflows whose latest run ended unresolved.
+- **Enabled** and **Not enabled** filter by whether a workflow is turned on.
+
+**Drafts** are workflows being written. Drafts never run.
 
 ## Open a workflow
 
-The overview shows when it starts, what it acts on and what success means. **How it works** lists each step in order. **Recent runs** shows every run with its decisions, actions and result checks. An accepted action is not success on its own; only a passed result check confirms it.
+A workflow has four parts:
+
+- **Overview** shows when it starts, what success means and its readiness: the next action, anything blocking it, what it covers, who approves its actions, what waits for a person and what recent runs verified. **How it works** lists the steps in plain language.
+- **Activity** shows every run with its decisions, actions and result checks. An accepted action isn't success on its own; only a passed result check confirms it.
+- **Rules** is where owners and admins turn the workflow on: stock rules for replenishment, or an activation that names the exact orders a correction may change.
+- **Technical details** keeps capability identifiers, permissions, inputs, version history and digests for inspection.
+
+Coverage that Luma can't establish shows as **Unknown**, never as zero.
+
+## Approval
+
+**Approval** in the overview states how approval actually applies under current workspace policy. A replenishment rule's high-risk quantity only marks larger drafts as high risk. It never lets a draft skip approval.
+
+## Set up replenishment
+
+Open **Replenish low stock** and choose **Add stock rules**, or start from **Procurement** or a stock position. You can set up to 25 stock positions at once:
+
+1. Choose the supplier and the stock positions. Positions that already have an active rule can't be selected.
+2. Review each position. Luma shows current stock, whether the first check would propose an order, and who approves it. You can adjust the minimum and target for each position.
+3. Activate. Each position gets its own rule and its own result. A rule that couldn't be confirmed can be retried; retrying never creates a second rule.
+
+A stock position's page shows the same readiness as the workflow, including a waiting decision and the latest purchase order.
 
 ## Start something new
 

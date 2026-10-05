@@ -20,7 +20,14 @@ export { resolutionWorkflow } from './domain/workflow.js';
 
 export type { WorkflowCatalog } from './application/catalog.js';
 
-export type { ReplenishmentWorkflow } from './application/replenishment-port.js';
+export type {
+  ReplenishmentBatchResult,
+  ReplenishmentPreview,
+  ReplenishmentPreviewItem,
+  ReplenishmentRunSummary,
+  ReplenishmentSubjectCoverage,
+  ReplenishmentWorkflow,
+} from './application/replenishment-port.js';
 
 export type { WorkflowTriggerStore } from './application/triggers.js';
 
@@ -109,3 +116,11 @@ export type {
   GenerationSummary,
   ProposalResult,
 } from './application/draft-generation.js';
+
+export type * from './domain/readiness.js';
+
+export {
+  assessReadiness,
+  describeApproval,
+  summarizeOutcomes,
+} from './domain/readiness.js';

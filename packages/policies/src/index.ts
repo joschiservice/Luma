@@ -17,4 +17,4 @@ export type {
   PolicyService,
 } from './application/policies.js';
 
-export { evaluatePolicy } from './domain/evaluate.js';
+export { approvalRequirement, evaluatePolicy } from './domain/evaluate.js';

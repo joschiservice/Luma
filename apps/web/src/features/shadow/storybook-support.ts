@@ -28,7 +28,7 @@ export type PreviewState =
   | 'no_candidate'
   | 'report'
   | 'report_empty';
-const summary: WorkflowSummary = {
+const summary: Omit<WorkflowSummary, 'readiness'> = {
   id: workflow,
   name: 'Correct an order shipping method',
   purpose: 'Apply the mapped shipping method.',

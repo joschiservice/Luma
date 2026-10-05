@@ -20,7 +20,7 @@ import {
   workflowOptions,
   workflowsKey,
 } from '../data';
-import { ReplenishmentRuleForm } from '../replenishment';
+import { ReplenishmentSetupFlow } from '../replenishment-setup';
 import { installTemplate } from './data';
 
 type Stage = 'requirements' | 'configure' | 'done';
@@ -113,6 +113,7 @@ export function UseTemplateDialog({
               organizationId={organizationId}
               template={template}
               lock={setLocked}
+              cancel={close}
               done={() => setStage('done')}
             />
           ) : (
@@ -153,11 +154,13 @@ function ReplenishmentStep({
   organizationId,
   template,
   lock,
+  cancel,
   done,
 }: {
   organizationId: string;
   template: WorkflowTemplate;
   lock(value: boolean): void;
+  cancel(): void;
   done(): void;
 }) {
   const client = useQueryClient();
@@ -184,13 +187,14 @@ function ReplenishmentStep({
     return <p role="status">Loading stock positions and suppliers…</p>;
 
   return (
-    <ReplenishmentRuleForm
+    <ReplenishmentSetupFlow
       organizationId={organizationId}
       detail={detail.data}
       setup={setup.data}
       onLock={lock}
-      done={async () => {
-        await client.invalidateQueries({
+      done={(changed) => {
+        if (!changed) return cancel();
+        void client.invalidateQueries({
           queryKey: workflowsKey(organizationId),
         });
         done();

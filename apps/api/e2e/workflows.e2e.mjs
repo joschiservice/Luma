@@ -55,7 +55,12 @@ it('publishes native workflows without cases, retains immutable versions and exp
   t.onTestFinished(() => pool.end());
   const tenantDb = createTenantDatabase(pool);
   // Publication only uses the owner store and refreshed membership, never execution controls.
-  const catalog = createWorkflows(tenantDb, {}, async () => context);
+  const catalog = createWorkflows(tenantDb, {}, async () => context, {
+    approvalRequirement: async () => ({
+      mode: 'every_action',
+      reason: 'minimum_risk',
+    }),
+  });
   const projected = resolutionWorkflow(compilePlaybook(shippingMethodPlaybook));
   const { digest, format, ...source } = projected;
   expect(digest).toHaveLength(64);

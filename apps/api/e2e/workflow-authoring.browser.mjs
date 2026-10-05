@@ -197,7 +197,8 @@ test('creates workflows from templates and from scratch, then publishes without 
     .first()
     .waitFor({ state: 'attached' });
   expect(page.url()).toMatch(/\/workflows\/custom-/);
-  await page.getByText('Prerequisites missing').first().waitFor();
+  await page.getByText('Blocked', { exact: true }).first().waitFor();
+  await page.getByRole('heading', { name: 'Can’t run right now' }).waitFor();
   await page.screenshot({
     path: `${screenshots}/published-desktop.png`,
     fullPage: true,

@@ -7,6 +7,7 @@ import type {
   TenantDatabase,
   TraceContext,
 } from '@luma/platform';
+import type { PolicyService } from '@luma/policies';
 
 import { createWorkflowCatalog } from './application/catalog.js';
 import { createCodeEvaluations } from './application/code-evaluations.js';
@@ -153,6 +154,7 @@ export function createWorkflows(
   db: TenantDatabase,
   legacy: PlaybookLibrary,
   refreshContext: (context: TenantContext) => Promise<TenantContext>,
+  approvalPolicy: Pick<PolicyService, 'approvalRequirement'>,
   replenishment?: import('./application/replenishment-port.js').ReplenishmentWorkflow,
   codeProcesses?: Pick<
     ReturnType<typeof createCodeProcesses>,
@@ -215,6 +217,7 @@ export function createWorkflows(
     legacy,
     compile: compilePublishedWorkflow,
     refreshContext,
+    approvalPolicy,
   });
 }
 

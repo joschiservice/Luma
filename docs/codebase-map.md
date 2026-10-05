@@ -117,6 +117,19 @@ Tests: Workflow compiler tests, `apps/api/e2e/workflows.e2e.mjs`,
 integration tests. See [Workflow model](workflows.md) and
 [ADR-007](architecture/007-workflow-model.md).
 
+Readiness (enablement, blockers, coverage, approval and the next action) is
+`packages/workflows/src/domain/readiness.ts`; approval comes from
+`approvalRequirement` in `packages/policies/src/domain/evaluate.ts`. Owners supply
+facts in `application/playbook-library.ts`, `application/catalog.ts` and
+`packages/procurement/src/application/replenishment-workflow.ts` (copy in
+`domain/replenishment-readiness.ts`). The web panel, pills and repair links are
+`apps/web/src/features/workflows/readiness.tsx`; record coverage is `coverage.tsx`,
+used by the stock and purchase-order pages, and bulk stock-rule setup is
+`replenishment-setup.tsx`. Tests: `readiness.test.ts`, `evaluate.test.ts`,
+`replenishment-readiness.test.ts`, `replenishment.e2e.mjs`, `playbooks.e2e.mjs`
+and the replenishment and playbooks browser journeys. See
+[Workflow readiness](workflows.md#readiness).
+
 General workflow starts enter through `packages/workflows/src/application/triggers.ts`.
 Versioned signal checks live in `domain/trigger.ts`; tenant-isolated persistence
 lives in `infrastructure/triggers.ts`. Migration `0025_workflow_triggers.sql`

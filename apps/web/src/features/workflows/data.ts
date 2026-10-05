@@ -1,6 +1,12 @@
 import {
   type ActivateWorkflow,
+  playbookSummarySchema,
+  replenishmentBatchResultSchema,
+  type ReplenishmentPreviewRequest,
+  replenishmentPreviewSchema,
+  type ReplenishmentRuleInput,
   workflowActivationSchema,
+  workflowCoverageSchema,
   workflowDetailSchema,
   workflowRunViewSchema,
   workflowSummarySchema,
@@ -143,9 +149,10 @@ export const resolutionWorkflowsOptions = (organizationId: string) =>
       });
       if (result.status !== 200) return failure(result);
 
-      return result.body.items.map((item) =>
-        workflowSummarySchema.parse({ ...item, category: 'resolution' }),
-      );
+      return result.body.items.map((item) => ({
+        ...playbookSummarySchema.parse(item),
+        category: 'resolution',
+      }));
     },
   });
 
@@ -198,20 +205,6 @@ export const replenishmentOptions = (organizationId: string) =>
       return result.body;
     },
   });
-
-/** Activates an immutable rule. Reuse the full request when retrying. */
-export async function configureReplenishment(
-  organizationId: string,
-  body: import('@luma/api-contract').ReplenishmentRuleInput,
-) {
-  const result = await api.workflows.configureReplenishment({
-    params: { organizationId, definitionId: 'inventory-replenishment' },
-    body,
-  });
-  if (result.status !== 200) return failure(result);
-
-  return result.body;
-}
 
 /** Checks server-owned stock and recovers an uncertain start using its request ID. */
 export async function startReplenishment(
@@ -269,6 +262,57 @@ export async function decideReplenishment(
 
   return result.body;
 }
+
+/** Checks proposed stock rules against current stock and rules. It changes nothing. */
+export async function previewReplenishment(
+  organizationId: string,
+  body: ReplenishmentPreviewRequest,
+) {
+  const result = await api.workflows.previewReplenishment({
+    params: { organizationId, definitionId: 'inventory-replenishment' },
+    body,
+  });
+  if (result.status !== 200) return failure(result);
+
+  return replenishmentPreviewSchema.parse(result.body);
+}
+
+/**
+ * Activates reviewed rules, each on its own. Resend the same items after an uncertain response;
+ * activated rules come back unchanged and are never duplicated.
+ */
+export async function configureReplenishmentBatch(
+  organizationId: string,
+  items: ReplenishmentRuleInput[],
+) {
+  const result = await api.workflows.configureReplenishmentBatch({
+    params: { organizationId, definitionId: 'inventory-replenishment' },
+    body: { items },
+  });
+  if (result.status !== 200) return failure(result);
+
+  return replenishmentBatchResultSchema.parse(result.body).results;
+}
+
+/** Reads how workflows cover one stock position, with readiness scoped to it. */
+export const workflowCoverageOptions = (
+  organizationId: string,
+  positionId: string,
+) =>
+  queryOptions({
+    queryKey: [...workflowsKey(organizationId), 'coverage', positionId],
+    ...privateQueryDefaults,
+    queryFn: async ({ signal }) => {
+      const result = await api.workflows.coverage({
+        params: { organizationId },
+        query: { subjectKind: 'inventory_position', subjectId: positionId },
+        fetchOptions: { signal, cache: 'no-store' },
+      });
+      if (result.status !== 200) return failure(result);
+
+      return workflowCoverageSchema.parse(result.body).items;
+    },
+  });
 
 /** Converts a non-200 API result into a workflow error with the server's message. */
 export const workflowFailure = failure;

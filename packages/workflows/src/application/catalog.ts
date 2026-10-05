@@ -1,11 +1,18 @@
 import type { TenantContext } from '@luma/identity';
 import { IdentityError, requireRole, requireTenant } from '@luma/identity';
+import type { PolicyService } from '@luma/policies';
 
 import type { EvaluateCode } from '../domain/code-evaluation.js';
 import type { PlaybookVersion } from '../domain/playbook.js';
 import { presentPlaybook } from '../domain/playbook-presentation.js';
 import type { ProcessStepOutput } from '../domain/process.js';
 import { presentProcessVersion } from '../domain/process-presentation.js';
+import {
+  type ApprovalBehavior,
+  assessReadiness,
+  describeApproval,
+  summarizeOutcomes,
+} from '../domain/readiness.js';
 import type {
   PublishedWorkflowVersion,
   WorkflowTriggerRequest,
@@ -76,6 +83,8 @@ export function createWorkflowCatalog(deps: {
   store: WorkflowCatalogStore;
   compile(input: unknown): PublishedWorkflowVersion;
   refreshContext(context: TenantContext): Promise<TenantContext>;
+  /** Reads the workspace approval setting for versions with actions. */
+  approvalPolicy: Pick<PolicyService, 'approvalRequirement'>;
   /** Explains why no installed adapter can run a version. */
   explain?(
     context: TenantContext,
@@ -222,6 +231,112 @@ export function createWorkflowCatalog(deps: {
     };
   }
 
+  /** States who approves a native version's actions under current policy. */
+  async function nativeApproval(
+    context: TenantContext,
+    version: PublishedWorkflowVersion,
+  ): Promise<ApprovalBehavior> {
+    if (version.format !== 'workflow/2') {
+      const requirement = await deps.approvalPolicy.approvalRequirement(
+        context.tenantId,
+        {
+          minimumRisk: version.policy.minimumRisk,
+          workflowRequired: version.policy.approval === 'required',
+        },
+      );
+
+      return describeApproval(requirement, 'action');
+    }
+    const actions = version.steps.filter((step) => step.kind === 'capability');
+    const granted = version.steps.some(
+      (step) => step.kind === 'code' && step.grants.length > 0,
+    );
+    if (!actions.length && !granted)
+      return {
+        mode: 'no_actions',
+        summary:
+          'This workflow doesn’t change connected systems, so nothing needs approval.',
+        details: [
+          'It computes values from the evidence supplied when it starts.',
+        ],
+      };
+    const requirement = await deps.approvalPolicy.approvalRequirement(
+      context.tenantId,
+      {
+        minimumRisk: actions.some((step) => step.minimumRisk !== 'low')
+          ? 'medium'
+          : 'low',
+        workflowRequired: version.steps.some(
+          (step) => step.kind === 'approval',
+        ),
+      },
+    );
+
+    return describeApproval(requirement, 'action');
+  }
+
+  /** Adds readiness to a native detail from its blockers and triggered runs. */
+  async function withReadiness(
+    context: TenantContext,
+    versions: PublishedWorkflowVersion[],
+    reasons: Map<string, string[]>,
+  ) {
+    const detail = nativeDetail(versions, context, reasons);
+    const current = versions[0]!;
+    const runnable = deps.codeProcesses?.supported(current) ?? false;
+    const starts = await deps.triggers.list(context, current.definition.id);
+    const evidence = await deps.store.processSteps(
+      context,
+      starts.map((run) => run.id),
+    );
+    const outcomes = summarizeOutcomes(
+      starts.map((run) => ({
+        id: run.id,
+        createdAt: run.createdAt,
+        state: presentTriggerRun(run, evidence.get(run.id)).processState,
+      })),
+      (state) =>
+        state === 'verified'
+          ? 'The expected result was verified.'
+          : state === 'ended'
+            ? 'The run finished without acting.'
+            : state
+              ? `The run is ${state.replaceAll('_', ' ')}.`
+              : 'The run is waiting to start.',
+    );
+
+    return {
+      ...detail,
+      summary: {
+        ...detail.summary,
+        readiness: assessReadiness({
+          enablement: runnable ? 'enabled' : 'not_enabled',
+          issues: detail.summary.blockers.map((message) => ({
+            code: 'no_adapter',
+            severity: 'blocking' as const,
+            message,
+            scope: null,
+            repair: null,
+          })),
+          coverage: {
+            unit: 'run',
+            covered: null,
+            ready: null,
+            explanation:
+              'This workflow has no scoped records. It runs on the evidence supplied when someone starts it.',
+          },
+          approval: await nativeApproval(context, current),
+          waiting: { count: null, repair: null },
+          outcomes,
+          enable: runnable
+            ? { label: 'Start a run', destination: 'workflow_rules' }
+            : null,
+          idle: 'Owners and admins start this workflow from its rules with the evidence it needs.',
+        }),
+      },
+    };
+  }
+
   function replenishment(id: string) {
     if (!deps.replenishment || id !== deps.replenishment.definitionId)
       throw new IdentityError(
@@ -322,6 +437,32 @@ export function createWorkflowCatalog(deps: {
       runId: string,
       input: Parameters<ReplenishmentWorkflow['decide']>[2],
     ) => replenishment(id).decide(context, runId, input),
+    /**
+     * Lists the workflows that can cover one record, with readiness scoped to it. Only stock
+     * positions have a covering workflow today; other kinds return an empty list.
+     */
+    async coverage(
+      context: TenantContext,
+      subject: { kind: 'inventory_position'; id: string },
+    ) {
+      context = await authorize(context);
+      if (subject.kind !== 'inventory_position' || !deps.replenishment)
+        return [];
+
+      return [await deps.replenishment.coverage(context, subject.id)];
+    },
+    /** Activates several replenishment rules, reporting each result. */
+    configureReplenishmentMany: (
+      context: TenantContext,
+      id: string,
+      items: Parameters<ReplenishmentWorkflow['configureMany']>[1],
+    ) => replenishment(id).configureMany(context, items),
+    /** Checks proposed replenishment rules without changing anything. */
+    previewReplenishment: (
+      context: TenantContext,
+      id: string,
+      input: Parameters<ReplenishmentWorkflow['preview']>[1],
+    ) => replenishment(id).preview(context, input),
     /** Starts a run using the exact version and supplied signal evidence. */
     async fire(
       context: TenantContext,
@@ -377,7 +518,8 @@ export function createWorkflowCatalog(deps: {
             )
             .map(
               async (v) =>
-                nativeDetail(v, context, await explain(context, v)).summary,
+                (await withReadiness(context, v, await explain(context, v)))
+                  .summary,
             ),
         )),
       ];
@@ -388,7 +530,7 @@ export function createWorkflowCatalog(deps: {
         return deps.replenishment.detail(context);
       const native = await deps.store.versions(context, id);
       if (native.length)
-        return nativeDetail(native, context, await explain(context, native));
+        return withReadiness(context, native, await explain(context, native));
       const detail = await deps.legacy.detail(context, id);
       // Versions are append-only; read after the view to include any concurrently published version.
       const versions = await deps.store.resolutionVersions(context, id);
