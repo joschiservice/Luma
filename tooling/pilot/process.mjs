@@ -7,8 +7,9 @@ import { startJourney } from './journey.mjs';
 
 /**
  * Runs commerce sync in the background like the sync worker, one pass at a time and briefly
- * idle between passes. The inventory check runs once a minute: JTL has no SKU filter, so each
- * check pages through every item. Returns a function that stops after the current pass.
+ * idle between passes. Once a minute it links the next SKUs a merchant reviewed and runs the
+ * inventory scenario check and scheduled detection. Returns a function that stops after the
+ * current pass.
  */
 function startSync(pilot) {
   let stopped = false;
@@ -20,6 +21,9 @@ function startSync(pilot) {
       await pilot
         .observe({ passes: 1, refresh: false, check })
         .catch((error) => pilot.app.log.error(error));
+      if (check)
+        for (const step of [pilot.link, pilot.detect])
+          await step().catch((error) => pilot.app.log.error(error));
       await delay(2_000);
     }
   })();

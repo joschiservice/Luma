@@ -103,11 +103,12 @@ Each source has its own current snapshot. An incoming snapshot replaces it when:
 
 - it re-normalizes the current snapshot's observation, for example after a new
   SKU mapping or normalizer version;
-- both snapshots carry a source update time and the incoming one is strictly
-  newer; or
-- at least one of them has no source update time and the incoming observation
-  time is later. When neither has a source update time and both observation times
-  are equal, the greater observation ID wins.
+- both snapshots carry a source update time and the incoming one is newer;
+- the source update times are equal or at least one is missing, and the incoming
+  observation time is later. Equal update times occur when a provider reports
+  whole seconds, as Shopify does, and a record changes twice within one second; or
+- both observation times are also equal and the greater observation ID wins,
+  unless exactly one snapshot has a source update time.
 
 Every other snapshot remains historical evidence and returns `retained`. Receipt
 time and opaque revisions never establish order. A source update time is never

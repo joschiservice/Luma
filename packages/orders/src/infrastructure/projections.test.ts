@@ -25,16 +25,31 @@ describe('supersedes', () => {
     ).toBe(true);
     expect(
       supersedes(
-        snapshot(b, '2026-09-21T00:00:00Z', '2026-09-18T00:00:00Z'),
-        current,
-      ),
-    ).toBe(false);
-    expect(
-      supersedes(
         snapshot(b, '2026-09-21T00:00:00Z', '2026-09-17T00:00:00Z'),
         current,
       ),
     ).toBe(false);
+  });
+
+  it('advances a later read with the same whole-second update time and ignores an earlier one', () => {
+    const current = snapshot(a, '2026-09-20T00:00:00Z', '2026-09-18T00:00:00Z');
+
+    expect(
+      supersedes(
+        snapshot(b, '2026-09-20T00:00:01Z', '2026-09-18T00:00:00Z'),
+        current,
+      ),
+    ).toBe(true);
+    expect(
+      supersedes(
+        snapshot(b, '2026-09-19T23:59:59Z', '2026-09-18T00:00:00Z'),
+        current,
+      ),
+    ).toBe(false);
+    const high = snapshot(b, '2026-09-20T00:00:00Z', '2026-09-18T00:00:00Z');
+
+    expect(supersedes(high, current)).toBe(true);
+    expect(supersedes(current, high)).toBe(false);
   });
 
   it('advances untimed sources to the later read and ignores late older reads', () => {

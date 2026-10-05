@@ -106,11 +106,10 @@ export interface SimulatorOptions {
 
 /**
  * The simulation time of a manual change. A running clock catches up to now; a paused clock
- * moves one second, because Shopify reports update times in whole seconds and Luma only
- * replaces a snapshot with a strictly newer one.
+ * moves one millisecond, so successive changes often share one whole-second Shopify update time.
  */
 const actionTime = (run: RunRecord) =>
-  Math.max(Math.round(currentTime(run)), run.now + (run.running ? 1 : 1_000));
+  Math.max(Math.round(currentTime(run)), run.now + 1);
 
 const notFound = (message: string) =>
   Object.assign(new Error(message), { statusCode: 404 });

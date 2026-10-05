@@ -34,4 +34,9 @@ export { createReadinessCheck } from './composition/readiness.js';
 
 export { createReplenishmentWorker } from './composition/replenishment-worker.js';
 
+export {
+  createDetectionWorker,
+  createScheduledDetection,
+} from './composition/detection-worker.js';
+
 export { createMetricListener } from './infrastructure/metric-listener.js';

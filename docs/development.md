@@ -91,7 +91,7 @@ The migration administrator connection is used only during initialization.
 superuser, database creation, role creation or RLS bypass privileges.
 
 `pnpm dev` also starts the commerce sync process (`apps/worker`), which imports
-history for active connections and keeps it current. It uses the worker login and
+history for active connections, keeps it current and runs scheduled detection. It uses the worker login and
 reads Shopify approval flags from `apps/api/.env`. See [Commerce sync](commerce-sync.md).
 
 Temporal runs only when requested. Its development server persists workflow

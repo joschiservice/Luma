@@ -652,14 +652,19 @@ test('throttling and drift fail reads the way Luma recovers from them', async ()
   const shop = createShop();
   await seed(shop);
   const page = pages(shop);
+  // A short throttle is waited out in place at Shopify's restore rate.
   shop.bucket.available = 50;
+  shop.bucket.at = Date.now();
+  const started = Date.now();
+  assert.equal((await page('orders.read', { limit: 100 })).ok, true);
+  assert.ok(Date.now() - started >= 900);
+  // A longer one is returned with its delay after the last attempt, so the sync schedules the retry.
+  shop.bucket.available = -500;
   shop.bucket.at = Date.now();
   const throttled = await page('orders.read', { limit: 100 });
   assert.equal(throttled.ok, false);
   assert.equal(throttled.error.code, 'rate_limited');
-  // The client waits for the missing points at Shopify's restore rate.
   assert.ok(throttled.error.retryAfterMs >= 1000);
-  assert.ok(throttled.error.retryAfterMs <= 2000);
 
   shop.bucket.available = rateLimit.capacity;
   shop.drift = true;

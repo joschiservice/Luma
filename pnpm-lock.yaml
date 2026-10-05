@@ -327,6 +327,9 @@ importers:
       '@luma/resolution':
         specifier: workspace:*
         version: link:packages/resolution
+      '@luma/simulator-commerce':
+        specifier: workspace:*
+        version: link:packages/simulator/commerce
       '@luma/simulator-core':
         specifier: workspace:*
         version: link:packages/simulator/core

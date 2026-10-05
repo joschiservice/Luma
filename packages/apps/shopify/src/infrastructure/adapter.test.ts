@@ -14,6 +14,13 @@ import { createShopifyConnector } from './adapter.js';
 import commerce from './fixtures/commerce.json' with { type: 'json' };
 import { mapShopifyWebhook } from './webhooks.js';
 
+// Reads repeat after transient failures; tests skip the waits.
+const readRetry = {
+  attempts: 3,
+  maxDelayMs: 2000,
+  sleep: async () => undefined,
+};
+
 vi.mock('@luma/identity', () => ({
   requireTenant(context: TenantContext, tenantId: string) {
     if (context.tenantId !== tenantId) throw new Error('Tenant mismatch');
@@ -121,6 +128,7 @@ function fixture(overrides: Partial<ShopifyConnectorOptions> = {}) {
     shop: 'example.myshopify.com',
     accessToken,
     fetch,
+    readRetry,
     recordObservations,
     now: () => new Date('2026-09-17T01:00:00Z'),
     ...overrides,
@@ -649,7 +657,7 @@ describe('Shopify read capabilities', () => {
 describe('Shopify failures', () => {
   it('returns retry advice when token storage fails without dispatching or exposing the error', async () => {
     const f = fixture();
-    f.accessToken.mockRejectedValueOnce(
+    f.accessToken.mockRejectedValue(
       new Error('secret-store unavailable: private-token'),
     );
     expect(await f.read('orders.read')).toEqual({
@@ -664,6 +672,7 @@ describe('Shopify failures', () => {
     expect(f.fetch).not.toHaveBeenCalled();
     expect(f.recordObservations).not.toHaveBeenCalled();
     expect(JSON.stringify(f.record.mock.calls)).not.toContain('private-token');
+    f.accessToken.mockResolvedValue('private-token');
     expect(await f.read('orders.read')).toMatchObject({ ok: true });
   });
   it('preserves classified token errors and treats empty credentials as authentication failures', async () => {
@@ -691,11 +700,12 @@ describe('Shopify failures', () => {
     'normalizes HTTP %s without exposing provider content',
     async (status, code) => {
       const f = fixture();
-      f.fetch.mockResolvedValueOnce(
-        new Response('private provider message', {
-          status,
-          headers: { 'retry-after': '2' },
-        }),
+      f.fetch.mockImplementation(
+        async () =>
+          new Response('private provider message', {
+            status,
+            headers: { 'retry-after': '2' },
+          }),
       );
       const result = await f.read('orders.read');
       expect(result).toMatchObject({
@@ -709,9 +719,16 @@ describe('Shopify failures', () => {
       expect(JSON.stringify([result, f.record.mock.calls])).not.toContain(
         'private provider message',
       );
-      expect(f.fetch).toHaveBeenCalledTimes(1);
+      expect(f.fetch).toHaveBeenCalledTimes(
+        status === 429 || status === 500 ? 3 : 1,
+      );
     },
   );
+  it('repeats a query after a transient failure', async () => {
+    const f = fixture();
+    f.fetch.mockResolvedValueOnce(new Response('', { status: 502 }));
+    expect(await f.read('orders.read')).toMatchObject({ ok: true });
+  });
   it('uses GraphQL throttle cost and rejects partial GraphQL success', async () => {
     const f = fixture();
     f.fetch.mockResolvedValueOnce(
@@ -742,9 +759,7 @@ describe('Shopify failures', () => {
     ['TypeError', 'transient'],
   ])('normalizes %s', async (name, code) => {
     const f = fixture();
-    f.fetch.mockRejectedValueOnce(
-      Object.assign(new Error('private'), { name }),
-    );
+    f.fetch.mockRejectedValue(Object.assign(new Error('private'), { name }));
     expect(await f.read('orders.read')).toMatchObject({
       ok: false,
       error: { code, effect: 'none', retry: 'after_delay' },

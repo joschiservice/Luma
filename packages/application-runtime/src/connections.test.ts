@@ -319,7 +319,8 @@ describe('installed connection lifecycle', () => {
       if (kind === 'jtl-onprem') {
         expect(headers.get('x-challengecode')).toBe('new-challenge');
         expect(approve).toHaveBeenCalledTimes(2);
-        approve.mockRejectedValueOnce(new Error('Destination not approved'));
+        // Reads are repeated after transient failures; the destination stays unapproved.
+        approve.mockRejectedValue(new Error('Destination not approved'));
         expect(await read()).toMatchObject({ ok: false });
         expect(fetch).toHaveBeenCalledTimes(2);
       }

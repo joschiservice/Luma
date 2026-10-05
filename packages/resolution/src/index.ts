@@ -2,6 +2,13 @@ export { createDetectionPipeline } from './application/detection.js';
 
 export { createInventoryMonitor } from './application/inventory-monitor.js';
 
+export { createDetectionMonitor } from './application/detection-monitor.js';
+
+export type {
+  DetectionMonitor,
+  DetectionSources,
+} from './application/detection-monitor.js';
+
 export type {
   FulfillmentMapping,
   InventoryMapping,

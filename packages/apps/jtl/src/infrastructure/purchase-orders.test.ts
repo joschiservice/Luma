@@ -13,6 +13,13 @@ import { cloudId } from './fixtures/cloud.js';
 import { adapterVersion } from './outputs.js';
 import { acceptanceId } from './purchase-orders.js';
 
+// Reads repeat after transient failures; tests skip the waits.
+const readRetry = {
+  attempts: 3,
+  maxDelayMs: 2000,
+  sleep: async () => undefined,
+};
+
 vi.mock('@luma/identity', () => ({
   requireTenant(context: TenantContext, tenantId: string) {
     if (context.tenantId !== tenantId) throw new Error('Tenant mismatch');
@@ -224,6 +231,7 @@ function fixture(overrides: Partial<JtlConnectorOptions> = {}) {
       apiKey: async () => 'secret',
     },
     fetch,
+    readRetry,
     recordObservations,
     purchaseOrderActions: true,
     now: () => now,
@@ -572,7 +580,9 @@ describe('JTL purchase-order submission', () => {
 
   it('marks pre-dispatch read failures as not dispatched', async () => {
     const f = fixture();
-    f.fetch.mockResolvedValueOnce(new Response('busy', { status: 503 }));
+    f.fetch.mockImplementation(
+      async () => new Response('busy', { status: 503 }),
+    );
     expect(await f.submit()).toMatchObject({
       ok: false,
       error: {

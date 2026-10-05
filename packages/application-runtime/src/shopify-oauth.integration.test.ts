@@ -408,10 +408,11 @@ describe.skipIf(!databaseUrl)('Shopify OAuth on PostgreSQL', () => {
       .update(body)
       .digest('base64');
     const transport = f.transport.getMockImplementation()!;
-    let failed = false;
+    // Queries are repeated after transient failures; the probe fails on all three attempts.
+    let failures = 0;
     f.transport.mockImplementation(async (url, init) => {
-      if (!failed && String(init?.body).includes('LumaScopeUpdate')) {
-        failed = true;
+      if (failures < 3 && String(init?.body).includes('LumaScopeUpdate')) {
+        failures += 1;
 
         return new Response(null, { status: 503 });
       }

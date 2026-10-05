@@ -293,6 +293,16 @@ test('real installed adapters read remote state, verify a lost write after resta
         ),
       /unavailable/,
     );
+    // One transient failure is repeated in place; reads fail when every attempt fails.
+    await host.call('runs/test/control', {
+      action: 'fault',
+      rule: {
+        instance: 'shopify',
+        operation: 'orders.read',
+        kind: 'unavailable',
+      },
+    });
+    assert.equal((await read(connections[1], 'orders.read')).ok, true);
     for (const [kind, code] of [
       ['unavailable', 'transient'],
       ['rate-limit', 'rate_limited'],
@@ -301,11 +311,22 @@ test('real installed adapters read remote state, verify a lost write after resta
     ]) {
       await host.call('runs/test/control', {
         action: 'fault',
-        rule: { instance: 'shopify', operation: 'orders.read', kind },
+        rule: {
+          instance: 'shopify',
+          operation: 'orders.read',
+          kind,
+          remaining: 3,
+        },
       });
       const result = await read(connections[1], 'orders.read');
       assert.equal(result.ok, false, kind);
       assert.equal(result.error.code, code, kind);
+      for (const fault of (await host.call('runs/test')).faults)
+        if (fault.status === 'armed')
+          await host.call('runs/test/control', {
+            action: 'disable',
+            id: fault.id,
+          });
     }
   } finally {
     await host.app.close();

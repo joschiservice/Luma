@@ -12,6 +12,7 @@ import {
   createReadinessCheck,
   createReplenishmentWorker,
   createResourceScope,
+  createScheduledDetection,
 } from '@luma/application-runtime';
 import { createCommerceSyncService } from '@luma/application-runtime/sync';
 import { createSyncRunner } from '@luma/commerce-sync';
@@ -49,6 +50,7 @@ import {
 } from '../apps/providers.mjs';
 import { lumaCases } from '../simulator/cases.mjs';
 import { createInventoryScenario } from '../simulator/inventory.mjs';
+import { createStockLinks } from '../simulator/links.mjs';
 import { simulatorShopifyEnv } from '../simulator/shopify-app.mjs';
 import { detectionRequest, readJson } from './fixtures.mjs';
 import { mutateProviderState } from './provider-state.mjs';
@@ -277,6 +279,25 @@ export async function createPilot(
           manifest,
         })
       : null;
+    // Scheduled detection, as the sync worker runs it, plus the links a merchant reviews.
+    const detectionErrors = [];
+    const scheduled = simulation
+      ? createScheduledDetection({
+          database: db,
+          capabilities,
+          category: (provider) =>
+            installations.providerCatalog.get(provider)?.category ?? null,
+          detection: () => detection,
+          log: (message, error) => {
+            detectionErrors.push({ message, error: error?.message ?? null });
+            console.error(message, error instanceof Error ? error.message : '');
+          },
+        })
+      : null;
+    if (scheduled) resources.add(scheduled.close);
+    const links = simulation
+      ? createStockLinks({ commerce, operator, manifest })
+      : null;
     const supported = (action) =>
       action.tenantId === manifest.organizationId &&
       action.connectionId === manifest.connections.jtl &&
@@ -314,8 +335,10 @@ export async function createPilot(
         ? 'simulator-verification-v1'
         : 'synthetic-shipping-correction-v1',
       async evaluate(actor, incident) {
-        if (inventory && incident.exceptionClass === 'inventory_mismatch')
+        if (inventory?.monitor.matches(incident))
           return inventory.monitor.verifier.evaluate(actor, incident);
+        if (scheduled?.verifier.handles(incident))
+          return scheduled.verifier.evaluate(actor, incident);
         if (manifest.scenario === 'verifying') await pause('verifying');
         // A fresh adapter read verifies this workflow's shipping correction, not shipment completion.
         const result = await capabilities.read(actor, {
@@ -770,6 +793,17 @@ export async function createPilot(
         }
         if (check) await inventory.check(await operator(), detection);
       },
+      /** Links the next batch of the merchant's reviewed SKUs and shop locations. */
+      link: async () => links?.pass(),
+      /** Runs one scheduled detection and verification pass, as the sync worker does. */
+      detect: async () => {
+        if (scheduled) await scheduled.tick(await operator());
+      },
+      detectionErrors,
+      /** Stored-state reads that choose what scheduled detection checks. */
+      detectionSources: scheduled?.sources ?? null,
+      /** The explicit inventory scenario, whose cases the scheduled monitor does not own. */
+      inventoryScenario: inventory?.monitor ?? null,
       close: resources.close,
     };
   } catch (error) {

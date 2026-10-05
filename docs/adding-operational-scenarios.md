@@ -32,7 +32,7 @@ Incidents that end on their own, such as drift corrected through Luma, close the
 
 Read [inventory.mjs](../tooling/simulator/inventory.mjs) for an explicit canonical SKU and location binding, and [inventory-monitor.ts](../packages/resolution/src/application/inventory-monitor.ts) for the application behavior. The monitor completes provider pagination, confirms the exact mapped records and current projections, and evaluates the existing exception rule.
 
-Reuse a suitable application service if one exists. Otherwise add a focused service in the owning application package and keep its rule in the domain. Connect it in [the pilot runtime](../tooling/pilot/runtime.mjs) and confirm what schedules it. Registering an incident kind does not schedule detection.
+Reuse a suitable application service if one exists. Otherwise add a focused service in the owning application package and keep its rule in the domain. Scheduled detection in [detection-monitor.ts](../packages/resolution/src/application/detection-monitor.ts) covers sync failures, linked stock and stuck fulfillment, and the pilot runs it once a minute through `pilot.detect()`. For a new rule, add a candidate read to its sources and a branch to its verifier, or connect a separate service in [the pilot runtime](../tooling/pilot/runtime.mjs) and the sync worker. Registering an incident kind does not schedule detection.
 
 Recovery changes provider state. Verification performs an independent fresh read and supplies evidence to the exception service. Missing records, provider failures, incomplete results or stale evidence must leave the case open. Read case status from Luma; the simulator stores only ground truth.
 

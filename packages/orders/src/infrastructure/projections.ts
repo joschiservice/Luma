@@ -431,29 +431,33 @@ type SnapshotOrder = Pick<
  * Decides whether `incoming` replaces `current` as its source's current snapshot.
  *
  * A re-normalized copy of the current observation always replaces it. When both snapshots
- * carry a source update time, only a strictly newer time wins; receipt order and opaque
+ * carry different source update times, the newer one wins; receipt order and opaque
  * revisions never count. Otherwise the later observation time wins, because every
- * observation records when its point-in-time read started on Luma's clock. Update times
- * from the source's clock are never compared with observation times. Equal observation
- * times fall back to the greater observation ID only when neither snapshot has an update
- * time, so the same set of untimed snapshots always settles on the same current one.
+ * observation records when its point-in-time read started on Luma's clock. This also
+ * advances a second change within one update time, since providers such as Shopify report
+ * whole seconds. Update times from the source's clock are never compared with observation
+ * times. Equal observation times fall back to the greater observation ID unless exactly one
+ * snapshot has an update time, so the same set of reads always settles on one snapshot.
  */
 export function supersedes(
   incoming: SnapshotOrder,
   current: SnapshotOrder,
 ): boolean {
   if (incoming.observationId === current.observationId) return true;
-  if (incoming.sourceUpdatedAt && current.sourceUpdatedAt)
-    return (
-      Date.parse(incoming.sourceUpdatedAt) > Date.parse(current.sourceUpdatedAt)
-    );
+  // Null when either snapshot lacks a source update time.
+  const updated =
+    incoming.sourceUpdatedAt && current.sourceUpdatedAt
+      ? Date.parse(incoming.sourceUpdatedAt) -
+        Date.parse(current.sourceUpdatedAt)
+      : null;
+  if (updated) return updated > 0;
   const observed =
     Date.parse(incoming.observedAt) - Date.parse(current.observedAt);
   if (observed !== 0) return observed > 0;
 
   return (
-    !incoming.sourceUpdatedAt &&
-    !current.sourceUpdatedAt &&
+    (updated === 0 ||
+      (!incoming.sourceUpdatedAt && !current.sourceUpdatedAt)) &&
     incoming.observationId > current.observationId
   );
 }

@@ -6,6 +6,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { recordKinds } from '../domain/records.js';
 import { createShopifyRecordReader } from './records.js';
 
+// Reads repeat after transient failures; tests skip the waits.
+const readRetry = {
+  attempts: 3,
+  maxDelayMs: 2000,
+  sleep: async () => undefined,
+};
+
 const gid = (kind: string) => `gid://shopify/${kind}/1`;
 const updatedAt = '2026-09-28T00:00:00Z';
 const money = { amount: '12.34', currencyCode: 'EUR' };
@@ -216,6 +223,7 @@ function fixture(granted = scopes, approved = true, contactsApproved = false) {
       connectionId: 'connection-a',
       accessToken: token,
       fetch,
+      readRetry,
       protectedCustomerDataApproved: approved,
       protectedCustomerContactApproved: contactsApproved,
       now: () => new Date(updatedAt),
@@ -319,7 +327,7 @@ describe('Shopify operational records', () => {
     expect(detail.sections.find((v) => v.key === 'refunds')?.rows).toHaveLength(
       1,
     );
-    f.fetch.mockResolvedValueOnce(new Response('', { status: 500 }));
+    f.fetch.mockImplementation(async () => new Response('', { status: 500 }));
     await expect(f.read('Order', gid('Order'))).rejects.toThrow('transient');
   });
   it('drains nested pages and rejects repeated cursors and mismatched IDs', async () => {

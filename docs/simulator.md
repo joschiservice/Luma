@@ -98,7 +98,7 @@ Ground truth stays in the simulator database. The **Scorecard** compares it with
 - **Closed without verification:** cases resolved by a verification that wasn't passed, complete and authoritative.
 - **Repeated writes:** provider writes committed more than once for the same idempotency key, or the same body when no key was sent.
 
-Luma currently runs the inventory monitor for one linked SKU pair only (see below). Its other detectors are not scheduled outside tests, so most kinds report as missed or not covered. That is the platform gap the scorecard is meant to show.
+Luma's sync process runs [scheduled detection](exception-detection.md#scheduled-detection) for sync failures, stock mismatches between linked SKUs and stuck fulfillment. Kinds without a rule report as not covered. A revoked credential makes the connection inactive, which the sync-failure rule treats as clear, so **Credentials revoked** reports as missed.
 
 ## Luma wiring
 
@@ -106,6 +106,7 @@ The pilot provisions one connection per instance (`jtl`, then one per shop) with
 
 - **Sync:** the pilot API runs the real commerce sync runner, which imports every capability with its normal backfill, incremental and reconcile schedule. Orders are imported source-local; Luma suggests cross-source order links from the shop order name, but people confirm them.
 - **Webhooks:** the simulator delivers signed Shopify webhooks for every change to Luma's real change route (`/v1/shopify/changes/:org/:connection`). The pilot configures a synthetic Shopify app whose client secret is the run's webhook secret. Those settings point to an `.invalid` origin that is never contacted.
+- **Links and detection:** imports keep each source's SKUs and locations apart until people link them. Acting as the merchant, the pilot links each shop's stock location to JTL's all-warehouses stock and, 100 per minute, the 500 most-demanded SKUs of the run's catalog (`LUMA_SIMULATOR_LINKED_SKUS` changes the number). Once a minute it then runs the same scheduled detection as the sync worker. Drift on unlinked SKUs is not compared and reports as missed.
 - **Inventory monitor:** the pilot links JTL item 2 (all warehouses) to the first shop's inventory item 2 at its location, and runs the inventory monitor with fresh verification for that pair. Inject **Stock sync drift** for `LUMA-SCENARIO-001` (test profile) or the first shop's SKU of item 2 to follow a case through detection and verified resolution. **Check now** in the Incidents tab runs the check immediately.
 
 ## Storage and API

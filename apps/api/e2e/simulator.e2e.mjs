@@ -270,3 +270,147 @@ test('inventory drift is detected, verified, scored and recurs through the same 
   );
   expect(unauthenticated.status).toBe(401);
 });
+
+test('scheduled detection compares linked stock and closes the case only after fresh verification', async (t) => {
+  const f = await setupSimulator(t);
+  const actor = await f.pilot.operator();
+  const stockCases = async () =>
+    (await f.pilot.detection.exceptions.list(actor)).filter(
+      (incident) =>
+        incident.exceptionClass === 'inventory_mismatch' &&
+        incident.subject.scope.includes(f.manifest.connections.shopify) &&
+        !f.pilot.inventoryScenario?.matches(incident),
+    );
+  await f.pilot.observe({ check: false });
+  expect(await f.pilot.link()).toEqual({ linked: 1, remaining: 0 });
+  await f.pilot.detect();
+  expect(await stockCases()).toEqual([]);
+
+  const id = randomUUID();
+  await f.call('runs/operations/incidents', {
+    id,
+    kind: 'inventory-drift',
+    target: 'LUMA-001',
+  });
+  await f.pilot.observe({ check: false });
+  await f.pilot.detect();
+  const [opened] = await stockCases();
+  expect(opened).toMatchObject({
+    state: expect.not.stringMatching('resolved'),
+  });
+  expect(opened.subject.scope.slice(1)).toEqual(
+    [f.manifest.connections.jtl, f.manifest.connections.shopify].sort(),
+  );
+  const evidence = await f.pilot.detection.exceptions.evidence(
+    actor,
+    opened.id,
+  );
+  expect(evidence.map((item) => item.source?.provider).sort()).toEqual([
+    'jtl',
+    'shopify',
+    undefined,
+  ]);
+
+  // The shop is wrong until the merchant repairs it; another pass keeps the case open.
+  await f.pilot.detect();
+  expect((await stockCases())[0]).toMatchObject({
+    id: opened.id,
+    state: expect.not.stringMatching('resolved'),
+  });
+  await f.call(`runs/operations/incidents/${id}/recover`, {});
+  await f.pilot.observe({ check: false });
+  await f.pilot.detect();
+  const closed = await f.pilot.detection.exceptions.get(actor, opened.id);
+  expect(closed.state).toBe('resolved');
+  expect(closed.resolution).toMatchObject({
+    kind: 'verification',
+    outcome: 'passed',
+  });
+  expect(
+    (await f.call('runs/operations/incidents')).find((item) => item.id === id),
+  ).toMatchObject({ detection: { state: 'detected', caseId: opened.id } });
+  expect(f.pilot.detectionErrors).toEqual([]);
+});
+
+test('stuck-fulfillment candidates carry the source references their import mapped', async (t) => {
+  const f = await setupSimulator(t);
+  const actor = await f.pilot.operator();
+  await f.call('runs/operations/control', {
+    action: 'order',
+    lines: [{ sku: 'LUMA-001', quantity: 2 }],
+  });
+  await f.pilot.observe({ check: false });
+  const later = new Date(Date.now() + 86_400_000).toISOString();
+  const open = await f.pilot.detectionSources.fulfillments(actor, {
+    before: later,
+    include: [],
+    limit: 50,
+  });
+  expect(open.length).toBeGreaterThan(0);
+  for (const work of open) {
+    expect(work.connectionId).toBe(f.manifest.connections.shopify);
+    expect(work.source).toMatchObject({
+      resource: 'fulfillment',
+      connectionId: work.connectionId,
+    });
+    expect(work.order.externalId).toMatch(/^gid:\/\/shopify\/Order\//);
+    expect(work.lines.length).toBeGreaterThan(0);
+  }
+  // Work that progressed recently is not a candidate yet.
+  expect(
+    await f.pilot.detectionSources.fulfillments(actor, {
+      before: new Date(Date.now() - 86_400_000).toISOString(),
+      include: [],
+      limit: 50,
+    }),
+  ).toEqual([]);
+});
+
+test('malformed shop responses open a sync failure that closes after a complete scan', async (t) => {
+  const f = await setupSimulator(t);
+  const actor = await f.pilot.operator();
+  const syncCases = async () =>
+    (await f.pilot.detection.exceptions.list(actor)).filter(
+      (incident) => incident.exceptionClass === 'sync_failure',
+    );
+  await f.pilot.observe({ check: false });
+  await f.pilot.detect();
+  expect(await syncCases()).toEqual([]);
+
+  // A response Luma cannot read is a hard failure and needs no retry window.
+  await f.call('runs/operations/control', {
+    action: 'fault',
+    rule: {
+      instance: 'shopify',
+      operation: 'products.read',
+      kind: 'malformed',
+      remaining: 100,
+    },
+  });
+  await f.pilot.observe({ check: false });
+  await f.pilot.detect();
+  const [opened, ...others] = await syncCases();
+  expect(others).toEqual([]);
+  expect(opened).toMatchObject({
+    severity: 'high',
+    subject: {
+      subjectId: f.manifest.connections.shopify,
+      scope: ['products.read'],
+    },
+  });
+
+  // Recovery alone does not close the case; a complete scan after detection does.
+  const [fault] = (await f.call('runs/operations')).faults;
+  await f.call('runs/operations/control', { action: 'disable', id: fault.id });
+  await f.pilot.detect();
+  expect((await syncCases())[0].state).not.toBe('resolved');
+  await f.pilot.observe({ check: false });
+  await f.pilot.detect();
+  expect(
+    await f.pilot.detection.exceptions.get(actor, opened.id),
+  ).toMatchObject({
+    state: 'resolved',
+    resolution: { kind: 'verification', outcome: 'passed' },
+  });
+  expect(f.pilot.detectionErrors).toEqual([]);
+});

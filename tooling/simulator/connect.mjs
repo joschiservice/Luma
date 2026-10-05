@@ -30,8 +30,9 @@ export async function waitForRun(
 }
 
 /**
- * Describes a ready run for pilot provisioning: one connection per provider instance and the
- * SKU pair the inventory monitor compares (ERP item 2 and its first shop listing).
+ * Describes a ready run for pilot provisioning: one connection per provider instance, the SKU
+ * pair the inventory monitor compares (ERP item 2 and its first shop listing), and the catalog
+ * and shop locations a merchant links for stock detection.
  * @param {any} run detail from `GET /api/runs/:id`
  */
 export function simulatorInstances(run) {
@@ -52,6 +53,16 @@ export function simulatorInstances(run) {
       erpItem: '2',
       inventoryItem: 'gid://shopify/InventoryItem/2',
       location: `gid://shopify/Location/${shops[0].location}`,
+    },
+    stock: {
+      profile: run.profile.name,
+      seed: run.seed,
+      locations: Object.fromEntries(
+        shops.map((shop) => [
+          shop.instance,
+          `gid://shopify/Location/${shop.location}`,
+        ]),
+      ),
     },
   };
 }

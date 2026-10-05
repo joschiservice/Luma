@@ -80,6 +80,7 @@
     "@luma/procurement": "workspace:*",
     "@luma/read-models": "workspace:*",
     "@luma/resolution": "workspace:*",
+    "@luma/simulator-commerce": "workspace:*",
     "@luma/simulator-core": "workspace:*",
     "@luma/simulator-jtl": "workspace:*",
     "@luma/simulator-shopify": "workspace:*",

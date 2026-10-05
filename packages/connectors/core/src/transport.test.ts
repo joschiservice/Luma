@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
 import { ConnectorError } from './index.js';
-import { fail, parse, retryAfterMs } from './transport.js';
+import { fail, parse, retryAfterMs, retryRead } from './transport.js';
 
 describe('connector transport helpers', () => {
   it.each([
@@ -47,5 +47,59 @@ describe('connector transport helpers', () => {
         },
       });
     }
+  });
+
+  it('repeats reads after advised failures and returns the first success', async () => {
+    const sleep = vi.fn(async () => undefined);
+    const read = vi
+      .fn<() => Promise<string>>()
+      .mockImplementationOnce(async () => fail('transient', 1000))
+      .mockImplementationOnce(async () => fail('rate_limited', 2000))
+      .mockResolvedValue('page');
+
+    await expect(
+      retryRead(read, { attempts: 3, maxDelayMs: 2000, sleep }),
+    ).resolves.toBe('page');
+    expect(sleep.mock.calls).toEqual([[1000], [2000]]);
+  });
+
+  it.each([
+    ['without retry advice', () => fail('not_found')],
+    ['with longer advice', () => fail('rate_limited', 30_000)],
+    [
+      'with an uncertain effect',
+      () => {
+        throw new ConnectorError({
+          code: 'transient',
+          effect: 'unknown',
+          retry: 'after_delay',
+          retryAfterMs: 10,
+        });
+      },
+    ],
+    [
+      'that are not connector failures',
+      () => {
+        throw new Error('bug');
+      },
+    ],
+  ])('throws failures %s at once', async (_name, failure) => {
+    const read = vi.fn(async () => failure());
+    const sleep = vi.fn(async () => undefined);
+
+    await expect(
+      retryRead(read, { attempts: 3, maxDelayMs: 2000, sleep }),
+    ).rejects.toThrow();
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(sleep).not.toHaveBeenCalled();
+  });
+
+  it('throws the last failure after the final attempt', async () => {
+    const read = vi.fn(async () => fail('timeout', 10));
+
+    await expect(
+      retryRead(read, { attempts: 3, maxDelayMs: 2000, sleep: async () => {} }),
+    ).rejects.toMatchObject({ failure: { code: 'timeout' } });
+    expect(read).toHaveBeenCalledTimes(3);
   });
 });

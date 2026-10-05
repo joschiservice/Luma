@@ -29,11 +29,15 @@ describe('JTL package transport', () => {
     );
   });
 
-  it('requires reconciliation when a write response is lost', async () => {
+  it('sends a write once and requires reconciliation when its response is lost', async () => {
     const fetch = vi
       .fn<typeof globalThis.fetch>()
       .mockRejectedValue(new Error('connection reset'));
-    const client = createClient({ connection: cloud, fetch });
+    const client = createClient({
+      connection: cloud,
+      fetch,
+      readRetry: { attempts: 3, maxDelayMs: 2000, sleep: async () => {} },
+    });
     await expect(
       client.request(
         'salesOrders/1',
@@ -43,9 +47,16 @@ describe('JTL package transport', () => {
     ).rejects.toMatchObject({
       failure: { effect: 'unknown', retry: 'reconcile' },
     });
+    expect(fetch).toHaveBeenCalledTimes(1);
     await expect(client.request('salesOrders')).rejects.toBeInstanceOf(
       ConnectorError,
     );
+    expect(fetch).toHaveBeenCalledTimes(4);
+    fetch.mockResolvedValueOnce(new Response('', { status: 502 }));
+    fetch.mockResolvedValueOnce(Response.json({ items: [] }));
+    await expect(client.request('salesOrders')).resolves.toEqual({
+      items: [],
+    });
   });
 
   it('rejects unencrypted remote on-premise endpoints before sending credentials', () => {

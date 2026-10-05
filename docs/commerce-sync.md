@@ -33,8 +33,13 @@ commits the ledger entries, counters and next cursor in one transaction. A resta
 or second runner continues from the committed cursor; a lost lease discards the
 page's ledger write, and the next attempt re-imports idempotently.
 
-Failures keep the cursor and back off from 30 seconds to at most an hour, honoring
-`retryAfterMs`. A rejected cursor restarts the scan. After five consecutive failures
+Provider transports first repeat a failed read briefly (see
+[connectors](connectors.md#errors-retries-and-evidence)), so a single transient
+request failure rarely fails a page. Page failures keep the cursor and back off from
+30 seconds to at most an hour, honoring `retryAfterMs`. `failing_since` records when the
+current run of failures began; a successful page clears it. Scheduled detection uses it
+for the sync-failure retry window
+([exception detection](exception-detection.md#scheduled-detection)). A rejected cursor restarts the scan. After five consecutive failures
 the stream is **failing**. Messages are controlled text by connector error code;
 provider text is never stored. A stream whose person no longer manages the
 workspace is blocked until an owner or admin resumes it, which makes them the

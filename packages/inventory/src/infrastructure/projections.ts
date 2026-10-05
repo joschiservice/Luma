@@ -283,27 +283,31 @@ type SnapshotOrder = Pick<
  * Decides whether `incoming` replaces `current` as its source's current snapshot.
  *
  * Applies the same ordering policy as order projections: a re-normalized copy of the
- * current observation always wins; two source update times compare strictly; otherwise
- * the later observation time wins, with the greater observation ID breaking ties only
- * between snapshots that both lack an update time. Source-clock update times are never
- * compared with Luma-clock observation times.
+ * current observation always wins; a newer source update time wins; otherwise the later
+ * observation time wins, so a second change within one whole-second update time still
+ * advances. The greater observation ID breaks remaining ties unless exactly one snapshot
+ * has an update time. Source-clock update times are never compared with Luma-clock
+ * observation times.
  */
 export function supersedes(
   incoming: SnapshotOrder,
   current: SnapshotOrder,
 ): boolean {
   if (incoming.observationId === current.observationId) return true;
-  if (incoming.sourceUpdatedAt && current.sourceUpdatedAt)
-    return (
-      Date.parse(incoming.sourceUpdatedAt) > Date.parse(current.sourceUpdatedAt)
-    );
+  // Null when either snapshot lacks a source update time.
+  const updated =
+    incoming.sourceUpdatedAt && current.sourceUpdatedAt
+      ? Date.parse(incoming.sourceUpdatedAt) -
+        Date.parse(current.sourceUpdatedAt)
+      : null;
+  if (updated) return updated > 0;
   const observed =
     Date.parse(incoming.observedAt) - Date.parse(current.observedAt);
   if (observed !== 0) return observed > 0;
 
   return (
-    !incoming.sourceUpdatedAt &&
-    !current.sourceUpdatedAt &&
+    (updated === 0 ||
+      (!incoming.sourceUpdatedAt && !current.sourceUpdatedAt)) &&
     incoming.observationId > current.observationId
   );
 }
