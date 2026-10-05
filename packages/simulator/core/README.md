@@ -1,24 +1,20 @@
 # @luma/simulator-core
 
-Provides the simulator clock, event journal, scheduling, fault handling, and in-process HTTP transport.
+Provides what every simulated provider shares: the record store contract and in-memory store, the provider request protocol and fetch transport, deterministic randomness, failure profiles and presets, manual fault rules, rate-limit buckets and incident kinds.
 
 ## Responsibilities
 
-Keep simulated time deterministic and separate from real transport timeouts. Provider-specific state and protocol behavior belong to the Shopify and JTL simulator packages.
+Failure decisions depend only on a run's seed and the request identity, so runs repeat. Transport deadlines use real time. Provider records and protocol behavior belong to the Shopify and JTL simulator packages.
 
 ## Public entry points
 
-Import through these package exports. Private source paths are not supported across package boundaries.
+Import through the package export. Private source paths are not supported across package boundaries.
 
 - `@luma/simulator-core` — [source](./src/index.ts).
 
 ## Development
 
-Run commands from the repository root after installing workspace dependencies.
-
 ```sh
-pnpm exec turbo run build --filter=@luma/simulator-core...
-pnpm exec turbo run typecheck --filter=@luma/simulator-core
 pnpm exec turbo run test --filter=@luma/simulator-core
 ```
 

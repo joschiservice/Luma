@@ -6,7 +6,7 @@ The pipeline evaluates the four [V0 taxonomy](exception-taxonomy.md) classes: sy
 
 ## Ingestion
 
-All methods require an identity-resolved `TenantContext`. Workers must resolve current organization membership before calling them. These are internal application ports; there is no unauthenticated ingestion route or polling scheduler.
+All methods require an identity-resolved `TenantContext`. Workers must resolve current organization membership before calling them. These are internal application ports; there is no unauthenticated ingestion route. Scheduled detection (below) is the production caller for sync failures, stock mismatches and stuck fulfillment.
 
 - `pipeline.inventory`: two normalized connector observations, explicit SKU/pool mappings, authority, completeness, projection currency and configuration. External IDs include their parent scope. Equal labels never establish a mapping. JTL aggregate stock requires an explicit equivalent Shopify pool mapping.
 - `pipeline.fulfillment`: one normalized operation, explicit order/line mapping and current eligibility evidence. Resolve holds/schedules from trusted evidence; pass `unknown` when eligibility is unavailable. Split operations remain separate. Shipment quantities from mirrored systems are never summed.
@@ -16,6 +16,18 @@ All methods require an identity-resolved `TenantContext`. Workers must resolve c
 Keep observation and event keys stable on redelivery. Use a new key for a new authoritative poll. Keys identify immutable evidence within a tenant; namespace provider event IDs by connection. Store only normalized operational facts and provenance, never credentials, error text or customer payloads. Raw payload retention remains connector-owned.
 
 `exceptions.ingest` is the normalized rule boundary for other trusted ingestion callers. It validates the supplied facts, evidence and configuration before persistence. `key` is a delivery correlation ID; changing it does not add an occurrence. Pass a new configuration version whenever a threshold changes. Reusing a version with different values fails atomically. Configuration selection belongs to the caller; the persisted version is the one used for that evaluation.
+
+## Scheduled detection
+
+The commerce sync process runs `createDetectionWorker` from `@luma/application-runtime` once a minute. For each workspace with an active sync it resolves the person the sync runs as through `detection_worker_scopes()`, then runs `createDetectionMonitor` from `@luma/resolution`. Stored state chooses candidates; fresh provider reads decide:
+
+- **Sync failure:** every orders, fulfillment, product and stock stream with failed pages is evaluated with its first failure time (`failing_since`), latest error code and whether five attempts failed. The evidence key changes with each new failure, so repeated passes add no occurrences.
+- **Stock mismatch:** stock positions that at least two connections report, because people linked their SKU and location, are compared when their stored availability differs. Each ERP report is paired with each storefront report; the app category decides which is which, and the ERP is the authority. Both sides are reread and projected before the rule runs, at most 25 positions per pass.
+- **Stuck fulfillment:** open work in `orders_fulfillment_list` without progress for `stuckSeconds` is reread through its order. Reported holds, or a start time in the future, make the work exempt; work from an adapter that does not read holds stays unknown. At most 25 per pass, oldest progress first.
+
+Open cases of these classes are always included. When the fresh evaluation is clear, the monitor requests verification. Its verifier rereads stock or fulfillment for the case's exact subject; a sync failure passes once its stream completes a scan after the latest detection without new failures. A case opened by a newly detected subject gets a diagnosis. Each rule runs independently, so an unavailable source does not stop the others, and failures are retried on the next pass.
+
+A revoked or disconnected connection blocks its streams. The rule treats an inactive connection as clear, so connection health, not a case, reports it.
 
 ## Persistence and lifecycle
 

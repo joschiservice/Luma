@@ -144,13 +144,7 @@ without changing their stored health or lifecycle history.
 The pilot uses an injected fetch function that cannot send requests
 to JTL or Shopify. Production entrypoints and configuration are unchanged.
 
-The simulator observation collector projects orders and fulfillments through the
-commerce services, advancing one order and fulfillment page per collection pass
-so large runs do not delay inventory monitoring. It uses the run's explicit order
-mappings to reconcile JTL and Shopify orders. Order lines, fulfillments and unmapped orders retain source-local
-identities. The mappings cite the stored observations and survive runtime restarts.
-Fields the adapters cannot establish, such as cancellation quantities and delivery
-deadlines, retain their unknown classifications in Insights.
+The simulator pilot runs the commerce sync runner against its simulated connections, as the sync worker does for live ones. Orders, fulfillments, products, stock, returns and customers are imported source-local; Luma suggests cross-source order links from the shop order name. Simulated Shopify webhooks reach the real change route and schedule early reads. See [the simulator guide](simulator.md#luma-wiring).
 
 ## Worker failure and recovery
 

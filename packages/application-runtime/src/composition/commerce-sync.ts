@@ -20,6 +20,7 @@ import type { TenantDatabase } from '@luma/platform';
 import { createTenantDatabase } from '@luma/platform/composition';
 import { Pool } from 'pg';
 
+import { createDetectionWorker } from './detection-worker.js';
 import { createResourceScope } from './resources.js';
 import { createCommerceServices } from './services.js';
 import { createSupplierFollowUpWorker } from './supplier-follow-up.js';
@@ -130,7 +131,8 @@ export function createCommerceSyncService(
 
 /**
  * Starts the commerce sync process: identity for resolving who each sync runs as, the
- * worker database pool and the runner loop. Close it after `run` resolves.
+ * worker database pool, the runner loop, supplier follow-up and scheduled detection. Close it
+ * after `run` resolves.
  */
 export async function createDefaultCommerceSyncWorker(
   identitySettings: Parameters<typeof createIdentity>[0],
@@ -162,13 +164,23 @@ export async function createDefaultCommerceSyncWorker(
       env,
     });
 
+    const detection = createDetectionWorker({
+      database: createTenantDatabase(pool),
+      pool,
+      identity: identity.service,
+      connections: settings.connections,
+      env,
+    });
+    resources.add(detection.close);
+
     return {
       run: async () => {
-        await Promise.all([worker.run(), followUp.run()]);
+        await Promise.all([worker.run(), followUp.run(), detection.run()]);
       },
       shutdown: () => {
         worker.shutdown();
         followUp.shutdown();
+        detection.shutdown();
       },
       close: resources.close,
     };

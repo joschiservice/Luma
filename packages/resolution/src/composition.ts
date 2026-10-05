@@ -25,6 +25,8 @@ export { createOperationsOverview } from './application/overview.js';
 
 export { createDeskStore } from './infrastructure/persistence/desk.js';
 
+export { createDetectionSources } from './infrastructure/persistence/detection-sources.js';
+
 export { createDeskService } from './application/desk.js';
 
 /** Composes freshly authorized measurement commands with the append-only evidence ledger. */

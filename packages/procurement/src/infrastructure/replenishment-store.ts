@@ -27,7 +27,10 @@ export function createReplenishmentStore(
             data: { available: string | null; unit: string };
           };
         }>(
-          `SELECT p.entity_id AS position_id,p.connection_id,s.document,e.reconciliation_key AS sku
+          // Imported SKUs have identity tuples as reconciliation keys; people know them by code.
+          `SELECT p.entity_id AS position_id,p.connection_id,s.document,
+             COALESCE((SELECT k.code FROM inventory_product_skus k WHERE k.tenant_id=p.tenant_id AND k.sku_id=e.id
+               AND k.code_key IS NOT NULL ORDER BY k.connection_id LIMIT 1),e.reconciliation_key) AS sku
            FROM inventory_projections p JOIN inventory_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id
            JOIN inventory_entities e ON e.tenant_id=p.tenant_id AND e.id=(s.document->'data'->>'skuId')::uuid
            WHERE p.tenant_id=$1 AND s.kind='position' ORDER BY e.reconciliation_key,p.entity_id,p.connection_id`,

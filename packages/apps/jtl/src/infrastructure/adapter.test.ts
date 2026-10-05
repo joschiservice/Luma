@@ -8,6 +8,13 @@ import { createJtlConnector } from './adapter.js';
 import { cloudId, cloudPayload } from './fixtures/cloud.js';
 import commerce from './fixtures/commerce.json' with { type: 'json' };
 
+// Reads repeat after transient failures; tests skip the waits.
+const readRetry = {
+  attempts: 3,
+  maxDelayMs: 2000,
+  sleep: async () => undefined,
+};
+
 vi.mock('@luma/identity', () => ({
   requireTenant(context: TenantContext, tenantId: string) {
     if (context.tenantId !== tenantId) throw new Error('Tenant mismatch');
@@ -47,6 +54,12 @@ function fixture(overrides: Partial<JtlConnectorOptions> = {}) {
     }
 
     if (path === 'items') return page(data.items);
+    const item = /^items\/(\d+)$/.exec(path);
+    if (item) {
+      const found = data.items.find(({ id }) => String(id) === item[1]);
+
+      return found ? json(found) : new Response('', { status: 404 });
+    }
     if (path === 'sales-orders') return page(data.orders);
     if (path === 'sales-orders/10/line-items') return json(data.orderLines);
     if (path === 'delivery-notes') return page(data.notes);
@@ -76,6 +89,7 @@ function fixture(overrides: Partial<JtlConnectorOptions> = {}) {
       apiKey,
     },
     fetch,
+    readRetry,
     recordObservations,
     now: () => new Date('2026-09-17T00:00:00Z'),
     ...overrides,
@@ -429,7 +443,7 @@ describe('JTL read adapter', () => {
     [503, 'transient'],
     [400, 'invalid_response'],
   ])(
-    'normalizes HTTP %s without retrying or leaking errors',
+    'normalizes HTTP %s, repeating only retryable reads, without leaking errors',
     async (status, code) => {
       const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
         new Response('sensitive provider failure', {
@@ -447,7 +461,9 @@ describe('JTL read adapter', () => {
         expect(result).toMatchObject({
           error: { retry: 'after_delay', retryAfterMs: 2000 },
         });
-      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(fetch).toHaveBeenCalledTimes(
+        [429, 500, 503].includes(Number(status)) ? 3 : 1,
+      );
       expect(f.recordObservations).not.toHaveBeenCalled();
       expect(JSON.stringify(result)).not.toContain('sensitive');
     },
@@ -583,7 +599,7 @@ describe('JTL read adapter', () => {
     expect(f.recordObservations).not.toHaveBeenCalled();
   });
 
-  it('continues an empty filtered item page and preserves missing versus zero stock', async () => {
+  it('reads one SKU directly instead of paging items and preserves missing versus zero stock', async () => {
     const f = fixture();
     f.data.items.push({
       ...f.data.items[0]!,
@@ -591,22 +607,18 @@ describe('JTL read adapter', () => {
       stockTotal: 0,
       stockAvailable: 0,
     });
-    const first = await f.read('inventory.read', { limit: 1, sku: ref('21') });
-    if (!first.ok || !first.value.nextCursor)
-      throw new Error('Missing filtered cursor');
-    expect(first.value.items).toEqual([]);
-    const next = await f.read('inventory.read', {
-      limit: 1,
-      sku: ref('21'),
-      cursor: first.value.nextCursor,
-    });
-    expect(next).toMatchObject({
+    expect(
+      await f.read('inventory.read', { limit: 1, sku: ref('21') }),
+    ).toMatchObject({
       ok: true,
       value: {
         nextCursor: null,
         items: [{ data: { onHand: '0', available: '0' } }],
       },
     });
+    expect(
+      f.fetch.mock.calls.map(([url]) => new URL(String(url)).pathname),
+    ).toEqual(['/api/eazybusiness/items/21']);
   });
 
   it('rejects unsafe configuration and resolves credential failures', async () => {
@@ -627,11 +639,12 @@ describe('JTL read adapter', () => {
       ok: false,
       error: { code: 'authentication' },
     });
-    f.apiKey.mockRejectedValueOnce(new Error('secret store failure'));
+    f.apiKey.mockRejectedValue(new Error('secret store failure'));
     expect(await f.read('orders.read')).toMatchObject({
       ok: false,
       error: { code: 'transient' },
     });
+    expect(f.apiKey).toHaveBeenCalledTimes(4);
     expect(f.fetch).not.toHaveBeenCalled();
   });
 });

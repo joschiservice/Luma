@@ -1,5 +1,11 @@
 import { ConnectorError } from '@luma/connector-core';
-import { fail, parse, retryAfterMs } from '@luma/connector-core/transport';
+import {
+  fail,
+  parse,
+  type ReadRetry,
+  retryAfterMs,
+  retryRead,
+} from '@luma/connector-core/transport';
 import { createAdminApiClient } from '@shopify/admin-api-client';
 import { z } from 'zod';
 
@@ -13,11 +19,17 @@ export interface ShopifyTransportOptions {
   accessToken(): Promise<string>;
   fetch?: typeof globalThis.fetch;
   timeoutMs?: number;
+  /** Repetition of queries after transient failures; defaults to three attempts. */
+  readRetry?: ReadRetry;
 }
 
+// Only documents that are plainly queries are repeated; mutations and anything unrecognized are not.
+const queryDocument = /^\s*(?:query\b|\{)/;
+
 /**
- * Creates a Shopify GraphQL reader that resolves a current token for each request and
- * reports normalized connector failures.
+ * Creates a Shopify GraphQL client that resolves a current token for each request and
+ * reports normalized connector failures. Queries are repeated briefly after transient
+ * failures; mutations are sent once, because a failed response may follow an applied change.
  */
 export function createClient(options: ShopifyTransportOptions) {
   if (!/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(options.shop))
@@ -25,8 +37,9 @@ export function createClient(options: ShopifyTransportOptions) {
   const timeoutMs = options.timeoutMs ?? 15000;
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 120000)
     fail('invalid_input');
+  const { readRetry } = options;
 
-  return async (
+  const send = async (
     query: string,
     variables: Record<string, unknown>,
   ): Promise<Record<string, unknown>> => {
@@ -152,4 +165,9 @@ export function createClient(options: ShopifyTransportOptions) {
 
     return envelope.data;
   };
+
+  return (query: string, variables: Record<string, unknown>) =>
+    queryDocument.test(query)
+      ? retryRead(() => send(query, variables), readRetry)
+      : send(query, variables);
 }

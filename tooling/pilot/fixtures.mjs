@@ -65,7 +65,10 @@ export function detectionRequest(manifest, kind, variant = 'default') {
   const subjectId = manifest.subjects[kind];
   const connections =
     kind === 'inventory_mismatch'
-      ? [manifest.connections.jtl, manifest.connections.shopify]
+      ? [
+          manifest.connections.jtl,
+          manifest.connections[manifest.primaryShop ?? 'shopify'],
+        ]
       : kind === 'workflow_failure'
         ? [null]
         : [manifest.connections.jtl];

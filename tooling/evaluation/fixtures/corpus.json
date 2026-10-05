@@ -4,277 +4,405 @@
   "fixture": {
     "version": "1",
     "provider": {
-      "id": "evaluation",
-      "seed": 44,
-      "random": 44,
-      "nextOrder": 11,
-      "scenario": "manual",
-      "clock": {
-        "now": 1767225600000,
-        "running": false,
-        "speed": 1,
-        "sequence": 4,
-        "events": [],
-        "journal": [
-          {
-            "sequence": 1,
-            "time": 1767225600000,
-            "kind": "merchant",
-            "detail": {
-              "kind": "order",
-              "id": "1",
-              "quantity": 2
-            },
-            "instance": "jtl",
-            "resource": "1"
-          },
-          {
-            "sequence": 2,
-            "time": 1767225600000,
-            "kind": "merchant",
-            "detail": {
-              "kind": "order",
-              "id": "1",
-              "quantity": 2
-            },
-            "instance": "shopify",
-            "resource": "1"
-          },
-          {
-            "sequence": 3,
-            "time": 1767225600000,
-            "kind": "merchant",
-            "detail": {
-              "kind": "order",
-              "id": "10",
-              "quantity": 2
-            },
-            "instance": "jtl",
-            "resource": "10"
-          },
-          {
-            "sequence": 4,
-            "time": 1767225600000,
-            "kind": "merchant",
-            "detail": {
-              "kind": "order",
-              "id": "10",
-              "quantity": 2
-            },
-            "instance": "shopify",
-            "resource": "10"
-          }
-        ],
-        "faults": []
-      },
-      "serviceHealth": {
-        "jtl": "healthy",
-        "shopify": "healthy"
-      },
+      "now": 1767225600000,
+      "faults": [],
+      "journal": [],
       "jtl": {
-        "orders": [
+        "seq": 3,
+        "sequences": {
+          "sales-order-line": 2
+        },
+        "records": [
           {
+            "kind": "item",
             "id": "1",
-            "salesOrderNumber": "SIM-1",
-            "isCancelled": false,
-            "deliveryStatus": 1,
-            "paymentStatus": 2,
-            "shippingMethodId": "7"
+            "parent": null,
+            "key": null,
+            "createdAt": 1767225600000,
+            "updatedAt": 1767225600000,
+            "seq": 1,
+            "data": {
+              "id": "1",
+              "sku": "LUMA-001",
+              "name": "Canvas tote",
+              "unit": "Stück",
+              "price": 24,
+              "gtin": "4006381333931",
+              "manufacturer": "Luma Goods",
+              "active": true,
+              "shopActive": true,
+              "stock": {
+                "1": 100
+              },
+              "reserved": 4,
+              "modified": "2026-01-01T00:00:00.002Z"
+            }
           },
           {
+            "kind": "sales-order",
+            "id": "1",
+            "parent": null,
+            "key": "open",
+            "createdAt": 1767225600000,
+            "updatedAt": 1767225600000,
+            "seq": 2,
+            "data": {
+              "id": "1",
+              "number": "AU-000001",
+              "externalNumber": "SIM-1",
+              "cancelled": false,
+              "paid": true,
+              "shippingMethodId": "7",
+              "currency": "EUR",
+              "total": 48,
+              "date": "2026-01-01T00:00:00.000Z",
+              "warehouse": "1",
+              "shippedAt": null,
+              "lines": [
+                {
+                  "id": "1",
+                  "itemId": "1",
+                  "sku": "LUMA-001",
+                  "name": "Canvas tote",
+                  "unit": "Stück",
+                  "quantity": 2,
+                  "shipped": 0,
+                  "price": 24
+                }
+              ]
+            }
+          },
+          {
+            "kind": "sales-order",
             "id": "10",
-            "salesOrderNumber": "SIM-10",
-            "isCancelled": false,
-            "deliveryStatus": 1,
-            "paymentStatus": 2,
-            "shippingMethodId": "7"
-          }
-        ],
-        "lines": [
-          {
-            "id": "1",
-            "salesOrderId": "1",
-            "itemId": "1",
-            "quantity": "2",
-            "salesUnit": "each"
-          },
-          {
-            "id": "10",
-            "salesOrderId": "10",
-            "itemId": "1",
-            "quantity": "2",
-            "salesUnit": "each"
-          }
-        ],
-        "items": [
-          {
-            "id": "1",
-            "sKU": "LUMA-001",
-            "name": "Canvas tote",
-            "unit": "each",
-            "isActive": true,
-            "isInventoryManagementActive": true,
-            "stockTotal": "100",
-            "stockReservedTotal": "4",
-            "stockAvailable": "96"
-          }
-        ],
-        "notes": [],
-        "noteLines": [],
-        "shippingMethods": [
-          {
-            "id": "7",
-            "name": "Standard"
-          },
-          {
-            "id": "8",
-            "name": "Express"
-          },
-          {
-            "id": "9",
-            "name": "Pickup"
+            "parent": null,
+            "key": "open",
+            "createdAt": 1767225600000,
+            "updatedAt": 1767225600000,
+            "seq": 3,
+            "data": {
+              "id": "10",
+              "number": "AU-000010",
+              "externalNumber": "SIM-10",
+              "cancelled": false,
+              "paid": true,
+              "shippingMethodId": "7",
+              "currency": "EUR",
+              "total": 48,
+              "date": "2026-01-01T00:00:00.000Z",
+              "warehouse": "1",
+              "shippedAt": null,
+              "lines": [
+                {
+                  "id": "2",
+                  "itemId": "1",
+                  "sku": "LUMA-001",
+                  "name": "Canvas tote",
+                  "unit": "Stück",
+                  "quantity": 2,
+                  "shipped": 0,
+                  "price": 24
+                }
+              ]
+            }
           }
         ]
       },
       "shopify": {
-        "nodes": {
-          "gid://shopify/Product/1": {
-            "id": "gid://shopify/Product/1",
-            "updatedAt": "2026-01-01T00:00:00.000Z",
-            "title": "Canvas tote",
-            "status": "ACTIVE"
-          },
-          "gid://shopify/ProductVariant/1": {
-            "id": "gid://shopify/ProductVariant/1",
-            "sku": "LUMA-001",
-            "inventoryItem": {
-              "id": "gid://shopify/InventoryItem/1"
+        "seq": 16,
+        "sequences": {
+          "id": 100000010
+        },
+        "records": [
+          {
+            "kind": "Product",
+            "id": "1",
+            "parent": null,
+            "key": null,
+            "createdAt": 1767225600000,
+            "updatedAt": 1767225600000,
+            "seq": 1,
+            "data": {
+              "title": "Canvas tote",
+              "vendor": "Luma Goods",
+              "productType": "Accessories",
+              "status": "ACTIVE",
+              "publishedAt": "2026-01-01T00:00:00Z",
+              "minPrice": 2400
             }
           },
-          "gid://shopify/InventoryItem/1": {
-            "id": "gid://shopify/InventoryItem/1",
-            "tracked": true
+          {
+            "kind": "ProductVariant",
+            "id": "1",
+            "parent": "1",
+            "key": "LUMA-001",
+            "createdAt": 1767225600000,
+            "updatedAt": 1767225600000,
+            "seq": 2,
+            "data": {
+              "product": "1",
+              "sku": "LUMA-001",
+              "title": "Default Title",
+              "price": 2400,
+              "barcode": "4006381333931"
+            }
           },
-          "gid://shopify/InventoryLevel/1": {
-            "id": "gid://shopify/InventoryLevel/1",
-            "updatedAt": "2026-01-01T00:00:00.000Z",
-            "location": {
-              "id": "gid://shopify/Location/1"
-            },
-            "quantities": [
-              {
-                "name": "on_hand",
-                "quantity": 100
-              },
-              {
-                "name": "committed",
-                "quantity": 4
-              },
-              {
-                "name": "available",
-                "quantity": 96
+          {
+            "kind": "InventoryItem",
+            "id": "1",
+            "parent": null,
+            "key": "LUMA-001",
+            "createdAt": 1767225600000,
+            "updatedAt": 1767225600000,
+            "seq": 3,
+            "data": {
+              "variant": "1",
+              "product": "1",
+              "sku": "LUMA-001",
+              "tracked": true
+            }
+          },
+          {
+            "kind": "InventoryLevel",
+            "id": "1.1",
+            "parent": "1",
+            "key": "1",
+            "createdAt": 1767225600000,
+            "updatedAt": 1767225600000,
+            "seq": 4,
+            "data": {
+              "item": "1",
+              "location": "1",
+              "onHand": 100,
+              "committed": 4
+            }
+          },
+          {
+            "kind": "Order",
+            "id": "1",
+            "parent": null,
+            "key": "#SIM-1",
+            "createdAt": 1767225600000,
+            "updatedAt": 1767225600000,
+            "seq": 5,
+            "data": {
+              "number": 1,
+              "name": "#SIM-1",
+              "customer": null,
+              "location": "1",
+              "shipping": "standard",
+              "currency": "EUR",
+              "displayFinancialStatus": "PAID",
+              "displayFulfillmentStatus": "UNFULFILLED",
+              "cancelledAt": null,
+              "cancelReason": null,
+              "closed": false,
+              "total": 4800,
+              "refunded": 0
+            }
+          },
+          {
+            "kind": "Order",
+            "id": "10",
+            "parent": null,
+            "key": "#SIM-10",
+            "createdAt": 1767225600000,
+            "updatedAt": 1767225600000,
+            "seq": 11,
+            "data": {
+              "number": 10,
+              "name": "#SIM-10",
+              "customer": null,
+              "location": "1",
+              "shipping": "standard",
+              "currency": "EUR",
+              "displayFinancialStatus": "PAID",
+              "displayFulfillmentStatus": "UNFULFILLED",
+              "cancelledAt": null,
+              "cancelReason": null,
+              "closed": false,
+              "total": 4800,
+              "refunded": 0
+            }
+          },
+          {
+            "kind": "LineItem",
+            "id": "100000001",
+            "parent": "1",
+            "key": null,
+            "createdAt": 1767225600000,
+            "updatedAt": 1767225600000,
+            "seq": 6,
+            "data": {
+              "order": "1",
+              "variant": "1",
+              "product": "1",
+              "sku": "LUMA-001",
+              "name": "Canvas tote",
+              "quantity": 2,
+              "price": 2400
+            }
+          },
+          {
+            "kind": "LineItem",
+            "id": "100000006",
+            "parent": "10",
+            "key": null,
+            "createdAt": 1767225600000,
+            "updatedAt": 1767225600000,
+            "seq": 12,
+            "data": {
+              "order": "10",
+              "variant": "1",
+              "product": "1",
+              "sku": "LUMA-001",
+              "name": "Canvas tote",
+              "quantity": 2,
+              "price": 2400
+            }
+          },
+          {
+            "kind": "FulfillmentOrder",
+            "id": "100000002",
+            "parent": "1",
+            "key": null,
+            "createdAt": 1767225600000,
+            "updatedAt": 1767225600000,
+            "seq": 7,
+            "data": {
+              "order": "1",
+              "location": "1",
+              "status": "OPEN",
+              "requestStatus": "UNSUBMITTED",
+              "fulfillAt": "2026-01-01T00:00:00Z",
+              "fulfillBy": "2026-01-03T00:00:00Z",
+              "holds": [],
+              "heldStatus": null,
+              "method": {
+                "name": "Standard",
+                "maxDeliveryAt": "2026-01-06T00:00:00Z"
               }
-            ]
+            }
           },
-          "gid://shopify/Order/1": {
-            "id": "gid://shopify/Order/1",
-            "updatedAt": "2026-01-01T00:00:00.000Z",
-            "name": "#SIM-1",
-            "cancelledAt": null,
-            "closed": false,
-            "displayFinancialStatus": "PAID",
-            "fulfillments": []
-          },
-          "gid://shopify/LineItem/1": {
-            "id": "gid://shopify/LineItem/1",
-            "quantity": 2,
-            "variant": {
-              "inventoryItem": {
-                "id": "gid://shopify/InventoryItem/1"
+          {
+            "kind": "FulfillmentOrder",
+            "id": "100000007",
+            "parent": "10",
+            "key": null,
+            "createdAt": 1767225600000,
+            "updatedAt": 1767225600000,
+            "seq": 13,
+            "data": {
+              "order": "10",
+              "location": "1",
+              "status": "OPEN",
+              "requestStatus": "UNSUBMITTED",
+              "fulfillAt": "2026-01-01T00:00:00Z",
+              "fulfillBy": "2026-01-03T00:00:00Z",
+              "holds": [],
+              "heldStatus": null,
+              "method": {
+                "name": "Standard",
+                "maxDeliveryAt": "2026-01-06T00:00:00Z"
               }
             }
           },
-          "gid://shopify/FulfillmentOrder/1": {
-            "id": "gid://shopify/FulfillmentOrder/1",
-            "updatedAt": "2026-01-01T00:00:00.000Z",
-            "status": "OPEN"
-          },
-          "gid://shopify/FulfillmentOrderLineItem/1": {
-            "id": "gid://shopify/FulfillmentOrderLineItem/1",
-            "remainingQuantity": 2,
-            "lineItem": {
-              "id": "gid://shopify/LineItem/1"
+          {
+            "kind": "FulfillmentOrderLineItem",
+            "id": "100000003",
+            "parent": "100000002",
+            "key": null,
+            "createdAt": 1767225600000,
+            "updatedAt": 1767225600000,
+            "seq": 8,
+            "data": {
+              "fulfillmentOrder": "100000002",
+              "lineItem": "100000001",
+              "totalQuantity": 2,
+              "remainingQuantity": 2
             }
           },
-          "gid://shopify/Order/10": {
-            "id": "gid://shopify/Order/10",
-            "updatedAt": "2026-01-01T00:00:00.000Z",
-            "name": "#SIM-10",
-            "cancelledAt": null,
-            "closed": false,
-            "displayFinancialStatus": "PAID",
-            "fulfillments": []
-          },
-          "gid://shopify/LineItem/10": {
-            "id": "gid://shopify/LineItem/10",
-            "quantity": 2,
-            "variant": {
-              "inventoryItem": {
-                "id": "gid://shopify/InventoryItem/1"
-              }
+          {
+            "kind": "FulfillmentOrderLineItem",
+            "id": "100000008",
+            "parent": "100000007",
+            "key": null,
+            "createdAt": 1767225600000,
+            "updatedAt": 1767225600000,
+            "seq": 14,
+            "data": {
+              "fulfillmentOrder": "100000007",
+              "lineItem": "100000006",
+              "totalQuantity": 2,
+              "remainingQuantity": 2
             }
           },
-          "gid://shopify/FulfillmentOrder/10": {
-            "id": "gid://shopify/FulfillmentOrder/10",
-            "updatedAt": "2026-01-01T00:00:00.000Z",
-            "status": "OPEN"
+          {
+            "kind": "OrderTransaction",
+            "id": "100000004",
+            "parent": "1",
+            "key": null,
+            "createdAt": 1767225600000,
+            "updatedAt": 1767225600000,
+            "seq": 9,
+            "data": {
+              "order": "1",
+              "refund": null,
+              "parent": null,
+              "kind": "SALE",
+              "status": "SUCCESS",
+              "gateway": "shopify_payments",
+              "amount": 4800,
+              "processedAt": "2026-01-01T00:00:00Z"
+            }
           },
-          "gid://shopify/FulfillmentOrderLineItem/10": {
-            "id": "gid://shopify/FulfillmentOrderLineItem/10",
-            "remainingQuantity": 2,
-            "lineItem": {
-              "id": "gid://shopify/LineItem/10"
+          {
+            "kind": "OrderTransaction",
+            "id": "100000009",
+            "parent": "10",
+            "key": null,
+            "createdAt": 1767225600000,
+            "updatedAt": 1767225600000,
+            "seq": 15,
+            "data": {
+              "order": "10",
+              "refund": null,
+              "parent": null,
+              "kind": "SALE",
+              "status": "SUCCESS",
+              "gateway": "shopify_payments",
+              "amount": 4800,
+              "processedAt": "2026-01-01T00:00:00Z"
+            }
+          },
+          {
+            "kind": "BasicEvent",
+            "id": "100000005",
+            "parent": "1",
+            "key": null,
+            "createdAt": 1767225600000,
+            "updatedAt": 1767225600000,
+            "seq": 10,
+            "data": {
+              "order": "1",
+              "action": "placed"
+            }
+          },
+          {
+            "kind": "BasicEvent",
+            "id": "100000010",
+            "parent": "10",
+            "key": null,
+            "createdAt": 1767225600000,
+            "updatedAt": 1767225600000,
+            "seq": 16,
+            "data": {
+              "order": "10",
+              "action": "placed"
             }
           }
-        },
-        "roots": {
-          "orders": ["gid://shopify/Order/1", "gid://shopify/Order/10"],
-          "products": ["gid://shopify/Product/1"],
-          "inventoryItems": ["gid://shopify/InventoryItem/1"]
-        },
-        "children": {
-          "gid://shopify/Product/1": {
-            "variants": ["gid://shopify/ProductVariant/1"]
-          },
-          "gid://shopify/InventoryItem/1": {
-            "inventoryLevels": ["gid://shopify/InventoryLevel/1"]
-          },
-          "gid://shopify/Order/1": {
-            "lineItems": ["gid://shopify/LineItem/1"],
-            "fulfillmentOrders": ["gid://shopify/FulfillmentOrder/1"]
-          },
-          "gid://shopify/FulfillmentOrder/1": {
-            "lineItems": ["gid://shopify/FulfillmentOrderLineItem/1"]
-          },
-          "gid://shopify/Order/10": {
-            "lineItems": ["gid://shopify/LineItem/10"],
-            "fulfillmentOrders": ["gid://shopify/FulfillmentOrder/10"]
-          },
-          "gid://shopify/FulfillmentOrder/10": {
-            "lineItems": ["gid://shopify/FulfillmentOrderLineItem/10"]
-          }
-        }
-      },
-      "mappings": [
-        {
-          "jtl": "1",
-          "shopify": "gid://shopify/Order/1"
-        },
-        {
-          "jtl": "10",
-          "shopify": "gid://shopify/Order/10"
-        }
-      ]
+        ]
+      }
     },
     "incident": {
       "id": "00000000-0000-4000-8000-000000000007",
@@ -1266,290 +1394,417 @@
         ]
       },
       "provider": {
-        "id": "evaluation",
-        "seed": 44,
-        "random": 44,
-        "nextOrder": 11,
-        "scenario": "manual",
-        "clock": {
-          "now": 1767225600000,
-          "running": false,
-          "speed": 1,
-          "sequence": 4,
-          "events": [],
-          "journal": [
-            {
-              "sequence": 1,
-              "time": 1767225600000,
-              "kind": "merchant",
-              "detail": {
-                "kind": "order",
-                "id": "1",
-                "quantity": 2
-              },
-              "instance": "jtl",
-              "resource": "1"
-            },
-            {
-              "sequence": 2,
-              "time": 1767225600000,
-              "kind": "merchant",
-              "detail": {
-                "kind": "order",
-                "id": "1",
-                "quantity": 2
-              },
-              "instance": "shopify",
-              "resource": "1"
-            },
-            {
-              "sequence": 3,
-              "time": 1767225600000,
-              "kind": "merchant",
-              "detail": {
-                "kind": "order",
-                "id": "10",
-                "quantity": 2
-              },
-              "instance": "jtl",
-              "resource": "10"
-            },
-            {
-              "sequence": 4,
-              "time": 1767225600000,
-              "kind": "merchant",
-              "detail": {
-                "kind": "order",
-                "id": "10",
-                "quantity": 2
-              },
-              "instance": "shopify",
-              "resource": "10"
-            }
-          ],
-          "faults": [
-            {
-              "id": "fault-1",
-              "instance": "jtl",
-              "operation": "orders.shipping-method.write",
-              "resource": "1",
-              "kind": "response-loss",
-              "phase": "after-commit",
-              "occurrence": 1,
-              "remaining": 1,
-              "matches": 0,
-              "status": "armed"
-            }
-          ]
-        },
-        "serviceHealth": {
-          "jtl": "healthy",
-          "shopify": "healthy"
-        },
+        "now": 1767225600000,
+        "faults": [
+          {
+            "id": "fault-1",
+            "instance": "jtl",
+            "operation": "orders.shipping-method.write",
+            "resource": "1",
+            "occurrence": 1,
+            "remaining": 1,
+            "matches": 0,
+            "status": "armed",
+            "kind": "response-loss"
+          }
+        ],
+        "journal": [],
         "jtl": {
-          "orders": [
+          "seq": 3,
+          "sequences": {
+            "sales-order-line": 2
+          },
+          "records": [
             {
+              "kind": "item",
               "id": "1",
-              "salesOrderNumber": "SIM-1",
-              "isCancelled": false,
-              "deliveryStatus": 1,
-              "paymentStatus": 2,
-              "shippingMethodId": "7"
+              "parent": null,
+              "key": null,
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 1,
+              "data": {
+                "id": "1",
+                "sku": "LUMA-001",
+                "name": "Canvas tote",
+                "unit": "Stück",
+                "price": 24,
+                "gtin": "4006381333931",
+                "manufacturer": "Luma Goods",
+                "active": true,
+                "shopActive": true,
+                "stock": {
+                  "1": 100
+                },
+                "reserved": 4,
+                "modified": "2026-01-01T00:00:00.002Z"
+              }
             },
             {
+              "kind": "sales-order",
+              "id": "1",
+              "parent": null,
+              "key": "open",
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 2,
+              "data": {
+                "id": "1",
+                "number": "AU-000001",
+                "externalNumber": "SIM-1",
+                "cancelled": false,
+                "paid": true,
+                "shippingMethodId": "7",
+                "currency": "EUR",
+                "total": 48,
+                "date": "2026-01-01T00:00:00.000Z",
+                "warehouse": "1",
+                "shippedAt": null,
+                "lines": [
+                  {
+                    "id": "1",
+                    "itemId": "1",
+                    "sku": "LUMA-001",
+                    "name": "Canvas tote",
+                    "unit": "Stück",
+                    "quantity": 2,
+                    "shipped": 0,
+                    "price": 24
+                  }
+                ]
+              }
+            },
+            {
+              "kind": "sales-order",
               "id": "10",
-              "salesOrderNumber": "SIM-10",
-              "isCancelled": false,
-              "deliveryStatus": 1,
-              "paymentStatus": 2,
-              "shippingMethodId": "7"
-            }
-          ],
-          "lines": [
-            {
-              "id": "1",
-              "salesOrderId": "1",
-              "itemId": "1",
-              "quantity": "2",
-              "salesUnit": "each"
-            },
-            {
-              "id": "10",
-              "salesOrderId": "10",
-              "itemId": "1",
-              "quantity": "2",
-              "salesUnit": "each"
-            }
-          ],
-          "items": [
-            {
-              "id": "1",
-              "sKU": "LUMA-001",
-              "name": "Canvas tote",
-              "unit": "each",
-              "isActive": true,
-              "isInventoryManagementActive": true,
-              "stockTotal": "100",
-              "stockReservedTotal": "4",
-              "stockAvailable": "96"
-            }
-          ],
-          "notes": [],
-          "noteLines": [],
-          "shippingMethods": [
-            {
-              "id": "7",
-              "name": "Standard"
-            },
-            {
-              "id": "8",
-              "name": "Express"
-            },
-            {
-              "id": "9",
-              "name": "Pickup"
+              "parent": null,
+              "key": "open",
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 3,
+              "data": {
+                "id": "10",
+                "number": "AU-000010",
+                "externalNumber": "SIM-10",
+                "cancelled": false,
+                "paid": true,
+                "shippingMethodId": "7",
+                "currency": "EUR",
+                "total": 48,
+                "date": "2026-01-01T00:00:00.000Z",
+                "warehouse": "1",
+                "shippedAt": null,
+                "lines": [
+                  {
+                    "id": "2",
+                    "itemId": "1",
+                    "sku": "LUMA-001",
+                    "name": "Canvas tote",
+                    "unit": "Stück",
+                    "quantity": 2,
+                    "shipped": 0,
+                    "price": 24
+                  }
+                ]
+              }
             }
           ]
         },
         "shopify": {
-          "nodes": {
-            "gid://shopify/Product/1": {
-              "id": "gid://shopify/Product/1",
-              "updatedAt": "2026-01-01T00:00:00.000Z",
-              "title": "Canvas tote",
-              "status": "ACTIVE"
-            },
-            "gid://shopify/ProductVariant/1": {
-              "id": "gid://shopify/ProductVariant/1",
-              "sku": "LUMA-001",
-              "inventoryItem": {
-                "id": "gid://shopify/InventoryItem/1"
+          "seq": 16,
+          "sequences": {
+            "id": 100000010
+          },
+          "records": [
+            {
+              "kind": "Product",
+              "id": "1",
+              "parent": null,
+              "key": null,
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 1,
+              "data": {
+                "title": "Canvas tote",
+                "vendor": "Luma Goods",
+                "productType": "Accessories",
+                "status": "ACTIVE",
+                "publishedAt": "2026-01-01T00:00:00Z",
+                "minPrice": 2400
               }
             },
-            "gid://shopify/InventoryItem/1": {
-              "id": "gid://shopify/InventoryItem/1",
-              "tracked": true
+            {
+              "kind": "ProductVariant",
+              "id": "1",
+              "parent": "1",
+              "key": "LUMA-001",
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 2,
+              "data": {
+                "product": "1",
+                "sku": "LUMA-001",
+                "title": "Default Title",
+                "price": 2400,
+                "barcode": "4006381333931"
+              }
             },
-            "gid://shopify/InventoryLevel/1": {
-              "id": "gid://shopify/InventoryLevel/1",
-              "updatedAt": "2026-01-01T00:00:00.000Z",
-              "location": {
-                "id": "gid://shopify/Location/1"
-              },
-              "quantities": [
-                {
-                  "name": "on_hand",
-                  "quantity": 100
-                },
-                {
-                  "name": "committed",
-                  "quantity": 4
-                },
-                {
-                  "name": "available",
-                  "quantity": 96
+            {
+              "kind": "InventoryItem",
+              "id": "1",
+              "parent": null,
+              "key": "LUMA-001",
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 3,
+              "data": {
+                "variant": "1",
+                "product": "1",
+                "sku": "LUMA-001",
+                "tracked": true
+              }
+            },
+            {
+              "kind": "InventoryLevel",
+              "id": "1.1",
+              "parent": "1",
+              "key": "1",
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 4,
+              "data": {
+                "item": "1",
+                "location": "1",
+                "onHand": 100,
+                "committed": 4
+              }
+            },
+            {
+              "kind": "Order",
+              "id": "1",
+              "parent": null,
+              "key": "#SIM-1",
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 5,
+              "data": {
+                "number": 1,
+                "name": "#SIM-1",
+                "customer": null,
+                "location": "1",
+                "shipping": "standard",
+                "currency": "EUR",
+                "displayFinancialStatus": "PAID",
+                "displayFulfillmentStatus": "UNFULFILLED",
+                "cancelledAt": null,
+                "cancelReason": null,
+                "closed": false,
+                "total": 4800,
+                "refunded": 0
+              }
+            },
+            {
+              "kind": "Order",
+              "id": "10",
+              "parent": null,
+              "key": "#SIM-10",
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 11,
+              "data": {
+                "number": 10,
+                "name": "#SIM-10",
+                "customer": null,
+                "location": "1",
+                "shipping": "standard",
+                "currency": "EUR",
+                "displayFinancialStatus": "PAID",
+                "displayFulfillmentStatus": "UNFULFILLED",
+                "cancelledAt": null,
+                "cancelReason": null,
+                "closed": false,
+                "total": 4800,
+                "refunded": 0
+              }
+            },
+            {
+              "kind": "LineItem",
+              "id": "100000001",
+              "parent": "1",
+              "key": null,
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 6,
+              "data": {
+                "order": "1",
+                "variant": "1",
+                "product": "1",
+                "sku": "LUMA-001",
+                "name": "Canvas tote",
+                "quantity": 2,
+                "price": 2400
+              }
+            },
+            {
+              "kind": "LineItem",
+              "id": "100000006",
+              "parent": "10",
+              "key": null,
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 12,
+              "data": {
+                "order": "10",
+                "variant": "1",
+                "product": "1",
+                "sku": "LUMA-001",
+                "name": "Canvas tote",
+                "quantity": 2,
+                "price": 2400
+              }
+            },
+            {
+              "kind": "FulfillmentOrder",
+              "id": "100000002",
+              "parent": "1",
+              "key": null,
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 7,
+              "data": {
+                "order": "1",
+                "location": "1",
+                "status": "OPEN",
+                "requestStatus": "UNSUBMITTED",
+                "fulfillAt": "2026-01-01T00:00:00Z",
+                "fulfillBy": "2026-01-03T00:00:00Z",
+                "holds": [],
+                "heldStatus": null,
+                "method": {
+                  "name": "Standard",
+                  "maxDeliveryAt": "2026-01-06T00:00:00Z"
                 }
-              ]
+              }
             },
-            "gid://shopify/Order/1": {
-              "id": "gid://shopify/Order/1",
-              "updatedAt": "2026-01-01T00:00:00.000Z",
-              "name": "#SIM-1",
-              "cancelledAt": null,
-              "closed": false,
-              "displayFinancialStatus": "PAID",
-              "fulfillments": []
-            },
-            "gid://shopify/LineItem/1": {
-              "id": "gid://shopify/LineItem/1",
-              "quantity": 2,
-              "variant": {
-                "inventoryItem": {
-                  "id": "gid://shopify/InventoryItem/1"
+            {
+              "kind": "FulfillmentOrder",
+              "id": "100000007",
+              "parent": "10",
+              "key": null,
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 13,
+              "data": {
+                "order": "10",
+                "location": "1",
+                "status": "OPEN",
+                "requestStatus": "UNSUBMITTED",
+                "fulfillAt": "2026-01-01T00:00:00Z",
+                "fulfillBy": "2026-01-03T00:00:00Z",
+                "holds": [],
+                "heldStatus": null,
+                "method": {
+                  "name": "Standard",
+                  "maxDeliveryAt": "2026-01-06T00:00:00Z"
                 }
               }
             },
-            "gid://shopify/FulfillmentOrder/1": {
-              "id": "gid://shopify/FulfillmentOrder/1",
-              "updatedAt": "2026-01-01T00:00:00.000Z",
-              "status": "OPEN"
-            },
-            "gid://shopify/FulfillmentOrderLineItem/1": {
-              "id": "gid://shopify/FulfillmentOrderLineItem/1",
-              "remainingQuantity": 2,
-              "lineItem": {
-                "id": "gid://shopify/LineItem/1"
+            {
+              "kind": "FulfillmentOrderLineItem",
+              "id": "100000003",
+              "parent": "100000002",
+              "key": null,
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 8,
+              "data": {
+                "fulfillmentOrder": "100000002",
+                "lineItem": "100000001",
+                "totalQuantity": 2,
+                "remainingQuantity": 2
               }
             },
-            "gid://shopify/Order/10": {
-              "id": "gid://shopify/Order/10",
-              "updatedAt": "2026-01-01T00:00:00.000Z",
-              "name": "#SIM-10",
-              "cancelledAt": null,
-              "closed": false,
-              "displayFinancialStatus": "PAID",
-              "fulfillments": []
-            },
-            "gid://shopify/LineItem/10": {
-              "id": "gid://shopify/LineItem/10",
-              "quantity": 2,
-              "variant": {
-                "inventoryItem": {
-                  "id": "gid://shopify/InventoryItem/1"
-                }
+            {
+              "kind": "FulfillmentOrderLineItem",
+              "id": "100000008",
+              "parent": "100000007",
+              "key": null,
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 14,
+              "data": {
+                "fulfillmentOrder": "100000007",
+                "lineItem": "100000006",
+                "totalQuantity": 2,
+                "remainingQuantity": 2
               }
             },
-            "gid://shopify/FulfillmentOrder/10": {
-              "id": "gid://shopify/FulfillmentOrder/10",
-              "updatedAt": "2026-01-01T00:00:00.000Z",
-              "status": "OPEN"
+            {
+              "kind": "OrderTransaction",
+              "id": "100000004",
+              "parent": "1",
+              "key": null,
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 9,
+              "data": {
+                "order": "1",
+                "refund": null,
+                "parent": null,
+                "kind": "SALE",
+                "status": "SUCCESS",
+                "gateway": "shopify_payments",
+                "amount": 4800,
+                "processedAt": "2026-01-01T00:00:00Z"
+              }
             },
-            "gid://shopify/FulfillmentOrderLineItem/10": {
-              "id": "gid://shopify/FulfillmentOrderLineItem/10",
-              "remainingQuantity": 2,
-              "lineItem": {
-                "id": "gid://shopify/LineItem/10"
+            {
+              "kind": "OrderTransaction",
+              "id": "100000009",
+              "parent": "10",
+              "key": null,
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 15,
+              "data": {
+                "order": "10",
+                "refund": null,
+                "parent": null,
+                "kind": "SALE",
+                "status": "SUCCESS",
+                "gateway": "shopify_payments",
+                "amount": 4800,
+                "processedAt": "2026-01-01T00:00:00Z"
+              }
+            },
+            {
+              "kind": "BasicEvent",
+              "id": "100000005",
+              "parent": "1",
+              "key": null,
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 10,
+              "data": {
+                "order": "1",
+                "action": "placed"
+              }
+            },
+            {
+              "kind": "BasicEvent",
+              "id": "100000010",
+              "parent": "10",
+              "key": null,
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 16,
+              "data": {
+                "order": "10",
+                "action": "placed"
               }
             }
-          },
-          "roots": {
-            "orders": ["gid://shopify/Order/1", "gid://shopify/Order/10"],
-            "products": ["gid://shopify/Product/1"],
-            "inventoryItems": ["gid://shopify/InventoryItem/1"]
-          },
-          "children": {
-            "gid://shopify/Product/1": {
-              "variants": ["gid://shopify/ProductVariant/1"]
-            },
-            "gid://shopify/InventoryItem/1": {
-              "inventoryLevels": ["gid://shopify/InventoryLevel/1"]
-            },
-            "gid://shopify/Order/1": {
-              "lineItems": ["gid://shopify/LineItem/1"],
-              "fulfillmentOrders": ["gid://shopify/FulfillmentOrder/1"]
-            },
-            "gid://shopify/FulfillmentOrder/1": {
-              "lineItems": ["gid://shopify/FulfillmentOrderLineItem/1"]
-            },
-            "gid://shopify/Order/10": {
-              "lineItems": ["gid://shopify/LineItem/10"],
-              "fulfillmentOrders": ["gid://shopify/FulfillmentOrder/10"]
-            },
-            "gid://shopify/FulfillmentOrder/10": {
-              "lineItems": ["gid://shopify/FulfillmentOrderLineItem/10"]
-            }
-          }
-        },
-        "mappings": [
-          {
-            "jtl": "1",
-            "shopify": "gid://shopify/Order/1"
-          },
-          {
-            "jtl": "10",
-            "shopify": "gid://shopify/Order/10"
-          }
-        ]
+          ]
+        }
       },
       "expected": {
         "calls": [
@@ -1665,290 +1920,417 @@
         ]
       },
       "provider": {
-        "id": "evaluation",
-        "seed": 44,
-        "random": 44,
-        "nextOrder": 11,
-        "scenario": "manual",
-        "clock": {
-          "now": 1767225600000,
-          "running": false,
-          "speed": 1,
-          "sequence": 4,
-          "events": [],
-          "journal": [
-            {
-              "sequence": 1,
-              "time": 1767225600000,
-              "kind": "merchant",
-              "detail": {
-                "kind": "order",
-                "id": "1",
-                "quantity": 2
-              },
-              "instance": "jtl",
-              "resource": "1"
-            },
-            {
-              "sequence": 2,
-              "time": 1767225600000,
-              "kind": "merchant",
-              "detail": {
-                "kind": "order",
-                "id": "1",
-                "quantity": 2
-              },
-              "instance": "shopify",
-              "resource": "1"
-            },
-            {
-              "sequence": 3,
-              "time": 1767225600000,
-              "kind": "merchant",
-              "detail": {
-                "kind": "order",
-                "id": "10",
-                "quantity": 2
-              },
-              "instance": "jtl",
-              "resource": "10"
-            },
-            {
-              "sequence": 4,
-              "time": 1767225600000,
-              "kind": "merchant",
-              "detail": {
-                "kind": "order",
-                "id": "10",
-                "quantity": 2
-              },
-              "instance": "shopify",
-              "resource": "10"
-            }
-          ],
-          "faults": [
-            {
-              "id": "fault-1",
-              "instance": "jtl",
-              "operation": "orders.shipping-method.read",
-              "resource": "1",
-              "kind": "outage",
-              "phase": "before",
-              "occurrence": 3,
-              "remaining": 1,
-              "matches": 0,
-              "status": "armed"
-            }
-          ]
-        },
-        "serviceHealth": {
-          "jtl": "healthy",
-          "shopify": "healthy"
-        },
+        "now": 1767225600000,
+        "faults": [
+          {
+            "id": "fault-1",
+            "instance": "jtl",
+            "operation": "orders.shipping-method.read",
+            "resource": "1",
+            "occurrence": 3,
+            "remaining": 1,
+            "matches": 0,
+            "status": "armed",
+            "kind": "unavailable"
+          }
+        ],
+        "journal": [],
         "jtl": {
-          "orders": [
+          "seq": 3,
+          "sequences": {
+            "sales-order-line": 2
+          },
+          "records": [
             {
+              "kind": "item",
               "id": "1",
-              "salesOrderNumber": "SIM-1",
-              "isCancelled": false,
-              "deliveryStatus": 1,
-              "paymentStatus": 2,
-              "shippingMethodId": "7"
+              "parent": null,
+              "key": null,
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 1,
+              "data": {
+                "id": "1",
+                "sku": "LUMA-001",
+                "name": "Canvas tote",
+                "unit": "Stück",
+                "price": 24,
+                "gtin": "4006381333931",
+                "manufacturer": "Luma Goods",
+                "active": true,
+                "shopActive": true,
+                "stock": {
+                  "1": 100
+                },
+                "reserved": 4,
+                "modified": "2026-01-01T00:00:00.002Z"
+              }
             },
             {
+              "kind": "sales-order",
+              "id": "1",
+              "parent": null,
+              "key": "open",
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 2,
+              "data": {
+                "id": "1",
+                "number": "AU-000001",
+                "externalNumber": "SIM-1",
+                "cancelled": false,
+                "paid": true,
+                "shippingMethodId": "7",
+                "currency": "EUR",
+                "total": 48,
+                "date": "2026-01-01T00:00:00.000Z",
+                "warehouse": "1",
+                "shippedAt": null,
+                "lines": [
+                  {
+                    "id": "1",
+                    "itemId": "1",
+                    "sku": "LUMA-001",
+                    "name": "Canvas tote",
+                    "unit": "Stück",
+                    "quantity": 2,
+                    "shipped": 0,
+                    "price": 24
+                  }
+                ]
+              }
+            },
+            {
+              "kind": "sales-order",
               "id": "10",
-              "salesOrderNumber": "SIM-10",
-              "isCancelled": false,
-              "deliveryStatus": 1,
-              "paymentStatus": 2,
-              "shippingMethodId": "7"
-            }
-          ],
-          "lines": [
-            {
-              "id": "1",
-              "salesOrderId": "1",
-              "itemId": "1",
-              "quantity": "2",
-              "salesUnit": "each"
-            },
-            {
-              "id": "10",
-              "salesOrderId": "10",
-              "itemId": "1",
-              "quantity": "2",
-              "salesUnit": "each"
-            }
-          ],
-          "items": [
-            {
-              "id": "1",
-              "sKU": "LUMA-001",
-              "name": "Canvas tote",
-              "unit": "each",
-              "isActive": true,
-              "isInventoryManagementActive": true,
-              "stockTotal": "100",
-              "stockReservedTotal": "4",
-              "stockAvailable": "96"
-            }
-          ],
-          "notes": [],
-          "noteLines": [],
-          "shippingMethods": [
-            {
-              "id": "7",
-              "name": "Standard"
-            },
-            {
-              "id": "8",
-              "name": "Express"
-            },
-            {
-              "id": "9",
-              "name": "Pickup"
+              "parent": null,
+              "key": "open",
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 3,
+              "data": {
+                "id": "10",
+                "number": "AU-000010",
+                "externalNumber": "SIM-10",
+                "cancelled": false,
+                "paid": true,
+                "shippingMethodId": "7",
+                "currency": "EUR",
+                "total": 48,
+                "date": "2026-01-01T00:00:00.000Z",
+                "warehouse": "1",
+                "shippedAt": null,
+                "lines": [
+                  {
+                    "id": "2",
+                    "itemId": "1",
+                    "sku": "LUMA-001",
+                    "name": "Canvas tote",
+                    "unit": "Stück",
+                    "quantity": 2,
+                    "shipped": 0,
+                    "price": 24
+                  }
+                ]
+              }
             }
           ]
         },
         "shopify": {
-          "nodes": {
-            "gid://shopify/Product/1": {
-              "id": "gid://shopify/Product/1",
-              "updatedAt": "2026-01-01T00:00:00.000Z",
-              "title": "Canvas tote",
-              "status": "ACTIVE"
-            },
-            "gid://shopify/ProductVariant/1": {
-              "id": "gid://shopify/ProductVariant/1",
-              "sku": "LUMA-001",
-              "inventoryItem": {
-                "id": "gid://shopify/InventoryItem/1"
+          "seq": 16,
+          "sequences": {
+            "id": 100000010
+          },
+          "records": [
+            {
+              "kind": "Product",
+              "id": "1",
+              "parent": null,
+              "key": null,
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 1,
+              "data": {
+                "title": "Canvas tote",
+                "vendor": "Luma Goods",
+                "productType": "Accessories",
+                "status": "ACTIVE",
+                "publishedAt": "2026-01-01T00:00:00Z",
+                "minPrice": 2400
               }
             },
-            "gid://shopify/InventoryItem/1": {
-              "id": "gid://shopify/InventoryItem/1",
-              "tracked": true
+            {
+              "kind": "ProductVariant",
+              "id": "1",
+              "parent": "1",
+              "key": "LUMA-001",
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 2,
+              "data": {
+                "product": "1",
+                "sku": "LUMA-001",
+                "title": "Default Title",
+                "price": 2400,
+                "barcode": "4006381333931"
+              }
             },
-            "gid://shopify/InventoryLevel/1": {
-              "id": "gid://shopify/InventoryLevel/1",
-              "updatedAt": "2026-01-01T00:00:00.000Z",
-              "location": {
-                "id": "gid://shopify/Location/1"
-              },
-              "quantities": [
-                {
-                  "name": "on_hand",
-                  "quantity": 100
-                },
-                {
-                  "name": "committed",
-                  "quantity": 4
-                },
-                {
-                  "name": "available",
-                  "quantity": 96
+            {
+              "kind": "InventoryItem",
+              "id": "1",
+              "parent": null,
+              "key": "LUMA-001",
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 3,
+              "data": {
+                "variant": "1",
+                "product": "1",
+                "sku": "LUMA-001",
+                "tracked": true
+              }
+            },
+            {
+              "kind": "InventoryLevel",
+              "id": "1.1",
+              "parent": "1",
+              "key": "1",
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 4,
+              "data": {
+                "item": "1",
+                "location": "1",
+                "onHand": 100,
+                "committed": 4
+              }
+            },
+            {
+              "kind": "Order",
+              "id": "1",
+              "parent": null,
+              "key": "#SIM-1",
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 5,
+              "data": {
+                "number": 1,
+                "name": "#SIM-1",
+                "customer": null,
+                "location": "1",
+                "shipping": "standard",
+                "currency": "EUR",
+                "displayFinancialStatus": "PAID",
+                "displayFulfillmentStatus": "UNFULFILLED",
+                "cancelledAt": null,
+                "cancelReason": null,
+                "closed": false,
+                "total": 4800,
+                "refunded": 0
+              }
+            },
+            {
+              "kind": "Order",
+              "id": "10",
+              "parent": null,
+              "key": "#SIM-10",
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 11,
+              "data": {
+                "number": 10,
+                "name": "#SIM-10",
+                "customer": null,
+                "location": "1",
+                "shipping": "standard",
+                "currency": "EUR",
+                "displayFinancialStatus": "PAID",
+                "displayFulfillmentStatus": "UNFULFILLED",
+                "cancelledAt": null,
+                "cancelReason": null,
+                "closed": false,
+                "total": 4800,
+                "refunded": 0
+              }
+            },
+            {
+              "kind": "LineItem",
+              "id": "100000001",
+              "parent": "1",
+              "key": null,
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 6,
+              "data": {
+                "order": "1",
+                "variant": "1",
+                "product": "1",
+                "sku": "LUMA-001",
+                "name": "Canvas tote",
+                "quantity": 2,
+                "price": 2400
+              }
+            },
+            {
+              "kind": "LineItem",
+              "id": "100000006",
+              "parent": "10",
+              "key": null,
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 12,
+              "data": {
+                "order": "10",
+                "variant": "1",
+                "product": "1",
+                "sku": "LUMA-001",
+                "name": "Canvas tote",
+                "quantity": 2,
+                "price": 2400
+              }
+            },
+            {
+              "kind": "FulfillmentOrder",
+              "id": "100000002",
+              "parent": "1",
+              "key": null,
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 7,
+              "data": {
+                "order": "1",
+                "location": "1",
+                "status": "OPEN",
+                "requestStatus": "UNSUBMITTED",
+                "fulfillAt": "2026-01-01T00:00:00Z",
+                "fulfillBy": "2026-01-03T00:00:00Z",
+                "holds": [],
+                "heldStatus": null,
+                "method": {
+                  "name": "Standard",
+                  "maxDeliveryAt": "2026-01-06T00:00:00Z"
                 }
-              ]
+              }
             },
-            "gid://shopify/Order/1": {
-              "id": "gid://shopify/Order/1",
-              "updatedAt": "2026-01-01T00:00:00.000Z",
-              "name": "#SIM-1",
-              "cancelledAt": null,
-              "closed": false,
-              "displayFinancialStatus": "PAID",
-              "fulfillments": []
-            },
-            "gid://shopify/LineItem/1": {
-              "id": "gid://shopify/LineItem/1",
-              "quantity": 2,
-              "variant": {
-                "inventoryItem": {
-                  "id": "gid://shopify/InventoryItem/1"
+            {
+              "kind": "FulfillmentOrder",
+              "id": "100000007",
+              "parent": "10",
+              "key": null,
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 13,
+              "data": {
+                "order": "10",
+                "location": "1",
+                "status": "OPEN",
+                "requestStatus": "UNSUBMITTED",
+                "fulfillAt": "2026-01-01T00:00:00Z",
+                "fulfillBy": "2026-01-03T00:00:00Z",
+                "holds": [],
+                "heldStatus": null,
+                "method": {
+                  "name": "Standard",
+                  "maxDeliveryAt": "2026-01-06T00:00:00Z"
                 }
               }
             },
-            "gid://shopify/FulfillmentOrder/1": {
-              "id": "gid://shopify/FulfillmentOrder/1",
-              "updatedAt": "2026-01-01T00:00:00.000Z",
-              "status": "OPEN"
-            },
-            "gid://shopify/FulfillmentOrderLineItem/1": {
-              "id": "gid://shopify/FulfillmentOrderLineItem/1",
-              "remainingQuantity": 2,
-              "lineItem": {
-                "id": "gid://shopify/LineItem/1"
+            {
+              "kind": "FulfillmentOrderLineItem",
+              "id": "100000003",
+              "parent": "100000002",
+              "key": null,
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 8,
+              "data": {
+                "fulfillmentOrder": "100000002",
+                "lineItem": "100000001",
+                "totalQuantity": 2,
+                "remainingQuantity": 2
               }
             },
-            "gid://shopify/Order/10": {
-              "id": "gid://shopify/Order/10",
-              "updatedAt": "2026-01-01T00:00:00.000Z",
-              "name": "#SIM-10",
-              "cancelledAt": null,
-              "closed": false,
-              "displayFinancialStatus": "PAID",
-              "fulfillments": []
-            },
-            "gid://shopify/LineItem/10": {
-              "id": "gid://shopify/LineItem/10",
-              "quantity": 2,
-              "variant": {
-                "inventoryItem": {
-                  "id": "gid://shopify/InventoryItem/1"
-                }
+            {
+              "kind": "FulfillmentOrderLineItem",
+              "id": "100000008",
+              "parent": "100000007",
+              "key": null,
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 14,
+              "data": {
+                "fulfillmentOrder": "100000007",
+                "lineItem": "100000006",
+                "totalQuantity": 2,
+                "remainingQuantity": 2
               }
             },
-            "gid://shopify/FulfillmentOrder/10": {
-              "id": "gid://shopify/FulfillmentOrder/10",
-              "updatedAt": "2026-01-01T00:00:00.000Z",
-              "status": "OPEN"
+            {
+              "kind": "OrderTransaction",
+              "id": "100000004",
+              "parent": "1",
+              "key": null,
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 9,
+              "data": {
+                "order": "1",
+                "refund": null,
+                "parent": null,
+                "kind": "SALE",
+                "status": "SUCCESS",
+                "gateway": "shopify_payments",
+                "amount": 4800,
+                "processedAt": "2026-01-01T00:00:00Z"
+              }
             },
-            "gid://shopify/FulfillmentOrderLineItem/10": {
-              "id": "gid://shopify/FulfillmentOrderLineItem/10",
-              "remainingQuantity": 2,
-              "lineItem": {
-                "id": "gid://shopify/LineItem/10"
+            {
+              "kind": "OrderTransaction",
+              "id": "100000009",
+              "parent": "10",
+              "key": null,
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 15,
+              "data": {
+                "order": "10",
+                "refund": null,
+                "parent": null,
+                "kind": "SALE",
+                "status": "SUCCESS",
+                "gateway": "shopify_payments",
+                "amount": 4800,
+                "processedAt": "2026-01-01T00:00:00Z"
+              }
+            },
+            {
+              "kind": "BasicEvent",
+              "id": "100000005",
+              "parent": "1",
+              "key": null,
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 10,
+              "data": {
+                "order": "1",
+                "action": "placed"
+              }
+            },
+            {
+              "kind": "BasicEvent",
+              "id": "100000010",
+              "parent": "10",
+              "key": null,
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 16,
+              "data": {
+                "order": "10",
+                "action": "placed"
               }
             }
-          },
-          "roots": {
-            "orders": ["gid://shopify/Order/1", "gid://shopify/Order/10"],
-            "products": ["gid://shopify/Product/1"],
-            "inventoryItems": ["gid://shopify/InventoryItem/1"]
-          },
-          "children": {
-            "gid://shopify/Product/1": {
-              "variants": ["gid://shopify/ProductVariant/1"]
-            },
-            "gid://shopify/InventoryItem/1": {
-              "inventoryLevels": ["gid://shopify/InventoryLevel/1"]
-            },
-            "gid://shopify/Order/1": {
-              "lineItems": ["gid://shopify/LineItem/1"],
-              "fulfillmentOrders": ["gid://shopify/FulfillmentOrder/1"]
-            },
-            "gid://shopify/FulfillmentOrder/1": {
-              "lineItems": ["gid://shopify/FulfillmentOrderLineItem/1"]
-            },
-            "gid://shopify/Order/10": {
-              "lineItems": ["gid://shopify/LineItem/10"],
-              "fulfillmentOrders": ["gid://shopify/FulfillmentOrder/10"]
-            },
-            "gid://shopify/FulfillmentOrder/10": {
-              "lineItems": ["gid://shopify/FulfillmentOrderLineItem/10"]
-            }
-          }
-        },
-        "mappings": [
-          {
-            "jtl": "1",
-            "shopify": "gid://shopify/Order/1"
-          },
-          {
-            "jtl": "10",
-            "shopify": "gid://shopify/Order/10"
-          }
-        ]
+          ]
+        }
       },
       "expected": {
         "calls": [
@@ -2076,290 +2458,417 @@
         ]
       },
       "provider": {
-        "id": "evaluation",
-        "seed": 44,
-        "random": 44,
-        "nextOrder": 11,
-        "scenario": "manual",
-        "clock": {
-          "now": 1767225600000,
-          "running": false,
-          "speed": 1,
-          "sequence": 4,
-          "events": [],
-          "journal": [
-            {
-              "sequence": 1,
-              "time": 1767225600000,
-              "kind": "merchant",
-              "detail": {
-                "kind": "order",
-                "id": "1",
-                "quantity": 2
-              },
-              "instance": "jtl",
-              "resource": "1"
-            },
-            {
-              "sequence": 2,
-              "time": 1767225600000,
-              "kind": "merchant",
-              "detail": {
-                "kind": "order",
-                "id": "1",
-                "quantity": 2
-              },
-              "instance": "shopify",
-              "resource": "1"
-            },
-            {
-              "sequence": 3,
-              "time": 1767225600000,
-              "kind": "merchant",
-              "detail": {
-                "kind": "order",
-                "id": "10",
-                "quantity": 2
-              },
-              "instance": "jtl",
-              "resource": "10"
-            },
-            {
-              "sequence": 4,
-              "time": 1767225600000,
-              "kind": "merchant",
-              "detail": {
-                "kind": "order",
-                "id": "10",
-                "quantity": 2
-              },
-              "instance": "shopify",
-              "resource": "10"
-            }
-          ],
-          "faults": [
-            {
-              "id": "fault-1",
-              "instance": "jtl",
-              "operation": "orders.shipping-method.write",
-              "resource": "1",
-              "kind": "outage",
-              "phase": "before",
-              "occurrence": 1,
-              "remaining": 1,
-              "matches": 0,
-              "status": "armed"
-            }
-          ]
-        },
-        "serviceHealth": {
-          "jtl": "healthy",
-          "shopify": "healthy"
-        },
+        "now": 1767225600000,
+        "faults": [
+          {
+            "id": "fault-1",
+            "instance": "jtl",
+            "operation": "orders.shipping-method.write",
+            "resource": "1",
+            "occurrence": 1,
+            "remaining": 1,
+            "matches": 0,
+            "status": "armed",
+            "kind": "unavailable"
+          }
+        ],
+        "journal": [],
         "jtl": {
-          "orders": [
+          "seq": 3,
+          "sequences": {
+            "sales-order-line": 2
+          },
+          "records": [
             {
+              "kind": "item",
               "id": "1",
-              "salesOrderNumber": "SIM-1",
-              "isCancelled": false,
-              "deliveryStatus": 1,
-              "paymentStatus": 2,
-              "shippingMethodId": "7"
+              "parent": null,
+              "key": null,
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 1,
+              "data": {
+                "id": "1",
+                "sku": "LUMA-001",
+                "name": "Canvas tote",
+                "unit": "Stück",
+                "price": 24,
+                "gtin": "4006381333931",
+                "manufacturer": "Luma Goods",
+                "active": true,
+                "shopActive": true,
+                "stock": {
+                  "1": 100
+                },
+                "reserved": 4,
+                "modified": "2026-01-01T00:00:00.002Z"
+              }
             },
             {
+              "kind": "sales-order",
+              "id": "1",
+              "parent": null,
+              "key": "open",
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 2,
+              "data": {
+                "id": "1",
+                "number": "AU-000001",
+                "externalNumber": "SIM-1",
+                "cancelled": false,
+                "paid": true,
+                "shippingMethodId": "7",
+                "currency": "EUR",
+                "total": 48,
+                "date": "2026-01-01T00:00:00.000Z",
+                "warehouse": "1",
+                "shippedAt": null,
+                "lines": [
+                  {
+                    "id": "1",
+                    "itemId": "1",
+                    "sku": "LUMA-001",
+                    "name": "Canvas tote",
+                    "unit": "Stück",
+                    "quantity": 2,
+                    "shipped": 0,
+                    "price": 24
+                  }
+                ]
+              }
+            },
+            {
+              "kind": "sales-order",
               "id": "10",
-              "salesOrderNumber": "SIM-10",
-              "isCancelled": false,
-              "deliveryStatus": 1,
-              "paymentStatus": 2,
-              "shippingMethodId": "7"
-            }
-          ],
-          "lines": [
-            {
-              "id": "1",
-              "salesOrderId": "1",
-              "itemId": "1",
-              "quantity": "2",
-              "salesUnit": "each"
-            },
-            {
-              "id": "10",
-              "salesOrderId": "10",
-              "itemId": "1",
-              "quantity": "2",
-              "salesUnit": "each"
-            }
-          ],
-          "items": [
-            {
-              "id": "1",
-              "sKU": "LUMA-001",
-              "name": "Canvas tote",
-              "unit": "each",
-              "isActive": true,
-              "isInventoryManagementActive": true,
-              "stockTotal": "100",
-              "stockReservedTotal": "4",
-              "stockAvailable": "96"
-            }
-          ],
-          "notes": [],
-          "noteLines": [],
-          "shippingMethods": [
-            {
-              "id": "7",
-              "name": "Standard"
-            },
-            {
-              "id": "8",
-              "name": "Express"
-            },
-            {
-              "id": "9",
-              "name": "Pickup"
+              "parent": null,
+              "key": "open",
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 3,
+              "data": {
+                "id": "10",
+                "number": "AU-000010",
+                "externalNumber": "SIM-10",
+                "cancelled": false,
+                "paid": true,
+                "shippingMethodId": "7",
+                "currency": "EUR",
+                "total": 48,
+                "date": "2026-01-01T00:00:00.000Z",
+                "warehouse": "1",
+                "shippedAt": null,
+                "lines": [
+                  {
+                    "id": "2",
+                    "itemId": "1",
+                    "sku": "LUMA-001",
+                    "name": "Canvas tote",
+                    "unit": "Stück",
+                    "quantity": 2,
+                    "shipped": 0,
+                    "price": 24
+                  }
+                ]
+              }
             }
           ]
         },
         "shopify": {
-          "nodes": {
-            "gid://shopify/Product/1": {
-              "id": "gid://shopify/Product/1",
-              "updatedAt": "2026-01-01T00:00:00.000Z",
-              "title": "Canvas tote",
-              "status": "ACTIVE"
-            },
-            "gid://shopify/ProductVariant/1": {
-              "id": "gid://shopify/ProductVariant/1",
-              "sku": "LUMA-001",
-              "inventoryItem": {
-                "id": "gid://shopify/InventoryItem/1"
+          "seq": 16,
+          "sequences": {
+            "id": 100000010
+          },
+          "records": [
+            {
+              "kind": "Product",
+              "id": "1",
+              "parent": null,
+              "key": null,
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 1,
+              "data": {
+                "title": "Canvas tote",
+                "vendor": "Luma Goods",
+                "productType": "Accessories",
+                "status": "ACTIVE",
+                "publishedAt": "2026-01-01T00:00:00Z",
+                "minPrice": 2400
               }
             },
-            "gid://shopify/InventoryItem/1": {
-              "id": "gid://shopify/InventoryItem/1",
-              "tracked": true
+            {
+              "kind": "ProductVariant",
+              "id": "1",
+              "parent": "1",
+              "key": "LUMA-001",
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 2,
+              "data": {
+                "product": "1",
+                "sku": "LUMA-001",
+                "title": "Default Title",
+                "price": 2400,
+                "barcode": "4006381333931"
+              }
             },
-            "gid://shopify/InventoryLevel/1": {
-              "id": "gid://shopify/InventoryLevel/1",
-              "updatedAt": "2026-01-01T00:00:00.000Z",
-              "location": {
-                "id": "gid://shopify/Location/1"
-              },
-              "quantities": [
-                {
-                  "name": "on_hand",
-                  "quantity": 100
-                },
-                {
-                  "name": "committed",
-                  "quantity": 4
-                },
-                {
-                  "name": "available",
-                  "quantity": 96
+            {
+              "kind": "InventoryItem",
+              "id": "1",
+              "parent": null,
+              "key": "LUMA-001",
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 3,
+              "data": {
+                "variant": "1",
+                "product": "1",
+                "sku": "LUMA-001",
+                "tracked": true
+              }
+            },
+            {
+              "kind": "InventoryLevel",
+              "id": "1.1",
+              "parent": "1",
+              "key": "1",
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 4,
+              "data": {
+                "item": "1",
+                "location": "1",
+                "onHand": 100,
+                "committed": 4
+              }
+            },
+            {
+              "kind": "Order",
+              "id": "1",
+              "parent": null,
+              "key": "#SIM-1",
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 5,
+              "data": {
+                "number": 1,
+                "name": "#SIM-1",
+                "customer": null,
+                "location": "1",
+                "shipping": "standard",
+                "currency": "EUR",
+                "displayFinancialStatus": "PAID",
+                "displayFulfillmentStatus": "UNFULFILLED",
+                "cancelledAt": null,
+                "cancelReason": null,
+                "closed": false,
+                "total": 4800,
+                "refunded": 0
+              }
+            },
+            {
+              "kind": "Order",
+              "id": "10",
+              "parent": null,
+              "key": "#SIM-10",
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 11,
+              "data": {
+                "number": 10,
+                "name": "#SIM-10",
+                "customer": null,
+                "location": "1",
+                "shipping": "standard",
+                "currency": "EUR",
+                "displayFinancialStatus": "PAID",
+                "displayFulfillmentStatus": "UNFULFILLED",
+                "cancelledAt": null,
+                "cancelReason": null,
+                "closed": false,
+                "total": 4800,
+                "refunded": 0
+              }
+            },
+            {
+              "kind": "LineItem",
+              "id": "100000001",
+              "parent": "1",
+              "key": null,
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 6,
+              "data": {
+                "order": "1",
+                "variant": "1",
+                "product": "1",
+                "sku": "LUMA-001",
+                "name": "Canvas tote",
+                "quantity": 2,
+                "price": 2400
+              }
+            },
+            {
+              "kind": "LineItem",
+              "id": "100000006",
+              "parent": "10",
+              "key": null,
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 12,
+              "data": {
+                "order": "10",
+                "variant": "1",
+                "product": "1",
+                "sku": "LUMA-001",
+                "name": "Canvas tote",
+                "quantity": 2,
+                "price": 2400
+              }
+            },
+            {
+              "kind": "FulfillmentOrder",
+              "id": "100000002",
+              "parent": "1",
+              "key": null,
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 7,
+              "data": {
+                "order": "1",
+                "location": "1",
+                "status": "OPEN",
+                "requestStatus": "UNSUBMITTED",
+                "fulfillAt": "2026-01-01T00:00:00Z",
+                "fulfillBy": "2026-01-03T00:00:00Z",
+                "holds": [],
+                "heldStatus": null,
+                "method": {
+                  "name": "Standard",
+                  "maxDeliveryAt": "2026-01-06T00:00:00Z"
                 }
-              ]
+              }
             },
-            "gid://shopify/Order/1": {
-              "id": "gid://shopify/Order/1",
-              "updatedAt": "2026-01-01T00:00:00.000Z",
-              "name": "#SIM-1",
-              "cancelledAt": null,
-              "closed": false,
-              "displayFinancialStatus": "PAID",
-              "fulfillments": []
-            },
-            "gid://shopify/LineItem/1": {
-              "id": "gid://shopify/LineItem/1",
-              "quantity": 2,
-              "variant": {
-                "inventoryItem": {
-                  "id": "gid://shopify/InventoryItem/1"
+            {
+              "kind": "FulfillmentOrder",
+              "id": "100000007",
+              "parent": "10",
+              "key": null,
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 13,
+              "data": {
+                "order": "10",
+                "location": "1",
+                "status": "OPEN",
+                "requestStatus": "UNSUBMITTED",
+                "fulfillAt": "2026-01-01T00:00:00Z",
+                "fulfillBy": "2026-01-03T00:00:00Z",
+                "holds": [],
+                "heldStatus": null,
+                "method": {
+                  "name": "Standard",
+                  "maxDeliveryAt": "2026-01-06T00:00:00Z"
                 }
               }
             },
-            "gid://shopify/FulfillmentOrder/1": {
-              "id": "gid://shopify/FulfillmentOrder/1",
-              "updatedAt": "2026-01-01T00:00:00.000Z",
-              "status": "OPEN"
-            },
-            "gid://shopify/FulfillmentOrderLineItem/1": {
-              "id": "gid://shopify/FulfillmentOrderLineItem/1",
-              "remainingQuantity": 2,
-              "lineItem": {
-                "id": "gid://shopify/LineItem/1"
+            {
+              "kind": "FulfillmentOrderLineItem",
+              "id": "100000003",
+              "parent": "100000002",
+              "key": null,
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 8,
+              "data": {
+                "fulfillmentOrder": "100000002",
+                "lineItem": "100000001",
+                "totalQuantity": 2,
+                "remainingQuantity": 2
               }
             },
-            "gid://shopify/Order/10": {
-              "id": "gid://shopify/Order/10",
-              "updatedAt": "2026-01-01T00:00:00.000Z",
-              "name": "#SIM-10",
-              "cancelledAt": null,
-              "closed": false,
-              "displayFinancialStatus": "PAID",
-              "fulfillments": []
-            },
-            "gid://shopify/LineItem/10": {
-              "id": "gid://shopify/LineItem/10",
-              "quantity": 2,
-              "variant": {
-                "inventoryItem": {
-                  "id": "gid://shopify/InventoryItem/1"
-                }
+            {
+              "kind": "FulfillmentOrderLineItem",
+              "id": "100000008",
+              "parent": "100000007",
+              "key": null,
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 14,
+              "data": {
+                "fulfillmentOrder": "100000007",
+                "lineItem": "100000006",
+                "totalQuantity": 2,
+                "remainingQuantity": 2
               }
             },
-            "gid://shopify/FulfillmentOrder/10": {
-              "id": "gid://shopify/FulfillmentOrder/10",
-              "updatedAt": "2026-01-01T00:00:00.000Z",
-              "status": "OPEN"
+            {
+              "kind": "OrderTransaction",
+              "id": "100000004",
+              "parent": "1",
+              "key": null,
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 9,
+              "data": {
+                "order": "1",
+                "refund": null,
+                "parent": null,
+                "kind": "SALE",
+                "status": "SUCCESS",
+                "gateway": "shopify_payments",
+                "amount": 4800,
+                "processedAt": "2026-01-01T00:00:00Z"
+              }
             },
-            "gid://shopify/FulfillmentOrderLineItem/10": {
-              "id": "gid://shopify/FulfillmentOrderLineItem/10",
-              "remainingQuantity": 2,
-              "lineItem": {
-                "id": "gid://shopify/LineItem/10"
+            {
+              "kind": "OrderTransaction",
+              "id": "100000009",
+              "parent": "10",
+              "key": null,
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 15,
+              "data": {
+                "order": "10",
+                "refund": null,
+                "parent": null,
+                "kind": "SALE",
+                "status": "SUCCESS",
+                "gateway": "shopify_payments",
+                "amount": 4800,
+                "processedAt": "2026-01-01T00:00:00Z"
+              }
+            },
+            {
+              "kind": "BasicEvent",
+              "id": "100000005",
+              "parent": "1",
+              "key": null,
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 10,
+              "data": {
+                "order": "1",
+                "action": "placed"
+              }
+            },
+            {
+              "kind": "BasicEvent",
+              "id": "100000010",
+              "parent": "10",
+              "key": null,
+              "createdAt": 1767225600000,
+              "updatedAt": 1767225600000,
+              "seq": 16,
+              "data": {
+                "order": "10",
+                "action": "placed"
               }
             }
-          },
-          "roots": {
-            "orders": ["gid://shopify/Order/1", "gid://shopify/Order/10"],
-            "products": ["gid://shopify/Product/1"],
-            "inventoryItems": ["gid://shopify/InventoryItem/1"]
-          },
-          "children": {
-            "gid://shopify/Product/1": {
-              "variants": ["gid://shopify/ProductVariant/1"]
-            },
-            "gid://shopify/InventoryItem/1": {
-              "inventoryLevels": ["gid://shopify/InventoryLevel/1"]
-            },
-            "gid://shopify/Order/1": {
-              "lineItems": ["gid://shopify/LineItem/1"],
-              "fulfillmentOrders": ["gid://shopify/FulfillmentOrder/1"]
-            },
-            "gid://shopify/FulfillmentOrder/1": {
-              "lineItems": ["gid://shopify/FulfillmentOrderLineItem/1"]
-            },
-            "gid://shopify/Order/10": {
-              "lineItems": ["gid://shopify/LineItem/10"],
-              "fulfillmentOrders": ["gid://shopify/FulfillmentOrder/10"]
-            },
-            "gid://shopify/FulfillmentOrder/10": {
-              "lineItems": ["gid://shopify/FulfillmentOrderLineItem/10"]
-            }
-          }
-        },
-        "mappings": [
-          {
-            "jtl": "1",
-            "shopify": "gid://shopify/Order/1"
-          },
-          {
-            "jtl": "10",
-            "shopify": "gid://shopify/Order/10"
-          }
-        ]
+          ]
+        }
       },
       "expected": {
         "calls": [

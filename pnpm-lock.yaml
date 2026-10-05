@@ -291,9 +291,15 @@ importers:
       '@luma/application-runtime':
         specifier: workspace:*
         version: link:packages/application-runtime
+      '@luma/commerce-sync':
+        specifier: workspace:*
+        version: link:packages/commerce-sync
       '@luma/connections':
         specifier: workspace:*
         version: link:packages/connections
+      '@luma/customers':
+        specifier: workspace:*
+        version: link:packages/customers
       '@luma/exceptions':
         specifier: workspace:*
         version: link:packages/exceptions
@@ -321,6 +327,18 @@ importers:
       '@luma/resolution':
         specifier: workspace:*
         version: link:packages/resolution
+      '@luma/simulator-commerce':
+        specifier: workspace:*
+        version: link:packages/simulator/commerce
+      '@luma/simulator-core':
+        specifier: workspace:*
+        version: link:packages/simulator/core
+      '@luma/simulator-jtl':
+        specifier: workspace:*
+        version: link:packages/simulator/jtl
+      '@luma/simulator-shopify':
+        specifier: workspace:*
+        version: link:packages/simulator/shopify
       '@luma/workflow-temporal':
         specifier: workspace:*
         version: link:packages/workflow-temporal
@@ -427,6 +445,12 @@ importers:
 
   apps/simulator:
     dependencies:
+      '@luma/simulator-commerce':
+        specifier: workspace:*
+        version: link:../../packages/simulator/commerce
+      '@luma/simulator-contract':
+        specifier: workspace:*
+        version: link:../../packages/simulator/contract
       '@luma/simulator-core':
         specifier: workspace:*
         version: link:../../packages/simulator/core
@@ -439,6 +463,9 @@ importers:
       fastify:
         specifier: 'catalog:'
         version: 5.12.5
+      pg:
+        specifier: catalog:pg-8-20-0
+        version: 8.20.0
       zod:
         specifier: catalog:zod3
         version: 3.25.76
@@ -446,8 +473,52 @@ importers:
       '@luma/typescript-config':
         specifier: workspace:*
         version: link:../../packages/typescript-config
+      '@types/pg':
+        specifier: 'catalog:'
+        version: 8.20.0
 
-  apps/simulator-web: {}
+  apps/simulator-web:
+    dependencies:
+      '@luma/simulator-contract':
+        specifier: workspace:*
+        version: link:../../packages/simulator/contract
+      '@luma/simulator-core':
+        specifier: workspace:*
+        version: link:../../packages/simulator/core
+      '@luma/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      '@tanstack/react-query':
+        specifier: 'catalog:'
+        version: 5.103.0(react@19.3.0)
+      lucide-react:
+        specifier: 'catalog:'
+        version: 1.46.0(react@19.3.0)
+      react:
+        specifier: 'catalog:'
+        version: 19.3.0
+      react-dom:
+        specifier: 'catalog:'
+        version: 19.3.0(react@19.3.0)
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
+      '@tailwindcss/vite':
+        specifier: 'catalog:'
+        version: 4.3.3(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0))
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: 'catalog:'
+        version: 19.3.0(@types/react@19.3.0)
+      '@vitejs/plugin-react':
+        specifier: ^6.0.0
+        version: 6.1.1(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0))
+      vite:
+        specifier: 'catalog:'
+        version: 8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0)
 
   apps/web:
     dependencies:
@@ -1399,6 +1470,29 @@ importers:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(@vitest/browser-playwright@4.1.11)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0))
 
+  packages/simulator/commerce:
+    dependencies:
+      '@luma/simulator-core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../../typescript-config
+
+  packages/simulator/contract:
+    dependencies:
+      '@luma/simulator-core':
+        specifier: workspace:*
+        version: link:../core
+      zod:
+        specifier: catalog:zod3
+        version: 3.25.76
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../../typescript-config
+
   packages/simulator/core:
     devDependencies:
       '@luma/typescript-config':
@@ -1420,6 +1514,9 @@ importers:
       '@luma/simulator-core':
         specifier: workspace:*
         version: link:../core
+      graphql:
+        specifier: 'catalog:'
+        version: 16.14.2
     devDependencies:
       '@luma/typescript-config':
         specifier: workspace:*

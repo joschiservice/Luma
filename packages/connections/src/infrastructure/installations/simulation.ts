@@ -12,7 +12,10 @@ const bindingSchema = z.object({
   tenantId: z.string().uuid(),
   connectionId: z.string().uuid(),
   runId: z.string().regex(/^[a-z0-9-]{1,64}$/),
-  instance: z.string().min(1),
+  /** Simulator instance that serves this connection, such as `shopify-de`. */
+  instance: z.string().regex(/^[a-z0-9-]{1,64}$/),
+  /** Provider of the instance; defaults to the instance name for single-instance runs. */
+  provider: z.string().min(1).optional(),
   target: z.unknown(),
 });
 const configSchema = z.object({
@@ -73,7 +76,8 @@ export function createSimulationTransport(input: unknown): SimulationTransport {
     if (
       JSON.stringify(Object.entries(target).sort()) !==
         JSON.stringify(Object.entries(connection.target).sort()) ||
-      binding.instance !== (connection.provider ?? connection.target.kind)
+      (binding.provider ?? binding.instance) !==
+        (connection.provider ?? connection.target.kind)
     )
       throw new Error('Simulation target does not match installation');
 
@@ -107,13 +111,15 @@ export function createSimulationTransport(input: unknown): SimulationTransport {
           status: z.number().int().min(200).max(599),
           headers: z.record(z.string()),
           body: z.unknown(),
+          // Raw bytes for simulated malformed responses.
+          bodyText: z.string().optional(),
           lost: z.boolean().optional(),
         })
         .parse(await response.json());
       if (result.lost)
         throw new TypeError('Simulated response lost after commit');
 
-      return new Response(JSON.stringify(result.body), {
+      return new Response(result.bodyText ?? JSON.stringify(result.body), {
         status: result.status,
         headers: result.headers,
       });

@@ -1,0 +1,150 @@
+/** One simulated Shopify store. */
+export interface ShopifyConfig {
+  /** `*.myshopify.com` domain, also used in webhook headers. */
+  shop: string;
+  name: string;
+  currency: string;
+  /** Prefix of order names, such as `DE` for `#DE1001`. */
+  orderPrefix: string;
+  /** Shop locations; numeric IDs become `gid://shopify/Location/<id>`. */
+  locations: { id: string; name: string }[];
+  /** Access scopes the installation reports, such as `read_orders`. */
+  scopes: string[];
+}
+
+/** Hold reasons a merchant or fraud check can apply. */
+export const shopifyHoldReasons = [
+  'AWAITING_PAYMENT',
+  'HIGH_RISK_OF_FRAUD',
+  'INCORRECT_ADDRESS',
+  'INVENTORY_OUT_OF_STOCK',
+  'UNKNOWN_DELIVERY_DATE',
+  'OTHER',
+] as const;
+
+export type ShopifyHoldReason = (typeof shopifyHoldReasons)[number];
+
+export interface ShopifySeedProduct {
+  /** Numeric product ID. */
+  id: string;
+  title: string;
+  vendor: string;
+  productType: string;
+  published: boolean;
+  variants: {
+    /** Numeric ID shared by the variant and its inventory item. */
+    id: string;
+    sku: string;
+    title: string;
+    price: string;
+    barcode: string | null;
+    /** On-hand quantity per numeric location ID. */
+    stock: Record<string, number>;
+  }[];
+}
+
+export interface ShopifyCustomerInput {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  address: { address1: string; city: string; zip: string; countryCode: string };
+}
+
+export interface ShopifyOrderLineInput {
+  /** Numeric variant ID. */
+  variant: string;
+  quantity: number;
+  /** Unit price as a decimal string in the shop currency. */
+  price: string;
+}
+
+/** Fulfillment display states a carrier reports. */
+export type ShipmentStatus =
+  'IN_TRANSIT' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'DELAYED' | 'FAILURE';
+
+/**
+ * Merchant, customer and integration actions. Numeric IDs are provider record numbers within
+ * this shop; `order` refers to the numeric order ID.
+ */
+export type ShopifyCommand =
+  | { kind: 'seed-catalog'; products: ShopifySeedProduct[] }
+  | { kind: 'customer'; customer: ShopifyCustomerInput }
+  | {
+      kind: 'order';
+      /** Explicit numeric ID for fixtures; allocated when omitted. */
+      id?: string | undefined;
+      customer?: string | null | undefined;
+      lines: ShopifyOrderLineInput[];
+      location: string;
+      shipping: 'standard' | 'express';
+      financialStatus: 'PAID' | 'PENDING';
+      holds?: ShopifyHoldReason[] | undefined;
+      /**
+       * Scheduled fulfillment time in simulation milliseconds, as for preorders. A later
+       * time leaves the fulfillment order SCHEDULED until it is opened.
+       */
+      fulfillAt?: number | undefined;
+    }
+  | { kind: 'paid'; order: string }
+  | {
+      kind: 'cancel';
+      order: string;
+      reason: 'CUSTOMER' | 'DECLINED' | 'FRAUD' | 'INVENTORY' | 'OTHER';
+    }
+  | { kind: 'hold'; order: string; reason: ShopifyHoldReason }
+  | { kind: 'release'; order: string }
+  /** Sets on-hand stock at a location; available is on hand minus committed. */
+  | { kind: 'stock'; variant: string; location: string; quantity: number }
+  /** Sets available stock as a stock sync does, keeping committed units. */
+  | { kind: 'available'; variant: string; location: string; quantity: number }
+  | {
+      kind: 'fulfill';
+      order: string;
+      /** Line quantities to ship; every remaining unit when omitted. */
+      lines?: { lineItem: string; quantity: number }[] | undefined;
+      carrier: string;
+      trackingNumber: string;
+      trackingUrl: string;
+      estimatedDeliveryAt?: number | undefined;
+    }
+  | { kind: 'shipment-status'; fulfillment: string; status: ShipmentStatus }
+  | {
+      kind: 'return';
+      order: string;
+      lines: { lineItem: string; quantity: number }[];
+      reason: string;
+    }
+  | {
+      kind:
+        | 'return-approve'
+        | 'return-decline'
+        | 'return-receive'
+        | 'return-close'
+        | 'refund-settle';
+      order: string;
+    }
+  | {
+      kind: 'refund';
+      order: string;
+      outcome: 'success' | 'pending' | 'failure';
+    }
+  | {
+      kind: 'product-update';
+      product: string;
+      price?: string | undefined;
+      status?: 'ACTIVE' | 'DRAFT' | 'ARCHIVED' | undefined;
+      published?: boolean | undefined;
+    };
+
+/** What a command created or changed, for the host's scheduling and journal. */
+export interface ShopifyCommandResult {
+  /** Numeric ID of the record the command created or changed. */
+  id: string;
+  /** Order name, such as `#DE1001`, for orders. */
+  name?: string | undefined;
+  /** Shopify global ID of that record. */
+  gid: string;
+  /** Changed line items with their numeric IDs, for orders. */
+  lines?: { id: string; variant: string; quantity: number }[] | undefined;
+}

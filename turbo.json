@@ -68,7 +68,8 @@
         "__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS",
         "LUMA_LOCAL_OTLP_ENDPOINT",
         "LUMA_LOCAL_PROFILES_ENDPOINT",
-        "LUMA_CODE_RUNTIME_DIR"
+        "LUMA_CODE_RUNTIME_DIR",
+        "LUMA_SIMULATOR_ORIGIN"
       ]
     },
     "build:storybook": {

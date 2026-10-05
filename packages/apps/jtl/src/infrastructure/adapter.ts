@@ -5,6 +5,7 @@ import {
   type CapabilityInput,
   type CapabilityOutput,
   type ConnectorConnection,
+  ConnectorError,
   type ExternalId,
   type Observation,
   type ProductSnapshot,
@@ -256,6 +257,34 @@ export function createJtlConnector(
           });
         }
 
+        // Emits one item's stock for the requested warehouse, or across all warehouses.
+        async function emitStock(item: z.infer<typeof s.item>) {
+          const location = filters.location?.externalId ?? 'all-warehouses';
+          const stock =
+            location === 'all-warehouses'
+              ? null
+              : capture(
+                  s.warehouseStock,
+                  await client.request(
+                    `warehouses/${location}/items/${item.id}/stocks`,
+                  ),
+                );
+          const known = (value: string | null | undefined) =>
+            item.isInventoryManagementActive ? (value ?? null) : null;
+          const available =
+            location === 'all-warehouses' ? known(item.stockAvailable) : null;
+          emit('sku', ref(item.id, location), item.modifiedTimestamp ?? null, {
+            sku: ref(item.id),
+            location: ref(location),
+            unit: unit(item.unit),
+            onHand: known(stock ? stock.totalQuantity : item.stockTotal),
+            reserved: stock ? null : known(item.stockReservedTotal),
+            available,
+            availabilityBasis:
+              available === null ? 'unknown' : 'provider_reported',
+          });
+        }
+
         async function orderLines(orderId: string) {
           const lines = capture(
             z.array(s.orderLine),
@@ -327,6 +356,25 @@ export function createJtlConnector(
               })),
             });
           }
+        } else if (capability === 'inventory.read' && filters.sku) {
+          // A stock check for one SKU reads that item instead of paging the whole catalog.
+          hasNext = false;
+          const sku = filters.sku.externalId;
+          let item: z.infer<typeof s.item> | null = null;
+          try {
+            item = capture(
+              s.item,
+              await client.request(`items/${encodeURIComponent(sku)}`),
+            );
+          } catch (error) {
+            // An unknown item has no stock to report, as in a paged read.
+            if (
+              !(error instanceof ConnectorError) ||
+              error.failure.code !== 'not_found'
+            )
+              throw error;
+          }
+          if (item && String(item.id) === sku) await emitStock(item);
         } else if (
           capability === 'products.read' ||
           capability === 'inventory.read'
@@ -356,41 +404,7 @@ export function createJtlConnector(
                   },
                 ],
               } satisfies ProductSnapshot);
-            } else {
-              if (filters.sku && filters.sku.externalId !== String(item.id))
-                continue;
-              const location = filters.location?.externalId ?? 'all-warehouses';
-              const stock =
-                location === 'all-warehouses'
-                  ? null
-                  : capture(
-                      s.warehouseStock,
-                      await client.request(
-                        `warehouses/${location}/items/${item.id}/stocks`,
-                      ),
-                    );
-              const known = (value: string | null | undefined) =>
-                item.isInventoryManagementActive ? (value ?? null) : null;
-              const available =
-                location === 'all-warehouses'
-                  ? known(item.stockAvailable)
-                  : null;
-              emit(
-                'sku',
-                ref(item.id, location),
-                item.modifiedTimestamp ?? null,
-                {
-                  sku: ref(item.id),
-                  location: ref(location),
-                  unit: unit(item.unit),
-                  onHand: known(stock ? stock.totalQuantity : item.stockTotal),
-                  reserved: stock ? null : known(item.stockReservedTotal),
-                  available,
-                  availabilityBasis:
-                    available === null ? 'unknown' : 'provider_reported',
-                },
-              );
-            }
+            } else await emitStock(item);
           }
         } else {
           const result = await page(

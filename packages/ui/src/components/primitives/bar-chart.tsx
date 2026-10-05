@@ -102,10 +102,12 @@ function Tooltip({
   category,
   series,
   unit,
+  selectable,
 }: {
   category: ChartCategory;
   series: ChartSeries[];
   unit: (value: number) => string;
+  selectable: boolean;
 }) {
   return (
     <>
@@ -139,7 +141,9 @@ function Tooltip({
           )}
         </>
       )}
-      <p className="lu-chart-tooltip-hint">Select to see the records</p>
+      {selectable && (
+        <p className="lu-chart-tooltip-hint">Select to see the records</p>
+      )}
     </>
   );
 }
@@ -275,7 +279,12 @@ export function BarChart({
           : { top: `${((shown + 1) / categories.length) * 100}%` }
       }
     >
-      <Tooltip category={categories[shown]} series={series} unit={unit} />
+      <Tooltip
+        category={categories[shown]}
+        series={series}
+        unit={unit}
+        selectable={!!onSelect}
+      />
     </div>
   );
 

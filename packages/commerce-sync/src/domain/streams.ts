@@ -74,6 +74,8 @@ export interface SyncStream {
   hintAt: string | null;
   attempts: number;
   error: { code: string; message: string; at: string } | null;
+  /** When the current run of consecutive failures began; null after a successful page. */
+  failingSince: string | null;
   blocked: BlockReason | null;
   lastSuccessAt: string | null;
   lastCompleteAt: string | null;

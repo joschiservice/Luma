@@ -10,6 +10,7 @@ import { compilePlaybook } from '@luma/resolution/composition';
 
 import { captureIncident } from './capture.mjs';
 import { evaluate } from './evaluate.mjs';
+import { shippingMethod } from './provider.mjs';
 
 const read = async (name) =>
   JSON.parse(
@@ -66,7 +67,7 @@ test('wrong provider parameters fail before mutation', async () => {
     'unexpected-provider-write',
   );
   assert.equal(
-    report.scenarios[0].checkpoint.provider.jtl.orders[0].shippingMethodId,
+    await shippingMethod(report.scenarios[0].checkpoint.provider, '1'),
     '7',
   );
 });

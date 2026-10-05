@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 
-import { handle, seed } from '@luma/simulator-shopify';
+import { createMemoryStore, createTransport } from '@luma/simulator-core';
+import { readStock, shopify } from '@luma/simulator-shopify';
 
 import { inventoryFixture } from './inventory-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
@@ -9,37 +10,92 @@ export const stockItem = 'gid://shopify/InventoryItem/1';
 
 export const stockLocation = 'gid://shopify/Location/1';
 
+const config = {
+  shop: 'stock.myshopify.com',
+  name: 'Stock',
+  currency: 'EUR',
+  orderPrefix: 'S',
+  locations: [{ id: '1', name: 'Simulator warehouse' }],
+  scopes: [
+    'read_orders',
+    'read_products',
+    'read_inventory',
+    'read_merchant_managed_fulfillment_orders',
+    'read_returns',
+    'write_inventory',
+  ],
+};
+
 /** Exercises real stock, approval and execution services against an isolated Shopify simulator. */
 export async function correctionFixture(t, origin = 'http://localhost:3000') {
   const originalFetch = globalThis.fetch;
-  const state = seed(Date.now());
-  const level = state.nodes['gid://shopify/InventoryLevel/1'];
-  level.quantities.find((q) => q.name === 'available').quantity = 12;
-  level.quantities.find((q) => q.name === 'on_hand').quantity = 12;
+  const store = createMemoryStore();
+  const context = () => ({
+    store,
+    now: Date.now(),
+    wallTime: Date.now(),
+    instance: 'stock',
+    config,
+    indexLagMs: 0,
+    notify: () => {},
+  });
+  await shopify.command(context(), {
+    kind: 'seed-catalog',
+    products: [
+      {
+        id: '1',
+        title: 'Canvas tote',
+        vendor: 'Luma Goods',
+        productType: 'Bags',
+        published: true,
+        variants: [
+          {
+            id: '1',
+            sku: 'LUMA-001',
+            title: 'Default Title',
+            price: '24.00',
+            barcode: '4006381333931',
+            stock: { 1: 12 },
+          },
+        ],
+      },
+    ],
+  });
+  // Mirrors the provider's current quantities after every simulated request.
+  const level = { quantities: [] };
+  const refresh = async () => {
+    const current = await readStock(context(), '1', '1');
+    level.quantities = [
+      { name: 'on_hand', quantity: current.onHand },
+      { name: 'committed', quantity: current.committed },
+      { name: 'available', quantity: current.available },
+    ];
+  };
+  await refresh();
   const mutations = [];
   let lost = false,
     race = false,
     delayVerification = false;
-  globalThis.fetch = async (url, init) => {
-    if (!String(url).startsWith('https://stock.myshopify.com/'))
-      return originalFetch(url, init);
-    const body = JSON.parse(init.body);
+  const transport = createTransport(async (request) => {
+    const body = JSON.parse(request.body);
     if (body.query.startsWith('mutation')) {
       mutations.push(body);
       if (race) {
-        level.quantities.find((q) => q.name === 'available').quantity = 10;
+        await shopify.command(context(), {
+          kind: 'available',
+          variant: '1',
+          location: '1',
+          quantity: 10,
+        });
         race = false;
       }
     }
-    const response = handle(state, {
-      url: String(url),
-      method: 'POST',
-      headers: { 'x-shopify-access-token': 'synthetic' },
-      body: init.body,
-    });
+    const response = await shopify.handle(context(), request);
+    await refresh();
     if (body.query.startsWith('mutation') && lost) {
       lost = false;
-      throw new Error('Lost response after commit');
+
+      return { ...response, lost: true };
     }
     if (
       body.query.startsWith('query LumaInventoryCorrection') &&
@@ -52,11 +108,12 @@ export async function correctionFixture(t, origin = 'http://localhost:3000') {
       ];
     }
 
-    return Response.json(response.body, {
-      status: response.status,
-      headers: response.headers,
-    });
-  };
+    return response;
+  });
+  globalThis.fetch = async (url, init) =>
+    String(url).startsWith('https://stock.myshopify.com/')
+      ? transport(url, init)
+      : originalFetch(url, init);
   t.onTestFinished(() => {
     globalThis.fetch = originalFetch;
   });
@@ -155,7 +212,7 @@ export async function correctionFixture(t, origin = 'http://localhost:3000') {
     admin,
     installed,
     stock,
-    state,
+    store,
     level,
     mutations,
     target,

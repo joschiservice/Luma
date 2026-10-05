@@ -16,7 +16,7 @@ Use Node 24 through `mise`. The native Pyroscope profiler ships Node ABI-specifi
 
 `pnpm pilot` and `pnpm pilot:worker` automatically start the Docker observability stack and export local telemetry. Run them in separate terminals. `pnpm simulator` starts the same stack, the pilot API and worker, the simulator service, and the web app together. Stop `dev:observe` before switching modes because they share the API and web ports.
 
-Select `luma-pilot-api`, `luma-pilot-worker`, or `luma-simulator` in the dashboard. Pilot requests include PostgreSQL queries, pool waits, algorithm timings, and propagated Temporal workflow/activity spans. Simulator provider calls continue the caller's trace through HTTP into SQLite transactions. Simulator spans separate state decoding, encoding, simulation advances, provider dispatch, and each transaction statement. CPU, wall-time, and heap profiles are collected for all three processes.
+Select `luma-pilot-api`, `luma-pilot-worker`, or `luma-simulator` in the dashboard. Pilot requests include PostgreSQL queries, pool waits, algorithm timings, and propagated Temporal workflow/activity spans. Simulator provider calls continue the caller's trace through HTTP into the simulator's PostgreSQL queries, including clock ticks and webhook delivery. CPU, wall-time, and heap profiles are collected for all three processes.
 
 The standalone `simulator:service` command remains a minimal simulator service without the application or diagnostics stack; use `pnpm simulator` for the full instrumented environment.
 
@@ -27,7 +27,7 @@ mise exec -- pnpm observe:verify pilot
 mise exec -- pnpm observe:verify simulator
 ```
 
-The simulator check also verifies SQLite traces and simulator profiles. Seeds and existing simulator state are preserved; telemetry does not reset scenarios or resume paused runs.
+The simulator check also verifies simulator PostgreSQL traces and profiles. Seeds and existing simulator state are preserved; telemetry does not reset scenarios or resume paused runs.
 
 ## Verify the installation
 

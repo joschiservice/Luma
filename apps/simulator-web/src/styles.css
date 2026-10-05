@@ -1,0 +1,603 @@
+@import '@luma/ui/styles.css';
+
+/*
+ * Simulator control panel layout. Shared components own their surfaces, colors and type;
+ * this file positions them and styles the few panel-specific elements with semantic tokens.
+ */
+
+.sim-app {
+  min-height: 100dvh;
+}
+
+.sim-topbar {
+  position: sticky;
+  z-index: 10;
+  top: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  min-height: var(--topbar-height);
+  padding: 8px 20px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.sim-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.sim-brand .lu-mark {
+  width: 20px;
+  height: 20px;
+}
+
+.sim-topbar-actions,
+.sim-actions,
+.sim-filters,
+.sim-chart-controls,
+.sim-runbar-states,
+.sim-runbar-controls,
+.sim-button-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.sim-filters {
+  align-items: flex-end;
+}
+
+.sim-run-select {
+  width: min(320px, 70vw);
+}
+
+.sim-speed-select,
+.sim-window-select,
+.sim-filter-select {
+  width: 176px;
+}
+
+.sim-instance-select,
+.sim-health-select {
+  width: 200px;
+}
+
+.sim-kind-filter,
+.sim-instance-filter {
+  width: 200px;
+}
+
+.sim-main {
+  display: grid;
+  gap: 16px;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 16px 20px 48px;
+}
+
+/* Grid children may shrink below their content so long values scroll or wrap inside them. */
+.sim-main > *,
+.sim-stack > *,
+.sim-runbar > *,
+.sim-chart-card > *,
+.sim-journal > *,
+.sim-form > * {
+  min-width: 0;
+}
+
+.sim-stack {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.sim-stack-tight {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.sim-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.sim-section-title {
+  font-size: 16px;
+  letter-spacing: -0.02em;
+}
+
+.sim-subtitle {
+  font-size: 14px;
+}
+
+.sim-run-title {
+  font-family: var(--font-mono);
+  font-size: 15px;
+}
+
+.sim-muted {
+  color: var(--foreground-subtle);
+}
+
+.sim-note {
+  color: var(--foreground-subtle);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.sim-label {
+  display: block;
+  color: var(--foreground-subtle);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.sim-error-text {
+  color: var(--state-error-text);
+  font-size: 13px;
+}
+
+.sim-mono {
+  font-family: var(--font-mono);
+}
+
+.sim-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.sim-plain-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sim-loading {
+  display: grid;
+  gap: 10px;
+  padding: 16px 0;
+}
+
+.sim-loading .lu-skeleton:nth-child(2) {
+  width: 80%;
+}
+
+.sim-loading .lu-skeleton:nth-child(3) {
+  width: 60%;
+}
+
+/* Run bar */
+.sim-runbar {
+  display: grid;
+  gap: 12px;
+}
+
+.sim-runbar-identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.sim-runbar-clock {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px 24px;
+}
+
+.sim-clock {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 30px;
+}
+
+.sim-button-group {
+  gap: 4px;
+}
+
+.sim-progress {
+  margin-top: 12px;
+}
+
+/* Tabs */
+/* The shared Tabs root lays out horizontal tabs as a row; this view stacks list and panel. */
+.sim-tabs {
+  min-width: 0;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sim-tabs-list {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.sim-count {
+  margin-left: 2px;
+  color: var(--foreground-subtle);
+  font-size: 12px;
+}
+
+/* Headline tiles */
+.sim-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.sim-tile {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+}
+
+.sim-tile-label {
+  color: var(--foreground-subtle);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.sim-tile-value {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 28px;
+}
+
+.sim-tile-value .sim-muted {
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.sim-tile-detail {
+  color: var(--foreground-subtle);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+/* Charts */
+.sim-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr));
+  gap: 12px;
+}
+
+.sim-chart-card {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.sim-chart-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sim-chart-header h3 {
+  font-size: 14px;
+}
+
+.sim-chart-header p {
+  font-size: 13px;
+}
+
+.sim-toggle {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.sim-chart-table {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+/* Tables */
+.sim-cell-stack {
+  display: grid;
+  justify-items: start;
+  gap: 2px;
+}
+
+/* Forms */
+.sim-form {
+  display: grid;
+  gap: 16px;
+}
+
+.sim-form-row,
+.sim-field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  align-items: start;
+  gap: 12px 16px;
+}
+
+.sim-two-column {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  align-items: start;
+  gap: 16px;
+}
+
+.sim-fieldset {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.sim-fieldset > legend {
+  margin-bottom: 8px;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sim-number {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sim-unit {
+  flex: none;
+  color: var(--foreground-subtle);
+  font-size: 12px;
+}
+
+.sim-rate {
+  display: grid;
+  gap: 6px;
+}
+
+.sim-slider {
+  width: 100%;
+  accent-color: var(--primary);
+}
+
+.sim-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.sim-parent-filter {
+  max-width: 320px;
+  margin: 12px 0;
+}
+
+.sim-dialog-wide {
+  max-width: min(720px, calc(100% - 2rem));
+}
+
+/* Choice cards: a native radio inside a labeled, bordered option. */
+.sim-choices {
+  display: grid;
+  gap: 8px;
+}
+
+.sim-choices-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+}
+
+.sim-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-standard);
+}
+
+.sim-choice:has(input:checked) {
+  border-color: var(--signal);
+  background: var(--surface-selected);
+}
+
+.sim-choice:has(input:focus-visible) {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.sim-choice input {
+  margin-top: 3px;
+  accent-color: var(--primary);
+}
+
+.sim-choice input:focus-visible {
+  outline: none;
+}
+
+.sim-choice-body {
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+}
+
+.sim-choice-body strong {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.sim-choice-facts {
+  color: var(--foreground-subtle);
+  font-size: 12px;
+}
+
+/* Editable lists */
+.sim-entries {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sim-entry {
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.sim-entry:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.sim-fieldset > button {
+  justify-self: start;
+}
+
+.sim-line {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px 12px;
+}
+
+.sim-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sim-apply-bar {
+  position: sticky;
+  z-index: 5;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-popover);
+}
+
+.sim-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 12px;
+  margin: 0 0 12px;
+}
+
+.sim-facts dt {
+  margin-bottom: 4px;
+  color: var(--foreground-subtle);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.sim-facts dd {
+  margin: 0;
+}
+
+.sim-json {
+  max-height: 70dvh;
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  border-radius: var(--radius-control);
+  background: var(--surface-sunken);
+  font-size: 12px;
+  line-height: 18px;
+  white-space: pre;
+}
+
+/* Journal */
+.sim-journal {
+  display: grid;
+  gap: 12px;
+}
+
+.sim-journal-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.sim-journal-entry {
+  border-bottom: 1px solid var(--line);
+  content-visibility: auto;
+  contain-intrinsic-size: auto 32px;
+}
+
+.sim-journal-entry summary {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+  padding: 6px 4px;
+  font-size: 13px;
+  list-style: none;
+}
+
+.sim-journal-entry summary:hover {
+  background: var(--surface-hover);
+}
+
+.sim-journal-entry summary > * {
+  flex: none;
+}
+
+.sim-journal-detail {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--foreground-subtle);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sim-journal-entry .sim-json {
+  margin: 0 0 8px;
+}
+
+@media (max-width: 640px) {
+  .sim-topbar,
+  .sim-main {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .sim-line {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sim-journal-entry summary {
+    flex-wrap: wrap;
+  }
+
+  .sim-journal-detail {
+    flex-basis: 100%;
+  }
+}

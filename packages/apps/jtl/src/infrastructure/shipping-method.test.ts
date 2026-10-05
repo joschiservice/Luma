@@ -10,6 +10,13 @@ import type { JtlConnectorOptions } from './adapter.js';
 import { createJtlConnector } from './adapter.js';
 import { cloudId } from './fixtures/cloud.js';
 
+// Reads repeat after transient failures; tests skip the waits.
+const readRetry = {
+  attempts: 3,
+  maxDelayMs: 2000,
+  sleep: async () => undefined,
+};
+
 vi.mock('@luma/identity', () => ({
   requireTenant(context: TenantContext, tenantId: string) {
     if (context.tenantId !== tenantId) throw new Error('Tenant mismatch');
@@ -76,6 +83,7 @@ function fixture(cloud = false) {
           apiKey: async () => 'secret',
         },
     fetch,
+    readRetry,
     recordObservations,
     shippingMethodActions: true,
     now: () => date,
@@ -394,7 +402,9 @@ describe('JTL shipping-method correction', () => {
     const f = fixture();
     await f.write();
     const effect = (await f.effectsRegistry().resolve(context, f.intent))!;
-    f.fetch.mockRejectedValueOnce(new Error('network'));
+    // Verification reads are repeated; every attempt fails here.
+    for (let attempt = 0; attempt < 3; attempt++)
+      f.fetch.mockRejectedValueOnce(new Error('network'));
     expect(await effect.verify(f.intent)).toMatchObject({
       outcome: 'inconclusive',
     });

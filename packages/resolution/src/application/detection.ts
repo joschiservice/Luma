@@ -172,6 +172,110 @@ export function inventoryRequest(
   };
 }
 
+export interface FulfillmentDetectionInput {
+  observation: Observation<FulfillmentSnapshot>;
+  mapping: FulfillmentMapping;
+  complete: boolean;
+  eligibility: 'eligible' | 'exempt' | 'unknown';
+  eligibilityEvidence: Evidence;
+  configuration: Configuration;
+}
+
+/** Builds stuck-fulfillment facts and evidence for detection and independent verification. */
+export function fulfillmentRequest(
+  context: TenantContext,
+  input: FulfillmentDetectionInput,
+  hash: (value: string) => string,
+): DetectionRequest {
+  const key = (parts: unknown[]) => hash(JSON.stringify(parts));
+  const { observation: o, mapping, configuration } = input;
+  requireTenant(context, o.source.tenantId);
+  requireTenant(context, mapping.tenantId);
+  requireTenant(context, mapping.source.tenantId);
+  const uniqueLines =
+    new Set(o.data.lines.map((line) => JSON.stringify(line.orderLine))).size ===
+      o.data.lines.length &&
+    new Set(mapping.lines.map((line) => JSON.stringify(line))).size ===
+      mapping.lines.length;
+  const mapped =
+    uniqueLines &&
+    sourceMatches(o.source, mapping.source) &&
+    externalMatches(o.data.order, mapping.order) &&
+    o.data.lines.length === mapping.lines.length &&
+    o.data.lines.every((line) =>
+      mapping.lines.some((expected) =>
+        externalMatches(line.orderLine, expected),
+      ),
+    );
+  const units = new Set(o.data.lines.map((line) => line.quantity.unit));
+  const amounts = o.data.lines.map((line) =>
+    decimalUnits(line.quantity.amount),
+  );
+  const quantity = amounts.some((amount) => amount < 0n)
+    ? '-1'
+    : o.data.lines.length === 0
+      ? null
+      : decimalString(
+          o.data.lines.reduce(
+            (sum, line) => sum + decimalUnits(line.quantity.amount),
+            0n,
+          ),
+        );
+  const mappingKey = `mapping:${key(['fulfillment', mapping])}`;
+  const facts: Facts<'stuck_fulfillment'> = {
+    tenantId: context.tenantId,
+    evidenceTenantId: context.tenantId,
+    subjectId: mapping.fulfillmentId,
+    evidenceRefs: [o.id, mappingKey, input.eligibilityEvidence.key],
+    connectionId: o.source.connectionId,
+    status: o.data.status,
+    observedAt: o.observedAt,
+    lastProgressAt: o.data.lastProgressAt,
+    quantity,
+    unit: units.size === 1 ? [...units][0]! : 'unknown',
+    mapped,
+    complete: input.complete && o.kind === 'snapshot',
+    eligibility: input.eligibility,
+    progressBasis: o.data.progressBasis ?? 'unknown',
+    otherOperationShippedQuantity: '0',
+  };
+  const mappingEvidence: Evidence = {
+    key: mappingKey,
+    tenantId: context.tenantId,
+    connectionId: null,
+    source: null,
+    observedAt: mapping.publishedAt,
+    sourceUpdatedAt: null,
+    adapterVersion: 'canonical-mapping-v1',
+    schemaVersion: 1,
+    facts: { ...mapping },
+  };
+
+  return {
+    key: key([
+      'fulfillment',
+      o.id,
+      mappingKey,
+      input.eligibilityEvidence.key,
+      input.complete,
+      input.eligibility,
+    ]),
+    input: { exceptionClass: 'stuck_fulfillment', facts },
+    configuration,
+    evidence: [
+      sourceEvidence(o, {
+        order: o.data.order,
+        status: o.data.status,
+        lines: o.data.lines,
+        lastProgressAt: o.data.lastProgressAt,
+        failureCode: o.data.failureCode,
+      }),
+      mappingEvidence,
+      input.eligibilityEvidence,
+    ],
+  };
+}
+
 /** Invoke with persisted scan/event IDs and mappings resolved inside the trusted tenant scope. */
 export function createDetectionPipeline(
   service: DetectionService,
@@ -183,103 +287,8 @@ export function createDetectionPipeline(
     inventory(context: TenantContext, input: InventoryDetectionInput) {
       return service.ingest(context, inventoryRequest(context, input, hash));
     },
-    fulfillment(
-      context: TenantContext,
-      input: {
-        observation: Observation<FulfillmentSnapshot>;
-        mapping: FulfillmentMapping;
-        complete: boolean;
-        eligibility: 'eligible' | 'exempt' | 'unknown';
-        eligibilityEvidence: Evidence;
-        configuration: Configuration;
-      },
-    ) {
-      const { observation: o, mapping, configuration } = input;
-      requireTenant(context, o.source.tenantId);
-      requireTenant(context, mapping.tenantId);
-      requireTenant(context, mapping.source.tenantId);
-      const uniqueLines =
-        new Set(o.data.lines.map((line) => JSON.stringify(line.orderLine)))
-          .size === o.data.lines.length &&
-        new Set(mapping.lines.map((line) => JSON.stringify(line))).size ===
-          mapping.lines.length;
-      const mapped =
-        uniqueLines &&
-        sourceMatches(o.source, mapping.source) &&
-        externalMatches(o.data.order, mapping.order) &&
-        o.data.lines.length === mapping.lines.length &&
-        o.data.lines.every((line) =>
-          mapping.lines.some((expected) =>
-            externalMatches(line.orderLine, expected),
-          ),
-        );
-      const units = new Set(o.data.lines.map((line) => line.quantity.unit));
-      const amounts = o.data.lines.map((line) =>
-        decimalUnits(line.quantity.amount),
-      );
-      const quantity = amounts.some((amount) => amount < 0n)
-        ? '-1'
-        : o.data.lines.length === 0
-          ? null
-          : decimalString(
-              o.data.lines.reduce(
-                (sum, line) => sum + decimalUnits(line.quantity.amount),
-                0n,
-              ),
-            );
-      const mappingKey = `mapping:${key(['fulfillment', mapping])}`;
-      const facts: Facts<'stuck_fulfillment'> = {
-        tenantId: context.tenantId,
-        evidenceTenantId: context.tenantId,
-        subjectId: mapping.fulfillmentId,
-        evidenceRefs: [o.id, mappingKey, input.eligibilityEvidence.key],
-        connectionId: o.source.connectionId,
-        status: o.data.status,
-        observedAt: o.observedAt,
-        lastProgressAt: o.data.lastProgressAt,
-        quantity,
-        unit: units.size === 1 ? [...units][0]! : 'unknown',
-        mapped,
-        complete: input.complete && o.kind === 'snapshot',
-        eligibility: input.eligibility,
-        progressBasis: o.data.progressBasis ?? 'unknown',
-        otherOperationShippedQuantity: '0',
-      };
-      const mappingEvidence: Evidence = {
-        key: mappingKey,
-        tenantId: context.tenantId,
-        connectionId: null,
-        source: null,
-        observedAt: mapping.publishedAt,
-        sourceUpdatedAt: null,
-        adapterVersion: 'canonical-mapping-v1',
-        schemaVersion: 1,
-        facts: { ...mapping },
-      };
-
-      return service.ingest(context, {
-        key: key([
-          'fulfillment',
-          o.id,
-          mappingKey,
-          input.eligibilityEvidence.key,
-          input.complete,
-          input.eligibility,
-        ]),
-        input: { exceptionClass: 'stuck_fulfillment', facts },
-        configuration,
-        evidence: [
-          sourceEvidence(o, {
-            order: o.data.order,
-            status: o.data.status,
-            lines: o.data.lines,
-            lastProgressAt: o.data.lastProgressAt,
-            failureCode: o.data.failureCode,
-          }),
-          mappingEvidence,
-          input.eligibilityEvidence,
-        ],
-      });
+    fulfillment(context: TenantContext, input: FulfillmentDetectionInput) {
+      return service.ingest(context, fulfillmentRequest(context, input, hash));
     },
     scan(
       context: TenantContext,

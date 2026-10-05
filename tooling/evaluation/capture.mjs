@@ -57,7 +57,7 @@ export function captureIncident(input) {
     'Reviewed expectations are required',
   );
   assert.ok(
-    Number.isFinite(fixture.provider.clock.now),
+    Number.isFinite(fixture.provider.now),
     'Initial provider state and clock are required',
   );
   fixture.incident.provenance = {

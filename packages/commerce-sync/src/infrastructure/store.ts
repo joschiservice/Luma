@@ -44,6 +44,7 @@ type StreamRow = {
   error_code: string | null;
   error_message: string | null;
   error_at: Date | null;
+  failing_since: Date | null;
   blocked: SyncStream['blocked'];
   last_success_at: Date | null;
   last_complete_at: Date | null;
@@ -93,6 +94,7 @@ function stream(row: StreamRow): SyncStream {
             at: row.error_at.toISOString(),
           }
         : null,
+    failingSince: iso(row.failing_since),
     blocked: row.blocked,
     lastSuccessAt: iso(row.last_success_at),
     lastCompleteAt: iso(row.last_complete_at),
@@ -423,7 +425,7 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
           current.scan === 'backfill' && current.scan_pages === 0;
         await tx.query(
           `UPDATE commerce_sync_streams SET cursor=$4,scan_pages=scan_pages+1,scan_records=scan_records+$5,
-            scan_total=COALESCE($6,scan_total),attempts=0,error_code=NULL,error_message=NULL,error_at=NULL,
+            scan_total=COALESCE($6,scan_total),attempts=0,error_code=NULL,error_message=NULL,error_at=NULL,failing_since=NULL,
             last_success_at=$7,lease_token=NULL,lease_until=NULL,due_at=$7,updated_at=now(),
             current_history_limited=CASE WHEN $8 THEN $9 ELSE current_history_limited END,
             history_from=CASE WHEN $10 THEN $11::timestamptz ELSE history_from END,
@@ -489,6 +491,7 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
         if (!current) return;
         await tx.query(
           `UPDATE commerce_sync_streams SET attempts=attempts+1,error_code=$4,error_message=$5,error_at=now(),
+            failing_since=COALESCE(failing_since,now()),
             due_at=$6,lease_token=NULL,lease_until=NULL,blocked=COALESCE($8,blocked),
             cursor=CASE WHEN $7 THEN NULL ELSE cursor END,scan_pages=CASE WHEN $7 THEN 0 ELSE scan_pages END,
             scan_records=CASE WHEN $7 THEN 0 ELSE scan_records END,version=version+1,updated_at=now()
@@ -640,7 +643,7 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
               scan_since=NULL,scan_pages=0,scan_records=0,scan_total=NULL,full_requested=true,paused=false,
               principal_id=$3,blocked=CASE WHEN blocked='principal_unavailable' THEN NULL ELSE blocked END,
               lease_token=NULL,lease_until=NULL,due_at=now(),attempts=0,error_code=NULL,error_message=NULL,
-              error_at=NULL,version=version+1,updated_at=now()
+              error_at=NULL,failing_since=NULL,version=version+1,updated_at=now()
             WHERE tenant_id=$1 AND id=$2`,
             values,
           );

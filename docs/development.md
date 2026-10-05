@@ -36,7 +36,7 @@ Use the [codebase map](codebase-map.md) to select the relevant tests. For simula
 mise exec -- pnpm verify:feature simulator
 ```
 
-This runs repository formatting and lint, one build of the API and simulator dependency graphs, focused type and unit checks for simulator packages, resolution and exceptions, simulator integration/panel tests, and the inventory platform E2E and browser suites. Steps run sequentially and stop on the first failure. Each step prints its status and writes full output to a numbered log under the printed temporary directory; failures also show the last 30 lines. Logs remain available after the command exits.
+This runs repository formatting and lint, one build of the API and simulator dependency graphs, focused type and unit checks for simulator packages, resolution and exceptions, the database-backed simulator host and adapter contract tests, and the inventory platform E2E and browser suites. Steps run sequentially and stop on the first failure. Each step prints its status and writes full output to a numbered log under the printed temporary directory; failures also show the last 30 lines. Logs remain available after the command exits.
 
 Docker and Playwright Chromium are required. Install Chromium with `pnpm --filter @luma/api exec playwright install chromium`. The platform suites share one disposable PostgreSQL server, with isolated databases per test. If `TEST_DATABASE_URL` is set, the existing test runner uses that server instead; use a test administrator connection that can create databases and roles. The command does not start or reset your local simulator workspace.
 
@@ -91,7 +91,7 @@ The migration administrator connection is used only during initialization.
 superuser, database creation, role creation or RLS bypass privileges.
 
 `pnpm dev` also starts the commerce sync process (`apps/worker`), which imports
-history for active connections and keeps it current. It uses the worker login and
+history for active connections, keeps it current and runs scheduled detection. It uses the worker login and
 reads Shopify approval flags from `apps/api/.env`. See [Commerce sync](commerce-sync.md).
 
 Temporal runs only when requested. Its development server persists workflow
@@ -104,9 +104,9 @@ available until `pnpm dev:down`.
 Stop app and worker processes before running `pnpm db:reset`. The command deletes
 all data in this checkout's managed PostgreSQL database and recreates the demo
 workspace. It requires an existing local setup and preserves local credentials
-and configuration. Pilot manifests and simulator state are archived under
-`.luma/backups/database-reset-*`; the next pilot or simulator launch seeds fresh
-state. Temporal workflow history is retained. Use the
+and configuration. It also drops the simulator's `luma_simulator` database. Pilot
+and simulator manifests are archived under `.luma/backups/database-reset-*`; the
+next pilot or simulator launch seeds fresh state. Temporal workflow history is retained. Use the
 [pilot reset](pilot-environment.md) to reset a pilot scenario without resetting
 the database.
 

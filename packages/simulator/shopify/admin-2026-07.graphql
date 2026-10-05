@@ -1,0 +1,1668 @@
+# Generated from https://shopify.dev/admin-graphql-direct-proxy/2026-07
+# Adapter surface only; regenerate with scripts/update-shopify-schema.mjs.
+schema {
+  query: QueryRoot
+  mutation: Mutation
+}
+directive @idempotent(key: String!) on FIELD
+
+type QueryRoot {
+  currentAppInstallation: AppInstallation!
+  customers(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+    sortKey: CustomerSortKeys = ID
+    query: String
+  ): CustomerConnection!
+  customersCount(query: String, limit: Int = 10000): Count
+  inventoryItems(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+    query: String
+  ): InventoryItemConnection!
+  node(id: ID!): Node
+  orders(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+    sortKey: OrderSortKeys = PROCESSED_AT
+    query: String
+    savedSearchId: ID
+  ): OrderConnection!
+  ordersCount(query: String, savedSearchId: ID, limit: Int = 10000): Count
+  products(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+    sortKey: ProductSortKeys = ID
+    query: String
+    savedSearchId: ID
+  ): ProductConnection!
+  productsCount(query: String, savedSearchId: ID, limit: Int = 10000): Count
+  shop: Shop!
+  webhookSubscriptions(
+    uri: String
+    format: WebhookSubscriptionFormat
+    topics: [WebhookSubscriptionTopic!]
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+    sortKey: WebhookSubscriptionSortKeys = CREATED_AT
+    query: String
+  ): WebhookSubscriptionConnection!
+}
+
+type AppInstallation implements Node {
+  accessScopes: [AccessScope!]!
+  id: ID!
+}
+
+interface Node {
+  id: ID!
+}
+
+"""
+The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID.
+"""
+scalar ID
+
+type AccessScope {
+  handle: String!
+}
+
+"""
+The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text.
+"""
+scalar String
+
+"""
+The `Int` scalar type represents non-fractional signed whole numeric values. Int can represent values between -(2^31) and 2^31 - 1.
+"""
+scalar Int
+
+"""
+The `Boolean` scalar type represents `true` or `false`.
+"""
+scalar Boolean
+
+enum CustomerSortKeys {
+  CREATED_AT
+  ID
+  LOCATION
+  NAME
+  RELEVANCE
+  UPDATED_AT
+}
+
+type CustomerConnection {
+  nodes: [Customer!]!
+  pageInfo: PageInfo!
+}
+
+type Customer implements Node {
+  amountSpent: MoneyV2!
+  createdAt: DateTime!
+  defaultAddress: MailingAddress
+  defaultEmailAddress: CustomerEmailAddress
+  defaultPhoneNumber: CustomerPhoneNumber
+  displayName: String!
+  id: ID!
+  numberOfOrders: UnsignedInt64!
+  orders(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+    sortKey: OrderSortKeys = ID
+    query: String
+  ): OrderConnection!
+  state: CustomerState!
+  tags: [String!]!
+  updatedAt: DateTime!
+}
+
+type MoneyV2 {
+  amount: Decimal!
+  currencyCode: CurrencyCode!
+}
+
+scalar Decimal
+
+enum CurrencyCode {
+  USD
+  EUR
+  GBP
+  CAD
+  AFN
+  ALL
+  DZD
+  AOA
+  ARS
+  AMD
+  AWG
+  AUD
+  BBD
+  AZN
+  BDT
+  BSD
+  BHD
+  BIF
+  BYN
+  BZD
+  BMD
+  BTN
+  BAM
+  BRL
+  BOB
+  BWP
+  BND
+  BGN
+  MMK
+  KHR
+  CVE
+  XCG
+  KYD
+  XAF
+  CLP
+  CNY
+  COP
+  KMF
+  CDF
+  CRC
+  HRK
+  CZK
+  DKK
+  DJF
+  DOP
+  XCD
+  EGP
+  ERN
+  ETB
+  FKP
+  XPF
+  FJD
+  GIP
+  GMD
+  GHS
+  GTQ
+  GYD
+  GEL
+  GNF
+  HTG
+  HNL
+  HKD
+  HUF
+  ISK
+  INR
+  IDR
+  ILS
+  IRR
+  IQD
+  JMD
+  JPY
+  JEP
+  JOD
+  KZT
+  KES
+  KID
+  KWD
+  KGS
+  LAK
+  LVL
+  LBP
+  LSL
+  LRD
+  LYD
+  LTL
+  MGA
+  MKD
+  MOP
+  MWK
+  MVR
+  MRU
+  MXN
+  MYR
+  MUR
+  MDL
+  MAD
+  MNT
+  MZN
+  NAD
+  NPR
+  ANG
+  NZD
+  NIO
+  NGN
+  NOK
+  OMR
+  PAB
+  PKR
+  PGK
+  PYG
+  PEN
+  PHP
+  PLN
+  QAR
+  RON
+  RUB
+  RWF
+  WST
+  SHP
+  SAR
+  RSD
+  SCR
+  SLL
+  SGD
+  SDG
+  SOS
+  SYP
+  ZAR
+  KRW
+  SSP
+  SBD
+  LKR
+  SRD
+  SZL
+  SEK
+  CHF
+  TWD
+  THB
+  TJS
+  TZS
+  TOP
+  TTD
+  TND
+  TRY
+  TMT
+  UGX
+  UAH
+  AED
+  UYU
+  UZS
+  VUV
+  VES
+  VND
+  XOF
+  YER
+  ZMW
+  USDC
+  BYR
+  STD
+  STN
+  VED
+  VEF
+  XXX
+}
+
+scalar DateTime
+
+type MailingAddress implements Node {
+  address1: String
+  address2: String
+  city: String
+  countryCodeV2: CountryCode
+  id: ID!
+  province: String
+  zip: String
+}
+
+enum CountryCode {
+  AF
+  AX
+  AL
+  DZ
+  AD
+  AO
+  AI
+  AG
+  AR
+  AM
+  AW
+  AC
+  AU
+  AT
+  AZ
+  BS
+  BH
+  BD
+  BB
+  BY
+  BE
+  BZ
+  BJ
+  BM
+  BT
+  BO
+  BA
+  BW
+  BV
+  BR
+  IO
+  BN
+  BG
+  BF
+  BI
+  KH
+  CA
+  CV
+  BQ
+  KY
+  CF
+  TD
+  CL
+  CN
+  CX
+  CC
+  CO
+  KM
+  CG
+  CD
+  CK
+  CR
+  HR
+  CU
+  CW
+  CY
+  CZ
+  CI
+  DK
+  DJ
+  DM
+  DO
+  EC
+  EG
+  SV
+  GQ
+  ER
+  EE
+  SZ
+  ET
+  FK
+  FO
+  FJ
+  FI
+  FR
+  GF
+  PF
+  TF
+  GA
+  GM
+  GE
+  DE
+  GH
+  GI
+  GR
+  GL
+  GD
+  GP
+  GT
+  GG
+  GN
+  GW
+  GY
+  HT
+  HM
+  VA
+  HN
+  HK
+  HU
+  IS
+  IN
+  ID
+  IR
+  IQ
+  IE
+  IM
+  IL
+  IT
+  JM
+  JP
+  JE
+  JO
+  KZ
+  KE
+  KI
+  KP
+  XK
+  KW
+  KG
+  LA
+  LV
+  LB
+  LS
+  LR
+  LY
+  LI
+  LT
+  LU
+  MO
+  MG
+  MW
+  MY
+  MV
+  ML
+  MT
+  MQ
+  MR
+  MU
+  YT
+  MX
+  MD
+  MC
+  MN
+  ME
+  MS
+  MA
+  MZ
+  MM
+  NA
+  NR
+  NP
+  NL
+  AN
+  NC
+  NZ
+  NI
+  NE
+  NG
+  NU
+  NF
+  MK
+  NO
+  OM
+  PK
+  PS
+  PA
+  PG
+  PY
+  PE
+  PH
+  PN
+  PL
+  PT
+  QA
+  CM
+  RE
+  RO
+  RU
+  RW
+  BL
+  SH
+  KN
+  LC
+  MF
+  PM
+  WS
+  SM
+  ST
+  SA
+  SN
+  RS
+  SC
+  SL
+  SG
+  SX
+  SK
+  SI
+  SB
+  SO
+  ZA
+  GS
+  KR
+  SS
+  ES
+  LK
+  VC
+  SD
+  SR
+  SJ
+  SE
+  CH
+  SY
+  TW
+  TJ
+  TZ
+  TH
+  TL
+  TG
+  TK
+  TO
+  TT
+  TA
+  TN
+  TR
+  TM
+  TC
+  TV
+  UG
+  UA
+  AE
+  GB
+  US
+  UM
+  UY
+  UZ
+  VU
+  VE
+  VN
+  VG
+  WF
+  EH
+  YE
+  ZM
+  ZW
+  ZZ
+}
+
+type CustomerEmailAddress {
+  emailAddress: String!
+}
+
+type CustomerPhoneNumber {
+  phoneNumber: String!
+}
+
+scalar UnsignedInt64
+
+enum OrderSortKeys {
+  CREATED_AT
+  CURRENT_TOTAL_PRICE
+  CUSTOMER_NAME
+  DESTINATION
+  FINANCIAL_STATUS
+  FULFILLMENT_STATUS
+  ID
+  ORDER_NUMBER
+  PO_NUMBER
+  PROCESSED_AT
+  RELEVANCE
+  TOTAL_ITEMS_QUANTITY
+  TOTAL_PRICE
+  UPDATED_AT
+}
+
+type OrderConnection {
+  nodes: [Order!]!
+  pageInfo: PageInfo!
+}
+
+type Order implements Node {
+  cancelledAt: DateTime
+  closed: Boolean!
+  createdAt: DateTime!
+  currentTotalPriceSet: MoneyBag!
+  customer: Customer
+  displayFinancialStatus: OrderDisplayFinancialStatus
+  displayFulfillmentStatus: OrderDisplayFulfillmentStatus!
+  events(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+    sortKey: EventSortKeys = ID
+    query: String
+  ): EventConnection!
+  fulfillmentOrders(
+    displayable: Boolean = false
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+    query: String
+  ): FulfillmentOrderConnection!
+  fulfillments(first: Int, query: String): [Fulfillment!]!
+  id: ID!
+  lineItems(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+  ): LineItemConnection!
+  name: String!
+  refunds(first: Int): [Refund!]!
+  returns(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+    query: String
+  ): ReturnConnection!
+  totalOutstandingSet: MoneyBag!
+  transactions(
+    first: Int
+    capturable: Boolean
+    manuallyResolvable: Boolean
+  ): [OrderTransaction!]!
+  updatedAt: DateTime!
+}
+
+type MoneyBag {
+  shopMoney: MoneyV2!
+}
+
+enum OrderDisplayFinancialStatus {
+  PENDING
+  AUTHORIZED
+  PARTIALLY_PAID
+  PARTIALLY_REFUNDED
+  VOIDED
+  PAID
+  REFUNDED
+  EXPIRED
+}
+
+enum OrderDisplayFulfillmentStatus {
+  UNFULFILLED
+  PARTIALLY_FULFILLED
+  FULFILLED
+  RESTOCKED
+  PENDING_FULFILLMENT
+  OPEN
+  IN_PROGRESS
+  ON_HOLD
+  SCHEDULED
+  REQUEST_DECLINED
+}
+
+enum EventSortKeys {
+  CREATED_AT
+  ID
+}
+
+type EventConnection {
+  nodes: [Event!]!
+  pageInfo: PageInfo!
+}
+
+interface Event {
+  createdAt: DateTime!
+  id: ID!
+}
+
+type PageInfo {
+  endCursor: String
+  hasNextPage: Boolean!
+}
+
+type FulfillmentOrderConnection {
+  nodes: [FulfillmentOrder!]!
+  pageInfo: PageInfo!
+}
+
+type FulfillmentOrder implements Node {
+  assignedLocation: FulfillmentOrderAssignedLocation!
+  deliveryMethod: DeliveryMethod
+  fulfillAt: DateTime
+  fulfillBy: DateTime
+  fulfillmentHolds: [FulfillmentHold!]!
+  id: ID!
+  lineItems(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+  ): FulfillmentOrderLineItemConnection!
+  locationsForMove(
+    lineItemIds: [ID!] = []
+    query: String
+    locationIds: [ID!]
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+  ): FulfillmentOrderLocationForMoveConnection!
+  order: Order!
+  requestStatus: FulfillmentOrderRequestStatus!
+  status: FulfillmentOrderStatus!
+  supportedActions: [FulfillmentOrderSupportedAction!]!
+  updatedAt: DateTime!
+}
+
+type FulfillmentOrderAssignedLocation {
+  location: Location
+  name: String!
+}
+
+type Location implements Node {
+  id: ID!
+  isActive: Boolean!
+  name: String!
+}
+
+type DeliveryMethod implements Node {
+  id: ID!
+  maxDeliveryDateTime: DateTime
+  methodType: DeliveryMethodType!
+  presentedName: String
+}
+
+enum DeliveryMethodType {
+  SHIPPING
+  PICK_UP
+  NONE
+  RETAIL
+  LOCAL
+  PICKUP_POINT
+}
+
+type FulfillmentHold implements Node {
+  heldByRequestingApp: Boolean!
+  id: ID!
+  reason: FulfillmentHoldReason!
+}
+
+enum FulfillmentHoldReason {
+  AWAITING_PAYMENT
+  HIGH_RISK_OF_FRAUD
+  INCORRECT_ADDRESS
+  INVENTORY_OUT_OF_STOCK
+  UNKNOWN_DELIVERY_DATE
+  ONLINE_STORE_POST_PURCHASE_CROSS_SELL
+  AWAITING_RETURN_ITEMS
+  OTHER
+}
+
+type FulfillmentOrderLineItemConnection {
+  nodes: [FulfillmentOrderLineItem!]!
+  pageInfo: PageInfo!
+}
+
+type FulfillmentOrderLineItem implements Node {
+  id: ID!
+  lineItem: LineItem!
+  remainingQuantity: Int!
+  totalQuantity: Int!
+}
+
+type LineItem implements Node {
+  id: ID!
+  name: String!
+  quantity: Int!
+  sku: String
+  variant: ProductVariant
+}
+
+type ProductVariant implements Node {
+  barcode: String
+  id: ID!
+  inventoryItem: InventoryItem!
+  price: Money!
+  product: Product!
+  sku: String
+  title: String!
+  updatedAt: DateTime!
+}
+
+type InventoryItem implements Node {
+  id: ID!
+  inventoryLevel(
+    locationId: ID!
+    includeInactive: Boolean = false
+  ): InventoryLevel
+  inventoryLevels(
+    includeInactive: Boolean = false
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+    query: String
+  ): InventoryLevelConnection!
+  sku: String
+  tracked: Boolean!
+  updatedAt: DateTime!
+  variant: ProductVariant!
+}
+
+type InventoryLevel implements Node {
+  id: ID!
+  location: Location!
+  quantities(names: [String!]!): [InventoryQuantity!]!
+  updatedAt: DateTime!
+}
+
+type InventoryQuantity implements Node {
+  id: ID!
+  name: String!
+  quantity: Int!
+}
+
+type InventoryLevelConnection {
+  nodes: [InventoryLevel!]!
+  pageInfo: PageInfo!
+}
+
+scalar Money
+
+type Product implements Node {
+  id: ID!
+  priceRangeV2: ProductPriceRangeV2!
+  publishedAt: DateTime
+  status: ProductStatus!
+  title: String!
+  updatedAt: DateTime!
+  variants(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+    sortKey: ProductVariantSortKeys = POSITION
+  ): ProductVariantConnection!
+  vendor: String!
+}
+
+type ProductPriceRangeV2 {
+  minVariantPrice: MoneyV2!
+}
+
+enum ProductStatus {
+  ACTIVE
+  ARCHIVED
+  DRAFT
+  UNLISTED
+}
+
+enum ProductVariantSortKeys {
+  FULL_TITLE
+  ID
+  INVENTORY_LEVELS_AVAILABLE
+  INVENTORY_MANAGEMENT
+  INVENTORY_POLICY
+  INVENTORY_QUANTITY
+  NAME
+  POPULAR
+  POSITION
+  RELEVANCE
+  SKU
+  TITLE
+}
+
+type ProductVariantConnection {
+  nodes: [ProductVariant!]!
+  pageInfo: PageInfo!
+}
+
+type FulfillmentOrderLocationForMoveConnection {
+  nodes: [FulfillmentOrderLocationForMove!]!
+  pageInfo: PageInfo!
+}
+
+type FulfillmentOrderLocationForMove {
+  location: Location!
+  movable: Boolean!
+  unavailableLineItemsCount: Count
+}
+
+type Count {
+  count: Int!
+  precision: CountPrecision!
+}
+
+enum CountPrecision {
+  EXACT
+  AT_LEAST
+}
+
+enum FulfillmentOrderRequestStatus {
+  UNSUBMITTED
+  SUBMITTED
+  ACCEPTED
+  REJECTED
+  CANCELLATION_REQUESTED
+  CANCELLATION_ACCEPTED
+  CANCELLATION_REJECTED
+  CLOSED
+}
+
+enum FulfillmentOrderStatus {
+  OPEN
+  IN_PROGRESS
+  CANCELLED
+  INCOMPLETE
+  CLOSED
+  SCHEDULED
+  ON_HOLD
+}
+
+type FulfillmentOrderSupportedAction {
+  action: FulfillmentOrderAction!
+}
+
+enum FulfillmentOrderAction {
+  CREATE_FULFILLMENT
+  REQUEST_FULFILLMENT
+  CANCEL_FULFILLMENT_ORDER
+  MOVE
+  REQUEST_CANCELLATION
+  MARK_AS_OPEN
+  RELEASE_HOLD
+  HOLD
+  EXTERNAL
+  SPLIT
+  MERGE
+  REPORT_PROGRESS
+}
+
+type Fulfillment implements Node {
+  deliveredAt: DateTime
+  displayStatus: FulfillmentDisplayStatus
+  estimatedDeliveryAt: DateTime
+  fulfillmentLineItems(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+  ): FulfillmentLineItemConnection!
+  id: ID!
+  inTransitAt: DateTime
+  location: Location
+  status: FulfillmentStatus!
+  trackingInfo(first: Int): [FulfillmentTrackingInfo!]!
+  updatedAt: DateTime!
+}
+
+enum FulfillmentDisplayStatus {
+  ATTEMPTED_DELIVERY
+  CANCELED
+  CONFIRMED
+  DELAYED
+  DELIVERED
+  FAILURE
+  FULFILLED
+  CARRIER_PICKED_UP
+  IN_TRANSIT
+  LABEL_PRINTED
+  LABEL_PURCHASED
+  LABEL_VOIDED
+  MARKED_AS_FULFILLED
+  NOT_DELIVERED
+  OUT_FOR_DELIVERY
+  READY_FOR_PICKUP
+  PICKED_UP
+  SUBMITTED
+}
+
+type FulfillmentLineItemConnection {
+  nodes: [FulfillmentLineItem!]!
+  pageInfo: PageInfo!
+}
+
+type FulfillmentLineItem implements Node {
+  id: ID!
+  lineItem: LineItem!
+  quantity: Int
+}
+
+enum FulfillmentStatus {
+  PENDING
+  OPEN
+  SUCCESS
+  CANCELLED
+  ERROR
+  FAILURE
+}
+
+type FulfillmentTrackingInfo {
+  company: String
+  number: String
+  url: URL
+}
+
+scalar URL
+
+type LineItemConnection {
+  nodes: [LineItem!]!
+  pageInfo: PageInfo!
+}
+
+type Refund implements Node {
+  createdAt: DateTime
+  id: ID!
+  order: Order!
+  refundLineItems(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+  ): RefundLineItemConnection!
+  return: Return
+  totalRefundedSet: MoneyBag!
+  transactions(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+  ): OrderTransactionConnection!
+  updatedAt: DateTime!
+}
+
+type RefundLineItemConnection {
+  nodes: [RefundLineItem!]!
+  pageInfo: PageInfo!
+}
+
+type RefundLineItem {
+  lineItem: LineItem!
+  quantity: Int!
+  restockType: RefundLineItemRestockType!
+  restocked: Boolean!
+}
+
+enum RefundLineItemRestockType {
+  RETURN
+  CANCEL
+  LEGACY_RESTOCK
+  NO_RESTOCK
+}
+
+type Return implements Node {
+  closedAt: DateTime
+  createdAt: DateTime!
+  decline: ReturnDecline
+  id: ID!
+  name: String!
+  order: Order!
+  requestApprovedAt: DateTime
+  returnLineItems(
+    processingStatus: ReturnProcessingStatusFilterInput
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+  ): ReturnLineItemTypeConnection!
+  reverseFulfillmentOrders(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+  ): ReverseFulfillmentOrderConnection!
+  status: ReturnStatus!
+}
+
+type ReturnDecline {
+  reason: ReturnDeclineReason!
+}
+
+enum ReturnDeclineReason {
+  RETURN_PERIOD_ENDED
+  FINAL_SALE
+  OTHER
+}
+
+enum ReturnProcessingStatusFilterInput {
+  PROCESSED
+  PROCESSABLE
+}
+
+type ReturnLineItemTypeConnection {
+  nodes: [ReturnLineItemType!]!
+  pageInfo: PageInfo!
+}
+
+interface ReturnLineItemType implements Node {
+  id: ID!
+  quantity: Int!
+  refundedQuantity: Int!
+  returnReasonDefinition: ReturnReasonDefinition
+}
+
+type ReturnReasonDefinition implements Node {
+  id: ID!
+  name: String!
+}
+
+type ReverseFulfillmentOrderConnection {
+  nodes: [ReverseFulfillmentOrder!]!
+  pageInfo: PageInfo!
+}
+
+type ReverseFulfillmentOrder implements Node {
+  id: ID!
+  lineItems(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+  ): ReverseFulfillmentOrderLineItemConnection!
+  status: ReverseFulfillmentOrderStatus!
+}
+
+type ReverseFulfillmentOrderLineItemConnection {
+  nodes: [ReverseFulfillmentOrderLineItem!]!
+  pageInfo: PageInfo!
+}
+
+type ReverseFulfillmentOrderLineItem implements Node {
+  dispositions: [ReverseFulfillmentOrderDisposition!]!
+  fulfillmentLineItem: FulfillmentLineItem
+  id: ID!
+}
+
+type ReverseFulfillmentOrderDisposition implements Node {
+  createdAt: DateTime!
+  id: ID!
+  quantity: Int!
+  type: ReverseFulfillmentOrderDispositionType!
+}
+
+enum ReverseFulfillmentOrderDispositionType {
+  RESTOCKED
+  PROCESSING_REQUIRED
+  NOT_RESTOCKED
+  MISSING
+}
+
+enum ReverseFulfillmentOrderStatus {
+  CANCELED
+  CLOSED
+  OPEN
+}
+
+enum ReturnStatus {
+  CANCELED
+  CLOSED
+  OPEN
+  REQUESTED
+  DECLINED
+}
+
+type OrderTransactionConnection {
+  nodes: [OrderTransaction!]!
+  pageInfo: PageInfo!
+}
+
+type OrderTransaction implements Node {
+  amountSet: MoneyBag!
+  createdAt: DateTime!
+  gateway: String
+  id: ID!
+  kind: OrderTransactionKind!
+  parentTransaction: OrderTransaction
+  processedAt: DateTime
+  status: OrderTransactionStatus!
+}
+
+enum OrderTransactionKind {
+  SALE
+  CAPTURE
+  AUTHORIZATION
+  VOID
+  REFUND
+  CHANGE
+  EMV_AUTHORIZATION
+  SUGGESTED_REFUND
+}
+
+enum OrderTransactionStatus {
+  SUCCESS
+  FAILURE
+  PENDING
+  ERROR
+  AWAITING_RESPONSE
+  UNKNOWN
+}
+
+type ReturnConnection {
+  nodes: [Return!]!
+  pageInfo: PageInfo!
+}
+
+enum CustomerState {
+  DECLINED
+  DISABLED
+  ENABLED
+  INVITED
+}
+
+type InventoryItemConnection {
+  nodes: [InventoryItem!]!
+  pageInfo: PageInfo!
+}
+
+enum ProductSortKeys {
+  CREATED_AT
+  ID
+  INVENTORY_TOTAL
+  PRODUCT_TYPE
+  PUBLISHED_AT
+  RELEVANCE
+  TITLE
+  UPDATED_AT
+  VENDOR
+}
+
+type ProductConnection {
+  nodes: [Product!]!
+  pageInfo: PageInfo!
+}
+
+type Shop implements Node {
+  id: ID!
+  myshopifyDomain: String!
+}
+
+enum WebhookSubscriptionFormat {
+  JSON
+  XML
+}
+
+enum WebhookSubscriptionTopic {
+  TAX_SUMMARIES_CREATE
+  APP_UNINSTALLED
+  APP_SCOPES_UPDATE
+  CARTS_CREATE
+  CARTS_UPDATE
+  CHANNELS_DELETE
+  CHECKOUTS_CREATE
+  CHECKOUTS_DELETE
+  CHECKOUTS_UPDATE
+  CUSTOMER_PAYMENT_METHODS_CREATE
+  CUSTOMER_PAYMENT_METHODS_UPDATE
+  CUSTOMER_PAYMENT_METHODS_REVOKE
+  COLLECTION_LISTINGS_ADD
+  COLLECTION_LISTINGS_REMOVE
+  COLLECTION_LISTINGS_UPDATE
+  COLLECTION_PUBLICATIONS_CREATE
+  COLLECTION_PUBLICATIONS_DELETE
+  COLLECTION_PUBLICATIONS_UPDATE
+  COLLECTIONS_CREATE
+  COLLECTIONS_DELETE
+  COLLECTIONS_UPDATE
+  CUSTOMER_GROUPS_CREATE
+  CUSTOMER_GROUPS_DELETE
+  CUSTOMER_GROUPS_UPDATE
+  CUSTOMERS_CREATE
+  CUSTOMERS_DELETE
+  CUSTOMERS_DISABLE
+  CUSTOMERS_ENABLE
+  CUSTOMERS_UPDATE
+  CUSTOMERS_PURCHASING_SUMMARY
+  CUSTOMERS_MARKETING_CONSENT_UPDATE
+  CUSTOMERS_WHATS_APP_MARKETING_CONSENT_UPDATE
+  CUSTOMER_TAGS_ADDED
+  CUSTOMER_TAGS_REMOVED
+  CUSTOMERS_EMAIL_MARKETING_CONSENT_UPDATE
+  DISPUTES_CREATE
+  DISPUTES_UPDATE
+  DRAFT_ORDERS_CREATE
+  DRAFT_ORDERS_DELETE
+  DRAFT_ORDERS_UPDATE
+  FULFILLMENT_EVENTS_CREATE
+  FULFILLMENT_EVENTS_DELETE
+  FULFILLMENTS_CREATE
+  FULFILLMENTS_UPDATE
+  ATTRIBUTED_SESSIONS_FIRST
+  ATTRIBUTED_SESSIONS_LAST
+  ORDER_TRANSACTIONS_CREATE
+  ORDERS_CANCELLED
+  ORDERS_CREATE
+  ORDERS_DELETE
+  ORDERS_EDITED
+  ORDERS_FULFILLED
+  ORDERS_PAID
+  ORDERS_PARTIALLY_FULFILLED
+  ORDERS_UPDATED
+  ORDERS_LINK_REQUESTED
+  FULFILLMENT_ORDERS_MOVED
+  FULFILLMENT_ORDERS_HOLD_RELEASED
+  FULFILLMENT_ORDERS_SCHEDULED_FULFILLMENT_ORDER_READY
+  FULFILLMENT_HOLDS_RELEASED
+  FULFILLMENT_ORDERS_ORDER_ROUTING_COMPLETE
+  FULFILLMENT_ORDERS_CANCELLED
+  FULFILLMENT_ORDERS_FULFILLMENT_SERVICE_FAILED_TO_COMPLETE
+  FULFILLMENT_ORDERS_FULFILLMENT_REQUEST_REJECTED
+  FULFILLMENT_ORDERS_CANCELLATION_REQUEST_SUBMITTED
+  FULFILLMENT_ORDERS_CANCELLATION_REQUEST_ACCEPTED
+  FULFILLMENT_ORDERS_CANCELLATION_REQUEST_REJECTED
+  FULFILLMENT_ORDERS_FULFILLMENT_REQUEST_SUBMITTED
+  FULFILLMENT_ORDERS_FULFILLMENT_REQUEST_ACCEPTED
+  FULFILLMENT_HOLDS_ADDED
+  FULFILLMENT_ORDERS_LINE_ITEMS_PREPARED_FOR_LOCAL_DELIVERY
+  FULFILLMENT_ORDERS_PLACED_ON_HOLD
+  FULFILLMENT_ORDERS_MERGED
+  FULFILLMENT_ORDERS_SPLIT
+  FULFILLMENT_ORDERS_PROGRESS_REPORTED
+  FULFILLMENT_ORDERS_MANUALLY_REPORTED_PROGRESS_STOPPED
+  PRODUCT_LISTINGS_ADD
+  PRODUCT_LISTINGS_REMOVE
+  PRODUCT_LISTINGS_UPDATE
+  SCHEDULED_PRODUCT_LISTINGS_ADD
+  SCHEDULED_PRODUCT_LISTINGS_UPDATE
+  SCHEDULED_PRODUCT_LISTINGS_REMOVE
+  PRODUCT_PUBLICATIONS_CREATE
+  PRODUCT_PUBLICATIONS_DELETE
+  PRODUCT_PUBLICATIONS_UPDATE
+  PRODUCTS_CREATE
+  PRODUCTS_DELETE
+  PRODUCTS_UPDATE
+  REFUNDS_CREATE
+  SEGMENTS_CREATE
+  SEGMENTS_DELETE
+  SEGMENTS_UPDATE
+  SHIPPING_ADDRESSES_CREATE
+  SHIPPING_ADDRESSES_UPDATE
+  SHOP_UPDATE
+  TAX_PARTNERS_UPDATE
+  TAX_SERVICES_CREATE
+  TAX_SERVICES_UPDATE
+  THEMES_CREATE
+  THEMES_DELETE
+  THEMES_PUBLISH
+  THEMES_UPDATE
+  VARIANTS_IN_STOCK
+  VARIANTS_OUT_OF_STOCK
+  INVENTORY_LEVELS_CONNECT
+  INVENTORY_LEVELS_UPDATE
+  INVENTORY_LEVELS_DISCONNECT
+  INVENTORY_ITEMS_CREATE
+  INVENTORY_ITEMS_UPDATE
+  INVENTORY_ITEMS_DELETE
+  LOCATIONS_ACTIVATE
+  LOCATIONS_DEACTIVATE
+  LOCATIONS_CREATE
+  LOCATIONS_UPDATE
+  LOCATIONS_DELETE
+  TENDER_TRANSACTIONS_CREATE
+  APP_PURCHASES_ONE_TIME_UPDATE
+  APP_SUBSCRIPTIONS_APPROACHING_CAPPED_AMOUNT
+  APP_SUBSCRIPTIONS_UPDATE
+  LOCALES_CREATE
+  LOCALES_UPDATE
+  LOCALES_DESTROY
+  MACHINE_TRANSLATION_BATCH_COMPLETED
+  DOMAINS_CREATE
+  DOMAINS_UPDATE
+  DOMAINS_DESTROY
+  SUBSCRIPTION_CONTRACTS_CREATE
+  SUBSCRIPTION_CONTRACTS_UPDATE
+  SUBSCRIPTION_BILLING_CYCLE_EDITS_CREATE
+  SUBSCRIPTION_BILLING_CYCLE_EDITS_UPDATE
+  SUBSCRIPTION_BILLING_CYCLE_EDITS_DELETE
+  PROFILES_CREATE
+  PROFILES_UPDATE
+  PROFILES_DELETE
+  SUBSCRIPTION_BILLING_ATTEMPTS_SUCCESS
+  SUBSCRIPTION_BILLING_ATTEMPTS_FAILURE
+  SUBSCRIPTION_BILLING_ATTEMPTS_CHALLENGED
+  RETURNS_CANCEL
+  RETURNS_CLOSE
+  RETURNS_REOPEN
+  RETURNS_REQUEST
+  RETURNS_APPROVE
+  RETURNS_UPDATE
+  RETURNS_PROCESS
+  RETURNS_DECLINE
+  REVERSE_DELIVERIES_ATTACH_DELIVERABLE
+  REVERSE_FULFILLMENT_ORDERS_DISPOSE
+  PAYMENT_TERMS_CREATE
+  PAYMENT_TERMS_DELETE
+  PAYMENT_TERMS_UPDATE
+  PAYMENT_SCHEDULES_DUE
+  SELLING_PLAN_GROUPS_CREATE
+  SELLING_PLAN_GROUPS_UPDATE
+  SELLING_PLAN_GROUPS_DELETE
+  BULK_OPERATIONS_FINISH
+  PRODUCT_FEEDS_CREATE
+  PRODUCT_FEEDS_UPDATE
+  PRODUCT_FEEDS_INCREMENTAL_SYNC
+  PRODUCT_FEEDS_FULL_SYNC
+  PRODUCT_FEEDS_FULL_SYNC_FINISH
+  MARKETS_CREATE
+  MARKETS_UPDATE
+  MARKETS_DELETE
+  ORDERS_RISK_ASSESSMENT_CHANGED
+  ORDERS_SHOPIFY_PROTECT_ELIGIBILITY_CHANGED
+  FINANCE_KYC_INFORMATION_UPDATE
+  FULFILLMENT_ORDERS_RESCHEDULED
+  PUBLICATIONS_DELETE
+  AUDIT_EVENTS_ADMIN_API_ACTIVITY
+  FULFILLMENT_ORDERS_LINE_ITEMS_PREPARED_FOR_PICKUP
+  COMPANIES_CREATE
+  COMPANIES_UPDATE
+  COMPANIES_DELETE
+  COMPANY_LOCATIONS_CREATE
+  COMPANY_LOCATIONS_UPDATE
+  COMPANY_LOCATIONS_DELETE
+  COMPANY_CONTACTS_CREATE
+  COMPANY_CONTACTS_UPDATE
+  COMPANY_CONTACTS_DELETE
+  CUSTOMERS_MERGE
+  INVENTORY_TRANSFERS_ADD_ITEMS
+  INVENTORY_TRANSFERS_UPDATE_ITEM_QUANTITIES
+  INVENTORY_TRANSFERS_REMOVE_ITEMS
+  INVENTORY_TRANSFERS_READY_TO_SHIP
+  INVENTORY_TRANSFERS_CANCEL
+  INVENTORY_TRANSFERS_COMPLETE
+  INVENTORY_TRANSFERS_UPDATED
+  INVENTORY_SHIPMENTS_DELETE
+  INVENTORY_SHIPMENTS_CREATE
+  INVENTORY_SHIPMENTS_MARK_IN_TRANSIT
+  INVENTORY_SHIPMENTS_UPDATE_TRACKING
+  INVENTORY_SHIPMENTS_ADD_ITEMS
+  INVENTORY_SHIPMENTS_UPDATE_ITEM_QUANTITIES
+  INVENTORY_SHIPMENTS_REMOVE_ITEMS
+  INVENTORY_SHIPMENTS_RECEIVE_ITEMS
+  CUSTOMER_ACCOUNT_SETTINGS_UPDATE
+  CUSTOMER_JOINED_SEGMENT
+  CUSTOMER_LEFT_SEGMENT
+  COMPANY_CONTACT_ROLES_ASSIGN
+  COMPANY_CONTACT_ROLES_REVOKE
+  SUBSCRIPTION_CONTRACTS_ACTIVATE
+  SUBSCRIPTION_CONTRACTS_PAUSE
+  SUBSCRIPTION_CONTRACTS_CANCEL
+  SUBSCRIPTION_CONTRACTS_FAIL
+  SUBSCRIPTION_CONTRACTS_EXPIRE
+  SUBSCRIPTION_BILLING_CYCLES_SKIP
+  SUBSCRIPTION_BILLING_CYCLES_UNSKIP
+  METAOBJECTS_CREATE
+  METAOBJECTS_UPDATE
+  METAOBJECTS_DELETE
+  FINANCE_APP_STAFF_MEMBER_GRANT
+  FINANCE_APP_STAFF_MEMBER_REVOKE
+  FINANCE_APP_STAFF_MEMBER_DELETE
+  FINANCE_APP_STAFF_MEMBER_UPDATE
+  DISCOUNTS_CREATE
+  DISCOUNTS_UPDATE
+  DISCOUNTS_DELETE
+  DISCOUNTS_REDEEMCODE_ADDED
+  DISCOUNTS_REDEEMCODE_REMOVED
+  METAFIELD_DEFINITIONS_CREATE
+  METAFIELD_DEFINITIONS_UPDATE
+  METAFIELD_DEFINITIONS_DELETE
+  DELIVERY_PROMISE_SETTINGS_UPDATE
+  MARKETS_BACKUP_REGION_UPDATE
+  CHECKOUT_AND_ACCOUNTS_CONFIGURATIONS_UPDATE
+}
+
+enum WebhookSubscriptionSortKeys {
+  CREATED_AT
+  ID
+}
+
+type WebhookSubscriptionConnection {
+  nodes: [WebhookSubscription!]!
+}
+
+type WebhookSubscription implements Node {
+  id: ID!
+  uri: String!
+}
+
+type Mutation {
+  fulfillmentOrderMove(
+    id: ID!
+    newLocationId: ID!
+    fulfillmentOrderLineItems: [FulfillmentOrderLineItemInput!]
+  ): FulfillmentOrderMovePayload
+  fulfillmentOrderOpen(id: ID!): FulfillmentOrderOpenPayload
+  fulfillmentOrderReleaseHold(
+    id: ID!
+    holdIds: [ID!]
+    externalId: String
+  ): FulfillmentOrderReleaseHoldPayload
+  inventorySetQuantities(
+    input: InventorySetQuantitiesInput!
+  ): InventorySetQuantitiesPayload
+  webhookSubscriptionCreate(
+    topic: WebhookSubscriptionTopic!
+    webhookSubscription: WebhookSubscriptionInput!
+  ): WebhookSubscriptionCreatePayload
+}
+
+input FulfillmentOrderLineItemInput {
+  id: ID!
+  quantity: Int!
+}
+
+type FulfillmentOrderMovePayload {
+  movedFulfillmentOrder: FulfillmentOrder
+  userErrors: [FulfillmentOrderMoveFulfillmentOrderMoveUserError!]!
+}
+
+type FulfillmentOrderMoveFulfillmentOrderMoveUserError {
+  field: [String!]
+  message: String!
+}
+
+type FulfillmentOrderOpenPayload {
+  fulfillmentOrder: FulfillmentOrder
+  userErrors: [UserError!]!
+}
+
+type UserError {
+  field: [String!]
+  message: String!
+}
+
+type FulfillmentOrderReleaseHoldPayload {
+  fulfillmentOrder: FulfillmentOrder
+  userErrors: [FulfillmentOrderReleaseHoldUserError!]!
+}
+
+type FulfillmentOrderReleaseHoldUserError {
+  field: [String!]
+  message: String!
+}
+
+input InventorySetQuantitiesInput {
+  reason: String!
+  name: String!
+  referenceDocumentUri: String
+  quantities: [InventoryQuantityInput!]!
+}
+
+input InventoryQuantityInput {
+  inventoryItemId: ID!
+  locationId: ID!
+  quantity: Int!
+  changeFromQuantity: Int
+}
+
+type InventorySetQuantitiesPayload {
+  inventoryAdjustmentGroup: InventoryAdjustmentGroup
+  userErrors: [InventorySetQuantitiesUserError!]!
+}
+
+type InventoryAdjustmentGroup implements Node {
+  changes(
+    inventoryItemIds: [ID!]
+    locationIds: [ID!]
+    quantityNames: [String!]
+  ): [InventoryChange!]!
+  id: ID!
+  reason: String!
+  referenceDocumentUri: String
+}
+
+type InventoryChange {
+  delta: Int!
+  name: String!
+  quantityAfterChange: Int
+}
+
+type InventorySetQuantitiesUserError {
+  code: InventorySetQuantitiesUserErrorCode
+  field: [String!]
+  message: String!
+}
+
+enum InventorySetQuantitiesUserErrorCode {
+  INVALID_INVENTORY_ITEM
+  INVALID_LOCATION
+  INVALID_QUANTITY_NEGATIVE
+  INVALID_REASON
+  INVALID_REFERENCE_DOCUMENT
+  ITEM_NOT_STOCKED_AT_LOCATION
+  INVALID_QUANTITY_TOO_HIGH
+  INVALID_QUANTITY_TOO_LOW
+  COMPARE_QUANTITY_REQUIRED
+  COMPARE_QUANTITY_STALE
+  CHANGE_FROM_QUANTITY_STALE
+  INVALID_NAME
+  NO_DUPLICATE_INVENTORY_ITEM_ID_GROUP_ID_PAIR
+  NON_MUTABLE_INVENTORY_ITEM
+  IDEMPOTENCY_CONCURRENT_REQUEST
+  IDEMPOTENCY_KEY_PARAMETER_MISMATCH
+  IDEMPOTENCY_PREVIOUS_ATTEMPT_FAILED
+}
+
+input WebhookSubscriptionInput {
+  format: WebhookSubscriptionFormat
+  includeFields: [String!]
+  filter: String
+  metafieldNamespaces: [String!]
+  metafields: [HasMetafieldsMetafieldIdentifierInput!]
+  name: String
+  uri: String
+}
+
+input HasMetafieldsMetafieldIdentifierInput {
+  namespace: String
+  key: String!
+}
+
+type WebhookSubscriptionCreatePayload {
+  userErrors: [UserError!]!
+  webhookSubscription: WebhookSubscription
+}
+
+type ReturnLineItem implements Node & ReturnLineItemType {
+  fulfillmentLineItem: FulfillmentLineItem!
+  id: ID!
+  quantity: Int!
+  refundedQuantity: Int!
+  returnReasonDefinition: ReturnReasonDefinition
+  withCodeDiscountedTotalPriceSet: MoneyBag!
+}
+
+type BasicEvent implements Event & Node {
+  action: String!
+  createdAt: DateTime!
+  id: ID!
+}

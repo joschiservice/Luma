@@ -117,17 +117,19 @@ try {
     const { provision } = await import('./database.mjs');
     if (command === 'reset') {
       console.log('Recreating this worktree’s local database and demo data.');
-      await compose(saved, [
-        'exec',
-        '-T',
-        'postgres',
-        'dropdb',
-        '-U',
-        'postgres',
-        '--force',
-        '--if-exists',
-        'luma',
-      ]);
+      // Simulated provider data belongs to the old workspace; the next pnpm simulator starts fresh.
+      for (const database of ['luma', 'luma_simulator'])
+        await compose(saved, [
+          'exec',
+          '-T',
+          'postgres',
+          'dropdb',
+          '-U',
+          'postgres',
+          '--force',
+          '--if-exists',
+          database,
+        ]);
       const backup = await archiveDatabaseState(stateDirectory);
       if (backup)
         console.log(`Pilot and simulator state archived to ${backup}`);

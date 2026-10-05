@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { currentPolicyVersion } from '@luma/policies';
 import { compilePlaybook, playbookHash } from '@luma/resolution/composition';
 
-import { advanceRun } from '../../apps/simulator/dist/run.js';
+import { advance, shippingMethod } from './provider.mjs';
 import { createWorker } from './runtime.mjs';
 
 /** Evaluates a pinned shipping-correction candidate and retains every scenario failure and trace. */
@@ -101,7 +101,7 @@ async function evaluateScenario(version, fixture) {
     });
     for (const command of controls.commands) {
       if (command.kind === 'advance') {
-        advanceRun(checkpoint.provider, command.ms);
+        advance(checkpoint.provider, command.ms);
         continue;
       }
       if (command.kind === 'restart') {
@@ -174,9 +174,10 @@ async function evaluateScenario(version, fixture) {
       'Outcome sequence mismatch',
     );
     assert.equal(
-      checkpoint.provider.jtl.orders.find(
-        (o) => o.id === incident.mapping.order.externalId,
-      ).shippingMethodId,
+      await shippingMethod(
+        checkpoint.provider,
+        incident.mapping.order.externalId,
+      ),
       expected.shippingMethodId,
       'Provider postcondition mismatch',
     );

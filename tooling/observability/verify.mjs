@@ -133,11 +133,11 @@ if (mode === 'simulator') {
   await response.text();
   await eventually(async () => {
     const q =
-      '{ resource.service.name = "luma-simulator" && name = "sqlite.SELECT" }';
+      '{ resource.service.name = "luma-simulator" && name = "db.SELECT" }';
     const result = await query(
       `tempo/api/search?q=${encodeURIComponent(q)}&start=${Math.floor(Date.now() / 1000) - 120}&end=${Math.floor(Date.now() / 1000)}`,
     );
-    assert(result.traces?.length, 'Missing simulator SQLite traces');
+    assert(result.traces?.length, 'Missing simulator PostgreSQL traces');
   });
   await eventually(async () => {
     const result = await query(
@@ -153,5 +153,5 @@ if (mode === 'simulator') {
       'Missing simulator profiles',
     );
   });
-  console.log('Verified simulator SQLite traces and profiles.');
+  console.log('Verified simulator PostgreSQL traces and profiles.');
 }
