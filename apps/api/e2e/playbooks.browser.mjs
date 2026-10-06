@@ -67,8 +67,7 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
   await page.getByRole('link', { name }).waitFor();
   await page.goto(`/app/${tenantId}/playbooks?q=shipping`);
   await page.waitForURL(`**/app/${tenantId}/workflows?q=shipping*`);
-  await page.getByRole('button', { name: 'Filter', exact: true }).click();
-  await page.getByRole('button', { name: 'System', exact: true }).click();
+  await page.getByRole('button', { name: 'Add System filter' }).click();
   await page.getByRole('button', { name: 'JTL Cloud', exact: true }).click();
   await page.getByRole('link', { name }).waitFor();
   await page

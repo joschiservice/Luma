@@ -497,10 +497,7 @@ export const Filter: Story = {
     const canvas = within(canvasElement);
     const page = within(canvasElement.ownerDocument.body);
     await userEvent.click(
-      await canvas.findByRole('button', { name: 'Filter' }),
-    );
-    await userEvent.click(
-      await page.findByRole('button', { name: 'Missing from' }),
+      await canvas.findByRole('button', { name: 'Add Missing from filter' }),
     );
     await userEvent.click(
       await page.findByRole('button', { name: 'JTL-Wawi' }),
@@ -514,7 +511,7 @@ export const Filter: Story = {
     await userEvent.type(search, 'apron{Enter}');
     await userEvent.click(canvas.getByRole('button', { name: 'Clear' }));
     await expect(
-      canvas.queryByRole('button', { name: /Missing from filter/ }),
+      canvas.queryByRole('button', { name: /^Edit Missing from filter/ }),
     ).toBeNull();
     await expect(search).toHaveValue('');
   },

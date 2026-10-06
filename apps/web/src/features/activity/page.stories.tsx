@@ -143,9 +143,14 @@ export const History: Story = {
 };
 
 export const Filtering: Story = {
+  globals: { viewport: { value: 'desktop' } },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const body = within(document.body);
+    const panel = within(
+      canvas.getByRole('complementary', { name: 'Filters' }),
+    );
+    const section = (name: string) =>
+      within(panel.getByRole('region', { name }));
 
     await expect(
       canvas.getByRole('searchbox', { name: 'Search activity' }),
@@ -157,24 +162,23 @@ export const Filtering: Story = {
       }),
     ).toBeVisible();
     await expect(
+      section('Recorded').getByRole('button', { name: 'Last 30 days' }),
+    ).toHaveAttribute('aria-pressed', 'true');
+    await expect(
       canvas.queryByRole('button', { name: /^Remove Recorded filter/ }),
     ).toBeNull();
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Add filter' }));
-    await userEvent.click(await body.findByRole('button', { name: 'System' }));
-    await userEvent.click(await body.findByRole('button', { name: 'Shopify' }));
+    // Every value is listed in the panel; one click applies it.
+    await userEvent.click(
+      section('System').getByRole('button', { name: 'Shopify' }),
+    );
     await expect(
       await canvas.findByRole('button', {
         name: 'Edit System filter: Shopify',
       }),
     ).toBeVisible();
-
-    await userEvent.click(canvas.getByRole('button', { name: 'Add filter' }));
     await userEvent.click(
-      await body.findByRole('button', { name: 'Connection' }),
-    );
-    await userEvent.click(
-      await body.findByRole('button', { name: 'JTL warehouse' }),
+      section('Connection').getByRole('button', { name: 'JTL warehouse' }),
     );
     await expect(
       await canvas.findByRole('button', {
@@ -182,15 +186,18 @@ export const Filtering: Story = {
       }),
     ).toBeVisible();
 
-    await userEvent.click(
-      canvas.getByRole('button', {
-        name: 'Edit Recorded filter: Last 30 days',
-      }),
+    await userEvent.click(section('Recorded').getByText('Custom range'));
+    await userEvent.type(
+      section('Recorded').getByLabelText('From'),
+      '2026-09-01',
     );
-    const from = await body.findByLabelText('From');
-    await userEvent.type(from, '2026-09-01');
-    await userEvent.type(body.getByLabelText('Through'), '2026-09-22');
-    await userEvent.click(body.getByRole('button', { name: 'Apply range' }));
+    await userEvent.type(
+      section('Recorded').getByLabelText('Through'),
+      '2026-09-22',
+    );
+    await userEvent.click(
+      section('Recorded').getByRole('button', { name: 'Apply range' }),
+    );
     await userEvent.click(
       await canvas.findByRole('button', {
         name: 'Remove Recorded filter: Sep 1 – Sep 22, 2026',
@@ -206,6 +213,9 @@ export const Filtering: Story = {
     await expect(
       canvas.queryByRole('button', { name: /^Edit System filter/ }),
     ).toBeNull();
+    await expect(
+      section('System').getByRole('button', { name: 'Any' }),
+    ).toHaveAttribute('aria-pressed', 'true');
   },
 };
 

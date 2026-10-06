@@ -1,32 +1,27 @@
 import {
   ArrowDownUp,
-  ArrowLeft,
-  Check,
-  ChevronRight,
   ListFilter,
-  type LucideIcon,
+  Plus,
   RefreshCw,
   Search,
   X,
 } from 'lucide-react';
-import {
-  type ReactNode,
-  type RefObject,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 
-import {
-  calendarPresets,
-  type CalendarRange,
-  calendarRangeError,
-  describeCalendarRange,
-} from '../../lib/date-range';
 import { cn } from '../../lib/utils';
 import { Badge } from './badge';
 import { Button } from './button';
+import {
+  clearFilter,
+  type CollectionFilter,
+  type CollectionFilterOption,
+  filterApplied,
+  FilterEditor,
+  FilterFields,
+  filterOffered,
+  filterValueLabel,
+  FocusFirst,
+} from './collection-filters';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,52 +35,10 @@ import {
 import { Input } from './input';
 import { ResponsivePopover } from './responsive-popover';
 
-export interface CollectionFilterOption {
-  value: string;
-  label: string;
-}
-
-interface FilterBase {
-  /** Unique within the toolbar. */
-  key: string;
-  /** The filter category, such as "Status". */
-  label: string;
-  icon?: LucideIcon | undefined;
-}
-
-/**
- * One filter the toolbar can present.
- *
- * - `choice` picks one option. It can be added from the filter menu while unset.
- * - `date-range` picks an inclusive calendar range with presets ending `today`. With `fallback`
- *   it always applies: the chip shows the fallback name and cannot be removed.
- * - `applied` is set elsewhere, such as from a link to one SKU. It shows as a removable chip
- *   while `value` is set and is never offered in the filter menu.
- */
-export type CollectionFilter =
-  | (FilterBase & {
-      kind: 'choice';
-      value: string | undefined;
-      options: readonly CollectionFilterOption[];
-      onChange: (value: string | undefined) => void;
-    })
-  | (FilterBase & {
-      kind: 'date-range';
-      from: string | undefined;
-      to: string | undefined;
-      /** Today's ISO calendar date in the workspace timezone. */
-      today: string;
-      /** The longest inclusive range the collection accepts. */
-      maxDays?: number | undefined;
-      /** Names the range applied when none is chosen, such as "Last 30 days". */
-      fallback?: string | undefined;
-      onChange: (range: CalendarRange) => void;
-    })
-  | (FilterBase & {
-      kind: 'applied';
-      value: string | undefined;
-      onRemove: () => void;
-    });
+export type {
+  CollectionFilter,
+  CollectionFilterOption,
+} from './collection-filters';
 
 /** Free-text search committed to the caller after typing pauses, or at once on Enter. */
 export interface CollectionSearch {
@@ -154,50 +107,21 @@ export function CollectionViews<Value extends string>({
 
 const searchDelay = 300;
 
-function applied(filter: CollectionFilter) {
-  if (filter.kind === 'date-range') return !!(filter.from || filter.to);
-
-  return filter.value !== undefined;
-}
-
-function shown(filter: CollectionFilter) {
-  return applied(filter) || (filter.kind === 'date-range' && !!filter.fallback);
-}
-
-function addable(filter: CollectionFilter) {
-  if (shown(filter)) return false;
-  if (filter.kind === 'choice') return filter.options.length > 0;
-
-  return filter.kind === 'date-range';
-}
-
-function valueLabel(filter: CollectionFilter) {
-  if (filter.kind === 'choice')
-    return (
-      filter.options.find((option) => option.value === filter.value)?.label ??
-      filter.value ??
-      ''
-    );
-  if (filter.kind === 'date-range')
-    return applied(filter)
-      ? describeCalendarRange(filter, filter.today)
-      : (filter.fallback ?? '');
-
-  return filter.value ?? '';
-}
-
-function clear(filter: CollectionFilter) {
-  if (filter.kind === 'choice') filter.onChange(undefined);
-  else if (filter.kind === 'date-range') filter.onChange({});
-  else filter.onRemove();
+/** A chip shows the applied value; a fallback date range always applies and is shown too. */
+function chipped(filter: CollectionFilter) {
+  return (
+    filterApplied(filter) || (filter.kind === 'date-range' && !!filter.fallback)
+  );
 }
 
 /**
- * Lays out a collection's controls in the shared order: views and Refresh; then search, filter
- * chips with an Add filter menu, page actions and sort. Without views, Refresh ends the second
- * row. Applied filters are always visible as chips; choosing a chip edits it and its remove
- * button clears it. The toolbar owns no filter state: every change is reported to the caller,
- * which owns the URL and fetching.
+ * Lays out a collection's controls in the shared order: views and Refresh; then search, one pill
+ * per filter, page actions and sort. Without views, Refresh ends the second row. Every offered
+ * filter is visible: unset filters are quiet pills that open their values in one click, applied
+ * filters are chips that edit the value and remove it. On small screens unset pills give way to
+ * one Filters button that lists every filter in a sheet. With `panel`, the collection sits in a
+ * `CollectionFilterPanel`; on wide screens the toolbar then shows only applied chips. The toolbar
+ * owns no filter state: every change is reported to the caller, which owns the URL and fetching.
  */
 export function CollectionToolbar({
   className,
@@ -206,6 +130,7 @@ export function CollectionToolbar({
   filters = [],
   sort,
   actions,
+  panel = false,
   onClear,
   onRefresh,
   refreshing = false,
@@ -218,6 +143,8 @@ export function CollectionToolbar({
   sort?: CollectionSort | undefined;
   /** Display controls for the collection, such as grouping. */
   actions?: ReactNode;
+  /** The filters are also listed in a docked `CollectionFilterPanel`. */
+  panel?: boolean;
   /** Clears search and every removable filter; shown while any is applied. */
   onClear?: (() => void) | undefined;
   onRefresh: () => void;
@@ -226,11 +153,14 @@ export function CollectionToolbar({
 }) {
   const root = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState<string | null>(null);
-  const [adding, setAdding] = useState<string | null>(null);
-  const chips = filters.filter(shown);
-  const available = filters.filter(addable);
-  const addingFilter = available.find((filter) => filter.key === adding);
-  const clearable = !!search?.value || filters.some(applied);
+  const offered = filters.filter(filterOffered);
+  const shown = filters.filter(
+    (filter) => chipped(filter) || filterOffered(filter),
+  );
+  const appliedCount = filters.filter(filterApplied).length;
+  const clearable = !!search?.value || appliedCount > 0;
+  const openChange = (key: string) => (next: boolean) =>
+    setOpen(next ? key : null);
 
   const refresh = (
     <Button
@@ -249,20 +179,30 @@ export function CollectionToolbar({
     </Button>
   );
 
-  // After a chip disappears, focus moves to the filter menu, or to search when every filter is set.
-  function restoreFocus() {
+  // After a change removes the focused control, focus the filter's pill when it is visible, else
+  // the Filters button, the first pill or search, whichever this layout shows.
+  function restoreFocus(key?: string) {
     requestAnimationFrame(() => {
-      const find = (selector: string) =>
-        root.current?.querySelector<HTMLElement>(selector);
-      (
-        find('.collection-filter-add') ??
-        find('.collection-toolbar-search input')
-      )?.focus();
+      const selectors = [
+        key ? `[data-filter="${CSS.escape(key)}"] > [data-slot='button']` : '',
+        '.collection-filter-sheet-trigger',
+        ".collection-filter-pill > [data-slot='button']",
+        '.collection-toolbar-search input',
+      ].filter(Boolean);
+      for (const selector of selectors)
+        for (const element of root.current?.querySelectorAll<HTMLElement>(
+          selector,
+        ) ?? [])
+          if (element.getClientRects().length) return element.focus();
     });
   }
 
   return (
-    <div className={cn('collection-toolbar', className)} ref={root}>
+    <div
+      className={cn('collection-toolbar', className)}
+      data-panel={panel || undefined}
+      ref={root}
+    >
       {views ? (
         <div className="collection-toolbar-views">
           {views}
@@ -271,77 +211,67 @@ export function CollectionToolbar({
       ) : null}
       <div className="collection-toolbar-controls">
         {search ? <SearchField {...search} /> : null}
-        {chips.length || available.length || clearable ? (
+        {shown.length || clearable ? (
           <div
             className="collection-toolbar-filters"
             role="group"
             aria-label="Filters"
           >
-            {chips.map((filter) => (
-              <FilterChip
-                key={filter.key}
-                filter={filter}
-                open={open === filter.key}
-                onOpenChange={(next) => setOpen(next ? filter.key : null)}
-                onRemove={() => {
-                  clear(filter);
-                  restoreFocus();
-                }}
-              />
-            ))}
-            {available.length ? (
+            {shown.map((filter) =>
+              chipped(filter) ? (
+                <FilterChip
+                  key={filter.key}
+                  filter={filter}
+                  open={open === filter.key}
+                  onOpenChange={openChange(filter.key)}
+                  onRemove={() => {
+                    clearFilter(filter);
+                    restoreFocus(filter.key);
+                  }}
+                />
+              ) : (
+                <FilterPill
+                  key={filter.key}
+                  filter={filter}
+                  open={open === filter.key}
+                  onOpenChange={openChange(filter.key)}
+                  done={() => {
+                    setOpen(null);
+                    restoreFocus(filter.key);
+                  }}
+                />
+              ),
+            )}
+            {offered.length ? (
               <ResponsivePopover
-                title={addingFilter?.label ?? 'Add filter'}
-                open={open === 'add'}
-                onOpenChange={(next) => {
-                  setOpen(next ? 'add' : null);
-                  if (next) setAdding(null);
-                }}
+                title="Filters"
+                open={open === 'sheet'}
+                onOpenChange={openChange('sheet')}
                 trigger={
-                  <Button variant="ghost" className="collection-filter-add">
+                  <Button
+                    variant="ghost"
+                    className="collection-filter-sheet-trigger"
+                    aria-label={
+                      appliedCount
+                        ? `Filters, ${appliedCount} applied`
+                        : 'Filters'
+                    }
+                  >
                     <ListFilter aria-hidden="true" />
-                    {chips.length ? 'Add filter' : 'Filter'}
+                    Filters
+                    {appliedCount ? <Badge>{appliedCount}</Badge> : null}
                   </Button>
                 }
               >
-                {addingFilter ? (
-                  <>
-                    <Button
-                      variant="ghost"
-                      className="collection-filter-back"
-                      onClick={() => setAdding(null)}
-                    >
-                      <ArrowLeft aria-hidden="true" /> All filters
-                    </Button>
-                    <FilterEditor
-                      filter={addingFilter}
-                      done={() => {
-                        setOpen(null);
-                        restoreFocus();
-                      }}
-                    />
-                  </>
-                ) : (
-                  <FocusFirst className="collection-filter-options">
-                    {available.map((filter) => {
-                      const Icon = filter.icon;
-
-                      return (
-                        <Button
-                          key={filter.key}
-                          variant="ghost"
-                          onClick={() => setAdding(filter.key)}
-                        >
-                          <span className="collection-filter-category">
-                            {Icon ? <Icon aria-hidden="true" /> : null}
-                            {filter.label}
-                          </span>
-                          <ChevronRight aria-hidden="true" />
-                        </Button>
-                      );
-                    })}
-                  </FocusFirst>
-                )}
+                <FocusFirst>
+                  <FilterFields filters={offered} />
+                </FocusFirst>
+                <Button
+                  className="collection-filter-sheet-done"
+                  onClick={() => setOpen(null)}
+                >
+                  Done
+                </Button>
               </ResponsivePopover>
             ) : null}
             {clearable && onClear ? (
@@ -432,6 +362,40 @@ function SearchField({
   );
 }
 
+/** An unset filter: one click lists its values. */
+function FilterPill({
+  filter,
+  open,
+  onOpenChange,
+  done,
+}: {
+  filter: CollectionFilter;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  done: () => void;
+}) {
+  return (
+    <div className="collection-filter-pill" data-filter={filter.key}>
+      <ResponsivePopover
+        title={filter.label}
+        open={open}
+        onOpenChange={onOpenChange}
+        trigger={
+          <Button variant="ghost" aria-label={`Add ${filter.label} filter`}>
+            <Plus aria-hidden="true" />
+            {filter.label}
+          </Button>
+        }
+      >
+        <FocusFirst>
+          <FilterEditor filter={filter} done={done} />
+        </FocusFirst>
+      </ResponsivePopover>
+    </div>
+  );
+}
+
+/** An applied filter: the value edits it and the remove button returns it to its default. */
 function FilterChip({
   filter,
   open,
@@ -443,7 +407,7 @@ function FilterChip({
   onOpenChange: (open: boolean) => void;
   onRemove: () => void;
 }) {
-  const value = valueLabel(filter);
+  const value = filterValueLabel(filter);
   const content = (
     <>
       <span className="collection-filter-label">{filter.label}:</span> {value}
@@ -451,7 +415,11 @@ function FilterChip({
   );
 
   return (
-    <div className="collection-filter-chip" data-kind={filter.kind}>
+    <div
+      className="collection-filter-chip"
+      data-kind={filter.kind}
+      data-filter={filter.key}
+    >
       {filter.kind === 'applied' ? (
         <span className="collection-filter-static">{content}</span>
       ) : (
@@ -468,10 +436,12 @@ function FilterChip({
             </Button>
           }
         >
-          <FilterEditor filter={filter} done={() => onOpenChange(false)} />
+          <FocusFirst>
+            <FilterEditor filter={filter} done={() => onOpenChange(false)} />
+          </FocusFirst>
         </ResponsivePopover>
       )}
-      {applied(filter) ? (
+      {filterApplied(filter) ? (
         <Button
           variant="ghost"
           size="icon"
@@ -482,162 +452,6 @@ function FilterChip({
         </Button>
       ) : null}
     </div>
-  );
-}
-
-function FilterEditor({
-  filter,
-  done,
-}: {
-  filter: CollectionFilter;
-  done: () => void;
-}) {
-  if (filter.kind === 'choice')
-    return <ChoiceOptions filter={filter} done={done} />;
-  if (filter.kind === 'date-range')
-    return <DateRangeForm filter={filter} done={done} />;
-
-  return null;
-}
-
-/** Long option lists get a filter field so the reader can narrow them by typing. */
-const searchableOptions = 8;
-
-function ChoiceOptions({
-  filter,
-  done,
-}: {
-  filter: Extract<CollectionFilter, { kind: 'choice' }>;
-  done: () => void;
-}) {
-  const [query, setQuery] = useState('');
-  const options = filter.options.filter((option) =>
-    option.label.toLowerCase().includes(query.trim().toLowerCase()),
-  );
-
-  return (
-    <FocusFirst
-      className="collection-filter-options"
-      aria-label={`${filter.label} options`}
-    >
-      {filter.options.length > searchableOptions ? (
-        <Input
-          type="search"
-          aria-label={`Find ${filter.label.toLowerCase()}`}
-          placeholder={`Find ${filter.label.toLowerCase()}…`}
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        />
-      ) : null}
-      {options.map((option) => (
-        <Button
-          key={option.value}
-          variant="ghost"
-          aria-pressed={filter.value === option.value}
-          onClick={() => {
-            filter.onChange(option.value);
-            done();
-          }}
-        >
-          <span className="truncate">{option.label}</span>
-          {filter.value === option.value ? <Check aria-hidden="true" /> : null}
-        </Button>
-      ))}
-      {!options.length ? (
-        <p className="collection-filter-none">No matching options</p>
-      ) : null}
-    </FocusFirst>
-  );
-}
-
-function DateRangeForm({
-  filter,
-  done,
-}: {
-  filter: Extract<CollectionFilter, { kind: 'date-range' }>;
-  done: () => void;
-}) {
-  const [from, setFrom] = useState(filter.from ?? '');
-  const [to, setTo] = useState(filter.to ?? '');
-  const [error, setError] = useState<string>();
-  const required = !!filter.fallback;
-  const presets = calendarPresets(filter.today).filter(
-    (preset) =>
-      !filter.maxDays ||
-      !calendarRangeError(preset, { maxDays: filter.maxDays }),
-  );
-  const apply = (range: CalendarRange) => {
-    filter.onChange(range);
-    done();
-  };
-
-  return (
-    <FocusFirst className="collection-filter-dates">
-      <div
-        className="collection-filter-options"
-        aria-label={`${filter.label} presets`}
-      >
-        {presets.map((preset) => {
-          const active = preset.from === filter.from && preset.to === filter.to;
-
-          return (
-            <Button
-              key={preset.label}
-              variant="ghost"
-              aria-pressed={active}
-              onClick={() => apply({ from: preset.from, to: preset.to })}
-            >
-              {preset.label}
-              {active ? <Check aria-hidden="true" /> : null}
-            </Button>
-          );
-        })}
-      </div>
-      <form
-        className="collection-filter-custom"
-        noValidate
-        onSubmit={(event) => {
-          event.preventDefault();
-          const range = { from: from || undefined, to: to || undefined };
-          const problem = calendarRangeError(range, {
-            required,
-            maxDays: filter.maxDays,
-          });
-          setError(problem);
-          if (!problem) apply(range);
-        }}
-      >
-        <p className="collection-filter-heading">Custom range</p>
-        <label>
-          <span>From</span>
-          <Input
-            type="date"
-            value={from}
-            max={to || filter.today}
-            required={required}
-            onChange={(event) => setFrom(event.target.value)}
-          />
-        </label>
-        <label>
-          <span>Through</span>
-          <Input
-            type="date"
-            value={to}
-            min={from || undefined}
-            required={required}
-            onChange={(event) => setTo(event.target.value)}
-          />
-        </label>
-        {error ? (
-          <p className="collection-filter-error" role="alert">
-            {error}
-          </p>
-        ) : null}
-        <Button type="submit" variant="outline" size="sm">
-          Apply range
-        </Button>
-      </form>
-    </FocusFirst>
   );
 }
 
@@ -703,35 +517,4 @@ function SortMenu({ sort }: { sort: CollectionSort }) {
       </DropdownMenuContent>
     </DropdownMenu>
   );
-}
-
-/** Moves focus to the first control when a picker step opens. */
-function FocusFirst({
-  className,
-  children,
-  'aria-label': ariaLabel,
-}: {
-  className: string;
-  children: ReactNode;
-  'aria-label'?: string;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  useFocusFirst(ref);
-
-  return (
-    <div className={className} ref={ref} aria-label={ariaLabel}>
-      {children}
-    </div>
-  );
-}
-
-function useFocusFirst(ref: RefObject<HTMLElement | null>) {
-  useLayoutEffect(() => {
-    const focus = () =>
-      ref.current?.querySelector<HTMLElement>('input, button')?.focus();
-    focus();
-    const frame = requestAnimationFrame(focus);
-
-    return () => cancelAnimationFrame(frame);
-  }, [ref]);
 }

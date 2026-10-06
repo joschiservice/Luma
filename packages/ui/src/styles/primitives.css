@@ -1092,22 +1092,48 @@
   font-weight: 400;
 }
 
-.collection-filter-add[data-slot='button'],
+.collection-filter-pill > [data-slot='button'],
+.collection-filter-sheet-trigger[data-slot='button'],
 .collection-filter-clear[data-slot='button'] {
   height: 26px;
+  gap: 4px;
   padding-inline: 9px;
   border-radius: 999px;
   font-size: 12px;
 }
 
-.collection-filter-add[data-slot='button'] {
+/* Unset filters are dashed so they read as available rather than applied. */
+.collection-filter-pill > [data-slot='button'] {
+  padding-left: 7px;
+  border: 1px dashed var(--line-strong);
+  color: var(--foreground-muted);
+}
+
+.collection-filter-sheet-trigger[data-slot='button'] {
   box-shadow: inset 0 0 0 1px var(--line-strong);
   color: var(--foreground-muted);
 }
 
-.collection-filter-add[data-slot='button'] svg {
-  width: 14px;
-  height: 14px;
+.collection-filter-pill > [data-slot='button'] svg,
+.collection-filter-sheet-trigger[data-slot='button'] svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* Small screens list every filter in one sheet; desktop shows each filter as its own pill. */
+.collection-filter-sheet-trigger[data-slot='button'] {
+  display: none;
+}
+
+.collection-filter-sheet-trigger [data-slot='badge'] {
+  min-width: 18px;
+  height: 18px;
+  padding-inline: 5px;
+}
+
+.collection-filter-sheet-done[data-slot='button'] {
+  width: 100%;
+  margin-top: 12px;
 }
 
 .collection-toolbar-display {
@@ -1133,21 +1159,13 @@
   text-align: left;
 }
 
+.collection-filter-options [data-slot='button'][aria-pressed='true'] {
+  background: var(--muted);
+  color: var(--foreground);
+}
+
 .collection-filter-options > [data-slot='input'] {
   margin-bottom: 4px;
-}
-
-.collection-filter-category {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.collection-filter-back[data-slot='button'] {
-  justify-content: flex-start;
-  width: 100%;
-  margin-bottom: 4px;
-  color: var(--foreground-muted);
 }
 
 .collection-filter-custom {
@@ -1193,10 +1211,130 @@
   font-size: 12px;
 }
 
+/* Filter fields: every filter under its heading, in the filters sheet and the docked panel. */
+.collection-filter-fields {
+  display: grid;
+  gap: 14px;
+}
+
+.collection-filter-section {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.collection-filter-section + .collection-filter-section {
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.collection-filter-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding-inline: 6px;
+  color: var(--foreground-subtle);
+  font-size: 11px;
+  font-weight: 550;
+}
+
+.collection-filter-section-heading svg {
+  width: 13px;
+  height: 13px;
+}
+
+.collection-filter-section .collection-filter-options [data-slot='button'] {
+  height: 28px;
+  font-size: 12px;
+}
+
+/* Listed together, selections read from the check and weight; a fill on every Any is noise. */
+.collection-filter-section
+  .collection-filter-options
+  [data-slot='button'][aria-pressed='true'] {
+  background: transparent;
+  font-weight: 600;
+}
+
+.collection-filter-section
+  .collection-filter-options
+  [data-slot='button'][aria-pressed='true']:hover {
+  background: var(--accent);
+}
+
+.collection-filter-custom-toggle[data-slot='disclosure'] > summary {
+  padding: 6px;
+  color: var(--foreground-muted);
+  font-size: 12px;
+}
+
+.collection-filter-custom-toggle .collection-filter-custom {
+  margin-top: 0;
+  padding-top: 4px;
+  border-top: 0;
+}
+
+/* Docked filter panel: shown beside the collection on wide screens only. */
+.collection-panel-layout {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+
+.collection-panel-main {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  min-width: 0;
+}
+
+.collection-filter-panel {
+  display: none;
+}
+
+.collection-filter-panel-title {
+  margin: 0 0 10px;
+  padding-inline: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+@media (min-width: 1180px) {
+  .collection-panel-layout {
+    grid-template-columns: 224px minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .collection-filter-panel {
+    position: sticky;
+    top: 16px;
+    display: block;
+    max-height: calc(100dvh - 32px);
+    overflow: auto;
+    padding: 12px 8px;
+    border-radius: var(--radius-panel);
+    background: var(--surface-raised);
+    box-shadow: var(--shadow-panel);
+  }
+
+  .collection-toolbar[data-panel] .collection-filter-pill {
+    display: none;
+  }
+}
+
 @media (max-width: 760px) {
   .collection-toolbar-search,
   .collection-toolbar-filters {
     flex-basis: 100%;
+  }
+
+  .collection-filter-pill {
+    display: none;
+  }
+
+  .collection-filter-sheet-trigger[data-slot='button'] {
+    display: inline-flex;
   }
 
   .collection-toolbar-display {
@@ -1223,7 +1361,8 @@
 
   .collection-filter-chip > [data-slot='button'],
   .collection-filter-static,
-  .collection-filter-add[data-slot='button'],
+  .collection-filter-pill > [data-slot='button'],
+  .collection-filter-sheet-trigger[data-slot='button'],
   .collection-filter-clear[data-slot='button'] {
     min-height: 36px;
   }
