@@ -590,8 +590,9 @@ export const Filters: Story = {
     await expect(
       canvas.getByRole('link', { name: 'Review 1 waiting decision' }),
     ).toBeVisible();
-    await userEvent.click(canvas.getByRole('button', { name: 'Filter' }));
-    await userEvent.click(await body.findByRole('button', { name: 'System' }));
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Add System filter' }),
+    );
     await userEvent.click(await body.findByRole('button', { name: 'Luma' }));
     await expect(
       canvas.queryByRole('link', { name: summary.name }),

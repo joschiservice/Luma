@@ -171,8 +171,7 @@ test('finds an order by number or SKU, explains it and pages a historical import
   await page.getByRole('link', { name: '#2003' }).waitFor();
   await page.getByRole('button', { name: 'All orders' }).click();
 
-  await page.getByRole('button', { name: 'Filter', exact: true }).click();
-  await page.getByRole('button', { name: 'Status' }).click();
+  await page.getByRole('button', { name: 'Add Status filter' }).click();
   await page.getByRole('button', { name: 'Open', exact: true }).click();
   await page
     .getByRole('button', { name: 'Edit Status filter: Open' })

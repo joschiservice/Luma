@@ -3,6 +3,10 @@ import { CalendarDays, CircleDot, Plug } from 'lucide-react';
 import { useState } from 'react';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 
+import {
+  type CollectionFilter,
+  CollectionFilterPanel,
+} from './collection-filters';
 import { CollectionToolbar, CollectionViews } from './collection-toolbar';
 
 const today = '2026-10-06';
@@ -19,7 +23,14 @@ interface State {
   direction: 'asc' | 'desc';
 }
 
-function Toolbar({ initial }: { initial?: Partial<State> }) {
+function Toolbar({
+  initial,
+  panel = false,
+}: {
+  initial?: Partial<State>;
+  /** Also lists the filters in a docked panel, as Activity does. */
+  panel?: boolean;
+}) {
   const [state, setState] = useState<State>({
     view: 'all',
     sort: 'updated',
@@ -28,8 +39,52 @@ function Toolbar({ initial }: { initial?: Partial<State> }) {
   });
   const update = (patch: Partial<State>) =>
     setState((previous) => ({ ...previous, ...patch }));
+  const filters: CollectionFilter[] = [
+    {
+      kind: 'choice',
+      key: 'status',
+      label: 'Status',
+      icon: CircleDot,
+      value: state.status,
+      options: [
+        { value: 'open', label: 'Open' },
+        { value: 'completed', label: 'Completed' },
+      ],
+      onChange: (status) => update({ status }),
+    },
+    {
+      kind: 'choice',
+      key: 'source',
+      label: 'Source',
+      icon: Plug,
+      value: state.source,
+      options: Array.from({ length: 10 }, (_, index) => ({
+        value: `store-${index + 1}`,
+        label: `Store ${index + 1}`,
+      })),
+      onChange: (source) => update({ source }),
+    },
+    {
+      kind: 'date-range',
+      key: 'placed',
+      label: 'Placed',
+      icon: CalendarDays,
+      from: state.from,
+      to: state.to,
+      today,
+      maxDays: 366,
+      onChange: (range) => update({ from: range.from, to: range.to }),
+    },
+    {
+      kind: 'applied',
+      key: 'sku',
+      label: 'SKU',
+      value: state.sku,
+      onRemove: () => update({ sku: undefined }),
+    },
+  ];
 
-  return (
+  const toolbar = (
     <div style={{ display: 'grid', gap: 12 }}>
       <CollectionToolbar
         views={
@@ -50,50 +105,8 @@ function Toolbar({ initial }: { initial?: Partial<State> }) {
           label: 'Search orders',
           placeholder: 'Order number, source ID or SKU…',
         }}
-        filters={[
-          {
-            kind: 'choice',
-            key: 'status',
-            label: 'Status',
-            icon: CircleDot,
-            value: state.status,
-            options: [
-              { value: 'open', label: 'Open' },
-              { value: 'completed', label: 'Completed' },
-            ],
-            onChange: (status) => update({ status }),
-          },
-          {
-            kind: 'choice',
-            key: 'source',
-            label: 'Source',
-            icon: Plug,
-            value: state.source,
-            options: Array.from({ length: 10 }, (_, index) => ({
-              value: `store-${index + 1}`,
-              label: `Store ${index + 1}`,
-            })),
-            onChange: (source) => update({ source }),
-          },
-          {
-            kind: 'date-range',
-            key: 'placed',
-            label: 'Placed',
-            icon: CalendarDays,
-            from: state.from,
-            to: state.to,
-            today,
-            maxDays: 366,
-            onChange: (range) => update({ from: range.from, to: range.to }),
-          },
-          {
-            kind: 'applied',
-            key: 'sku',
-            label: 'SKU',
-            value: state.sku,
-            onRemove: () => update({ sku: undefined }),
-          },
-        ]}
+        filters={filters}
+        panel={panel}
         sort={{
           value: state.sort,
           options: [
@@ -122,6 +135,12 @@ function Toolbar({ initial }: { initial?: Partial<State> }) {
       </output>
     </div>
   );
+
+  return panel ? (
+    <CollectionFilterPanel filters={filters}>{toolbar}</CollectionFilterPanel>
+  ) : (
+    toolbar
+  );
 }
 
 const meta = {
@@ -148,18 +167,27 @@ export const Default: Story = {
     );
     await expect(applied(canvasElement)).toHaveTextContent('"q":"TOTE"');
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Filter' }));
-    await userEvent.click(await body.findByRole('button', { name: 'Status' }));
+    // Every filter is visible while unset and opens its values in one click.
+    for (const name of ['Status', 'Source', 'Placed'])
+      await expect(
+        canvas.getByRole('button', { name: `Add ${name} filter` }),
+      ).toBeVisible();
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Add Status filter' }),
+    );
     await userEvent.click(await body.findByRole('button', { name: 'Open' }));
     await expect(
       canvas.getByRole('button', { name: 'Edit Status filter: Open' }),
     ).toBeVisible();
+    await waitFor(() =>
+      expect(
+        canvas.getByRole('button', { name: 'Edit Status filter: Open' }),
+      ).toHaveFocus(),
+    );
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Add filter' }));
-    await expect(
-      body.queryByRole('button', { name: 'Status' }),
-    ).not.toBeInTheDocument();
-    await userEvent.click(await body.findByRole('button', { name: 'Source' }));
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Add Source filter' }),
+    );
     await userEvent.type(
       await body.findByRole('searchbox', { name: 'Find source' }),
       '10',
@@ -173,8 +201,16 @@ export const Default: Story = {
       canvas.getByRole('button', { name: 'Remove Status filter: Open' }),
     );
     await waitFor(() =>
-      expect(canvas.getByRole('button', { name: 'Add filter' })).toHaveFocus(),
+      expect(
+        canvas.getByRole('button', { name: 'Add Status filter' }),
+      ).toHaveFocus(),
     );
+
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Edit Source filter: Store 10' }),
+    );
+    await userEvent.click(await body.findByRole('button', { name: 'Any' }));
+    await expect(applied(canvasElement)).not.toHaveTextContent('"source"');
 
     await userEvent.click(canvas.getByRole('button', { name: 'Clear' }));
     await expect(applied(canvasElement)).not.toHaveTextContent('"q"');
@@ -189,8 +225,9 @@ export const DateRange: Story = {
     const canvas = within(canvasElement);
     const body = within(document.body);
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Filter' }));
-    await userEvent.click(await body.findByRole('button', { name: 'Placed' }));
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Add Placed filter' }),
+    );
     await userEvent.click(
       await body.findByRole('button', { name: 'Last 7 days' }),
     );
@@ -250,4 +287,74 @@ export const AppliedFromLink: Story = {
 export const Narrow: Story = {
   args: { initial: { status: 'open', from: '2026-10-06', to: '2026-10-06' } },
   globals: { viewport: { value: 'mobile1' } },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const body = within(document.body);
+
+    // Applied values stay visible as chips; one sheet lists every filter.
+    await expect(
+      canvas.getByRole('button', { name: 'Edit Status filter: Open' }),
+    ).toBeVisible();
+    await expect(
+      canvas.queryByRole('button', { name: 'Add Source filter' }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Filters, 2 applied' }),
+    );
+    const sheet = within(await body.findByRole('dialog', { name: 'Filters' }));
+    await userEvent.click(
+      within(sheet.getByRole('region', { name: 'Status' })).getByRole(
+        'button',
+        { name: 'Completed' },
+      ),
+    );
+    await userEvent.click(sheet.getByRole('button', { name: 'Done' }));
+    await expect(applied(canvasElement)).toHaveTextContent(
+      '"status":"completed"',
+    );
+    await expect(
+      canvas.getByRole('button', { name: 'Edit Status filter: Completed' }),
+    ).toBeVisible();
+  },
+};
+
+export const FilterPanel: Story = {
+  args: { panel: true, initial: { status: 'open' } },
+  globals: { viewport: { value: 'desktop' } },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const panel = within(
+      canvas.getByRole('complementary', { name: 'Filters' }),
+    );
+
+    // Every value is one click away; applied values also stay as chips by the results.
+    await expect(
+      canvas.queryByRole('button', { name: 'Add Source filter' }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(
+      within(panel.getByRole('region', { name: 'Status' })).getByRole(
+        'button',
+        { name: 'Completed' },
+      ),
+    );
+    await expect(
+      canvas.getByRole('button', { name: 'Edit Status filter: Completed' }),
+    ).toBeVisible();
+    await userEvent.click(
+      within(panel.getByRole('region', { name: 'Placed' })).getByRole(
+        'button',
+        { name: 'Last 30 days' },
+      ),
+    );
+    await expect(applied(canvasElement)).toHaveTextContent(
+      '"from":"2026-09-07","to":"2026-10-06"',
+    );
+    await userEvent.click(
+      within(panel.getByRole('region', { name: 'Status' })).getByRole(
+        'button',
+        { name: 'Any' },
+      ),
+    );
+    await expect(applied(canvasElement)).not.toHaveTextContent('"status"');
+  },
 };

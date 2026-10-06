@@ -405,12 +405,7 @@ export const Filter: Story = {
     const canvas = within(canvasElement);
     const page = within(canvasElement.ownerDocument.body);
     await userEvent.click(
-      await canvas.findByRole('button', { name: 'Filter' }),
-    );
-    await userEvent.click(
-      within(await page.findByRole('dialog')).getByRole('button', {
-        name: 'Status',
-      }),
+      await canvas.findByRole('button', { name: 'Add Status filter' }),
     );
     await userEvent.click(
       within(await page.findByRole('dialog')).getByRole('button', {
@@ -420,11 +415,8 @@ export const Filter: Story = {
     await expect(
       await canvas.findByRole('button', { name: 'Edit Status filter: Open' }),
     ).toBeVisible();
-    await userEvent.click(canvas.getByRole('button', { name: 'Add filter' }));
     await userEvent.click(
-      within(await page.findByRole('dialog')).getByRole('button', {
-        name: 'Placed',
-      }),
+      canvas.getByRole('button', { name: 'Add Placed filter' }),
     );
     await userEvent.click(
       within(await page.findByRole('dialog')).getByRole('button', {
@@ -444,7 +436,7 @@ export const Filter: Story = {
     ).toBeNull();
     await userEvent.click(canvas.getByRole('button', { name: 'Clear' }));
     await expect(
-      canvas.queryByRole('button', { name: /Placed filter/ }),
+      canvas.queryByRole('button', { name: /^Edit Placed filter/ }),
     ).toBeNull();
   },
 };

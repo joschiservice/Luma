@@ -8,6 +8,7 @@ import {
 } from '@luma/api-contract';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
+import { CollectionFilterPanel } from '@luma/ui/components/primitives/collection-filters';
 import {
   type CollectionFilter,
   CollectionToolbar,
@@ -243,112 +244,37 @@ export function ActivityView({
         title="Activity"
         description="Actions, decisions and results recorded in this workspace, newest first."
       />
-      <CollectionToolbar
-        search={{
-          value: filters.q,
-          onChange: (q) => update({ q }),
-          label: 'Search activity',
-          placeholder: 'Issue, resource, action, actor or run ID…',
-          maxLength: 200,
-        }}
-        filters={toolbarFilters}
-        onClear={() => change({})}
-        onRefresh={refresh}
-        refreshing={refreshing}
-        refreshLabel="Refresh activity"
-      />
-      <p className="activity-coverage">
-        {page ? `${page.coverage} ` : null}Search matches issue IDs, resource
-        references, action labels, actor IDs and workflow run IDs. Dates use
-        recorded workspace time, up to 366 days.
-      </p>
-      {offline ? (
-        <Alert role="status" className="activity-notice">
-          You are offline. Loaded activity may be outdated. Reconnect to
-          refresh.
-        </Alert>
-      ) : null}
-      {error ? (
-        <Alert tone="danger" role="alert" className="activity-notice">
-          {error}{' '}
-          {stalePage ? (
-            <Button
-              variant="outline"
-              onClick={() =>
-                change({
-                  ...filters,
-                  cursor: undefined,
-                  latest: undefined,
-                  event: undefined,
-                })
-              }
-            >
-              Latest events
-            </Button>
-          ) : (
-            <Button variant="outline" onClick={refresh}>
-              Retry
-            </Button>
-          )}
-        </Alert>
-      ) : null}
-      {newEvents ? (
-        <Button
-          variant="outline"
-          onClick={() => {
-            change({
-              ...filters,
-              cursor: undefined,
-              latest: undefined,
-              event: undefined,
-            });
-            refresh();
+      <CollectionFilterPanel filters={toolbarFilters}>
+        <CollectionToolbar
+          panel
+          search={{
+            value: filters.q,
+            onChange: (q) => update({ q }),
+            label: 'Search activity',
+            placeholder: 'Issue, resource, action, actor or run ID…',
+            maxLength: 200,
           }}
-        >
-          New events available — view latest
-        </Button>
-      ) : null}
-      {page ? (
-        <>
-          {!page.items.length ? (
-            <Empty className="activity-empty">
-              <h2>No matching recorded activity</h2>
-              <p>
-                Try another date range or clear the filters. Unrecorded changes
-                do not appear here.
-              </p>
-              <Button variant="outline" onClick={() => change({})}>
-                Clear filters
-              </Button>
-            </Empty>
-          ) : (
-            <ol className="activity-list">
-              {Array.from(
-                new Map(page.items.map((item) => [item.id, item])).values(),
-              ).map((item, index, items) => (
-                <ActivityRow
-                  key={item.id}
-                  item={item}
-                  related={
-                    Boolean(item.attemptId ?? item.proposalId) &&
-                    (item.attemptId ?? item.proposalId) ===
-                      (items[index - 1]?.attemptId ??
-                        items[index - 1]?.proposalId)
-                  }
-                  organizationId={organizationId}
-                  expanded={filters.event === item.id}
-                  expand={() =>
-                    change({
-                      ...filters,
-                      event: filters.event === item.id ? undefined : item.id,
-                    })
-                  }
-                />
-              ))}
-            </ol>
-          )}
-          <div className="activity-pagination">
-            {filters.cursor ? (
+          filters={toolbarFilters}
+          onClear={() => change({})}
+          onRefresh={refresh}
+          refreshing={refreshing}
+          refreshLabel="Refresh activity"
+        />
+        <p className="activity-coverage">
+          {page ? `${page.coverage} ` : null}Search matches issue IDs, resource
+          references, action labels, actor IDs and workflow run IDs. Dates use
+          recorded workspace time, up to 366 days.
+        </p>
+        {offline ? (
+          <Alert role="status" className="activity-notice">
+            You are offline. Loaded activity may be outdated. Reconnect to
+            refresh.
+          </Alert>
+        ) : null}
+        {error ? (
+          <Alert tone="danger" role="alert" className="activity-notice">
+            {error}{' '}
+            {stalePage ? (
               <Button
                 variant="outline"
                 onClick={() =>
@@ -362,30 +288,108 @@ export function ActivityView({
               >
                 Latest events
               </Button>
-            ) : null}
-            <span role="status">
-              {page.items.length} recorded events on this page
-            </span>
-            {page.nextCursor ? (
-              <Button
-                variant="outline"
-                onClick={() =>
-                  change({
-                    ...filters,
-                    cursor: page.nextCursor!,
-                    latest: filters.latest ?? page.items[0]?.id,
-                    event: undefined,
-                  })
-                }
-              >
-                Older events
+            ) : (
+              <Button variant="outline" onClick={refresh}>
+                Retry
               </Button>
-            ) : null}
-          </div>
-        </>
-      ) : loading && !error ? (
-        <p role="status">Loading activity…</p>
-      ) : null}
+            )}
+          </Alert>
+        ) : null}
+        {newEvents ? (
+          <Button
+            variant="outline"
+            onClick={() => {
+              change({
+                ...filters,
+                cursor: undefined,
+                latest: undefined,
+                event: undefined,
+              });
+              refresh();
+            }}
+          >
+            New events available — view latest
+          </Button>
+        ) : null}
+        {page ? (
+          <>
+            {!page.items.length ? (
+              <Empty className="activity-empty">
+                <h2>No matching recorded activity</h2>
+                <p>
+                  Try another date range or clear the filters. Unrecorded
+                  changes do not appear here.
+                </p>
+                <Button variant="outline" onClick={() => change({})}>
+                  Clear filters
+                </Button>
+              </Empty>
+            ) : (
+              <ol className="activity-list">
+                {Array.from(
+                  new Map(page.items.map((item) => [item.id, item])).values(),
+                ).map((item, index, items) => (
+                  <ActivityRow
+                    key={item.id}
+                    item={item}
+                    related={
+                      Boolean(item.attemptId ?? item.proposalId) &&
+                      (item.attemptId ?? item.proposalId) ===
+                        (items[index - 1]?.attemptId ??
+                          items[index - 1]?.proposalId)
+                    }
+                    organizationId={organizationId}
+                    expanded={filters.event === item.id}
+                    expand={() =>
+                      change({
+                        ...filters,
+                        event: filters.event === item.id ? undefined : item.id,
+                      })
+                    }
+                  />
+                ))}
+              </ol>
+            )}
+            <div className="activity-pagination">
+              {filters.cursor ? (
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    change({
+                      ...filters,
+                      cursor: undefined,
+                      latest: undefined,
+                      event: undefined,
+                    })
+                  }
+                >
+                  Latest events
+                </Button>
+              ) : null}
+              <span role="status">
+                {page.items.length} recorded events on this page
+              </span>
+              {page.nextCursor ? (
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    change({
+                      ...filters,
+                      cursor: page.nextCursor!,
+                      latest: filters.latest ?? page.items[0]?.id,
+                      event: undefined,
+                    })
+                  }
+                >
+                  Older events
+                </Button>
+              ) : null}
+            </div>
+          </>
+        ) : loading && !error ? (
+          <p role="status">Loading activity…</p>
+        ) : null}
+      </CollectionFilterPanel>
     </div>
   );
 }

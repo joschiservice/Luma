@@ -330,19 +330,16 @@ export const RemovableFilters: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const body = within(document.body);
-    await userEvent.click(canvas.getByRole('button', { name: 'Filter' }));
     await userEvent.click(
-      await body.findByRole('button', { name: 'Severity' }),
+      canvas.getByRole('button', { name: 'Add Severity filter' }),
     );
     await userEvent.click(await body.findByRole('button', { name: 'High' }));
     await expect(
       canvas.getByRole('button', { name: 'Edit Severity filter: High' }),
     ).toBeVisible();
-    await userEvent.click(canvas.getByRole('button', { name: 'Add filter' }));
     await expect(
-      body.queryByRole('button', { name: 'Severity' }),
+      canvas.queryByRole('button', { name: 'Add Severity filter' }),
     ).not.toBeInTheDocument();
-    await userEvent.keyboard('{Escape}');
     await userEvent.click(
       canvas.getByRole('button', { name: 'Edit Severity filter: High' }),
     );
@@ -351,7 +348,9 @@ export const RemovableFilters: Story = {
       canvas.getByRole('button', { name: 'Remove Severity filter: Medium' }),
     );
     await waitFor(() =>
-      expect(canvas.getByRole('button', { name: 'Filter' })).toHaveFocus(),
+      expect(
+        canvas.getByRole('button', { name: 'Add Severity filter' }),
+      ).toHaveFocus(),
     );
     await expect(
       canvas.queryByRole('button', { name: 'Clear' }),

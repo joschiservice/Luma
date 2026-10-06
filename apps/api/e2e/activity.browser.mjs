@@ -54,11 +54,13 @@ test('filters, expands, returns, paginates and recovers workspace activity on de
   const fixture = await seedActivity(db, tenantId, actor);
   await page.getByRole('link', { name: 'Activity', exact: true }).click();
   await page.locator('.activity-event').first().waitFor();
-  const addFilter = async (category, option) => {
-    await page.getByRole('button', { name: 'Add filter', exact: true }).click();
-    await page.getByRole('button', { name: category, exact: true }).click();
-    await page.getByRole('button', { name: option, exact: true }).click();
-  };
+  // Wide screens list every Activity filter in a docked panel.
+  const addFilter = async (category, option) =>
+    page
+      .getByRole('complementary', { name: 'Filters' })
+      .getByRole('region', { name: category, exact: true })
+      .getByRole('button', { name: option, exact: true })
+      .click();
   const param = (name) => new URL(page.url()).searchParams.get(name);
   await addFilter('System', 'jtl-cloud');
   await expect.poll(() => param('system')).toBe('jtl-cloud');
@@ -96,9 +98,12 @@ test('filters, expands, returns, paginates and recovers workspace activity on de
       exact: true,
     })
     .click();
-  await page.getByLabel('From', { exact: true }).fill('2020-01-01');
-  await page.getByLabel('Through', { exact: true }).fill('2020-01-31');
-  await page.getByRole('button', { name: 'Apply range', exact: true }).click();
+  const picker = page.getByRole('dialog', { name: 'Recorded' });
+  await picker.getByLabel('From', { exact: true }).fill('2020-01-01');
+  await picker.getByLabel('Through', { exact: true }).fill('2020-01-31');
+  await picker
+    .getByRole('button', { name: 'Apply range', exact: true })
+    .click();
   await page
     .getByRole('heading', { name: 'No matching recorded activity' })
     .waitFor();
