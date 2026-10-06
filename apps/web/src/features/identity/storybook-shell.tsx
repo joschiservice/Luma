@@ -23,6 +23,7 @@ export function StoryShell({
   account = 'Alex Morgan',
   email = 'alex@northstar.example',
   attention = 3,
+  assistant,
   children,
 }: {
   page?: StoryPage;
@@ -30,6 +31,8 @@ export function StoryShell({
   account?: string;
   email?: string;
   attention?: number;
+  /** An open assistant panel docked beside the page. */
+  assistant?: ReactNode;
   children?: ReactNode | ((page: string) => ReactNode);
 }) {
   const [page, setPage] = useState<string>(initialPage);
@@ -140,6 +143,8 @@ export function StoryShell({
             docsLink={<a href="#docs" />}
           />
         }
+        assistant={assistant}
+        assistantOpen={!!assistant}
       >
         {typeof children === 'function' ? children(page) : children}
       </WorkspaceLayout>

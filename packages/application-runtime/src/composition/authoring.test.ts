@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 
-import { authoringAvailability } from './authoring.js';
+import { assistantAvailability, authoringAvailability } from './authoring.js';
 
 const bedrock = {
   region: 'eu-central-1',
@@ -55,4 +55,23 @@ it('allows authoring only on an EU Bedrock route with zero data retention', () =
       /^Describing workflows needs an EU model route/,
     );
   }
+});
+
+it('gives the assistant its own EU route', () => {
+  expect(
+    assistantAvailability(
+      { routes: { assistant: route }, bedrock, timeoutMs: 1000 },
+      true,
+    ),
+  ).toEqual({ available: true, reason: null });
+
+  // An authoring route doesn't enable the assistant.
+  const result = assistantAvailability(
+    { routes: { authoring: route }, bedrock, timeoutMs: 1000 },
+    true,
+  );
+  expect(result.available).toBe(false);
+  expect(result.reason).toBe(
+    'Asking Luma needs an EU model route with zero data retention. Whoever runs this Luma server needs to configure the assistant route.',
+  );
 });

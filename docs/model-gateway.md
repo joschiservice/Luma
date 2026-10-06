@@ -28,9 +28,9 @@ Set the three required Bedrock variables together. Startup fails when a `bedrock
 
 ## Local development
 
-Managed commands do not generate model settings; put them in `apps/api/.env`. Until a `bedrock-eu` route and Bedrock settings exist, describing workflows and reading supplier messages report why they are unavailable and call no model. Local seeded and simulator data is synthetic, so the processing-path review does not block local use.
+Managed commands do not generate model settings; put them in `apps/api/.env`. Until a `bedrock-eu` route and Bedrock settings exist, describing workflows, reading supplier messages and Ask Luma report why they are unavailable and call no model. Local seeded and simulator data is synthetic, so the processing-path review does not block local use.
 
-To enable both features, get credentials for a dedicated IAM principal with the permissions listed under [Bedrock EU adapter](#bedrock-eu-adapter) and set the account's retention mode to `none` in the configured region. Copy the Bedrock variables and the two-profile `MODEL_GATEWAY_ROUTES` example from `apps/api/.env.example`, fill in the credentials and restart `pnpm dev`. Startup fails on partial or non-EU settings. `pnpm evaluate:authoring` reads the same file and makes synthetic calls through the `authoring` route.
+To enable these features, get credentials for a dedicated IAM principal with the permissions listed under [Bedrock EU adapter](#bedrock-eu-adapter) and set the account's retention mode to `none` in the configured region. Copy the Bedrock variables and the `MODEL_GATEWAY_ROUTES` example from `apps/api/.env.example`, fill in the credentials and restart `pnpm dev`. Startup fails on partial or non-EU settings. `pnpm evaluate:authoring` reads the same file and makes synthetic calls through the `authoring` route.
 
 ## Workflow authoring profile
 
@@ -68,6 +68,15 @@ requirements as authoring (`supplierExtractionAvailability`). Without such a rou
 are stored and people record facts by selecting text; no model is called. Route it like
 authoring, for example `"supplier-extraction":{"adapter":"bedrock-eu",...}` in
 `MODEL_GATEWAY_ROUTES`. The processing-path review applies before sending tenant data.
+
+## Assistant profile
+
+Ask Luma ([assistant](assistant.md)) uses profile `assistant` with the same sensitive, EU,
+zero-retention policy and route requirements as authoring (`assistantAvailability`). Questions,
+earlier turns and read results are tenant data. Without such a route, the panel shows the reason
+and no model is called. Route it like authoring, for example
+`"assistant":{"adapter":"bedrock-eu",...}` in `MODEL_GATEWAY_ROUTES`. The model must support
+tool use. The processing-path review applies before sending tenant data.
 
 ## Data policy
 

@@ -66,8 +66,13 @@ export const Open: Story = {
       body.queryByRole('link', { name: /^Home/ }),
     ).not.toBeInTheDocument();
     await userEvent.clear(input);
-    await userEvent.type(input, 'zzzz');
+    await userEvent.type(input, 'zz');
     await expect(body.getByRole('status')).toHaveTextContent('No pages found');
+    // A longer query can become a question for Luma.
+    await userEvent.type(input, 'zz late orders');
+    await expect(
+      body.getByRole('button', { name: /Ask Luma.*Ask “zzzz late orders”/ }),
+    ).toBeVisible();
     await userEvent.keyboard('{Escape}');
     const trigger = within(canvasElement).getByRole('button', {
       name: 'Search pages',

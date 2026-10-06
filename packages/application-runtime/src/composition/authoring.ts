@@ -1,3 +1,4 @@
+import { assistantModelProfile } from '@luma/assistant/composition';
 import type { ModelGatewayConfig } from '@luma/config';
 import { authoringModelProfile } from '@luma/platform';
 import { supplierExtractionProfile } from '@luma/procurement/composition';
@@ -37,6 +38,23 @@ export function supplierExtractionAvailability(
     supplierExtractionProfile,
     'Reading supplier messages needs an EU model route with zero data retention.',
     'supplier-extraction',
+  );
+}
+
+/**
+ * Decides whether members can ask the workspace assistant. Questions and the records it reads
+ * are tenant data, so the same EU zero-retention Bedrock requirement applies.
+ */
+export function assistantAvailability(
+  settings: ModelGatewayConfig | undefined,
+  gatewayInstalled: boolean,
+) {
+  return euAvailability(
+    settings,
+    gatewayInstalled,
+    assistantModelProfile,
+    'Asking Luma needs an EU model route with zero data retention.',
+    'assistant',
   );
 }
 

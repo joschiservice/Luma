@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 
+import { createWorkspaceAssistant } from '@luma/assistant/composition';
 import { createAuditLog } from '@luma/audit/composition';
 import type { ConnectionManagement, EffectRegistry } from '@luma/connections';
 import {
@@ -21,7 +22,11 @@ import {
   createOrderMetricReader,
   orderStateQueries,
 } from '@luma/orders/composition';
-import type { ModelGateway, TenantDatabase } from '@luma/platform';
+import type {
+  ModelGateway,
+  Observability,
+  TenantDatabase,
+} from '@luma/platform';
 import { createReplenishmentScenarios } from '@luma/procurement';
 import {
   createProcurement,
@@ -145,6 +150,7 @@ export interface ApplicationServices {
     decisions: ReturnType<typeof createDecisionQueue>;
     decisionAssignments: ReturnType<typeof createDecisionAssignments>;
     insights: ReturnType<typeof createInsights>;
+    assistant: ReturnType<typeof createWorkspaceAssistant>;
   };
 }
 
@@ -170,6 +176,10 @@ export interface ApplicationOptions {
   supplierExtraction?: { available: boolean; reason: string | null };
   /** Days supplier message text is kept; defaults to 365. */
   supplierMessageRetentionDays?: number;
+  /** Whether the gateway has an EU zero-retention route for the workspace assistant. */
+  assistant?: { available: boolean; reason: string | null };
+  /** Records assistant and tool spans. Without it, the assistant runs untraced. */
+  observability?: Observability;
 }
 
 /**
@@ -395,6 +405,36 @@ export function createApplicationServices(
     attention: orderAttentionQuery,
     attentionFor: orderAttentionForOrders,
   };
+  const orders = createOrderWorkspace(
+    database,
+    orderQueries,
+    createActivityStore,
+    identity.refreshContext,
+  );
+  const fulfillment = createFulfillmentWorkspace(
+    database,
+    orderQueries,
+    createActivityStore,
+    identity.refreshContext,
+  );
+  const inventory = createInventoryWorkspace(database);
+  const returns = createReturnWorkspace(database);
+  const assistant = createWorkspaceAssistant({
+    gateway: options.modelGateway ?? null,
+    availability: options.assistant ?? {
+      available: false,
+      reason: 'Asking Luma isn’t set up on this server.',
+    },
+    reads: {
+      orders,
+      issues: detection.cases,
+      inventory,
+      fulfillment,
+      returns,
+    },
+    refreshContext: identity.refreshContext,
+    observability: options.observability,
+  });
 
   return {
     codeProcesses,
@@ -446,23 +486,13 @@ export function createApplicationServices(
         () => new Date(),
         createResolutionMetricReader(database),
       ),
-      inventory: createInventoryWorkspace(database),
+      inventory,
       products: createProductWorkspace(database),
       procurementContext: createProcurementContext(database),
-      returns: createReturnWorkspace(database),
+      returns,
       records: createRecordExplorer(database),
-      orders: createOrderWorkspace(
-        database,
-        orderQueries,
-        createActivityStore,
-        identity.refreshContext,
-      ),
-      fulfillment: createFulfillmentWorkspace(
-        database,
-        orderQueries,
-        createActivityStore,
-        identity.refreshContext,
-      ),
+      orders,
+      fulfillment,
       decisions,
       decisionAssignments,
       insights: createInsights(database, {
@@ -499,6 +529,7 @@ export function createApplicationServices(
         },
         refreshContext: identity.refreshContext,
       }),
+      assistant,
     },
   };
 }

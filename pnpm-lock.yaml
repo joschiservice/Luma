@@ -722,6 +722,9 @@ importers:
       '@luma/app-host':
         specifier: workspace:*
         version: link:../app-host
+      '@luma/assistant':
+        specifier: workspace:*
+        version: link:../assistant
       '@luma/audit':
         specifier: workspace:*
         version: link:../audit
@@ -923,6 +926,43 @@ importers:
       graphql:
         specifier: 'catalog:'
         version: 16.14.2
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(@vitest/browser-playwright@4.1.11)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0))
+
+  packages/assistant:
+    dependencies:
+      '@luma/api-contract':
+        specifier: workspace:*
+        version: link:../api-contract
+      '@luma/exceptions':
+        specifier: workspace:*
+        version: link:../exceptions
+      '@luma/identity':
+        specifier: workspace:*
+        version: link:../identity
+      '@luma/platform':
+        specifier: workspace:*
+        version: link:../platform
+      '@luma/read-models':
+        specifier: workspace:*
+        version: link:../read-models
+      '@ts-rest/fastify':
+        specifier: 'catalog:'
+        version: 3.52.1(@ts-rest/core@3.52.1(@types/node@24.13.5)(zod@3.25.76))(fastify@5.12.5)(zod@3.25.76)
+      fastify:
+        specifier: 'catalog:'
+        version: 5.12.5
+      zod:
+        specifier: catalog:zod3
+        version: 3.25.76
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.5
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(@vitest/browser-playwright@4.1.11)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0))

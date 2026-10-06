@@ -19,6 +19,7 @@ import {
   Moon,
   Plus,
   Search,
+  Sparkles,
   Sun,
 } from 'lucide-react';
 import {
@@ -29,6 +30,7 @@ import {
   useSyncExternalStore,
 } from 'react';
 
+import { askLuma } from '../../lib/assistant-panel';
 import { usesCommandKey } from '../../lib/keyboard';
 import { setThemePreference, type ThemePreference } from '../../lib/theme';
 import { ordersOptions, suppliersOptions } from '../procurement/data';
@@ -46,10 +48,19 @@ type Command = {
   keywords: string;
 } & (
   | { kind: 'theme'; theme: ThemePreference }
+  | { kind: 'assistant' }
   | { kind: 'link'; render: (children: ReactNode) => ReactNode }
 );
 
 const commands: Command[] = [
+  {
+    id: 'assistant',
+    kind: 'assistant',
+    label: 'Ask Luma',
+    description: 'Ask about orders, issues, stock, fulfillment and returns',
+    Icon: Sparkles,
+    keywords: 'ask luma assistant ai chat question answer',
+  },
   {
     id: 'theme-light',
     kind: 'theme',
@@ -127,6 +138,8 @@ export function WorkspaceSearch({
   );
   const input = useRef<HTMLInputElement>(null);
   const results = useRef<HTMLElement>(null);
+  // Asking Luma hands focus to its composer instead of the menu trigger.
+  const handoff = useRef(false);
 
   function changeOpen(value: boolean) {
     setOpen(value);
@@ -199,9 +212,13 @@ export function WorkspaceSearch({
   const pages = workspaceDestinations.filter((item) =>
     matches(query, `${item.label} ${item.description}`),
   );
+  // Any longer query can become a question for Luma.
+  const question = query.trim().length >= 3 ? query.trim() : '';
   const actions = query.trim()
-    ? commands.filter((item) =>
-        matches(query, `${item.label} ${item.description} ${item.keywords}`),
+    ? commands.filter(
+        (item) =>
+          (item.kind === 'assistant' && question) ||
+          matches(query, `${item.label} ${item.description} ${item.keywords}`),
       )
     : commands;
   const focusable = () =>
@@ -223,6 +240,12 @@ export function WorkspaceSearch({
         className="command-palette"
         showCloseButton={false}
         initialFocus={input}
+        finalFocus={() => {
+          if (!handoff.current) return true;
+          handoff.current = false;
+
+          return document.getElementById('assistant-question') ?? true;
+        }}
       >
         <DialogTitle className="sr-only">
           Go to a page or run a command
@@ -395,7 +418,11 @@ export function WorkspaceSearch({
                 </span>
                 <span className="command-item-copy">
                   <strong>{command.label}</strong>
-                  <span>{command.description}</span>
+                  <span>
+                    {command.kind === 'assistant' && question
+                      ? `Ask “${question}”`
+                      : command.description}
+                  </span>
                 </span>
                 <CornerDownLeft
                   className="command-item-enter"
@@ -405,13 +432,18 @@ export function WorkspaceSearch({
               </>
             );
 
-            return command.kind === 'theme' ? (
+            return command.kind === 'theme' || command.kind === 'assistant' ? (
               <button
                 key={command.id}
                 type="button"
                 className="command-item"
                 onClick={() => {
-                  setThemePreference(command.theme);
+                  if (command.kind === 'theme')
+                    setThemePreference(command.theme);
+                  else {
+                    handoff.current = true;
+                    askLuma(question);
+                  }
                   changeOpen(false);
                 }}
               >

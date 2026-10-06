@@ -182,6 +182,19 @@ from the model routes. Tests: `domain/draft-generation.test.ts`,
 `tooling/evaluation/authoring.mjs` (`pnpm evaluate:authoring`). See
 [Describe a workflow](workflows.md#describe-a-workflow).
 
+## Ask Luma assistant
+
+The tool loop is `packages/assistant/src/application/assistant.ts`; the read-only tool
+registry is `application/tools.ts` with tools in `infrastructure/tools`; citation markers and
+result bounds are `domain/answer.ts`; the prompt is `domain/prompt.ts`. Composition is
+`createWorkspaceAssistant` in `src/composition.ts`, wired in
+`packages/application-runtime/src/composition/application.ts` with availability from
+`authoring.ts`. Contracts are `packages/api-contract/src/assistant.ts` and
+`contracts/assistant.ts`. The web panel, toggle and ⌘ J shortcut are
+`apps/web/src/features/assistant`, docked by `workspace-layout.tsx`. Tests:
+`packages/assistant/src/*.test.ts`, the web `assistant` tests and the `Assistant/Panel`
+stories. See [Ask Luma assistant](assistant.md).
+
 ## Procurement
 
 Start at `packages/procurement/src/domain/procurement.ts` for Supplier,

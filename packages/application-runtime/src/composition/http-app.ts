@@ -6,6 +6,8 @@ import { apiContract } from '@luma/api-contract';
 import { openApiDocument } from '@luma/api-contract/openapi';
 import type { AppRegistry, AppService } from '@luma/app-host';
 import { appRoutes } from '@luma/app-host/http';
+import type { Assistant } from '@luma/assistant';
+import { assistantRoutes } from '@luma/assistant/http';
 import type { SyncService } from '@luma/commerce-sync';
 import { syncRoutes } from '@luma/commerce-sync/http';
 import type { ConnectionManagement, ProviderCatalog } from '@luma/connections';
@@ -124,6 +126,7 @@ export interface AppDependencies {
   decisions?: DecisionQueue;
   decisionAssignments?: DecisionAssignments;
   insights?: Insights;
+  assistant?: Assistant;
   sync?: SyncService;
   metricEvents?: MetricEvents;
   apps?: AppService;
@@ -392,6 +395,7 @@ export function buildApp(
           dependencies.decisionAssignments,
         ),
         insights: insightRoutes(dependencies.insights),
+        assistant: assistantRoutes(dependencies.assistant),
       },
       routerApp,
       {
