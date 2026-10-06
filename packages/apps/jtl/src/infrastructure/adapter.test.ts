@@ -583,6 +583,53 @@ describe('JTL read adapter', () => {
     expect(f.recordObservations).not.toHaveBeenCalled();
   });
 
+  it('reads order lines concurrently within a bound and keeps page order', async () => {
+    const base = fixture();
+    base.data.orders = Array.from({ length: 10 }, (_, index) => ({
+      ...base.data.orders[0]!,
+      id: 100 + index,
+      salesOrderNumber: `SO-${100 + index}`,
+    }));
+    let active = 0;
+    let peak = 0;
+    const f = fixture({
+      fetch: async (input, init) => {
+        const order = /sales-orders\/(\d+)\/line-items/.exec(String(input));
+        if (!order) return base.fetch(input, init);
+        active += 1;
+        peak = Math.max(peak, active);
+        // Holds each read open so overlapping requests are observable.
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        active -= 1;
+
+        return Response.json(
+          base.data.orderLines.map((line, index) => ({
+            ...line,
+            id: Number(order[1]) * 100 + index,
+            salesOrderId: Number(order[1]),
+          })),
+        );
+      },
+    });
+
+    const result = await f.read('orders.read', { limit: 10 });
+    expect(
+      result.ok && result.value.items.map((item) => item.source.externalId),
+    ).toEqual(base.data.orders.map((order) => String(order.id)));
+    expect(peak).toBe(4);
+  });
+
+  it('reads the lines of an order once for all of its delivery notes in a page', async () => {
+    const f = fixture();
+    const result = await f.read('fulfillment.read');
+    expect(result.ok && result.value.items).toHaveLength(2);
+    expect(
+      f.fetch.mock.calls.filter(([url]) =>
+        String(url).includes('sales-orders/10/line-items'),
+      ),
+    ).toHaveLength(1);
+  });
+
   it('rejects ambiguous duplicate fulfillment lines and zero-date shipment evidence', async () => {
     const f = fixture();
     f.data.noteLines[0]!.push({ ...f.data.noteLines[0]![0]!, id: 399 });

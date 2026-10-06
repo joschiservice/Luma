@@ -12,6 +12,8 @@ import { rateLimit, shopify } from '@luma/simulator-shopify';
 // Run after building the app and simulator packages. Synthetic latency is per HTTP request.
 const latencyMs = Number(process.env.BENCHMARK_LATENCY_MS ?? 10);
 const size = Number(process.env.BENCHMARK_RECORDS ?? 25);
+// Requested records per page; adapters may return fewer, as Shopify does above 25.
+const pageSize = Number(process.env.BENCHMARK_PAGE_SIZE ?? 25);
 const provider = process.env.BENCHMARK_PROVIDER ?? 'shopify';
 const mode = process.env.BENCHMARK_MODE ?? 'paged';
 const capabilities = (
@@ -23,6 +25,7 @@ const capabilities = (
 assert.ok(['shopify', 'jtl'].includes(provider));
 assert.ok(['paged', 'bulk'].includes(mode));
 assert.ok(Number.isSafeInteger(size) && size > 0 && size <= 100_000);
+assert.ok(Number.isSafeInteger(pageSize) && pageSize > 0 && pageSize <= 100);
 assert.ok(Number.isFinite(latencyMs) && latencyMs >= 0);
 const rateEnabled = process.env.BENCHMARK_RATE_LIMIT === '1';
 const tenantId = '00000000-0000-4000-8000-000000000001';
@@ -266,7 +269,7 @@ for (const capability of capabilities) {
       capability,
       version: '0',
       input: {
-        limit: 25,
+        limit: pageSize,
         ...(cursor ? { cursor } : {}),
         ...(mode === 'bulk' ? { historyImport: { key, chunkSize: 500 } } : {}),
       },

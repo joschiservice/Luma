@@ -28,10 +28,12 @@ ledger.
 
 ## Pages, checkpoints and retries
 
-The runner leases one stream (5 minutes), reads one page of 25 records, imports it and
-commits the ledger entries, counters and next cursor in one transaction. A restarted
-or second runner continues from the committed cursor; a lost lease discards the
-page's ledger write, and the next attempt re-imports idempotently.
+The runner leases one stream (5 minutes) and requests a page of 100 records; adapters
+may return fewer (Shopify returns at most 25, or 5 for fulfillments and returns). It
+imports the page's changed records in one ingestion transaction, then commits the ledger
+entries, counters and next cursor in one transaction. A restarted or second runner
+continues from the committed cursor; a lost lease discards the page's ledger write, and
+the next attempt re-imports idempotently.
 
 Provider transports first repeat a failed read briefly (see
 [connectors](connectors.md#errors-retries-and-evidence)), so a single transient
@@ -47,7 +49,8 @@ stream's person. Streams stop while their connection is inactive or no longer gr
 the capability, and restart when it returns.
 
 A record that fails Luma's validation is marked `failed` in the ledger with a
-controlled problem and does not stop the page. Records whose related records are not
+controlled problem and does not stop the page: the page's ingestion transaction is
+rolled back and its records are imported one at a time, so only that record fails. Records whose related records are not
 imported yet (for example a fulfillment before its order) are `pending` and retried
 on the next scan.
 
@@ -100,7 +103,9 @@ in other connections. Order suggestions require a JTL external marketplace order
 matching a Shopify order number. Dates and totals support review; neither establishes identity.
 Multiple candidates stay visible and are never applied automatically.
 
-Order link/unlink runs with ingestion in a shared transaction, serialized per tenant. Children
+Order link/unlink runs in one ingestion transaction that holds the tenant's ingestion
+lock exclusively. Imports hold it shared, so a link waits for running imports and new
+imports wait for the link. Children
 receive canonical IDs keyed by the current order mapping revision; parent bindings remain
 immutable. Old pointers are retired by the orders owner, with snapshots and actor/reason history
 retained. Redirects preserve old order and child links, cases and activity. The order list, search,
@@ -127,8 +132,27 @@ runs the store, runner, ingestion and customer profiles against PostgreSQL: page
 import with checkpoints, re-import without duplicates, out-of-order updates, retry
 from a checkpoint, fulfillments after orders, missing-record detection, change
 notifications, customer erasure and suppression, SKU and order link/unlink, stale replays, interrupted order linking, reference
-redirects, ambiguous suggestions, tenant isolation and principal recovery. Shopify adapter tests validate the new queries against the 2026-07 schema.
+redirects, ambiguous suggestions, tenant isolation and principal recovery. It also covers
+page imports that fail only a rejected record, concurrent imports of overlapping streams
+and connections, and imports sharing the ingestion lock while a link waits. Shopify adapter tests validate the new queries against the 2026-07 schema.
 The web Data sync page has `Data sync/Workspace` stories and presentation tests.
+
+Set `LUMA_IMPORT_BENCHMARK=<records>` when running that test file to measure end-to-end
+history imports through the runner with production defaults and an in-memory source
+without latency. Results are written to `/tmp/luma-import-benchmark-<records>.json`. On
+October 6, 2026, PostgreSQL 17 in Docker on a development laptop with durable commits
+measured, for 2,000 records per stream:
+
+| Stream                                 | Before batched imports | After |
+| -------------------------------------- | ---------------------: | ----: |
+| Products, records/s                    |                    126 |   908 |
+| Inventory, records/s                   |                    200 | 1,515 |
+| Orders with two lines, records/s       |                     41 |   399 |
+| Fulfillments, records/s                |                     71 | 1,056 |
+| Orders from two connections, records/s |                     39 | 1,040 |
+
+These figures exclude provider latency and rate limits. Order imports are now limited
+mostly by search indexing of order mappings and the order list refresh.
 
 ## Recent history, live reads and exports
 
@@ -142,12 +166,18 @@ A recent-window read never establishes absence or full-history coverage.
 
 The workspace runs up to `COMMERCE_SYNC_WORKSPACE_CONCURRENCY` pages concurrently
 (default 4, range 1–8). Admission per connection is limited by
-`COMMERCE_SYNC_CONNECTION_CONCURRENCY` (default 1, range 1–4), including leases held
+`COMMERCE_SYNC_CONNECTION_CONCURRENCY` (default 2, range 1–4), including leases held
 by other processes. The workspace page limit also counts leases across processes;
 use the same concurrency settings on all sync workers. `COMMERCE_SYNC_CONCURRENCY` still limits parallel workspaces.
 A short tenant advisory lock serializes admission; provider reads run outside it.
 The worker pool allows `tenant concurrency × workspace concurrency × 2 + 2`
 connections. Size PostgreSQL's connection limit for the total number of workers.
+
+Pages of one workspace import concurrently. Owners take the order and inventory entity
+locks of a page in sorted order, and new entities and mappings are inserted in sorted
+order, so overlapping pages (for example orders and their fulfillments) wait for each
+other instead of deadlocking. If PostgreSQL still cancels a transaction to break a lock
+cycle, the page's import is retried once before the page fails.
 
 Idle hints and incremental scans precede history pages. During an active scan,
 only `due_at` makes its next page eligible; a saved hint cannot bypass failure

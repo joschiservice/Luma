@@ -291,7 +291,8 @@ export function createShopifyConnector(
               options.shop,
               API_VERSION,
               capability,
-              input.limit,
+              // The effective page size, so cursors survive a larger requested page.
+              readPageSize(capability, input.limit),
               filters.sku ?? null,
               filters.location ?? null,
               filters.order ?? null,
@@ -540,7 +541,11 @@ export function createShopifyConnector(
               }
             : await request(
                 `query LumaCustomers($first: Int!, $after: String, $query: String) { page: customers(first: $first, after: $after, query: $query${sorted}) { nodes { ${fields} } ${pageFields} } }`,
-                { first: input.limit, after, query: search },
+                {
+                  first: readPageSize(capability, input.limit),
+                  after,
+                  query: search,
+                },
               );
           const customers = capture(s.connection(s.customerNode), data.page);
           for (const customer of customers.nodes) {

@@ -49,6 +49,14 @@ export interface SourceRecords {
     ingestKey: string,
     input: CommerceObservation,
   ): Promise<CommerceObservation>;
+  /**
+   * Stores observations in one transaction and returns them in input order. Any invalid
+   * observation, unavailable connection or conflicting ingest key rejects the batch.
+   */
+  recordMany(
+    context: TenantContext,
+    items: { ingestKey: string; input: CommerceObservation }[],
+  ): Promise<CommerceObservation[]>;
   /** Reads a previously stored observation from this tenant, or null when absent. */
   get(
     context: TenantContext,
@@ -62,6 +70,19 @@ export interface SourceRecords {
     canonicalId: string,
     observationId: string,
     method: string,
+  ): Promise<void>;
+  /**
+   * Records many evidence-backed mappings in one sorted write; requires an owner or admin.
+   * A source already mapped elsewhere, missing evidence or a missing target rejects the batch.
+   */
+  bindMany(
+    context: TenantContext,
+    entries: {
+      source: SourceIdentity;
+      canonicalId: string;
+      observationId: string;
+      method: string;
+    }[],
   ): Promise<void>;
   /** Returns the current canonical mapping for this source, or null when none exists. */
   resolve(
@@ -83,6 +104,12 @@ export interface SourceRecords {
     connectionId: string,
     observationId: string,
   ): Promise<CommerceObservation | null>;
+  /** Returns the canonical IDs, among those given, with a source mapping that was ever revised. */
+  revised(
+    context: TenantContext,
+    resource: SourceIdentity['resource'],
+    canonicalIds: string[],
+  ): Promise<Set<string>>;
   /** Lists the source identities currently mapped to one canonical entity. */
   mappings(
     context: TenantContext,

@@ -94,12 +94,38 @@ export interface CommerceProjections {
     kind: EntityKind,
     reconciliationKey: string,
   ): Promise<string>;
-  has(context: TenantContext, kind: EntityKind, id: string): Promise<boolean>;
+  /**
+   * Creates or finds entities for many reconciliation keys in one sorted write. The result maps
+   * `JSON.stringify([kind, reconciliationKey])` to the entity ID.
+   */
+  identifyMany(
+    context: TenantContext,
+    items: { kind: EntityKind; reconciliationKey: string }[],
+  ): Promise<Map<string, string>>;
+  /** Returns the IDs that are not entities of this kind in the tenant. */
+  missing(
+    context: TenantContext,
+    kind: EntityKind,
+    ids: string[],
+  ): Promise<string[]>;
   project(
     context: TenantContext,
     snapshot: CanonicalSnapshot,
   ): Promise<'applied' | 'retained' | 'duplicate'>;
+  /**
+   * Projects snapshots in input order in one transaction, holding every affected order's lock
+   * and refreshing the order, fulfillment and return lists once. Any failure rejects the batch.
+   */
+  projectMany(
+    context: TenantContext,
+    snapshots: CanonicalSnapshot[],
+  ): Promise<('applied' | 'retained' | 'duplicate')[]>;
   current(context: TenantContext, entityId: string): Promise<Projection[]>;
+  /** Current projections of many entities in one read, keyed by entity ID; absent when none. */
+  currentMany(
+    context: TenantContext,
+    entityIds: string[],
+  ): Promise<Map<string, Projection[]>>;
   history(
     context: TenantContext,
     entityId: string,

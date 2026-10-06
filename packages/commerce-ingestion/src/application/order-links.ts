@@ -1,8 +1,24 @@
-import type { CommerceObservation, SourceRecords } from '@luma/connections';
+import type {
+  CommerceObservation,
+  SourceIdentity,
+  SourceRecords,
+} from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
 import type { CommerceProjections } from '@luma/orders';
 
 import { sourceLocalKey } from './source-local.js';
+
+/** The source order an order, fulfillment, return or refund belongs to; null for other records. */
+export function orderParent(input: CommerceObservation): SourceIdentity | null {
+  const origin = input.observation.source;
+
+  return input.capability === 'orders.read'
+    ? origin
+    : input.capability === 'fulfillment.read' ||
+        input.capability === 'returns.read'
+      ? { ...origin, ...input.observation.data.order, resource: 'order' }
+      : null;
+}
 
 /**
  * Re-keys a remapped order's source children for its current mapping generation. Existing
@@ -14,24 +30,8 @@ export async function prepareOrderChildren(
   sources: SourceRecords,
   orders: CommerceProjections,
 ) {
-  if (
-    !['orders.read', 'fulfillment.read', 'returns.read'].includes(
-      input.capability,
-    )
-  )
-    return;
   const origin = input.observation.source;
-  const parent =
-    input.capability === 'orders.read'
-      ? origin
-      : input.capability === 'fulfillment.read' ||
-          input.capability === 'returns.read'
-        ? {
-            ...origin,
-            ...input.observation.data.order,
-            resource: 'order' as const,
-          }
-        : null;
+  const parent = orderParent(input);
   if (!parent) return;
   const orderId = await sources.resolve(context, parent);
   if (!orderId) return;

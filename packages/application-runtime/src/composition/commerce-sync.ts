@@ -73,7 +73,7 @@ export function createCommerceSyncWorker(options: {
     resolveContext: options.identity.resolveWorkflowContext,
     digest,
     workspaceConcurrency: options.workspaceConcurrency ?? 4,
-    connectionConcurrency: options.connectionConcurrency ?? 1,
+    connectionConcurrency: options.connectionConcurrency ?? 2,
     log,
   });
   const stop = new AbortController();

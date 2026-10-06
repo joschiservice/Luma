@@ -8,6 +8,7 @@ import { z } from 'zod';
 import type {
   CanonicalSnapshot,
   CommerceProjections,
+  Projection,
 } from '../application/projections.js';
 import { refreshFulfillmentList } from './fulfillment-list.js';
 import { refreshOrderList } from './list-projection.js';
@@ -20,12 +21,283 @@ import { snapshotSchema } from './validation.js';
  */
 export function createCommerceProjections(
   db: TenantDatabase,
-  inventoryExists: (
+  inventoryMissing: (
     context: TenantContext,
     kind: 'sku' | 'location',
-    id: string,
-  ) => Promise<boolean>,
+    ids: string[],
+  ) => Promise<string[]>,
 ): CommerceProjections {
+  /** Applies one validated snapshot; the caller holds its order lock and refreshes reads. */
+  async function apply(
+    tx: SqlTransaction,
+    context: TenantContext,
+    value: CanonicalSnapshot,
+  ): Promise<'applied' | 'retained' | 'duplicate'> {
+    const tenant = context.tenantId;
+    const old = await tx.query<{ document: CanonicalSnapshot }>(
+      'SELECT document FROM orders_snapshots WHERE tenant_id=$1 AND entity_id=$2 AND observation_id=$3 AND normalizer_version=$4 AND mapping_version=$5',
+      [
+        tenant,
+        value.entityId,
+        value.observationId,
+        value.normalizerVersion,
+        value.mappingVersion,
+      ],
+    );
+    if (old.rows[0]) {
+      const same = await tx.query<{ matches: boolean }>(
+        'SELECT $1::jsonb=$2::jsonb AS matches',
+        [old.rows[0].document, value],
+      );
+      if (!same.rows[0]?.matches) throw new Error('Snapshot identity conflict');
+      // Replaying after a SKU link change can return to an earlier snapshot of the
+      // current observation; make it current again.
+      const restored = await tx.query<{ snapshot_id: string }>(
+        `WITH existing AS (SELECT id FROM orders_snapshots WHERE tenant_id=$1 AND entity_id=$2
+            AND observation_id=$4 AND normalizer_version=$5 AND mapping_version=$6)
+          INSERT INTO orders_projections(tenant_id,entity_id,connection_id,snapshot_id)
+          SELECT $1,$2,$3,id FROM existing
+          ON CONFLICT(tenant_id,entity_id,connection_id) DO UPDATE SET snapshot_id=EXCLUDED.snapshot_id,
+            version=orders_projections.version+1,updated_at=now()
+          WHERE orders_projections.snapshot_id<>EXCLUDED.snapshot_id AND EXISTS (
+            SELECT 1 FROM orders_snapshots c WHERE c.tenant_id=$1 AND c.id=orders_projections.snapshot_id
+            AND c.observation_id=$4)
+          RETURNING snapshot_id`,
+        [
+          tenant,
+          value.entityId,
+          value.connectionId,
+          value.observationId,
+          value.normalizerVersion,
+          value.mappingVersion,
+        ],
+      );
+      const snapshot = restored.rows[0]?.snapshot_id;
+      if (!snapshot) return 'duplicate';
+      await tx.query(
+        'INSERT INTO orders_projection_events(id,tenant_id,snapshot_id,actor_id) VALUES($1,$2,$3,$4)',
+        [randomUUID(), tenant, snapshot, context.actor.id],
+      );
+
+      return 'applied';
+    }
+
+    return (await applyNew(tx, context, [value]))[0]!;
+  }
+
+  /**
+   * Applies new snapshots, at most one per entity and source, with one statement per step.
+   * The caller holds their order locks and has checked that none was stored before.
+   */
+  async function applyNew(
+    tx: SqlTransaction,
+    context: TenantContext,
+    values: CanonicalSnapshot[],
+  ): Promise<('applied' | 'retained')[]> {
+    const tenant = context.tenantId;
+    const refs = [
+      ...new Map(
+        values.flatMap(references).map((ref) => [`${ref.kind}:${ref.id}`, ref]),
+      ).values(),
+    ];
+    const found = await tx.query<{ count: number }>(
+      `SELECT count(*)::int AS count FROM orders_entities e
+        JOIN unnest($2::text[],$3::uuid[]) AS k(kind,id) ON e.tenant_id=$1 AND e.kind=k.kind AND e.id=k.id`,
+      [tenant, refs.map((ref) => ref.kind), refs.map((ref) => ref.id)],
+    );
+    if (found.rows[0]!.count !== refs.length)
+      throw new Error('Canonical relationship not found');
+    const relations = values
+      .flatMap((value) =>
+        childrenOf(value).map((child) => ({ child, order: orderOf(value) })),
+      )
+      .sort((a, b) => a.child.localeCompare(b.child));
+    const children = relations.map((relation) => relation.child);
+    const parents = relations.map((relation) => relation.order);
+    await tx.query(
+      `INSERT INTO orders_relationships(tenant_id,child_id,order_id)
+        SELECT $1,child,parent FROM unnest($2::uuid[],$3::uuid[]) AS k(child,parent) ON CONFLICT DO NOTHING`,
+      [tenant, children, parents],
+    );
+    const foreign = await tx.query(
+      `SELECT 1 FROM orders_relationships r JOIN unnest($2::uuid[],$3::uuid[]) AS k(child,parent)
+        ON r.tenant_id=$1 AND r.child_id=k.child WHERE r.order_id<>k.parent LIMIT 1`,
+      [tenant, children, parents],
+    );
+    if (foreign.rowCount)
+      throw new Error('Canonical child belongs to another order');
+    const dependents = values.filter((value) => value.data.type !== 'order');
+    const parentOrders = await currentDocuments(
+      tx,
+      tenant,
+      dependents.map((value) => ({
+        entityId: orderOf(value),
+        connectionId: value.connectionId,
+      })),
+    );
+    for (const value of dependents) {
+      if (value.data.type === 'order') continue;
+      const parent = parentOrders.get(
+        `${orderOf(value)}:${value.connectionId}`,
+      );
+      if (!parent || parent.deleted || parent.data.type !== 'order')
+        throw new Error('Order projection not found');
+      const lines = parent.data.lines;
+      if (
+        value.data.lines.some(
+          (line) =>
+            line.orderLineId &&
+            !lines.some(
+              (p) => p.id === line.orderLineId && p.unit === line.unit,
+            ),
+        )
+      )
+        throw new Error(
+          `${value.data.type === 'fulfillment' ? 'Fulfillment' : 'Return or refund'} line or unit mismatch`,
+        );
+    }
+    const ids = values.map(() => randomUUID());
+    await tx.query(
+      `INSERT INTO orders_snapshots(id,tenant_id,entity_id,kind,connection_id,observation_id,normalizer_version,source_updated_at,observed_at,document,mapping_version)
+      SELECT r.id,$1,r.entity_id,r.kind,r.connection_id,r.observation_id,r.normalizer_version,r.source_updated_at,r.observed_at,r.document,r.mapping_version
+      FROM jsonb_to_recordset($2::jsonb) AS r(id uuid,entity_id uuid,kind text,connection_id uuid,observation_id uuid,
+        normalizer_version text,source_updated_at timestamptz,observed_at timestamptz,document jsonb,mapping_version text)`,
+      [
+        tenant,
+        JSON.stringify(
+          values.map((value, index) => ({
+            id: ids[index],
+            entity_id: value.entityId,
+            kind: value.kind,
+            connection_id: value.connectionId,
+            observation_id: value.observationId,
+            normalizer_version: value.normalizerVersion,
+            source_updated_at: value.sourceUpdatedAt,
+            observed_at: value.observedAt,
+            document: value,
+            mapping_version: value.mappingVersion,
+          })),
+        ),
+      ],
+    );
+    const current = await currentDocuments(tx, tenant, values);
+    const statuses = values.map((value) => {
+      const existing = current.get(`${value.entityId}:${value.connectionId}`);
+
+      return existing && !supersedes(value, existing)
+        ? ('retained' as const)
+        : ('applied' as const);
+    });
+    const applied = values
+      .map((value, index) => ({ value, id: ids[index]! }))
+      .filter((_, index) => statuses[index] === 'applied')
+      .sort(
+        (a, b) =>
+          a.value.entityId.localeCompare(b.value.entityId) ||
+          a.value.connectionId.localeCompare(b.value.connectionId),
+      );
+    if (applied.length) {
+      await tx.query(
+        `INSERT INTO orders_projections(tenant_id,entity_id,connection_id,snapshot_id)
+        SELECT $1,entity_id,connection_id,snapshot_id FROM unnest($2::uuid[],$3::uuid[],$4::uuid[]) AS k(entity_id,connection_id,snapshot_id)
+        ON CONFLICT(tenant_id,entity_id,connection_id) DO UPDATE SET snapshot_id=EXCLUDED.snapshot_id,version=orders_projections.version+1,updated_at=now()`,
+        [
+          tenant,
+          applied.map((item) => item.value.entityId),
+          applied.map((item) => item.value.connectionId),
+          applied.map((item) => item.id),
+        ],
+      );
+      await tx.query(
+        `INSERT INTO orders_projection_events(id,tenant_id,snapshot_id,actor_id)
+        SELECT gen_random_uuid(),$1,snapshot_id,$3 FROM unnest($2::uuid[]) AS snapshot_id`,
+        [tenant, applied.map((item) => item.id), context.actor.id],
+      );
+    }
+
+    return statuses;
+  }
+
+  /**
+   * Applies a batch in input order. New snapshots of distinct sources share set-based writes;
+   * replays, repeated sources and orders arriving with their children apply one at a time.
+   */
+  async function applyAll(
+    tx: SqlTransaction,
+    context: TenantContext,
+    values: CanonicalSnapshot[],
+  ): Promise<('applied' | 'retained' | 'duplicate')[]> {
+    const sources = new Set(
+      values.map((value) => `${value.entityId}:${value.connectionId}`),
+    );
+    const orders = values.filter((value) => value.data.type === 'order');
+    if (
+      sources.size === values.length &&
+      (orders.length === 0 || orders.length === values.length)
+    ) {
+      const stored = await tx.query(
+        `SELECT 1 FROM orders_snapshots s JOIN unnest($2::uuid[],$3::uuid[],$4::text[],$5::text[])
+          AS k(entity_id,observation_id,normalizer_version,mapping_version)
+        ON s.tenant_id=$1 AND s.entity_id=k.entity_id AND s.observation_id=k.observation_id
+          AND s.normalizer_version=k.normalizer_version AND s.mapping_version=k.mapping_version LIMIT 1`,
+        [
+          context.tenantId,
+          values.map((value) => value.entityId),
+          values.map((value) => value.observationId),
+          values.map((value) => value.normalizerVersion),
+          values.map((value) => value.mappingVersion),
+        ],
+      );
+      if (!stored.rowCount) return applyNew(tx, context, values);
+    }
+    const statuses: ('applied' | 'retained' | 'duplicate')[] = [];
+    for (const value of values) statuses.push(await apply(tx, context, value));
+
+    return statuses;
+  }
+
+  async function projectMany(
+    context: TenantContext,
+    inputs: CanonicalSnapshot[],
+  ) {
+    requireRole(context, ['owner', 'admin']);
+    const values = inputs.map(
+      (input) => snapshotSchema.parse(input) as CanonicalSnapshot,
+    );
+    if (!values.length) return [];
+    const skus = values.flatMap((value) =>
+      value.data.type === 'order'
+        ? value.data.lines.flatMap((line) => (line.skuId ? [line.skuId] : []))
+        : [],
+    );
+    if ((await inventoryMissing(context, 'sku', skus)).length)
+      throw new Error('Canonical SKU not found');
+    const locations = values.flatMap((value) =>
+      value.data.type === 'fulfillment' && value.data.location?.locationId
+        ? [value.data.location.locationId]
+        : [],
+    );
+    if ((await inventoryMissing(context, 'location', locations)).length)
+      throw new Error('Canonical location not found');
+
+    return db.transaction(context.tenantId, async (tx) => {
+      // Sorted, as in the list rebuilder, so concurrent batches cannot deadlock.
+      await tx.query(
+        `WITH ids AS MATERIALIZED (SELECT DISTINCT id FROM unnest($2::uuid[]) id ORDER BY id)
+        SELECT pg_advisory_xact_lock(hashtextextended('orders:' || $1 || ':' || id::text,0)) FROM ids`,
+        [context.tenantId, values.map(orderOf)],
+      );
+      const statuses = await applyAll(tx, context, values);
+      await refresh(
+        tx,
+        context.tenantId,
+        values.filter((_, index) => statuses[index] === 'applied'),
+      );
+
+      return statuses;
+    });
+  }
+
   return {
     async identify(context, kind, reconciliationKey) {
       requireRole(context, ['owner', 'admin']);
@@ -49,198 +321,57 @@ export function createCommerceProjections(
         );
       });
     },
-    async has(context, kind, id) {
+    async identifyMany(context, items) {
+      requireRole(context, ['owner', 'admin']);
+      for (const item of items)
+        z.string().min(1).max(1024).parse(item.reconciliationKey);
+      const found = new Map<string, string>();
+      if (!items.length) return found;
+      const kinds = items.map((item) => item.kind);
+      const keys = items.map((item) => item.reconciliationKey);
+
+      return db.transaction(context.tenantId, async (tx) => {
+        // Sorted inserts keep concurrent imports of overlapping records from deadlocking.
+        await tx.query(
+          `INSERT INTO orders_entities(id,tenant_id,kind,reconciliation_key)
+          SELECT gen_random_uuid(),$1,kind,key FROM (SELECT DISTINCT kind,key FROM unnest($2::text[],$3::text[]) AS k(kind,key)) k
+          ORDER BY kind,key ON CONFLICT(tenant_id,kind,reconciliation_key) DO NOTHING`,
+          [context.tenantId, kinds, keys],
+        );
+        const rows = await tx.query<{
+          kind: string;
+          reconciliation_key: string;
+          id: string;
+        }>(
+          `SELECT e.kind,e.reconciliation_key,e.id FROM orders_entities e
+          JOIN unnest($2::text[],$3::text[]) AS k(kind,key) ON e.tenant_id=$1 AND e.kind=k.kind AND e.reconciliation_key=k.key`,
+          [context.tenantId, kinds, keys],
+        );
+        for (const row of rows.rows)
+          found.set(JSON.stringify([row.kind, row.reconciliation_key]), row.id);
+
+        return found;
+      });
+    },
+    async missing(context, kind, ids) {
       requireTenant(context, context.tenantId);
+      const unique = [...new Set(ids)];
+      if (!unique.length) return [];
 
       return db.transaction(context.tenantId, async (tx) =>
-        Boolean(
-          (
-            await tx.query(
-              'SELECT id FROM orders_entities WHERE tenant_id=$1 AND kind=$2 AND id=$3',
-              [context.tenantId, kind, id],
-            )
-          ).rowCount,
-        ),
+        (
+          await tx.query<{ id: string }>(
+            `SELECT k.id FROM unnest($3::uuid[]) AS k(id) WHERE NOT EXISTS (
+              SELECT 1 FROM orders_entities e WHERE e.tenant_id=$1 AND e.kind=$2 AND e.id=k.id)`,
+            [context.tenantId, kind, unique],
+          )
+        ).rows.map((row) => row.id),
       );
     },
     async project(context, input) {
-      requireRole(context, ['owner', 'admin']);
-      const value = snapshotSchema.parse(input) as CanonicalSnapshot;
-      if (value.data.type === 'order')
-        for (const line of value.data.lines) {
-          if (
-            line.skuId &&
-            !(await inventoryExists(context, 'sku', line.skuId))
-          )
-            throw new Error('Canonical SKU not found');
-        }
-      const locationId =
-        value.data.type === 'fulfillment'
-          ? value.data.location?.locationId
-          : null;
-      if (
-        locationId &&
-        !(await inventoryExists(context, 'location', locationId))
-      )
-        throw new Error('Canonical location not found');
-
-      return db.transaction(context.tenantId, async (tx) => {
-        const tenant = context.tenantId;
-        await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
-          `orders:${tenant}:${value.data.type === 'order' ? value.entityId : value.data.orderId}`,
-        ]);
-        const old = await tx.query<{ document: CanonicalSnapshot }>(
-          'SELECT document FROM orders_snapshots WHERE tenant_id=$1 AND entity_id=$2 AND observation_id=$3 AND normalizer_version=$4 AND mapping_version=$5',
-          [
-            tenant,
-            value.entityId,
-            value.observationId,
-            value.normalizerVersion,
-            value.mappingVersion,
-          ],
-        );
-        if (old.rows[0]) {
-          const same = await tx.query<{ matches: boolean }>(
-            'SELECT $1::jsonb=$2::jsonb AS matches',
-            [old.rows[0].document, value],
-          );
-          if (!same.rows[0]?.matches)
-            throw new Error('Snapshot identity conflict');
-          // Replaying after a SKU link change can return to an earlier snapshot of the
-          // current observation; make it current again.
-          const restored = await tx.query<{ snapshot_id: string }>(
-            `WITH existing AS (SELECT id FROM orders_snapshots WHERE tenant_id=$1 AND entity_id=$2
-              AND observation_id=$4 AND normalizer_version=$5 AND mapping_version=$6)
-            INSERT INTO orders_projections(tenant_id,entity_id,connection_id,snapshot_id)
-            SELECT $1,$2,$3,id FROM existing
-            ON CONFLICT(tenant_id,entity_id,connection_id) DO UPDATE SET snapshot_id=EXCLUDED.snapshot_id,
-              version=orders_projections.version+1,updated_at=now()
-            WHERE orders_projections.snapshot_id<>EXCLUDED.snapshot_id AND EXISTS (
-              SELECT 1 FROM orders_snapshots c WHERE c.tenant_id=$1 AND c.id=orders_projections.snapshot_id
-              AND c.observation_id=$4)
-            RETURNING snapshot_id`,
-            [
-              tenant,
-              value.entityId,
-              value.connectionId,
-              value.observationId,
-              value.normalizerVersion,
-              value.mappingVersion,
-            ],
-          );
-          const snapshot = restored.rows[0]?.snapshot_id;
-          if (!snapshot) return 'duplicate';
-          await tx.query(
-            'INSERT INTO orders_projection_events(id,tenant_id,snapshot_id,actor_id) VALUES($1,$2,$3,$4)',
-            [randomUUID(), tenant, snapshot, context.actor.id],
-          );
-          await refresh(tx, tenant, value);
-
-          return 'applied';
-        }
-        for (const ref of references(value)) {
-          const found = await tx.query(
-            'SELECT id FROM orders_entities WHERE tenant_id=$1 AND kind=$2 AND id=$3',
-            [tenant, ref.kind, ref.id],
-          );
-          if (!found.rowCount)
-            throw new Error('Canonical relationship not found');
-        }
-        const parentId =
-          value.data.type === 'order' ? value.entityId : value.data.orderId;
-        const children =
-          value.data.type === 'order'
-            ? value.data.lines.map((l) => l.id)
-            : [
-                value.entityId,
-                ...lineIds(value),
-                ...(value.data.type === 'refund' && value.data.returnId
-                  ? [value.data.returnId]
-                  : []),
-              ];
-        for (const child of children) {
-          await tx.query(
-            'INSERT INTO orders_relationships(tenant_id,child_id,order_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',
-            [tenant, child, parentId],
-          );
-          const parent = (
-            await tx.query<{ order_id: string }>(
-              'SELECT order_id FROM orders_relationships WHERE tenant_id=$1 AND child_id=$2',
-              [tenant, child],
-            )
-          ).rows[0];
-          if (parent?.order_id !== parentId)
-            throw new Error('Canonical child belongs to another order');
-        }
-        if (value.data.type !== 'order') {
-          const parent = (
-            await tx.query<{ document: CanonicalSnapshot }>(
-              `SELECT s.document FROM orders_projections p JOIN orders_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id
-             WHERE p.tenant_id=$1 AND p.entity_id=$2 AND p.connection_id=$3`,
-              [tenant, parentId, value.connectionId],
-            )
-          ).rows[0]?.document;
-          if (!parent || parent.deleted || parent.data.type !== 'order')
-            throw new Error('Order projection not found');
-          const lines = parent.data.lines;
-          const units = value.data.lines.flatMap((line) =>
-            line.orderLineId
-              ? [{ orderLineId: line.orderLineId, unit: line.unit }]
-              : [],
-          );
-          if (
-            units.some(
-              (line) =>
-                !lines.some(
-                  (p) => p.id === line.orderLineId && p.unit === line.unit,
-                ),
-            )
-          )
-            throw new Error(
-              `${value.data.type === 'fulfillment' ? 'Fulfillment' : 'Return or refund'} line or unit mismatch`,
-            );
-        }
-        const id = randomUUID();
-        await tx.query(
-          `INSERT INTO orders_snapshots(id,tenant_id,entity_id,kind,connection_id,observation_id,normalizer_version,source_updated_at,observed_at,document,mapping_version)
-     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-          [
-            id,
-            tenant,
-            value.entityId,
-            value.kind,
-            value.connectionId,
-            value.observationId,
-            value.normalizerVersion,
-            value.sourceUpdatedAt,
-            value.observedAt,
-            value,
-            value.mappingVersion,
-          ],
-        );
-        const current = (
-          await tx.query<{ document: CanonicalSnapshot }>(
-            `SELECT s.document FROM orders_projections p JOIN orders_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id
-      WHERE p.tenant_id=$1 AND p.entity_id=$2 AND p.connection_id=$3`,
-            [tenant, value.entityId, value.connectionId],
-          )
-        ).rows[0]?.document;
-        if (current && !supersedes(value, current)) return 'retained';
-        await tx.query(
-          `INSERT INTO orders_projections(tenant_id,entity_id,connection_id,snapshot_id) VALUES($1,$2,$3,$4)
-     ON CONFLICT(tenant_id,entity_id,connection_id) DO UPDATE SET snapshot_id=EXCLUDED.snapshot_id,version=orders_projections.version+1,updated_at=now()`,
-          [tenant, value.entityId, value.connectionId, id],
-        );
-        await tx.query(
-          'INSERT INTO orders_projection_events(id,tenant_id,snapshot_id,actor_id) VALUES($1,$2,$3,$4)',
-          [randomUUID(), tenant, id, context.actor.id],
-        );
-
-        await refresh(tx, tenant, value);
-
-        return 'applied';
-      });
+      return (await projectMany(context, [input]))[0]!;
     },
+    projectMany,
     async current(context, entityId) {
       requireTenant(context, context.tenantId);
 
@@ -260,6 +391,29 @@ export function createCommerceProjections(
             )
           ).rows,
       );
+    },
+    async currentMany(context, entityIds) {
+      requireTenant(context, context.tenantId);
+      const found = new Map<string, Projection[]>();
+      const ids = [...new Set(entityIds)];
+      if (!ids.length) return found;
+      const rows = await db.transaction(context.tenantId, (tx) =>
+        tx.query<{
+          entityId: string;
+          snapshotId: string;
+          version: number;
+          snapshot: CanonicalSnapshot;
+        }>(
+          `SELECT p.entity_id AS "entityId",s.id AS "snapshotId",p.version,s.document AS snapshot FROM orders_projections p
+          JOIN orders_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id
+          WHERE p.tenant_id=$1 AND p.entity_id=ANY($2::uuid[]) ORDER BY p.entity_id,p.connection_id`,
+          [context.tenantId, ids],
+        ),
+      );
+      for (const { entityId, ...projection } of rows.rows)
+        found.set(entityId, [...(found.get(entityId) ?? []), projection]);
+
+      return found;
     },
     async childParent(context, childId) {
       requireTenant(context, context.tenantId);
@@ -484,30 +638,100 @@ function lineIds(value: CanonicalSnapshot): string[] {
   return [...new Set(ids)];
 }
 
-/** Rebuilds the maintained reads that depend on a newly current snapshot, in its transaction. */
+/** The current snapshot document of each source, keyed by `entityId:connectionId`. */
+async function currentDocuments(
+  tx: SqlTransaction,
+  tenant: string,
+  sources: Pick<CanonicalSnapshot, 'entityId' | 'connectionId'>[],
+) {
+  const found = new Map<string, CanonicalSnapshot>();
+  if (!sources.length) return found;
+  const rows = await tx.query<{
+    entity_id: string;
+    connection_id: string;
+    document: CanonicalSnapshot;
+  }>(
+    `SELECT p.entity_id,p.connection_id,s.document FROM orders_projections p
+    JOIN unnest($2::uuid[],$3::uuid[]) AS k(entity_id,connection_id) ON p.tenant_id=$1 AND p.entity_id=k.entity_id AND p.connection_id=k.connection_id
+    JOIN orders_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id`,
+    [
+      tenant,
+      sources.map((source) => source.entityId),
+      sources.map((source) => source.connectionId),
+    ],
+  );
+  for (const row of rows.rows)
+    found.set(`${row.entity_id}:${row.connection_id}`, row.document);
+
+  return found;
+}
+
+/** Entities whose parent is the snapshot's order: its lines, or the child and its references. */
+function childrenOf(value: CanonicalSnapshot): string[] {
+  return value.data.type === 'order'
+    ? value.data.lines.map((line) => line.id)
+    : [
+        value.entityId,
+        ...lineIds(value),
+        ...(value.data.type === 'refund' && value.data.returnId
+          ? [value.data.returnId]
+          : []),
+      ];
+}
+
+const orderOf = (value: CanonicalSnapshot) =>
+  value.data.type === 'order' ? value.entityId : value.data.orderId;
+
+const sortedUnique = (ids: string[]) => [...new Set(ids)].sort();
+
+/**
+ * Rebuilds the maintained reads that depend on newly current snapshots once per batch, in
+ * their transaction. The caller holds the order locks.
+ */
 async function refresh(
   tx: SqlTransaction,
   tenantId: string,
-  value: CanonicalSnapshot,
+  values: CanonicalSnapshot[],
 ) {
+  if (!values.length) return;
   await tx.query(
-    'DELETE FROM orders_entity_redirects WHERE tenant_id=$1 AND entity_id=$2',
-    [tenantId, value.entityId],
+    'DELETE FROM orders_entity_redirects WHERE tenant_id=$1 AND entity_id=ANY($2::uuid[])',
+    [tenantId, sortedUnique(values.map((value) => value.entityId))],
   );
-  if (value.data.type === 'return' || value.data.type === 'refund') {
-    await refreshReturnList(tx, tenantId, value.data.orderId);
-
-    return;
-  }
-  const orderId =
-    value.data.type === 'order' ? value.entityId : value.data.orderId;
-  await refreshOrderList(tx, tenantId, [orderId], value.data.type === 'order');
-  await refreshFulfillmentList(tx, tenantId, [orderId]);
-  // Return rows show their order's number; keep it current when the order changes.
-  if (value.data.type === 'order')
+  const returns = (value: CanonicalSnapshot) =>
+    value.data.type === 'return' || value.data.type === 'refund';
+  for (const orderId of sortedUnique(values.filter(returns).map(orderOf)))
+    await refreshReturnList(tx, tenantId, orderId);
+  const listed = values.filter((value) => !returns(value));
+  const orders = listed.filter((value) => value.data.type === 'order');
+  const searched = sortedUnique(orders.map(orderOf));
+  await refreshOrderList(tx, tenantId, searched);
+  await refreshOrderList(
+    tx,
+    tenantId,
+    sortedUnique(listed.map(orderOf)).filter((id) => !searched.includes(id)),
+    false,
+  );
+  await refreshFulfillmentList(tx, tenantId, sortedUnique(listed.map(orderOf)));
+  // Return rows show their order's number; the last applied snapshot of each source is current.
+  const numbers = [
+    ...new Map(
+      orders.map((value) => [`${value.entityId}:${value.connectionId}`, value]),
+    ).values(),
+  ];
+  if (numbers.length)
     await tx.query(
-      `UPDATE orders_returns SET order_number=$4 WHERE tenant_id=$1 AND order_id=$2 AND connection_id=$3
-       AND order_number IS DISTINCT FROM $4`,
-      [tenantId, value.entityId, value.connectionId, value.data.displayNumber],
+      `UPDATE orders_returns r SET order_number=u.number
+      FROM unnest($2::uuid[],$3::uuid[],$4::text[]) AS u(order_id,connection_id,number)
+      WHERE r.tenant_id=$1 AND r.order_id=u.order_id AND r.connection_id=u.connection_id
+        AND r.order_number IS DISTINCT FROM u.number`,
+      [
+        tenantId,
+        numbers.map((value) => value.entityId),
+        numbers.map((value) => value.connectionId),
+        numbers.map((value) =>
+          value.data.type === 'order' ? value.data.displayNumber : null,
+        ),
+      ],
     );
 }

@@ -15,7 +15,7 @@ describe('commerce sync configuration', () => {
     expect(readCommerceSyncConfig(env)).toMatchObject({
       concurrency: 4,
       workspaceConcurrency: 4,
-      connectionConcurrency: 1,
+      connectionConcurrency: 2,
     });
     expect(
       readCommerceSyncConfig({

@@ -19,60 +19,212 @@ import { commerceSchema, sourceSchema } from './source-validation.js';
  */
 export function createSourceRecords(
   db: TenantDatabase,
-  canonicalExists: (
+  canonicalMissing: (
     context: TenantContext,
     kind: SourceIdentity['resource'],
-    id: string,
-  ) => Promise<boolean>,
+    ids: string[],
+  ) => Promise<string[]>,
 ): SourceRecords {
-  return {
-    async record(context, ingestKey, input) {
-      requireRole(context, ['owner', 'admin']);
-      z.string().min(1).max(1024).parse(ingestKey);
-      const value = commerceSchema.parse(input);
+  const recordMany: SourceRecords['recordMany'] = async (context, items) => {
+    requireRole(context, ['owner', 'admin']);
+    const values = items.map((item) => {
+      z.string().min(1).max(1024).parse(item.ingestKey);
+      const value = commerceSchema.parse(item.input);
       requireTenant(context, value.observation.source.tenantId);
 
-      return db.transaction(context.tenantId, async (tx) => {
+      return { ingestKey: item.ingestKey, value };
+    });
+    if (!values.length) return [];
+
+    return db.transaction(context.tenantId, async (tx) => {
+      const installed = await tx.query<{
+        id: string;
+        document: {
+          status: string;
+          provider?: string;
+          target: { kind: string };
+        };
+      }>(
+        'SELECT id,document FROM connector_installations WHERE tenant_id=$1 AND id=ANY($2::uuid[])',
+        [
+          context.tenantId,
+          [
+            ...new Set(
+              values.map(({ value }) => value.observation.source.connectionId),
+            ),
+          ],
+        ],
+      );
+      const connections = new Map(
+        installed.rows.map((row) => [row.id, row.document]),
+      );
+      for (const { value } of values) {
         const source = value.observation.source;
-        const installed = await tx.query<{
-          document: {
-            status: string;
-            provider?: string;
-            target: { kind: string };
-          };
-        }>(
-          'SELECT document FROM connector_installations WHERE tenant_id=$1 AND id=$2',
-          [context.tenantId, source.connectionId],
-        );
-        const connection = installed.rows[0]?.document;
+        const connection = connections.get(source.connectionId);
         if (
           !connection ||
           (connection.provider ?? connection.target.kind) !== source.provider ||
           !['active', 'degraded'].includes(connection.status)
         )
           throw new Error('Connection unavailable');
-        await tx.query(
-          `INSERT INTO connector_observations(id,tenant_id,connection_id,ingest_key,document) VALUES($1,$2,$3,$4,$5)
-     ON CONFLICT(tenant_id,connection_id,ingest_key) DO NOTHING`,
-          [
-            value.observation.id,
-            context.tenantId,
-            source.connectionId,
-            ingestKey,
-            value,
-          ],
-        );
-        const stored = (
-          await tx.query<{ document: CommerceObservation; matches: boolean }>(
-            `SELECT document,(document #- '{observation,id}')=($4::jsonb #- '{observation,id}') AS matches
-      FROM connector_observations WHERE tenant_id=$1 AND connection_id=$2 AND ingest_key=$3`,
-            [context.tenantId, source.connectionId, ingestKey, value],
+      }
+      const rows = values.map(({ ingestKey, value }) => ({
+        id: value.observation.id,
+        connection_id: value.observation.source.connectionId,
+        ingest_key: ingestKey,
+        document: value,
+      }));
+      const key = (connectionId: string, ingestKey: string) =>
+        JSON.stringify([connectionId, ingestKey]);
+      const stored = new Map(
+        (
+          await tx.query<{
+            connection_id: string;
+            ingest_key: string;
+            document: CommerceObservation;
+          }>(
+            `INSERT INTO connector_observations(id,tenant_id,connection_id,ingest_key,document)
+            SELECT r.id,$1,r.connection_id,r.ingest_key,r.document
+            FROM jsonb_to_recordset($2::jsonb) AS r(id uuid,connection_id uuid,ingest_key text,document jsonb)
+            ON CONFLICT(tenant_id,connection_id,ingest_key) DO NOTHING
+            RETURNING connection_id,ingest_key,document`,
+            [context.tenantId, JSON.stringify(rows)],
           )
-        ).rows[0]!;
-        if (!stored.matches) throw new Error('Ingest key conflict');
+        ).rows.map((row) => [
+          key(row.connection_id, row.ingest_key),
+          row.document,
+        ]),
+      );
+      // Keys stored earlier must hold the same observation apart from its ID.
+      const existing = rows.filter(
+        (row) => !stored.has(key(row.connection_id, row.ingest_key)),
+      );
+      if (existing.length) {
+        const found = await tx.query<{
+          connection_id: string;
+          ingest_key: string;
+          document: CommerceObservation;
+          matches: boolean;
+        }>(
+          `SELECT o.connection_id,o.ingest_key,o.document,
+            (o.document #- '{observation,id}')=(r.document #- '{observation,id}') AS matches
+          FROM jsonb_to_recordset($2::jsonb) AS r(connection_id uuid,ingest_key text,document jsonb)
+          JOIN connector_observations o ON o.tenant_id=$1 AND o.connection_id=r.connection_id AND o.ingest_key=r.ingest_key`,
+          [context.tenantId, JSON.stringify(existing)],
+        );
+        for (const row of found.rows) {
+          if (!row.matches) throw new Error('Ingest key conflict');
+          stored.set(key(row.connection_id, row.ingest_key), row.document);
+        }
+      }
 
-        return stored.document;
+      return rows.map((row) => {
+        const document = stored.get(key(row.connection_id, row.ingest_key));
+        if (!document) throw new Error('Ingest key conflict');
+
+        return document;
       });
+    });
+  };
+
+  const bindMany: SourceRecords['bindMany'] = async (context, entries) => {
+    requireRole(context, ['owner', 'admin']);
+    const values = entries.map((entry) => {
+      const source = sourceSchema.parse(entry.source);
+      requireTenant(context, source.tenantId);
+      z.string().uuid().parse(entry.canonicalId);
+      z.string().uuid().parse(entry.observationId);
+      z.string().min(1).max(1024).parse(entry.method);
+
+      return { ...entry, source };
+    });
+    if (!values.length) return;
+    for (const resource of new Set(
+      values.map((value) => value.source.resource),
+    ))
+      if (
+        (
+          await canonicalMissing(
+            context,
+            resource,
+            values
+              .filter((value) => value.source.resource === resource)
+              .map((value) => value.canonicalId),
+          )
+        ).length
+      )
+        throw new Error('Canonical mapping target not found');
+    await db.transaction(context.tenantId, async (tx) => {
+      const evidence = new Map(
+        (
+          await tx.query<{
+            id: string;
+            connection_id: string;
+            document: CommerceObservation;
+          }>(
+            'SELECT id,connection_id,document FROM connector_observations WHERE tenant_id=$1 AND id=ANY($2::uuid[])',
+            [
+              context.tenantId,
+              [...new Set(values.map((value) => value.observationId))],
+            ],
+          )
+        ).rows.map((row) => [row.id, row]),
+      );
+      for (const { source, observationId } of values) {
+        const stored = evidence.get(observationId);
+        if (
+          !stored ||
+          stored.connection_id !== source.connectionId ||
+          stored.document.observation.source.provider !== source.provider ||
+          !evidenceIdentities(stored.document).some(
+            (s) =>
+              s.resource === source.resource &&
+              s.externalId === source.externalId &&
+              s.scopeKey === source.scopeKey,
+          )
+        )
+          throw new Error(
+            'Mapping evidence does not identify this source object',
+          );
+      }
+      const rows = JSON.stringify(
+        values.map((value) => ({
+          connection_id: value.source.connectionId,
+          resource: value.source.resource,
+          scope_key: value.source.scopeKey,
+          external_id: value.source.externalId,
+          canonical_id: value.canonicalId,
+          observation_id: value.observationId,
+          method: value.method,
+        })),
+      );
+      // Sorted inserts keep concurrent imports of overlapping records from deadlocking.
+      await tx.query(
+        `INSERT INTO connector_source_mappings(id,tenant_id,connection_id,resource,scope_key,external_id,canonical_id,observation_id,method,actor_id)
+        SELECT gen_random_uuid(),$1,r.connection_id,r.resource,r.scope_key,r.external_id,r.canonical_id,r.observation_id,r.method,$3
+        FROM jsonb_to_recordset($2::jsonb) AS r(connection_id uuid,resource text,scope_key text,external_id text,
+          canonical_id uuid,observation_id uuid,method text)
+        ORDER BY r.connection_id,r.resource,r.scope_key,r.external_id
+        ON CONFLICT(tenant_id,connection_id,resource,scope_key,external_id) DO NOTHING`,
+        [context.tenantId, rows, context.actor.id],
+      );
+      const conflicting = await tx.query(
+        `SELECT 1 FROM jsonb_to_recordset($2::jsonb) AS r(connection_id uuid,resource text,scope_key text,external_id text,canonical_id uuid)
+        LEFT JOIN connector_source_mappings m ON m.tenant_id=$1 AND m.connection_id=r.connection_id AND m.resource=r.resource
+          AND m.scope_key=r.scope_key AND m.external_id=r.external_id
+        WHERE m.canonical_id IS DISTINCT FROM r.canonical_id LIMIT 1`,
+        [context.tenantId, rows],
+      );
+      if (conflicting.rowCount)
+        throw new Error('Source already maps to another canonical entity');
+    });
+  };
+
+  return {
+    recordMany,
+    bindMany,
+    async record(context, ingestKey, input) {
+      return (await recordMany(context, [{ ingestKey, input }]))[0]!;
     },
     async get(context, connectionId, ingestKey) {
       requireTenant(context, context.tenantId);
@@ -88,63 +240,8 @@ export function createSourceRecords(
           ).rows[0]?.document ?? null,
       );
     },
-    async bind(context, input, canonicalId, observationId, method) {
-      requireRole(context, ['owner', 'admin']);
-      const source = sourceSchema.parse(input);
-      requireTenant(context, source.tenantId);
-      z.string().uuid().parse(canonicalId);
-      z.string().uuid().parse(observationId);
-      z.string().min(1).max(1024).parse(method);
-      if (!(await canonicalExists(context, source.resource, canonicalId)))
-        throw new Error('Canonical mapping target not found');
-      await db.transaction(context.tenantId, async (tx) => {
-        const evidence = (
-          await tx.query<{ document: CommerceObservation }>(
-            'SELECT document FROM connector_observations WHERE tenant_id=$1 AND connection_id=$2 AND id=$3',
-            [context.tenantId, source.connectionId, observationId],
-          )
-        ).rows[0]?.document;
-        if (
-          !evidence ||
-          evidence.observation.source.provider !== source.provider ||
-          !evidenceIdentities(evidence).some(
-            (s) =>
-              s.resource === source.resource &&
-              s.externalId === source.externalId &&
-              s.scopeKey === source.scopeKey,
-          )
-        )
-          throw new Error(
-            'Mapping evidence does not identify this source object',
-          );
-        const values = [
-          context.tenantId,
-          source.connectionId,
-          source.resource,
-          source.scopeKey,
-          source.externalId,
-        ];
-        await tx.query(
-          `INSERT INTO connector_source_mappings(id,tenant_id,connection_id,resource,scope_key,external_id,canonical_id,observation_id,method,actor_id)
-     VALUES($6,$1,$2,$3,$4,$5,$7,$8,$9,$10) ON CONFLICT(tenant_id,connection_id,resource,scope_key,external_id) DO NOTHING`,
-          [
-            ...values,
-            randomUUID(),
-            canonicalId,
-            observationId,
-            method,
-            context.actor.id,
-          ],
-        );
-        const existing = (
-          await tx.query<{ canonical_id: string }>(
-            'SELECT canonical_id FROM connector_source_mappings WHERE tenant_id=$1 AND connection_id=$2 AND resource=$3 AND scope_key=$4 AND external_id=$5',
-            values,
-          )
-        ).rows[0];
-        if (existing?.canonical_id !== canonicalId)
-          throw new Error('Source already maps to another canonical entity');
-      });
+    async bind(context, source, canonicalId, observationId, method) {
+      await bindMany(context, [{ source, canonicalId, observationId, method }]);
     },
     async resolve(context, input) {
       const source = sourceSchema.parse(input);
@@ -224,6 +321,26 @@ export function createSourceRecords(
           ).rows[0]?.document ?? null,
       );
     },
+    async revised(context, resource, canonicalIds) {
+      requireTenant(context, context.tenantId);
+      const ids = [...new Set(canonicalIds)];
+      if (!ids.length) return new Set<string>();
+
+      return db.transaction(
+        context.tenantId,
+        async (tx) =>
+          new Set(
+            (
+              await tx.query<{ canonical_id: string }>(
+                `SELECT DISTINCT m.canonical_id FROM connector_source_mappings m
+                WHERE m.tenant_id=$1 AND m.resource=$2 AND m.canonical_id=ANY($3::uuid[])
+                  AND EXISTS (SELECT 1 FROM connector_mapping_revisions r WHERE r.tenant_id=m.tenant_id AND r.mapping_id=m.id)`,
+                [context.tenantId, resource, ids],
+              )
+            ).rows.map((row) => row.canonical_id),
+          ),
+      );
+    },
     async mappings(context, resource, canonicalId) {
       requireTenant(context, context.tenantId);
       z.string().uuid().parse(canonicalId);
@@ -283,7 +400,7 @@ export function createSourceRecords(
       z.string().min(1).max(1024).parse(method);
       z.string().min(1).max(2000).parse(reason);
       if (from === to) throw new Error('Source already maps to this entity');
-      if (!(await canonicalExists(context, source.resource, to)))
+      if ((await canonicalMissing(context, source.resource, [to])).length)
         throw new Error('Canonical mapping target not found');
 
       return db.transaction(context.tenantId, async (tx) => {
