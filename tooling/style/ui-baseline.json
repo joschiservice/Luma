@@ -62,14 +62,6 @@
   "apps/web/src/features/workflows/authoring/authoring.css": {
     "reason": "Existing appearance values retained to avoid visual changes in the tooling rollout. Remove entries when migrating to tokens or shared variants.",
     "findings": {
-      "primitive-appearance: .authoring-categories [data-slot='button'] { padding-inline: 10px }": 1,
-      "primitive-appearance: .authoring-categories [data-slot='button'] { border-radius: 7px }": 1,
-      "primitive-appearance: .authoring-categories [data-slot='button'] { color: var(--foreground-subtle) }": 1,
-      "primitive-appearance: .authoring-categories [data-slot='button'][aria-pressed='true'] { background: var(--surface-raised) }": 1,
-      "raw-color: .authoring-categories [data-slot='button'][aria-pressed='true'] { box-shadow: 0 1px 2px rgb(16 37 83 / 0.08),\n    0 0 0 1px var(--line) }": 1,
-      "primitive-appearance: .authoring-categories [data-slot='button'][aria-pressed='true'] { box-shadow: 0 1px 2px rgb(16 37 83 / 0.08),\n    0 0 0 1px var(--line) }": 1,
-      "primitive-appearance: .authoring-categories [data-slot='button'][aria-pressed='true'] { color: var(--foreground) }": 1,
-      "primitive-appearance: .dark .authoring-categories [data-slot='button'][aria-pressed='true'] { background: color-mix(in srgb, var(--foreground) 10%, transparent) }": 1,
       "raw-color: .authoring-requirements li > svg { color: var(--state-verified, #148a4a) }": 1,
       "raw-color: .authoring-requirements li[data-met='false'] > svg { color: var(--state-approval-text, #9a6700) }": 1,
       "raw-color: .authoring-problems li[data-severity='warning'] strong { color: var(--state-approval-text, #9a6700) }": 1,
