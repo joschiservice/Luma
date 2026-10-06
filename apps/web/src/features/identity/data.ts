@@ -1,6 +1,9 @@
+import { passkeyClient } from '@better-auth/passkey/client';
 import { type ApiError, apiErrorSchema } from '@luma/api-contract';
 import { type QueryClient, queryOptions } from '@tanstack/react-query';
 import { createAuthClient } from 'better-auth/client';
+import { twoFactorClient } from 'better-auth/client/plugins';
+import { useSyncExternalStore } from 'react';
 import { z } from 'zod';
 
 import { createWebApiClient } from '../../lib/api-client';
@@ -8,12 +11,28 @@ import { privateQueryDefaults } from '../../lib/private-query';
 
 export const auth = createAuthClient({
   basePath: '/api/auth',
-  fetchOptions: { retry: 0 },
+  // Resolve fetch per request so previews and tests can intercept auth calls.
+  fetchOptions: {
+    retry: 0,
+    customFetchImpl: (input, init) => globalThis.fetch(input, init),
+  },
+  plugins: [twoFactorClient(), passkeyClient()],
 });
 
 const api = createWebApiClient();
 
 export const sessionKey = ['private', 'session'] as const;
+
+const unchanging = () => () => undefined;
+
+/** Reports whether this browser supports WebAuthn passkeys; false during server rendering. */
+export function usePasskeySupport() {
+  return useSyncExternalStore(
+    unchanging,
+    () => typeof window.PublicKeyCredential === 'function',
+    () => false,
+  );
+}
 
 /**
  * A failed API or auth request. Keeps the HTTP status and, when the response carried the API
@@ -131,6 +150,7 @@ export const sessionOptions = () =>
               id: result.data.user.id,
               name: result.data.user.name,
               email: result.data.user.email,
+              twoFactorEnabled: result.data.user.twoFactorEnabled === true,
             },
           }
         : null;

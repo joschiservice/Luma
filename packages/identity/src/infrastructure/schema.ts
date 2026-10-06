@@ -1,4 +1,12 @@
-import { boolean, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import {
+  bigint,
+  boolean,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from 'drizzle-orm/pg-core';
 
 const time = (name: string) => timestamp(name, { withTimezone: true });
 
@@ -8,6 +16,7 @@ export const user = pgTable('users', {
   email: text('email').notNull().unique(),
   emailVerified: boolean('email_verified').notNull().default(false),
   image: text('image'),
+  twoFactorEnabled: boolean('two_factor_enabled').notNull().default(false),
   createdAt: time('created_at').notNull(),
   updatedAt: time('updated_at').notNull(),
 });
@@ -89,4 +98,35 @@ export const invitation = pgTable('invitations', {
     .references(() => user.id),
   expiresAt: time('expires_at').notNull(),
   createdAt: time('created_at').notNull(),
+});
+
+export const twoFactor = pgTable('two_factors', {
+  id: uuid('id').primaryKey(),
+  userId: uuid('user_id')
+    .notNull()
+    .unique()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  secret: text('secret').notNull(),
+  backupCodes: text('backup_codes').notNull(),
+  verified: boolean('verified').notNull().default(true),
+  failedVerificationCount: integer('failed_verification_count')
+    .notNull()
+    .default(0),
+  lockedUntil: time('locked_until'),
+});
+
+export const passkey = pgTable('passkeys', {
+  id: uuid('id').primaryKey(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  name: text('name'),
+  credentialID: text('credential_id').notNull().unique(),
+  publicKey: text('public_key').notNull(),
+  counter: bigint('counter', { mode: 'number' }).notNull(),
+  deviceType: text('device_type').notNull(),
+  backedUp: boolean('backed_up').notNull(),
+  transports: text('transports'),
+  aaguid: text('aaguid'),
+  createdAt: time('created_at'),
 });
