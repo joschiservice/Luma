@@ -59,7 +59,7 @@ test('finds a held fulfillment, explains the next safe step and follows its orde
   await page.evaluate(() => document.documentElement.classList.remove('dark'));
 
   // A tracking number search keeps the view in the address.
-  await page.getByRole('button', { name: /^All/ }).click();
+  await page.getByRole('tab', { name: /^All/ }).click();
   await page
     .getByRole('searchbox', { name: 'Search fulfillment' })
     .fill('4521-8876');
@@ -70,7 +70,7 @@ test('finds a held fulfillment, explains the next safe step and follows its orde
   expect(url.searchParams.get('q')).toBe('4521-8876');
 
   // The held work explains its cause, the next step and what counts as progress.
-  await page.getByRole('button', { name: /^On hold/ }).click();
+  await page.getByRole('tab', { name: /^On hold/ }).click();
   await page.getByRole('button', { name: 'Clear', exact: true }).click();
   await page.getByRole('link', { name: '#200', exact: true }).click();
   await page

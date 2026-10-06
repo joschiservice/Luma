@@ -76,7 +76,7 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
   await page.getByRole('link', { name }).waitFor();
   await page.getByRole('button', { name: /^Enabled 0$/ }).click();
   await page.getByRole('heading', { name: 'No matching workflows' }).waitFor();
-  await page.getByRole('button', { name: /^All workflows 1$/ }).click();
+  await page.getByRole('tab', { name: /^All workflows 1$/ }).click();
   await page.getByRole('link', { name }).waitFor();
   await page.getByLabel('Search workflows').fill('missing');
   await page.getByRole('heading', { name: 'No matching workflows' }).waitFor();
@@ -177,7 +177,7 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
     fullPage: false,
   });
   await page.getByRole('link', { name: 'All workflows' }).click();
-  await page.getByRole('button', { name: /^Needs attention 1$/ }).click();
+  await page.getByRole('tab', { name: /^Needs attention 1$/ }).click();
   await page.getByRole('link', { name }).waitFor();
   await page.getByText('Blocked', { exact: true }).first().waitFor();
   await db.owner.query(

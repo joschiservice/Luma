@@ -387,10 +387,11 @@ export const Attention: Story = {
     ).toBeVisible();
     await expect(canvas.getByText('Held: Incorrect address.')).toBeVisible();
     await expect(canvas.getByText('Past fulfill-by')).toBeVisible();
-    await userEvent.click(canvas.getByRole('button', { name: /On hold/ }));
-    await expect(
-      canvas.getByRole('button', { name: /On hold/ }),
-    ).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(canvas.getByRole('tab', { name: /On hold/ }));
+    await expect(canvas.getByRole('tab', { name: /On hold/ })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
   },
 };
 

@@ -65,12 +65,6 @@
   margin: 12px 14px;
 }
 
-.workflow-view-count {
-  color: var(--foreground-subtle);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-}
-
 .workflow-search {
   position: relative;
   flex: 1;

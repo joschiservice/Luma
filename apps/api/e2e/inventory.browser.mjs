@@ -39,7 +39,7 @@ test('investigates stock differences, follows affected orders and preserves filt
   await page.getByRole('link', { name: 'Inspect inventory' }).click();
   await page.getByRole('heading', { name: 'Inventory', exact: true }).waitFor();
   await page
-    .getByRole('button', { name: 'Source differences', exact: true })
+    .getByRole('tab', { name: 'Source differences', exact: true })
     .click();
   const search = page.getByRole('searchbox', { name: 'Search inventory' });
   await search.fill('77');

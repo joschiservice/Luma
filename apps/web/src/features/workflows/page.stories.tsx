@@ -575,7 +575,7 @@ export const Filters: Story = {
     const canvas = within(canvasElement);
     const body = within(canvasElement.ownerDocument.body);
     await userEvent.click(
-      canvas.getByRole('button', { name: 'Needs attention 3' }),
+      canvas.getByRole('tab', { name: 'Needs attention 3' }),
     );
     await expect(
       canvas.getByRole('link', { name: 'Replenish low stock' }),
@@ -583,7 +583,7 @@ export const Filters: Story = {
     await expect(
       canvas.queryByRole('link', { name: 'Correct a delivery address' }),
     ).not.toBeInTheDocument();
-    await userEvent.click(canvas.getByRole('button', { name: 'Enabled 2' }));
+    await userEvent.click(canvas.getByRole('tab', { name: 'Enabled 2' }));
     await expect(
       canvas.getByRole('link', { name: summary.name }),
     ).toBeVisible();
@@ -611,9 +611,7 @@ export const Filters: Story = {
     await expect(
       await canvas.findByRole('link', { name: summary.name }),
     ).toBeVisible();
-    await userEvent.click(
-      canvas.getByRole('button', { name: /^All workflows/ }),
-    );
+    await userEvent.click(canvas.getByRole('tab', { name: /^All workflows/ }));
     await userEvent.type(search, 'commitments');
     await expect(
       await canvas.findByRole('link', { name: 'Replenish low stock' }),

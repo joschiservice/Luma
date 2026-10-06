@@ -122,7 +122,7 @@ test('creates and reviews procurement records with safe retries on desktop and m
   await page
     .getByRole('button', { name: 'Clear filters', exact: true })
     .click();
-  await page.getByRole('button', { name: /Suppliers 1/ }).click();
+  await page.getByRole('tab', { name: /Suppliers 1/ }).click();
   await page
     .getByRole('rowheader', { name: 'Northstar Supply', exact: true })
     .waitFor();

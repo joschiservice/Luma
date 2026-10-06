@@ -986,20 +986,26 @@
   min-width: 0;
 }
 
+/* Many views scroll sideways in narrow layouts instead of wrapping the segmented control. */
 .collection-views {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
   min-width: 0;
+  max-width: 100%;
 }
 
-.collection-views > [data-slot='button'] {
-  gap: 6px;
+.collection-views [data-slot='tabs-list'] {
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
-.collection-views > [data-slot='button'][aria-pressed='true'] {
-  background: var(--muted);
-  color: var(--foreground);
+/* The scrolling list clips outside outlines, so focus is drawn inside the trigger. */
+.collection-views [data-slot='tabs-trigger']:focus-visible {
+  outline-offset: -2px;
+}
+
+.collection-views [data-slot='tabs-trigger'] svg {
+  width: 14px;
+  height: 14px;
 }
 
 .collection-toolbar-refresh[data-slot='button'] {

@@ -484,11 +484,11 @@ export const Browse: Story = {
     ).toBeVisible();
     await expect(canvas.getAllByText('Not in catalog')).toHaveLength(2);
     await userEvent.click(
-      canvas.getByRole('button', { name: /Differs by source/ }),
+      canvas.getByRole('tab', { name: /Differs by source/ }),
     );
     await expect(
-      canvas.getByRole('button', { name: /Differs by source/ }),
-    ).toHaveAttribute('aria-pressed', 'true');
+      canvas.getByRole('tab', { name: /Differs by source/ }),
+    ).toHaveAttribute('aria-selected', 'true');
   },
 };
 

@@ -118,7 +118,7 @@ test('opens the exact records behind a chart point and returns to them', async (
 
   // The table view opens the same records as the bars.
   const backlog = page.locator('section[data-chart="fulfillment"]');
-  await backlog.getByRole('button', { name: 'Table', exact: true }).click();
+  await backlog.getByRole('tab', { name: 'Table', exact: true }).click();
   await backlog
     .getByRole('table', { name: 'Fulfillment backlog' })
     .getByRole('button', { name: /No progress\. Show the records\.$/ })

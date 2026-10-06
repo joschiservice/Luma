@@ -34,6 +34,7 @@ import {
 } from './dropdown-menu';
 import { Input } from './input';
 import { ResponsivePopover } from './responsive-popover';
+import { Tabs, TabsList, TabsTrigger } from './tabs';
 
 export type {
   CollectionFilter,
@@ -70,7 +71,10 @@ export interface CollectionView<Value extends string> {
   attention?: boolean | undefined;
 }
 
-/** Switches between a collection's saved views. Each view is a toggle button with an optional count. */
+/**
+ * Switches between a collection's saved views as segmented tabs with optional counts. Arrow keys
+ * move focus; Enter or Space selects, so moving through views does not refetch each one.
+ */
 export function CollectionViews<Value extends string>({
   label,
   value,
@@ -83,25 +87,34 @@ export function CollectionViews<Value extends string>({
   onChange: (value: Value) => void;
 }) {
   return (
-    <div className="collection-views" role="group" aria-label={label}>
-      {views.map((view) => (
-        <Button
-          key={view.value}
-          variant="ghost"
-          aria-pressed={view.value === value}
-          title={view.description}
-          onClick={() => onChange(view.value)}
-        >
-          {view.icon}
-          {view.label}
-          {view.count !== undefined ? (
-            <Badge tone={view.attention && view.count ? 'warning' : 'neutral'}>
-              {view.count}
-            </Badge>
-          ) : null}
-        </Button>
-      ))}
-    </div>
+    <Tabs
+      value={value}
+      className="collection-views"
+      onValueChange={(next) => {
+        const view = views.find((item) => item.value === next);
+        if (view) onChange(view.value);
+      }}
+    >
+      <TabsList aria-label={label} activateOnFocus={false}>
+        {views.map((view) => (
+          <TabsTrigger
+            key={view.value}
+            value={view.value}
+            title={view.description}
+          >
+            {view.icon}
+            {view.label}
+            {view.count !== undefined ? (
+              <Badge
+                tone={view.attention && view.count ? 'warning' : 'neutral'}
+              >
+                {view.count}
+              </Badge>
+            ) : null}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+    </Tabs>
   );
 }
 

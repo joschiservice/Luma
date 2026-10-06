@@ -258,11 +258,11 @@ export const TemplateGallery: Story = {
     await expect(
       canvas.getByRole('link', { name: 'Add a supplier' }),
     ).toBeVisible();
-    await userEvent.click(canvas.getByRole('button', { name: /Resolution/ }));
+    await userEvent.click(canvas.getByRole('tab', { name: /Resolution/ }));
     await expect(
       canvas.queryByRole('heading', { name: 'Replenish low stock' }),
     ).not.toBeInTheDocument();
-    await userEvent.click(canvas.getByRole('button', { name: /All/ }));
+    await userEvent.click(canvas.getByRole('tab', { name: /All/ }));
     await userEvent.type(
       canvas.getByLabelText('Search templates'),
       'nothing like this',

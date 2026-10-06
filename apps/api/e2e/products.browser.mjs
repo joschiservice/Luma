@@ -90,7 +90,7 @@ test('finds a SKU, compares its store and ERP listings and follows affected orde
   await page.evaluate(() => document.documentElement.classList.add('dark'));
   await page.screenshot({ path: '/tmp/luma101-list-dark.png', fullPage: true });
   await page.evaluate(() => document.documentElement.classList.remove('dark'));
-  await page.getByRole('button', { name: /Not in every source/ }).click();
+  await page.getByRole('tab', { name: /Not in every source/ }).click();
   await page.getByRole('button', { name: 'Add Missing from filter' }).click();
   await page.getByRole('button', { name: 'JTL-Wawi', exact: true }).click();
   await page

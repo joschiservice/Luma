@@ -91,11 +91,6 @@
   gap: 8px;
 }
 
-.insights-view-toggle {
-  display: inline-flex;
-  gap: 2px;
-}
-
 .insights-card-body {
   display: grid;
   min-width: 0;

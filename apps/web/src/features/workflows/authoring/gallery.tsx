@@ -5,6 +5,7 @@ import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Card } from '@luma/ui/components/primitives/card';
+import { CollectionViews } from '@luma/ui/components/primitives/collection-toolbar';
 import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { Empty } from '@luma/ui/components/primitives/empty';
 import { Input } from '@luma/ui/components/primitives/input';
@@ -42,6 +43,8 @@ const categories = {
   resolution: 'Resolution',
   inventory: 'Inventory',
 } as const;
+
+const categoryKeys = ['procurement', 'resolution', 'inventory'] as const;
 
 export interface GallerySearch {
   category?: keyof typeof categories | undefined;
@@ -249,38 +252,25 @@ export function NewWorkflowView({
           </div>
         </div>
         <div className="authoring-filters">
-          <div
-            className="authoring-categories"
-            role="group"
-            aria-label="Template category"
-          >
-            {[['', 'All'], ...Object.entries(categories)].map(
-              ([value, label]) => (
-                <Button
-                  key={value}
-                  variant="ghost"
-                  aria-pressed={(search.category ?? '') === value}
-                  onClick={() =>
-                    changeSearch({
-                      ...search,
-                      category: (value ||
-                        undefined) as GallerySearch['category'],
-                    })
-                  }
-                >
-                  {label}
-                  <span className="workflow-view-count">
-                    {matching
-                      ? value
-                        ? matching.filter((item) => item.category === value)
-                            .length
-                        : matching.length
-                      : '—'}
-                  </span>
-                </Button>
-              ),
-            )}
-          </div>
+          <CollectionViews
+            label="Template category"
+            value={search.category ?? 'all'}
+            views={[
+              { value: 'all', label: 'All', count: matching?.length },
+              ...categoryKeys.map((value) => ({
+                value,
+                label: categories[value],
+                count: matching?.filter((item) => item.category === value)
+                  .length,
+              })),
+            ]}
+            onChange={(value) =>
+              changeSearch({
+                ...search,
+                category: value === 'all' ? undefined : value,
+              })
+            }
+          />
           <div className="workflow-search">
             <Search size={16} aria-hidden="true" />
             <Input

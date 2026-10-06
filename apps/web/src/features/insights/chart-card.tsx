@@ -14,6 +14,11 @@ import {
 import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { StateDot } from '@luma/ui/components/primitives/state';
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+} from '@luma/ui/components/primitives/tabs';
 import { Link } from '@tanstack/react-router';
 import { RefreshCw } from 'lucide-react';
 import { useId, useState } from 'react';
@@ -107,23 +112,20 @@ export function ChartCard({
         <p className="insights-card-description">{definition.description}</p>
         <div className="insights-card-actions">
           {badge && <Badge tone={badge.tone}>{badge.label}</Badge>}
-          <div
-            className="insights-view-toggle"
-            role="group"
-            aria-label={`${definition.title} view`}
+          <Tabs
+            value={view}
+            onValueChange={(next) =>
+              setView(next === 'table' ? 'table' : 'chart')
+            }
           >
-            {(['chart', 'table'] as const).map((option) => (
-              <Button
-                key={option}
-                variant="ghost"
-                size="sm"
-                aria-pressed={view === option}
-                onClick={() => setView(option)}
-              >
-                {option === 'chart' ? 'Chart' : 'Table'}
-              </Button>
-            ))}
-          </div>
+            <TabsList
+              aria-label={`${definition.title} view`}
+              activateOnFocus={false}
+            >
+              <TabsTrigger value="chart">Chart</TabsTrigger>
+              <TabsTrigger value="table">Table</TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
       </header>
       <div className="insights-card-body">

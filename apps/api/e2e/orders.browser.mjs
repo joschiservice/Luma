@@ -166,10 +166,10 @@ test('finds an order by number or SKU, explains it and pages a historical import
   await page.getByRole('button', { name: 'Previous' }).click();
   await page.getByText('1–50 orders').waitFor();
 
-  await page.getByRole('button', { name: 'Overdue', exact: true }).click();
+  await page.getByRole('tab', { name: 'Overdue', exact: true }).click();
   await page.getByText('1–1 orders').waitFor();
   await page.getByRole('link', { name: '#2003' }).waitFor();
-  await page.getByRole('button', { name: 'All orders' }).click();
+  await page.getByRole('tab', { name: 'All orders' }).click();
 
   await page.getByRole('button', { name: 'Add Status filter' }).click();
   await page.getByRole('button', { name: 'Open', exact: true }).click();

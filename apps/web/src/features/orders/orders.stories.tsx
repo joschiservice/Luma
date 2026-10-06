@@ -390,13 +390,14 @@ export const Browse: Story = {
     await expect(placed).toHaveAttribute('aria-sort', 'descending');
     await userEvent.click(within(placed).getByRole('button'));
     await expect(placed).toHaveAttribute('aria-sort', 'ascending');
-    await userEvent.click(canvas.getByRole('button', { name: 'Overdue' }));
+    await userEvent.click(canvas.getByRole('tab', { name: 'Overdue' }));
+    await expect(canvas.getByRole('tab', { name: 'Overdue' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
     await expect(
-      canvas.getByRole('button', { name: 'Overdue' }),
-    ).toHaveAttribute('aria-pressed', 'true');
-    await expect(
-      canvas.getByRole('button', { name: 'All orders' }),
-    ).toHaveAttribute('aria-pressed', 'false');
+      canvas.getByRole('tab', { name: 'All orders' }),
+    ).toHaveAttribute('aria-selected', 'false');
   },
 };
 

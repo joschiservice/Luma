@@ -223,7 +223,7 @@ export const OrdersWithImportedHistory: Story = {
     await expect(canvas.getByText(/without a placed time/)).toBeVisible();
     await userEvent.click(canvas.getByRole('button', { name: /^Open\s*39$/ }));
     await expect(args.onSelect).toHaveBeenLastCalledWith({ series: 'open' });
-    await userEvent.click(canvas.getByRole('button', { name: 'Table' }));
+    await userEvent.click(canvas.getByRole('tab', { name: 'Table' }));
     const table = canvas.getByRole('table', {
       name: 'Orders placed, last 7 days',
     });
