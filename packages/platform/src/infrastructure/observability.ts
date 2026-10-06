@@ -24,6 +24,8 @@ import {
 } from '@sentry/opentelemetry';
 import { PostHog } from 'posthog-node';
 
+import type { ErrorDetails } from '../application/error-details.js';
+import { describeError } from '../application/error-details.js';
 import type {
   ActivityFailureContext,
   Observability,
@@ -31,6 +33,7 @@ import type {
   Operation,
   TraceContext,
 } from '../application/observability.js';
+import { redactHttpFailure } from './redaction.js';
 
 // This adapter accepts only deployment settings; it does not read ambient environment.
 export interface TelemetrySettings {
@@ -83,7 +86,12 @@ export function createObservability(
         environment: settings.environment,
         release: settings.release,
         defaultIntegrations: false,
-        integrations: [Sentry.linkedErrorsIntegration()],
+        integrations: [
+          Sentry.linkedErrorsIntegration(),
+          Sentry.onUncaughtExceptionIntegration(),
+          // Strict mode keeps Node's default exit after the event is flushed.
+          Sentry.onUnhandledRejectionIntegration({ mode: 'strict' }),
+        ],
         skipOpenTelemetrySetup: true,
         registerEsmLoaderHooks: false,
         sendDefaultPii: false,
@@ -103,8 +111,12 @@ export function createObservability(
           return event;
         },
         beforeSend(event, hint) {
-          const activity = hint.data?.activityFailure as
-            ActivityFailureContext | undefined;
+          // Rebuild events from explicit data so ambient scope, extras and breadcrumbs never leave.
+          const data = hint.data as Partial<FailureData> | undefined;
+          const activity = data?.activityFailure;
+          const context = data?.context;
+          const http = data?.http;
+          const message = data?.message;
 
           return {
             type: undefined,
@@ -113,13 +125,39 @@ export function createObservability(
             platform: 'node',
             environment: settings.environment,
             release: settings.release,
-            level: 'error',
-            ...(activity && event.exception
+            level: event.level === 'fatal' ? 'fatal' : 'error',
+            ...(event.exception
               ? { exception: event.exception }
               : { message: 'Operation failed' }),
-            tags: safeTags(event.tags),
+            ...(http
+              ? {
+                  transaction: `${http.method} ${http.route}`,
+                  request: {
+                    method: http.method,
+                    url: http.url,
+                    headers: http.headers,
+                  },
+                }
+              : message
+                ? { transaction: message }
+                : {}),
+            tags: {
+              ...safeTags(context ? metadata(context) : event.tags),
+              ...(http
+                ? { 'http.method': http.method, 'http.route': http.route }
+                : {}),
+            },
             contexts: {
-              ...(event.contexts?.trace ? { trace: event.contexts.trace } : {}),
+              ...(context
+                ? {
+                    trace: {
+                      trace_id: context.traceId,
+                      span_id: context.spanId,
+                    },
+                  }
+                : event.contexts?.trace
+                  ? { trace: event.contexts.trace }
+                  : {}),
               ...(activity
                 ? {
                     temporal: {
@@ -356,21 +394,56 @@ export function createObservability(
         throw error;
       }
     },
-    captureError(context) {
-      sentry?.captureEvent({
-        message: 'Operation failed',
-        level: 'error',
-        tags: metadata(context) as Record<string, string>,
-        contexts: {
-          trace: { trace_id: context.traceId, span_id: context.spanId },
-        },
-      });
+    captureError(error, { context, request, message } = {}) {
+      const http = request ? redactHttpFailure(request) : undefined;
+      if (settings.local) {
+        const exception = exceptionAttributes(describeError(error));
+        const span = context ? activeSpans.get(context.spanId) : undefined;
+        span?.addEvent('exception', exception);
+        if (http) span?.setAttribute('luma.http.url', http.url);
+        logs.getLogger('luma').emit({
+          body: message ?? (http ? 'Request failed' : 'Operation failed'),
+          severityNumber: SeverityNumber.ERROR,
+          severityText: 'ERROR',
+          attributes: {
+            ...exception,
+            ...(context ? { request_id: context.requestId } : {}),
+            ...(http
+              ? {
+                  'http.request.method': http.method,
+                  'http.route': http.route,
+                  'luma.http.url': http.url,
+                }
+              : {}),
+          },
+          context: span ? trace.setSpan(ROOT_CONTEXT, span) : ROOT_CONTEXT,
+        });
+      }
+      const data: FailureData = {
+        ...(context ? { context } : {}),
+        ...(http ? { http } : {}),
+        ...(message ? { message } : {}),
+      };
+      sentry?.captureException(error, { originalException: error, data });
     },
     captureActivityError(error, context) {
-      sentry?.captureException(error, {
-        originalException: error,
-        data: { activityFailure: context },
-      });
+      if (settings.local)
+        logs.getLogger('luma').emit({
+          body: 'Workflow activity failed',
+          severityNumber: SeverityNumber.ERROR,
+          severityText: 'ERROR',
+          attributes: {
+            ...exceptionAttributes(describeError(error)),
+            'temporal.workflow_id': context.workflowId,
+            'temporal.run_id': context.workflowRunId,
+            'temporal.activity_id': context.activityId,
+            'temporal.activity_type': context.activityType,
+            'temporal.attempt': context.attempt,
+            'temporal.task_queue': context.taskQueue,
+          },
+        });
+      const data: FailureData = { activityFailure: context };
+      sentry?.captureException(error, { originalException: error, data });
     },
     capture(context, event) {
       if (
@@ -417,6 +490,31 @@ export function createObservability(
   };
 
   return api;
+}
+
+interface FailureData {
+  context?: TraceContext;
+  message?: string;
+  http?: ReturnType<typeof redactHttpFailure>;
+  activityFailure?: ActivityFailureContext;
+}
+
+/** OpenTelemetry exception attributes, with linked causes appended to the stack trace. */
+function exceptionAttributes(details: ErrorDetails): Attributes {
+  return {
+    'exception.type': details.type,
+    'exception.message': details.message,
+    'exception.stacktrace': stackTrace(details),
+    ...(details.code ? { 'error.type': details.code } : {}),
+  };
+}
+
+function stackTrace(details: ErrorDetails): string {
+  const own = details.stack ?? `${details.type}: ${details.message}`;
+
+  return details.cause
+    ? `${own}\nCaused by: ${stackTrace(details.cause)}`
+    : own;
 }
 
 function safeTags(

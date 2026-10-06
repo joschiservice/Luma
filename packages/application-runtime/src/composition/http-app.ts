@@ -22,6 +22,7 @@ import {
   settingsRoutes,
 } from '@luma/identity/http';
 import type { ModelGateway, Observability, Observation } from '@luma/platform';
+import { describeError } from '@luma/platform';
 import type { ProcurementService } from '@luma/procurement';
 import type { SupplierCommitments } from '@luma/procurement/composition';
 import { procurementRoutes } from '@luma/procurement/http';
@@ -283,10 +284,24 @@ export function buildApp(
         ? error.message
         : knownError?.message;
     if (!knownError) {
+      const route = request.routeOptions.url ?? 'unmatched';
       if (request.observation)
-        dependencies.observability?.captureError(request.observation.context);
+        dependencies.observability?.captureError(error, {
+          context: request.observation.context,
+          request: {
+            method: request.method,
+            route,
+            url: request.url,
+            headers: request.headers,
+          },
+        });
       request.log.error(
-        { traceId: request.observation?.context.traceId },
+        {
+          traceId: request.observation?.context.traceId,
+          method: request.method,
+          route,
+          error: describeError(error),
+        },
         'Request failed',
       );
     }
@@ -359,12 +374,16 @@ export function buildApp(
                 ]));
               if (ready && !draining)
                 return { status: 200, body: { status: 'ready' } };
-            } catch {
+            } catch (error) {
               if (request.observation)
-                dependencies.observability?.captureError(
-                  request.observation.context,
-                );
-              request.log.error('Readiness check failed');
+                dependencies.observability?.captureError(error, {
+                  context: request.observation.context,
+                  message: 'Readiness check failed',
+                });
+              request.log.error(
+                { error: describeError(error) },
+                'Readiness check failed',
+              );
             } finally {
               clearTimeout(timeout);
             }

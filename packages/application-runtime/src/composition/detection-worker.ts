@@ -9,6 +9,7 @@ import type { Configuration } from '@luma/exceptions';
 import { defaultConfiguration } from '@luma/exceptions';
 import type { IdentityService } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
+import { createFailureLog } from '@luma/platform';
 import { createDetectionMonitor } from '@luma/resolution';
 import { createDetectionSources } from '@luma/resolution/composition';
 import type { Pool } from 'pg';
@@ -83,10 +84,7 @@ export function createDetectionWorker(options: {
     refreshContext: options.identity.refreshContext,
     ...(options.env ? { env: options.env } : {}),
   });
-  const log =
-    options.log ??
-    ((message: string, error?: unknown) =>
-      console.error(message, error instanceof Error ? error.message : ''));
+  const log = options.log ?? createFailureLog();
   const monitor = createScheduledDetection({
     database: options.database,
     capabilities: createInstalledRuntime({

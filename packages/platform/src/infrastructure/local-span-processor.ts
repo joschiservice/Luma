@@ -20,6 +20,7 @@ const attributes = new Set([
   'request_id',
   'trace_id',
   'action_id',
+  'luma.http.url',
   'model.latency_ms',
   'langfuse.observation.model.name',
   'langfuse.observation.usage_details',
@@ -43,7 +44,17 @@ export function queryMetadata(sql: string): Attributes {
   };
 }
 
-/** Removes request data, SQL, errors, and workflow identifiers before export. */
+const exceptionAttributes = new Set([
+  'exception.type',
+  'exception.message',
+  'exception.stacktrace',
+  'error.type',
+]);
+
+/**
+ * Removes request data, SQL, parameters and workflow identifiers before local export. Error
+ * statuses and exception events keep their message and stack so failures are diagnosable.
+ */
 export function sanitizeSpan(span: ReadableSpan): ReadableSpan {
   const safe = Object.fromEntries(
     Object.entries(span.attributes).filter(([key]) => attributes.has(key)),
@@ -80,9 +91,22 @@ export function sanitizeSpan(span: ReadableSpan): ReadableSpan {
     ...span,
     name,
     attributes: safe,
-    events: [],
+    events: span.events
+      .filter((event) => event.name === 'exception')
+      .map((event) => ({
+        name: event.name,
+        time: event.time,
+        attributes: Object.fromEntries(
+          Object.entries(event.attributes ?? {}).filter(([key]) =>
+            exceptionAttributes.has(key),
+          ),
+        ),
+      })),
     links: span.links.map((link) => ({ context: link.context })),
-    status: { code: span.status.code },
+    status:
+      span.status.code === 2 && span.status.message
+        ? { code: span.status.code, message: span.status.message }
+        : { code: span.status.code },
     spanContext: () => span.spanContext(),
   };
 }

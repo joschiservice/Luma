@@ -16,7 +16,8 @@ import {
 import { createCustomerProfiles } from '@luma/customers/composition';
 import type { IdentityService } from '@luma/identity';
 import { createIdentity } from '@luma/identity/composition';
-import type { TenantDatabase } from '@luma/platform';
+import type { Observability, TenantDatabase } from '@luma/platform';
+import { createFailureLog } from '@luma/platform';
 import { createTenantDatabase } from '@luma/platform/composition';
 import { Pool } from 'pg';
 
@@ -60,10 +61,7 @@ export function createCommerceSyncWorker(options: {
     // The runner stores each page itself after the adapter returns it.
     recordObservations: async () => undefined,
   });
-  const log =
-    options.log ??
-    ((message: string, error?: unknown) =>
-      console.error(message, error instanceof Error ? error.message : ''));
+  const log = options.log ?? createFailureLog();
   const runner = createSyncRunner({
     store: createSyncStore(options.database),
     reader,
@@ -135,15 +133,18 @@ export function createCommerceSyncService(
 
 /**
  * Starts the commerce sync process: identity for resolving who each sync runs as, the
- * worker database pool, the runner loop, supplier follow-up and scheduled detection. Close it
- * after `run` resolves.
+ * worker database pool, the runner loop, supplier follow-up and scheduled detection. Failures
+ * are written to stderr and reported through `observability` when supplied. Close it after
+ * `run` resolves.
  */
 export async function createDefaultCommerceSyncWorker(
   identitySettings: Parameters<typeof createIdentity>[0],
   settings: CommerceSyncConfig,
   env: Readonly<Record<string, string | undefined>> = process.env,
+  observability?: Pick<Observability, 'captureError'>,
 ) {
   const resources = createResourceScope();
+  const log = createFailureLog(observability);
   try {
     const identity = createIdentity(identitySettings);
     resources.add(identity.close);
@@ -160,6 +161,7 @@ export async function createDefaultCommerceSyncWorker(
       concurrency: settings.concurrency,
       workspaceConcurrency: settings.workspaceConcurrency,
       connectionConcurrency: settings.connectionConcurrency,
+      log,
     });
     resources.add(worker.close);
     const followUp = createSupplierFollowUpWorker({
@@ -168,6 +170,7 @@ export async function createDefaultCommerceSyncWorker(
       identity: identity.service,
       connections: settings.connections,
       env,
+      log,
     });
 
     const detection = createDetectionWorker({
@@ -176,6 +179,7 @@ export async function createDefaultCommerceSyncWorker(
       identity: identity.service,
       connections: settings.connections,
       env,
+      log,
     });
     resources.add(detection.close);
 

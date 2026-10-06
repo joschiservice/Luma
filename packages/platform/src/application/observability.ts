@@ -41,6 +41,23 @@ export interface ActivityFailureContext {
   namespace: string;
 }
 
+/** Request facts for an unexpected HTTP failure; the adapter redacts them before export. */
+export interface HttpFailureContext {
+  method: string;
+  /** Route pattern, such as `/v1/organizations/:organizationId/cases`. */
+  route: string;
+  /** Path and query string as received. */
+  url: string;
+  headers?: Readonly<Record<string, string | string[] | undefined>>;
+}
+
+/** Where an unexpected failure happened. Messages are fixed operation descriptions. */
+export interface FailureContext {
+  context?: TraceContext;
+  request?: HttpFailureContext;
+  message?: string;
+}
+
 export interface Observability {
   request(
     requestId: string,
@@ -60,8 +77,15 @@ export interface Observability {
     operation: Operation,
     work: (context: TraceContext, observation: Observation) => Promise<T>,
   ): Promise<T>;
-  captureError(context: TraceContext): void;
-  /** Captures the original activity exception and Temporal identifiers in Sentry when configured. */
+  /**
+   * Reports an unexpected failure with its message, stack and causes to Sentry and, in local
+   * diagnostics, to the trace and log stream. URLs and sensitive headers are redacted.
+   */
+  captureError(error: unknown, failure?: FailureContext): void;
+  /**
+   * Reports the original activity exception with Temporal identifiers to Sentry and, in local
+   * diagnostics, to the log stream.
+   */
   captureActivityError(error: unknown, context: ActivityFailureContext): void;
   capture(context: TraceContext, event: ProductEvent): void;
   flag(

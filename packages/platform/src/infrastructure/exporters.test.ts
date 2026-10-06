@@ -6,7 +6,7 @@ import { expect, it } from 'vitest';
 
 import { createObservability } from './observability.js';
 
-it('exports the same trace to real Sentry and Langfuse SDKs with safe error metadata', async () => {
+it('exports the same trace to real Sentry and Langfuse SDKs', async () => {
   const envelopes: unknown[] = [];
   const langfuse = new InMemorySpanExporter();
   langfuse.shutdown = async () => {};
@@ -42,12 +42,10 @@ it('exports the same trace to real Sentry and Langfuse SDKs with safe error meta
       }),
     ).rejects.toThrow();
   });
-  telemetry.captureError(root.context);
   root.end('error');
   await telemetry.shutdown();
   const encoded = JSON.stringify(envelopes);
   expect(encoded).toContain('transaction');
-  expect(encoded).toContain('Operation failed');
   expect(encoded).toContain(root.context.traceId);
   expect(encoded).not.toMatch(/private@example.com|password-secret/);
   expect(langfuse.getFinishedSpans()).toHaveLength(3);
@@ -203,4 +201,130 @@ it('exports original activity exceptions and causes with Temporal context at sam
   expect(first).not.toHaveProperty('request');
   expect(first).not.toHaveProperty('user');
   expect(JSON.stringify(envelopes)).not.toContain('private-provider-payload');
+});
+
+function sentryEvents() {
+  const envelopes: unknown[] = [];
+  const events: Event[] = [];
+  const transport: NonNullable<
+    NonNullable<Parameters<typeof createObservability>[1]>['sentryTransport']
+  > = () => ({
+    send: async (envelope) => {
+      envelopes.push(envelope);
+      events.push(
+        ...envelope[1]
+          .filter(([header]) => header.type === 'event')
+          .map(([, event]) => event as Event),
+      );
+
+      return { statusCode: 200 };
+    },
+    flush: async () => true,
+  });
+
+  return { envelopes, events, transport };
+}
+
+it('exports HTTP failures with stack, causes and a redacted request', async () => {
+  const { envelopes, events, transport } = sentryEvents();
+  const telemetry = createObservability(
+    {
+      environment: 'test',
+      release: 'test',
+      sampleRate: 0,
+      tenantHashKey: 'a'.repeat(32),
+      sentryDsn: 'https://abc@o1.ingest.de.sentry.io/1',
+    },
+    { sentryTransport: transport },
+  );
+  const root = telemetry.request(randomUUID(), undefined, {
+    route: '/v1/organizations/:organizationId/skus/:skuId',
+    method: 'GET',
+  });
+  const context = telemetry.forTenant(root.context, randomUUID(), 'EU');
+  const caseId = randomUUID();
+  telemetry.captureError(
+    Object.assign(
+      new Error('canceling statement due to statement timeout', {
+        cause: new Error('Pool query failed'),
+      }),
+      { code: '57014', detail: 'Key (email)=(private@example.com)' },
+    ),
+    {
+      context,
+      request: {
+        method: 'GET',
+        route: '/v1/organizations/:organizationId/skus/:skuId',
+        url: `/v1/organizations/${caseId}/skus/SHIRT-RED?window=24h&q=private-search`,
+        headers: {
+          cookie: 'session=cookie-secret',
+          authorization: 'Bearer bearer-secret',
+          'x-forwarded-for': '203.0.113.9',
+          'user-agent': 'Vitest',
+        },
+      },
+    },
+  );
+  await telemetry.shutdown();
+
+  expect(events).toHaveLength(1);
+  const [event] = events;
+  expect(event?.exception?.values).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        value: 'canceling statement due to statement timeout',
+        stacktrace: { frames: expect.any(Array) },
+      }),
+      expect.objectContaining({ value: 'Pool query failed' }),
+    ]),
+  );
+  expect(event?.transaction).toBe(
+    'GET /v1/organizations/:organizationId/skus/:skuId',
+  );
+  expect(event?.request).toEqual({
+    method: 'GET',
+    url: `/v1/organizations/${caseId}/skus/:skuId?window=24h&q=[Filtered]`,
+    headers: {
+      cookie: '[Filtered]',
+      authorization: '[Filtered]',
+      'x-forwarded-for': '[Filtered]',
+      'user-agent': 'Vitest',
+    },
+  });
+  expect(event?.tags).toMatchObject({
+    request_id: context.requestId,
+    tenant_ref: context.tenantRef,
+    'http.route': '/v1/organizations/:organizationId/skus/:skuId',
+  });
+  expect(event?.contexts?.trace).toEqual({
+    trace_id: context.traceId,
+    span_id: context.spanId,
+  });
+  expect(event).not.toHaveProperty('extra');
+  expect(event).not.toHaveProperty('user');
+  expect(JSON.stringify(envelopes)).not.toMatch(
+    /cookie-secret|bearer-secret|203\.0\.113\.9|private-search|SHIRT-RED|private@example\.com/,
+  );
+});
+
+it('names background failures by their operation message', async () => {
+  const { events, transport } = sentryEvents();
+  const telemetry = createObservability(
+    {
+      environment: 'test',
+      release: 'test',
+      sampleRate: 0,
+      sentryDsn: 'https://abc@o1.ingest.de.sentry.io/1',
+    },
+    { sentryTransport: transport },
+  );
+  telemetry.captureError(new Error('Provider timed out'), {
+    message: 'Sync pass failed; retrying.',
+  });
+  await telemetry.shutdown();
+
+  expect(events).toHaveLength(1);
+  expect(events[0]?.transaction).toBe('Sync pass failed; retrying.');
+  expect(events[0]?.exception?.values?.[0]?.value).toBe('Provider timed out');
+  expect(events[0]).not.toHaveProperty('request');
 });

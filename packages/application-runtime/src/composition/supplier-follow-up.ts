@@ -5,6 +5,7 @@ import type { ConnectionsConfig } from '@luma/config';
 import { createInstalledPurchaseOrderRuntime } from '@luma/connections/composition';
 import type { IdentityService } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
+import { createFailureLog } from '@luma/platform';
 import type { Pool } from 'pg';
 
 import { createApplicationServices } from './application.js';
@@ -43,10 +44,7 @@ export function createSupplierFollowUpWorker(options: {
       installations: host.connections,
     },
   });
-  const log =
-    options.log ??
-    ((message: string, error?: unknown) =>
-      console.error(message, error instanceof Error ? error.message : ''));
+  const log = options.log ?? createFailureLog();
   const stop = new AbortController();
 
   /** Runs one pass over every principal with live submissions. */

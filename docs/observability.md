@@ -62,13 +62,31 @@ The API binds telemetry to `request.tenantContext` after the identity guard succ
 
 ## Data policy
 
-General telemetry contains deployment metadata, opaque correlation IDs, tenant HMACs, fixed operation names, status, timing, approved model names, token counts, model latency and reported cost. Sentry activity exception reports additionally contain the diagnostic fields described below. There is no general-purpose metadata bag. Do not add emails, names, addresses, commerce identifiers, prompts, completions, tool arguments/results, URLs, query strings, request bodies, headers, cookies or credentials.
+General telemetry contains deployment metadata, opaque correlation IDs, tenant HMACs, fixed operation names, status, timing, approved model names, token counts, model latency and reported cost. Error reports additionally contain the diagnostic fields described under [error reports](#error-reports). There is no general-purpose metadata bag. Do not add emails, names, addresses, commerce identifiers, prompts, completions, tool arguments/results, URLs, query strings, request bodies, headers, cookies or credentials.
 
-Sentry default integrations and hosted automatic instrumentation are disabled. The opt-in local adapter instruments HTTP and PostgreSQL, with export-level redaction tested separately. General error reports use a fixed message plus correlation IDs. Explicit activity exception reports preserve error messages, stacks, and linked causes; both paths exclude breadcrumbs and request context. Langfuse exports only this adapter's tracer and masks input/output/metadata fields as a second boundary. Media upload is disabled. PostHog disables GeoIP, exception autocapture, automatic flag events and person profiles. Application HTTP logs contain generated request IDs, trace IDs and status; default request logging is disabled.
+Sentry default integrations and hosted automatic instrumentation are disabled; only linked errors and process-level error capture are enabled. The opt-in local adapter instruments HTTP and PostgreSQL, with export-level redaction tested separately. Langfuse exports only this adapter's tracer and masks input/output/metadata fields as a second boundary. Media upload is disabled. PostHog disables GeoIP, exception autocapture, automatic flag events and person profiles. Application HTTP logs contain generated request IDs, trace IDs and status, plus error details for failed requests; default request logging is disabled.
 
 Future integrations must retain these rules. In particular, enabling framework/model auto-instrumentation requires export-level redaction tests before deployment.
 
-Temporal activity failures also produce a worker diagnostic log named `Workflow activity failed before sanitization`. It contains the original thrown error, including its stack and cause, and Temporal's workflow ID, run ID, activity ID, activity type, and attempt. The default worker logger writes to stderr. When `SENTRY_DSN` is configured, both the regular worker and the pilot also capture the original exception in Sentry, including linked causes and a `temporal` context with these identifiers. Error capture is independent of trace sampling. Worker shutdown flushes pending events. These diagnostic logs and Sentry events can contain provider details and require restricted access. Activity arguments, custom error properties, and ambient user or request data are not added to the Sentry event. Temporal history continues to receive sanitized failures. Use the workflow, run, activity, and attempt fields to match a diagnostic entry to an `Activity failed` warning.
+## Error reports
+
+Unexpected failures are reported with their error type, message, stack, code and up to five linked causes:
+
+- API requests that end with an internal server error, and failed readiness checks. Validation, payload-size and media-type errors and deliberate API errors such as `NOT_FOUND` or `SERVICE_UNAVAILABLE` are responses, not reports.
+- Temporal activity failures, described below.
+- Commerce sync worker failures: sync passes, supplier follow-up and scheduled detection. The fixed log message, such as `Sync pass failed; retrying.`, names the operation.
+- Uncaught exceptions and unhandled promise rejections when Sentry is configured. The process still exits as Node would.
+
+Sentry events contain the exception, correlation tags (`request_id`, `action_id`, `trace_id`, `tenant_ref`) and, for requests, the route pattern and method as tags and a redacted request with method, URL and headers:
+
+- **URLs:** route words and UUIDs stay. Other path values become their route parameter name, such as `:skuId`, or `[Filtered]` when no route matched. Query values are `[Filtered]` except bounded view parameters such as `window`, `limit`, `sort` and `status`. Search text, cursors and OAuth codes and state stay filtered.
+- **Headers:** cookies, authorization, tokens, secrets, sessions, signatures and HMACs, API keys, CSRF tokens, AWS signing headers, Shopify shop domains and client IP addresses are `[Filtered]`. The referrer is redacted like a request URL.
+
+Request bodies, users, breadcrumbs, extras and custom error properties, such as PostgreSQL's `detail`, are never added. Error messages and stacks can still contain tenant or provider values, for example a provider error text. URLs can contain organization and record UUIDs. Restrict the Sentry project to the people who handle production incidents, keep EU ingestion and set retention before enabling it.
+
+Process logs on stderr carry the same error details as `error` with `type`, `message`, `code`, `stack` and `cause`. The API logs `Request failed` with trace ID, method and route; workers log the operation message. Logs contain no URLs, headers or bodies.
+
+Temporal activity failures also produce a worker diagnostic log named `Workflow activity failed before sanitization`. It contains the original thrown error, including its stack and cause, and Temporal's workflow ID, run ID, activity ID, activity type, and attempt. The default worker logger writes to stderr. When `SENTRY_DSN` is configured, both the regular worker and the pilot also capture the original exception in Sentry, including linked causes and a `temporal` context with these identifiers. Error capture is independent of trace sampling. Worker shutdown flushes pending events. These diagnostic logs and Sentry events can contain provider details and require restricted access. Activity arguments, custom error properties, and ambient user or request data are not added to the Sentry event. In local diagnostics, the worker also logs the failure to Loki as `Workflow activity failed`. Temporal history continues to receive sanitized failures. Use the workflow, run, activity, and attempt fields to match a diagnostic entry to an `Activity failed` warning.
 
 ## Verification
 

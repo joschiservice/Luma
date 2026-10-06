@@ -12,7 +12,7 @@ import {
   sanitizeSpan,
 } from './local-span-processor.js';
 
-it('exports timings and correlation but removes SQL, parameters, exception details and URLs', async () => {
+it('exports timings, correlation and exceptions but removes SQL, parameters and URLs', async () => {
   const exporter = new InMemorySpanExporter();
   const record = vi.fn();
   const provider = new NodeTracerProvider({
@@ -30,15 +30,28 @@ it('exports timings and correlation but removes SQL, parameters, exception detai
     'url.full': 'http://secret',
     'db.query.parameters': ['password'],
   });
-  span.recordException(new Error('password private@example.com'));
-  span.setStatus({ code: SpanStatusCode.ERROR, message: 'secret-error' });
+  span.recordException(new Error('canceling statement due to timeout'));
+  span.addEvent('query', { 'db.statement': 'SELECT secret' });
+  span.setStatus({
+    code: SpanStatusCode.ERROR,
+    message: 'canceling statement due to timeout',
+  });
   span.end();
   await provider.forceFlush();
   const result = exporter.getFinishedSpans()[0]!;
   expect(result.name).toBe('db.SELECT');
   expect(result.attributes['luma.db.query_id']).toMatch(/^[a-f0-9]{16}$/);
-  expect(result.status).toEqual({ code: SpanStatusCode.ERROR });
-  expect(result.events).toEqual([]);
+  expect(result.status).toEqual({
+    code: SpanStatusCode.ERROR,
+    message: 'canceling statement due to timeout',
+  });
+  expect(result.events).toHaveLength(1);
+  expect(result.events[0]?.attributes).toMatchObject({
+    'exception.type': 'Error',
+    'exception.message': 'canceling statement due to timeout',
+    'exception.stacktrace': expect.stringContaining('local-span-processor'),
+  });
+  expect(JSON.stringify(result.events)).not.toMatch(/secret/);
   expect(JSON.stringify(result.attributes)).not.toMatch(
     /secret|private|password/,
   );
@@ -132,6 +145,87 @@ it('keeps concurrent request spans separate while automatic children inherit the
   } finally {
     await telemetry.shutdown();
     await provider.shutdown();
+    trace.disable();
+    context.disable();
+    propagation.disable();
+  }
+});
+
+it('records local request failures on the request span and in the log stream', async () => {
+  const { context, propagation, trace } = await import('@opentelemetry/api');
+  const { logs } = await import('@opentelemetry/api-logs');
+  const {
+    InMemoryLogRecordExporter,
+    LoggerProvider,
+    SimpleLogRecordProcessor,
+  } = await import('@opentelemetry/sdk-logs');
+  const { createObservability } = await import('./observability.js');
+  const exporter = new InMemorySpanExporter();
+  const provider = new NodeTracerProvider({
+    spanProcessors: [
+      localSpanProcessor(new SimpleSpanProcessor(exporter), () => ({
+        record: vi.fn(),
+      })),
+    ],
+  });
+  provider.register();
+  const records = new InMemoryLogRecordExporter();
+  const logger = new LoggerProvider({
+    processors: [new SimpleLogRecordProcessor({ exporter: records })],
+  });
+  logs.setGlobalLoggerProvider(logger);
+  const telemetry = createObservability({
+    environment: 'test',
+    release: 'test',
+    sampleRate: 1,
+    local: { endpoint: 'http://127.0.0.1:4318' },
+  });
+  try {
+    const route = '/v1/organizations/:organizationId/operations/overview';
+    const request = telemetry.request('request', undefined, {
+      route,
+      method: 'GET',
+    });
+    telemetry.captureError(
+      new Error('Overview failed', { cause: new Error('statement timeout') }),
+      {
+        context: request.context,
+        request: {
+          method: 'GET',
+          route,
+          url: '/v1/organizations/private/operations/overview?window=24h&q=secret',
+          headers: { cookie: 'secret' },
+        },
+      },
+    );
+    request.end('error');
+    await provider.forceFlush();
+    const [span] = exporter.getFinishedSpans();
+    const url =
+      '/v1/organizations/:organizationId/operations/overview?window=24h&q=[Filtered]';
+    expect(span?.attributes['luma.http.url']).toBe(url);
+    expect(span?.events[0]?.attributes).toMatchObject({
+      'exception.message': 'Overview failed',
+      'exception.stacktrace': expect.stringContaining(
+        'Caused by: Error: statement timeout',
+      ),
+    });
+    const failure = records
+      .getFinishedLogRecords()
+      .find((record) => record.body === 'Request failed');
+    expect(failure?.attributes).toMatchObject({
+      'exception.message': 'Overview failed',
+      'http.route': route,
+      'luma.http.url': url,
+      request_id: 'request',
+    });
+    expect(failure?.spanContext?.traceId).toBe(request.context.traceId);
+    expect(JSON.stringify(failure?.attributes)).not.toMatch(/secret|private/);
+  } finally {
+    await telemetry.shutdown();
+    await provider.shutdown();
+    await logger.shutdown();
+    logs.disable();
     trace.disable();
     context.disable();
     propagation.disable();

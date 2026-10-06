@@ -18,6 +18,8 @@ Use Node 24 through `mise`. The native Pyroscope profiler ships Node ABI-specifi
 
 Select `luma-pilot-api`, `luma-pilot-worker`, or `luma-simulator` in the dashboard. Pilot requests include PostgreSQL queries, pool waits, algorithm timings, and propagated Temporal workflow/activity spans. Simulator provider calls continue the caller's trace through HTTP into the simulator's PostgreSQL queries, including clock ticks and webhook delivery. CPU, wall-time, and heap profiles are collected for all three processes.
 
+The pilot API prints failed requests to its console as JSON log lines with the error's message, stack and causes. Background sync and detection failures print with the same details. Both also appear in Loki and on the request's trace.
+
 The standalone `simulator:service` command remains a minimal simulator service without the application or diagnostics stack; use `pnpm simulator` for the full instrumented environment.
 
 With the relevant mode running, verify it from another terminal:
@@ -51,6 +53,7 @@ The check generates readiness requests, then verifies their database child spans
 | Is JavaScript blocking the event loop?           | Event-loop delay and CPU charts                                                                                 |
 | Is an activity waiting or retrying?              | Activity queue-delay and retry charts; inspect the Temporal trace                                               |
 | What happened in a request?                      | The trace's logs link, or Explore → Loki filtered by `trace_id`                                                 |
+| Why did a request, activity or sync pass fail?   | Explore → Loki, error-level logs with `exception.message` and `exception.stacktrace`; or the trace's exception  |
 
 The dashboard refreshes every five seconds. Generate traffic before judging it: percentile/rate charts need multiple exports, and activity charts remain empty until an activity runs. Profiles upload about every ten seconds. Heap profiles are sampled allocations; they are not full heap snapshots.
 
@@ -118,6 +121,7 @@ Stop the watch processes first to avoid port conflicts; keep the Docker services
 - `LUMA_LOCAL_OTLP_ENDPOINT` selects the local OTLP HTTP receiver.
 - `LUMA_LOCAL_PROFILES_ENDPOINT` enables Pyroscope profiling. Omit it for tracing/metrics/logs without the native profiler.
 - Both endpoints must be loopback HTTP origins. Local mode is rejected for staging/production.
-- Trace exports contain safe operation metadata, correlation IDs, query fingerprints, and timing. Raw SQL, URLs, headers, arguments, exception details, and workflow IDs are removed. Metrics use bounded dimensions and hashed pool IDs. Profiles contain function names and source paths.
+- Trace exports contain safe operation metadata, correlation IDs, query fingerprints, timing and errors. Exception events and error statuses keep their message and stack, and failed requests carry their redacted URL as `luma.http.url`. Raw SQL, parameters, headers, arguments and workflow IDs are removed. Metrics use bounded dimensions and hashed pool IDs. Profiles contain function names and source paths.
+- Failures are also logged to Loki at error level as `Request failed`, `Workflow activity failed` or the background operation's message, with `exception.*` attributes. URLs and headers are redacted as described in [error reports](observability.md#error-reports).
 
 The Docker image is pinned by digest. Update it deliberately and rerun `observe:verify` when changing versions. This bundled stack is intended for development/testing. The application uses OpenTelemetry so the instrumentation can later target a separately configured production backend.

@@ -466,7 +466,7 @@ describe('observability baseline', () => {
     await observability.shutdown();
   });
 
-  it('redacts HTTP errors and application logs', async () => {
+  it('hides unexpected errors from clients and logs their details with the route', async () => {
     const { observability, spans } = fixture();
     let log = '';
     const stream = new Writable({
@@ -477,16 +477,37 @@ describe('observability baseline', () => {
     });
     const app = buildApp({ logger: { stream } }, { observability });
     app.addHook('preHandler', async () => {
-      throw new Error('private@example.com credential-secret');
+      throw Object.assign(new Error('Overview query timed out'), {
+        code: '57014',
+        detail: 'private@example.com',
+      });
     });
     try {
-      const response = await app.inject('/health?token=query-secret');
+      const response = await app.inject({
+        url: '/health?token=query-secret',
+        headers: { cookie: 'session=cookie-secret' },
+      });
       expect(response.statusCode).toBe(500);
+      expect(response.body).not.toContain('Overview query timed out');
       expect(spans.getFinishedSpans()[0]?.status.code).toBe(2);
-      expect(log).toContain(response.headers['x-trace-id']);
-      expect(log + response.body).not.toMatch(
-        /private|credential-secret|query-secret/,
-      );
+      const entry = log
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line) as { msg: string })
+        .find((line) => line.msg === 'Request failed');
+      expect(entry).toMatchObject({
+        msg: 'Request failed',
+        traceId: response.headers['x-trace-id'],
+        method: 'GET',
+        route: '/health',
+        error: {
+          type: 'Error',
+          message: 'Overview query timed out',
+          code: '57014',
+          stack: expect.stringContaining('app.test.ts'),
+        },
+      });
+      expect(log).not.toMatch(/private|cookie-secret|query-secret/);
     } finally {
       await app.close();
     }

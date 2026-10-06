@@ -29,6 +29,7 @@ import { parseAction } from '@luma/execution/composition';
 import { IdentityError } from '@luma/identity';
 import { createIdentity } from '@luma/identity/composition';
 import { registerIdentityHttp } from '@luma/identity/http';
+import { createFailureLog } from '@luma/platform';
 import { createTenantDatabase } from '@luma/platform/composition';
 import {
   createProposalRefresher,
@@ -76,6 +77,7 @@ export async function createPilot(
     throw new Error('The synthetic pilot is for local development only');
   const settings = identitySettings(env);
   const resources = createResourceScope();
+  const failureLog = createFailureLog(observability);
   try {
     const identity = createIdentity(settings);
     resources.add(identity.close);
@@ -258,8 +260,7 @@ export async function createPilot(
           recordRead: createReadChecks(db),
           resolveContext: identity.service.resolveWorkflowContext,
           digest: (value) => createHash('sha256').update(value).digest('hex'),
-          log: (message, error) =>
-            console.error(message, error instanceof Error ? error.message : ''),
+          log: failureLog,
         })
       : undefined;
     const capabilities = simulation
@@ -290,7 +291,7 @@ export async function createPilot(
           detection: () => detection,
           log: (message, error) => {
             detectionErrors.push({ message, error: error?.message ?? null });
-            console.error(message, error instanceof Error ? error.message : '');
+            failureLog(message, error);
           },
         })
       : null;
@@ -480,7 +481,8 @@ export async function createPilot(
     const app =
       role === 'api'
         ? buildApp(
-            { logger: false },
+            // Failed requests and background sync errors print to the pilot console.
+            { logger: { level: 'error' } },
             {
               observability,
               identity: identity.service,
