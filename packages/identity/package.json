@@ -26,6 +26,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@better-auth/passkey": "catalog:",
     "@luma/api-contract": "workspace:*",
     "@ts-rest/fastify": "catalog:",
     "better-auth": "catalog:",

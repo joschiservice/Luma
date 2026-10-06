@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHmac, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
 import { buildRuntimeApp } from '@luma/application-runtime';
@@ -6,6 +6,39 @@ import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
+
+/** Returns the request cookie header for the cookies a response sets. */
+function responseCookies(response: { headers: Record<string, unknown> }) {
+  const value = response.headers['set-cookie'];
+  const cookies = Array.isArray(value) ? value : value ? [value] : [];
+
+  return cookies
+    .map((cookie) => String(cookie).split(';')[0]!)
+    .filter((cookie) => !cookie.endsWith('='))
+    .join('; ');
+}
+
+/** Computes the current RFC 6238 code an authenticator app shows for an otpauth URI. */
+function totp(uri: string) {
+  const encoded = new URL(uri).searchParams.get('secret')!;
+  let bits = '';
+  for (const character of encoded)
+    bits += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
+      .indexOf(character)
+      .toString(2)
+      .padStart(5, '0');
+  const key = Buffer.from(
+    bits.match(/.{8}/g)!.map((byte) => Number.parseInt(byte, 2)),
+  );
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30_000)));
+  const digest = createHmac('sha1', key).update(counter).digest();
+  const offset = digest[digest.length - 1]! & 15;
+
+  return String(
+    (digest.readUInt32BE(offset) & 0x7fffffff) % 1_000_000,
+  ).padStart(6, '0');
+}
 
 describe.skipIf(!databaseUrl)(
   'identity on PostgreSQL with restricted runtime credentials',
@@ -91,6 +124,15 @@ describe.skipIf(!databaseUrl)(
       await owner.query(
         await readFile(
           new URL('../migrations/0023_workspace_settings.sql', import.meta.url),
+          'utf8',
+        ),
+      );
+      await owner.query(
+        await readFile(
+          new URL(
+            '../migrations/0052_authentication_factors.sql',
+            import.meta.url,
+          ),
           'utf8',
         ),
       );
@@ -567,6 +609,201 @@ describe.skipIf(!databaseUrl)(
       expect(ownDuplicate.statusCode, ownDuplicate.body).toBe(409);
 
       expect((await app.inject({ url: '/ready' })).statusCode).toBe(200);
+    });
+    it('requires a confirmed authenticator code or unused backup code after the password', async () => {
+      const password = 'test-password-long-enough';
+      const carol = await signup('carol');
+      const signIn = () =>
+        app.inject({
+          method: 'POST',
+          url: '/auth/sign-in/email',
+          headers: { origin },
+          payload: { email: 'carol@example.test', password },
+        });
+      const verify = (
+        cookie: string,
+        kind: 'totp' | 'backup-code',
+        code: string,
+      ) =>
+        app.inject({
+          method: 'POST',
+          url: `/auth/two-factor/verify-${kind}`,
+          headers: headers(cookie),
+          payload: { code },
+        });
+      const organizations = (cookie: string) =>
+        app.inject({ url: '/v1/organizations', headers: headers(cookie) });
+
+      const wrongPassword = await app.inject({
+        method: 'POST',
+        url: '/auth/two-factor/enable',
+        headers: headers(carol.cookie),
+        payload: { password: 'not-the-password' },
+      });
+      expect(wrongPassword.statusCode, wrongPassword.body).toBe(400);
+      const enabled = await app.inject({
+        method: 'POST',
+        url: '/auth/two-factor/enable',
+        headers: headers(carol.cookie),
+        payload: { password },
+      });
+      expect(enabled.statusCode, enabled.body).toBe(200);
+      const { totpURI, backupCodes } = enabled.json() as {
+        totpURI: string;
+        backupCodes: string[];
+      };
+      expect(totpURI).toMatch(
+        /^otpauth:\/\/totp\/Luma:carol%40example\.test\?/,
+      );
+      expect(backupCodes).toHaveLength(10);
+
+      // Setup stays inactive until the person proves the authenticator app works.
+      const unconfirmed = await signIn();
+      expect(unconfirmed.json()).toMatchObject({
+        user: { twoFactorEnabled: false },
+      });
+      const confirmed = await verify(carol.cookie, 'totp', totp(totpURI));
+      expect(confirmed.statusCode, confirmed.body).toBe(200);
+      const rotated = responseCookies(confirmed);
+      expect((await organizations(rotated)).statusCode).toBe(200);
+      expect((await organizations(carol.cookie)).statusCode).toBe(401);
+
+      const challenge = await signIn();
+      expect(challenge.statusCode, challenge.body).toBe(200);
+      expect(challenge.json()).toEqual({
+        twoFactorRedirect: true,
+        twoFactorMethods: ['totp'],
+      });
+      const pending = responseCookies(challenge);
+      expect(pending).not.toContain('session_token=');
+      expect((await organizations(pending)).statusCode).toBe(401);
+      const trusted = await app.inject({
+        method: 'POST',
+        url: '/auth/two-factor/verify-totp',
+        headers: headers(pending),
+        payload: { code: totp(totpURI), trustDevice: true },
+      });
+      expect(trusted.statusCode, trusted.body).toBe(400);
+      expect((await verify(pending, 'totp', '000000')).statusCode).toBe(401);
+      const passed = await verify(pending, 'totp', totp(totpURI));
+      expect(passed.statusCode, passed.body).toBe(200);
+      expect((await organizations(responseCookies(passed))).statusCode).toBe(
+        200,
+      );
+      expect((await verify(pending, 'totp', totp(totpURI))).statusCode).toBe(
+        401,
+      );
+
+      const backup = await verify(
+        responseCookies(await signIn()),
+        'backup-code',
+        backupCodes[0]!,
+      );
+      expect(backup.statusCode, backup.body).toBe(200);
+      expect((await organizations(responseCookies(backup))).statusCode).toBe(
+        200,
+      );
+      expect(
+        (
+          await verify(
+            responseCookies(await signIn()),
+            'backup-code',
+            backupCodes[0]!,
+          )
+        ).statusCode,
+      ).toBe(401);
+
+      const session = responseCookies(backup);
+      const regenerated = await app.inject({
+        method: 'POST',
+        url: '/auth/two-factor/generate-backup-codes',
+        headers: headers(session),
+        payload: { password },
+      });
+      expect(regenerated.statusCode, regenerated.body).toBe(200);
+      const fresh = (regenerated.json() as { backupCodes: string[] })
+        .backupCodes;
+      expect(fresh).toHaveLength(10);
+      expect(fresh).not.toContain(backupCodes[1]);
+      expect(
+        (
+          await verify(
+            responseCookies(await signIn()),
+            'backup-code',
+            backupCodes[1]!,
+          )
+        ).statusCode,
+      ).toBe(401);
+
+      const disabled = await app.inject({
+        method: 'POST',
+        url: '/auth/two-factor/disable',
+        headers: headers(session),
+        payload: { password },
+      });
+      expect(disabled.statusCode, disabled.body).toBe(200);
+      const direct = await signIn();
+      expect(direct.json()).toMatchObject({
+        user: { twoFactorEnabled: false },
+      });
+      expect((await organizations(responseCookies(direct))).statusCode).toBe(
+        200,
+      );
+    });
+    it('scopes passkey ceremonies to the configured relying party and hides other factor routes', async () => {
+      const dave = await signup('dave');
+      const anonymous = await app.inject({
+        url: '/auth/passkey/generate-register-options',
+        headers: { origin },
+      });
+      expect(anonymous.statusCode).toBe(401);
+      const registration = await app.inject({
+        url: '/auth/passkey/generate-register-options',
+        headers: headers(dave.cookie),
+      });
+      expect(registration.statusCode, registration.body).toBe(200);
+      expect(registration.json()).toMatchObject({
+        rp: { id: 'localhost', name: 'Luma' },
+        user: { name: 'dave@example.test' },
+      });
+      const listed = await app.inject({
+        url: '/auth/passkey/list-user-passkeys',
+        headers: headers(dave.cookie),
+      });
+      expect(listed.statusCode, listed.body).toBe(200);
+      expect(listed.json()).toEqual([]);
+
+      const authentication = await app.inject({
+        url: '/auth/passkey/generate-authenticate-options',
+        headers: { origin },
+      });
+      expect(authentication.statusCode, authentication.body).toBe(200);
+      expect(authentication.json()).toMatchObject({ rpId: 'localhost' });
+      const unknown = await app.inject({
+        method: 'POST',
+        url: '/auth/passkey/verify-authentication',
+        headers: headers(responseCookies(authentication)),
+        payload: {
+          response: { id: 'unknown', rawId: 'unknown', type: 'public-key' },
+        },
+      });
+      expect(unknown.statusCode, unknown.body).toBe(401);
+      expect(responseCookies(unknown)).not.toContain('session_token=');
+
+      for (const url of [
+        '/auth/two-factor/get-totp-uri',
+        '/auth/two-factor/send-otp',
+        '/auth/two-factor/verify-otp',
+        '/auth/passkey/update-passkey',
+      ]) {
+        const response = await app.inject({
+          method: 'POST',
+          url,
+          headers: headers(dave.cookie),
+          payload: {},
+        });
+        expect(response.statusCode, url).toBe(404);
+      }
     });
     it('invalidates session access immediately after sign-out', async () => {
       const response = await app.inject({

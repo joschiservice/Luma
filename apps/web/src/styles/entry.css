@@ -197,6 +197,40 @@
   width: 100%;
 }
 
+.auth-panel-inner > [data-slot='button'],
+.auth-factor > [data-slot='button'] {
+  width: 100%;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: -4px 0;
+  color: var(--foreground-subtle);
+  font-size: 12px;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+  content: '';
+}
+
+.auth-factor {
+  display: grid;
+  gap: 16px;
+}
+
+.auth-factor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .auth-switch {
   padding-top: 16px;
   border-top: 1px solid var(--line);

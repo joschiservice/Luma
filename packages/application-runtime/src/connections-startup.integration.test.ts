@@ -122,6 +122,7 @@ describe.skipIf(!databaseUrl)('connections through the API CLI', () => {
         '0001_identity.sql',
         '0004_connector_installations.sql',
         '0024_workspace_apps.sql',
+        '0052_authentication_factors.sql',
       ]) {
         await owner.query(
           await readFile(

@@ -14,6 +14,7 @@ import {
   Bell,
   Building2,
   Check,
+  KeyRound,
   LayoutDashboard,
   LockKeyhole,
   Mail,
@@ -33,6 +34,7 @@ import {
 import { settingsApi, settingsOptions, settingsResult } from './data';
 import { AppearanceSettings, HomeSidebarSettings } from './personal';
 import { SectionHeading } from './section-heading';
+import { SecuritySettings } from './security';
 import { TeamSettings } from './team';
 
 export const settingsSections = [
@@ -43,6 +45,12 @@ export const settingsSections = [
     label: 'Approvals',
     group: 'Workspace',
     Icon: ShieldCheck,
+  },
+  {
+    id: 'security',
+    label: 'Security',
+    group: 'Personal',
+    Icon: KeyRound,
   },
   {
     id: 'notifications',
@@ -175,7 +183,9 @@ export function SettingsView({
           {data ? (
             <>
               {!admin &&
-              !['notifications', 'appearance', 'home'].includes(section) ? (
+              !['security', 'notifications', 'appearance', 'home'].includes(
+                section,
+              ) ? (
                 <Alert tone="neutral">
                   <LockKeyhole size={14} /> You have member access. An owner or
                   admin can change workspace settings.
@@ -204,6 +214,9 @@ export function SettingsView({
                   organizationId={organizationId}
                   disabled={!admin || !online}
                 />
+              ) : null}
+              {section === 'security' ? (
+                <SecuritySettings disabled={!online} />
               ) : null}
               {section === 'appearance' ? <AppearanceSettings /> : null}
               {section === 'home' ? (

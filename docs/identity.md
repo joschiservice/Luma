@@ -52,7 +52,31 @@ The typed contract and OpenAPI document describe organization routes. Send the s
 
 Owners and admins manage members; only owners may grant or revoke ownership. The last owner cannot be removed or demoted. Membership mutations serialize on the organization row and recheck the acting membership after acquiring the lock. Adding users by UUID remains an explicit administrator action. [Workspace Settings](workspace-settings.md) also provides expiring email invitations, audited access changes and email preferences.
 
-The auth bridge also permits session listing/revocation and password changes. Other Better Auth routes, including direct organization routes, return 404. Organization creation uses Better Auth's organization plugin inside the identity transaction; Luma's API owns membership management and placement rules. Cookie cache and automatic account linking are disabled.
+The auth bridge also permits session listing/revocation, password changes, and the two-factor and passkey routes listed under [Sign-in factors](#sign-in-factors). Other Better Auth routes, including direct organization routes, return 404. Organization creation uses Better Auth's organization plugin inside the identity transaction; Luma's API owns membership management and placement rules. Cookie cache and automatic account linking are disabled.
+
+## Sign-in factors
+
+People can add an authenticator app (TOTP) after their password, and passkeys that replace it. Both are personal account settings in **Settings → Security**; the user guide is `apps/web/content/docs/account-security.mdx`. Migration `0052_authentication_factors.sql` adds `users.two_factor_enabled`, `two_factors` and `passkeys`, with DML for `luma_identity` only. Like sessions and accounts, these credential tables have no tenant scope.
+
+| Route                                             | Behavior                                                                                     |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `POST /auth/two-factor/enable`                    | Checks the password, stores an encrypted secret and returns the TOTP URI and 10 backup codes |
+| `POST /auth/two-factor/verify-totp`               | Confirms setup with a session, or completes a pending password sign-in                       |
+| `POST /auth/two-factor/verify-backup-code`        | Completes a pending password sign-in and consumes the code                                   |
+| `POST /auth/two-factor/generate-backup-codes`     | Checks the password and replaces all backup codes                                            |
+| `POST /auth/two-factor/disable`                   | Checks the password, removes the secret and backup codes                                     |
+| `GET /auth/passkey/generate-register-options`     | Starts registration; needs a session created within the last day                             |
+| `POST /auth/passkey/verify-registration`          | Stores the verified credential for the session user                                          |
+| `GET /auth/passkey/generate-authenticate-options` | Starts a discoverable-credential sign-in                                                     |
+| `POST /auth/passkey/verify-authentication`        | Verifies the assertion and creates a session                                                 |
+| `GET /auth/passkey/list-user-passkeys`            | Lists the caller's passkeys                                                                  |
+| `POST /auth/passkey/delete-passkey`               | Removes one of the caller's passkeys                                                         |
+
+TOTP is pending until the first code is confirmed; until then, sign-in needs only the password. When it is on, a correct password deletes the new session and returns `twoFactorRedirect` with a signed 10-minute challenge cookie. Each challenge allows five codes, and ten failures lock code entry for 15 minutes. Confirming setup and turning it off rotate the session. Trusted devices are not supported: `trustDevice` and `disableSession` are rejected. Code delivery by email or SMS, re-reading the TOTP URI and renaming passkeys stay unexposed.
+
+A passkey sign-in counts as both factors and skips the code step. The relying-party ID is the `BETTER_AUTH_URL` hostname, and assertions are accepted only from `AUTH_TRUSTED_ORIGINS`. Browsers reject IP addresses as relying-party IDs, so local development serves the web app on `http://localhost:<port>`; `127.0.0.1` remains trusted for password sign-in only. Changing the production hostname invalidates existing passkeys. Passkeys created in one worktree are offered in others on `localhost`, but only work against the database that stored them.
+
+With `NODE_ENV=production`, Better Auth rate-limits `/two-factor/*`, like sign-in, to three requests per 10 seconds for each client IP. Without a forwarded client address, all callers share one bucket, so the [production proxy](#production-proxy) overwrites `X-Forwarded-For`. The store is per process; several API instances need shared storage before relying on these limits.
 
 ## Context and isolation
 
@@ -110,7 +134,8 @@ creation, inspect the refreshed workspace list before starting another creation.
 Serve the web app and API under one HTTPS origin. Set `BETTER_AUTH_URL` to that
 public origin and include it in `AUTH_TRUSTED_ORIGINS`. Forward `/api/` to the
 trusted API service, removing only the `/api` prefix. Preserve `Cookie`, `Origin`
-and every `Set-Cookie` header. Disable caching for auth and organization responses.
+and every `Set-Cookie` header. Replace `X-Forwarded-For` with the client address
+so auth rate limits apply per client. Disable caching for auth and organization responses.
 Never rewrite an untrusted Origin into a trusted one. For example, with Nginx:
 
 ```nginx
@@ -119,6 +144,7 @@ location /api/ {
     proxy_set_header Host $host;
     proxy_set_header Origin $http_origin;
     proxy_set_header Cookie $http_cookie;
+    proxy_set_header X-Forwarded-For $remote_addr;
     proxy_cache off;
     add_header Cache-Control "no-store" always;
 }

@@ -180,7 +180,9 @@ export async function environment(saved, workflows = false, observing = false) {
     if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT'))
       throw error;
   }
-  const localOrigin = `http://127.0.0.1:${saved.webPort}`;
+  // Passkeys need a domain as relying-party ID; browsers reject IP addresses.
+  const localOrigin = `http://localhost:${saved.webPort}`;
+  const loopbackOrigin = `http://127.0.0.1:${saved.webPort}`;
   const webOrigin =
     apiEnv.SHOPIFY_WEB_ORIGIN || apiEnv.BETTER_AUTH_URL || localOrigin;
   if (
@@ -201,7 +203,9 @@ export async function environment(saved, workflows = false, observing = false) {
     BETTER_AUTH_SECRET: saved.authSecret,
     BETTER_AUTH_COOKIE_PREFIX: project,
     BETTER_AUTH_URL: webOrigin,
-    AUTH_TRUSTED_ORIGINS: [...new Set([webOrigin, localOrigin])].join(','),
+    AUTH_TRUSTED_ORIGINS: [
+      ...new Set([webOrigin, localOrigin, loopbackOrigin]),
+    ].join(','),
     __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS: new URL(webOrigin).hostname,
     TEMPORAL_NAMESPACE: 'default',
     TEMPORAL_TASK_QUEUE: 'luma-exceptions-v1',

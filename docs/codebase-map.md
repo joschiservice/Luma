@@ -69,6 +69,11 @@ Start at `packages/identity/src/application/settings.ts` for authorized edits an
 `packages/policies/src/application/policies.ts` and execution admission. Tests are
 `apps/api/e2e/settings.e2e.mjs`, `settings.browser.mjs` and the Settings stories.
 Personal Appearance and Home & sidebar sections are in `apps/web/src/features/settings/personal.tsx`.
+Personal Security (authenticator app, backup codes and passkeys) is `security.tsx` in the same directory;
+the sign-in code step is `apps/web/src/features/identity/second-factor.tsx`. Server plugins are configured in
+`packages/identity/src/infrastructure/auth.ts` and exposed through the allowlist in `api/auth-handler.ts`.
+Tests are `identity.integration.test.ts` in application-runtime, `security.stories.tsx` and
+`authentication-factors.browser.mjs`. See [sign-in factors](identity.md#sign-in-factors).
 See [workspace settings](workspace-settings.md) for configuration and retry semantics.
 
 ## Operational issue flow
