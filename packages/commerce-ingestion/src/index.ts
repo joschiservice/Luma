@@ -9,7 +9,10 @@ import { requireRole, requireTenant } from '@luma/identity';
 import type { CommerceProjections as Inventory } from '@luma/inventory';
 import type { CommerceProjections as Orders } from '@luma/orders';
 
-import { prepareOrderChildren } from './application/order-links.js';
+import {
+  orderParent,
+  prepareOrderChildren,
+} from './application/order-links.js';
 import { sourceLocalKey } from './application/source-local.js';
 
 export { sourceLocalKey } from './application/source-local.js';
@@ -41,14 +44,20 @@ export function createCommerceIngestion(
   inventory: Inventory,
   digest: (value: string) => string,
 ) {
-  async function project(
+  /**
+   * Resolves one stored observation into its owner's snapshot, or reports the related records
+   * it still waits for. Inventory positions use `positions` when it holds their entity, and
+   * children use `parents` for their order's current projections.
+   */
+  async function plan(
     context: TenantContext,
     input: CommerceObservation,
-  ): Promise<ProjectionOutcome> {
-    await prepareOrderChildren(context, input, sources, orders);
+    known: Map<string, string>,
+    positions: Map<string, string>,
+    parents: Map<string, Projection[]>,
+  ): Promise<Plan> {
     const o = input.observation;
     const missing: SourceIdentity[] = [];
-    const known = await sources.resolveMany(context, identities(input));
 
     async function lookup(source: SourceIdentity) {
       return known.get(identityKey(source)) ?? sources.resolve(context, source);
@@ -80,29 +89,30 @@ export function createCommerceIngestion(
       const skuId = await resolve('sku', data.sku),
         locationId = await resolve('location', data.location);
       if (!skuId || !locationId) return { status: 'pending', missing };
-      const entityId = await inventory.identify(
-        context,
-        'position',
-        JSON.stringify([skuId, locationId, data.unit]),
-      );
-      const status = await inventory.project(context, {
-        ...provenance,
-        entityId,
-        kind: 'position',
-        mappingVersion: digest(JSON.stringify([skuId, locationId])),
-        data: {
-          type: 'position',
-          skuId,
-          locationId,
-          unit: data.unit,
-          onHand: data.onHand,
-          reserved: data.reserved,
-          available: data.available,
-          availabilityBasis: data.availabilityBasis,
-        },
-      });
+      const key = positionKey(skuId, locationId, data.unit);
+      const entityId =
+        positions.get(JSON.stringify(['position', key])) ??
+        (await inventory.identify(context, 'position', key));
 
-      return { status, entityId };
+      return {
+        owner: 'inventory',
+        snapshot: {
+          ...provenance,
+          entityId,
+          kind: 'position',
+          mappingVersion: digest(JSON.stringify([skuId, locationId])),
+          data: {
+            type: 'position',
+            skuId,
+            locationId,
+            unit: data.unit,
+            onHand: data.onHand,
+            reserved: data.reserved,
+            available: data.available,
+            availabilityBasis: data.availabilityBasis,
+          },
+        },
+      };
     }
     if (input.capability === 'products.read') {
       const data = input.observation.data;
@@ -121,26 +131,28 @@ export function createCommerceIngestion(
           });
       }
       if (!entityId || missing.length) return { status: 'pending', missing };
-      const status = await inventory.project(context, {
-        ...provenance,
-        schemaVersion: 2,
-        normalizerVersion: normalizers.product,
-        entityId,
-        kind: 'product',
-        mappingVersion: digest(
-          JSON.stringify([entityId, skus.map((sku) => sku.skuId)]),
-        ),
-        data: {
-          type: 'product',
-          title: data.title,
-          status: data.status,
-          ...(data.vendor !== undefined && { vendor: data.vendor }),
-          ...(data.published !== undefined && { published: data.published }),
-          skus,
-        },
-      });
 
-      return { status, entityId };
+      return {
+        owner: 'inventory',
+        snapshot: {
+          ...provenance,
+          schemaVersion: 2,
+          normalizerVersion: normalizers.product,
+          entityId,
+          kind: 'product',
+          mappingVersion: digest(
+            JSON.stringify([entityId, skus.map((sku) => sku.skuId)]),
+          ),
+          data: {
+            type: 'product',
+            title: data.title,
+            status: data.status,
+            ...(data.vendor !== undefined && { vendor: data.vendor }),
+            ...(data.published !== undefined && { published: data.published }),
+            skus,
+          },
+        },
+      };
     }
     if (input.capability === 'orders.read') {
       const entityId = await resolve('order', o.source);
@@ -164,28 +176,30 @@ export function createCommerceIngestion(
           });
       }
       if (!entityId || missing.length) return { status: 'pending', missing };
-      const status = await orders.project(context, {
-        ...provenance,
-        schemaVersion: 2,
-        normalizerVersion: normalizers.order,
-        entityId,
-        kind: 'order',
-        mappingVersion: digest(
-          JSON.stringify([entityId, lines.map((l) => [l.id, l.skuId])]),
-        ),
-        data: {
-          type: 'order',
-          displayNumber: data.displayNumber,
-          ...(data.dueAt === undefined ? {} : { dueAt: data.dueAt }),
-          ...(data.placedAt === undefined ? {} : { placedAt: data.placedAt }),
-          ...(data.total === undefined ? {} : { total: data.total }),
-          status: data.status,
-          paymentStatus: data.paymentStatus,
-          lines,
-        },
-      });
 
-      return { status, entityId };
+      return {
+        owner: 'orders',
+        snapshot: {
+          ...provenance,
+          schemaVersion: 2,
+          normalizerVersion: normalizers.order,
+          entityId,
+          kind: 'order',
+          mappingVersion: digest(
+            JSON.stringify([entityId, lines.map((l) => [l.id, l.skuId])]),
+          ),
+          data: {
+            type: 'order',
+            displayNumber: data.displayNumber,
+            ...(data.dueAt === undefined ? {} : { dueAt: data.dueAt }),
+            ...(data.placedAt === undefined ? {} : { placedAt: data.placedAt }),
+            ...(data.total === undefined ? {} : { total: data.total }),
+            status: data.status,
+            paymentStatus: data.paymentStatus,
+            lines,
+          },
+        },
+      };
     }
     if (input.capability === 'returns.read') {
       const data = input.observation.data;
@@ -202,9 +216,9 @@ export function createCommerceIngestion(
           : null;
       if (!entityId || !orderId || missing.length)
         return { status: 'pending', missing };
-      const parent = (await orders.current(context, orderId)).find(
-        (p) => p.snapshot.connectionId === o.source.connectionId,
-      );
+      const parent = (
+        parents.get(orderId) ?? (await orders.current(context, orderId))
+      ).find((p) => p.snapshot.connectionId === o.source.connectionId);
       if (
         !parent ||
         parent.snapshot.deleted ||
@@ -222,54 +236,56 @@ export function createCommerceIngestion(
           JSON.stringify([entityId, orderId, lineIds, returnId]),
         ),
       };
-      const status =
-        data.type === 'return'
-          ? await orders.project(context, {
-              ...common,
-              kind: 'return',
-              data: {
-                type: 'return',
-                orderId,
-                name: data.name,
-                status: data.status,
-                requestedAt: data.requestedAt,
-                approvedAt: data.approvedAt,
-                closedAt: data.closedAt,
-                declineReason: data.declineReason,
-                receivedAt: data.receivedAt,
-                lines: data.lines.map((line, index) => ({
-                  orderLineId: lineIds[index] ?? null,
-                  quantity: line.quantity.amount,
-                  unit: line.quantity.unit,
-                  reason: line.reason,
-                  receivedQuantity: line.receivedQuantity,
-                  restockedQuantity: line.restockedQuantity,
-                  refundedQuantity: line.refundedQuantity,
-                  value: line.value,
-                })),
-              },
-            })
-          : await orders.project(context, {
-              ...common,
-              kind: 'refund',
-              data: {
-                type: 'refund',
-                orderId,
-                returnId,
-                createdAt: data.createdAt,
-                total: data.total,
-                lines: data.lines.map((line, index) => ({
-                  orderLineId: lineIds[index]!,
-                  quantity: line.quantity.amount,
-                  unit: line.quantity.unit,
-                  restock: line.restock,
-                  restocked: line.restocked,
-                })),
-                transactions: data.transactions,
-              },
-            });
 
-      return { status, entityId };
+      return {
+        owner: 'orders',
+        snapshot:
+          data.type === 'return'
+            ? {
+                ...common,
+                kind: 'return',
+                data: {
+                  type: 'return',
+                  orderId,
+                  name: data.name,
+                  status: data.status,
+                  requestedAt: data.requestedAt,
+                  approvedAt: data.approvedAt,
+                  closedAt: data.closedAt,
+                  declineReason: data.declineReason,
+                  receivedAt: data.receivedAt,
+                  lines: data.lines.map((line, index) => ({
+                    orderLineId: lineIds[index] ?? null,
+                    quantity: line.quantity.amount,
+                    unit: line.quantity.unit,
+                    reason: line.reason,
+                    receivedQuantity: line.receivedQuantity,
+                    restockedQuantity: line.restockedQuantity,
+                    refundedQuantity: line.refundedQuantity,
+                    value: line.value,
+                  })),
+                },
+              }
+            : {
+                ...common,
+                kind: 'refund',
+                data: {
+                  type: 'refund',
+                  orderId,
+                  returnId,
+                  createdAt: data.createdAt,
+                  total: data.total,
+                  lines: data.lines.map((line, index) => ({
+                    orderLineId: lineIds[index]!,
+                    quantity: line.quantity.amount,
+                    unit: line.quantity.unit,
+                    restock: line.restock,
+                    restocked: line.restocked,
+                  })),
+                  transactions: data.transactions,
+                },
+              },
+      };
     }
     const data = input.observation.data;
     const entityId = await resolve('fulfillment', o.source),
@@ -290,9 +306,9 @@ export function createCommerceIngestion(
       : null;
     if (!entityId || !orderId || missing.length)
       return { status: 'pending', missing };
-    const parent = (await orders.current(context, orderId)).find(
-      (p) => p.snapshot.connectionId === o.source.connectionId,
-    );
+    const parent = (
+      parents.get(orderId) ?? (await orders.current(context, orderId))
+    ).find((p) => p.snapshot.connectionId === o.source.connectionId);
     if (
       !parent ||
       parent.snapshot.deleted ||
@@ -314,46 +330,149 @@ export function createCommerceIngestion(
       );
     const optional = <K extends keyof typeof data>(key: K) =>
       data[key] === undefined ? {} : { [key]: data[key] };
-    const status = await orders.project(context, {
-      ...provenance,
-      schemaVersion: 2,
-      normalizerVersion: normalizers.fulfillment,
-      entityId,
-      kind: 'fulfillment',
-      mappingVersion: digest(
-        JSON.stringify([
-          entityId,
-          orderId,
-          lines.map((l) => l.orderLineId),
-          locationId,
-        ]),
-      ),
-      data: {
-        type: 'fulfillment',
-        orderId,
-        status: data.status,
-        lastProgressAt: data.lastProgressAt,
-        failureCode: data.failureCode,
-        lines,
-        ...optional('kind'),
-        ...optional('holds'),
-        ...(data.location === undefined
-          ? {}
-          : {
-              location: data.location
-                ? { locationId, name: data.location.name }
-                : null,
-            }),
-        ...optional('fulfillAt'),
-        ...optional('fulfillBy'),
-        ...optional('estimatedDeliveryAt'),
-        ...optional('method'),
-        ...optional('tracking'),
-        ...optional('delivery'),
-      },
-    });
 
-    return { status, entityId };
+    return {
+      owner: 'orders',
+      snapshot: {
+        ...provenance,
+        schemaVersion: 2,
+        normalizerVersion: normalizers.fulfillment,
+        entityId,
+        kind: 'fulfillment',
+        mappingVersion: digest(
+          JSON.stringify([
+            entityId,
+            orderId,
+            lines.map((l) => l.orderLineId),
+            locationId,
+          ]),
+        ),
+        data: {
+          type: 'fulfillment',
+          orderId,
+          status: data.status,
+          lastProgressAt: data.lastProgressAt,
+          failureCode: data.failureCode,
+          lines,
+          ...optional('kind'),
+          ...optional('holds'),
+          ...(data.location === undefined
+            ? {}
+            : {
+                location: data.location
+                  ? { locationId, name: data.location.name }
+                  : null,
+              }),
+          ...optional('fulfillAt'),
+          ...optional('fulfillBy'),
+          ...optional('estimatedDeliveryAt'),
+          ...optional('method'),
+          ...optional('tracking'),
+          ...optional('delivery'),
+        },
+      },
+    };
+  }
+
+  /** Resolves any number of identities in reads within the source lookup's batch limit. */
+  async function resolveAll(context: TenantContext, all: SourceIdentity[]) {
+    const found = new Map<string, string>();
+    for (let start = 0; start < all.length; start += resolveBatch)
+      for (const [key, id] of await sources.resolveMany(
+        context,
+        all.slice(start, start + resolveBatch),
+      ))
+        found.set(key, id);
+
+    return found;
+  }
+
+  /**
+   * Projects stored observations in input order. Children of linked orders are re-keyed first;
+   * owners then apply their snapshots in one batch each. Any failure rejects the batch.
+   */
+  async function projectMany(
+    context: TenantContext,
+    inputs: CommerceObservation[],
+  ): Promise<ProjectionOutcome[]> {
+    if (!inputs.length) return [];
+    const parents = inputs.map(orderParent);
+    const parentIds = await resolveAll(
+      context,
+      parents.filter((parent) => parent !== null),
+    );
+    const revised = await sources.revised(context, 'order', [
+      ...parentIds.values(),
+    ]);
+    for (const [index, input] of inputs.entries()) {
+      const parent = parents[index];
+      const id = parent && parentIds.get(identityKey(parent));
+      if (id && revised.has(id))
+        await prepareOrderChildren(context, input, sources, orders);
+    }
+    const known = await resolveAll(context, unique(inputs.flatMap(identities)));
+    const positions = await inventory.identifyMany(
+      context,
+      inputs.flatMap((input) => {
+        if (input.capability !== 'inventory.read') return [];
+        const data = input.observation.data;
+        const source = input.observation.source;
+        const skuId = known.get(
+          identityKey({ ...source, ...data.sku, resource: 'sku' }),
+        );
+        const locationId = known.get(
+          identityKey({ ...source, ...data.location, resource: 'location' }),
+        );
+
+        return skuId && locationId
+          ? [
+              {
+                kind: 'position' as const,
+                reconciliationKey: positionKey(skuId, locationId, data.unit),
+              },
+            ]
+          : [];
+      }),
+    );
+    const parentOrders = await orders.currentMany(
+      context,
+      inputs.flatMap((input, index) => {
+        const parent = parents[index];
+        const id =
+          input.capability !== 'orders.read' &&
+          parent &&
+          known.get(identityKey(parent));
+
+        return id ? [id] : [];
+      }),
+    );
+    const plans: Plan[] = [];
+    for (const input of inputs)
+      plans.push(await plan(context, input, known, positions, parentOrders));
+    const statuses = {
+      orders: await orders.projectMany(
+        context,
+        plans.flatMap((item) =>
+          'owner' in item && item.owner === 'orders' ? [item.snapshot] : [],
+        ),
+      ),
+      inventory: await inventory.projectMany(
+        context,
+        plans.flatMap((item) =>
+          'owner' in item && item.owner === 'inventory' ? [item.snapshot] : [],
+        ),
+      ),
+    };
+    const next = { orders: 0, inventory: 0 };
+
+    return plans.map((item) =>
+      'owner' in item
+        ? {
+            status: statuses[item.owner][next[item.owner]++]!,
+            entityId: item.snapshot.entityId,
+          }
+        : item,
+    );
   }
 
   return {
@@ -363,8 +482,9 @@ export function createCommerceIngestion(
       input: CommerceObservation,
     ) {
       requireTenant(context, context.tenantId);
+      const stored = await sources.record(context, ingestKey, input);
 
-      return project(context, await sources.record(context, ingestKey, input));
+      return (await projectMany(context, [stored]))[0]!;
     },
     async replay(
       context: TenantContext,
@@ -374,7 +494,7 @@ export function createCommerceIngestion(
       const stored = await sources.get(context, connectionId, ingestKey);
       if (!stored) throw new Error('Observation not found');
 
-      return project(context, stored);
+      return (await projectMany(context, [stored]))[0]!;
     },
     bind,
     async import(
@@ -382,22 +502,9 @@ export function createCommerceIngestion(
       ingestKey: string,
       input: CommerceObservation,
     ) {
-      requireRole(context, ['owner', 'admin']);
-      const stored = await sources.record(context, ingestKey, input);
-      const all = identities(stored);
-      const mapped = await sources.resolveMany(context, all);
-      for (const source of all)
-        if (!mapped.has(identityKey(source)))
-          await bind(
-            context,
-            source,
-            sourceLocalKey(source),
-            stored.observation.id,
-            sourceLocalMethod,
-          );
-
-      return project(context, stored);
+      return (await importMany(context, [{ ingestKey, input }]))[0]!;
     },
+    importMany,
     async link(
       context: TenantContext,
       kind: LinkableKind,
@@ -485,6 +592,53 @@ export function createCommerceIngestion(
     },
   };
 
+  /**
+   * Stores observations, binds every unmapped identity they carry to a source-local entity and
+   * projects them in input order. Any failure rejects the batch.
+   */
+  async function importMany(
+    context: TenantContext,
+    items: { ingestKey: string; input: CommerceObservation }[],
+  ): Promise<ProjectionOutcome[]> {
+    requireRole(context, ['owner', 'admin']);
+    const stored = await sources.recordMany(context, items);
+    const evidence = new Map<string, string>();
+    for (const item of stored)
+      for (const source of identities(item))
+        if (!evidence.has(identityKey(source)))
+          evidence.set(identityKey(source), item.observation.id);
+    const all = unique(stored.flatMap(identities));
+    const mapped = await resolveAll(context, all);
+    const unmapped = all.filter((source) => !mapped.has(identityKey(source)));
+    const keys = unmapped.map((source) => sourceLocalEntity(source));
+    const created = new Map([
+      ...(await orders.identifyMany(
+        context,
+        keys.flatMap((key) => (key.owner === 'orders' ? [key.entity] : [])),
+      )),
+      ...(await inventory.identifyMany(
+        context,
+        keys.flatMap((key) => (key.owner === 'inventory' ? [key.entity] : [])),
+      )),
+    ]);
+    await sources.bindMany(
+      context,
+      unmapped.map((source, index) => ({
+        source,
+        canonicalId: created.get(
+          JSON.stringify([
+            keys[index]!.entity.kind,
+            keys[index]!.entity.reconciliationKey,
+          ]),
+        )!,
+        observationId: evidence.get(identityKey(source))!,
+        method: sourceLocalMethod,
+      })),
+    );
+
+    return projectMany(context, stored);
+  }
+
   async function bind(
     context: TenantContext,
     source: SourceIdentity,
@@ -494,25 +648,16 @@ export function createCommerceIngestion(
   ) {
     requireRole(context, ['owner', 'admin']);
     requireTenant(context, source.tenantId);
-    if (source.resource === 'customer')
-      throw new Error('Customer profiles have no canonical mapping');
-    if (source.resource === 'supplier' || source.resource === 'purchase_order')
-      throw new Error('Procurement owns supplier and purchase-order records');
     // The key is explicit operator evidence, never an inferred SKU or display number.
-    const resource = source.resource;
+    const { owner, entity } = sourceLocalEntity(source, reconciliationKey);
     const id =
-      resource === 'order' || resource === 'order_line'
-        ? await orders.identify(context, resource, reconciliationKey)
-        : resource === 'fulfillment' ||
-            resource === 'return' ||
-            resource === 'refund'
-          ? // One source's operations; mirrored copies in other sources stay separate.
-            await orders.identify(
-              context,
-              resource,
-              JSON.stringify([source.connectionId, reconciliationKey]),
-            )
-          : await inventory.identify(context, resource, reconciliationKey);
+      owner === 'orders'
+        ? await orders.identify(context, entity.kind, entity.reconciliationKey)
+        : await inventory.identify(
+            context,
+            entity.kind,
+            entity.reconciliationKey,
+          );
     await sources.bind(context, source, id, observationId, method);
 
     return id;
@@ -532,7 +677,7 @@ export function createCommerceIngestion(
         item.observationId,
       );
       if (!stored) throw new Error('Observation not found');
-      const outcome = await project(context, stored);
+      const outcome = (await projectMany(context, [stored]))[0]!;
       if (outcome.status === 'pending')
         throw new LinkError(
           'Related order records are not ready. Import the order and try again.',
@@ -567,7 +712,7 @@ export function createCommerceIngestion(
       );
       if (!stored) throw new Error('Observation not found');
 
-      return project(context, stored);
+      return (await projectMany(context, [stored]))[0]!;
     };
     for (const item of await inventory.dependents(
       context,
@@ -613,6 +758,73 @@ const identityKey = (source: SourceIdentity) =>
     source.scopeKey,
     source.externalId,
   ]);
+
+type OrderSnapshot = Parameters<Orders['project']>[1];
+
+type Projection = Awaited<ReturnType<Orders['current']>>[number];
+
+type InventorySnapshot = Parameters<Inventory['project']>[1];
+
+type Plan =
+  | { status: 'pending'; missing: SourceIdentity[] }
+  | { owner: 'orders'; snapshot: OrderSnapshot }
+  | { owner: 'inventory'; snapshot: InventorySnapshot };
+
+// `SourceRecords.resolveMany` accepts at most this many identities per read.
+const resolveBatch = 10_000;
+
+const positionKey = (skuId: string, locationId: string, unit: string) =>
+  JSON.stringify([skuId, locationId, unit]);
+
+const unique = (sources: SourceIdentity[]) => [
+  ...new Map(sources.map((source) => [identityKey(source), source])).values(),
+];
+
+/** The owner entity a source binds to by itself, before any person links it elsewhere. */
+function sourceLocalEntity(
+  source: SourceIdentity,
+  reconciliationKey = sourceLocalKey(source),
+):
+  | {
+      owner: 'orders';
+      entity: {
+        kind: 'order' | 'order_line' | 'fulfillment' | 'return' | 'refund';
+        reconciliationKey: string;
+      };
+    }
+  | {
+      owner: 'inventory';
+      entity: {
+        kind: 'sku' | 'location' | 'product' | 'position';
+        reconciliationKey: string;
+      };
+    } {
+  const resource = source.resource;
+  if (resource === 'customer')
+    throw new Error('Customer profiles have no canonical mapping');
+  if (resource === 'supplier' || resource === 'purchase_order')
+    throw new Error('Procurement owns supplier and purchase-order records');
+  if (resource === 'order' || resource === 'order_line')
+    return { owner: 'orders', entity: { kind: resource, reconciliationKey } };
+  if (
+    resource === 'fulfillment' ||
+    resource === 'return' ||
+    resource === 'refund'
+  )
+    // One source's operations; mirrored copies in other sources stay separate.
+    return {
+      owner: 'orders',
+      entity: {
+        kind: resource,
+        reconciliationKey: JSON.stringify([
+          source.connectionId,
+          reconciliationKey,
+        ]),
+      },
+    };
+
+  return { owner: 'inventory', entity: { kind: resource, reconciliationKey } };
+}
 
 /** Every source identity an observation carries, including its parent and line references. */
 function identities(input: CommerceObservation): SourceIdentity[] {

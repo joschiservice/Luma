@@ -36,9 +36,13 @@ operation rather than overwriting history.
 
 ## Imports, products and links
 
-`ingestion.import(context, ingestKey, input)` is the history-import path. It records
-the observation, binds every unmapped identity it carries to its own canonical
-entity (`sourceLocalKey`, method `Imported source record…`) and projects. Existing
+`ingestion.importMany(context, items)` is the history-import path; `import` imports one
+record the same way. It records the observations, binds every unmapped identity they
+carry to its own canonical entity (`sourceLocalKey`, method `Imported source record…`)
+and projects them in input order, all in one transaction. Owners create entities and
+mappings with sorted multi-row writes, lock every affected order or inventory entity in
+sorted order and refresh the order, fulfillment and return lists once per batch. Any
+failure rolls back the whole batch. Existing
 mappings, including operator mappings made before the import, are reused. Imports
 never merge records across connections; SKU text and display numbers stay descriptive.
 
@@ -65,8 +69,9 @@ Order links re-key each source child under the order mapping revision before rep
 lines, fulfillments, returns and refunds use that same generation. The immutable parent guard
 still rejects children bound to an unrelated order. Orders-owned retirements remove old current
 pointers and maintain redirects; snapshots remain immutable. Unlink restores a source-local
-order with another child generation. Runtime ingestion, including link/unlink, shares a tenant
-transaction and lock, so partial remappings are not visible to concurrent imports or reads.
+order with another child generation. Runtime ingestion runs in tenant transactions that hold the
+tenant's ingestion lock: imports and replays share it, while link/unlink hold it exclusively, so
+partial remappings are not visible to concurrent imports or reads.
 
 A replay can return to a snapshot that already exists, for example after unlinking.
 The owner then makes that snapshot current again when it re-normalizes the current

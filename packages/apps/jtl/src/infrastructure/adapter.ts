@@ -257,18 +257,25 @@ export function createJtlConnector(
           });
         }
 
+        const location = filters.location?.externalId ?? 'all-warehouses';
+
+        // Reads one item's stock for the requested warehouse; all warehouses use item totals.
+        async function readStock(item: z.infer<typeof s.item>) {
+          return location === 'all-warehouses'
+            ? null
+            : capture(
+                s.warehouseStock,
+                await client.request(
+                  `warehouses/${location}/items/${item.id}/stocks`,
+                ),
+              );
+        }
+
         // Emits one item's stock for the requested warehouse, or across all warehouses.
-        async function emitStock(item: z.infer<typeof s.item>) {
-          const location = filters.location?.externalId ?? 'all-warehouses';
-          const stock =
-            location === 'all-warehouses'
-              ? null
-              : capture(
-                  s.warehouseStock,
-                  await client.request(
-                    `warehouses/${location}/items/${item.id}/stocks`,
-                  ),
-                );
+        function emitStock(
+          item: z.infer<typeof s.item>,
+          stock: Awaited<ReturnType<typeof readStock>>,
+        ) {
           const known = (value: string | null | undefined) =>
             item.isInventoryManagementActive ? (value ?? null) : null;
           const available =
@@ -285,16 +292,30 @@ export function createJtlConnector(
           });
         }
 
-        async function orderLines(orderId: string) {
-          const lines = capture(
-            z.array(s.orderLine),
-            await client.request(`sales-orders/${orderId}/line-items`),
-          );
-          if (
-            new Set(lines.map((line) => line.id)).size !== lines.length ||
-            lines.some((line) => line.salesOrderId !== orderId)
-          )
-            fail('invalid_response');
+        const linesByOrder = new Map<
+          string,
+          Promise<z.infer<typeof s.orderLine>[]>
+        >();
+
+        // Several delivery notes of one order share its line read within a page.
+        function orderLines(orderId: string) {
+          let lines = linesByOrder.get(orderId);
+          if (!lines) {
+            lines = client
+              .request(`sales-orders/${orderId}/line-items`)
+              .then((value) => {
+                const parsed = capture(z.array(s.orderLine), value);
+                if (
+                  new Set(parsed.map((line) => line.id)).size !==
+                    parsed.length ||
+                  parsed.some((line) => line.salesOrderId !== orderId)
+                )
+                  fail('invalid_response');
+
+                return parsed;
+              });
+            linesByOrder.set(orderId, lines);
+          }
 
           return lines;
         }
@@ -311,8 +332,13 @@ export function createJtlConnector(
           );
           hasNext = result.hasNext;
           total = result.total;
-          for (const order of result.items) {
-            const lines = await orderLines(order.id);
+          const linesOf = await mapConcurrent(
+            result.items,
+            childReadConcurrency,
+            (order) => orderLines(order.id),
+          );
+          for (const [index, order] of result.items.entries()) {
+            const lines = linesOf[index]!;
             // ERP 2.2 sales orders and delivery notes have no modification time, so these
             // snapshots are ordered by observation time. Creation dates are not update times.
             emit('order', ref(order.id), null, {
@@ -374,7 +400,8 @@ export function createJtlConnector(
             )
               throw error;
           }
-          if (item && String(item.id) === sku) await emitStock(item);
+          if (item && String(item.id) === sku)
+            emitStock(item, await readStock(item));
         } else if (
           capability === 'products.read' ||
           capability === 'inventory.read'
@@ -382,7 +409,15 @@ export function createJtlConnector(
           const result = await page('items', s.item, pageNumber, input.limit);
           hasNext = result.hasNext;
           if (capability === 'products.read') total = result.total;
-          for (const item of result.items) {
+          const stocks =
+            capability === 'inventory.read'
+              ? await mapConcurrent(
+                  result.items,
+                  childReadConcurrency,
+                  readStock,
+                )
+              : [];
+          for (const [index, item] of result.items.entries()) {
             if (capability === 'products.read') {
               emit('product', ref(item.id), item.modifiedTimestamp ?? null, {
                 title: item.name ?? null,
@@ -404,7 +439,7 @@ export function createJtlConnector(
                   },
                 ],
               } satisfies ProductSnapshot);
-            } else await emitStock(item);
+            } else emitStock(item, stocks[index]!);
           }
         } else {
           const result = await page(
@@ -417,23 +452,33 @@ export function createJtlConnector(
               : {},
           );
           hasNext = result.hasNext;
-          for (const root of result.items) {
-            const note = capture(
-              s.note,
-              await client.request(`delivery-notes/${root.id}`),
-            );
+          const notes = await mapConcurrent(
+            result.items,
+            childReadConcurrency,
+            async (root) => {
+              const note = capture(
+                s.note,
+                await client.request(`delivery-notes/${root.id}`),
+              );
+              if (note.id !== root.id) fail('invalid_response');
+
+              return {
+                note,
+                lines: await children(
+                  `delivery-notes/${note.id}/line-items`,
+                  s.noteLine,
+                ),
+                sourceLines: await orderLines(note.salesOrderId),
+              };
+            },
+          );
+          for (const { note, lines, sourceLines } of notes) {
             if (
-              note.id !== root.id ||
               (filters.order &&
                 String(note.salesOrderId) !== filters.order.externalId) ||
               note.packages.some((value) => value.deliveryNoteId !== note.id)
             )
               fail('invalid_response');
-            const lines = await children(
-              `delivery-notes/${note.id}/line-items`,
-              s.noteLine,
-            );
-            const sourceLines = await orderLines(note.salesOrderId);
             const mapped = lines.map((line) => {
               const source = sourceLines.find(
                 (value) => value.id === line.salesOrderLineItemId,
@@ -543,4 +588,36 @@ export function createJtlConnector(
       'fulfillment.read': handler('fulfillment.read'),
     },
   };
+}
+
+/**
+ * Child reads (order lines, delivery notes, warehouse stock) in flight per page. ERP 2.2
+ * publishes no request quota, so the bound stays small; transports still honor `Retry-After`.
+ */
+const childReadConcurrency = 4;
+
+/** Maps items with at most `limit` calls in flight, in input order; stops after a failure. */
+async function mapConcurrent<T, R>(
+  items: T[],
+  limit: number,
+  map: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  let failed = false;
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, async () => {
+      while (!failed && next < items.length) {
+        const index = next++;
+        try {
+          results[index] = await map(items[index]!);
+        } catch (error) {
+          failed = true;
+          throw error;
+        }
+      }
+    }),
+  );
+
+  return results;
 }

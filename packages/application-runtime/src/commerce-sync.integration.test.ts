@@ -10,6 +10,7 @@ import {
 import type {
   CapabilityReader,
   CapabilityResult,
+  CommerceObservation,
   Observation,
   ReadCapability,
 } from '@luma/connections';
@@ -1638,4 +1639,327 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
       members.delete('admin');
     }
   });
+
+  it('imports a page together and fails only the record that breaks record rules', async () => {
+    const broken = order(shop, '2');
+    (
+      broken.data as { lines: { quantity: { amount: string } }[] }
+    ).lines[0]!.quantity.amount = '0';
+    source.set(shop, 'orders.read', [
+      order(shop, '1'),
+      broken,
+      order(shop, '3', { number: 'SEARCH-3' }),
+    ]);
+    await drain();
+
+    const items = await owner.query(
+      `SELECT external_id,status,problem FROM commerce_sync_items
+      WHERE tenant_id=$1 AND record_type='orders' ORDER BY external_id`,
+      [tenant],
+    );
+    expect(items.rows).toEqual([
+      { external_id: '1', status: 'current', problem: null },
+      {
+        external_id: '2',
+        status: 'failed',
+        problem: 'The source record does not match Luma’s record rules',
+      },
+      { external_id: '3', status: 'current', problem: null },
+    ]);
+    // Maintained reads are refreshed for every record projected in the page.
+    const listed = await owner.query(
+      `SELECT o.display_number,count(k.value_id)::int AS search_values FROM orders_list o
+      LEFT JOIN orders_search_links k ON k.tenant_id=o.tenant_id AND k.entity_id=o.entity_id
+      WHERE o.tenant_id=$1 GROUP BY o.display_number ORDER BY o.display_number`,
+      [tenant],
+    );
+    expect(listed.rows).toEqual([
+      { display_number: '#1', search_values: 2 },
+      { display_number: 'SEARCH-3', search_values: 2 },
+    ]);
+  });
+
+  it('imports overlapping streams from several connections concurrently', async () => {
+    const skus = Array.from({ length: 30 }, (_, index) => `item-${index}`);
+    for (const connectionId of [shop, erp]) {
+      source.set(
+        connectionId,
+        'products.read',
+        skus.map((sku, index) =>
+          product(connectionId, `p-${index}`, sku, `CODE-${index}`),
+        ),
+      );
+      source.set(
+        connectionId,
+        'inventory.read',
+        skus.map((sku, index) => stock(connectionId, sku, String(index))),
+      );
+      source.set(
+        connectionId,
+        'orders.read',
+        skus.map((sku, index) =>
+          order(connectionId, `o-${index}`, { sku, extraLine: index % 2 > 0 }),
+        ),
+      );
+      source.set(
+        connectionId,
+        'fulfillment.read',
+        skus.map((_, index) =>
+          shipment(connectionId, `f-${index}`, `o-${index}`),
+        ),
+      );
+    }
+    const parallel = createSyncRunner({
+      store: createSyncStore(db),
+      reader: source.reader,
+      ingestion: services.ingestion,
+      customers: createCustomerProfiles(db),
+      recordRead: createReadChecks(db),
+      resolveContext: async (principal) => context(principal),
+      digest: (value) => createHash('sha256').update(value).digest('hex'),
+      pageSize: 5,
+      workspaceConcurrency: 8,
+      connectionConcurrency: 4,
+    });
+    for (
+      let pass = 0;
+      pass < 50 && (await parallel.scopes()).includes(tenant);
+      pass++
+    )
+      await parallel.tick(tenant, 5000);
+
+    const statuses = await owner.query(
+      'SELECT status,count(*)::int AS count FROM commerce_sync_items WHERE tenant_id=$1 GROUP BY status',
+      [tenant],
+    );
+    expect(statuses.rows).toEqual([{ status: 'current', count: 240 }]);
+    const failing = await owner.query(
+      'SELECT record_type,error_code FROM commerce_sync_streams WHERE tenant_id=$1 AND error_code IS NOT NULL',
+      [tenant],
+    );
+    expect(failing.rows).toEqual([]);
+    const counts = await owner.query(
+      `SELECT (SELECT count(*)::int FROM inventory_entities WHERE tenant_id=$1 AND kind='sku') AS skus,
+        (SELECT count(*)::int FROM inventory_entities WHERE tenant_id=$1 AND kind='position') AS positions,
+        (SELECT count(*)::int FROM orders_list WHERE tenant_id=$1) AS orders,
+        (SELECT count(*)::int FROM orders_fulfillment_list WHERE tenant_id=$1) AS fulfillments`,
+      [tenant],
+    );
+    expect(counts.rows[0]).toEqual({
+      skus: 60,
+      positions: 60,
+      orders: 60,
+      fulfillments: 60,
+    });
+  });
+
+  it('lets imports share the workspace while a link waits for them', async () => {
+    const observe = (item: Item) => ({
+      ...item,
+      id: randomUUID(),
+      observedAt: new Date().toISOString(),
+    });
+    const outcomes = await services.ingestion.importMany(context(), [
+      {
+        ingestKey: `test:${randomUUID()}`,
+        input: {
+          capability: 'products.read',
+          observation: observe(product(shop, 'p1', 'item-1', 'ABC-1')),
+        } as CommerceObservation,
+      },
+      {
+        ingestKey: `test:${randomUUID()}`,
+        input: {
+          capability: 'products.read',
+          observation: observe(product(erp, 'p9', 'sku-9', 'ABC-1')),
+        } as CommerceObservation,
+      },
+    ]);
+    expect(outcomes.map((outcome) => outcome.status)).toEqual([
+      'applied',
+      'applied',
+    ]);
+    const sku = async (connectionId: string) =>
+      (
+        await owner.query<{ canonical_id: string }>(
+          "SELECT canonical_id FROM connector_source_mappings WHERE tenant_id=$1 AND connection_id=$2 AND resource='sku'",
+          [tenant, connectionId],
+        )
+      ).rows[0]!.canonical_id;
+    const lock = await owner.connect();
+    try {
+      // Another import holds the workspace lock for its whole transaction.
+      await lock.query(
+        'SELECT pg_advisory_lock_shared(hashtextextended($1,0))',
+        [`commerce-ingestion:${tenant}`],
+      );
+      const imported = await services.ingestion.import(
+        context(),
+        `test:${randomUUID()}`,
+        {
+          capability: 'inventory.read',
+          observation: observe(stock(shop, 'item-1', '3')),
+        } as CommerceObservation,
+      );
+      expect(imported.status).toBe('applied');
+
+      let linked = false;
+      const link = services.ingestion
+        .link(context(), 'sku', await sku(shop), await sku(erp), 'Same mug')
+        .then(() => {
+          linked = true;
+        });
+      await expect
+        .poll(
+          async () =>
+            (
+              await owner.query(
+                "SELECT count(*)::int AS count FROM pg_locks WHERE locktype='advisory' AND NOT granted",
+              )
+            ).rows[0].count,
+          { timeout: 5000 },
+        )
+        .toBe(1);
+      expect(linked).toBe(false);
+      await lock.query(
+        'SELECT pg_advisory_unlock_shared(hashtextextended($1,0))',
+        [`commerce-ingestion:${tenant}`],
+      );
+      await link;
+      expect(await sku(erp)).toBe(await sku(shop));
+    } finally {
+      lock.release();
+    }
+  });
+
+  it.skipIf(!process.env.LUMA_IMPORT_BENCHMARK)(
+    'measures history import throughput',
+    async () => {
+      const count = Number(process.env.LUMA_IMPORT_BENCHMARK);
+      // Fixture observations name Shopify as their provider.
+      const install = async () => {
+        const id = randomUUID();
+        const provider = 'shopify';
+        await owner.query(
+          'INSERT INTO connector_installations(tenant_id,id,version,document,secret) VALUES($1,$2,1,$3,$4)',
+          [
+            tenant,
+            id,
+            {
+              id,
+              tenantId: tenant,
+              version: 1,
+              status: 'active',
+              provider,
+              target: { kind: provider },
+              label: `Benchmark ${provider}`,
+              permissions: reads,
+              granted: reads,
+            },
+            'encrypted-fixture',
+          ],
+        );
+        await owner.query(
+          `INSERT INTO connector_lifecycle_events(tenant_id,connection_id,version,event,actor_id,status,credential_version)
+          VALUES($1,$2,1,'installed','operator','active',1)`,
+          [tenant, id],
+        );
+        for (const capability of reads) source.set(id, capability, []);
+
+        return id;
+      };
+      // Production defaults: page size, workspace and connection concurrency.
+      const bench = createSyncRunner({
+        store: createSyncStore(db),
+        reader: source.reader,
+        ingestion: services.ingestion,
+        customers: createCustomerProfiles(db),
+        recordRead: createReadChecks(db),
+        resolveContext: async (principal) => context(principal),
+        digest: (value) => createHash('sha256').update(value).digest('hex'),
+      });
+      const results: Record<string, number>[] = [];
+      const measured: Record<string, number> = {};
+
+      async function phase(label: string, records: number) {
+        const start = performance.now();
+        for (
+          let pass = 0;
+          pass < 1_000 && (await bench.scopes()).includes(tenant);
+          pass++
+        )
+          await bench.tick(tenant, 20_000);
+        const ms = performance.now() - start;
+        const failing = await owner.query(
+          'SELECT record_type,error_code FROM commerce_sync_streams WHERE tenant_id=$1 AND error_code IS NOT NULL',
+          [tenant],
+        );
+        expect(failing.rows).toEqual([]);
+        measured[label] = Math.round((records / ms) * 1000);
+        results.push({ [label]: Math.round(ms) });
+      }
+
+      const skus = Array.from({ length: count }, (_, index) => `sku-${index}`);
+      const catalog = await install();
+      source.set(
+        catalog,
+        'products.read',
+        skus.map((sku, index) => product(catalog, `p-${index}`, sku, sku)),
+      );
+      await phase('products', count);
+      source.set(
+        catalog,
+        'inventory.read',
+        skus.map((sku, index) => stock(catalog, sku, String(index % 50))),
+      );
+      const inventory = await owner.query<{ id: string }>(
+        "SELECT id FROM commerce_sync_streams WHERE tenant_id=$1 AND connection_id=$2 AND record_type='inventory'",
+        [tenant, catalog],
+      );
+      await service.command(context(), inventory.rows[0]!.id, 'reimport');
+      await phase('inventory', count);
+      const store = await install();
+      source.set(
+        store,
+        'orders.read',
+        skus.map((sku, index) =>
+          order(store, `o-${index}`, { sku, extraLine: true }),
+        ),
+      );
+      await phase('orders', count);
+      source.set(
+        store,
+        'fulfillment.read',
+        skus.map((_, index) => shipment(store, `f-${index}`, `o-${index}`)),
+      );
+      const fulfillments = await owner.query<{ id: string }>(
+        "SELECT id FROM commerce_sync_streams WHERE tenant_id=$1 AND connection_id=$2 AND record_type='fulfillments'",
+        [tenant, store],
+      );
+      await service.command(context(), fulfillments.rows[0]!.id, 'reimport');
+      await phase('fulfillments', count);
+      const stores = [await install(), await install()];
+      for (const id of stores)
+        source.set(
+          id,
+          'orders.read',
+          skus.map((sku, index) =>
+            order(id, `o-${index}`, { sku, extraLine: true }),
+          ),
+        );
+      await phase('orders from two connections', count * 2);
+
+      const failed = await owner.query(
+        "SELECT count(*)::int AS count FROM commerce_sync_items WHERE tenant_id=$1 AND status<>'current'",
+        [tenant],
+      );
+      expect(failed.rows[0].count).toBe(0);
+      const { writeFile } = await import('node:fs/promises');
+      await writeFile(
+        `/tmp/luma-import-benchmark-${count}.json`,
+        JSON.stringify({ recordsPerSecond: measured, ms: results }, null, 2),
+      );
+    },
+    3_600_000,
+  );
 });

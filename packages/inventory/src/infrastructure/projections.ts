@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import type { TenantContext } from '@luma/identity';
 import { requireRole, requireTenant } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
 import { z } from 'zod';
@@ -18,6 +19,226 @@ import { snapshotSchema } from './validation.js';
 export function createCommerceProjections(
   db: TenantDatabase,
 ): CommerceProjections {
+  /** Applies one validated snapshot; the caller holds its entity lock. */
+  async function apply(
+    tx: SqlTransaction,
+    context: TenantContext,
+    value: CanonicalSnapshot,
+  ): Promise<'applied' | 'retained' | 'duplicate'> {
+    const tenant = context.tenantId;
+    const old = await tx.query<{ document: CanonicalSnapshot }>(
+      'SELECT document FROM inventory_snapshots WHERE tenant_id=$1 AND entity_id=$2 AND observation_id=$3 AND normalizer_version=$4 AND mapping_version=$5',
+      [
+        tenant,
+        value.entityId,
+        value.observationId,
+        value.normalizerVersion,
+        value.mappingVersion,
+      ],
+    );
+    if (old.rows[0]) {
+      const same = await tx.query<{ matches: boolean }>(
+        'SELECT $1::jsonb=$2::jsonb AS matches',
+        [old.rows[0].document, value],
+      );
+      if (!same.rows[0]?.matches) throw new Error('Snapshot identity conflict');
+      // Replaying after a link change can return to an earlier snapshot of the current
+      // observation, or to an entity whose projection was retired; make it current again.
+      const restored = await tx.query<{ snapshot_id: string }>(
+        `WITH existing AS (SELECT id FROM inventory_snapshots WHERE tenant_id=$1 AND entity_id=$2
+          AND observation_id=$4 AND normalizer_version=$5 AND mapping_version=$6)
+        INSERT INTO inventory_projections(tenant_id,entity_id,connection_id,snapshot_id)
+        SELECT $1,$2,$3,id FROM existing
+        ON CONFLICT(tenant_id,entity_id,connection_id) DO UPDATE SET snapshot_id=EXCLUDED.snapshot_id,
+          version=inventory_projections.version+1,updated_at=now()
+        WHERE inventory_projections.snapshot_id<>EXCLUDED.snapshot_id AND EXISTS (
+          SELECT 1 FROM inventory_snapshots c WHERE c.tenant_id=$1 AND c.id=inventory_projections.snapshot_id
+          AND c.observation_id=$4)
+        RETURNING snapshot_id`,
+        [
+          tenant,
+          value.entityId,
+          value.connectionId,
+          value.observationId,
+          value.normalizerVersion,
+          value.mappingVersion,
+        ],
+      );
+      const snapshot = restored.rows[0]?.snapshot_id;
+      if (!snapshot) return 'duplicate';
+      await tx.query(
+        'INSERT INTO inventory_projection_events(id,tenant_id,snapshot_id,actor_id) VALUES($1,$2,$3,$4)',
+        [randomUUID(), tenant, snapshot, context.actor.id],
+      );
+      await refreshProductSkus(tx, tenant, [{ snapshotId: snapshot, value }]);
+
+      return 'applied';
+    }
+
+    return (await applyNew(tx, context, [value]))[0]!;
+  }
+
+  /**
+   * Applies new snapshots, at most one per entity and source, with one statement per step.
+   * The caller holds their entity locks and has checked that none was stored before.
+   */
+  async function applyNew(
+    tx: SqlTransaction,
+    context: TenantContext,
+    values: CanonicalSnapshot[],
+  ): Promise<('applied' | 'retained')[]> {
+    const tenant = context.tenantId;
+    const refs = [
+      ...new Map(
+        values.flatMap(references).map((ref) => [`${ref.kind}:${ref.id}`, ref]),
+      ).values(),
+    ];
+    const found = await tx.query<{ count: number }>(
+      `SELECT count(*)::int AS count FROM inventory_entities e
+      JOIN unnest($2::text[],$3::uuid[]) AS k(kind,id) ON e.tenant_id=$1 AND e.kind=k.kind AND e.id=k.id`,
+      [tenant, refs.map((ref) => ref.kind), refs.map((ref) => ref.id)],
+    );
+    if (found.rows[0]!.count !== refs.length)
+      throw new Error('Canonical relationship not found');
+    const ids = values.map(() => randomUUID());
+    await tx.query(
+      `INSERT INTO inventory_snapshots(id,tenant_id,entity_id,kind,connection_id,observation_id,normalizer_version,source_updated_at,observed_at,document,mapping_version)
+      SELECT r.id,$1,r.entity_id,r.kind,r.connection_id,r.observation_id,r.normalizer_version,r.source_updated_at,r.observed_at,r.document,r.mapping_version
+      FROM jsonb_to_recordset($2::jsonb) AS r(id uuid,entity_id uuid,kind text,connection_id uuid,observation_id uuid,
+        normalizer_version text,source_updated_at timestamptz,observed_at timestamptz,document jsonb,mapping_version text)`,
+      [
+        tenant,
+        JSON.stringify(
+          values.map((value, index) => ({
+            id: ids[index],
+            entity_id: value.entityId,
+            kind: value.kind,
+            connection_id: value.connectionId,
+            observation_id: value.observationId,
+            normalizer_version: value.normalizerVersion,
+            source_updated_at: value.sourceUpdatedAt,
+            observed_at: value.observedAt,
+            document: value,
+            mapping_version: value.mappingVersion,
+          })),
+        ),
+      ],
+    );
+    const current = new Map(
+      (
+        await tx.query<{
+          entity_id: string;
+          connection_id: string;
+          document: CanonicalSnapshot;
+        }>(
+          `SELECT p.entity_id,p.connection_id,s.document FROM inventory_projections p
+          JOIN unnest($2::uuid[],$3::uuid[]) AS k(entity_id,connection_id) ON p.tenant_id=$1 AND p.entity_id=k.entity_id AND p.connection_id=k.connection_id
+          JOIN inventory_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id`,
+          [
+            tenant,
+            values.map((value) => value.entityId),
+            values.map((value) => value.connectionId),
+          ],
+        )
+      ).rows.map((row) => [
+        `${row.entity_id}:${row.connection_id}`,
+        row.document,
+      ]),
+    );
+    const statuses = values.map((value) => {
+      const existing = current.get(`${value.entityId}:${value.connectionId}`);
+
+      return existing && !supersedes(value, existing)
+        ? ('retained' as const)
+        : ('applied' as const);
+    });
+    const applied = values
+      .map((value, index) => ({ value, snapshotId: ids[index]! }))
+      .filter((_, index) => statuses[index] === 'applied')
+      .sort(
+        (a, b) =>
+          a.value.entityId.localeCompare(b.value.entityId) ||
+          a.value.connectionId.localeCompare(b.value.connectionId),
+      );
+    if (applied.length) {
+      await tx.query(
+        `INSERT INTO inventory_projections(tenant_id,entity_id,connection_id,snapshot_id)
+        SELECT $1,entity_id,connection_id,snapshot_id FROM unnest($2::uuid[],$3::uuid[],$4::uuid[]) AS k(entity_id,connection_id,snapshot_id)
+        ON CONFLICT(tenant_id,entity_id,connection_id) DO UPDATE SET snapshot_id=EXCLUDED.snapshot_id,version=inventory_projections.version+1,updated_at=now()`,
+        [
+          tenant,
+          applied.map((item) => item.value.entityId),
+          applied.map((item) => item.value.connectionId),
+          applied.map((item) => item.snapshotId),
+        ],
+      );
+      await tx.query(
+        `INSERT INTO inventory_projection_events(id,tenant_id,snapshot_id,actor_id)
+        SELECT gen_random_uuid(),$1,snapshot_id,$3 FROM unnest($2::uuid[]) AS snapshot_id`,
+        [tenant, applied.map((item) => item.snapshotId), context.actor.id],
+      );
+      await refreshProductSkus(tx, tenant, applied);
+    }
+
+    return statuses;
+  }
+
+  /**
+   * Applies a batch in input order. New snapshots of distinct sources share set-based writes;
+   * replays and repeated sources apply one at a time.
+   */
+  async function applyAll(
+    tx: SqlTransaction,
+    context: TenantContext,
+    values: CanonicalSnapshot[],
+  ): Promise<('applied' | 'retained' | 'duplicate')[]> {
+    const sources = new Set(
+      values.map((value) => `${value.entityId}:${value.connectionId}`),
+    );
+    if (sources.size === values.length) {
+      const stored = await tx.query(
+        `SELECT 1 FROM inventory_snapshots s JOIN unnest($2::uuid[],$3::uuid[],$4::text[],$5::text[])
+          AS k(entity_id,observation_id,normalizer_version,mapping_version)
+        ON s.tenant_id=$1 AND s.entity_id=k.entity_id AND s.observation_id=k.observation_id
+          AND s.normalizer_version=k.normalizer_version AND s.mapping_version=k.mapping_version LIMIT 1`,
+        [
+          context.tenantId,
+          values.map((value) => value.entityId),
+          values.map((value) => value.observationId),
+          values.map((value) => value.normalizerVersion),
+          values.map((value) => value.mappingVersion),
+        ],
+      );
+      if (!stored.rowCount) return applyNew(tx, context, values);
+    }
+    const statuses: ('applied' | 'retained' | 'duplicate')[] = [];
+    for (const value of values) statuses.push(await apply(tx, context, value));
+
+    return statuses;
+  }
+
+  async function projectMany(
+    context: TenantContext,
+    inputs: CanonicalSnapshot[],
+  ) {
+    requireRole(context, ['owner', 'admin']);
+    const values = inputs.map(
+      (input) => snapshotSchema.parse(input) as CanonicalSnapshot,
+    );
+    if (!values.length) return [];
+
+    return db.transaction(context.tenantId, async (tx) => {
+      // Sorted so concurrent batches touching the same entities cannot deadlock.
+      await tx.query(
+        `WITH ids AS MATERIALIZED (SELECT DISTINCT id FROM unnest($2::uuid[]) id ORDER BY id)
+        SELECT pg_advisory_xact_lock(hashtextextended('inventory:' || $1 || ':' || id::text,0)) FROM ids`,
+        [context.tenantId, values.map((value) => value.entityId)],
+      );
+
+      return applyAll(tx, context, values);
+    });
+  }
+
   return {
     async identify(context, kind, reconciliationKey) {
       requireRole(context, ['owner', 'admin']);
@@ -41,142 +262,57 @@ export function createCommerceProjections(
         );
       });
     },
-    async has(context, kind, id) {
+    async identifyMany(context, items) {
+      requireRole(context, ['owner', 'admin']);
+      for (const item of items)
+        z.string().min(1).max(1024).parse(item.reconciliationKey);
+      const found = new Map<string, string>();
+      if (!items.length) return found;
+      const kinds = items.map((item) => item.kind);
+      const keys = items.map((item) => item.reconciliationKey);
+
+      return db.transaction(context.tenantId, async (tx) => {
+        // Sorted inserts keep concurrent imports of overlapping records from deadlocking.
+        await tx.query(
+          `INSERT INTO inventory_entities(id,tenant_id,kind,reconciliation_key)
+          SELECT gen_random_uuid(),$1,kind,key FROM (SELECT DISTINCT kind,key FROM unnest($2::text[],$3::text[]) AS k(kind,key)) k
+          ORDER BY kind,key ON CONFLICT(tenant_id,kind,reconciliation_key) DO NOTHING`,
+          [context.tenantId, kinds, keys],
+        );
+        const rows = await tx.query<{
+          kind: string;
+          reconciliation_key: string;
+          id: string;
+        }>(
+          `SELECT e.kind,e.reconciliation_key,e.id FROM inventory_entities e
+          JOIN unnest($2::text[],$3::text[]) AS k(kind,key) ON e.tenant_id=$1 AND e.kind=k.kind AND e.reconciliation_key=k.key`,
+          [context.tenantId, kinds, keys],
+        );
+        for (const row of rows.rows)
+          found.set(JSON.stringify([row.kind, row.reconciliation_key]), row.id);
+
+        return found;
+      });
+    },
+    async missing(context, kind, ids) {
       requireTenant(context, context.tenantId);
+      const unique = [...new Set(ids)];
+      if (!unique.length) return [];
 
       return db.transaction(context.tenantId, async (tx) =>
-        Boolean(
-          (
-            await tx.query(
-              'SELECT id FROM inventory_entities WHERE tenant_id=$1 AND kind=$2 AND id=$3',
-              [context.tenantId, kind, id],
-            )
-          ).rowCount,
-        ),
+        (
+          await tx.query<{ id: string }>(
+            `SELECT k.id FROM unnest($3::uuid[]) AS k(id) WHERE NOT EXISTS (
+              SELECT 1 FROM inventory_entities e WHERE e.tenant_id=$1 AND e.kind=$2 AND e.id=k.id)`,
+            [context.tenantId, kind, unique],
+          )
+        ).rows.map((row) => row.id),
       );
     },
     async project(context, input) {
-      requireRole(context, ['owner', 'admin']);
-      const value = snapshotSchema.parse(input) as CanonicalSnapshot;
-
-      return db.transaction(context.tenantId, async (tx) => {
-        const tenant = context.tenantId;
-        await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
-          `inventory:${tenant}:${value.entityId}`,
-        ]);
-        const old = await tx.query<{ document: CanonicalSnapshot }>(
-          'SELECT document FROM inventory_snapshots WHERE tenant_id=$1 AND entity_id=$2 AND observation_id=$3 AND normalizer_version=$4 AND mapping_version=$5',
-          [
-            tenant,
-            value.entityId,
-            value.observationId,
-            value.normalizerVersion,
-            value.mappingVersion,
-          ],
-        );
-        if (old.rows[0]) {
-          const same = await tx.query<{ matches: boolean }>(
-            'SELECT $1::jsonb=$2::jsonb AS matches',
-            [old.rows[0].document, value],
-          );
-          if (!same.rows[0]?.matches)
-            throw new Error('Snapshot identity conflict');
-          // Replaying after a link change can return to an earlier snapshot of the current
-          // observation, or to an entity whose projection was retired; make it current again.
-          const restored = await tx.query<{ snapshot_id: string }>(
-            `WITH existing AS (SELECT id FROM inventory_snapshots WHERE tenant_id=$1 AND entity_id=$2
-              AND observation_id=$4 AND normalizer_version=$5 AND mapping_version=$6)
-            INSERT INTO inventory_projections(tenant_id,entity_id,connection_id,snapshot_id)
-            SELECT $1,$2,$3,id FROM existing
-            ON CONFLICT(tenant_id,entity_id,connection_id) DO UPDATE SET snapshot_id=EXCLUDED.snapshot_id,
-              version=inventory_projections.version+1,updated_at=now()
-            WHERE inventory_projections.snapshot_id<>EXCLUDED.snapshot_id AND EXISTS (
-              SELECT 1 FROM inventory_snapshots c WHERE c.tenant_id=$1 AND c.id=inventory_projections.snapshot_id
-              AND c.observation_id=$4)
-            RETURNING snapshot_id`,
-            [
-              tenant,
-              value.entityId,
-              value.connectionId,
-              value.observationId,
-              value.normalizerVersion,
-              value.mappingVersion,
-            ],
-          );
-          const snapshot = restored.rows[0]?.snapshot_id;
-          if (!snapshot) return 'duplicate';
-          await tx.query(
-            'INSERT INTO inventory_projection_events(id,tenant_id,snapshot_id,actor_id) VALUES($1,$2,$3,$4)',
-            [randomUUID(), tenant, snapshot, context.actor.id],
-          );
-          if (value.data.type === 'product')
-            await refreshProductSkus(
-              tx,
-              tenant,
-              value.entityId,
-              value.connectionId,
-              snapshot,
-              value,
-            );
-
-          return 'applied';
-        }
-        for (const ref of references(value)) {
-          const found = await tx.query(
-            'SELECT id FROM inventory_entities WHERE tenant_id=$1 AND kind=$2 AND id=$3',
-            [tenant, ref.kind, ref.id],
-          );
-          if (!found.rowCount)
-            throw new Error('Canonical relationship not found');
-        }
-        const id = randomUUID();
-        await tx.query(
-          `INSERT INTO inventory_snapshots(id,tenant_id,entity_id,kind,connection_id,observation_id,normalizer_version,source_updated_at,observed_at,document,mapping_version)
-     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-          [
-            id,
-            tenant,
-            value.entityId,
-            value.kind,
-            value.connectionId,
-            value.observationId,
-            value.normalizerVersion,
-            value.sourceUpdatedAt,
-            value.observedAt,
-            value,
-            value.mappingVersion,
-          ],
-        );
-        const current = (
-          await tx.query<{ document: CanonicalSnapshot }>(
-            `SELECT s.document FROM inventory_projections p JOIN inventory_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id
-      WHERE p.tenant_id=$1 AND p.entity_id=$2 AND p.connection_id=$3`,
-            [tenant, value.entityId, value.connectionId],
-          )
-        ).rows[0]?.document;
-        if (current && !supersedes(value, current)) return 'retained';
-        await tx.query(
-          `INSERT INTO inventory_projections(tenant_id,entity_id,connection_id,snapshot_id) VALUES($1,$2,$3,$4)
-     ON CONFLICT(tenant_id,entity_id,connection_id) DO UPDATE SET snapshot_id=EXCLUDED.snapshot_id,version=inventory_projections.version+1,updated_at=now()`,
-          [tenant, value.entityId, value.connectionId, id],
-        );
-        await tx.query(
-          'INSERT INTO inventory_projection_events(id,tenant_id,snapshot_id,actor_id) VALUES($1,$2,$3,$4)',
-          [randomUUID(), tenant, id, context.actor.id],
-        );
-        if (value.data.type === 'product')
-          await refreshProductSkus(
-            tx,
-            tenant,
-            value.entityId,
-            value.connectionId,
-            id,
-            value,
-          );
-
-        return 'applied';
-      });
+      return (await projectMany(context, [input]))[0]!;
     },
+    projectMany,
     async dependents(context, kind, id, connectionId) {
       requireTenant(context, context.tenantId);
       z.string().uuid().parse(id);
@@ -322,54 +458,60 @@ function references(value: CanonicalSnapshot): { kind: string; id: string }[] {
   ];
 }
 
-// Indexed product-to-SKU relations for the current source projection; JSON expression
-// indexes are not usable under forced row-level security.
+// Indexed product-to-SKU relations for the current source projections; JSON expression
+// indexes are not usable under forced row-level security. Positions are skipped.
 async function refreshProductSkus(
   tx: SqlTransaction,
   tenant: string,
-  productId: string,
-  connectionId: string,
-  snapshotId: string,
-  value: CanonicalSnapshot,
+  items: { snapshotId: string; value: CanonicalSnapshot }[],
 ) {
+  const products = items.filter((item) => item.value.data.type === 'product');
+  if (!products.length) return;
   await tx.query(
-    'DELETE FROM inventory_product_skus WHERE tenant_id=$1 AND product_id=$2 AND connection_id=$3',
-    [tenant, productId, connectionId],
+    `DELETE FROM inventory_product_skus k USING unnest($2::uuid[],$3::uuid[]) AS d(product_id,connection_id)
+    WHERE k.tenant_id=$1 AND k.product_id=d.product_id AND k.connection_id=d.connection_id`,
+    [
+      tenant,
+      products.map((item) => item.value.entityId),
+      products.map((item) => item.value.connectionId),
+    ],
   );
-  if (value.deleted || value.data.type !== 'product') return;
-  const data = value.data;
-  // Each row repeats the product's listing facts so catalog reads use plain columns.
+  const rows = products.flatMap(({ snapshotId, value }) => {
+    if (value.deleted || value.data.type !== 'product') return [];
+    const data = value.data;
+
+    // Each row repeats the product's listing facts so catalog reads use plain columns.
+    return data.skus.map((sku) => ({
+      product_id: value.entityId,
+      connection_id: value.connectionId,
+      snapshot_id: snapshotId,
+      product_title: data.title,
+      product_status: data.status,
+      vendor: data.vendor ?? null,
+      published: data.published ?? null,
+      observed_at: value.observedAt,
+      source_updated_at: value.sourceUpdatedAt,
+      sku_id: sku.skuId,
+      code: sku.code,
+      title: sku.title ?? null,
+      barcode: sku.barcode ?? null,
+      amount: sku.price?.amount ?? null,
+      currency: sku.price?.currency ?? null,
+      unit: sku.unit,
+    }));
+  });
+  if (!rows.length) return;
   await tx.query(
     `INSERT INTO inventory_product_skus(tenant_id,product_id,connection_id,sku_id,code,snapshot_id,
       product_title,product_status,vendor,published,variant_title,barcode,price_amount,price_currency,unit,
       observed_at,source_updated_at)
-    SELECT DISTINCT ON (s.sku_id) $1::uuid,$2::uuid,$3::uuid,s.sku_id,s.code,$4::uuid,$5,$6,$7,$8,
-      s.title,s.barcode,s.amount::numeric,s.currency,s.unit,$9::timestamptz,$10::timestamptz
-    FROM jsonb_to_recordset($11::jsonb)
-      AS s(sku_id uuid,code text,title text,barcode text,amount text,currency text,unit text)
-    ORDER BY s.sku_id,s.code NULLS LAST`,
-    [
-      tenant,
-      productId,
-      connectionId,
-      snapshotId,
-      data.title,
-      data.status,
-      data.vendor ?? null,
-      data.published ?? null,
-      value.observedAt,
-      value.sourceUpdatedAt,
-      JSON.stringify(
-        data.skus.map((sku) => ({
-          sku_id: sku.skuId,
-          code: sku.code,
-          title: sku.title ?? null,
-          barcode: sku.barcode ?? null,
-          amount: sku.price?.amount ?? null,
-          currency: sku.price?.currency ?? null,
-          unit: sku.unit,
-        })),
-      ),
-    ],
+    SELECT DISTINCT ON (s.product_id,s.connection_id,s.sku_id) $1::uuid,s.product_id,s.connection_id,s.sku_id,s.code,
+      s.snapshot_id,s.product_title,s.product_status,s.vendor,s.published,s.title,s.barcode,s.amount::numeric,s.currency,
+      s.unit,s.observed_at,s.source_updated_at
+    FROM jsonb_to_recordset($2::jsonb) AS s(product_id uuid,connection_id uuid,snapshot_id uuid,product_title text,
+      product_status text,vendor text,published boolean,observed_at timestamptz,source_updated_at timestamptz,
+      sku_id uuid,code text,title text,barcode text,amount text,currency text,unit text)
+    ORDER BY s.product_id,s.connection_id,s.sku_id,s.code NULLS LAST`,
+    [tenant, JSON.stringify(rows)],
   );
 }

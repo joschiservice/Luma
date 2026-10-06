@@ -49,7 +49,7 @@ export function readCommerceSyncConfig(
   );
   const connectionConcurrency = bounded(
     'COMMERCE_SYNC_CONNECTION_CONCURRENCY',
-    1,
+    2,
     4,
   );
 

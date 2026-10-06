@@ -96,7 +96,7 @@ export interface SyncStream {
 }
 
 export const syncPolicy = {
-  pageSize: 25,
+  pageSize: 100,
   recentHistoryMs: 30 * 24 * 60 * 60_000,
   leaseMs: 5 * 60_000,
   /** Interval between change reads when the source filters by update time. */

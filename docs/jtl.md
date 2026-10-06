@@ -39,7 +39,7 @@ Delivery notes do not expose operations that have not yet produced a note, carri
 
 ## Pagination and evidence
 
-`limit` is 1–100 parent records. Cursors bind the tenant, connection, API destination, JTL cloud tenant, capability, page size, filters and unit mapping. Preserve them unchanged. JTL pages start at 1; inconsistent page numbers, counts and continuation metadata reject the read. Delivery-note lines are fully paginated with duplicate detection and a 1,000-page ceiling. A child failure rejects the entire parent page.
+`limit` is 1–100 parent records. Cursors bind the tenant, connection, API destination, JTL cloud tenant, capability, page size, filters and unit mapping. Preserve them unchanged. JTL pages start at 1; inconsistent page numbers, counts and continuation metadata reject the read. Delivery-note lines are fully paginated with duplicate detection and a 1,000-page ceiling. A child failure rejects the entire parent page. Child reads of a page (order lines, delivery-note details and lines, warehouse stock) run with at most four requests in flight and keep page order; delivery notes of one order share its line read.
 
 SKU filtering scans item pages locally because the overview endpoint has no exact item-ID filter. Continue through empty filtered pages while a cursor remains. A fulfillment order filter uses the documented `salesOrderNumberId` parameter and checks the returned detail's order identity. Location filters other than `all-warehouses` are JTL warehouse IDs, not bin IDs. Resource IDs accept local positive integers or cloud UUIDs and preserve their identity; they are never converted between connection types.
 

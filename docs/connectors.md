@@ -99,9 +99,9 @@ Full initial history uses resumable Bulk Operations for orders, products, invent
 and approved customers. See [commerce sync](commerce-sync.md#recent-history-live-reads-and-exports).
 
 Run `node tooling/benchmarks/commerce.mjs` after building the adapter and simulator
-packages. `BENCHMARK_PROVIDER=jtl`, `BENCHMARK_RECORDS`, `BENCHMARK_LATENCY_MS`,
-`BENCHMARK_CAPABILITIES`, `BENCHMARK_MODE=bulk` and `BENCHMARK_RATE_LIMIT=1` select
-comparable scenarios. The benchmark counts provider requests, pages, normalized
+packages. `BENCHMARK_PROVIDER=jtl`, `BENCHMARK_RECORDS`, `BENCHMARK_PAGE_SIZE` (default
+25), `BENCHMARK_LATENCY_MS`, `BENCHMARK_CAPABILITIES`, `BENCHMARK_MODE=bulk` and
+`BENCHMARK_RATE_LIMIT=1` select comparable scenarios. The benchmark counts provider requests, pages, normalized
 records and elapsed time. It validates every page and rejects a query above the
 single-query cost limit. These are adapter measurements on synthetic data, without
 database projection time, real provider latency or a production throughput promise.
@@ -133,14 +133,21 @@ With the simulator's 2,000-point bucket and 100 points/s restoration enabled,
 budget with a virtual clock and verify complete overflow reads and bulk/paged
 normalized equality. Request reduction alone is not an end-to-end speedup claim.
 
-JTL ERP 2.2 currently has these measured patterns for 25 records at 10 ms/request:
+JTL ERP 2.2 currently has these measured patterns for 25 records at 10 ms/request, with
+child reads four at a time:
 
 | JTL stream                | Requests/page | Elapsed | Records/s |
 | ------------------------- | ------------: | ------: | --------: |
-| Orders                    |            26 | 0.318 s |      78.6 |
-| Products                  |             1 | 0.018 s |   1,354.1 |
-| Inventory, all warehouses |             1 | 0.015 s |   1,632.1 |
-| Fulfillments              |            76 | 0.893 s |      28.0 |
+| Orders                    |            26 | 0.102 s |     245.6 |
+| Products                  |             1 | 0.013 s |   1,972.4 |
+| Inventory, all warehouses |             1 | 0.013 s |   1,905.3 |
+| Fulfillments              |            76 | 0.250 s |      99.8 |
+
+On October 6, 2026, at the simulator's realistic median latency of 120 ms/request, 200
+orders read at 7.9 records/s with sequential child reads in pages of 25, and at 31.6
+records/s with four concurrent child reads in pages of 100. Fulfillments rose from 2.7 to
+10.8 records/s. The simulator's delivery notes each belong to a different order, so these
+runs do not show shared order-line reads.
 
 The [published ERP 2.2 OpenAPI](https://developer.jtl-software.com/openapi/erp/2.2.json)
 uses `pageNumber`/`pageSize` with count metadata. Orders and items default to page 1

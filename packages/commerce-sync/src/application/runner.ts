@@ -41,6 +41,11 @@ export interface SyncRunnerDependencies {
       ingestKey: string,
       input: CommerceObservation,
     ): Promise<ProjectionOutcome>;
+    /** Imports a page in one transaction; any failure rejects the whole batch. */
+    importMany(
+      context: TenantContext,
+      items: { ingestKey: string; input: CommerceObservation }[],
+    ): Promise<ProjectionOutcome[]>;
     link(
       context: TenantContext,
       kind: 'sku' | 'location' | 'order',
@@ -153,53 +158,83 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
     return resolved;
   }
 
-  async function importRecord(
+  async function importCustomer(
+    tenant: TenantContext,
+    observation: Observation<unknown>,
+  ): Promise<RecordOutcome | null> {
+    const data = observation.data as CustomerSnapshot;
+    const result = await deps.customers.upsert(tenant, {
+      connectionId: observation.source.connectionId,
+      externalId: observation.source.externalId,
+      displayName: data.displayName,
+      email: data.email,
+      phone: data.phone,
+      address: data.address,
+      state: data.state,
+      sourceCreatedAt: data.createdAt,
+      orderCount: data.orderCount,
+      amountSpent: data.amountSpent,
+      tags: data.tags,
+      shared: data.shared,
+      sourceUpdatedAt: observation.sourceUpdatedAt,
+      observedAt: observation.observedAt,
+      observationId: observation.id,
+    });
+    // Erased customers are not tracked; the next read skips them again.
+    if (result === 'suppressed') return null;
+
+    return { status: 'current', problem: null, entityId: null };
+  }
+
+  /**
+   * Imports a page's changed records together. When one record breaks Luma's record rules,
+   * the batch is rolled back and its records are imported one by one, so only that record fails.
+   */
+  async function importRecords(
     tenant: TenantContext,
     recordType: RecordType,
-    observation: Observation<unknown>,
-  ): Promise<Pick<LedgerEntry, 'status' | 'problem' | 'entityId'> | null> {
+    observations: Observation<unknown>[],
+  ): Promise<(RecordOutcome | null)[]> {
+    if (!observations.length) return [];
     if (recordType === 'customers') {
-      const data = observation.data as CustomerSnapshot;
-      const result = await deps.customers.upsert(tenant, {
-        connectionId: observation.source.connectionId,
-        externalId: observation.source.externalId,
-        displayName: data.displayName,
-        email: data.email,
-        phone: data.phone,
-        address: data.address,
-        state: data.state,
-        sourceCreatedAt: data.createdAt,
-        orderCount: data.orderCount,
-        amountSpent: data.amountSpent,
-        tags: data.tags,
-        shared: data.shared,
-        sourceUpdatedAt: observation.sourceUpdatedAt,
-        observedAt: observation.observedAt,
-        observationId: observation.id,
-      });
-      // Erased customers are not tracked; the next read skips them again.
-      if (result === 'suppressed') return null;
+      const outcomes: (RecordOutcome | null)[] = [];
+      for (const observation of observations)
+        outcomes.push(await isolate(() => importCustomer(tenant, observation)));
 
-      return { status: 'current', problem: null, entityId: null };
+      return outcomes;
     }
-    const outcome = await deps.ingestion.import(
-      tenant,
-      `sync:${observation.id}`,
-      {
+    const item = (observation: Observation<unknown>) => ({
+      ingestKey: `sync:${observation.id}`,
+      input: {
         capability: recordCapabilities[recordType],
         observation,
       } as CommerceObservation,
-    );
-    if (outcome.status === 'pending')
-      return {
-        status: 'pending',
-        problem: outcome.missing.some((source) => source.resource === 'order')
-          ? 'Waiting for its order to be imported'
-          : 'Waiting for related records to be imported',
-        entityId: null,
-      };
+    });
+    try {
+      return (
+        await retryConflict(() =>
+          deps.ingestion.importMany(tenant, observations.map(item)),
+        )
+      ).map(recordOutcome);
+    } catch (error) {
+      if (!isRecordProblem(error)) throw error;
+      if (observations.length === 1) return [rejected];
+    }
+    const outcomes: (RecordOutcome | null)[] = [];
+    for (const observation of observations) {
+      const { ingestKey, input } = item(observation);
+      outcomes.push(
+        await isolate(async () =>
+          recordOutcome(
+            await retryConflict(() =>
+              deps.ingestion.import(tenant, ingestKey, input),
+            ),
+          ),
+        ),
+      );
+    }
 
-    return { status: 'current', problem: null, entityId: outcome.entityId };
+    return outcomes;
   }
 
   /** Runs one page of the next due stream; returns false when nothing was due. */
@@ -210,7 +245,7 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
       token,
       syncPolicy.leaseMs,
       {
-        connectionConcurrency: deps.connectionConcurrency ?? 1,
+        connectionConcurrency: deps.connectionConcurrency ?? 2,
         workspaceConcurrency: deps.workspaceConcurrency ?? 4,
       },
     );
@@ -379,6 +414,8 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
       };
       const entries: LedgerEntry[] = [];
       const unchanged: ItemKey[] = [];
+      const changed: { observation: Observation<unknown>; digest: string }[] =
+        [];
       for (const observation of page.items as Observation<unknown>[]) {
         const item = key(observation);
         const digest = deps.digest(
@@ -395,17 +432,15 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
           counts.unchanged += 1;
           continue;
         }
-        let outcome: Awaited<ReturnType<typeof importRecord>>;
-        try {
-          outcome = await importRecord(tenant, claimed.recordType, observation);
-        } catch (error) {
-          if (!isRecordProblem(error)) throw error;
-          outcome = {
-            status: 'failed',
-            problem: 'The source record does not match Luma’s record rules',
-            entityId: null,
-          };
-        }
+        changed.push({ observation, digest });
+      }
+      const outcomes = await importRecords(
+        tenant,
+        claimed.recordType,
+        changed.map((item) => item.observation),
+      );
+      for (const [index, { observation, digest }] of changed.entries()) {
+        const outcome = outcomes[index];
         if (!outcome) {
           counts.unchanged += 1;
           continue;
@@ -418,7 +453,7 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
               : 'failed'
         ] += 1;
         entries.push({
-          ...item,
+          ...key(observation),
           ...outcome,
           digest,
           sourceCreatedAt: createdAt(claimed.recordType, observation),
@@ -529,6 +564,56 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
 }
 
 export type SyncRunner = ReturnType<typeof createSyncRunner>;
+
+type RecordOutcome = Pick<LedgerEntry, 'status' | 'problem' | 'entityId'>;
+
+const rejected: RecordOutcome = {
+  status: 'failed',
+  problem: 'The source record does not match Luma’s record rules',
+  entityId: null,
+};
+
+function recordOutcome(outcome: ProjectionOutcome): RecordOutcome {
+  if (outcome.status === 'pending')
+    return {
+      status: 'pending',
+      problem: outcome.missing.some((source) => source.resource === 'order')
+        ? 'Waiting for its order to be imported'
+        : 'Waiting for related records to be imported',
+      entityId: null,
+    };
+
+  return { status: 'current', problem: null, entityId: outcome.entityId };
+}
+
+/** Runs one record's import; a record-rule failure marks only that record as failed. */
+async function isolate(
+  work: () => Promise<RecordOutcome | null>,
+): Promise<RecordOutcome | null> {
+  try {
+    return await work();
+  } catch (error) {
+    if (!isRecordProblem(error)) throw error;
+
+    return rejected;
+  }
+}
+
+/**
+ * Concurrent imports take entity locks in sorted order, but PostgreSQL may still resolve a rare
+ * lock cycle by cancelling one transaction. The batch rolled back, so it is retried once.
+ */
+async function retryConflict<T>(work: () => Promise<T>): Promise<T> {
+  try {
+    return await work();
+  } catch (error) {
+    const code =
+      error instanceof Error && 'code' in error ? error.code : undefined;
+    if (code !== '40P01' && code !== '40001') throw error;
+
+    return work();
+  }
+}
 
 function grantedTypes(connection: SyncConnection): RecordType[] {
   return recordTypes.filter((type) =>
