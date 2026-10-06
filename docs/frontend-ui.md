@@ -76,11 +76,17 @@ Badges and state pills always contain a text label. Keep source freshness separa
 
 `Disclosure` retains native details/summary keyboard and open-state behavior. Include a summary as its first child. Menus and navigation drawers continue to use their dedicated components.
 
+## Collection pages
+
+List pages share one order: `PageHeader`, then `CollectionToolbar`, then the coverage line, notices, the table and pagination. The toolbar places views and Refresh on the first row, then search, filter chips with the **Filter** menu, page display actions and one **Sort** menu. Pages describe filters as data (`choice`, `date-range` or link-set `applied` filters) and own their URL state; the toolbar owns presentation, focus and the search draft. Applied filters are always visible as chips, so never hide them in a collapsed panel. Use `CollectionViews` for button views; link-based views can keep `Tabs`.
+
+`SyncCoverage` (`apps/web/src/features/sync/coverage.tsx`) condenses what each source has imported into one line. It leads with sources that need attention, says the list is incomplete while any import runs, and keeps per-source detail behind a disclosure.
+
 ## Issues
 
 `IssueSplitView` composes the resizable panels for the inbox, with minimum list and detail widths and a single-pane layout on narrow screens. Both pane trees stay mounted across layout changes to preserve local interaction state. The inbox toolbar spans the page above the split view; filters wrap on small screens.
 
-`IssuePageLayout` and `IssuePanelLayout` share section content and navigation behavior. The full page moves its identity and actions into the top bar and uses `IssueSectionSelect` on small screens. The inspector keeps Overview visible and uses native disclosures for supporting sections, with Findings initially open. Contextual actions expand their target section before moving focus. `IssueViewTabs` composes the shadcn `Tabs` primitives with URL-backed links. `IssueListToolbar` owns the view toolbar and editable filter chips; its caller owns URL state and fetching.
+`IssuePageLayout` and `IssuePanelLayout` share section content and navigation behavior. The full page moves its identity and actions into the top bar and uses `IssueSectionSelect` on small screens. The inspector keeps Overview visible and uses native disclosures for supporting sections, with Findings initially open. Contextual actions expand their target section before moving focus. `IssueViewTabs` composes the shadcn `Tabs` primitives with URL-backed links. `IssueListToolbar` adapts the issue filters to `CollectionToolbar`; its caller owns URL state and fetching.
 
 ## Density and maintenance
 

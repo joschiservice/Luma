@@ -10,8 +10,6 @@
 .inventory-page a {
   color: var(--signal-text);
 }
-.inventory-views,
-.inventory-search,
 .inventory-detail-toolbar,
 .inventory-pagination,
 .inventory-pagination > div {
@@ -19,18 +17,6 @@
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-}
-.inventory-views [aria-pressed='true'] {
-  background: var(--muted);
-  color: var(--foreground);
-}
-.inventory-search {
-  flex: 1 1 280px;
-  flex-wrap: nowrap;
-  color: var(--muted-foreground);
-}
-.inventory-search input {
-  min-width: 0;
 }
 .inventory-cell {
   display: grid;

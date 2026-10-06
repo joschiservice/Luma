@@ -468,17 +468,15 @@ export const Library: Story = {
       await canvas.findByRole('link', { name: summary.name }),
     ).toBeVisible();
     await userEvent.type(
-      canvas.getByLabelText('Search workflows'),
+      canvas.getByRole('searchbox', { name: 'Search workflows' }),
       'not found',
     );
     await expect(
-      canvas.getByRole('heading', { name: 'No matching workflows' }),
+      await canvas.findByRole('heading', { name: 'No matching workflows' }),
     ).toBeVisible();
-    await userEvent.click(
-      canvas.getByRole('button', { name: 'Clear filters' }),
-    );
+    await userEvent.click(canvas.getByRole('button', { name: 'Clear' }));
     await expect(
-      canvas.getByRole('link', { name: summary.name }),
+      await canvas.findByRole('link', { name: summary.name }),
     ).toBeVisible();
   },
 };
@@ -592,35 +590,38 @@ export const Filters: Story = {
     await expect(
       canvas.getByRole('link', { name: 'Review 1 waiting decision' }),
     ).toBeVisible();
-    await userEvent.click(canvas.getByRole('combobox', { name: 'System' }));
-    await userEvent.click(await body.findByRole('option', { name: 'Luma' }));
+    await userEvent.click(canvas.getByRole('button', { name: 'Filter' }));
+    await userEvent.click(await body.findByRole('button', { name: 'System' }));
+    await userEvent.click(await body.findByRole('button', { name: 'Luma' }));
     await expect(
       canvas.queryByRole('link', { name: summary.name }),
     ).not.toBeInTheDocument();
-    await userEvent.type(canvas.getByLabelText('Search workflows'), 'address');
+    const search = canvas.getByRole('searchbox', { name: 'Search workflows' });
+    await userEvent.type(search, 'address');
     await expect(
-      canvas.getByRole('heading', { name: 'No matching workflows' }),
+      await canvas.findByRole('heading', { name: 'No matching workflows' }),
     ).toBeVisible();
-    await userEvent.click(canvas.getByRole('button', { name: 'Clear search' }));
+    await userEvent.clear(search);
     await userEvent.click(
-      canvas.getByRole('button', { name: 'Remove Luma filter' }),
+      await canvas.findByRole('button', {
+        name: 'Remove System filter: Luma',
+      }),
     );
     await expect(
-      canvas.getByRole('link', { name: summary.name }),
+      await canvas.findByRole('link', { name: summary.name }),
     ).toBeVisible();
     await userEvent.click(
-      canvas.getByRole('button', { name: 'Clear filters' }),
+      canvas.getByRole('button', { name: /^All workflows/ }),
     );
-    await userEvent.type(
-      canvas.getByLabelText('Search workflows'),
-      'commitments',
-    );
+    await userEvent.type(search, 'commitments');
     await expect(
-      canvas.getByRole('link', { name: 'Replenish low stock' }),
+      await canvas.findByRole('link', { name: 'Replenish low stock' }),
     ).toBeVisible();
-    await expect(
-      canvas.queryByRole('link', { name: summary.name }),
-    ).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        canvas.queryByRole('link', { name: summary.name }),
+      ).not.toBeInTheDocument(),
+    );
   },
 };
 

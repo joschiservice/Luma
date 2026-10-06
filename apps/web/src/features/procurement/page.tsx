@@ -1,15 +1,19 @@
 import './procurement.css';
 
-import type {
-  OrderStage,
-  OrderSummary,
-  PurchaseOrder,
-  Supplier,
+import {
+  type OrderStage,
+  orderStageSchema,
+  type OrderSummary,
+  type PurchaseOrder,
+  type Supplier,
 } from '@luma/api-contract';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
-import { CollectionToolbar } from '@luma/ui/components/primitives/collection-toolbar';
+import {
+  CollectionToolbar,
+  CollectionViews,
+} from '@luma/ui/components/primitives/collection-toolbar';
 import {
   DataTable,
   type DataTableColumn,
@@ -17,8 +21,6 @@ import {
 } from '@luma/ui/components/primitives/data-table';
 import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { Empty } from '@luma/ui/components/primitives/empty';
-import { Input } from '@luma/ui/components/primitives/input';
-import { Select } from '@luma/ui/components/primitives/select';
 import { StatePill } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { PageHeader } from '@luma/ui/components/workspace/page-header';
@@ -32,10 +34,10 @@ import {
 import {
   ArrowUpRight,
   Building2,
+  CircleDot,
   FileText,
   PackageCheck,
   Plus,
-  Search,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -219,6 +221,27 @@ function supplierColumns({
   ];
 }
 
+const stageFilters = ['attention', ...orderStageSchema.options] as const;
+
+/**
+ * Lists the order stage filter choices. A legacy `status` link has no stage, so its status is
+ * offered as one more choice while it applies, letting the chip name it.
+ */
+function stageOptions(status: string) {
+  const legacy = Object.entries(statusLabels).find(
+    ([value]) => value === status,
+  );
+
+  return [
+    { value: 'attention', label: 'Needs a response' },
+    ...orderStageSchema.options.map((value) => ({
+      value,
+      label: stages[value].label,
+    })),
+    ...(legacy ? [{ value: `status:${legacy[0]}`, label: legacy[1] }] : []),
+  ];
+}
+
 /** Keeps procurement views and filters shareable without accepting unsupported statuses. */
 export function parseProcurementSearch(value: Record<string, unknown>): {
   view: 'orders' | 'suppliers';
@@ -398,82 +421,73 @@ export function ProcurementPage() {
       <div className="procurement-collection">
         <CollectionToolbar
           views={
-            <div
-              className="procurement-views"
-              role="group"
-              aria-label="Procurement views"
-            >
-              {(['orders', 'suppliers'] as const).map((view) => (
-                <Button
-                  key={view}
-                  variant="ghost"
-                  aria-pressed={filters.view === view}
-                  onClick={() => change({ view, q: '', status: '' })}
-                >
-                  {view === 'orders' ? (
-                    <FileText size={15} />
-                  ) : (
-                    <Building2 size={15} />
-                  )}{' '}
-                  {view === 'orders' ? 'Purchase orders' : 'Suppliers'}
-                  <span>
-                    {(view === 'orders' ? orders.data : suppliers.data)?.items
-                      .length ?? '—'}
-                  </span>
-                </Button>
-              ))}
-            </div>
+            <CollectionViews
+              label="Procurement views"
+              value={filters.view}
+              views={[
+                {
+                  value: 'orders',
+                  label: 'Purchase orders',
+                  icon: <FileText aria-hidden="true" />,
+                  count: orders.data?.items.length,
+                },
+                {
+                  value: 'suppliers',
+                  label: 'Suppliers',
+                  icon: <Building2 aria-hidden="true" />,
+                  count: suppliers.data?.items.length,
+                },
+              ]}
+              onChange={(view) => change({ view, q: '', status: '' })}
+            />
           }
+          search={{
+            value: filters.q || undefined,
+            onChange: (q) => change({ q: q ?? '' }),
+            label:
+              filters.view === 'orders'
+                ? 'Search purchase orders'
+                : 'Search suppliers',
+            placeholder:
+              filters.view === 'orders'
+                ? 'Search orders, suppliers, or SKUs…'
+                : 'Search suppliers…',
+            maxLength: 200,
+          }}
+          filters={
+            filters.view === 'orders'
+              ? [
+                  {
+                    kind: 'choice',
+                    key: 'stage',
+                    label: 'Stage',
+                    icon: CircleDot,
+                    value:
+                      filters.stage ??
+                      (filters.status ? `status:${filters.status}` : undefined),
+                    options: stageOptions(filters.status),
+                    onChange: (value) =>
+                      change(
+                        value?.startsWith('status:')
+                          ? { status: value.slice(7), stage: undefined }
+                          : {
+                              status: '',
+                              stage: stageFilters.find(
+                                (stage) => stage === value,
+                              ),
+                            },
+                      ),
+                  },
+                ]
+              : []
+          }
+          onClear={() => change({ q: '', status: '', stage: undefined })}
           onRefresh={() => {
             void orders.refetch();
             void suppliers.refetch();
           }}
           refreshing={orders.isFetching || suppliers.isFetching}
-          children={
-            <div className="procurement-filters">
-              <div className="procurement-search">
-                <Search size={15} aria-hidden="true" />
-                <Input
-                  aria-label={
-                    filters.view === 'orders'
-                      ? 'Search purchase orders'
-                      : 'Search suppliers'
-                  }
-                  placeholder={
-                    filters.view === 'orders'
-                      ? 'Search orders, suppliers, or SKUs…'
-                      : 'Search suppliers…'
-                  }
-                  value={filters.q}
-                  onChange={(e) => change({ q: e.target.value })}
-                />
-              </div>
-              {filters.view === 'orders' && (
-                <Select
-                  aria-label="Order stage"
-                  className="procurement-stage-filter"
-                  value={
-                    filters.stage ??
-                    (filters.status ? `status:${filters.status}` : '')
-                  }
-                  options={[
-                    { value: '', label: 'All stages' },
-                    { value: 'attention', label: 'Needs a response' },
-                    ...Object.entries(stages).map(([value, stage]) => ({
-                      value,
-                      label: stage.label,
-                    })),
-                  ]}
-                  onValueChange={(value) =>
-                    change({
-                      status: '',
-                      stage: (value || undefined) as typeof filters.stage,
-                    })
-                  }
-                />
-              )}
-            </div>
-          }
+          refreshLabel="Refresh procurement"
         />
         {selected.isPending ? (
           <div className="procurement-loading" role="status">

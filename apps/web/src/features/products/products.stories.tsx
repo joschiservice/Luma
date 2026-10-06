@@ -492,6 +492,34 @@ export const Browse: Story = {
   },
 };
 
+export const Filter: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const page = within(canvasElement.ownerDocument.body);
+    await userEvent.click(
+      await canvas.findByRole('button', { name: 'Filter' }),
+    );
+    await userEvent.click(
+      await page.findByRole('button', { name: 'Missing from' }),
+    );
+    await userEvent.click(
+      await page.findByRole('button', { name: 'JTL-Wawi' }),
+    );
+    await expect(
+      await canvas.findByRole('button', {
+        name: 'Edit Missing from filter: JTL-Wawi',
+      }),
+    ).toBeVisible();
+    const search = canvas.getByRole('searchbox', { name: 'Search products' });
+    await userEvent.type(search, 'apron{Enter}');
+    await userEvent.click(canvas.getByRole('button', { name: 'Clear' }));
+    await expect(
+      canvas.queryByRole('button', { name: /Missing from filter/ }),
+    ).toBeNull();
+    await expect(search).toHaveValue('');
+  },
+};
+
 export const Dark: Story = { globals: { theme: 'dark' } };
 
 export const Narrow: Story = {

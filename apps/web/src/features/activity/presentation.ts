@@ -1,5 +1,16 @@
 import type { ActivityEvent } from '@luma/api-contract';
+import type { CollectionFilterOption } from '@luma/ui/components/primitives/collection-toolbar';
 import type { OperationalState } from '@luma/ui/components/primitives/state';
+
+import { providerName } from '../sync/presentation';
+
+/** A workspace connection that activity can be filtered by. */
+export interface ActivitySource {
+  id: string;
+  label: string;
+  /** The connection's target kind, which activity records as its system. */
+  system: string;
+}
 
 /** Readable names for activity codes that don't read well when title-cased. */
 export const activityLabels: Record<string, string> = {
@@ -67,4 +78,42 @@ export function activityState(
     default:
       return 'idle';
   }
+}
+
+/**
+ * Offers each workspace connection by label. An applied connection that is no longer listed keeps
+ * an option with its shortened ID, so its filter chip stays readable.
+ */
+export function activityConnectionOptions(
+  sources: readonly ActivitySource[],
+  applied: string | undefined,
+): CollectionFilterOption[] {
+  const options = sources.map((source) => ({
+    value: source.id,
+    label: source.label,
+  }));
+  if (applied && !options.some((option) => option.value === applied))
+    options.push({
+      value: applied,
+      label: `Connection ${applied.slice(0, 8)}`,
+    });
+
+  return options;
+}
+
+/**
+ * Offers each distinct system the workspace connects to, named by provider where Luma knows it.
+ * An applied system that no connection uses any more keeps an option with its raw value.
+ */
+export function activitySystemOptions(
+  sources: readonly ActivitySource[],
+  applied: string | undefined,
+): CollectionFilterOption[] {
+  const systems = new Set(sources.map((source) => source.system));
+  if (applied) systems.add(applied);
+
+  return Array.from(systems, (system) => ({
+    value: system,
+    label: providerName(system),
+  }));
 }

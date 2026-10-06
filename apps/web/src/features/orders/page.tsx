@@ -35,13 +35,8 @@ import {
   ordersOptions,
   type OrdersSearch,
 } from './data';
-import {
-  orderFilterChips,
-  OrderFilters,
-  type OrderSource,
-} from './list-filters';
+import { orderFiltered, OrderFilters, type OrderSource } from './list-filters';
 import { OrdersTable } from './list-table';
-import { viewDescriptions } from './presentation';
 
 const subscribe = (changed: () => void) => onlineManager.subscribe(changed);
 const onlineSnapshot = () => onlineManager.isOnline();
@@ -158,13 +153,6 @@ export function OrdersView({
   /** Which sources and dates the list covers. */
   coverage?: ReactNode;
 }) {
-  const [draft, setDraft] = useState(search.q ?? '');
-  const [shownQuery, setShownQuery] = useState(search.q);
-  // Links and history can change the query while the page stays mounted.
-  if (shownQuery !== search.q) {
-    setShownQuery(search.q);
-    setDraft(search.q ?? '');
-  }
   const filters = orderFilters(search);
   const update = (patch: Partial<OrdersSearch>) =>
     change(
@@ -175,8 +163,7 @@ export function OrdersView({
       ) as OrdersSearch,
     );
   const view = search.view ?? 'all';
-  const filtered =
-    orderFilterChips(search, sources).length > 0 || view !== 'all';
+  const filtered = orderFiltered(search) || view !== 'all';
 
   return (
     <main className="orders-page">
@@ -188,18 +175,11 @@ export function OrdersView({
       <OrderFilters
         search={search}
         sources={sources}
-        draft={draft}
-        onDraftChange={setDraft}
         update={update}
         change={change}
         refresh={refresh}
         refreshing={refreshing}
       />
-      <p className="orders-coverage">
-        {viewDescriptions[view]} Orders appear as Luma reads them from each
-        source. Totals, placed dates and SKU text show once a source reports
-        them.
-      </p>
       {coverage}
       {offline ? (
         <Alert role="status">
@@ -244,13 +224,7 @@ export function OrdersView({
                     : 'Orders appear here once a connected store or ERP reports them.'}
                 </p>
                 {filtered ? (
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setDraft('');
-                      change({});
-                    }}
-                  >
+                  <Button variant="outline" onClick={() => change({})}>
                     Clear filters
                   </Button>
                 ) : (

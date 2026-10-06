@@ -10,8 +10,6 @@
 .products-page a {
   color: var(--signal-text);
 }
-.products-views,
-.products-search,
 .products-detail-toolbar,
 .products-pagination,
 .products-pagination > div,
@@ -21,21 +19,6 @@
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-}
-.products-views [aria-pressed='true'] {
-  background: var(--muted);
-  color: var(--foreground);
-}
-.products-views button {
-  gap: 6px;
-}
-.products-search {
-  flex: 1 1 300px;
-  flex-wrap: nowrap;
-  color: var(--muted-foreground);
-}
-.products-search input {
-  min-width: 0;
 }
 .products-cell,
 .products-listing,

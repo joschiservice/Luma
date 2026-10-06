@@ -17,7 +17,6 @@ import { CollectionToolbar } from '@luma/ui/components/primitives/collection-too
 import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { Empty } from '@luma/ui/components/primitives/empty';
 import { Pagination } from '@luma/ui/components/primitives/pagination';
-import { Select } from '@luma/ui/components/primitives/select';
 import { StatePill } from '@luma/ui/components/primitives/state';
 import { Switch } from '@luma/ui/components/primitives/switch';
 import {
@@ -37,7 +36,7 @@ import {
   useParams,
   useSearch,
 } from '@tanstack/react-router';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, CircleHelp, LayoutGrid } from 'lucide-react';
 import {
   type ReactNode,
   useEffect,
@@ -90,6 +89,10 @@ const reasons: DecisionReason[] = [
   'manual_intervention',
   'uncertainty',
 ];
+
+/** Names a filter option with its waiting count; the applied option reads without one. */
+const facetLabel = (label: string, count: number | undefined) =>
+  count === undefined ? label : `${label} · ${count}`;
 
 function DecisionRow({
   item,
@@ -294,69 +297,56 @@ export function NeedsYouView({
             </Tabs>
           }
           filters={[
-            ...(search.domain
-              ? [
-                  {
-                    key: 'domain',
-                    label: domainLabels[search.domain],
-                    onRemove: () => update({ domain: undefined }),
-                  },
-                ]
-              : []),
-            ...(search.reason
-              ? [
-                  {
-                    key: 'reason',
-                    label: reasonLabels[search.reason],
-                    onRemove: () => update({ reason: undefined }),
-                  },
-                ]
-              : []),
-          ]}
-          onClear={() => update({ domain: undefined, reason: undefined })}
-        >
-          <Select<string>
-            aria-label="Area"
-            value={search.domain ?? ''}
-            options={[
-              { value: '', label: 'All areas' },
-              ...domains.map((domain) => ({
+            {
+              kind: 'choice',
+              key: 'domain',
+              label: 'Area',
+              icon: LayoutGrid,
+              value: search.domain,
+              options: domains.map((domain) => ({
                 value: domain,
-                label: `${domainLabels[domain]}${list ? ` · ${list.counts.domains[domain]}` : ''}`,
+                label: facetLabel(
+                  domainLabels[domain],
+                  domain !== search.domain && list
+                    ? list.counts.domains[domain]
+                    : undefined,
+                ),
               })),
-            ]}
-            onValueChange={(value) =>
-              update({
-                domain: domains.find((domain) => domain === value),
-              })
-            }
-          />
-          <Select<string>
-            aria-label="Reason"
-            value={search.reason ?? ''}
-            options={[
-              { value: '', label: 'All reasons' },
-              ...reasons.map((reason) => ({
+              onChange: (value) =>
+                update({ domain: domains.find((domain) => domain === value) }),
+            },
+            {
+              kind: 'choice',
+              key: 'reason',
+              label: 'Reason',
+              icon: CircleHelp,
+              value: search.reason,
+              options: reasons.map((reason) => ({
                 value: reason,
-                label: `${reasonLabels[reason]}${list ? ` · ${list.counts.reasons[reason]}` : ''}`,
+                label: facetLabel(
+                  reasonLabels[reason],
+                  reason !== search.reason && list
+                    ? list.counts.reasons[reason]
+                    : undefined,
+                ),
               })),
-            ]}
-            onValueChange={(value) =>
-              update({
-                reason: reasons.find((reason) => reason === value),
-              })
-            }
-          />
-          <label className="decisions-grouping">
-            <Switch
-              checked={!!search.grouped}
-              onCheckedChange={(checked) =>
-                update({ grouped: checked ? true : undefined })
-              }
-            />
-            Group by cause
-          </label>
-        </CollectionToolbar>
+              onChange: (value) =>
+                update({ reason: reasons.find((reason) => reason === value) }),
+            },
+          ]}
+          actions={
+            <label className="decisions-grouping">
+              <Switch
+                checked={!!search.grouped}
+                onCheckedChange={(checked) =>
+                  update({ grouped: checked ? true : undefined })
+                }
+              />
+              Group by cause
+            </label>
+          }
+          onClear={() => update({ domain: undefined, reason: undefined })}
+        />
       </div>
       {offline ? (
         <CaseNotice title="You’re offline">

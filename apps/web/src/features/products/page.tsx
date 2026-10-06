@@ -9,7 +9,11 @@ import type {
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
-import { CollectionToolbar } from '@luma/ui/components/primitives/collection-toolbar';
+import {
+  type CollectionFilterOption,
+  CollectionToolbar,
+  CollectionViews,
+} from '@luma/ui/components/primitives/collection-toolbar';
 import {
   DataTable,
   type DataTableColumn,
@@ -17,8 +21,6 @@ import {
 } from '@luma/ui/components/primitives/data-table';
 import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { Empty } from '@luma/ui/components/primitives/empty';
-import { Input } from '@luma/ui/components/primitives/input';
-import { Select } from '@luma/ui/components/primitives/select';
 import { StatePill } from '@luma/ui/components/primitives/state';
 import { PageHeader } from '@luma/ui/components/workspace/page-header';
 import { onlineManager, useQuery } from '@tanstack/react-query';
@@ -28,7 +30,7 @@ import {
   useParams,
   useSearch,
 } from '@tanstack/react-router';
-import { Package, Search } from 'lucide-react';
+import { Package, PackageCheck, PackageX } from 'lucide-react';
 import { type ReactNode, useState, useSyncExternalStore } from 'react';
 
 import { SignInRedirect } from '../identity/common';
@@ -112,6 +114,21 @@ export function ProductsPage() {
       refresh={() => void query.refetch()}
     />
   );
+}
+
+/** Lists catalog sources as filter options, keeping a selected source that the page no longer lists. */
+function sourceOptions(
+  sources: CatalogSource[],
+  selected: string | undefined,
+): CollectionFilterOption[] {
+  const options = sources.map((source) => ({
+    value: source.connectionId,
+    label: source.label,
+  }));
+
+  return selected && !options.some((option) => option.value === selected)
+    ? [...options, { value: selected, label: 'Selected source' }]
+    : options;
 }
 
 /** Shows one source's listing of a SKU, or why the source has none. */
@@ -267,25 +284,13 @@ export function ProductsView({
   /** Which sources the list covers. */
   coverage?: ReactNode;
 }) {
-  const [draft, setDraft] = useState(search.q ?? '');
-  const [shown, setShown] = useState(search.q);
-  if (shown !== search.q) {
-    setShown(search.q);
-    setDraft(search.q ?? '');
-  }
   const update = (patch: Partial<ProductsSearch>) =>
     change({ ...productFilters(search), from: search.from, ...patch });
-  const clear = () => {
-    setDraft('');
-    change({ from: search.from });
-  };
+  const clear = () => change({ from: search.from });
   const from = recordReturnPath(organizationId, search.from);
   const view = search.view ?? 'all';
   const shownList = list ?? stale;
   const sources = shownList?.sources ?? [];
-  const sourceLabel = (id: string | undefined) =>
-    sources.find((source) => source.connectionId === id)?.label ??
-    'Selected source';
   const filtered = !!(
     search.q ||
     search.connectionId ||
@@ -307,122 +312,55 @@ export function ProductsView({
         refreshing={refreshing}
         onRefresh={refresh}
         views={
-          <div className="products-views" role="group" aria-label="Views">
-            {views.map((option) => (
-              <Button
-                key={option}
-                variant="ghost"
-                aria-pressed={view === option}
-                onClick={() => update({ view: option })}
-              >
-                {viewLabels[option]}
-                {shownList ? (
-                  <Badge
-                    tone={
-                      option !== 'all' && shownList.counts[option]
-                        ? 'warning'
-                        : 'neutral'
-                    }
-                  >
-                    {shownList.counts[option]}
-                  </Badge>
-                ) : null}
-              </Button>
-            ))}
-          </div>
+          <CollectionViews
+            label="Product views"
+            value={view}
+            views={views.map((option) => ({
+              value: option,
+              label: viewLabels[option],
+              description: viewDescriptions[option],
+              count: shownList?.counts[option],
+              attention: option !== 'all',
+            }))}
+            onChange={(option) => update({ view: option })}
+          />
         }
+        search={{
+          value: search.q,
+          onChange: (q) => update({ q }),
+          label: 'Search products',
+          placeholder: 'SKU, title, barcode, vendor or source ID…',
+        }}
         filters={[
-          ...(search.q
-            ? [
-                {
-                  key: 'q',
-                  label: `Search: ${search.q}`,
-                  onRemove: () => update({ q: undefined }),
-                },
-              ]
-            : []),
-          ...(search.connectionId
-            ? [
-                {
-                  key: 'connectionId',
-                  label: `Listed in ${sourceLabel(search.connectionId)}`,
-                  onRemove: () => update({ connectionId: undefined }),
-                },
-              ]
-            : []),
-          ...(search.missingFrom
-            ? [
-                {
-                  key: 'missingFrom',
-                  label: `Not in ${sourceLabel(search.missingFrom)}`,
-                  onRemove: () => update({ missingFrom: undefined }),
-                },
-              ]
-            : []),
+          {
+            kind: 'choice',
+            key: 'connectionId',
+            label: 'Listed in',
+            icon: PackageCheck,
+            value: search.connectionId,
+            options: sourceOptions(sources, search.connectionId),
+            onChange: (connectionId) => update({ connectionId }),
+          },
+          {
+            kind: 'choice',
+            key: 'missingFrom',
+            label: 'Missing from',
+            icon: PackageX,
+            value: search.missingFrom,
+            options:
+              sources.length > 1 || search.missingFrom
+                ? sourceOptions(sources, search.missingFrom)
+                : [],
+            onChange: (missingFrom) => update({ missingFrom }),
+          },
         ]}
-        onClear={clear}
-      >
-        <form
-          className="products-search"
-          role="search"
-          onSubmit={(event) => {
-            event.preventDefault();
-            update({ q: draft.trim() || undefined });
-          }}
-        >
-          <Search size={16} aria-hidden="true" />
-          <Input
-            aria-label="Search products"
-            placeholder="SKU, title, barcode, vendor or source ID…"
-            maxLength={120}
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-          />
-          <Button variant="outline" type="submit">
-            Search
-          </Button>
-        </form>
-        <Select
-          aria-label="Listed in"
-          value={search.connectionId ?? ''}
-          options={[
-            { value: '', label: 'Listed in: any source' },
-            ...sources.map((source) => ({
-              value: source.connectionId,
-              label: `Listed in ${source.label}`,
-            })),
-          ]}
-          onValueChange={(value) =>
-            update({ connectionId: value || undefined })
-          }
-        />
-        {sources.length > 1 ? (
-          <Select
-            aria-label="Missing from"
-            value={search.missingFrom ?? ''}
-            options={[
-              { value: '', label: 'Missing from: no filter' },
-              ...sources.map((source) => ({
-                value: source.connectionId,
-                label: `Not in ${source.label}`,
-              })),
-            ]}
-            onValueChange={(value) =>
-              update({ missingFrom: value || undefined })
-            }
-          />
-        ) : null}
-        {filtered ? (
-          <Button variant="ghost" onClick={clear}>
-            Clear filters
-          </Button>
-        ) : null}
-      </CollectionToolbar>
-      <p className="products-note">
-        {viewDescriptions[view]} No source is treated as the authority. Prices
-        are compared only within the same currency.
-      </p>
+        onClear={() => change({ from: search.from, view: search.view })}
+      />
       {coverage}
+      <p className="products-note">
+        No source is treated as the authority. Prices are compared only within
+        the same currency.
+      </p>
       {offline ? (
         <Alert role="status">
           You are offline. Reconnect to refresh products.

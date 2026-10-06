@@ -53,29 +53,10 @@
   margin: 0 20px 12px;
 }
 
-/* Toolbar: views, filters and refresh */
+/* Toolbar: the shared collection toolbar, inset to the inbox. */
 .inbox-toolbar {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 12px;
   padding: 0 20px 12px;
   border-bottom: 1px solid var(--line);
-}
-
-.inbox-views {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  order: 0;
-}
-
-.inbox-views > [data-slot='button'] {
-  order: 2;
-}
-
-.issue-refresh-label {
-  display: none;
 }
 
 .issue-view-tabs {
@@ -97,71 +78,6 @@
 
 .issue-view-tabs [data-slot='tabs-trigger'][data-view='active'] svg {
   color: var(--signal);
-}
-
-.issue-filter-chips {
-  display: flex;
-  align-items: center;
-  flex: 1 1 180px;
-  flex-wrap: wrap;
-  gap: 6px;
-  min-width: 0;
-}
-
-.issue-filter-chip {
-  display: inline-flex;
-  align-items: center;
-  max-width: 100%;
-  border-radius: 999px;
-  background: var(--signal-soft);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--signal) 22%, transparent);
-}
-
-.issue-filter-chip [data-slot='button'] {
-  height: 26px;
-  padding: 0 4px 0 10px;
-  border-radius: 999px 0 0 999px;
-  color: var(--foreground);
-  font-size: 12px;
-}
-
-.issue-filter-chip [data-slot='button']:last-child {
-  width: 26px;
-  padding: 0;
-  border-radius: 0 999px 999px 0;
-}
-
-.issue-filter-chip [data-slot='button']:last-child svg {
-  width: 13px;
-  height: 13px;
-}
-
-.issue-filter-label {
-  color: var(--foreground-subtle);
-  font-weight: 400;
-}
-
-.issue-filter-add[data-slot='button'],
-.issue-filter-chips > [data-slot='button'] {
-  height: 26px;
-  padding-inline: 8px;
-  border-radius: 999px;
-  font-size: 12px;
-}
-
-.issue-filter-add[data-slot='button'] {
-  box-shadow: inset 0 0 0 1px var(--line-strong);
-  color: var(--foreground-muted);
-}
-
-.issue-filter-options {
-  display: grid;
-  gap: 1px;
-}
-
-.issue-filter-options [data-slot='button'] {
-  justify-content: space-between;
-  text-align: left;
 }
 
 /* Split view */
@@ -2520,10 +2436,6 @@
   .issue-panel-navigation > :is(button, a) {
     width: 40px;
     height: 40px;
-  }
-
-  .issue-filter-chip [data-slot='button'] {
-    min-height: 36px;
   }
 
   .issue-section-disclosure > .issue-section-trigger {

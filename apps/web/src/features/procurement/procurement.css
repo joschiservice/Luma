@@ -109,45 +109,9 @@
   background: var(--surface-raised);
   box-shadow: var(--shadow-panel);
 }
-.procurement-views,
-.procurement-filters {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.procurement-views button {
-  color: var(--muted-foreground);
-}
-.procurement-views button[aria-pressed='true'] {
-  background: var(--accent);
-  color: var(--foreground);
-}
-.procurement-views button span {
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  opacity: 0.65;
-}
-.procurement-filters {
-  flex: 1;
-  justify-content: flex-end;
-}
-.procurement-search {
-  position: relative;
-  min-width: 180px;
-  max-width: 340px;
-  flex: 1;
-}
-.procurement-search > svg {
-  position: absolute;
-  top: 11px;
-  left: 11px;
-  color: var(--muted-foreground);
-}
-.procurement-search input {
-  padding-left: 34px;
-}
-.procurement-filters > [data-slot='select-trigger'] {
-  width: 145px;
+.procurement-collection > .collection-toolbar {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
 }
 .procurement-record-icon {
   display: grid;
@@ -460,12 +424,6 @@
   }
   .procurement-detail-grid {
     grid-template-columns: 1fr;
-  }
-  .procurement-filters {
-    width: 100%;
-  }
-  .procurement-views {
-    flex-wrap: wrap;
   }
   .procurement-form-pair {
     grid-template-columns: 1fr;

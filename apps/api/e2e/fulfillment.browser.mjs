@@ -61,9 +61,9 @@ test('finds a held fulfillment, explains the next safe step and follows its orde
   // A tracking number search keeps the view in the address.
   await page.getByRole('button', { name: /^All/ }).click();
   await page
-    .getByRole('textbox', { name: 'Search fulfillment' })
+    .getByRole('searchbox', { name: 'Search fulfillment' })
     .fill('4521-8876');
-  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await page.keyboard.press('Enter');
   await page.getByRole('link', { name: '#202', exact: true }).waitFor();
   const url = new URL(page.url());
   expect(url.searchParams.get('view')).toBe('all');
@@ -71,7 +71,7 @@ test('finds a held fulfillment, explains the next safe step and follows its orde
 
   // The held work explains its cause, the next step and what counts as progress.
   await page.getByRole('button', { name: /^On hold/ }).click();
-  await page.getByRole('button', { name: 'Clear filters' }).first().click();
+  await page.getByRole('button', { name: 'Clear', exact: true }).click();
   await page.getByRole('link', { name: '#200', exact: true }).click();
   await page
     .getByRole('heading', { name: 'On hold: Incorrect address' })

@@ -3,12 +3,13 @@ import './inventory.css';
 import type { InventoryList, StockPosition } from '@luma/api-contract';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
-import { CollectionToolbar } from '@luma/ui/components/primitives/collection-toolbar';
+import {
+  CollectionToolbar,
+  CollectionViews,
+} from '@luma/ui/components/primitives/collection-toolbar';
 import { DataTable } from '@luma/ui/components/primitives/data-table';
 import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { Empty } from '@luma/ui/components/primitives/empty';
-import { Input } from '@luma/ui/components/primitives/input';
-import { Select } from '@luma/ui/components/primitives/select';
 import { PageHeader } from '@luma/ui/components/workspace/page-header';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -17,7 +18,7 @@ import {
   useParams,
   useSearch,
 } from '@tanstack/react-router';
-import { Boxes, Search } from 'lucide-react';
+import { Boxes, Plug } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 
 import { connectionsOptions } from '../connections/data';
@@ -108,12 +109,6 @@ export function InventoryView({
   /** Which sources the list covers. */
   coverage?: ReactNode;
 }) {
-  const [draft, setDraft] = useState(search.q ?? '');
-  const [shown, setShown] = useState(search.q);
-  if (shown !== search.q) {
-    setShown(search.q);
-    setDraft(search.q ?? '');
-  }
   const update = (patch: Partial<InventorySearch>) =>
     change({ ...search, cursor: undefined, ...patch });
   const from = recordReturnPath(organizationId, search.from);
@@ -214,85 +209,70 @@ export function InventoryView({
         refreshing={refreshing}
         onRefresh={refresh}
         views={
-          <div className="inventory-views">
-            {(
-              [
-                ['all', 'All stock'],
-                ['differs', 'Source differences'],
-                ['unknown', 'Incomplete stock'],
-              ] as const
-            ).map(([view, label]) => (
-              <Button
-                key={view}
-                variant="ghost"
-                aria-pressed={(search.view ?? 'all') === view}
-                onClick={() => update({ view })}
-              >
-                {label}
-              </Button>
-            ))}
-          </div>
-        }
-        filters={(['skuId', 'locationId'] as const).flatMap((key) =>
-          search[key]
-            ? [
-                {
-                  key,
-                  label: key === 'skuId' ? 'Selected SKU' : 'Selected location',
-                  onRemove: () => update({ [key]: undefined }),
-                },
-              ]
-            : [],
-        )}
-        onClear={() => change({})}
-      >
-        <form
-          className="inventory-search"
-          onSubmit={(event) => {
-            event.preventDefault();
-            update({ q: draft.trim() || undefined });
-          }}
-        >
-          <Search size={16} aria-hidden="true" />
-          <Input
-            aria-label="Search inventory"
-            placeholder="Search SKU or location…"
-            maxLength={120}
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
+          <CollectionViews
+            label="Inventory views"
+            value={search.view ?? 'all'}
+            views={[
+              { value: 'all', label: 'All stock' },
+              { value: 'differs', label: 'Source differences' },
+              { value: 'unknown', label: 'Incomplete stock' },
+            ]}
+            onChange={(view) =>
+              update({ view: view === 'all' ? undefined : view })
+            }
           />
-          <Button variant="outline" type="submit">
-            Search
-          </Button>
-        </form>
-        <Select
-          aria-label="Inventory source"
-          value={search.connectionId ?? ''}
-          options={[
-            { value: '', label: 'All sources' },
-            ...sources.map((s) => ({ value: s.id, label: s.label })),
-          ]}
-          onValueChange={(value) =>
-            update({ connectionId: value || undefined })
-          }
-        />
-        {filtered ? (
-          <Button
-            variant="ghost"
-            onClick={() => {
-              setDraft('');
-              change({});
-            }}
-          >
-            Clear filters
-          </Button>
-        ) : null}
-      </CollectionToolbar>
+        }
+        search={{
+          value: search.q,
+          onChange: (q) => update({ q }),
+          label: 'Search inventory',
+          placeholder: 'Search SKU or location…',
+        }}
+        filters={[
+          {
+            kind: 'choice',
+            key: 'connectionId',
+            label: 'Source',
+            icon: Plug,
+            value: search.connectionId,
+            options: [
+              ...sources.map((s) => ({ value: s.id, label: s.label })),
+              ...(search.connectionId &&
+              !sources.some((s) => s.id === search.connectionId)
+                ? [{ value: search.connectionId, label: 'Selected source' }]
+                : []),
+            ],
+            onChange: (connectionId) => update({ connectionId }),
+          },
+          {
+            kind: 'applied',
+            key: 'skuId',
+            label: 'SKU',
+            value: search.skuId
+              ? (list?.items.find((item) => item.skuId === search.skuId)?.sku ??
+                'Selected SKU')
+              : undefined,
+            onRemove: () => update({ skuId: undefined }),
+          },
+          {
+            kind: 'applied',
+            key: 'locationId',
+            label: 'Location',
+            value: search.locationId
+              ? (list?.items.find(
+                  (item) => item.locationId === search.locationId,
+                )?.location ?? 'Selected location')
+              : undefined,
+            onRemove: () => update({ locationId: undefined }),
+          },
+        ]}
+        onClear={() => change({ view: search.view, from: search.from })}
+      />
+      {coverage}
       <p className="inventory-note">
         One position per SKU, location and unit. Source quantities stay
         separate. Unknown means the source has not reported a value.
       </p>
-      {coverage}
       {offline ? (
         <Alert role="status">
           You are offline. Reconnect to refresh stock.

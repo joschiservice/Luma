@@ -171,6 +171,18 @@ test('finds an order by number or SKU, explains it and pages a historical import
   await page.getByRole('link', { name: '#2003' }).waitFor();
   await page.getByRole('button', { name: 'All orders' }).click();
 
+  await page.getByRole('button', { name: 'Filter', exact: true }).click();
+  await page.getByRole('button', { name: 'Status' }).click();
+  await page.getByRole('button', { name: 'Open', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Edit Status filter: Open' })
+    .waitFor();
+  await page.waitForURL((url) => url.searchParams.get('status') === 'open');
+  await page
+    .getByRole('button', { name: 'Remove Status filter: Open' })
+    .click();
+  await page.waitForURL((url) => !url.searchParams.has('status'));
+
   await page.getByRole('searchbox', { name: 'Search orders' }).fill('TOTE-red');
   await page.keyboard.press('Enter');
   await page.getByText('1–1 orders').waitFor();

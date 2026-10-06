@@ -9,6 +9,10 @@ import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
 import {
+  CollectionToolbar,
+  CollectionViews,
+} from '@luma/ui/components/primitives/collection-toolbar';
+import {
   DataTable,
   type DataTableColumn,
   DataTableRowLink,
@@ -23,9 +27,10 @@ import {
   useParams,
   useSearch,
 } from '@tanstack/react-router';
-import { ArrowLeft, ArrowRight, RefreshCw, Search } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Plug } from 'lucide-react';
 import { useState } from 'react';
 
+import { connectionsOptions } from '../connections/data';
 import { IdentityError } from '../identity/data';
 import {
   recordListError,
@@ -35,15 +40,33 @@ import {
   recordsOptions,
 } from './data';
 
-const kinds: { value: RecordKind | ''; label: string }[] = [
-  { value: '', label: 'All records' },
-  { value: 'order', label: 'Orders' },
-  { value: 'fulfillment', label: 'Fulfillments' },
-  { value: 'position', label: 'Stock' },
-  { value: 'sku', label: 'SKUs' },
-  { value: 'product', label: 'Products' },
-  { value: 'issue', label: 'Issues' },
-];
+const kinds: { value: string; kind: RecordKind | undefined; label: string }[] =
+  [
+    { value: 'all', kind: undefined, label: 'All records' },
+    { value: 'order', kind: 'order', label: 'Orders' },
+    { value: 'fulfillment', kind: 'fulfillment', label: 'Fulfillments' },
+    { value: 'position', kind: 'position', label: 'Stock' },
+    { value: 'sku', kind: 'sku', label: 'SKUs' },
+    { value: 'product', kind: 'product', label: 'Products' },
+    { value: 'issue', kind: 'issue', label: 'Issues' },
+  ];
+
+/**
+ * Offers connected sources when there is more than one to choose from. An applied source always
+ * keeps an option so its chip names it, even when it is no longer listed.
+ */
+function sourceOptions(
+  connections: readonly { id: string; label: string }[] | undefined,
+  applied: string | undefined,
+) {
+  const options = (
+    connections && (connections.length > 1 || applied) ? connections : []
+  ).map((item) => ({ value: item.id, label: item.label }));
+  if (applied && !options.some((option) => option.value === applied))
+    options.push({ value: applied, label: `Source ${applied.slice(0, 8)}` });
+
+  return options;
+}
 
 function recordHref(
   organizationId: string,
@@ -140,102 +163,83 @@ export function RecordsPage() {
   });
   const search = useSearch({ from: '/app/$organizationId/records/' });
   const navigate = useNavigate({ from: '/app/$organizationId/records/' });
-  const [draft, setDraft] = useState(search.q);
   const query = useQuery(recordsOptions(organizationId, search));
   const [trails, setTrails] = useState<Record<string, (string | undefined)[]>>(
     {},
   );
-  const filters = {
+  const connections = useQuery(connectionsOptions(organizationId));
+  // `from` is the page to return to from a record, not a filter; navigation keeps it.
+  const listSearch = {
     q: search.q,
     kind: search.kind,
     connectionId: search.connectionId,
     from: search.from,
   };
-  const filterKey = JSON.stringify(filters);
+  const filterKey = JSON.stringify(listSearch);
   const trail = trails[filterKey] ?? [undefined];
   const position = trail.indexOf(search.cursor);
   const error = recordListError(query.error, search);
   const goTo = (cursor: string | undefined, page: number | undefined) =>
-    void navigate({ search: { ...filters, cursor, page } });
+    void navigate({ search: { ...listSearch, cursor, page } });
   const nextCursor = query.data?.nextCursor;
 
   return (
-    <main className="records-page">
+    <main className="records-page records-list">
       <PageHeader
         title="Records"
         description="Follow the source facts behind orders, stock, fulfillments and issues."
       />
-      <div className="record-explorer-head">
-        <form
-          className="record-search"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void navigate({
-              search: {
-                q: draft.trim(),
-                kind: search.kind,
-                connectionId: search.connectionId,
-                from: search.from,
-              },
-            });
-          }}
-        >
-          <Search size={18} aria-hidden="true" />
-          <input
-            aria-label="Search records"
-            placeholder="Search number, source ID or record…"
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            maxLength={120}
-          />
-          <Button type="submit" size="sm">
-            Search
-          </Button>
-        </form>
-        <Button
-          variant="outline"
-          aria-label="Refresh records"
-          disabled={query.isFetching}
-          onClick={() => void query.refetch()}
-        >
-          <RefreshCw size={16} /> Refresh
-        </Button>
-      </div>
-      <nav className="record-filters" aria-label="Record types">
-        {kinds.map(({ value, label }) => (
-          <button
-            type="button"
-            key={label}
-            className={search.kind === (value || undefined) ? 'active' : ''}
-            aria-current={
-              search.kind === (value || undefined) ? 'page' : undefined
-            }
-            onClick={() =>
+      <CollectionToolbar
+        views={
+          <CollectionViews
+            label="Record types"
+            value={search.kind ?? 'all'}
+            views={kinds}
+            onChange={(value) =>
               void navigate({
                 search: {
-                  q: search.q,
-                  kind: value || undefined,
-                  connectionId: search.connectionId,
-                  from: search.from,
+                  ...listSearch,
+                  kind: kinds.find((item) => item.value === value)?.kind,
                 },
               })
             }
-          >
-            {label}
-          </button>
-        ))}
-      </nav>
-      <div className="record-coverage">
-        <Badge tone="neutral">Current records</Badge>
-        {search.connectionId ? (
-          <Badge tone="neutral">One connected source</Badge>
-        ) : null}
-        <span>
-          Customer and return records are waiting for connected source
-          projections. Results show 50 records per page, most recently observed
-          first.
-        </span>
-      </div>
+          />
+        }
+        search={{
+          value: search.q || undefined,
+          onChange: (q) =>
+            void navigate({
+              search: { ...listSearch, q: q?.trim() ?? '' },
+            }),
+          label: 'Search records',
+          placeholder: 'Search number, source ID or record…',
+          maxLength: 120,
+        }}
+        filters={[
+          {
+            kind: 'choice',
+            key: 'connectionId',
+            label: 'Source',
+            icon: Plug,
+            value: search.connectionId,
+            options: sourceOptions(connections.data, search.connectionId),
+            onChange: (connectionId) =>
+              void navigate({ search: { ...listSearch, connectionId } }),
+          },
+        ]}
+        onClear={() =>
+          void navigate({
+            search: { q: '', kind: search.kind, from: search.from },
+          })
+        }
+        onRefresh={() => void query.refetch()}
+        refreshing={query.isFetching}
+        refreshLabel="Refresh records"
+      />
+      <p className="record-coverage">
+        Customer and return records appear once connected sources share them.{' '}
+        {recordPageSize} records per page, most recently observed first.
+      </p>
       {query.isPending ? (
         <p className="record-notice" role="status">
           Loading records…

@@ -8,7 +8,11 @@ import type {
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
-import { CollectionToolbar } from '@luma/ui/components/primitives/collection-toolbar';
+import {
+  type CollectionFilterOption,
+  CollectionToolbar,
+  CollectionViews,
+} from '@luma/ui/components/primitives/collection-toolbar';
 import {
   DataTable,
   type DataTableColumn,
@@ -16,8 +20,6 @@ import {
 } from '@luma/ui/components/primitives/data-table';
 import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { Empty } from '@luma/ui/components/primitives/empty';
-import { Input } from '@luma/ui/components/primitives/input';
-import { Select } from '@luma/ui/components/primitives/select';
 import { StatePill } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { PageHeader } from '@luma/ui/components/workspace/page-header';
@@ -28,7 +30,7 @@ import {
   useParams,
   useSearch,
 } from '@tanstack/react-router';
-import { CircleCheck, Search, Truck } from 'lucide-react';
+import { CircleCheck, MapPin, Plug, Shapes, Truck } from 'lucide-react';
 import { type ReactNode, useState, useSyncExternalStore } from 'react';
 
 import { SignInRedirect } from '../identity/common';
@@ -69,6 +71,26 @@ const views: FulfillmentView[] = [
 
 // Views that list problems; a non-zero count is highlighted.
 const warningViews = new Set<FulfillmentView>(['attention', 'held', 'delayed']);
+
+const kinds = ['fulfillment_order', 'shipment'] as const;
+
+const kindFilterLabels: Record<(typeof kinds)[number], string> = {
+  fulfillment_order: 'Fulfillment orders',
+  shipment: 'Shipments',
+};
+
+const sorts = ['waiting', 'recent', 'deadline'] as const;
+
+/** Keeps a selected filter value that the loaded page does not list, so its chip stays readable. */
+function withSelected(
+  options: CollectionFilterOption[],
+  selected: string | undefined,
+  label: string,
+): CollectionFilterOption[] {
+  return selected && !options.some((option) => option.value === selected)
+    ? [...options, { value: selected, label }]
+    : options;
+}
 
 /** Connects the fulfillment list to workspace-scoped queries and shareable URL filters. */
 export function FulfillmentPage() {
@@ -325,18 +347,9 @@ export function FulfillmentView({
   /** Which sources the list covers. */
   coverage?: ReactNode;
 }) {
-  const [draft, setDraft] = useState(search.q ?? '');
-  const [shown, setShown] = useState(search.q);
-  if (shown !== search.q) {
-    setShown(search.q);
-    setDraft(search.q ?? '');
-  }
   const update = (patch: Partial<FulfillmentSearch>) =>
     change({ ...fulfillmentFilters(search), from: search.from, ...patch });
-  const clear = () => {
-    setDraft('');
-    change({ from: search.from, view: search.view });
-  };
+  const clear = () => change({ from: search.from, view: search.view });
   const from = recordReturnPath(organizationId, search.from);
   const view = search.view ?? 'attention';
   const shownList = list ?? stale;
@@ -348,9 +361,6 @@ export function FulfillmentView({
     search.locationId ||
     search.kind
   );
-  const locationLabel =
-    locations.find((location) => location.id === search.locationId)?.name ??
-    'Selected location';
 
   return (
     <main className="fulfillment-page">
@@ -365,161 +375,89 @@ export function FulfillmentView({
         refreshing={refreshing}
         onRefresh={refresh}
         views={
-          <div className="fulfillment-views" role="group" aria-label="Views">
-            {views.map((option) => (
-              <Button
-                key={option}
-                variant="ghost"
-                aria-pressed={view === option}
-                onClick={() => update({ view: option })}
-              >
-                {viewLabels[option]}
-                {shownList ? (
-                  <Badge
-                    tone={
-                      warningViews.has(option) && shownList.counts[option]
-                        ? 'warning'
-                        : 'neutral'
-                    }
-                  >
-                    {shownList.counts[option]}
-                  </Badge>
-                ) : null}
-              </Button>
-            ))}
-          </div>
+          <CollectionViews
+            label="Fulfillment views"
+            value={view}
+            views={views.map((option) => ({
+              value: option,
+              label: viewLabels[option],
+              description: viewDescriptions[option],
+              count: shownList?.counts[option],
+              attention: warningViews.has(option),
+            }))}
+            onChange={(option) => update({ view: option })}
+          />
         }
+        search={{
+          value: search.q,
+          onChange: (q) => update({ q }),
+          label: 'Search fulfillment',
+          placeholder: 'Order, tracking number, location or source ID…',
+        }}
         filters={[
-          ...(search.q
-            ? [
-                {
-                  key: 'q',
-                  label: `Search: ${search.q}`,
-                  onRemove: () => update({ q: undefined }),
-                },
-              ]
-            : []),
-          ...(search.connectionId
-            ? [
-                {
-                  key: 'connectionId',
-                  label: `Source: ${sources.find((source) => source.connectionId === search.connectionId)?.label ?? 'Selected source'}`,
-                  onRemove: () => update({ connectionId: undefined }),
-                },
-              ]
-            : []),
-          ...(search.locationId
-            ? [
-                {
-                  key: 'locationId',
-                  label: `Location: ${locationLabel}`,
-                  onRemove: () => update({ locationId: undefined }),
-                },
-              ]
-            : []),
-          ...(search.kind
-            ? [
-                {
-                  key: 'kind',
-                  label: `${kindLabels[search.kind]}s only`,
-                  onRemove: () => update({ kind: undefined }),
-                },
-              ]
-            : []),
-        ]}
-        onClear={clear}
-      >
-        <form
-          className="fulfillment-search"
-          role="search"
-          onSubmit={(event) => {
-            event.preventDefault();
-            update({ q: draft.trim() || undefined });
-          }}
-        >
-          <Search size={16} aria-hidden="true" />
-          <Input
-            aria-label="Search fulfillment"
-            placeholder="Order, tracking number, location or source ID…"
-            maxLength={120}
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-          />
-          <Button variant="outline" type="submit">
-            Search
-          </Button>
-        </form>
-        {sources.length > 1 ? (
-          <Select
-            aria-label="Source"
-            value={search.connectionId ?? ''}
-            options={[
-              { value: '', label: 'All sources' },
-              ...sources.map((source) => ({
-                value: source.connectionId,
-                label: source.label,
-              })),
-            ]}
-            onValueChange={(value) =>
-              update({ connectionId: value || undefined })
-            }
-          />
-        ) : null}
-        {locations.length ? (
-          <Select
-            aria-label="Location"
-            value={search.locationId ?? ''}
-            options={[
-              { value: '', label: 'All locations' },
-              ...locations.map((location) => ({
+          {
+            kind: 'choice',
+            key: 'connectionId',
+            label: 'Source',
+            icon: Plug,
+            value: search.connectionId,
+            options: withSelected(
+              sources.length > 1 || search.connectionId
+                ? sources.map((source) => ({
+                    value: source.connectionId,
+                    label: source.label,
+                  }))
+                : [],
+              search.connectionId,
+              'Selected source',
+            ),
+            onChange: (connectionId) => update({ connectionId }),
+          },
+          {
+            kind: 'choice',
+            key: 'locationId',
+            label: 'Location',
+            icon: MapPin,
+            value: search.locationId,
+            options: withSelected(
+              locations.map((location) => ({
                 value: location.id,
                 label: `${location.name ?? 'Unnamed location'} · ${location.open} open`,
               })),
-            ]}
-            onValueChange={(value) =>
-              update({ locationId: value || undefined })
-            }
-          />
-        ) : null}
-        <Select
-          aria-label="Type"
-          value={search.kind ?? ''}
-          options={[
-            { value: '', label: 'Work and shipments' },
-            { value: 'fulfillment_order', label: 'Fulfillment orders' },
-            { value: 'shipment', label: 'Shipments' },
-          ]}
-          onValueChange={(value) =>
-            update({
-              kind:
-                value === 'fulfillment_order' || value === 'shipment'
-                  ? value
-                  : undefined,
-            })
-          }
-        />
-        <Select
-          aria-label="Sort"
-          value={search.sort ?? 'waiting'}
-          options={Object.entries(sortLabels).map(([value, label]) => ({
-            value,
-            label: `Sort: ${label}`,
-          }))}
-          onValueChange={(value) =>
-            update({
-              sort:
-                value === 'recent' || value === 'deadline' ? value : undefined,
-            })
-          }
-        />
-      </CollectionToolbar>
-      <p className="fulfillment-note">
-        {viewDescriptions[view]} Work without progress for{' '}
-        {shownList?.stalledAfterHours ?? 48} hours counts as delayed. Each
-        source’s work is shown separately, even when systems mirror the same
-        order.
-      </p>
+              search.locationId,
+              'Selected location',
+            ),
+            onChange: (locationId) => update({ locationId }),
+          },
+          {
+            kind: 'choice',
+            key: 'kind',
+            label: 'Type',
+            icon: Shapes,
+            value: search.kind,
+            options: kinds.map((value) => ({
+              value,
+              label: kindFilterLabels[value],
+            })),
+            onChange: (value) =>
+              update({ kind: kinds.find((item) => item === value) }),
+          },
+        ]}
+        sort={{
+          value: search.sort ?? 'waiting',
+          options: sorts.map((value) => ({ value, label: sortLabels[value] })),
+          onChange: (value) => {
+            const sort = sorts.find((item) => item === value);
+            update({ sort: sort === 'waiting' ? undefined : sort });
+          },
+        }}
+        onClear={clear}
+      />
       {coverage}
+      <p className="fulfillment-note">
+        Work without progress for {shownList?.stalledAfterHours ?? 48} hours
+        counts as delayed. Each source’s work is listed separately.
+      </p>
       {offline ? (
         <Alert role="status">
           You are offline. Reconnect to refresh fulfillment.

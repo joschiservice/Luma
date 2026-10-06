@@ -41,8 +41,10 @@ test('investigates stock differences, follows affected orders and preserves filt
   await page
     .getByRole('button', { name: 'Source differences', exact: true })
     .click();
-  await page.getByRole('textbox', { name: 'Search inventory' }).fill('77');
-  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  const search = page.getByRole('searchbox', { name: 'Search inventory' });
+  await search.fill('77');
+  await search.press('Enter');
+  await page.waitForURL((url) => url.searchParams.get('q') === '"77"');
   await page.getByRole('link', { name: 'SKU-100', exact: true }).waitFor();
   await page.screenshot({
     path: '/tmp/luma99-inventory-light.png',
@@ -82,13 +84,15 @@ test('investigates stock differences, follows affected orders and preserves filt
         document.documentElement.clientWidth,
     ),
   ).toBe(true);
-  await page.getByRole('link', { name: 'Back to inventory' }).click();
+  // Opened from an issue, the detail page links back to that issue; history returns to the list.
+  await page.getByRole('link', { name: 'Back to context' }).waitFor();
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goBack();
+  await page.getByRole('link', { name: 'SKU-100', exact: true }).waitFor();
   expect(JSON.parse(new URL(page.url()).searchParams.get('q'))).toBe('77');
   expect(new URL(page.url()).searchParams.get('view')).toBe('differs');
-  await page
-    .getByRole('textbox', { name: 'Search inventory' })
-    .fill('does-not-exist');
-  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await search.fill('does-not-exist');
+  await search.press('Enter');
   await page.getByRole('heading', { name: 'No stock matches' }).waitFor();
   await page.goto(`/app/${f.org.id}/inventory/${stock.position.id}`);
   await page.getByRole('link', { name: '#100', exact: true }).click();

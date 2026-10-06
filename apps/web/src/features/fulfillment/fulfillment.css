@@ -10,8 +10,6 @@
 .fulfillment-page a {
   color: var(--signal-text);
 }
-.fulfillment-views,
-.fulfillment-search,
 .fulfillment-detail-toolbar,
 .fulfillment-pagination,
 .fulfillment-pagination > div,
@@ -20,21 +18,6 @@
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-}
-.fulfillment-views [aria-pressed='true'] {
-  background: var(--muted);
-  color: var(--foreground);
-}
-.fulfillment-views button {
-  gap: 6px;
-}
-.fulfillment-search {
-  flex: 1 1 300px;
-  flex-wrap: nowrap;
-  color: var(--muted-foreground);
-}
-.fulfillment-search input {
-  min-width: 0;
 }
 .fulfillment-flags {
   gap: 6px;

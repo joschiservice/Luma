@@ -1,15 +1,19 @@
 import './returns.css';
 
-import type {
-  ReturnList,
-  ReturnListItem,
-  ReturnStage,
-  ReturnView,
+import {
+  type ReturnList,
+  type ReturnListItem,
+  type ReturnStage,
+  returnStageSchema,
+  type ReturnView,
 } from '@luma/api-contract';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
-import { CollectionToolbar } from '@luma/ui/components/primitives/collection-toolbar';
+import {
+  CollectionToolbar,
+  CollectionViews,
+} from '@luma/ui/components/primitives/collection-toolbar';
 import {
   DataTable,
   type DataTableColumn,
@@ -17,8 +21,6 @@ import {
 } from '@luma/ui/components/primitives/data-table';
 import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { Empty } from '@luma/ui/components/primitives/empty';
-import { Input } from '@luma/ui/components/primitives/input';
-import { Select } from '@luma/ui/components/primitives/select';
 import { StateDot, StatePill } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { PageHeader } from '@luma/ui/components/workspace/page-header';
@@ -29,12 +31,13 @@ import {
   useParams,
   useSearch,
 } from '@tanstack/react-router';
-import { CircleCheck, Search, Undo2 } from 'lucide-react';
+import { CircleCheck, CircleDot, Plug, Search, Undo2 } from 'lucide-react';
 import { type ReactNode, useState, useSyncExternalStore } from 'react';
 
 import { SignInRedirect } from '../identity/common';
 import { IdentityError } from '../identity/data';
 import { recordReturnPath } from '../records/data';
+import { SyncCoverage } from '../sync/coverage';
 import { ago } from '../sync/presentation';
 import {
   defaultSort,
@@ -71,6 +74,8 @@ const stageHints: Partial<Record<ReturnStage, string>> = {
   ready_to_close: 'Close the return',
 };
 
+const sorts: readonly ReturnSort[] = ['oldest', 'newest', 'activity'];
+
 const sortLabels: Record<ReturnSort, string> = {
   oldest: 'Oldest request first',
   newest: 'Newest request first',
@@ -104,6 +109,7 @@ export function ReturnsPage() {
   return (
     <ReturnsView
       organizationId={organizationId}
+      coverage={<SyncCoverage organizationId={organizationId} type="returns" />}
       search={search}
       list={query.isError ? undefined : query.data}
       stale={query.isError ? query.data : undefined}
@@ -158,6 +164,7 @@ function StageStrip({
             className="returns-stage"
             aria-pressed={active}
             data-empty={count === 0 || undefined}
+            title={stageDescriptions[stage]}
             onClick={() => choose(active ? undefined : stage)}
           >
             <span className="returns-stage-head">
@@ -331,18 +338,12 @@ export function ReturnsView({
   /** Which sources and dates the list covers. */
   coverage?: ReactNode;
 }) {
-  const [draft, setDraft] = useState(search.q ?? '');
-  const [shown, setShown] = useState(search.q);
-  if (shown !== search.q) {
-    setShown(search.q);
-    setDraft(search.q ?? '');
-  }
   const update = (patch: Partial<ReturnsSearch>) =>
     change({ ...returnFilters(search), from: search.from, ...patch });
-  const clear = () => {
-    setDraft('');
-    change({ from: search.from });
-  };
+  const clear = () => change({ from: search.from });
+  // A stage spans views, so choosing one shows it across all returns.
+  const chooseStage = (stage: ReturnStage | undefined) =>
+    update(stage ? { stage, view: 'all' } : { stage: undefined });
   const from = recordReturnPath(organizationId, search.from);
   const view = search.view ?? defaultView;
   const sort = search.sort ?? defaultSort(view);
@@ -353,6 +354,19 @@ export function ReturnsView({
   const sourceLabel = (id: string | undefined) =>
     sources.find((source) => source.connectionId === id)?.label ??
     'Selected source';
+  // Only sources that share returns are offered; a linked source stays readable as a chip.
+  const sourceOptions = (sharing.length > 1 ? sharing : []).map((source) => ({
+    value: source.connectionId,
+    label: source.label,
+  }));
+  if (
+    search.connectionId &&
+    !sourceOptions.some((option) => option.value === search.connectionId)
+  )
+    sourceOptions.push({
+      value: search.connectionId,
+      label: sourceLabel(search.connectionId),
+    });
   const filtered = !!(search.q || search.connectionId || search.stage);
   const views: ReturnView[] = ['action', 'waiting', 'done', 'all'];
   const total = shownList?.counts.views[view] ?? 0;
@@ -372,9 +386,7 @@ export function ReturnsView({
         <StageStrip
           list={shownList}
           selected={search.stage}
-          choose={(stage) =>
-            update(stage ? { stage, view: 'all' } : { stage: undefined })
-          }
+          choose={chooseStage}
         />
       ) : null}
       <CollectionToolbar
@@ -382,111 +394,65 @@ export function ReturnsView({
         refreshing={refreshing}
         onRefresh={refresh}
         views={
-          <div className="returns-views" role="group" aria-label="Views">
-            {views.map((option) => (
-              <Button
-                key={option}
-                variant="ghost"
-                aria-pressed={view === option}
-                onClick={() => update({ view: option, sort: undefined })}
-              >
-                {viewLabels[option]}
-                {shownList ? (
-                  <Badge
-                    tone={
-                      option === 'action' && shownList.counts.views.action
-                        ? 'warning'
-                        : 'neutral'
-                    }
-                  >
-                    {shownList.counts.views[option]}
-                  </Badge>
-                ) : null}
-              </Button>
-            ))}
-          </div>
+          <CollectionViews
+            label="Return views"
+            value={view}
+            views={views.map((option) => ({
+              value: option,
+              label: viewLabels[option],
+              description: viewDescriptions[option],
+              count: shownList?.counts.views[option],
+              attention: option === 'action',
+            }))}
+            onChange={(option) => update({ view: option, sort: undefined })}
+          />
         }
+        search={{
+          value: search.q,
+          onChange: (q) => update({ q }),
+          label: 'Search returns',
+          placeholder: 'Return, order number, reason or source ID…',
+        }}
         filters={[
-          ...(search.q
-            ? [
-                {
-                  key: 'q',
-                  label: `Search: ${search.q}`,
-                  onRemove: () => update({ q: undefined }),
-                },
-              ]
-            : []),
-          ...(search.stage
-            ? [
-                {
-                  key: 'stage',
-                  label: `Stage: ${stageLabels[search.stage]}`,
-                  onRemove: () => update({ stage: undefined }),
-                },
-              ]
-            : []),
-          ...(search.connectionId
-            ? [
-                {
-                  key: 'connectionId',
-                  label: `From ${sourceLabel(search.connectionId)}`,
-                  onRemove: () => update({ connectionId: undefined }),
-                },
-              ]
-            : []),
+          {
+            kind: 'choice',
+            key: 'stage',
+            label: 'Stage',
+            icon: CircleDot,
+            value: search.stage,
+            options: returnStageSchema.options.map((value) => ({
+              value,
+              label: stageLabels[value],
+            })),
+            onChange: (value) =>
+              chooseStage(
+                returnStageSchema.options.find((item) => item === value),
+              ),
+          },
+          {
+            kind: 'choice',
+            key: 'connectionId',
+            label: 'Source',
+            icon: Plug,
+            value: search.connectionId,
+            options: sourceOptions,
+            onChange: (connectionId) => update({ connectionId }),
+          },
         ]}
-        onClear={clear}
-      >
-        <form
-          className="returns-search"
-          role="search"
-          onSubmit={(event) => {
-            event.preventDefault();
-            update({ q: draft.trim() || undefined });
-          }}
-        >
-          <Search size={16} aria-hidden="true" />
-          <Input
-            aria-label="Search returns"
-            placeholder="Return, order number, reason or source ID…"
-            maxLength={120}
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-          />
-          <Button variant="outline" type="submit">
-            Search
-          </Button>
-        </form>
-        {sharing.length > 1 ? (
-          <Select
-            aria-label="Source"
-            value={search.connectionId ?? ''}
-            options={[
-              { value: '', label: 'All sources' },
-              ...sharing.map((source) => ({
-                value: source.connectionId,
-                label: source.label,
-              })),
-            ]}
-            onValueChange={(value) =>
-              update({ connectionId: value || undefined })
-            }
-          />
-        ) : null}
-        <Select
-          aria-label="Sort"
-          value={sort}
-          options={(['oldest', 'newest', 'activity'] as const).map((value) => ({
-            value,
-            label: sortLabels[value],
-          }))}
-          onValueChange={(value) => update({ sort: value as ReturnSort })}
-        />
-      </CollectionToolbar>
+        sort={{
+          value: sort,
+          options: sorts.map((value) => ({ value, label: sortLabels[value] })),
+          onChange: (value) => {
+            const next = sorts.find((item) => item === value);
+            update({ sort: next === defaultSort(view) ? undefined : next });
+          },
+        }}
+        onClear={() =>
+          change({ from: search.from, view: search.view, sort: search.sort })
+        }
+      />
+      {coverage}
       <p className="returns-note">
-        {search.stage
-          ? stageDescriptions[search.stage]
-          : viewDescriptions[view]}{' '}
         Luma reads returns from your store and never approves, receives or
         refunds them.
       </p>
@@ -501,7 +467,6 @@ export function ReturnsView({
           </Link>
         </Alert>
       ))}
-      {coverage}
       {offline ? (
         <Alert role="status">
           You are offline. Reconnect to refresh returns.
