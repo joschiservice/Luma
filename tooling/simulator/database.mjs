@@ -2,8 +2,6 @@ import { createHmac, randomUUID } from 'node:crypto';
 
 import { Pool } from 'pg';
 
-import { migrate } from '../../apps/simulator/dist/migrate.js';
-
 const quote = async (client, value) =>
   (await client.query('SELECT quote_literal($1) AS value', [value])).rows[0]
     .value;
@@ -57,6 +55,8 @@ export async function provisionSimulatorDatabase(adminUrl, target) {
   }
   const owner = new URL(adminUrl);
   owner.pathname = `/${target.database}`;
+  // Loaded on use: callers build the simulator after importing this module.
+  const { migrate } = await import('../../apps/simulator/dist/migrate.js');
   await migrate(owner.toString(), target.role);
   const runtime = new URL(owner);
   runtime.username = target.role;
