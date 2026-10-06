@@ -8,6 +8,10 @@ import {
 } from '@luma/api-contract';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
+import {
+  type CollectionFilter,
+  CollectionToolbar,
+} from '@luma/ui/components/primitives/collection-toolbar';
 import { Empty } from '@luma/ui/components/primitives/empty';
 import { StateDot, StatePill } from '@luma/ui/components/primitives/state';
 import {
@@ -15,6 +19,7 @@ import {
   WorkspaceTimezone,
 } from '@luma/ui/components/primitives/workspace-date';
 import { PageHeader } from '@luma/ui/components/workspace/page-header';
+import { workspaceDateValue } from '@luma/ui/lib/timezone';
 import { onlineManager, useQuery } from '@tanstack/react-query';
 import {
   Link,
@@ -22,13 +27,27 @@ import {
   useParams,
   useSearch,
 } from '@tanstack/react-router';
-import { ChevronDown, RefreshCw } from 'lucide-react';
-import { useContext, useEffect, useState, useSyncExternalStore } from 'react';
+import {
+  CalendarDays,
+  ChevronDown,
+  CircleDot,
+  Plug,
+  Server,
+  Tag,
+} from 'lucide-react';
+import { useContext, useEffect, useSyncExternalStore } from 'react';
 
+import { connectionsOptions } from '../connections/data';
 import { SignInRedirect } from '../identity/common';
 import { IdentityError } from '../identity/data';
-import { type ActivityFilters, activityOptions, activityRange } from './data';
-import { activityLabel, activityState } from './presentation';
+import { type ActivityFilters, activityOptions } from './data';
+import {
+  activityConnectionOptions,
+  activityLabel,
+  type ActivitySource,
+  activityState,
+  activitySystemOptions,
+} from './presentation';
 
 const label = activityLabel;
 const subscribe = (changed: () => void) => onlineManager.subscribe(changed);
@@ -47,6 +66,7 @@ export function ActivityPage() {
   const head = useQuery(
     activityOptions(organizationId, filters, true, timeZone),
   );
+  const connections = useQuery(connectionsOptions(organizationId));
   const refreshPage = page.refetch;
   const visibilityChanged =
     !!page.data && !!head.data && page.data.visibility !== head.data.visibility;
@@ -86,7 +106,12 @@ export function ActivityPage() {
   return (
     <ActivityView
       organizationId={organizationId}
-      filters={{ ...filters, ...activityRange(filters, new Date(), timeZone) }}
+      filters={filters}
+      sources={connections.data?.map((connection) => ({
+        id: connection.id,
+        label: connection.label,
+        system: connection.target.kind,
+      }))}
       page={accessLost || visibilityChanged ? undefined : page.data}
       loading={page.isPending}
       refreshing={page.isFetching || head.isFetching}
@@ -119,6 +144,7 @@ export function ActivityPage() {
 export function ActivityView({
   organizationId,
   filters,
+  sources = [],
   page,
   loading,
   refreshing,
@@ -130,7 +156,10 @@ export function ActivityView({
   refresh,
 }: {
   organizationId: string;
+  /** The URL filters. Dates are set only when chosen; otherwise the last 30 days apply. */
   filters: ActivityFilters;
+  /** Workspace connections offered as connection and system filters. */
+  sources?: readonly ActivitySource[] | undefined;
   page?: Page | undefined;
   loading?: boolean;
   refreshing?: boolean;
@@ -142,114 +171,96 @@ export function ActivityView({
   change: (filters: ActivityFilters) => void;
   refresh: () => void;
 }) {
-  const update = (key: keyof ActivityFilters, value: string) =>
+  const timeZone = useContext(WorkspaceTimezone);
+  // Any filter change returns to the latest events and closes the open event.
+  const update = (patch: Partial<ActivityFilters>) =>
     change({
       ...filters,
-      [key]: value || undefined,
+      ...patch,
       cursor: undefined,
       latest: undefined,
       event: undefined,
     });
+  const toolbarFilters: CollectionFilter[] = [
+    {
+      kind: 'date-range',
+      key: 'recorded',
+      label: 'Recorded',
+      icon: CalendarDays,
+      from: filters.from,
+      to: filters.to,
+      today: workspaceDateValue(new Date(), timeZone),
+      maxDays: 366,
+      fallback: 'Last 30 days',
+      onChange: (range) => update({ from: range.from, to: range.to }),
+    },
+    {
+      kind: 'choice',
+      key: 'connectionId',
+      label: 'Connection',
+      icon: Plug,
+      value: filters.connectionId,
+      options: activityConnectionOptions(sources, filters.connectionId),
+      onChange: (connectionId) => update({ connectionId }),
+    },
+    {
+      kind: 'choice',
+      key: 'system',
+      label: 'System',
+      icon: Server,
+      value: filters.system,
+      options: activitySystemOptions(sources, filters.system),
+      onChange: (system) => update({ system }),
+    },
+    {
+      kind: 'choice',
+      key: 'type',
+      label: 'Event type',
+      icon: Tag,
+      value: filters.type,
+      options: activityTypes.map((value) => ({ value, label: label(value) })),
+      onChange: (value) =>
+        update({ type: activityTypes.find((item) => item === value) }),
+    },
+    {
+      kind: 'choice',
+      key: 'outcome',
+      label: 'Outcome',
+      icon: CircleDot,
+      value: filters.outcome,
+      options: activityOutcomes.map((value) => ({
+        value,
+        label: label(value),
+      })),
+      onChange: (value) =>
+        update({ outcome: activityOutcomes.find((item) => item === value) }),
+    },
+  ];
 
   return (
     <div className="activity-page">
       <PageHeader
         title="Activity"
         description="Actions, decisions and results recorded in this workspace, newest first."
-        actions={
-          <Button
-            variant="outline"
-            aria-label="Refresh activity"
-            disabled={refreshing || offline}
-            onClick={refresh}
-          >
-            <RefreshCw
-              aria-hidden="true"
-              className={refreshing ? 'activity-spin' : undefined}
-            />
-            {refreshing ? 'Refreshing…' : 'Refresh'}
-          </Button>
-        }
       />
-      <div className="activity-filters">
-        <label>
-          Search activity
-          <input
-            type="search"
-            value={filters.q ?? ''}
-            placeholder="Issue, resource, action, actor or run ID"
-            onChange={(e) => update('q', e.target.value)}
-            aria-describedby="activity-search-help"
-          />
-        </label>
-        <ActivityDates
-          key={`${filters.from}:${filters.to}`}
-          from={filters.from ?? ''}
-          to={filters.to ?? ''}
-          apply={(from, to) =>
-            change({
-              ...filters,
-              from,
-              to,
-              cursor: undefined,
-              latest: undefined,
-              event: undefined,
-            })
-          }
-        />
-        <label>
-          System
-          <input
-            aria-label="System"
-            value={filters.system ?? ''}
-            placeholder="All systems"
-            onChange={(e) => update('system', e.target.value)}
-          />
-        </label>
-        <label>
-          Connection ID
-          <input
-            key={filters.connectionId ?? ''}
-            defaultValue={filters.connectionId ?? ''}
-            placeholder="Connection UUID"
-            onBlur={(e) => update('connectionId', e.target.value)}
-          />
-        </label>
-        <label>
-          Event type
-          <select
-            aria-label="Event type"
-            value={filters.type ?? ''}
-            onChange={(e) => update('type', e.target.value)}
-          >
-            <option value="">All event types</option>
-            {activityTypes.map((v) => (
-              <option key={v} value={v}>
-                {label(v)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Outcome
-          <select
-            aria-label="Outcome"
-            value={filters.outcome ?? ''}
-            onChange={(e) => update('outcome', e.target.value)}
-          >
-            <option value="">All outcomes</option>
-            {activityOutcomes.map((v) => (
-              <option key={v} value={v}>
-                {label(v)}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-      <p id="activity-search-help" className="activity-help">
-        Search issue IDs, persisted resource references, action labels, actor
-        IDs and workflow run IDs. Dates use recorded time; select up to 366
-        days.
+      <CollectionToolbar
+        search={{
+          value: filters.q,
+          onChange: (q) => update({ q }),
+          label: 'Search activity',
+          placeholder: 'Issue, resource, action, actor or run ID…',
+          maxLength: 200,
+        }}
+        filters={toolbarFilters}
+        onClear={() => change({})}
+        onRefresh={refresh}
+        refreshing={refreshing}
+        refreshLabel="Refresh activity"
+      />
+      <p className="activity-coverage">
+        {page ? `${page.coverage} ` : null}Search matches issue IDs, resource
+        references, action labels, actor IDs and workflow run IDs. Dates use
+        recorded workspace time, up to 366 days.
       </p>
       {offline ? (
         <Alert role="status" className="activity-notice">
@@ -299,7 +310,6 @@ export function ActivityView({
       ) : null}
       {page ? (
         <>
-          <p className="activity-coverage">{page.coverage}</p>
           {!page.items.length ? (
             <Empty className="activity-empty">
               <h2>No matching recorded activity</h2>
@@ -533,63 +543,5 @@ function ActivityRow({
         </div>
       ) : null}
     </li>
-  );
-}
-
-function ActivityDates({
-  from,
-  to,
-  apply,
-}: {
-  from: string;
-  to: string;
-  apply: (from: string, to: string) => void;
-}) {
-  const [start, setStart] = useState(from);
-  const [end, setEnd] = useState(to);
-  const [error, setError] = useState(false);
-
-  return (
-    <form
-      className="activity-dates"
-      onSubmit={(event) => {
-        event.preventDefault();
-        const span = Date.parse(end) - Date.parse(start);
-        if (!Number.isFinite(span) || span < 0 || span >= 366 * 86400000) {
-          setError(true);
-
-          return;
-        }
-        setError(false);
-        apply(start, end);
-      }}
-    >
-      <label>
-        From (workspace time)
-        <input
-          type="date"
-          required
-          value={start}
-          onChange={(event) => setStart(event.target.value)}
-        />
-      </label>
-      <label>
-        Through (workspace time)
-        <input
-          type="date"
-          required
-          value={end}
-          onChange={(event) => setEnd(event.target.value)}
-        />
-      </label>
-      <Button variant="outline" type="submit">
-        Apply dates
-      </Button>
-      {error ? (
-        <p role="alert">
-          Choose an end date on or after the start, within 366 days.
-        </p>
-      ) : null}
-    </form>
   );
 }

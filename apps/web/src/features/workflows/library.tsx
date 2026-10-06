@@ -4,11 +4,12 @@ import type { WorkflowDraft, WorkflowSummary } from '@luma/api-contract';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button, buttonVariants } from '@luma/ui/components/primitives/button';
-import { CollectionToolbar } from '@luma/ui/components/primitives/collection-toolbar';
+import {
+  CollectionToolbar,
+  CollectionViews,
+} from '@luma/ui/components/primitives/collection-toolbar';
 import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { Empty } from '@luma/ui/components/primitives/empty';
-import { Input } from '@luma/ui/components/primitives/input';
-import { Select } from '@luma/ui/components/primitives/select';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { PageHeader } from '@luma/ui/components/workspace/page-header';
 import { useQuery } from '@tanstack/react-query';
@@ -21,12 +22,11 @@ import {
 import {
   ChevronRight,
   FilePenLine,
+  Plug,
   Plus,
   Search,
   Workflow,
-  X,
 } from 'lucide-react';
-import { useRef } from 'react';
 
 import { SignInRedirect } from '../identity/common';
 import { contextOptions, IdentityError } from '../identity/data';
@@ -42,6 +42,8 @@ export const statusNames = {
   enabled: 'Enabled',
   not_enabled: 'Not enabled',
 };
+
+const libraryViews = ['all', 'attention', 'enabled', 'not_enabled'] as const;
 
 const inView = (item: WorkflowSummary, status: string | undefined) =>
   !status ||
@@ -151,7 +153,6 @@ export function WorkflowLibraryView({
   error?: string | undefined;
   refresh: () => void;
 }) {
-  const input = useRef<HTMLInputElement>(null);
   const search = (filters.q ?? '').trim().toLowerCase();
   const matching = items?.filter(
     (item) =>
@@ -168,36 +169,7 @@ export function WorkflowLibraryView({
   );
   const filtered = matching?.filter((item) => inView(item, filters.status));
   const count = (value: string) =>
-    items ? (matching?.filter((item) => inView(item, value)).length ?? 0) : '—';
-  const activeFilters = [
-    ...(filters.q
-      ? [
-          {
-            key: 'q',
-            label: `Search: ${filters.q}`,
-            onRemove: () => change({ ...filters, q: '' }),
-          },
-        ]
-      : []),
-    ...(filters.system
-      ? [
-          {
-            key: 'system',
-            label: workflowSystemLabel(filters.system),
-            onRemove: () => change({ ...filters, system: '' }),
-          },
-        ]
-      : []),
-    ...(filters.status
-      ? [
-          {
-            key: 'status',
-            label: statusNames[filters.status as keyof typeof statusNames],
-            onRemove: () => change({ ...filters, status: '' }),
-          },
-        ]
-      : []),
-  ];
+    matching?.filter((item) => inView(item, value)).length ?? 0;
 
   return (
     <div className="workflows-page workflow-library-page">
@@ -227,94 +199,53 @@ export function WorkflowLibraryView({
       <div className="workflow-collection">
         <CollectionToolbar
           views={
-            <>
-              <Select
-                className="workflow-mobile-view"
-                aria-label="Workflow view"
-                value={filters.status ?? ''}
-                options={[
-                  ['', 'All workflows'],
-                  ...Object.entries(statusNames),
-                ].map(([value, label]) => ({
-                  value: value!,
-                  label: `${label} (${count(value!)})`,
-                }))}
-                onValueChange={(value) =>
-                  change({ ...filters, status: value ?? '' })
-                }
-              />
-              <div
-                className="workflow-views"
-                role="group"
-                aria-label="Workflow view"
-              >
-                {[['', 'All workflows'], ...Object.entries(statusNames)].map(
-                  ([value, label]) => (
-                    <Button
-                      key={value}
-                      variant="ghost"
-                      aria-pressed={(filters.status ?? '') === value}
-                      onClick={() => change({ ...filters, status: value })}
-                    >
-                      {label}
-                      <span className="workflow-view-count">
-                        {count(value!)}
-                      </span>
-                    </Button>
-                  ),
-                )}
-              </div>
-            </>
-          }
-          filters={activeFilters}
-          onClear={() => change({})}
-          onRefresh={refresh}
-          refreshing={refreshing}
-          refreshLabel="Refresh workflows"
-        >
-          <div className="workflow-search">
-            <Search size={16} aria-hidden="true" />
-            <Input
-              ref={input}
-              type="search"
-              aria-label="Search workflows"
-              value={filters.q ?? ''}
-              onChange={(event) =>
-                change({ ...filters, q: event.target.value })
+            <CollectionViews
+              label="Workflow view"
+              value={
+                libraryViews.find((view) => view === filters.status) ?? 'all'
               }
-              placeholder="Search workflows…"
+              views={libraryViews.map((value) => ({
+                value,
+                label: value === 'all' ? 'All workflows' : statusNames[value],
+                count: items ? count(value === 'all' ? '' : value) : undefined,
+              }))}
+              onChange={(view) =>
+                change({ ...filters, status: view === 'all' ? '' : view })
+              }
             />
-            {filters.q ? (
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label="Clear search"
-                onClick={() => {
-                  change({ ...filters, q: '' });
-                  input.current?.focus();
-                }}
-              >
-                <X aria-hidden="true" />
-              </Button>
-            ) : null}
-          </div>
-          <Select
-            aria-label="System"
-            value={filters.system ?? ''}
-            onValueChange={(value) =>
-              change({ ...filters, system: value ?? '' })
-            }
-            options={[
-              { value: '', label: 'All systems' },
-              ...[
-                ...new Set((items ?? []).flatMap((item) => item.systems)),
+          }
+          search={{
+            value: filters.q || undefined,
+            onChange: (q) => change({ ...filters, q: q ?? '' }),
+            label: 'Search workflows',
+            placeholder: 'Search workflows…',
+            maxLength: 200,
+          }}
+          filters={[
+            {
+              kind: 'choice',
+              key: 'system',
+              label: 'System',
+              icon: Plug,
+              value: filters.system || undefined,
+              options: [
+                ...new Set([
+                  ...(items ?? []).flatMap((item) => item.systems),
+                  ...(filters.system ? [filters.system] : []),
+                ]),
               ].map((value) => ({
                 value,
                 label: workflowSystemLabel(value),
               })),
-            ]}
-          />
-        </CollectionToolbar>
+              onChange: (system) =>
+                change({ ...filters, system: system ?? '' }),
+            },
+          ]}
+          onClear={() => change({ status: filters.status })}
+          onRefresh={refresh}
+          refreshing={refreshing}
+          refreshLabel="Refresh workflows"
+        />
         {error ? (
           <Alert tone="danger" role="alert" className="workflow-notice">
             <span>

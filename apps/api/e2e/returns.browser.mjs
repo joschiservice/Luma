@@ -125,13 +125,12 @@ test('opens a return from its order, tells pending work from money returned and 
 
   // Search finds the refund without a return by its source ID.
   await page.goto(`/app/${f.org.id}/returns?view=all`);
-  await page
-    .getByRole('textbox', { name: 'Search returns' })
-    .fill('gid://shopify/Refund/2003');
-  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  const search = page.getByRole('searchbox', { name: 'Search returns' });
+  await search.fill('gid://shopify/Refund/2003');
+  await search.press('Enter');
   await page.getByText('Refund without a return', { exact: false }).waitFor();
-  await page.getByRole('textbox', { name: 'Search returns' }).fill('nothing');
-  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await search.fill('nothing');
+  await search.press('Enter');
   await page.getByRole('heading', { name: 'No returns match' }).waitFor();
 
   // G then T opens Returns from anywhere in the workspace.

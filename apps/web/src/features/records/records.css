@@ -4,57 +4,15 @@
   padding: 0 2rem 4rem;
   color: var(--foreground);
 }
-.record-explorer-head {
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-  justify-content: space-between;
-  margin: 1.5rem 0;
+.records-list {
+  display: grid;
+  gap: 14px;
 }
-.record-search {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  min-width: 0;
-  width: min(680px, 100%);
-  padding: 0.4rem 0.5rem 0.4rem 1rem;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--card);
-}
-.record-search input {
-  width: 100%;
-  min-width: 0;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: inherit;
-}
-.record-filters {
-  display: flex;
-  gap: 0.3rem;
-  overflow: auto;
-  border-bottom: 1px solid var(--border);
-}
-.record-filters button {
-  padding: 0.75rem 0.9rem;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  color: var(--muted-foreground);
-  white-space: nowrap;
-  cursor: pointer;
-}
-.record-filters button.active {
-  border-bottom-color: currentColor;
-  color: var(--foreground);
-  font-weight: 700;
+.records-list > .page-header {
+  margin-bottom: 0;
 }
 .record-coverage {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin: 1.25rem 0;
+  margin: 0;
   color: var(--muted-foreground);
   font-size: 0.83rem;
 }
@@ -256,12 +214,6 @@
   }
   .record-detail-grid {
     grid-template-columns: 1fr;
-  }
-  .record-explorer-head {
-    flex-wrap: wrap;
-  }
-  .record-search {
-    width: 100%;
   }
   .record-detail-head {
     display: block;

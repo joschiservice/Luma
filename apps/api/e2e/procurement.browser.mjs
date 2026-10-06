@@ -113,7 +113,9 @@ test('creates and reviews procurement records with safe retries on desktop and m
     path: '/tmp/luma69-list-desktop.png',
     fullPage: true,
   });
-  await page.getByLabel('Search purchase orders').fill('missing');
+  await page
+    .getByRole('searchbox', { name: 'Search purchase orders' })
+    .fill('missing');
   await page
     .getByRole('heading', { name: 'No matching purchase orders' })
     .waitFor();

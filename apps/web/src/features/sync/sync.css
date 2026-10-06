@@ -294,14 +294,18 @@
 }
 
 /* Coverage note shown above record lists */
-.sync-coverage-note {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 14px;
-  margin: 0;
-  color: var(--muted-foreground);
+.sync-coverage {
+  min-width: 0;
   font-size: 12px;
+}
+
+.sync-coverage.ui-disclosure[data-slot='disclosure'] > summary {
+  gap: 8px;
+  padding-block: 2px;
+  color: var(--foreground-muted);
+  font-size: 12px;
+  font-weight: 400;
+  cursor: pointer;
 }
 
 .sync-coverage-label {
@@ -309,13 +313,39 @@
   font-weight: 550;
 }
 
-.sync-coverage-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+.sync-coverage-summary {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.sync-coverage-note a {
+.sync-coverage[open] .sync-coverage-summary {
+  white-space: normal;
+}
+
+.sync-coverage-items {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 8px;
+  padding: 0 0 0 14px;
+  list-style: none;
+  color: var(--muted-foreground);
+}
+
+.sync-coverage-items li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sync-coverage-items strong {
+  color: var(--foreground);
+  font-weight: 550;
+}
+
+.sync-coverage > a {
+  margin-left: 14px;
   color: var(--signal-text);
 }
 

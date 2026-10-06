@@ -14,7 +14,8 @@ test('filters, expands, returns, paginates and recovers workspace activity on de
   const db = await database(t);
   await db.migrate();
   await db.grantRuntime();
-  const api = await startApi(t, db, origin);
+  // Connection and system filters list the workspace connections.
+  const api = await startApi(t, db, origin, 'e2e/connections-server.mjs');
   const web = startProcess(
     t,
     'e2e/web-server.mjs',
@@ -53,10 +54,21 @@ test('filters, expands, returns, paginates and recovers workspace activity on de
   const fixture = await seedActivity(db, tenantId, actor);
   await page.getByRole('link', { name: 'Activity', exact: true }).click();
   await page.locator('.activity-event').first().waitFor();
-  await page.getByLabel('System', { exact: true }).fill('jtl-cloud');
-  await page.getByLabel('Search activity').fill(actor);
+  const addFilter = async (category, option) => {
+    await page.getByRole('button', { name: 'Add filter', exact: true }).click();
+    await page.getByRole('button', { name: category, exact: true }).click();
+    await page.getByRole('button', { name: option, exact: true }).click();
+  };
+  const param = (name) => new URL(page.url()).searchParams.get(name);
+  await addFilter('System', 'jtl-cloud');
+  await expect.poll(() => param('system')).toBe('jtl-cloud');
+  const search = page.getByRole('searchbox', { name: 'Search activity' });
+  await search.fill(actor);
+  await search.press('Enter');
+  await expect.poll(() => param('q')).toBe(actor);
   await page.locator('.activity-event').first().waitFor();
-  await page.getByLabel('Outcome', { exact: true }).selectOption('uncertain');
+  await addFilter('Outcome', 'Uncertain');
+  await expect.poll(() => param('outcome')).toBe('uncertain');
   await page
     .getByRole('button', { name: /Execution completed/ })
     .first()
@@ -71,38 +83,41 @@ test('filters, expands, returns, paginates and recovers workspace activity on de
   await page.goBack();
   expect(page.url()).toBe(filtered);
   await page.getByText('observation:shipping-1042', { exact: true }).waitFor();
-  await page.getByLabel('Outcome', { exact: true }).selectOption('');
+  await page
+    .getByRole('button', {
+      name: 'Remove Outcome filter: Uncertain',
+      exact: true,
+    })
+    .click();
   // Applying both endpoints together allows a valid range outside the current year.
-  const rangeFrom = await page
-    .getByLabel('From (workspace time)', { exact: true })
-    .inputValue();
-  const rangeTo = await page
-    .getByLabel('Through (workspace time)', { exact: true })
-    .inputValue();
   await page
-    .getByLabel('From (workspace time)', { exact: true })
-    .fill('2020-01-01');
-  await page
-    .getByLabel('Through (workspace time)', { exact: true })
-    .fill('2020-01-31');
-  await page.getByRole('button', { name: 'Apply dates', exact: true }).click();
+    .getByRole('button', {
+      name: 'Edit Recorded filter: Last 30 days',
+      exact: true,
+    })
+    .click();
+  await page.getByLabel('From', { exact: true }).fill('2020-01-01');
+  await page.getByLabel('Through', { exact: true }).fill('2020-01-31');
+  await page.getByRole('button', { name: 'Apply range', exact: true }).click();
   await page
     .getByRole('heading', { name: 'No matching recorded activity' })
     .waitFor();
-  expect(new URL(page.url()).searchParams.get('from')).toBe('2020-01-01');
+  expect(param('from')).toBe('2020-01-01');
   await page.reload();
-  expect(
-    await page
-      .getByLabel('Through (workspace time)', { exact: true })
-      .inputValue(),
-  ).toBe('2020-01-31');
+  // Removing the explicit range returns to the default last 30 days.
   await page
-    .getByLabel('From (workspace time)', { exact: true })
-    .fill(rangeFrom);
+    .getByRole('button', {
+      name: 'Remove Recorded filter: Jan 1 – Jan 31, 2020',
+      exact: true,
+    })
+    .click();
   await page
-    .getByLabel('Through (workspace time)', { exact: true })
-    .fill(rangeTo);
-  await page.getByRole('button', { name: 'Apply dates', exact: true }).click();
+    .getByRole('button', {
+      name: 'Edit Recorded filter: Last 30 days',
+      exact: true,
+    })
+    .waitFor();
+  expect(param('from')).toBeNull();
   await page.locator('.activity-event').first().waitFor();
   let failOlder = true;
   const olderPattern = `**/v1/organizations/${tenantId}/activity?*`;

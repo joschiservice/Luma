@@ -90,8 +90,9 @@ test('searches scoped records and returns from a metric to the same cohort', asy
   });
   await page.getByRole('link', { name: 'Back to records' }).click();
   await page.getByRole('heading', { name: 'Records', exact: true }).waitFor();
-  await page.getByRole('textbox', { name: 'Search records' }).fill('#1000');
-  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  const search = page.getByRole('searchbox', { name: 'Search records' });
+  await search.fill('#1000');
+  await search.press('Enter');
   await page.getByRole('link', { name: /#1000/ }).waitFor();
   expect(
     await page

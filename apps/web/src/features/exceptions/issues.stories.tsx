@@ -24,7 +24,7 @@ import { Pagination } from '@luma/ui/components/primitives/pagination';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Maximize2, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
-import { expect, userEvent, within } from 'storybook/test';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { MINIMAL_VIEWPORTS } from 'storybook/viewport';
 
 import { StoryShell } from '../identity/storybook-shell';
@@ -330,35 +330,31 @@ export const RemovableFilters: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const body = within(document.body);
-    await userEvent.click(canvas.getByRole('button', { name: 'Add filter' }));
-    await userEvent.hover(
-      await body.findByRole('menuitem', { name: 'Severity' }),
-    );
+    await userEvent.click(canvas.getByRole('button', { name: 'Filter' }));
     await userEvent.click(
-      await body.findByRole('menuitemradio', { name: 'High' }),
+      await body.findByRole('button', { name: 'Severity' }),
     );
+    await userEvent.click(await body.findByRole('button', { name: 'High' }));
     await expect(
       canvas.getByRole('button', { name: 'Edit Severity filter: High' }),
     ).toBeVisible();
     await userEvent.click(canvas.getByRole('button', { name: 'Add filter' }));
     await expect(
-      body.queryByRole('menuitem', { name: 'Severity' }),
+      body.queryByRole('button', { name: 'Severity' }),
     ).not.toBeInTheDocument();
     await userEvent.keyboard('{Escape}');
     await userEvent.click(
       canvas.getByRole('button', { name: 'Edit Severity filter: High' }),
     );
-    await userEvent.click(
-      await body.findByRole('menuitemradio', { name: 'Medium' }),
-    );
+    await userEvent.click(await body.findByRole('button', { name: 'Medium' }));
     await userEvent.click(
       canvas.getByRole('button', { name: 'Remove Severity filter: Medium' }),
     );
+    await waitFor(() =>
+      expect(canvas.getByRole('button', { name: 'Filter' })).toHaveFocus(),
+    );
     await expect(
-      canvas.getByRole('button', { name: 'Add filter' }),
-    ).toHaveFocus();
-    await expect(
-      canvas.queryByRole('button', { name: 'Clear filters' }),
+      canvas.queryByRole('button', { name: 'Clear' }),
     ).not.toBeInTheDocument();
   },
 };

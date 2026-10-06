@@ -400,6 +400,55 @@ export const Browse: Story = {
   },
 };
 
+export const Filter: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const page = within(canvasElement.ownerDocument.body);
+    await userEvent.click(
+      await canvas.findByRole('button', { name: 'Filter' }),
+    );
+    await userEvent.click(
+      within(await page.findByRole('dialog')).getByRole('button', {
+        name: 'Status',
+      }),
+    );
+    await userEvent.click(
+      within(await page.findByRole('dialog')).getByRole('button', {
+        name: 'Open',
+      }),
+    );
+    await expect(
+      await canvas.findByRole('button', { name: 'Edit Status filter: Open' }),
+    ).toBeVisible();
+    await userEvent.click(canvas.getByRole('button', { name: 'Add filter' }));
+    await userEvent.click(
+      within(await page.findByRole('dialog')).getByRole('button', {
+        name: 'Placed',
+      }),
+    );
+    await userEvent.click(
+      within(await page.findByRole('dialog')).getByRole('button', {
+        name: 'Last 7 days',
+      }),
+    );
+    await expect(
+      await canvas.findByRole('button', {
+        name: 'Edit Placed filter: Last 7 days',
+      }),
+    ).toBeVisible();
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Remove Status filter: Open' }),
+    );
+    await expect(
+      canvas.queryByRole('button', { name: 'Edit Status filter: Open' }),
+    ).toBeNull();
+    await userEvent.click(canvas.getByRole('button', { name: 'Clear' }));
+    await expect(
+      canvas.queryByRole('button', { name: /Placed filter/ }),
+    ).toBeNull();
+  },
+};
+
 export const Loading: Story = { args: { state: 'loading' } };
 
 export const NoOrders: Story = { args: { state: 'empty' } };

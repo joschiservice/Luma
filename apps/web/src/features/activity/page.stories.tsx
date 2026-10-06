@@ -40,6 +40,19 @@ const item: ActivityEvent = {
   evidenceRefs: ['observation:shipping-1042'],
 };
 
+const sources = [
+  {
+    id: '44444444-4444-4444-8444-444444444444',
+    label: 'JTL warehouse',
+    system: 'jtl-cloud',
+  },
+  {
+    id: '55555555-5555-4555-8555-555555555555',
+    label: 'Main store',
+    system: 'shopify',
+  },
+];
+
 function Preview({
   state = 'ready',
 }: {
@@ -53,10 +66,7 @@ function Preview({
     | 'access'
     | undefined;
 }) {
-  const [filters, change] = useState<ActivityFilters>({
-    from: '2026-09-01',
-    to: '2026-09-22',
-  });
+  const [filters, change] = useState<ActivityFilters>({});
 
   return (
     <>
@@ -64,6 +74,7 @@ function Preview({
       <ActivityView
         organizationId="33333333-3333-4333-8333-333333333333"
         filters={filters}
+        sources={sources}
         change={change}
         refresh={() => {}}
         loading={state === 'loading'}
@@ -128,6 +139,73 @@ export const History: Story = {
     await expect(
       canvas.getByRole('link', { name: 'Open issue and evidence' }),
     ).toBeVisible();
+  },
+};
+
+export const Filtering: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const body = within(document.body);
+
+    await expect(
+      canvas.getByRole('searchbox', { name: 'Search activity' }),
+    ).toBeVisible();
+    // The default range always applies, so it cannot be removed.
+    await expect(
+      canvas.getByRole('button', {
+        name: 'Edit Recorded filter: Last 30 days',
+      }),
+    ).toBeVisible();
+    await expect(
+      canvas.queryByRole('button', { name: /^Remove Recorded filter/ }),
+    ).toBeNull();
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Add filter' }));
+    await userEvent.click(await body.findByRole('button', { name: 'System' }));
+    await userEvent.click(await body.findByRole('button', { name: 'Shopify' }));
+    await expect(
+      await canvas.findByRole('button', {
+        name: 'Edit System filter: Shopify',
+      }),
+    ).toBeVisible();
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Add filter' }));
+    await userEvent.click(
+      await body.findByRole('button', { name: 'Connection' }),
+    );
+    await userEvent.click(
+      await body.findByRole('button', { name: 'JTL warehouse' }),
+    );
+    await expect(
+      await canvas.findByRole('button', {
+        name: 'Edit Connection filter: JTL warehouse',
+      }),
+    ).toBeVisible();
+
+    await userEvent.click(
+      canvas.getByRole('button', {
+        name: 'Edit Recorded filter: Last 30 days',
+      }),
+    );
+    const from = await body.findByLabelText('From');
+    await userEvent.type(from, '2026-09-01');
+    await userEvent.type(body.getByLabelText('Through'), '2026-09-22');
+    await userEvent.click(body.getByRole('button', { name: 'Apply range' }));
+    await userEvent.click(
+      await canvas.findByRole('button', {
+        name: 'Remove Recorded filter: Sep 1 – Sep 22, 2026',
+      }),
+    );
+    await expect(
+      await canvas.findByRole('button', {
+        name: 'Edit Recorded filter: Last 30 days',
+      }),
+    ).toBeVisible();
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Clear' }));
+    await expect(
+      canvas.queryByRole('button', { name: /^Edit System filter/ }),
+    ).toBeNull();
   },
 };
 

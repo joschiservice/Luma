@@ -67,11 +67,13 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
   await page.getByRole('link', { name }).waitFor();
   await page.goto(`/app/${tenantId}/playbooks?q=shipping`);
   await page.waitForURL(`**/app/${tenantId}/workflows?q=shipping*`);
-  await page.getByRole('combobox', { name: 'System' }).click();
-  await page.getByRole('option', { name: 'JTL Cloud' }).click();
+  await page.getByRole('button', { name: 'Filter', exact: true }).click();
+  await page.getByRole('button', { name: 'System', exact: true }).click();
+  await page.getByRole('button', { name: 'JTL Cloud', exact: true }).click();
   await page.getByRole('link', { name }).waitFor();
-  await page.getByRole('combobox', { name: 'System' }).click();
-  await page.getByRole('option', { name: 'All systems' }).click();
+  await page
+    .getByRole('button', { name: 'Remove System filter: JTL Cloud' })
+    .click();
   await page.getByRole('link', { name }).waitFor();
   await page.getByRole('button', { name: /^Enabled 0$/ }).click();
   await page.getByRole('heading', { name: 'No matching workflows' }).waitFor();
@@ -79,8 +81,12 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
   await page.getByRole('link', { name }).waitFor();
   await page.getByLabel('Search workflows').fill('missing');
   await page.getByRole('heading', { name: 'No matching workflows' }).waitFor();
-  await page.getByRole('button', { name: 'Clear filters' }).click();
+  await page.getByRole('button', { name: 'Clear', exact: true }).click();
   await page.getByLabel('Search workflows').fill('shipping');
+  await page.getByLabel('Search workflows').press('Enter');
+  await page.waitForURL((url) =>
+    (url.searchParams.get('q') ?? '').includes('shipping'),
+  );
   await page.getByRole('link', { name }).click();
   await page.getByRole('heading', { name: 'How it works' }).waitFor();
   await page.getByRole('heading', { name: 'Ready to set up' }).waitFor();

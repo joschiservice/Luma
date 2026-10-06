@@ -184,6 +184,15 @@ export const Browse: Story = {
     await expect(
       canvas.getByRole('button', { name: /^Refund failed/ }),
     ).toHaveAttribute('aria-pressed', 'true');
+    // The chosen stage is an applied filter chip that can be removed.
+    await userEvent.click(
+      canvas.getByRole('button', {
+        name: 'Remove Stage filter: Refund failed',
+      }),
+    );
+    await expect(
+      canvas.getByRole('button', { name: /^Refund failed/ }),
+    ).toHaveAttribute('aria-pressed', 'false');
   },
 };
 

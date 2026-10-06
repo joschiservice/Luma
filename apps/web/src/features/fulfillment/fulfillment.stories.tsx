@@ -394,6 +394,43 @@ export const Attention: Story = {
   },
 };
 
+export const Filter: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const page = within(canvasElement.ownerDocument.body);
+    await userEvent.click(
+      await canvas.findByRole('button', { name: 'Filter' }),
+    );
+    await userEvent.click(
+      await page.findByRole('button', { name: 'Location' }),
+    );
+    await userEvent.click(
+      await page.findByRole('button', { name: 'Tokyo warehouse · 14 open' }),
+    );
+    await expect(
+      await canvas.findByRole('button', {
+        name: 'Edit Location filter: Tokyo warehouse · 14 open',
+      }),
+    ).toBeVisible();
+    await userEvent.click(canvas.getByRole('button', { name: 'Add filter' }));
+    await userEvent.click(await page.findByRole('button', { name: 'Type' }));
+    await userEvent.click(
+      await page.findByRole('button', { name: 'Shipments' }),
+    );
+    await userEvent.click(
+      await canvas.findByRole('button', {
+        name: 'Remove Type filter: Shipments',
+      }),
+    );
+    await expect(
+      canvas.queryByRole('button', { name: /Type filter/ }),
+    ).toBeNull();
+    await expect(
+      canvas.getByRole('button', { name: /^Edit Location filter/ }),
+    ).toBeVisible();
+  },
+};
+
 export const Dark: Story = { globals: { theme: 'dark' } };
 
 export const Narrow: Story = {

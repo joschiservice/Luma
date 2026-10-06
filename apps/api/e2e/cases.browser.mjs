@@ -172,11 +172,9 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
   await page.getByRole('button', { name: 'Return to first page' }).click();
   await page.getByRole('button', { name: 'Next', exact: true }).click();
   await page.getByRole('button', { name: 'Previous', exact: true }).click();
-  await page.getByRole('button', { name: 'Add filter', exact: true }).click();
-  await page.getByRole('menuitem', { name: 'Issue type', exact: true }).click();
-  await page
-    .getByRole('menuitemradio', { name: 'Sync failure', exact: true })
-    .click();
+  await page.getByRole('button', { name: 'Filter', exact: true }).click();
+  await page.getByRole('button', { name: 'Issue type', exact: true }).click();
+  await page.getByRole('button', { name: 'Sync failure', exact: true }).click();
   const issueTypeFilter = page.getByRole('button', {
     name: 'Edit Issue type filter: Sync failure',
     exact: true,

@@ -91,8 +91,12 @@ test('finds a SKU, compares its store and ERP listings and follows affected orde
   await page.screenshot({ path: '/tmp/luma101-list-dark.png', fullPage: true });
   await page.evaluate(() => document.documentElement.classList.remove('dark'));
   await page.getByRole('button', { name: /Not in every source/ }).click();
-  await page.getByRole('combobox', { name: 'Missing from' }).click();
-  await page.getByRole('option', { name: 'Not in JTL-Wawi' }).click();
+  await page.getByRole('button', { name: 'Filter', exact: true }).click();
+  await page.getByRole('button', { name: 'Missing from', exact: true }).click();
+  await page.getByRole('button', { name: 'JTL-Wawi', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Edit Missing from filter: JTL-Wawi' })
+    .waitFor();
   await page.getByRole('link', { name: 'APR-M', exact: true }).waitFor();
   expect(
     await page.getByRole('link', { name: 'SKU-100', exact: true }).count(),
@@ -105,8 +109,10 @@ test('finds a SKU, compares its store and ERP listings and follows affected orde
   const url = new URL(page.url());
   expect(url.searchParams.get('view')).toBe('missing');
   expect(url.searchParams.get('missingFrom')).toBe(catalog.erp);
-  await page.getByRole('textbox', { name: 'Search products' }).fill('nothing');
-  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await page
+    .getByRole('searchbox', { name: 'Search products' })
+    .fill('nothing');
+  await page.keyboard.press('Enter');
   await page.getByRole('heading', { name: 'No products match' }).waitFor();
 
   // Stock detail leads to the product, and the product leads to inventory.

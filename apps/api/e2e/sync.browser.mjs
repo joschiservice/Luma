@@ -34,13 +34,15 @@ test('follows history import coverage and pauses a sync', async ({
   page.on('pageerror', (error) => errors.push(error.message));
 
   await page.goto(`/app/${f.org.id}/orders`);
+  // The list states its coverage in one line; per-source detail opens beneath it.
   await page
-    .getByText('Tokyo store: importing orders (41%)', { exact: false })
+    .getByText('Importing from the source (41%) · list is incomplete', {
+      exact: false,
+    })
     .waitFor();
-  await page
-    .getByRole('link', { name: 'Data sync', exact: true })
-    .first()
-    .click();
+  await page.locator('.sync-coverage summary').click();
+  await page.getByText('importing orders (41%)', { exact: false }).waitFor();
+  await page.getByRole('link', { name: 'Open Data sync', exact: true }).click();
   await page.getByRole('heading', { name: 'Data sync', exact: true }).waitFor();
   await page.getByRole('heading', { name: 'Importing history' }).waitFor();
   const progress = page.getByRole('progressbar', {
