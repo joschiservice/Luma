@@ -13,9 +13,12 @@ import {
 } from '@tanstack/react-router';
 import { useEffect } from 'react';
 
+import { useAssistantOpen } from '../../lib/assistant-panel';
 import { isTypingTarget } from '../../lib/keyboard';
 import { setThemePreference, useThemePreference } from '../../lib/theme';
 import { AppNavigation } from '../apps/navigation';
+import { AssistantPanel } from '../assistant/panel';
+import { AssistantToggle, useAssistantShortcut } from '../assistant/toggle';
 import { decisionsOptions } from '../decisions/data';
 import { ContextHelp } from '../help/context-help';
 import { PinCurrentPage, PinnedNavigation } from '../layout/pins';
@@ -176,7 +179,9 @@ function TenantShell({ organizationId }: { organizationId: string }) {
     refetchInterval: false,
   });
   const session = client.getQueryData(sessionOptions().queryKey);
+  const assistantOpen = useAssistantOpen();
   useGoShortcuts(organizationId);
+  useAssistantShortcut();
   if (access.isError)
     return <Failure error={access.error} retry={() => void access.refetch()} />;
   if (organizations.isError)
@@ -233,7 +238,17 @@ function TenantShell({ organizationId }: { organizationId: string }) {
         <>
           <PinCurrentPage organizationId={organizationId} />
           <ContextHelp />
+          <AssistantToggle />
         </>
+      }
+      assistantOpen={assistantOpen}
+      assistant={
+        <WorkspaceTimezone value={settings.data?.workspace.timezone ?? 'UTC'}>
+          <AssistantPanel
+            organizationId={organizationId}
+            open={assistantOpen}
+          />
+        </WorkspaceTimezone>
       }
       accountMenu={
         <WorkspaceAccountMenu

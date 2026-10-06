@@ -27,6 +27,7 @@ import { Pool } from 'pg';
 import { createMetricListener } from '../infrastructure/metric-listener.js';
 import { createApplicationServices } from './application.js';
 import {
+  assistantAvailability,
   authoringAvailability,
   supplierExtractionAvailability,
 } from './authoring.js';
@@ -131,6 +132,8 @@ export async function buildRuntimeApp(
         modelSettings,
         !!modelGateway,
       ),
+      assistant: assistantAvailability(modelSettings, !!modelGateway),
+      ...(observability ? { observability } : {}),
       ...(connections && 'registry' in installedConnections
         ? {
             purchasing: {

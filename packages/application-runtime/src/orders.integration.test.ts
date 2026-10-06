@@ -2,6 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 
 import { buildApp, createCommerceServices } from '@luma/application-runtime';
+import {
+  assistantModelProfile,
+  createWorkspaceAssistant,
+} from '@luma/assistant/composition';
 import type { CommerceObservation } from '@luma/connections';
 import { createConnectionCoverage } from '@luma/connections/composition';
 import {
@@ -15,7 +19,12 @@ import {
   createOrderMetricReader,
   orderStateQueries,
 } from '@luma/orders/composition';
-import { createTenantDatabase } from '@luma/platform/composition';
+import type { ModelAdapter } from '@luma/platform';
+import {
+  createModelGateway,
+  createObservability,
+  createTenantDatabase,
+} from '@luma/platform/composition';
 import {
   createOperationalMetrics,
   createOrderWorkspace,
@@ -609,6 +618,106 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
     });
     expect(isolated.items.map((item) => item.id)).toEqual([foreignOrder]);
     expect(await orders.get(context(otherTenant), a)).toBeNull();
+  }, 60000);
+
+  it('cites the orders the Orders page lists for the same filters, within one tenant', async () => {
+    const { a, foreignOrder } = await seedWorkspace();
+    const orders = workspace();
+    const filters = {
+      view: 'outstanding' as const,
+      placedFrom: '2026-09-01T00:00:00+02:00',
+    };
+    const page = await orders.list(context(), {
+      q: '',
+      count: 'exact',
+      view: 'outstanding',
+      placedFrom: '2026-08-31T22:00:00.000Z',
+      sort: 'updated',
+      direction: 'desc',
+      limit: 10,
+    });
+    expect(page.items.map((item) => item.id)).toContain(a);
+
+    const ask = async (tenantId: string) => {
+      let call = 0;
+      const adapter: ModelAdapter = {
+        region: 'EU',
+        supportsZeroDataRetention: true,
+        async generate(_route, request) {
+          const usage = { inputTokens: 1, outputTokens: 1, costUsd: null };
+          if (call++ === 0)
+            return {
+              text: '',
+              toolCalls: [
+                { id: 'search', name: 'search_orders', arguments: filters },
+              ],
+              usage,
+            };
+          // Cite every record the read returned, as a model following the prompt would.
+          const result = request.messages.at(-1)!.content;
+
+          return {
+            text: `Outstanding: ${result.match(/\[\[order:[^\]]+\]\]/g)?.join(' ') ?? 'none'}`,
+            toolCalls: [],
+            usage,
+          };
+        },
+      };
+      const gateway = createModelGateway(
+        {
+          routes: {
+            [assistantModelProfile]: {
+              adapter: 'bedrock-eu',
+              model: 'eu.anthropic.claude-sonnet-4-5-20250929-v1:0',
+              providers: ['bedrock'],
+              zeroDataRetention: true,
+            },
+          },
+          timeoutMs: 30_000,
+        },
+        createObservability({
+          environment: 'test',
+          release: 'test',
+          sampleRate: 0,
+        }),
+        { bedrockEu: adapter },
+      );
+      const unavailable = async () => {
+        throw new Error('Not read by this question');
+      };
+      const assistant = createWorkspaceAssistant({
+        gateway,
+        availability: { available: true, reason: null },
+        reads: {
+          orders,
+          issues: { list: unavailable, get: unavailable },
+          inventory: { list: unavailable },
+          fulfillment: { list: unavailable },
+          returns: { list: unavailable },
+        },
+        refreshContext: async (value) => value,
+      });
+
+      return assistant.ask(context(tenantId), {
+        question: 'Which orders placed this month are still outstanding?',
+        history: [],
+      });
+    };
+
+    const answer = await ask(tenant);
+    expect(answer.citations.map((item) => item.id)).toEqual(
+      page.items.map((item) => item.id),
+    );
+    expect(answer.citations[0]).toMatchObject({
+      kind: 'order',
+      observedAt: page.items[0]!.observedAt,
+    });
+
+    const other = await ask(otherTenant);
+    expect(other.citations.map((item) => item.id)).not.toContain(a);
+    expect(other.citations.every((item) => item.id === foreignOrder)).toBe(
+      true,
+    );
   }, 60000);
 
   it('explains one order with source facts, progress, evidence and linked work', async () => {

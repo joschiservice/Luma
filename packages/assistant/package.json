@@ -1,0 +1,43 @@
+{
+  "name": "@luma/assistant",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "luma-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./composition": {
+      "luma-source": "./src/composition.ts",
+      "types": "./dist/composition.d.ts",
+      "default": "./dist/composition.js"
+    },
+    "./http": {
+      "luma-source": "./src/http.ts",
+      "types": "./dist/http.d.ts",
+      "default": "./dist/http.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@luma/api-contract": "workspace:*",
+    "@luma/exceptions": "workspace:*",
+    "@luma/identity": "workspace:*",
+    "@luma/platform": "workspace:*",
+    "@luma/read-models": "workspace:*",
+    "@ts-rest/fastify": "catalog:",
+    "fastify": "catalog:",
+    "zod": "catalog:zod3"
+  },
+  "devDependencies": {
+    "@luma/typescript-config": "workspace:*",
+    "@types/node": "catalog:",
+    "vitest": "catalog:"
+  }
+}

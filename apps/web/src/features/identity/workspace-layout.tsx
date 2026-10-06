@@ -25,13 +25,17 @@ type WorkspaceLayoutProps = {
   search?: ReactNode;
   context?: ReactNode;
   help?: ReactNode;
+  /** A panel docked beside the page, shown while `assistantOpen` is true. */
+  assistant?: ReactNode;
+  assistantOpen?: boolean;
   children: ReactNode;
 };
 
 /**
  * Renders the workspace frame: a persistent sidebar that collapses to an icon rail,
  * a compact top bar with breadcrumbs and page controls, and the scrollable page.
- * Small screens move the sidebar into a navigation drawer. Press `[` to collapse.
+ * Small screens move the sidebar into a navigation drawer. Press `[` to collapse. An optional
+ * assistant panel docks to the right of the page, or covers it on small screens.
  */
 export function WorkspaceLayout({
   workspaceSwitcher,
@@ -40,6 +44,8 @@ export function WorkspaceLayout({
   search,
   context,
   help,
+  assistant,
+  assistantOpen = false,
   children,
 }: WorkspaceLayoutProps) {
   const [open, setOpen] = useState(false);
@@ -71,6 +77,7 @@ export function WorkspaceLayout({
         <div
           className="desk"
           data-sidebar={collapsed ? 'collapsed' : 'expanded'}
+          data-assistant={assistant && assistantOpen ? 'open' : 'closed'}
         >
           <a className="skip-link" href="#workspace-content">
             Skip to content
@@ -135,6 +142,7 @@ export function WorkspaceLayout({
               {children}
             </main>
           </div>
+          {assistant}
         </div>
       </WorkspaceBreadcrumbSlot.Provider>
     </WorkspaceHeaderSlot.Provider>

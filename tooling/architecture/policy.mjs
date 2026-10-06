@@ -53,6 +53,8 @@ export const dependencies = {
     'connectors',
     'procurement',
   ],
+  // Answers questions through read-only tools over owners' read services.
+  assistant: ['platform', 'identity', 'reads', 'exceptions'],
 };
 
 export const layers = {
@@ -84,4 +86,5 @@ export const domainPackages = {
   'commerce-sync': 'sync',
   customers: 'customers',
   'workflow-temporal': 'temporal',
+  assistant: 'assistant',
 };

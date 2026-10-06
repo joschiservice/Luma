@@ -3,6 +3,7 @@ import { initContract } from '@ts-rest/core';
 import { apiErrorSchema } from './common.js';
 import { activityContract } from './contracts/activity.js';
 import { appsContract } from './contracts/apps.js';
+import { assistantContract } from './contracts/assistant.js';
 import { exceptionsContract } from './contracts/cases.js';
 import { connectionsContract } from './contracts/connections.js';
 import { decisionsContract } from './contracts/decisions.js';
@@ -63,6 +64,7 @@ const routes: {
   sync: typeof syncContract;
   decisions: typeof decisionsContract;
   insights: typeof insightsContract;
+  assistant: typeof assistantContract;
 } = {
   shadow: shadowContract,
   activity: activityContract,
@@ -93,6 +95,7 @@ const routes: {
   sync: syncContract,
   decisions: decisionsContract,
   insights: insightsContract,
+  assistant: assistantContract,
 };
 const options = {
   strictStatusCodes: true as const,
@@ -196,3 +199,5 @@ export * from './sync.js';
 export * from './decisions.js';
 
 export * from './insights.js';
+
+export * from './assistant.js';
