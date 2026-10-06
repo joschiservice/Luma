@@ -180,8 +180,11 @@ export function createResolutionMetricReader(
         SELECT c.id AS incident_id,s.document FROM cohort c
         JOIN exception_evidence e ON e.tenant_id=c.tenant_id AND e.exception_id=c.id
         JOIN exception_inputs i ON i.tenant_id=e.tenant_id AND i.evidence_key=e.evidence_key
-        JOIN exception_sources s ON s.tenant_id=i.tenant_id AND (i.document->'facts'->'evidenceRefs') ? s.evidence_key
-        UNION SELECT c.id,s.document FROM cohort c JOIN exception_sources s ON s.tenant_id=c.tenant_id AND (c.document->'resolution'->'evidenceRefs') ? s.evidence_key
+        CROSS JOIN LATERAL jsonb_array_elements_text(CASE WHEN jsonb_typeof(i.document->'facts'->'evidenceRefs')='array' THEN i.document->'facts'->'evidenceRefs' ELSE '[]' END) ref(key)
+        JOIN exception_sources s ON s.tenant_id=i.tenant_id AND s.evidence_key=ref.key
+        UNION SELECT c.id,s.document FROM cohort c
+        CROSS JOIN LATERAL jsonb_array_elements_text(CASE WHEN jsonb_typeof(c.document->'resolution'->'evidenceRefs')='array' THEN c.document->'resolution'->'evidenceRefs' ELSE '[]' END) ref(key)
+        JOIN exception_sources s ON s.tenant_id=c.tenant_id AND s.evidence_key=ref.key
       ), proposals AS (
         SELECT p.tenant_id,p.id,p.exception_id FROM case_proposals p JOIN cohort c ON c.tenant_id=p.tenant_id AND c.id=p.exception_id
         UNION SELECT s.tenant_id,s.proposal_id,c.id FROM action_admission_steps s JOIN cohort c ON c.tenant_id=s.tenant_id AND c.id::text=s.document->>'incidentId'
