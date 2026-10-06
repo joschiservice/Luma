@@ -7,6 +7,16 @@ schema {
 directive @idempotent(key: String!) on FIELD
 
 type QueryRoot {
+  bulkOperation(id: ID!): BulkOperation
+  bulkOperations(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+    sortKey: BulkOperationsSortKeys = CREATED_AT
+    query: String
+  ): BulkOperationConnection!
   currentAppInstallation: AppInstallation!
   customers(
     first: Int
@@ -64,28 +74,48 @@ type QueryRoot {
   ): WebhookSubscriptionConnection!
 }
 
-type AppInstallation implements Node {
-  accessScopes: [AccessScope!]!
+"""
+The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID.
+"""
+scalar ID
+
+type BulkOperation implements Node {
+  errorCode: BulkOperationErrorCode
   id: ID!
+  query: String!
+  rootObjectCount: UnsignedInt64!
+  status: BulkOperationStatus!
+  url: URL
 }
 
 interface Node {
   id: ID!
 }
 
-"""
-The `ID` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as `"4"`) or integer (such as `4`) input value will be accepted as an ID.
-"""
-scalar ID
-
-type AccessScope {
-  handle: String!
+enum BulkOperationErrorCode {
+  ACCESS_DENIED
+  INTERNAL_SERVER_ERROR
+  TIMEOUT
 }
 
 """
 The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text.
 """
 scalar String
+
+scalar UnsignedInt64
+
+enum BulkOperationStatus {
+  CANCELED
+  CANCELING
+  COMPLETED
+  CREATED
+  EXPIRED
+  FAILED
+  RUNNING
+}
+
+scalar URL
 
 """
 The `Int` scalar type represents non-fractional signed whole numeric values. Int can represent values between -(2^31) and 2^31 - 1.
@@ -97,6 +127,30 @@ The `Boolean` scalar type represents `true` or `false`.
 """
 scalar Boolean
 
+enum BulkOperationsSortKeys {
+  COMPLETED_AT
+  CREATED_AT
+}
+
+type BulkOperationConnection {
+  nodes: [BulkOperation!]!
+  pageInfo: PageInfo!
+}
+
+type PageInfo {
+  endCursor: String
+  hasNextPage: Boolean!
+}
+
+type AppInstallation implements Node {
+  accessScopes: [AccessScope!]!
+  id: ID!
+}
+
+type AccessScope {
+  handle: String!
+}
+
 enum CustomerSortKeys {
   CREATED_AT
   ID
@@ -107,8 +161,13 @@ enum CustomerSortKeys {
 }
 
 type CustomerConnection {
+  edges: [CustomerEdge!]!
   nodes: [Customer!]!
   pageInfo: PageInfo!
+}
+
+type CustomerEdge {
+  node: Customer!
 }
 
 type Customer implements Node {
@@ -575,8 +634,6 @@ type CustomerPhoneNumber {
   phoneNumber: String!
 }
 
-scalar UnsignedInt64
-
 enum OrderSortKeys {
   CREATED_AT
   CURRENT_TOTAL_PRICE
@@ -595,8 +652,13 @@ enum OrderSortKeys {
 }
 
 type OrderConnection {
+  edges: [OrderEdge!]!
   nodes: [Order!]!
   pageInfo: PageInfo!
+}
+
+type OrderEdge {
+  node: Order!
 }
 
 type Order implements Node {
@@ -696,14 +758,14 @@ interface Event {
   id: ID!
 }
 
-type PageInfo {
-  endCursor: String
-  hasNextPage: Boolean!
-}
-
 type FulfillmentOrderConnection {
+  edges: [FulfillmentOrderEdge!]!
   nodes: [FulfillmentOrder!]!
   pageInfo: PageInfo!
+}
+
+type FulfillmentOrderEdge {
+  node: FulfillmentOrder!
 }
 
 type FulfillmentOrder implements Node {
@@ -782,8 +844,13 @@ enum FulfillmentHoldReason {
 }
 
 type FulfillmentOrderLineItemConnection {
+  edges: [FulfillmentOrderLineItemEdge!]!
   nodes: [FulfillmentOrderLineItem!]!
   pageInfo: PageInfo!
+}
+
+type FulfillmentOrderLineItemEdge {
+  node: FulfillmentOrderLineItem!
 }
 
 type FulfillmentOrderLineItem implements Node {
@@ -847,8 +914,13 @@ type InventoryQuantity implements Node {
 }
 
 type InventoryLevelConnection {
+  edges: [InventoryLevelEdge!]!
   nodes: [InventoryLevel!]!
   pageInfo: PageInfo!
+}
+
+type InventoryLevelEdge {
+  node: InventoryLevel!
 }
 
 scalar Money
@@ -898,8 +970,13 @@ enum ProductVariantSortKeys {
 }
 
 type ProductVariantConnection {
+  edges: [ProductVariantEdge!]!
   nodes: [ProductVariant!]!
   pageInfo: PageInfo!
+}
+
+type ProductVariantEdge {
+  node: ProductVariant!
 }
 
 type FulfillmentOrderLocationForMoveConnection {
@@ -1004,8 +1081,13 @@ enum FulfillmentDisplayStatus {
 }
 
 type FulfillmentLineItemConnection {
+  edges: [FulfillmentLineItemEdge!]!
   nodes: [FulfillmentLineItem!]!
   pageInfo: PageInfo!
+}
+
+type FulfillmentLineItemEdge {
+  node: FulfillmentLineItem!
 }
 
 type FulfillmentLineItem implements Node {
@@ -1029,11 +1111,14 @@ type FulfillmentTrackingInfo {
   url: URL
 }
 
-scalar URL
-
 type LineItemConnection {
+  edges: [LineItemEdge!]!
   nodes: [LineItem!]!
   pageInfo: PageInfo!
+}
+
+type LineItemEdge {
+  node: LineItem!
 }
 
 type Refund implements Node {
@@ -1241,8 +1326,13 @@ enum CustomerState {
 }
 
 type InventoryItemConnection {
+  edges: [InventoryItemEdge!]!
   nodes: [InventoryItem!]!
   pageInfo: PageInfo!
+}
+
+type InventoryItemEdge {
+  node: InventoryItem!
 }
 
 enum ProductSortKeys {
@@ -1258,8 +1348,13 @@ enum ProductSortKeys {
 }
 
 type ProductConnection {
+  edges: [ProductEdge!]!
   nodes: [Product!]!
   pageInfo: PageInfo!
+}
+
+type ProductEdge {
+  node: Product!
 }
 
 type Shop implements Node {
@@ -1515,6 +1610,10 @@ type WebhookSubscription implements Node {
 }
 
 type Mutation {
+  bulkOperationRunQuery(
+    query: String!
+    groupObjects: Boolean! = false
+  ): BulkOperationRunQueryPayload
   fulfillmentOrderMove(
     id: ID!
     newLocationId: ID!
@@ -1533,6 +1632,23 @@ type Mutation {
     topic: WebhookSubscriptionTopic!
     webhookSubscription: WebhookSubscriptionInput!
   ): WebhookSubscriptionCreatePayload
+}
+
+type BulkOperationRunQueryPayload {
+  bulkOperation: BulkOperation
+  userErrors: [BulkOperationUserError!]!
+}
+
+type BulkOperationUserError {
+  code: BulkOperationUserErrorCode
+  field: [String!]
+  message: String!
+}
+
+enum BulkOperationUserErrorCode {
+  OPERATION_IN_PROGRESS
+  INVALID
+  LIMIT_REACHED
 }
 
 input FulfillmentOrderLineItemInput {

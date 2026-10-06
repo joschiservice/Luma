@@ -55,6 +55,22 @@ test('follows history import coverage and pauses a sync', async ({
     .waitFor();
   await page.screenshot({ path: '/tmp/luma96-sync-light.png', fullPage: true });
 
+  await f.db.owner.query(
+    `UPDATE commerce_sync_streams SET recent_history_from=now()-interval '30 days',
+    recent_history_completed_at=now(),scan_waiting=true WHERE tenant_id=$1 AND id=$2`,
+    [f.org.id, f.stream],
+  );
+  await page.getByRole('button', { name: 'Refresh sync status' }).click();
+  await page.getByText('Recent history imported', { exact: true }).waitFor();
+  await page.getByText('Preparing history', { exact: true }).waitFor();
+  expect(await progress.getAttribute('aria-valuetext')).toBe(
+    'The source is preparing an export',
+  );
+  await page.screenshot({
+    path: '/tmp/luma122-sync-recent-light.png',
+    fullPage: true,
+  });
+
   await page
     .getByRole('button', { name: 'Orders sync actions' })
     .first()
@@ -62,9 +78,13 @@ test('follows history import coverage and pauses a sync', async ({
   await page.getByRole('menuitem', { name: 'Pause' }).click();
   await page.getByText('Sync paused.', { exact: false }).waitFor();
   await page.getByRole('group', { name: 'Orders paused' }).waitFor();
+  await page.getByRole('heading', { name: 'History import paused' }).waitFor();
 
   await page.evaluate(() => document.documentElement.classList.add('dark'));
-  await page.screenshot({ path: '/tmp/luma96-sync-dark.png', fullPage: true });
+  await page.screenshot({
+    path: '/tmp/luma122-sync-recent-dark.png',
+    fullPage: true,
+  });
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
     await page.evaluate(
@@ -73,8 +93,11 @@ test('follows history import coverage and pauses a sync', async ({
         document.documentElement.clientWidth,
     ),
   ).toBe(true);
+  await page
+    .getByText('Recent history imported', { exact: true })
+    .scrollIntoViewIfNeeded();
   await page.screenshot({
-    path: '/tmp/luma96-sync-mobile.png',
+    path: '/tmp/luma122-sync-recent-mobile.png',
     fullPage: true,
   });
   expect(errors).toEqual([]);

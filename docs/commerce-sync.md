@@ -9,7 +9,7 @@ capabilities and never writes to a source.
 A **stream** exists per connection and record type (`orders`, `fulfillments`,
 `products`, `inventory`, `customers`, `returns`) whose read capability the connection grants.
 The runner creates streams for active connections, running as the person who first
-installed the connection. Each stream runs one **scan** at a time; every scan is a
+installed the connection. Each stream has one active **scan**, with a suspended history checkpoint during a live read; every scan is a
 **run** in `commerce_sync_runs`.
 
 | Scan          | When                                                       | Reads                                    |
@@ -23,7 +23,7 @@ overlap) only to handlers whose descriptor lists `filters: ['updatedSince']`. Ot
 handlers are reread in full every 30 minutes. The overlap and daily full check cover
 clock skew and missed notifications; ordering of snapshots still follows the
 projection rules, not these times. Fulfillment and return history waits for the
-connection's order history. The returns stream stores both returns and refunds in its
+connection's order history, or its completed recent window where supported. The returns stream stores both returns and refunds in its
 ledger.
 
 ## Pages, checkpoints and retries
@@ -129,3 +129,52 @@ from a checkpoint, fulfillments after orders, missing-record detection, change
 notifications, customer erasure and suppression, SKU and order link/unlink, stale replays, interrupted order linking, reference
 redirects, ambiguous suggestions, tenant isolation and principal recovery. Shopify adapter tests validate the new queries against the 2026-07 schema.
 The web Data sync page has `Data sync/Workspace` stories and presentation tests.
+
+## Recent history, live reads and exports
+
+Shopify order, fulfillment and return backfills first read a 30-day creation window,
+newest first. The durable `recent_history_from` and `recent_history_completed_at`
+checkpoint distinguishes that window from completed full history. Recent child
+streams may start after recent orders finish; providers without `createdSince`
+retain the full-order dependency. A second scan reads the complete history the
+source shares. Shopify's 60-day limit still applies without `read_all_orders`.
+A recent-window read never establishes absence or full-history coverage.
+
+The workspace runs up to `COMMERCE_SYNC_WORKSPACE_CONCURRENCY` pages concurrently
+(default 4, range 1–8). Admission per connection is limited by
+`COMMERCE_SYNC_CONNECTION_CONCURRENCY` (default 1, range 1–4), including leases held
+by other processes. The workspace page limit also counts leases across processes;
+use the same concurrency settings on all sync workers. `COMMERCE_SYNC_CONCURRENCY` still limits parallel workspaces.
+A short tenant advisory lock serializes admission; provider reads run outside it.
+The worker pool allows `tenant concurrency × workspace concurrency × 2 + 2`
+connections. Size PostgreSQL's connection limit for the total number of workers.
+
+Idle hints and incremental scans precede history pages. During an active scan,
+only `due_at` makes its next page eligible; a saved hint cannot bypass failure
+backoff. At a page boundary, a due live read can suspend a filterable history scan.
+Its cursor, counters and export state are persisted, then restored after the live
+scan finishes. Live reads also run every five minutes during long history imports.
+A provider cooldown defers the entire connection, including hinted work. Shopify
+clients share a budget per tenant/connection, using requested query cost, refunded
+balance, restore rate and `Retry-After` before sending the next request.
+
+Full Shopify backfills of orders, products, inventory and permitted customers use
+Bulk Operations on Admin API 2026-07. Recent windows, incremental reads and full
+checks remain paged. A stable, hashed scan alias identifies an export, allowing
+recovery after a lost start response without repeating the mutation. An opaque
+cursor stores the operation ID, byte offset and root count. Preparing exports
+release their lease and poll later; they do not record successful reads or coverage.
+The adapter queues when all five query slots are occupied.
+
+Completed exports are streamed as grouped JSONL in chunks of 500 root records.
+Children are joined through `__parentId` before normalizing a complete observation.
+The file is never saved. The ledger and cursor commit together, so replay after a
+crash recognizes unchanged records. The final root count must match the completed
+export's count. Failed, canceled, expired, malformed or truncated exports never
+complete coverage. Retry transient download failures; use **Re-import history** to
+start a new export when its operation or seven-day download URL is no longer usable.
+Customer selections obey the same protected-data approvals as paged reads, and
+customer read checks contain no profiles.
+
+See [connector import measurements](connectors.md#import-read-patterns-and-measurements)
+for reproducible simulator measurements and their limits.

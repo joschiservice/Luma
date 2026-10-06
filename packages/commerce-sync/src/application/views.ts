@@ -17,6 +17,8 @@ export interface SyncStreamView {
     kind: ScanKind;
     startedAt: string;
     since: string | null;
+    createdSince?: string | null;
+    waitingForExport?: boolean;
     pages: number;
     records: number;
     total: number | null;
@@ -35,6 +37,8 @@ export interface SyncStreamView {
     historyFrom: string | null;
     historyRequirement: string | null;
     olderHistoryAvailable: boolean;
+    recentFrom?: string | null;
+    recentCompletedAt?: string | null;
   };
   lastSuccessAt: string | null;
   lastCompleteAt: string | null;
@@ -65,6 +69,8 @@ export interface SyncRunView {
   kind: ScanKind;
   trigger: ScanTrigger;
   since: string | null;
+  /** Creation window of a recent-history run; null for other runs. */
+  createdSince?: string | null;
   fullScan: boolean;
   startedAt: string;
   finishedAt: string | null;

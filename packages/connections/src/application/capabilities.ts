@@ -26,7 +26,7 @@ export interface CapabilityDescriptor {
   /** Retry advice never authorizes replay of an uncertain write. */
   retry: { maxAttempts: number; initialDelayMs: number };
   /** Optional read filters the handler honors; absent means none. */
-  filters?: 'updatedSince'[];
+  filters?: ('updatedSince' | 'createdSince' | 'historyImport')[];
 }
 
 export interface InvocationContext {

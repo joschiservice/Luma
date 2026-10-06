@@ -5,10 +5,11 @@ import type {
 } from '@luma/simulator-core';
 import { execute, GraphQLError } from 'graphql';
 
+import { bulkDownload, bulkResolver } from './bulk.js';
 import { createLoader, type RequestContext } from './context.js';
 import { actualCost, prepare, queryCost, readRequest } from './operation.js';
 import type { ShopifyContext } from './records.js';
-import { fieldResolver, typeResolver } from './resolvers.js';
+import { typeResolver } from './resolvers.js';
 import { schema } from './schema.js';
 
 export const apiVersion = '2026-07';
@@ -94,6 +95,8 @@ export async function handle(
   context: ShopifyContext,
   request: ProviderRequest,
 ): Promise<ProviderResponse> {
+  const download = await bulkDownload(context, request);
+  if (download) return download;
   if (request.method !== 'POST' || new URL(request.url).pathname !== endpoint)
     return respond({ errors: 'Not Found' }, 404);
   if (!request.headers['x-shopify-access-token']) return unauthorized();
@@ -133,7 +136,7 @@ export async function handle(
     variableValues: body.variables,
     operationName: body.operationName,
     contextValue: requestContext,
-    fieldResolver,
+    fieldResolver: bulkResolver,
     typeResolver,
   });
   const actual = actualCost(

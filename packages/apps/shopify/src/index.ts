@@ -9,6 +9,7 @@ import {
   createInstallationRepository,
   createInstallationService,
 } from '@luma/connections/composition';
+import { createReadBudget, type ReadBudget } from '@luma/connector-shopify';
 import { IdentityError } from '@luma/identity';
 import { z } from 'zod';
 
@@ -64,6 +65,8 @@ export function createShopifyProvider(
     customerAccess?: { contact: boolean; address: boolean };
   } = {},
 ): ConnectionProvider {
+  const budgets = new Map<string, ReadBudget>();
+
   return {
     appId: 'shopify',
     provider: 'shopify',
@@ -93,7 +96,15 @@ export function createShopifyProvider(
         simulationTransport(current.connection, runtime.simulation) ??
         runtime.fetch;
 
+      const budgetKey = `${context.tenantId}:${id}`;
+      let budget = budgets.get(budgetKey);
+      if (!budget) {
+        budget = createReadBudget();
+        budgets.set(budgetKey, budget);
+      }
+
       return createShopifyConnector({
+        budget,
         tenantId: context.tenantId,
         connectionId: id,
         shop: target.shop,

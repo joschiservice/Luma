@@ -46,6 +46,7 @@ export function evaluate(
           'authentication',
           'permission_denied',
           'invalid_response',
+          'export_unavailable',
           'unsupported_capability',
           'unsupported_version',
         ].includes(f.errorCode ?? '')

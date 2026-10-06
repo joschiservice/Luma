@@ -41,6 +41,8 @@ export function createCommerceSyncWorker(options: {
   env?: Readonly<Record<string, string | undefined>>;
   /** Tenants processed in parallel. */
   concurrency?: number;
+  workspaceConcurrency?: number;
+  connectionConcurrency?: number;
   idleMs?: number;
   log?: (message: string, error?: unknown) => void;
 }) {
@@ -70,6 +72,8 @@ export function createCommerceSyncWorker(options: {
     recordRead: createReadChecks(options.database),
     resolveContext: options.identity.resolveWorkflowContext,
     digest,
+    workspaceConcurrency: options.workspaceConcurrency ?? 4,
+    connectionConcurrency: options.connectionConcurrency ?? 1,
     log,
   });
   const stop = new AbortController();
@@ -145,7 +149,7 @@ export async function createDefaultCommerceSyncWorker(
     resources.add(identity.close);
     const pool = new Pool({
       connectionString: settings.databaseUrl,
-      max: settings.concurrency * 2 + 2,
+      max: settings.concurrency * settings.workspaceConcurrency * 2 + 2,
     });
     resources.add(() => pool.end());
     const worker = createCommerceSyncWorker({
@@ -154,6 +158,8 @@ export async function createDefaultCommerceSyncWorker(
       connections: settings.connections,
       env,
       concurrency: settings.concurrency,
+      workspaceConcurrency: settings.workspaceConcurrency,
+      connectionConcurrency: settings.connectionConcurrency,
     });
     resources.add(worker.close);
     const followUp = createSupplierFollowUpWorker({

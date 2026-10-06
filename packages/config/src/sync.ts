@@ -6,6 +6,9 @@ export interface CommerceSyncConfig {
   connections: NonNullable<ReturnType<typeof readConnectionsConfig>>;
   /** Tenants synchronized in parallel by one process. */
   concurrency: number;
+  /** Bounded pages per workspace and concurrent streams per connection. */
+  workspaceConcurrency: number;
+  connectionConcurrency: number;
 }
 
 /**
@@ -32,5 +35,29 @@ export function readCommerceSyncConfig(
       'COMMERCE_SYNC_CONCURRENCY must be an integer from 1 to 32',
     );
 
-  return { databaseUrl, connections, concurrency };
+  const bounded = (key: string, fallback: number, max: number) => {
+    const value = Number(env[key] ?? fallback);
+    if (!Number.isInteger(value) || value < 1 || value > max)
+      throw new Error(`${key} must be an integer from 1 to ${max}`);
+
+    return value;
+  };
+  const workspaceConcurrency = bounded(
+    'COMMERCE_SYNC_WORKSPACE_CONCURRENCY',
+    4,
+    8,
+  );
+  const connectionConcurrency = bounded(
+    'COMMERCE_SYNC_CONNECTION_CONCURRENCY',
+    1,
+    4,
+  );
+
+  return {
+    databaseUrl,
+    connections,
+    concurrency,
+    workspaceConcurrency,
+    connectionConcurrency,
+  };
 }

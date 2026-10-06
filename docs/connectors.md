@@ -78,6 +78,7 @@ A receipt means accepted, not verified success. `verify` must read authoritative
 | `authentication`, `permission_denied`                          | Repair provider credentials or permissions                     |
 | `not_found`, `conflict`                                        | Refresh mappings/state and reevaluate intent                   |
 | `rate_limited`, `transient`, `timeout`                         | Follow explicit delay advice only when retry is safe           |
+| `export_unavailable`                                           | History export cannot resume; request a new history import     |
 | `internal`                                                     | Unclassified failure; inspect controlled operational evidence  |
 
 Adapters throw `ConnectorError` with a normalized code, effect certainty (`none` or `unknown`), retry advice and optional delay in milliseconds. `none` means the adapter can establish that no effect occurred. A dispatched write timeout normally has an unknown effect. Unknown effects always require reconciliation, regardless of retry advice or idempotency support. Unclassified exceptions and malformed write responses are unknown; provider exception text is discarded. The Shopify and JTL transports repeat a read up to three times when it fails with no effect and a delay advice of at most two seconds (`retryRead` in `@luma/connector-core/transport`). Shopify repeats only documents that start with `query` or `{`; writes and mutations are sent once. Longer advice and other failures reach the caller unchanged. Descriptor limits remain advisory. Execution currently reserves one attempt and does not redispatch it.
@@ -87,3 +88,74 @@ The awaited `record` hook receives start/success/failure, tenant/connection, cor
 ## Validation
 
 `sample-provider.test.ts` tests both mechanism variants through one consumer, effect binding and verification, scoped discovery, invalid versions/input/output, idempotency conflicts, conditional writes, error normalization and evidence-hook failures. Identity authentication and database durability remain covered by their existing suites. Run `pnpm check` with `TEST_DATABASE_URL` set to PostgreSQL 17 to include those integration tests.
+
+## Import read patterns and measurements
+
+Shopify nested page selections read parent records and their first child pages
+in one query. Every child connection with `hasNextPage` is drained before publishing
+an observation. Root pages are capped at 25, or 5 for fulfillment and returns;
+these bounds keep the simulator's worst-case requested costs below 1,000.
+Full initial history uses resumable Bulk Operations for orders, products, inventory
+and approved customers. See [commerce sync](commerce-sync.md#recent-history-live-reads-and-exports).
+
+Run `node tooling/benchmarks/commerce.mjs` after building the adapter and simulator
+packages. `BENCHMARK_PROVIDER=jtl`, `BENCHMARK_RECORDS`, `BENCHMARK_LATENCY_MS`,
+`BENCHMARK_CAPABILITIES`, `BENCHMARK_MODE=bulk` and `BENCHMARK_RATE_LIMIT=1` select
+comparable scenarios. The benchmark counts provider requests, pages, normalized
+records and elapsed time. It validates every page and rejects a query above the
+single-query cost limit. These are adapter measurements on synthetic data, without
+database projection time, real provider latency or a production throughput promise.
+
+On October 6, 2026, 25 parents with one variant/line and one location each, 10 ms
+latency per request, with a full budget reported to isolate request amplification:
+
+| Shopify stream  | Previous requests | Nested requests | Previous records/s | Nested records/s | Maximum requested cost |
+| --------------- | ----------------: | --------------: | -----------------: | ---------------: | ---------------------: |
+| Orders          |                52 |               2 |               39.6 |            586.7 |                    727 |
+| Products        |                52 |               2 |               41.0 |            856.4 |                    527 |
+| Inventory       |                51 |               1 |               40.9 |          1,749.0 |                    377 |
+| Customers       |                 2 |               2 |              934.7 |            931.5 |                    127 |
+| Fulfillments    |               102 |               6 |               41.5 |            620.8 |                    312 |
+| Returns/refunds |               177 |               6 |               23.6 |            578.4 |                    467 |
+
+Fulfillment and return scenarios yield 50 observations from 25 orders. Nested reads
+use five root pages for these streams, plus one initial metadata request. Child
+overflow adds requests, so the table is not a fixed requests-per-page guarantee.
+Customer reads already selected complete records; their timing difference is noise.
+
+For 70,000 products at 10 ms/request, nested pagination took **90.499 s** with
+**2,801 requests**; Bulk Operations took **68.158 s** with **283 requests**, including
+export preparation and checkpointed download chunks. At 245 ms/request, 1,000
+products took **10.298 s** paged versus **3.862 s** bulk (41 versus 7 requests).
+These runs disable budget exhaustion to isolate latency and export processing.
+With the simulator's 2,000-point bucket and 100 points/s restoration enabled,
+500 products took **19.038 s**, with **zero throttles**. Tests also drive the same
+budget with a virtual clock and verify complete overflow reads and bulk/paged
+normalized equality. Request reduction alone is not an end-to-end speedup claim.
+
+JTL ERP 2.2 currently has these measured patterns for 25 records at 10 ms/request:
+
+| JTL stream                | Requests/page | Elapsed | Records/s |
+| ------------------------- | ------------: | ------: | --------: |
+| Orders                    |            26 | 0.318 s |      78.6 |
+| Products                  |             1 | 0.018 s |   1,354.1 |
+| Inventory, all warehouses |             1 | 0.015 s |   1,632.1 |
+| Fulfillments              |            76 | 0.893 s |      28.0 |
+
+The [published ERP 2.2 OpenAPI](https://developer.jtl-software.com/openapi/erp/2.2.json)
+uses `pageNumber`/`pageSize` with count metadata. Orders and items default to page 1
+and size 100; the schema supplies no maximum page size or global requests/s quota.
+Do not treat simulator limits as a provider guarantee. Keep concurrency bounded and
+honor 429/503 `Retry-After`. Sales-order lines are an unpaged array; delivery-note
+lines are separately paged. The consumed endpoints offer no Shopify-style nested
+selection or general batch read. Named batch endpoints concern other operations,
+not complete orders with lines. Orders support `salesOrderDateAfter`, `sortBy` and
+`sortDescending`; creation filters must not be represented as update filters.
+
+The historical pilot's first-page `invalid_response` could not be reproduced:
+the current installed adapter validated 25 orders and their lines, and the original
+ongoing backfill now has successful pages. Its three earlier errors have no retained
+field-path diagnostics. No schema relaxation is justified by that evidence. A
+follow-up must capture allowlisted endpoint and validation field paths on recurrence,
+without provider payloads or customer data, before assigning a cause. See
+[JTL adapter constraints](jtl.md).

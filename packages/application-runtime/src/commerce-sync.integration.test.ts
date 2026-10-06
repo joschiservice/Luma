@@ -60,8 +60,12 @@ function provider(tenantId: string, erpId: string) {
     capability: string;
     cursor?: string;
     updatedSince?: string;
+    createdSince?: string;
   }[] = [];
   let historyLimited = true;
+  let recentEnabled = false;
+  let onRead:
+    ((request: (typeof requests)[number]) => Promise<void>) | undefined;
   const reader: CapabilityReader = {
     async discover(_context, connectionId) {
       return collections.has(`${connectionId}:orders.read`) ||
@@ -73,7 +77,14 @@ function provider(tenantId: string, erpId: string) {
             idempotency: 'none' as const,
             retry: { maxAttempts: 1, initialDelayMs: 1 },
             ...(capability === 'orders.read' || capability === 'customers.read'
-              ? { filters: ['updatedSince' as const] }
+              ? {
+                  filters: [
+                    'updatedSince' as const,
+                    ...(recentEnabled && capability === 'orders.read'
+                      ? ['createdSince' as const]
+                      : []),
+                  ],
+                }
               : {}),
           }))
         : [];
@@ -83,13 +94,16 @@ function provider(tenantId: string, erpId: string) {
         limit: number;
         cursor?: string;
         updatedSince?: string;
+        createdSince?: string;
       };
       requests.push({
         connectionId: request.connectionId,
         capability: request.capability,
         ...(input.cursor ? { cursor: input.cursor } : {}),
         ...(input.updatedSince ? { updatedSince: input.updatedSince } : {}),
+        ...(input.createdSince ? { createdSince: input.createdSince } : {}),
       });
+      await onRead?.(requests.at(-1)!);
       const failure = failures.findIndex(
         (item) =>
           item.connectionId === request.connectionId &&
@@ -106,11 +120,17 @@ function provider(tenantId: string, erpId: string) {
       }
       const all = (
         collections.get(`${request.connectionId}:${request.capability}`) ?? []
-      ).filter(
-        (item) =>
-          !input.updatedSince ||
-          (item.sourceUpdatedAt ?? '') >= input.updatedSince,
-      );
+      )
+        .filter(
+          (item) =>
+            !input.updatedSince ||
+            (item.sourceUpdatedAt ?? '') >= input.updatedSince,
+        )
+        .filter(
+          (item) =>
+            !input.createdSince ||
+            (item.data as { placedAt: string }).placedAt >= input.createdSince,
+        );
       const start = Number(input.cursor ?? 0);
       const observedAt = new Date().toISOString();
       const items = all.slice(start, start + input.limit).map((item) => ({
@@ -154,6 +174,12 @@ function provider(tenantId: string, erpId: string) {
         capability,
         ...(cursor ? { cursor } : {}),
       });
+    },
+    recentHistory() {
+      recentEnabled = true;
+    },
+    onRead(next: typeof onRead) {
+      onRead = next;
     },
     grantAllOrders() {
       historyLimited = false;
@@ -500,6 +526,256 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
     });
   });
 
+  it('admits independent connections concurrently and enforces connection leases across runners', async () => {
+    const store = createSyncStore(db);
+    for (const connectionId of [shop, erp])
+      await store.createStreams(
+        tenant,
+        connectionId,
+        ['orders', 'products'],
+        'operator',
+      );
+    const claims = await Promise.all(
+      Array.from({ length: 4 }, () =>
+        store.claim(tenant, randomUUID(), 60_000),
+      ),
+    );
+    const active = claims.filter((claim) => claim !== null);
+    expect(active).toHaveLength(2);
+    expect(new Set(active.map((claim) => claim.connectionId)).size).toBe(2);
+    expect(await store.claim(tenant, randomUUID(), 60_000)).toBeNull();
+    expect(
+      await store.claim(tenant, randomUUID(), 60_000, {
+        connectionConcurrency: 2,
+        workspaceConcurrency: 2,
+      }),
+    ).toBeNull();
+    expect(await store.claim(randomUUID(), randomUUID(), 60_000)).toBeNull();
+    await store.deferConnection(
+      tenant,
+      shop,
+      new Date(Date.now() + 60_000).toISOString(),
+    );
+    await owner.query(
+      'UPDATE commerce_sync_streams SET lease_until=NULL WHERE tenant_id=$1 AND connection_id=$2',
+      [tenant, shop],
+    );
+    expect(
+      await store.claim(tenant, randomUUID(), 60_000, { connectionId: shop }),
+    ).toBeNull();
+  });
+
+  it('persists recent coverage and restores an export checkpoint after a live read and restart', async () => {
+    const store = createSyncStore(db);
+    const tokens = {
+      recent: randomUUID(),
+      child: randomUUID(),
+      live: randomUUID(),
+      history: randomUUID(),
+      preempt: randomUUID(),
+      resume: randomUUID(),
+    };
+    await store.createStreams(
+      tenant,
+      shop,
+      ['orders', 'fulfillments'],
+      'operator',
+    );
+    const claimed = (await store.claim(tenant, tokens.recent, 60_000))!;
+    expect(claimed.recordType).toBe('orders');
+    const startedAt = new Date(Date.now() - 1000).toISOString();
+    const recentFrom = new Date(Date.now() - 30 * 86400_000).toISOString();
+    const nextDueAt = new Date(Date.now() + 300_000).toISOString();
+    const empty = {
+      entries: [],
+      unchanged: [],
+      counts: { records: 0, changed: 0, unchanged: 0, pending: 0, failed: 0 },
+      total: 0,
+      history: null,
+      now: new Date().toISOString(),
+    };
+    await store.startScan(tenant, claimed.id, tokens.recent, {
+      id: randomUUID(),
+      plan: {
+        kind: 'backfill',
+        since: null,
+        createdSince: recentFrom,
+        trigger: 'connection',
+      },
+      fullScan: false,
+      now: startedAt,
+      liveEnabled: true,
+    });
+    await store.commitPage(tenant, claimed.id, tokens.recent, {
+      ...empty,
+      nextCursor: null,
+      complete: { nextDueAt },
+    });
+    let streams = await createSyncStore(db).streams(tenant);
+    expect(streams.find((item) => item.id === claimed.id)).toMatchObject({
+      phase: 'backfill',
+      recentHistoryFrom: recentFrom,
+      recentHistoryCompletedAt: empty.now,
+      backfillCompletedAt: null,
+    });
+    const child = await store.claim(tenant, tokens.child, 60_000);
+    expect(child?.recordType).toBe('fulfillments');
+    await store.command(tenant, child!.id, { kind: 'pause' }, 'operator');
+    await owner.query(
+      "UPDATE commerce_sync_streams SET lease_until=now()-interval '1 second' WHERE tenant_id=$1 AND id=$2",
+      [tenant, child!.id],
+    );
+
+    // A hint between phases must not turn partial history into completed history.
+    const live = (await store.claim(tenant, tokens.live, 60_000))!;
+    await store.startScan(tenant, live.id, tokens.live, {
+      id: randomUUID(),
+      plan: { kind: 'incremental', since: startedAt, trigger: 'webhook' },
+      fullScan: false,
+      now: empty.now,
+      liveEnabled: true,
+    });
+    await store.commitPage(tenant, live.id, tokens.live, {
+      ...empty,
+      nextCursor: null,
+      complete: { nextDueAt },
+    });
+    expect(
+      (await store.streams(tenant)).find((item) => item.id === live.id)?.phase,
+    ).toBe('backfill');
+
+    const history = (await store.claim(tenant, tokens.history, 60_000))!;
+    const historyId = randomUUID();
+    await store.startScan(tenant, history.id, tokens.history, {
+      id: historyId,
+      plan: { kind: 'backfill', since: null, trigger: 'connection' },
+      fullScan: true,
+      now: empty.now,
+      liveEnabled: true,
+    });
+    await store.commitPage(tenant, history.id, tokens.history, {
+      ...empty,
+      nextCursor: 'export:chunk-2',
+      complete: null,
+      deferred: true,
+    });
+    const preempt = (await store.claim(tenant, tokens.preempt, 60_000))!;
+    expect(preempt.scan).toMatchObject({
+      cursor: 'export:chunk-2',
+      waitingForExport: true,
+    });
+    await store.suspendScan(tenant, preempt.id, tokens.preempt);
+    await store.startScan(tenant, preempt.id, tokens.preempt, {
+      id: randomUUID(),
+      plan: { kind: 'incremental', since: startedAt, trigger: 'webhook' },
+      fullScan: false,
+      now: empty.now,
+      liveEnabled: true,
+    });
+    await store.commitPage(tenant, preempt.id, tokens.preempt, {
+      ...empty,
+      nextCursor: null,
+      complete: { nextDueAt },
+    });
+    streams = await createSyncStore(db).streams(tenant);
+    expect(streams.find((item) => item.id === history.id)).toMatchObject({
+      phase: 'backfill',
+      suspendedScan: null,
+      scan: {
+        id: historyId,
+        cursor: 'export:chunk-2',
+        waitingForExport: true,
+        pages: 0,
+      },
+      backfillCompletedAt: null,
+    });
+    const resumed = (await store.claim(tenant, tokens.resume, 60_000))!;
+    await store.commitPage(tenant, resumed.id, tokens.resume, {
+      ...empty,
+      nextCursor: null,
+      complete: { nextDueAt },
+    });
+    expect(
+      (await store.streams(tenant)).find((item) => item.id === resumed.id),
+    ).toMatchObject({
+      phase: 'incremental',
+      scan: null,
+      backfillCompletedAt: empty.now,
+    });
+  });
+
+  it('runs a hinted live scan between history pages and resumes the history cursor', async () => {
+    source.set(shop, 'orders.read', [
+      order(shop, '1'),
+      order(shop, '2'),
+      order(shop, '3'),
+    ]);
+    let hinted = false;
+    source.onRead(async (request) => {
+      if (
+        request.connectionId !== shop ||
+        request.capability !== 'orders.read' ||
+        hinted
+      )
+        return;
+      hinted = true;
+      source.set(shop, 'orders.read', [
+        order(shop, '1'),
+        order(shop, '2'),
+        order(shop, '3'),
+        order(shop, '4', {
+          placed: new Date().toISOString(),
+          updated: new Date().toISOString(),
+        }),
+      ]);
+      await owner.query(
+        "UPDATE commerce_sync_streams SET hint_at=now()-interval '1 second' WHERE tenant_id=$1 AND connection_id=$2 AND record_type='orders'",
+        [tenant, shop],
+      );
+    });
+    await drain();
+    const requests = source.requests.filter(
+      (request) =>
+        request.connectionId === shop && request.capability === 'orders.read',
+    );
+    expect(
+      requests.map((request) =>
+        request.updatedSince ? 'live' : (request.cursor ?? 'start'),
+      ),
+    ).toEqual(['start', 'live', '2']);
+    expect(await stream('orders')).toMatchObject({
+      phase: 'incremental',
+      scan: null,
+    });
+    expect(
+      (await service.overview(context())).connections.find(
+        (item) => item.connectionId === shop,
+      )?.recordTypes[0]?.stream?.records,
+    ).toMatchObject({ current: 4, missing: 0 });
+  });
+
+  it('reads the recent order window before older records without falsely finishing history', async () => {
+    source.recentHistory();
+    const recent = new Date(Date.now() - 86400_000).toISOString();
+    source.set(shop, 'orders.read', [
+      order(shop, 'old'),
+      order(shop, 'recent', { placed: recent }),
+    ]);
+    await drain();
+    const requests = source.requests.filter(
+      (request) =>
+        request.connectionId === shop && request.capability === 'orders.read',
+    );
+    expect(requests[0]?.createdSince).toBeDefined();
+    expect(requests[1]?.createdSince).toBeUndefined();
+    const completed = (await createSyncStore(db).streams(tenant)).find(
+      (item) => item.recordType === 'orders' && item.connectionId === shop,
+    )!;
+    expect(completed.recentHistoryCompletedAt).not.toBeNull();
+    expect(completed.backfillCompletedAt).not.toBeNull();
+    expect(completed.phase).toBe('incremental');
+  });
+
   it('imports history page by page, then reads only changes without duplicating records', async () => {
     source.set(shop, 'orders.read', [
       order(shop, '1', { placed: '2026-08-01T10:00:00.000Z' }),
@@ -652,6 +928,86 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
     ).toBe(2);
   });
 
+  it('rotates a hinted scan, preserves retry backoff and consumes the hint after completion', async () => {
+    const store = createSyncStore(db);
+    await store.createStreams(tenant, shop, ['orders', 'products'], 'operator');
+    await owner.query(
+      "UPDATE commerce_sync_streams SET due_at=now()-interval '2 minutes' WHERE tenant_id=$1 AND record_type='orders'",
+      [tenant],
+    );
+    const token = randomUUID();
+    const first = await store.claim(tenant, token, 60_000, {
+      connectionConcurrency: 2,
+    });
+    expect(first?.recordType).toBe('orders');
+    await store.startScan(tenant, first!.id, token, {
+      id: randomUUID(),
+      plan: { kind: 'backfill', since: null, trigger: 'connection' },
+      fullScan: true,
+      now: new Date(Date.now() - 120_000).toISOString(),
+    });
+    await owner.query(
+      "UPDATE commerce_sync_streams SET hint_at=now()-interval '1 minute' WHERE tenant_id=$1 AND id=$2",
+      [tenant, first!.id],
+    );
+    const empty = {
+      entries: [],
+      unchanged: [],
+      counts: { records: 0, changed: 0, unchanged: 0, pending: 0, failed: 0 },
+      total: null,
+      history: undefined,
+      now: new Date().toISOString(),
+    };
+    await store.commitPage(tenant, first!.id, token, {
+      ...empty,
+      nextCursor: 'next',
+      complete: null,
+    });
+    const other = await store.claim(tenant, randomUUID(), 60_000, {
+      connectionConcurrency: 2,
+    });
+    expect(other?.recordType).toBe('products');
+    const retryToken = randomUUID();
+    expect(
+      (
+        await store.claim(tenant, retryToken, 60_000, {
+          connectionConcurrency: 2,
+        })
+      )?.id,
+    ).toBe(first!.id);
+    await store.failPage(tenant, first!.id, retryToken, {
+      code: 'transient',
+      message: 'Try again',
+      dueAt: new Date(Date.now() + 60_000).toISOString(),
+      restart: false,
+      block: null,
+    });
+    expect(
+      await store.claim(tenant, randomUUID(), 60_000, {
+        connectionConcurrency: 2,
+      }),
+    ).toBeNull();
+    await owner.query(
+      'UPDATE commerce_sync_streams SET due_at=now() WHERE tenant_id=$1 AND id=$2',
+      [tenant, first!.id],
+    );
+    const finishToken = randomUUID();
+    await store.claim(tenant, finishToken, 60_000, {
+      connectionConcurrency: 2,
+    });
+    await store.commitPage(tenant, first!.id, finishToken, {
+      ...empty,
+      nextCursor: null,
+      complete: { nextDueAt: new Date(Date.now() + 60_000).toISOString() },
+    });
+    const hinted = await store.claim(tenant, randomUUID(), 60_000, {
+      connectionConcurrency: 2,
+    });
+    expect(hinted?.id).toBe(first!.id);
+    expect(hinted?.scan).toBeNull();
+    expect(hinted?.hintAt).not.toBeNull();
+  });
+
   it('schedules a change read from a verified notification', async () => {
     source.set(shop, 'orders.read', [order(shop, '1')]);
     await drain();
@@ -775,6 +1131,26 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
         )
       ).rows[0].count,
     ).toBe('1');
+
+    runner = createSyncRunner({
+      store: createSyncStore(db),
+      reader: source.reader,
+      ingestion: services.ingestion,
+      customers: createCustomerProfiles(db),
+      recordRead: createReadChecks(db),
+      resolveContext: async (principal) => context(principal),
+      digest: (value) => createHash('sha256').update(value).digest('hex'),
+      connectionConcurrency: 2,
+      workspaceConcurrency: 4,
+    });
+    for (const item of (await createSyncStore(db).streams(tenant)).filter(
+      (item) => ['products', 'inventory'].includes(item.recordType),
+    ))
+      await service.command(context(), item.id, 'reimport');
+    await drain();
+    expect(await skuOf(shop)).toBe(shopSku);
+    expect(await skuOf(erp)).toBe(shopSku);
+    expect(await positionSkus()).toEqual([shopSku, shopSku]);
 
     await service.requestLink(context(), {
       operation: 'unlink',

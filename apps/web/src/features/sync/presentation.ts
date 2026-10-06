@@ -132,7 +132,16 @@ export function streamState(stream: SyncStreamView): {
     case 'waiting':
       return { state: 'waiting', label: 'Waiting for orders' };
     case 'importing':
-      return { state: 'running', label: 'Importing history' };
+      return {
+        state: 'running',
+        label: stream.scan?.waitingForExport
+          ? 'Preparing history'
+          : stream.scan?.createdSince
+            ? 'Importing recent history'
+            : stream.coverage.recentCompletedAt && stream.coverage.recentFrom
+              ? 'Importing older history'
+              : 'Importing history',
+      };
     case 'syncing':
       return {
         state: 'running',
@@ -154,6 +163,8 @@ export function scanProgress(type: SyncRecordType, stream: SyncStreamView) {
   const scan = stream.scan;
   if (!scan) return null;
   const total = scan.total;
+  if (scan.waitingForExport)
+    return { value: null, text: 'The source is preparing an export' };
 
   return {
     value: total
@@ -180,6 +191,22 @@ export function coverageStatement(
 ): { text: string; limited: boolean } {
   const noun = recordTypes[type].noun;
   const verb = dated[type];
+  if (
+    stream.phase === 'backfill' &&
+    stream.coverage.recentCompletedAt &&
+    stream.coverage.recentFrom
+  ) {
+    const from =
+      stream.coverage.historyFrom &&
+      stream.coverage.historyFrom > stream.coverage.recentFrom
+        ? stream.coverage.historyFrom
+        : stream.coverage.recentFrom;
+
+    return {
+      text: `${noun[0]!.toUpperCase()}${noun.slice(1)} since ${day(from)} ${stream.records.failed || stream.records.pending ? 'read; some records need attention' : 'imported'}. Older history ${stream.paused ? 'paused' : stream.error || stream.blocked ? 'is incomplete' : 'continues in the background'}.`,
+      limited: !!stream.coverage.historyFrom,
+    };
+  }
   if (stream.phase === 'backfill')
     return {
       text: stream.records.total
@@ -245,11 +272,23 @@ export function overallState(overview: SyncOverview): {
       detail: 'Records that already arrived stay available while Luma waits.',
     };
   const importing = streams.filter((stream) => stream.phase === 'backfill');
+  if (importing.length && importing.every((stream) => stream.paused))
+    return {
+      state: 'idle',
+      title: 'History import paused',
+      detail:
+        'Records already imported stay available. Resume a sync to continue importing history.',
+    };
   if (importing.length)
     return {
       state: 'running',
       title: 'Importing history',
-      detail: `${streams.length - importing.length} of ${streams.length} ${streams.length === 1 ? 'record type' : 'record types'} imported. You can use Luma while this runs.`,
+      detail: importing.some(
+        (stream) =>
+          stream.coverage.recentCompletedAt && stream.coverage.recentFrom,
+      )
+        ? 'Recent records are available. Older history continues in the background while Luma reads new changes.'
+        : `${streams.length - importing.length} of ${streams.length} ${streams.length === 1 ? 'record type' : 'record types'} imported. You can use Luma while this runs.`,
     };
   const retrying = streams.filter((s) => s.status === 'retrying').length;
   if (retrying)

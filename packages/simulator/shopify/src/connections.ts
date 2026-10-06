@@ -97,6 +97,22 @@ export async function connection<T>(
   query: ConnectionQuery,
   options: ConnectionOptions<T> = {},
 ) {
+  if (context.bulk) {
+    const records = await all<T>(
+      context.shop,
+      indexed(context, query, options.search),
+    );
+    const nodes = options.match ? records.filter(options.match) : records;
+
+    return {
+      nodes,
+      edges: nodes.map((node) => ({
+        node,
+        cursor: wrap(encodeCursor(node, query.order ?? 'created')),
+      })),
+      pageInfo: { hasNextPage: false, endCursor: null },
+    };
+  }
   const first = int(args, 'first');
   const last = int(args, 'last');
   if (first === null && last === null)
@@ -152,6 +168,10 @@ export async function connection<T>(
 
   return {
     nodes: items,
+    edges: items.map((node) => ({
+      node,
+      cursor: wrap(encodeCursor(node, order)),
+    })),
     pageInfo: {
       hasNextPage: backwards ? cursor !== null : more,
       endCursor: end ? wrap(encodeCursor(end, order)) : null,

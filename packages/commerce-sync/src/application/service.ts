@@ -50,6 +50,16 @@ function streamView(
   waitingOnOrders: boolean,
 ): SyncStreamView {
   const window = historyWindow(stream);
+  const due =
+    [stream.dueAt, ...(stream.scan ? [] : [stream.hintAt])]
+      .filter((value): value is string => value !== null)
+      .sort()[0] ?? null;
+  const nextRunAt =
+    due &&
+    stream.providerDueAt &&
+    Date.parse(stream.providerDueAt) > Date.parse(due)
+      ? stream.providerDueAt
+      : due;
 
   return {
     id: stream.id,
@@ -62,6 +72,8 @@ function streamView(
           kind: stream.scan.kind,
           startedAt: stream.scan.startedAt,
           since: stream.scan.since,
+          createdSince: stream.scan.createdSince ?? null,
+          waitingForExport: stream.scan.waitingForExport ?? false,
           pages: stream.scan.pages,
           records: stream.scan.records,
           total: stream.scan.total,
@@ -81,18 +93,15 @@ function streamView(
       historyFrom: window.from,
       historyRequirement: window.requirement,
       olderHistoryAvailable: window.olderHistoryAvailable,
+      recentFrom: stream.recentHistoryFrom ?? null,
+      recentCompletedAt: stream.recentHistoryCompletedAt ?? null,
     },
     lastSuccessAt: stream.lastSuccessAt,
     lastCompleteAt: stream.lastCompleteAt,
     lastFullScanAt: stream.lastFullScanAt,
     backfillStartedAt: stream.backfillStartedAt,
     backfillCompletedAt: stream.backfillCompletedAt,
-    nextRunAt:
-      stream.paused || stream.blocked
-        ? null
-        : ([stream.dueAt, stream.hintAt]
-            .filter((value): value is string => value !== null)
-            .sort()[0] ?? null),
+    nextRunAt: stream.paused || stream.blocked ? null : nextRunAt,
     error: stream.error ? { ...stream.error, attempts: stream.attempts } : null,
   };
 }
@@ -149,7 +158,9 @@ export function createSyncService(deps: SyncServiceDependencies) {
           );
           const ordersImporting = streams.some(
             (stream) =>
-              stream.recordType === 'orders' && stream.phase === 'backfill',
+              stream.recordType === 'orders' &&
+              stream.phase === 'backfill' &&
+              !stream.recentHistoryCompletedAt,
           );
 
           return {
@@ -187,6 +198,7 @@ export function createSyncService(deps: SyncServiceDependencies) {
         kind: run.kind,
         trigger: run.trigger,
         since: run.since,
+        createdSince: run.createdSince ?? null,
         fullScan: run.fullScan,
         startedAt: run.startedAt,
         finishedAt: run.finishedAt,

@@ -12,6 +12,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ShopifyConnectorOptions } from './adapter.js';
 import { createShopifyConnector } from './adapter.js';
 import commerce from './fixtures/commerce.json' with { type: 'json' };
+import { returnNode } from './schemas.js';
 import { mapShopifyWebhook } from './webhooks.js';
 
 // Reads repeat after transient failures; tests skip the waits.
@@ -42,7 +43,10 @@ const page = (nodes: unknown[], cursor: string | null = null) => ({
 const response = (data: unknown) => Response.json({ data });
 
 function fixture(overrides: Partial<ShopifyConnectorOptions> = {}) {
-  const data = structuredClone(commerce);
+  const data = {
+    ...structuredClone(commerce),
+    returns: commerce.returns.map((item) => returnNode.parse(item)),
+  };
   const fetch = vi.fn<typeof globalThis.fetch>(async (_url, init) => {
     const { query, variables } = JSON.parse(String(init?.body)) as {
       query: string;
@@ -57,29 +61,49 @@ function fixture(overrides: Partial<ShopifyConnectorOptions> = {}) {
       });
     if (query.includes('LumaCustomers'))
       return response({ page: page(data.customers) });
-    if (query.includes('LumaPage') && query.includes('returns(first: 1)'))
+    if (query.includes('LumaPage')) {
+      const order = {
+        ...data.order,
+        lineItems: page(data.orderLines),
+        fulfillmentOrders: page(
+          data.work.map((item) => ({
+            ...item,
+            lineItems: page(data.workLines),
+          })),
+        ),
+        fulfillments: data.shipments.map((item) => ({
+          ...item,
+          fulfillmentLineItems: page(data.shipmentLines),
+        })),
+        returns: page(
+          data.returns.map((item) => ({
+            ...item,
+            returnLineItems: page(data.returnLines),
+            reverseFulfillmentOrders: page(
+              data.reverseOrders.map((reverse) => ({
+                ...reverse,
+                lineItems: page(data.reverseLines),
+              })),
+            ),
+          })),
+        ),
+        refunds: data.refunds.map((item) => ({
+          ...item,
+          refundLineItems: page(data.refundLines),
+          transactions: page(data.refundTransactions),
+        })),
+      };
+
       return response({
         page: page([
-          {
-            id: data.order.id,
-            returns: { nodes: data.returns.map(({ id }) => ({ id })) },
-            refunds: data.refunds.map(({ id }) => ({ id })),
-          },
-          { id: 'gid://shopify/Order/2', returns: { nodes: [] }, refunds: [] },
+          query.includes('products(')
+            ? { ...data.product, variants: page(data.variants) }
+            : query.includes('inventoryItems(')
+              ? { ...data.inventoryItem, inventoryLevels: page(data.levels) }
+              : order,
         ]),
       });
-    if (query.includes('LumaPage'))
-      return response({
-        page: page([
-          {
-            id: query.includes('products(')
-              ? data.product.id
-              : query.includes('inventoryItems(')
-                ? data.inventoryItem.id
-                : data.order.id,
-          },
-        ]),
-      });
+    }
     if (query.includes('children:')) {
       const nodes = query.includes('children: returns(')
         ? data.returns
@@ -350,6 +374,15 @@ describe('Shopify read capabilities', () => {
     const fallback = f.fetch.getMockImplementation()!;
     f.fetch.mockImplementation(async (url, init) => {
       const { query, variables } = JSON.parse(String(init?.body));
+      if (query.includes('LumaPage'))
+        return response({
+          page: page([
+            {
+              ...commerce.order,
+              lineItems: page([commerce.orderLines[0]], 'line-page-2'),
+            },
+          ]),
+        });
       if (query.includes('children: lineItems'))
         return response({
           node: {
@@ -363,8 +396,8 @@ describe('Shopify read capabilities', () => {
     });
     const result = await f.read('orders.read');
     expect(result.ok && result.value.items[0]?.data.lines).toHaveLength(2);
-    // Scan start, root page, order node and two line pages.
-    expect(f.fetch).toHaveBeenCalledTimes(5);
+    // Scan start, nested root page and one overflow page.
+    expect(f.fetch).toHaveBeenCalledTimes(3);
   });
   it('binds pagination to the tenant, connection, capability and filters', async () => {
     const f = fixture();
@@ -555,7 +588,7 @@ describe('Shopify read capabilities', () => {
     const f = fixture();
     const fallback = f.fetch.getMockImplementation()!;
     f.fetch.mockImplementation(async (url, init) =>
-      String(init?.body).includes('children: lineItems')
+      String(init?.body).includes('LumaPage')
         ? Response.json({
             errors: [
               { message: 'secret', extensions: { code: 'ACCESS_DENIED' } },
@@ -579,9 +612,13 @@ describe('Shopify read capabilities', () => {
     const g = fixture();
     const fallback = g.fetch.getMockImplementation()!;
     g.fetch.mockImplementation(async (url, init) =>
-      String(init?.body).includes('children:')
-        ? response({ node: { children: page([], 'same') } })
-        : fallback(url, init),
+      String(init?.body).includes('LumaPage')
+        ? response({
+            page: page([{ ...commerce.order, lineItems: page([], 'same') }]),
+          })
+        : String(init?.body).includes('children:')
+          ? response({ node: { children: page([], 'same') } })
+          : fallback(url, init),
     );
     expect(await g.read('orders.read')).toMatchObject({
       ok: false,
@@ -914,29 +951,16 @@ describe('Shopify returns and refunds', () => {
 
   it('maps declined returns and unknown statuses without guessing', async () => {
     const f = fixture();
-    const fallback = f.fetch.getMockImplementation()!;
-    const [returned] = commerce.returns;
-    f.fetch.mockImplementation(async (url, init) => {
-      const { query } = JSON.parse(String(init?.body));
-      if (query.includes('children: returns('))
-        return response({
-          node: {
-            children: page([
-              {
-                ...returned,
-                status: 'DECLINED',
-                decline: { reason: 'FINAL_SALE' },
-                closedAt: '2026-09-19T00:00:00Z',
-              },
-              { ...returned, id: 'gid://shopify/Return/90', status: 'NEW' },
-            ]),
-          },
-        });
-      if (query.includes('refunds {'))
-        return response({ node: { refunds: [] } });
-
-      return fallback(url, init);
+    const returned = f.data.returns[0]!;
+    returned.status = 'DECLINED';
+    returned.decline = { reason: 'FINAL_SALE' };
+    returned.closedAt = '2026-09-19T00:00:00Z';
+    f.data.returns.push({
+      ...returned,
+      id: 'gid://shopify/Return/90',
+      status: 'NEW',
     });
+    f.data.refunds.splice(0);
     const result = await f.read('returns.read');
     expect(
       result.ok && result.value.items.map((item) => item.data),
@@ -975,7 +999,7 @@ describe('Shopify history import reads', () => {
       (await f.runtime.discover(context, 'connection-a')).find(
         (item) => item.capability === 'inventory.read',
       )?.filters,
-    ).toBeUndefined();
+    ).toEqual(['historyImport']);
 
     f.data.scopes.push({ handle: 'read_all_orders' });
     const full = await f.read('orders.read');
@@ -1066,7 +1090,7 @@ describe('Shopify query contract', () => {
           (JSON.parse(String(init?.body)) as { query: string }).query,
       ),
     );
-    expect(operations.size).toBe(29);
+    expect(operations.size).toBe(14);
     for (const query of operations) {
       expect(
         validate(schema, parse(query)).map((error) => error.message),

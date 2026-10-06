@@ -327,3 +327,39 @@ export const attention: SyncOverview = {
     },
   ],
 };
+
+/** Recent records available while Shopify prepares its older-history export. */
+export const recentHistory: SyncOverview = {
+  ...current,
+  connections: current.connections.map((connection) => ({
+    ...connection,
+    recordTypes: connection.recordTypes.map((item) =>
+      item.recordType === 'orders' && item.stream
+        ? {
+            ...item,
+            stream: {
+              ...item.stream,
+              status: 'importing',
+              phase: 'backfill',
+              backfillCompletedAt: null,
+              coverage: {
+                ...item.stream.coverage,
+                recentFrom: '2026-08-30T09:00:00.000Z',
+                recentCompletedAt: '2026-09-29T08:59:00.000Z',
+              },
+              scan: {
+                kind: 'backfill',
+                startedAt: '2026-09-29T08:59:00.000Z',
+                since: null,
+                createdSince: null,
+                waitingForExport: true,
+                pages: 0,
+                records: 0,
+                total: null,
+              },
+            },
+          }
+        : item,
+    ),
+  })),
+};

@@ -231,7 +231,7 @@ export function createShopifyRecordReader(
       let after: string | null = null;
       const seen = new Set<string>();
       do {
-        const data = await request(
+        const data: Record<string, unknown> = await request(
           `query LumaRecordChildren($id: ID!, $after: String) { node(id: $id) { ... on ${kind} { children: ${field}(first: 100, after: $after) { nodes { ${fields} } pageInfo { hasNextPage endCursor } } } } }`,
           { id, after },
         );

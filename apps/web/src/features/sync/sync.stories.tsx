@@ -11,10 +11,17 @@ import { expect, within } from 'storybook/test';
 
 import appStyles from '../../styles.css?inline';
 import { SyncView } from './page';
-import { attention, current, importing, organizationId } from './sync-fixtures';
+import {
+  attention,
+  current,
+  importing,
+  organizationId,
+  recentHistory,
+} from './sync-fixtures';
 
 const overviews: Record<string, SyncOverview | undefined> = {
   importing,
+  recentHistory,
   current,
   attention,
   empty: { ...importing, connections: [], runs: [] },
@@ -126,3 +133,27 @@ export const NoConnections: Story = { args: { state: 'empty' } };
 export const Loading: Story = { args: { state: 'loading' } };
 
 export const LoadFailed: Story = { args: { state: 'error' } };
+
+export const RecentHistoryAvailable: Story = {
+  args: { state: 'recentHistory' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByText('Recent history imported'),
+    ).toBeVisible();
+    await expect(canvas.getByText('Preparing history')).toBeVisible();
+    await expect(
+      canvas.getByText('The source is preparing an export'),
+    ).toBeVisible();
+    await expect(
+      canvas.getByText(
+        /^Orders since.*Older history continues in the background/,
+      ),
+    ).toBeVisible();
+  },
+};
+
+export const RecentHistoryDark: Story = {
+  args: { state: 'recentHistory' },
+  globals: { theme: 'dark' },
+};

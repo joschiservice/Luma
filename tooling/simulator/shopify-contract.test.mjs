@@ -23,7 +23,10 @@ import {
 
 import { createFulfillmentProvider } from '../../packages/apps/shopify/dist/infrastructure/fulfillment-recovery-provider.js';
 import { createInventoryCorrectionProvider } from '../../packages/apps/shopify/dist/infrastructure/inventory-correction-provider.js';
-import { createClient } from '../../packages/connectors/shopify/dist/index.js';
+import {
+  createClient,
+  createReadBudget,
+} from '../../packages/connectors/shopify/dist/index.js';
 
 const tenantId = '00000000-0000-4000-8000-000000000001';
 const connectionId = '00000000-0000-4000-8000-000000000002';
@@ -120,21 +123,23 @@ const tracking = (number) => ({
  * Creates a simulated shop behind a fetch transport that applies Shopify's rate limit as the
  * simulator host does: admission by requested cost, then a refund down to the actual cost.
  */
-function createShop() {
+function createShop(clock = Date.now) {
   const store = createMemoryStore();
-  const bucket = { available: rateLimit.capacity, at: Date.now() };
+  const bucket = { available: rateLimit.capacity, at: clock() };
   const shop = {
     store,
     bucket,
     /** Applies an incompatible API change to successful responses. */
     drift: false,
+    throttles: 0,
+    maxCost: 0,
     events: [],
     now: Date.now() - 3_600_000,
     context() {
       return {
         store,
         now: shop.now,
-        wallTime: Date.now(),
+        wallTime: clock(),
         instance: 'shopify',
         config,
         indexLagMs: 0,
@@ -148,8 +153,12 @@ function createShop() {
     },
     fetch: createTransport(async (request) => {
       const cost = rateLimit.cost(request);
-      if (!charge(rateLimit, bucket, cost, Date.now()))
+      shop.maxCost = Math.max(shop.maxCost, cost);
+      if (!charge(rateLimit, bucket, cost, clock())) {
+        shop.throttles++;
+
         return rateLimit.reject(cost, bucket.available);
+      }
 
       const handled = await shopify.handle(shop.context(), request);
       const response = shop.drift ? shopify.drift(handled) : handled;
@@ -275,7 +284,7 @@ async function seed(shop) {
 }
 
 /** Composes the real Shopify connector and returns its capability runtime's page reads. */
-function pages(shop) {
+function pages(shop, options = {}) {
   const connector = createShopifyConnector({
     tenantId,
     connectionId,
@@ -283,6 +292,7 @@ function pages(shop) {
     accessToken: async () => 'synthetic',
     fetch: shop.fetch,
     customerAccess: { contact: true, address: true },
+    ...options,
     recordObservations: async () => {},
   });
   const runtime = createCapabilityRuntime({
@@ -942,4 +952,289 @@ test('record explorer reads every record kind with available sections', async ()
       .Refunded,
     '0.0 EUR',
   );
+});
+
+const normalized = (items) =>
+  items.map(({ source, kind, sourceUpdatedAt, sourceRevision, data }) => ({
+    source,
+    kind,
+    sourceUpdatedAt,
+    sourceRevision,
+    data,
+  }));
+
+/** Makes a synthetic asynchronous export ready without waiting on wall-clock time. */
+async function completeExports(shop, status = 'RUNNING') {
+  const records = await shop.store.page({ kind: 'BulkOperation', limit: 100 });
+  for (const record of records.items)
+    await shop.store.put('BulkOperation', record.id, {
+      ...record.data,
+      readyAt: 0,
+      status,
+    });
+}
+
+test('bulk history resumes export and JSONL chunks after restart with identical observations', async () => {
+  const shop = createShop();
+  await seed(shop);
+  for (const capability of [
+    'orders.read',
+    'products.read',
+    'inventory.read',
+    'customers.read',
+  ]) {
+    const paged = await reads(shop)(capability);
+    const key = crypto.randomUUID();
+    let result = await pages(shop)(capability, {
+      limit: 1,
+      historyImport: { key },
+    });
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.equal(result.value.deferred, true);
+    assert.ok(result.value.nextCursor);
+    await completeExports(shop);
+    const imported = [];
+    let cursor = result.value.nextCursor;
+    const initialCursor = cursor;
+    do {
+      // A fresh connector is composed every time, as after a worker restart.
+      result = await pages(shop)(capability, {
+        limit: 1,
+        cursor,
+        historyImport: { key },
+      });
+      assert.equal(result.ok, true, JSON.stringify(result));
+      assert.equal(result.value.deferred, undefined);
+      imported.push(...result.value.items);
+      cursor = result.value.nextCursor;
+    } while (cursor);
+    assert.deepEqual(normalized(imported), normalized(paged.items));
+    const replay = await pages(shop)(capability, {
+      limit: 1,
+      cursor: initialCursor,
+      historyImport: { key },
+    });
+    assert.equal(replay.ok, true);
+    assert.deepEqual(
+      normalized(replay.value.items),
+      normalized(imported.slice(0, replay.value.items.length)),
+    );
+    assert.equal(
+      (
+        await shop.store.page({ kind: 'BulkOperation', limit: 100 })
+      ).items.filter((item) => item.data.query.includes(key)).length,
+      0,
+    );
+  }
+  assert.equal(
+    (await shop.store.page({ kind: 'BulkOperation', limit: 100 })).items.length,
+    4,
+  );
+});
+
+test('bulk history recovers a lost start response without a second export', async () => {
+  const shop = createShop();
+  await seed(shop);
+  const original = shop.fetch;
+  let lost = false;
+  shop.fetch = async (url, init) => {
+    const response = await original(url, init);
+    if (!lost && String(init?.body).includes('LumaBulkStart')) {
+      lost = true;
+      throw new TypeError('Response lost');
+    }
+
+    return response;
+  };
+  const input = { limit: 2, historyImport: { key: crypto.randomUUID() } };
+  const failed = await pages(shop)('products.read', input);
+  assert.equal(failed.ok, false);
+  const resumed = await pages(shop)('products.read', input);
+  assert.equal(resumed.ok, true, JSON.stringify(resumed));
+  assert.equal(resumed.value.deferred, true);
+  assert.equal(
+    (await shop.store.page({ kind: 'BulkOperation', limit: 100 })).items.length,
+    1,
+  );
+});
+
+test('failed, partial and truncated bulk exports never finish history', async () => {
+  const shop = createShop();
+  await seed(shop);
+  const input = { limit: 25, historyImport: { key: crypto.randomUUID() } };
+  const first = await pages(shop)('orders.read', input);
+  assert.equal(first.ok, true);
+  await completeExports(shop, 'FAILED');
+  const failed = await pages(shop)('orders.read', {
+    ...input,
+    cursor: first.value.nextCursor,
+  });
+  assert.equal(failed.ok, false);
+  assert.equal(failed.error.code, 'export_unavailable');
+  const records = await shop.store.page({ kind: 'BulkOperation', limit: 100 });
+  const record = records.items[0];
+  await shop.store.put('BulkOperation', record.id, {
+    ...record.data,
+    status: 'COMPLETED',
+    file: record.data.file.split('\n').slice(0, 2).join('\n'),
+  });
+  const partial = await pages(shop)('orders.read', {
+    ...input,
+    cursor: first.value.nextCursor,
+  });
+  assert.equal(partial.ok, false);
+});
+
+test('shared pacing admits nested pages within the requested budget without throttling', async () => {
+  let time = Date.now();
+  const shop = createShop(() => time);
+  await shop.run({
+    kind: 'seed-catalog',
+    products: Array.from({ length: 500 }, (_, i) => ({
+      ...catalog[0],
+      id: String(i + 100),
+      variants: [{ ...catalog[0].variants[0], id: String(i + 100) }],
+    })),
+  });
+  const budget = createReadBudget({
+    now: () => time,
+    sleep: async (ms) => {
+      time += ms;
+    },
+  });
+  const page = pages(shop, { budget });
+  const started = time;
+  let cursor;
+  let records = 0;
+  do {
+    const result = await page('products.read', {
+      limit: 25,
+      ...(cursor ? { cursor } : {}),
+    });
+    assert.equal(result.ok, true, JSON.stringify(result));
+    records += result.value.items.length;
+    cursor = result.value.nextCursor;
+  } while (cursor);
+  assert.equal(records, 500);
+  assert.equal(shop.throttles, 0);
+  assert.ok(shop.maxCost <= 1000);
+  assert.ok(
+    time - started > 15_000 && time - started < 25_000,
+    `Budget pacing took ${time - started} ms`,
+  );
+});
+
+test('nested overflow imports every variant and every order, shipment, return and refund line', async () => {
+  const shop = createShop();
+  const product = {
+    ...catalog[0],
+    id: '100',
+    variants: Array.from({ length: 12 }, (_, i) => ({
+      ...catalog[0].variants[0],
+      id: String(i + 100),
+    })),
+  };
+  await shop.run({ kind: 'seed-catalog', products: [product] });
+  const order = await shop.run({
+    kind: 'order',
+    lines: product.variants.map((variant) => ({
+      variant: variant.id,
+      quantity: 2,
+      price: '24.00',
+    })),
+    location: '1',
+    shipping: 'standard',
+    financialStatus: 'PAID',
+  });
+  await shop.run({ kind: 'fulfill', order: order.id, ...tracking('OVERFLOW') });
+  await shop.run({
+    kind: 'return',
+    order: order.id,
+    lines: order.lines.map((line) => ({ lineItem: line.id, quantity: 1 })),
+    reason: 'Synthetic',
+  });
+  await shop.run({ kind: 'return-approve', order: order.id });
+  await shop.run({ kind: 'return-receive', order: order.id });
+  await shop.run({ kind: 'refund', order: order.id, outcome: 'success' });
+  const read = reads(shop);
+  const orders = await read('orders.read');
+  assert.equal(orders.items[0].data.lines.length, 12);
+  const products = await read('products.read');
+  assert.equal(products.items[0].data.skus.length, 12);
+  const fulfillments = await read('fulfillment.read');
+  assert.ok(fulfillments.items.length >= 2);
+  assert.ok(fulfillments.items.every((item) => item.data.lines.length === 12));
+  const returns = await read('returns.read');
+  assert.equal(
+    returns.items.find((item) => item.data.type === 'return').data.lines.length,
+    12,
+  );
+  assert.equal(
+    returns.items.find((item) => item.data.type === 'refund').data.lines.length,
+    12,
+  );
+  assert.ok(shop.maxCost <= 1000);
+});
+
+test('bulk history queues at five active queries and excludes unapproved customer fields', async () => {
+  const shop = createShop();
+  await seed(shop);
+  for (let i = 0; i < 5; i++)
+    await shop.store.put('BulkOperation', String(i + 100), {
+      query: `{ operation_${i}: products { edges { node { id } } } }`,
+      status: 'RUNNING',
+      readyAt: Date.now() + 60000,
+      file: '',
+      rootObjectCount: '0',
+    });
+  const input = { limit: 25, historyImport: { key: crypto.randomUUID() } };
+  const queued = await pages(shop)('customers.read', input);
+  assert.equal(queued.ok, true, JSON.stringify(queued));
+  assert.equal(queued.value.deferred, true);
+  assert.equal(queued.value.nextCursor, null);
+  assert.equal(
+    (await shop.store.page({ kind: 'BulkOperation', limit: 100 })).items.length,
+    5,
+  );
+  await completeExports(shop);
+  const page = pages(shop, {
+    customerAccess: { contact: false, address: false },
+  });
+  const started = await page('customers.read', input);
+  assert.equal(started.ok, true, JSON.stringify(started));
+  await completeExports(shop);
+  const done = await page('customers.read', {
+    ...input,
+    cursor: started.value.nextCursor,
+  });
+  assert.equal(done.ok, true, JSON.stringify(done));
+  assert.ok(
+    done.value.items.every(
+      (item) =>
+        item.data.email === null &&
+        item.data.phone === null &&
+        item.data.address === null,
+    ),
+  );
+  const operations = (
+    await shop.store.page({ kind: 'BulkOperation', limit: 100 })
+  ).items;
+  const customer = operations.find((item) =>
+    item.data.query.includes('customers'),
+  );
+  assert.ok(
+    !/defaultEmailAddress|defaultPhoneNumber|defaultAddress|displayName/.test(
+      customer.data.query,
+    ),
+  );
+  await shop.store.put('BulkOperation', customer.id, {
+    ...customer.data,
+    status: 'EXPIRED',
+  });
+  const expired = await page('customers.read', {
+    ...input,
+    cursor: started.value.nextCursor,
+  });
+  assert.equal(expired.ok, false);
+  assert.equal(expired.error.code, 'export_unavailable');
 });

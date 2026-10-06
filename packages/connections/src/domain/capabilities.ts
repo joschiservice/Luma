@@ -54,6 +54,10 @@ export interface PageQuery {
    * Send it only to handlers whose descriptor lists `updatedSince`; others reject it.
    */
   updatedSince?: string;
+  /** Creation window; send only when the handler advertises this filter. */
+  createdSince?: string;
+  /** Stable scan identity for a resumable provider history export. */
+  historyImport?: { key: string; chunkSize?: number };
 }
 
 /**
@@ -77,6 +81,10 @@ export interface Page<T> {
   total?: number | null;
   /** Present when the source hides older records from this connection. */
   history?: HistoryLimit | null;
+  /** Export is preparing: checkpoint the cursor, but do not complete coverage. */
+  deferred?: boolean;
+  /** Provider advice before the next page, including successful budget depletion. */
+  retryAfterMs?: number;
 }
 
 export interface Quantity {

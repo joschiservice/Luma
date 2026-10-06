@@ -9,6 +9,8 @@ import {
 import { createAdminApiClient } from '@shopify/admin-api-client';
 import { z } from 'zod';
 
+import { createReadBudget, type ReadBudget } from './read-budget.js';
+
 export { fail, parse } from '@luma/connector-core/transport';
 
 export const API_VERSION = '2026-07';
@@ -21,6 +23,8 @@ export interface ShopifyTransportOptions {
   timeoutMs?: number;
   /** Repetition of queries after transient failures; defaults to three attempts. */
   readRetry?: ReadRetry;
+  /** Shared read budget for clients on the same tenant connection. */
+  budget?: ReadBudget;
 }
 
 // Only documents that are plainly queries are repeated; mutations and anything unrecognized are not.
@@ -31,13 +35,22 @@ const queryDocument = /^\s*(?:query\b|\{)/;
  * reports normalized connector failures. Queries are repeated briefly after transient
  * failures; mutations are sent once, because a failed response may follow an applied change.
  */
-export function createClient(options: ShopifyTransportOptions) {
+export function createClient(options: ShopifyTransportOptions): {
+  (
+    query: string,
+    variables: Record<string, unknown>,
+  ): Promise<Record<string, unknown>>;
+  nextReadDelay(): number;
+} {
   if (!/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(options.shop))
     fail('invalid_input');
   const timeoutMs = options.timeoutMs ?? 15000;
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 120000)
     fail('invalid_input');
   const { readRetry } = options;
+  const budget =
+    options.budget ??
+    createReadBudget(readRetry?.sleep ? { sleep: readRetry.sleep } : {});
 
   const send = async (
     query: string,
@@ -88,10 +101,9 @@ export function createClient(options: ShopifyTransportOptions) {
         if (response.status === 403) fail('permission_denied');
         if (response.status === 404) fail('not_found');
         if (response.status === 429) {
-          fail(
-            'rate_limited',
-            retryAfterMs(response.headers.get('retry-after')),
-          );
+          const advised = retryAfterMs(response.headers.get('retry-after'));
+          budget.cooldown(advised ?? 1000);
+          fail('rate_limited', advised);
         }
         if (response.status >= 500) fail('transient', 1000);
         fail('invalid_response');
@@ -138,6 +150,14 @@ export function createClient(options: ShopifyTransportOptions) {
       }),
       body,
     );
+    const cost = envelope.extensions?.cost;
+    if (cost)
+      budget.observe(
+        JSON.stringify([query, variables.first ?? null]),
+        cost.requestedQueryCost,
+        cost.throttleStatus.currentlyAvailable,
+        cost.throttleStatus.restoreRate,
+      );
     if (envelope.errors?.length) {
       const codes = envelope.errors.map((error) => error.extensions?.code);
       if (codes.includes('ACCESS_DENIED')) fail('permission_denied');
@@ -166,8 +186,17 @@ export function createClient(options: ShopifyTransportOptions) {
     return envelope.data;
   };
 
-  return (query: string, variables: Record<string, unknown>) =>
-    queryDocument.test(query)
-      ? retryRead(() => send(query, variables), readRetry)
-      : send(query, variables);
+  return Object.assign(
+    (query: string, variables: Record<string, unknown>) => {
+      const attempt = () =>
+        budget.run(JSON.stringify([query, variables.first ?? null]), () =>
+          send(query, variables),
+        );
+
+      return queryDocument.test(query)
+        ? retryRead(attempt, readRetry)
+        : attempt();
+    },
+    { nextReadDelay: () => budget.nextDelay() },
+  );
 }

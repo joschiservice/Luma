@@ -28,7 +28,10 @@ export function coverageItems(overview: SyncOverview, type: SyncRecordType) {
     let text: string;
     if (stream.phase === 'backfill') {
       const progress = scanProgress(type, stream);
-      text = `importing ${noun}${progress?.value != null ? ` (${Math.floor(progress.value)}%)` : ''}`;
+      text =
+        stream.coverage.recentCompletedAt && stream.coverage.recentFrom
+          ? `${noun} since ${day(stream.coverage.historyFrom && stream.coverage.historyFrom > stream.coverage.recentFrom ? stream.coverage.historyFrom : stream.coverage.recentFrom)} ${stream.records.failed || stream.records.pending ? 'read' : 'imported'} · older history incomplete`
+          : `importing ${noun}${progress?.value != null ? ` (${Math.floor(progress.value)}%)` : ''}`;
     } else if (stream.coverage.historyFrom)
       text = `${noun} since ${day(stream.coverage.historyFrom)}`;
     else text = `all ${noun}`;

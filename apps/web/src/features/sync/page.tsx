@@ -252,9 +252,10 @@ export function SyncView({
           <RecentRuns overview={overview} />
           <p className="sync-footnote">
             Luma never changes records in your systems while syncing. Change
-            notifications trigger a read within seconds; without them, Luma
-            checks for changes every few minutes and rereads everything once a
-            day. <a href="/docs/data-sync">How data sync works</a>
+            notifications queue a read within seconds; source limits can delay
+            it. Without them, Luma checks for changes every few minutes and
+            rereads everything once a day.{' '}
+            <a href="/docs/data-sync">How data sync works</a>
           </p>
         </>
       ) : null}
@@ -426,7 +427,9 @@ function StreamRow({
   const [confirm, setConfirm] = useState(false);
   const now = Date.parse(asOf);
   const state = streamState(stream);
-  const progress = scanProgress(type, stream);
+  const progress = ['importing', 'syncing'].includes(stream.status)
+    ? scanProgress(type, stream)
+    : null;
   const coverage = coverageStatement(type, stream);
   const noun = recordTypes[type].noun;
   const label = `${recordTypes[type].title} ${state.label.toLowerCase()}`;
@@ -447,7 +450,20 @@ function StreamRow({
           </div>
         ) : null}
       </div>
-      <p className="sync-stream-coverage">{coverage.text}</p>
+      <div className="sync-stream-coverage">
+        {stream.coverage.recentCompletedAt &&
+        stream.coverage.recentFrom &&
+        stream.phase === 'backfill' ? (
+          <span className="sync-recent-coverage">
+            <CircleCheck size={14} aria-hidden="true" />
+            Recent history{' '}
+            {stream.records.failed || stream.records.pending
+              ? 'read'
+              : 'imported'}
+          </span>
+        ) : null}
+        <p>{coverage.text}</p>
+      </div>
       <div className="sync-stream-time">
         {stream.lastSuccessAt ? (
           <span title={stream.lastSuccessAt}>
@@ -702,7 +718,10 @@ function RecentRuns({ overview }: { overview: SyncOverview }) {
             )}
             <span className="sync-run-main">
               <strong>
-                {scanKinds[run.kind]} · {recordTypes[run.recordType].title}
+                {run.createdSince
+                  ? 'Recent history import'
+                  : scanKinds[run.kind]}{' '}
+                · {recordTypes[run.recordType].title}
               </strong>
               <small>
                 {labels.get(run.connectionId) ?? 'Connection'} ·{' '}

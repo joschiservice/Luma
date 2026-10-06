@@ -33,6 +33,13 @@ type StreamRow = {
   scan_pages: number;
   scan_records: number;
   scan_total: number | null;
+  scan_created_since: Date | null;
+  scan_waiting: boolean;
+  recent_history_from: Date | null;
+  recent_history_completed_at: Date | null;
+  suspended_scan: SyncStream['scan'];
+  live_due_at: Date | null;
+  provider_due_at: Date | null;
   full_requested: boolean;
   watermark: Date | null;
   history_from: Date | null;
@@ -73,11 +80,18 @@ function stream(row: StreamRow): SyncStream {
             cursor: row.cursor,
             startedAt: row.scan_started_at.toISOString(),
             since: iso(row.scan_since),
+            createdSince: iso(row.scan_created_since),
+            waitingForExport: row.scan_waiting,
             pages: row.scan_pages,
             records: row.scan_records,
             total: row.scan_total,
           }
         : null,
+    suspendedScan: row.suspended_scan,
+    recentHistoryFrom: iso(row.recent_history_from),
+    recentHistoryCompletedAt: iso(row.recent_history_completed_at),
+    liveDueAt: iso(row.live_due_at),
+    providerDueAt: iso(row.provider_due_at),
     fullRequested: row.full_requested,
     watermark: iso(row.watermark),
     historyFrom: iso(row.history_from),
@@ -251,31 +265,86 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
         return result.rowCount ?? 0;
       });
     },
-    async claim(tenantId, token, leaseMs) {
+    async claim(tenantId, token, leaseMs, options = {}) {
       return db.transaction(tenantId, async (tx) => {
+        // Serialize admission only, not provider reads: limits hold across worker processes.
+        await tx.query(
+          'SELECT pg_advisory_xact_lock(hashtextextended($1, 51))',
+          [tenantId],
+        );
         const row = (
           await tx.query<StreamRow>(
             `WITH candidate AS (
               SELECT s.id FROM commerce_sync_streams s
               WHERE s.tenant_id=$1 AND NOT s.paused AND s.blocked IS NULL
                 AND (s.lease_until IS NULL OR s.lease_until < now())
-                AND (s.due_at <= now() OR s.hint_at <= now())
+                AND ($4::uuid IS NULL OR s.connection_id=$4)
+                AND (SELECT count(*) FROM commerce_sync_streams active WHERE active.tenant_id=s.tenant_id
+                  AND active.lease_until > now()) < $6
+                AND (s.provider_due_at IS NULL OR s.provider_due_at <= now())
+                AND (SELECT count(*) FROM commerce_sync_streams busy WHERE busy.tenant_id=s.tenant_id
+                  AND busy.connection_id=s.connection_id AND busy.lease_until > now()) < $5
+                AND (s.due_at <= now() OR (s.scan IS NULL AND s.hint_at <= now()))
                 -- Fulfillments and returns refer to orders, so their history waits for the order history.
                 AND NOT (s.record_type IN ('fulfillments','returns') AND s.phase='backfill' AND EXISTS (
                   SELECT 1 FROM commerce_sync_streams o WHERE o.tenant_id=s.tenant_id
                   AND o.connection_id=s.connection_id AND o.record_type='orders'
-                  AND o.phase='backfill' AND o.blocked IS NULL))
-              ORDER BY LEAST(s.due_at,s.hint_at) NULLS LAST,s.id
+                  AND o.phase='backfill' AND o.recent_history_completed_at IS NULL AND o.blocked IS NULL))
+              ORDER BY CASE
+                WHEN s.scan='incremental' OR (s.scan IS NULL AND s.phase='incremental' AND s.hint_at <= now())
+                  OR (s.live_enabled AND s.suspended_scan IS NULL AND s.scan IN ('backfill','reconcile')
+                    AND (s.hint_at <= now() OR s.live_due_at <= now())) THEN 0
+                WHEN s.phase='backfill' AND s.scan IS NULL AND s.backfill_started_at IS NULL AND s.record_type IN ('orders','fulfillments','returns') THEN 1
+                ELSE 2 END,
+                CASE WHEN s.scan IS NOT NULL THEN s.due_at ELSE LEAST(s.due_at,s.hint_at) END NULLS LAST,s.id
               LIMIT 1 FOR UPDATE SKIP LOCKED
             )
             UPDATE commerce_sync_streams s SET lease_token=$2,
               lease_until=now()+($3::integer*interval '1 millisecond'),updated_at=now()
             FROM candidate c WHERE s.tenant_id=$1 AND s.id=c.id RETURNING s.*`,
-            [tenantId, token, leaseMs],
+            [
+              tenantId,
+              token,
+              leaseMs,
+              options.connectionId ?? null,
+              options.connectionConcurrency ?? 1,
+              options.workspaceConcurrency ?? 4,
+            ],
           )
         ).rows[0];
 
         return row ? stream(row) : null;
+      });
+    },
+    async suspendScan(tenantId, streamId, token) {
+      return db.transaction(tenantId, async (tx) => {
+        const current = await lockStream(tx, tenantId, streamId, token);
+        if (!current) return null;
+        const checkpoint = stream(current).scan;
+        if (
+          !checkpoint ||
+          checkpoint.kind === 'incremental' ||
+          current.suspended_scan
+        )
+          return stream(current);
+        const row = (
+          await tx.query<StreamRow>(
+            `UPDATE commerce_sync_streams SET suspended_scan=$4,scan=NULL,scan_id=NULL,cursor=NULL,scan_created_since=NULL
+           WHERE tenant_id=$1 AND id=$2 AND lease_token=$3 RETURNING *`,
+            [tenantId, streamId, token, checkpoint],
+          )
+        ).rows[0]!;
+
+        return stream(row);
+      });
+    },
+    async deferConnection(tenantId, connectionId, dueAt) {
+      await db.transaction(tenantId, async (tx) => {
+        await tx.query(
+          `UPDATE commerce_sync_streams SET provider_due_at=GREATEST(provider_due_at,$3::timestamptz)
+          WHERE tenant_id=$1 AND connection_id=$2`,
+          [tenantId, connectionId, dueAt],
+        );
       });
     },
     async startScan(tenantId, streamId, token, run) {
@@ -285,7 +354,10 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
             `UPDATE commerce_sync_streams SET scan=$4,scan_id=$5,cursor=NULL,scan_started_at=$6,scan_since=$7,
               scan_pages=0,scan_records=0,scan_total=NULL,
               full_requested=CASE WHEN $8 THEN false ELSE full_requested END,
-              backfill_started_at=CASE WHEN $4='backfill' THEN $6 ELSE backfill_started_at END,
+              scan_created_since=$9,scan_waiting=false,live_enabled=$10,
+              recent_history_from=COALESCE(recent_history_from,$9::timestamptz),
+              live_due_at=COALESCE(live_due_at,$6::timestamptz+interval '5 minutes'),
+              backfill_started_at=CASE WHEN $4='backfill' THEN COALESCE(backfill_started_at,$6) ELSE backfill_started_at END,
               hint_at=CASE WHEN hint_at <= $6 THEN NULL ELSE hint_at END,updated_at=now()
             WHERE tenant_id=$1 AND id=$2 AND lease_token=$3 AND scan IS NULL RETURNING *`,
             [
@@ -297,13 +369,15 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
               run.now,
               run.plan.since,
               run.fullScan,
+              run.plan.createdSince ?? null,
+              run.liveEnabled ?? false,
             ],
           )
         ).rows[0];
         if (!row) return null;
         await tx.query(
-          `INSERT INTO commerce_sync_runs(tenant_id,id,stream_id,kind,trigger,since,full_scan,started_at,outcome)
-          VALUES($1,$2,$3,$4,$5,$6,$7,$8,'running')`,
+          `INSERT INTO commerce_sync_runs(tenant_id,id,stream_id,kind,trigger,since,full_scan,started_at,outcome,created_since)
+          VALUES($1,$2,$3,$4,$5,$6,$7,$8,'running',$9)`,
           [
             tenantId,
             run.id,
@@ -313,6 +387,7 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
             run.plan.since,
             run.fullScan,
             run.now,
+            run.plan.createdSince ?? null,
           ],
         );
 
@@ -368,6 +443,21 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
         const current = await lockStream(tx, tenantId, streamId, token);
         if (!current?.scan_id || !current.scan || !current.scan_started_at)
           return false;
+        if (page.deferred) {
+          await tx.query(
+            `UPDATE commerce_sync_streams SET cursor=$4,due_at=$5,scan_waiting=true,lease_token=NULL,lease_until=NULL
+            WHERE tenant_id=$1 AND id=$2 AND lease_token=$3`,
+            [
+              tenantId,
+              streamId,
+              token,
+              page.nextCursor,
+              page.dueAt ?? page.now,
+            ],
+          );
+
+          return true;
+        }
         const scope = [tenantId, current.connection_id, current.record_type];
         if (page.entries.length)
           await tx.query(
@@ -424,9 +514,9 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
         const firstBackfillPage =
           current.scan === 'backfill' && current.scan_pages === 0;
         await tx.query(
-          `UPDATE commerce_sync_streams SET cursor=$4,scan_pages=scan_pages+1,scan_records=scan_records+$5,
+          `UPDATE commerce_sync_streams SET cursor=$4,scan_waiting=false,scan_pages=scan_pages+1,scan_records=scan_records+$5,
             scan_total=COALESCE($6,scan_total),attempts=0,error_code=NULL,error_message=NULL,error_at=NULL,failing_since=NULL,
-            last_success_at=$7,lease_token=NULL,lease_until=NULL,due_at=$7,updated_at=now(),
+            last_success_at=$7,lease_token=NULL,lease_until=NULL,due_at=now(),updated_at=now(),
             current_history_limited=CASE WHEN $8 THEN $9 ELSE current_history_limited END,
             history_from=CASE WHEN $10 THEN $11::timestamptz ELSE history_from END,
             history_requirement=CASE WHEN $10 THEN $12 ELSE history_requirement END
@@ -447,14 +537,15 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
           ],
         );
         if (!page.complete) return true;
-        const full = current.scan_since === null;
+        const full =
+          current.scan_since === null && current.scan_created_since === null;
         let missing: number | null = null;
         if (full) {
           // Only a complete scan can show that a record is gone; it is flagged, never deleted.
           await tx.query(
             `UPDATE commerce_sync_items SET missing_since=COALESCE(missing_since,$5)
             WHERE tenant_id=$1 AND connection_id=$2 AND record_type=$3
-              AND seen_scan_id IS DISTINCT FROM $4 AND first_seen_at < $6`,
+              AND seen_scan_id IS DISTINCT FROM $4 AND last_seen_at < $6`,
             [...scope, current.scan_id, page.now, current.scan_started_at],
           );
           missing = Number(
@@ -472,11 +563,60 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
           WHERE tenant_id=$1 AND id=$2`,
           [tenantId, current.scan_id, page.now, missing],
         );
+        if (current.suspended_scan) {
+          const saved = current.suspended_scan;
+          await tx.query(
+            `UPDATE commerce_sync_streams SET scan=$4,scan_id=$5,cursor=$6,scan_started_at=$7,scan_since=$8,
+            scan_created_since=$9,scan_waiting=$16,scan_pages=$10,scan_records=$11,scan_total=$12,suspended_scan=NULL,
+            watermark=$13,last_complete_at=$14,live_due_at=$15,due_at=now() WHERE tenant_id=$1 AND id=$2 AND scan_id=$3`,
+            [
+              tenantId,
+              streamId,
+              current.scan_id,
+              saved.kind,
+              saved.id,
+              saved.cursor,
+              saved.startedAt,
+              saved.since,
+              saved.createdSince ?? null,
+              saved.pages,
+              saved.records,
+              saved.total,
+              current.scan_started_at,
+              page.now,
+              page.complete.nextDueAt,
+              saved.waitingForExport ?? false,
+            ],
+          );
+
+          return true;
+        }
+        if (current.scan === 'incremental' && current.phase === 'backfill') {
+          await tx.query(
+            `UPDATE commerce_sync_streams SET scan=NULL,scan_id=NULL,cursor=NULL,
+            watermark=GREATEST(watermark,scan_started_at),last_complete_at=$3,live_due_at=$4,due_at=now()
+            WHERE tenant_id=$1 AND id=$2`,
+            [tenantId, streamId, page.now, page.complete.nextDueAt],
+          );
+
+          return true;
+        }
+        if (current.scan_created_since) {
+          await tx.query(
+            `UPDATE commerce_sync_streams SET scan=NULL,scan_id=NULL,cursor=NULL,scan_created_since=NULL,
+            recent_history_completed_at=$3,watermark=GREATEST(watermark,scan_started_at),last_complete_at=$3,due_at=now(),
+            live_due_at=$4,version=version+1 WHERE tenant_id=$1 AND id=$2`,
+            [tenantId, streamId, page.now, page.complete.nextDueAt],
+          );
+
+          return true;
+        }
         await tx.query(
-          `UPDATE commerce_sync_streams SET scan=NULL,scan_id=NULL,cursor=NULL,phase='incremental',
-            watermark=scan_started_at,last_complete_at=$3,
+          `UPDATE commerce_sync_streams SET scan=NULL,scan_id=NULL,cursor=NULL,scan_created_since=NULL,phase='incremental',
+            watermark=GREATEST(watermark,scan_started_at),last_complete_at=$3,
             last_full_scan_at=CASE WHEN $4 THEN scan_started_at ELSE last_full_scan_at END,
             backfill_completed_at=CASE WHEN scan='backfill' THEN $3 ELSE backfill_completed_at END,
+            recent_history_completed_at=COALESCE(recent_history_completed_at,$3),live_due_at=$5,
             due_at=$5,version=version+1
           WHERE tenant_id=$1 AND id=$2`,
           [tenantId, streamId, page.now, full, page.complete.nextDueAt],
@@ -571,6 +711,7 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
               kind: SyncRun['kind'];
               trigger: SyncRun['trigger'];
               since: Date | null;
+              created_since: Date | null;
               full_scan: boolean;
               started_at: Date;
               finished_at: Date | null;
@@ -597,6 +738,7 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
             kind: row.kind,
             trigger: row.trigger,
             since: iso(row.since),
+            createdSince: iso(row.created_since),
             fullScan: row.full_scan,
             startedAt: row.started_at.toISOString(),
             finishedAt: iso(row.finished_at),
@@ -632,15 +774,18 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
             values.slice(0, 2),
           );
         else if (command.kind === 'reimport') {
-          if (current.scan_id)
+          if (current.scan_id || current.suspended_scan)
             await tx.query(
               `UPDATE commerce_sync_runs SET outcome='cancelled',finished_at=now()
-              WHERE tenant_id=$1 AND id=$2 AND outcome='running'`,
-              [tenantId, current.scan_id],
+              WHERE tenant_id=$1 AND id=ANY($2::uuid[]) AND outcome='running'`,
+              [
+                tenantId,
+                [current.scan_id, current.suspended_scan?.id].filter(Boolean),
+              ],
             );
           await tx.query(
             `UPDATE commerce_sync_streams SET phase='backfill',scan=NULL,scan_id=NULL,cursor=NULL,scan_started_at=NULL,
-              scan_since=NULL,scan_pages=0,scan_records=0,scan_total=NULL,full_requested=true,paused=false,
+              scan_since=NULL,scan_created_since=NULL,recent_history_from=NULL,recent_history_completed_at=NULL,suspended_scan=NULL,live_due_at=NULL,scan_pages=0,scan_records=0,scan_total=NULL,full_requested=true,paused=false,
               principal_id=$3,blocked=CASE WHEN blocked='principal_unavailable' THEN NULL ELSE blocked END,
               lease_token=NULL,lease_until=NULL,due_at=now(),attempts=0,error_code=NULL,error_message=NULL,
               error_at=NULL,failing_since=NULL,version=version+1,updated_at=now()

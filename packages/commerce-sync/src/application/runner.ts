@@ -73,6 +73,9 @@ export interface SyncRunnerDependencies {
   digest(value: string): string;
   /** Records requested per page; defaults to the sync policy. */
   pageSize?: number;
+  /** Maximum concurrent pages per workspace and per provider connection. */
+  workspaceConcurrency?: number;
+  connectionConcurrency?: number;
   now?: () => Date;
   id?: () => string;
   /** Receives operational failures without tenant data or provider payloads. */
@@ -202,7 +205,15 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
   /** Runs one page of the next due stream; returns false when nothing was due. */
   async function runPage(tenantId: string) {
     const token = id();
-    const claimed = await deps.store.claim(tenantId, token, syncPolicy.leaseMs);
+    const claimed = await deps.store.claim(
+      tenantId,
+      token,
+      syncPolicy.leaseMs,
+      {
+        connectionConcurrency: deps.connectionConcurrency ?? 1,
+        workspaceConcurrency: deps.workspaceConcurrency ?? 4,
+      },
+    );
     if (!claimed) return false;
     const started = now();
     const fail = (
@@ -249,13 +260,46 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
       const supportsSince =
         descriptor.filters?.includes('updatedSince') ?? false;
       let stream: SyncStream | null = claimed;
-      if (!claimed.scan) {
-        const plan = planScan(claimed, started, supportsSince);
+      const liveDue =
+        (claimed.hintAt && Date.parse(claimed.hintAt) <= +started) ||
+        (claimed.liveDueAt && Date.parse(claimed.liveDueAt) <= +started);
+      if (
+        supportsSince &&
+        claimed.scan &&
+        claimed.scan.kind !== 'incremental' &&
+        !claimed.suspendedScan &&
+        liveDue
+      )
+        stream = await deps.store.suspendScan(tenantId, claimed.id, token);
+      if (!stream) return true;
+      if (!stream.scan) {
+        const plan = stream.suspendedScan
+          ? {
+              kind: 'incremental' as const,
+              since: new Date(
+                Date.parse(stream.watermark ?? stream.suspendedScan.startedAt) -
+                  syncPolicy.overlapMs,
+              ).toISOString(),
+              trigger: claimed.hintAt
+                ? ('webhook' as const)
+                : ('schedule' as const),
+            }
+          : planScan(stream, started, supportsSince);
+        if (
+          plan.kind === 'backfill' &&
+          !stream.recentHistoryCompletedAt &&
+          ['orders', 'fulfillments', 'returns'].includes(stream.recordType) &&
+          descriptor.filters?.includes('createdSince')
+        )
+          plan.createdSince =
+            stream.recentHistoryFrom ??
+            new Date(+started - syncPolicy.recentHistoryMs).toISOString();
         stream = await deps.store.startScan(tenantId, claimed.id, token, {
           id: id(),
           plan,
-          fullScan: plan.since === null,
+          fullScan: plan.since === null && !plan.createdSince,
           now: started.toISOString(),
+          liveEnabled: supportsSince,
         });
         if (!stream?.scan) return true;
       }
@@ -268,19 +312,35 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
           limit: deps.pageSize ?? syncPolicy.pageSize,
           ...(scan.cursor ? { cursor: scan.cursor } : {}),
           ...(scan.since ? { updatedSince: scan.since } : {}),
+          ...(scan.createdSince ? { createdSince: scan.createdSince } : {}),
+          ...(scan.kind === 'backfill' &&
+          !scan.createdSince &&
+          descriptor.filters?.includes('historyImport')
+            ? { historyImport: { key: scan.id, chunkSize: 500 } }
+            : {}),
         },
       });
-      await deps
-        .recordRead(
-          tenant,
-          claimed.connectionId,
-          capability,
-          redact(capability, result),
-        )
-        .catch((error: unknown) =>
-          log('Sync read check was not recorded', error),
-        );
+      if (!result.ok || !result.value.deferred)
+        await deps
+          .recordRead(
+            tenant,
+            claimed.connectionId,
+            capability,
+            redact(capability, result),
+          )
+          .catch((error: unknown) =>
+            log('Sync read check was not recorded', error),
+          );
       if (!result.ok) {
+        if (result.error.code === 'rate_limited')
+          await deps.store.deferConnection(
+            tenantId,
+            claimed.connectionId,
+            new Date(
+              +now() +
+                retryDelayMs(claimed.attempts + 1, result.error.retryAfterMs),
+            ).toISOString(),
+          );
         const restart = result.error.code === 'invalid_input' && !!scan.cursor;
         await fail(result.error.code, {
           restart,
@@ -292,6 +352,17 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
         return true;
       }
       const page = result.value;
+      if (page.completeness !== 'complete') {
+        await fail('invalid_response');
+
+        return true;
+      }
+      if (page.retryAfterMs && !page.deferred)
+        await deps.store.deferConnection(
+          tenantId,
+          claimed.connectionId,
+          new Date(+now() + page.retryAfterMs).toISOString(),
+        );
       const keys = page.items.map(key);
       const known = await deps.store.ledger(
         tenantId,
@@ -365,6 +436,14 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
           ? null
           : { nextDueAt: nextDueAt(now(), supportsSince) },
         now: now().toISOString(),
+        ...(page.deferred
+          ? {
+              deferred: true,
+              dueAt: new Date(
+                +now() + (page.retryAfterMs ?? 2000),
+              ).toISOString(),
+            }
+          : {}),
       });
     } catch (error) {
       log('Sync page failed', error);
@@ -440,7 +519,11 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
       await prepare(tenantId);
       await deps.store.applyHints(tenantId, syncPolicy.hintDelayMs);
       await processLinks(tenantId);
-      while (Date.now() < deadline && (await runPage(tenantId)));
+      await Promise.all(
+        Array.from({ length: deps.workspaceConcurrency ?? 4 }, async () => {
+          while (Date.now() < deadline && (await runPage(tenantId)));
+        }),
+      );
     },
   };
 }

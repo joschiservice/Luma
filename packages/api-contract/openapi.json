@@ -95733,6 +95733,14 @@
                                           "format": "date-time",
                                           "nullable": true
                                         },
+                                        "createdSince": {
+                                          "type": "string",
+                                          "format": "date-time",
+                                          "nullable": true
+                                        },
+                                        "waitingForExport": {
+                                          "type": "boolean"
+                                        },
                                         "pages": {
                                           "type": "integer",
                                           "minimum": 0
@@ -95819,6 +95827,16 @@
                                         },
                                         "olderHistoryAvailable": {
                                           "type": "boolean"
+                                        },
+                                        "recentFrom": {
+                                          "type": "string",
+                                          "format": "date-time",
+                                          "nullable": true
+                                        },
+                                        "recentCompletedAt": {
+                                          "type": "string",
+                                          "format": "date-time",
+                                          "nullable": true
                                         }
                                       },
                                       "required": [
@@ -95964,6 +95982,11 @@
                             ]
                           },
                           "since": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "createdSince": {
                             "type": "string",
                             "format": "date-time",
                             "nullable": true
@@ -96451,6 +96474,14 @@
                           "format": "date-time",
                           "nullable": true
                         },
+                        "createdSince": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        },
+                        "waitingForExport": {
+                          "type": "boolean"
+                        },
                         "pages": {
                           "type": "integer",
                           "minimum": 0
@@ -96537,6 +96568,16 @@
                         },
                         "olderHistoryAvailable": {
                           "type": "boolean"
+                        },
+                        "recentFrom": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        },
+                        "recentCompletedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
                         }
                       },
                       "required": [

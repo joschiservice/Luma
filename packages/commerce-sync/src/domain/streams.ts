@@ -58,10 +58,20 @@ export interface SyncStream {
     cursor: string | null;
     startedAt: string;
     since: string | null;
+    /** Creation window for the first recent-history pass. */
+    createdSince?: string | null;
+    waitingForExport?: boolean;
     pages: number;
     records: number;
     total: number | null;
   } | null;
+  /** Independent history checkpoint retained while an incremental scan runs. */
+  suspendedScan?: SyncStream['scan'];
+  recentHistoryFrom?: string | null;
+  recentHistoryCompletedAt?: string | null;
+  liveDueAt?: string | null;
+  /** Earliest read time allowed by the connection’s shared provider budget. */
+  providerDueAt?: string | null;
   fullRequested: boolean;
   /** Start of the last completed scan; the next incremental read starts shortly before it. */
   watermark: string | null;
@@ -87,6 +97,7 @@ export interface SyncStream {
 
 export const syncPolicy = {
   pageSize: 25,
+  recentHistoryMs: 30 * 24 * 60 * 60_000,
   leaseMs: 5 * 60_000,
   /** Interval between change reads when the source filters by update time. */
   incrementalIntervalMs: 5 * 60_000,
@@ -108,6 +119,8 @@ export interface ScanPlan {
   /** Source update time the read filters from; null reads every record. */
   since: string | null;
   trigger: ScanTrigger;
+  /** Optional creation-time filter; distinct from changed-record reads. */
+  createdSince?: string | null;
 }
 
 /**
@@ -129,6 +142,14 @@ export function planScan(
   supportsSince: boolean,
 ): ScanPlan {
   const hinted = stream.hintAt !== null && Date.parse(stream.hintAt) <= +now;
+  if (hinted && stream.watermark && supportsSince)
+    return {
+      kind: 'incremental',
+      since: new Date(
+        Date.parse(stream.watermark) - syncPolicy.overlapMs,
+      ).toISOString(),
+      trigger: 'webhook',
+    };
   if (stream.phase === 'backfill')
     return {
       kind: 'backfill',
@@ -183,6 +204,8 @@ export function retryDelayMs(attempts: number, advisedMs?: number) {
 }
 
 const failureMessages: Record<string, string> & { default: string } = {
+  export_unavailable:
+    'The source’s history export is no longer usable. Choose Re-import history to start a new export. Records already imported stay available.',
   authentication:
     'The source rejected Luma’s credentials. Reconnect this connection.',
   permission_denied:
@@ -234,6 +257,7 @@ export function streamStatus(
     return stream.attempts >= syncPolicy.failingAfterAttempts
       ? 'failing'
       : 'retrying';
+  if (stream.scan?.kind === 'incremental') return 'syncing';
   if (stream.phase === 'backfill')
     return waitingOnOrders && !stream.scan ? 'waiting' : 'importing';
   if (stream.scan) return 'syncing';

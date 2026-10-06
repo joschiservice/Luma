@@ -8,7 +8,13 @@ import {
   soon,
   streamState,
 } from './presentation';
-import { attention, current, importing, stream } from './sync-fixtures';
+import {
+  attention,
+  current,
+  importing,
+  recentHistory,
+  stream,
+} from './sync-fixtures';
 
 describe('coverageStatement', () => {
   it('never claims completeness before the history import finishes', () => {
@@ -93,5 +99,61 @@ describe('sync states', () => {
     expect(ago('2026-09-29T06:00:00.000Z', now)).toBe('3h ago');
     expect(soon('2026-09-29T09:04:00.000Z', now)).toBe('in 4m');
     expect(soon('2026-09-29T08:59:00.000Z', now)).toBe('now');
+  });
+});
+
+describe('recent history coverage', () => {
+  const orders = recentHistory.connections[0]!.recordTypes[0]!.stream!;
+  it('distinguishes export preparation from imported recent records and full history', () => {
+    expect(streamState(orders).label).toBe('Preparing history');
+    expect(scanProgress('orders', orders)).toEqual({
+      value: null,
+      text: 'The source is preparing an export',
+    });
+    expect(coverageStatement('orders', orders).text).toBe(
+      'Orders since Aug 30, 2026 imported. Older history continues in the background.',
+    );
+  });
+  it('keeps coverage qualified when imports are paused, incomplete or source limited', () => {
+    expect(
+      coverageStatement('orders', { ...orders, paused: true }).text,
+    ).toContain('Older history paused.');
+    expect(
+      coverageStatement('orders', {
+        ...orders,
+        records: { ...orders.records, failed: 1 },
+      }).text,
+    ).toContain('read; some records need attention');
+    expect(
+      coverageStatement('orders', {
+        ...orders,
+        coverage: { ...orders.coverage, historyFrom: '2026-09-01T00:00:00Z' },
+      }).text,
+    ).toContain('since Sep 1, 2026');
+  });
+});
+
+it('reports paused history without claiming it is continuing in the background', () => {
+  const overview = {
+    ...recentHistory,
+    connections: recentHistory.connections.map((connection) => ({
+      ...connection,
+      recordTypes: connection.recordTypes.map((item) =>
+        item.stream?.phase === 'backfill'
+          ? {
+              ...item,
+              stream: {
+                ...item.stream,
+                status: 'paused' as const,
+                paused: true,
+              },
+            }
+          : item,
+      ),
+    })),
+  };
+  expect(overallState(overview)).toMatchObject({
+    state: 'idle',
+    title: 'History import paused',
   });
 });

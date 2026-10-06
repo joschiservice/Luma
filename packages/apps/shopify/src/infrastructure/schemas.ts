@@ -49,6 +49,8 @@ const page = <T extends z.ZodTypeAny>(item: T) =>
     items: z.array(item),
     nextCursor: z.string().nullable(),
     completeness: z.enum(['complete', 'partial']),
+    deferred: z.boolean().optional(),
+    retryAfterMs: z.number().nonnegative().optional(),
     total: z.number().int().nonnegative().nullable().optional(),
     history: z
       .object({ availableFrom: timestamp, requirement: z.string().nullable() })
@@ -320,7 +322,17 @@ const pageInput = z
   })
   .strict();
 
-const changedInput = pageInput.extend({ updatedSince: timestamp.optional() });
+const changedInput = pageInput.extend({
+  updatedSince: timestamp.optional(),
+  createdSince: timestamp.optional(),
+  historyImport: z
+    .object({
+      key: z.string().uuid(),
+      chunkSize: z.number().int().min(1).max(1000).optional(),
+    })
+    .strict()
+    .optional(),
+});
 
 const scoped = (type: string) =>
   z.object({ externalId: gid(type), scopeKey: z.literal('') }).strict();
@@ -330,6 +342,13 @@ export const inputs = {
   'products.read': changedInput,
   'customers.read': changedInput,
   'inventory.read': pageInput.extend({
+    historyImport: z
+      .object({
+        key: z.string().uuid(),
+        chunkSize: z.number().int().min(1).max(1000).optional(),
+      })
+      .strict()
+      .optional(),
     sku: scoped('InventoryItem').optional(),
     location: scoped('Location').optional(),
   }),

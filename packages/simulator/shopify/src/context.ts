@@ -76,4 +76,6 @@ export interface RequestContext {
   loader: Loader;
   /** Set when a mutation changed provider state. */
   committed: boolean;
+  /** Bulk queries read complete connections without synchronous paging limits. */
+  bulk?: boolean;
 }

@@ -41,6 +41,23 @@ it('reports import progress and coverage, and lets only managers control syncs',
     stream: null,
   });
 
+  await f.db.owner.query(
+    `UPDATE commerce_sync_streams SET recent_history_from=now()-interval '30 days',
+    recent_history_completed_at=now(),scan_waiting=true WHERE tenant_id=$1 AND id=$2`,
+    [f.org.id, f.stream],
+  );
+  const recent = await f.request(f.member, `${f.base}/sync`);
+  const recentStream = recent.connections.find(
+    (connection) => connection.connectionId === f.store,
+  ).recordTypes[0].stream;
+  expect(recentStream).toMatchObject({
+    phase: 'backfill',
+    backfillCompletedAt: null,
+    scan: { waitingForExport: true },
+  });
+  expect(recentStream.coverage.recentFrom).toBeTruthy();
+  expect(recentStream.coverage.recentCompletedAt).toBeTruthy();
+
   await f.request(
     f.member,
     `${f.base}/sync/${f.stream}/commands`,

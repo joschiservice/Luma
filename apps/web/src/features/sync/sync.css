@@ -412,3 +412,15 @@
   color: var(--muted-foreground);
   font-size: 13px;
 }
+
+.sync-stream-coverage > p {
+  margin: 0;
+}
+.sync-recent-coverage {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  color: var(--state-success-text);
+  font-weight: 550;
+}

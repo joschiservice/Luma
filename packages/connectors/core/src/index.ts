@@ -4,6 +4,7 @@ export type ConnectorErrorCode =
   | 'unsupported_version'
   | 'invalid_input'
   | 'invalid_response'
+  | 'export_unavailable'
   | 'authentication'
   | 'permission_denied'
   | 'not_found'

@@ -27,6 +27,8 @@ import {
 } from '@luma/connector-shopify';
 import { z } from 'zod';
 
+import { readBulkHistory } from './bulk-history.js';
+import { readPageSize, readSelection } from './read-selections.js';
 import * as s from './schemas.js';
 
 const pageFields = 'pageInfo { hasNextPage endCursor }';
@@ -245,8 +247,22 @@ export function createShopifyConnector(
         idempotency: 'none',
         retry: { maxAttempts: 3, initialDelayMs: 1000 },
         ...(capability === 'inventory.read'
-          ? {}
-          : { filters: ['updatedSince' as const] }),
+          ? { filters: ['historyImport' as const] }
+          : {
+              filters: [
+                'updatedSince' as const,
+                ...(capability === 'orders.read' ||
+                capability === 'fulfillment.read' ||
+                capability === 'returns.read'
+                  ? ['createdSince' as const]
+                  : []),
+                ...(capability === 'orders.read' ||
+                capability === 'products.read' ||
+                capability === 'customers.read'
+                  ? ['historyImport' as const]
+                  : []),
+              ],
+            }),
       },
       parseInput: (input) =>
         s.inputs[capability].parse(input) as CapabilityInput<K>,
@@ -263,6 +279,10 @@ export function createShopifyConnector(
           CapabilityInput<'fulfillment.read'>;
         const updatedSince =
           'updatedSince' in input ? (input.updatedSince ?? null) : null;
+        const createdSince =
+          'createdSince' in input ? (input.createdSince ?? null) : null;
+        const historyImport =
+          'historyImport' in input ? input.historyImport : undefined;
         const binding = createHash('sha256')
           .update(
             JSON.stringify([
@@ -276,6 +296,9 @@ export function createShopifyConnector(
               filters.location ?? null,
               filters.order ?? null,
               updatedSince,
+              createdSince,
+              historyImport?.key ?? null,
+              historyImport?.chunkSize ?? null,
             ]),
           )
           .digest('hex');
@@ -334,12 +357,30 @@ export function createShopifyConnector(
           });
         }
 
+        // Cache only this page. Consumers validate and allowlist each record before capture.
+        const nested = new Map<string, Record<string, unknown>>();
+
+        function remember(value: unknown): void {
+          if (Array.isArray(value)) {
+            for (const item of value) remember(item);
+          } else if (value && typeof value === 'object') {
+            const fields = parse(record, value);
+            if (typeof fields.id === 'string')
+              nested.set(fields.id, { ...nested.get(fields.id), ...fields });
+            for (const child of Object.values(fields)) remember(child);
+          }
+        }
+
         async function node<T>(
           externalId: string,
           type: string,
           fields: string,
           schema: z.ZodType<T, z.ZodTypeDef, unknown>,
         ): Promise<T> {
+          const cached = nested.get(externalId);
+          // Overflow pages may cache an ID-only reference; fetch its full selection.
+          if (cached && Object.keys(cached).length > 1)
+            return capture(schema, cached);
           const data = await request(
             `query LumaNode($id: ID!) { node(id: $id) { ... on ${type} { ${fields} } } }`,
             { id: externalId },
@@ -358,13 +399,21 @@ export function createShopifyConnector(
         ): Promise<T[]> {
           const result: T[] = [];
           let cursor: string | null = null;
-          const seen = new Set<string>();
+          const initial = nested.get(externalId)?.[field];
+          if (initial !== undefined) {
+            const page = capture(s.connection(schema), initial);
+            result.push(...page.nodes);
+            cursor = next(page.pageInfo);
+            if (!cursor) return result;
+          }
+          const seen = new Set<string>(cursor ? [cursor] : []);
           do {
             const data = await request(
               `query LumaChildren($id: ID!, $after: String) { node(id: $id) { ... on ${type} { children: ${field}(first: 100, after: $after) { nodes { ${fields} } ${pageFields} } } } }`,
               { id: externalId, after: cursor },
             );
             if (data.node === null) fail('not_found');
+            remember(data.node);
             const parent = parse(record, data.node);
             const page = capture(s.connection(schema), parent.children);
             result.push(...page.nodes);
@@ -394,12 +443,54 @@ export function createShopifyConnector(
               : 'Order';
         const selected = filters.sku ?? filters.order;
         // Timestamps are validated ISO values, so quoting cannot add search operators.
-        const search = updatedSince ? `updated_at:>='${updatedSince}'` : null;
-        const sorted = search ? ', sortKey: UPDATED_AT' : '';
+        const search =
+          [
+            updatedSince ? `updated_at:>='${updatedSince}'` : null,
+            createdSince ? `created_at:>='${createdSince}'` : null,
+          ]
+            .filter(Boolean)
+            .join(' ') || null;
+        const sorted = createdSince
+          ? ', sortKey: CREATED_AT, reverse: true'
+          : updatedSince
+            ? ', sortKey: UPDATED_AT'
+            : '';
         let total: number | null | undefined;
         let history: HistoryLimit | null | undefined;
+        const bulk = historyImport
+          ? await readBulkHistory({
+              request,
+              fetch: options.fetch ?? globalThis.fetch,
+              capability,
+              key: historyImport.key,
+              cursor: after,
+              limit: historyImport.chunkSize ?? input.limit,
+              ...(options.customerAccess
+                ? { customerAccess: options.customerAccess }
+                : {}),
+            })
+          : null;
+        const encode = (cursor: string | null) =>
+          cursor
+            ? Buffer.from(JSON.stringify({ binding, after: cursor })).toString(
+                'base64url',
+              )
+            : null;
+        if (bulk?.deferred)
+          return parse<unknown>(s.outputs[capability], {
+            items: [],
+            nextCursor: encode(bulk.cursor),
+            completeness: 'complete',
+            deferred: true,
+            retryAfterMs: 2000,
+          }) as CapabilityOutput<K>;
+
         // The first page of a scan reports the collection size and any history limit.
-        if (!after && !selected && capability !== 'inventory.read') {
+        if (
+          (!after || bulk?.offset === 0) &&
+          !selected &&
+          capability !== 'inventory.read'
+        ) {
           const countField =
             capability in counted
               ? counted[capability as keyof typeof counted]
@@ -440,10 +531,17 @@ export function createShopifyConnector(
               ? 'defaultAddress { address1 address2 city province zip countryCodeV2 }'
               : '',
           ].join(' ');
-          const data = await request(
-            `query LumaCustomers($first: Int!, $after: String, $query: String) { page: customers(first: $first, after: $after, query: $query${sorted}) { nodes { ${fields} } ${pageFields} } }`,
-            { first: input.limit, after, query: search },
-          );
+          const data = bulk
+            ? {
+                page: {
+                  nodes: bulk.nodes,
+                  pageInfo: { hasNextPage: false, endCursor: null },
+                },
+              }
+            : await request(
+                `query LumaCustomers($first: Int!, $after: String, $query: String) { page: customers(first: $first, after: $after, query: $query${sorted}) { nodes { ${fields} } ${pageFields} } }`,
+                { first: input.limit, after, query: search },
+              );
           const customers = capture(s.connection(s.customerNode), data.page);
           for (const customer of customers.nodes) {
             const address = access.address ? customer.defaultAddress : null;
@@ -482,37 +580,37 @@ export function createShopifyConnector(
             } satisfies CustomerSnapshot);
           }
           roots = [];
-          nextAfter = next(customers.pageInfo);
+          nextAfter = bulk ? bulk.cursor : next(customers.pageInfo);
           if (nextAfter && nextAfter === after) fail('invalid_response');
+        } else if (bulk) {
+          remember(bulk.nodes);
+          roots = bulk.nodes.map((value) => ({
+            id: parse(s.gid(rootType), value.id),
+          }));
+          nextAfter = bulk.cursor;
+          total = capability === 'inventory.read' ? undefined : bulk.total;
         } else if (selected) {
           if (after) fail('invalid_input');
           roots = [{ id: selected.externalId }];
-        } else if (capability === 'returns.read') {
-          // One cheap page of orders shows which orders have returns or refunds to read.
-          const data = await request(
-            `query LumaPage($first: Int!, $after: String, $query: String) { page: orders(first: $first, after: $after, query: $query${sorted}) { nodes { id returns(first: 1) { nodes { id } } refunds(first: 1) { id } } ${pageFields} } }`,
-            { first: input.limit, after, query: search },
-          );
-          const page = capture(s.connection(s.returnsPageOrder), data.page);
-          roots = page.nodes.filter(
-            (order) => order.returns.nodes.length || order.refunds.length,
-          );
-          nextAfter = next(page.pageInfo);
-          if (nextAfter && nextAfter === after) fail('invalid_response');
         } else {
+          const fields = readSelection(capability);
           const data = await request(
             root === 'inventoryItems'
-              ? `query LumaPage($first: Int!, $after: String) { page: ${root}(first: $first, after: $after) { nodes { id } ${pageFields} } }`
-              : `query LumaPage($first: Int!, $after: String, $query: String) { page: ${root}(first: $first, after: $after, query: $query${sorted}) { nodes { id } ${pageFields} } }`,
+              ? `query LumaPage($first: Int!, $after: String) { page: ${root}(first: $first, after: $after) { nodes { ${fields} } ${pageFields} } }`
+              : `query LumaPage($first: Int!, $after: String, $query: String) { page: ${root}(first: $first, after: $after, query: $query${sorted}) { nodes { ${fields} } ${pageFields} } }`,
             root === 'inventoryItems'
-              ? { first: input.limit, after }
-              : { first: input.limit, after, query: search },
+              ? { first: readPageSize(capability, input.limit), after }
+              : {
+                  first: readPageSize(capability, input.limit),
+                  after,
+                  query: search,
+                },
           );
-          const page = capture(
-            s.connection(z.object({ id: s.gid(rootType) })),
-            data.page,
-          );
-          roots = page.nodes;
+          const page = parse(s.connection(record), data.page);
+          remember(page.nodes);
+          roots = page.nodes.map((value) => ({
+            id: parse(s.gid(rootType), value.id),
+          }));
           nextAfter = next(page.pageInfo);
           if (nextAfter && nextAfter === after) fail('invalid_response');
         }
@@ -905,12 +1003,9 @@ export function createShopifyConnector(
 
         const result: Page<unknown> = {
           items,
-          nextCursor: nextAfter
-            ? Buffer.from(
-                JSON.stringify({ binding, after: nextAfter }),
-              ).toString('base64url')
-            : null,
+          nextCursor: encode(nextAfter),
           completeness: 'complete',
+          retryAfterMs: request.nextReadDelay(),
           ...(total === undefined ? {} : { total }),
           ...(history === undefined ? {} : { history }),
         };

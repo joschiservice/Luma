@@ -10,7 +10,7 @@ When you connect a store or ERP, Luma imports its history and then keeps it curr
 For each connection, Luma imports every record type the connection allows:
 
 - **Orders** with their lines, totals and placed dates.
-- **Fulfillments** such as fulfillment orders, shipments and delivery notes. They start once the order history is imported, because each fulfillment belongs to an order.
+- **Fulfillments** such as fulfillment orders, shipments and delivery notes. For Shopify, recent fulfillments start once recent orders are imported; older history follows, because each fulfillment belongs to an order.
 - **Products** with their variants and SKU codes.
 - **Stock levels** per SKU and location.
 - **Customers**, when the connection is approved to share customer data. Contact details and addresses are imported only if that access is approved as well.
@@ -30,7 +30,11 @@ You can use Luma while history imports. Orders, stock and customers appear as th
 
 ## Understand coverage
 
-Coverage says exactly what Luma holds. Until the first import finishes, it shows how many records have arrived so far and never claims completeness.
+Shopify imports the last 30 days of orders first, followed by their recent fulfillments and returns. **Recent history imported** means that window has been read and imported. Older history continues in the background; it has separate progress and stays incomplete until its import finishes. Records that need attention are shown separately.
+
+**Preparing history** means the source is building an export. There may be no record progress yet. You can leave the page; Luma continues automatically and resumes from its saved progress after a restart.
+
+Coverage says exactly what Luma holds. During an import, it shows how many records have arrived so far and the completed recent window, without claiming full history is complete.
 
 Some sources share only recent history. Shopify shares the last 60 days of orders unless the Luma app has the `read_all_orders` permission. In that case Data sync says which date the shared history starts from. Luma keeps every order it imports, so coverage grows over time. When older orders become available, Data sync offers to import them.
 
@@ -38,9 +42,9 @@ A **full check** rereads every record once a day. Records the source no longer r
 
 ## How Luma stays current
 
-After the history import, Luma reads changes as they happen:
+Luma reads new changes while Shopify history imports and after the import finishes:
 
-- When a source sends change notifications, Luma reads the changed records within seconds.
+- When a source sends change notifications, Luma queues a read within seconds. A page already running or a source rate limit can delay the read.
 - Otherwise Luma checks for changes every few minutes. Sources that can't list recent changes are reread in full every 30 minutes.
 - Every record type gets a full check once a day.
 

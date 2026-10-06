@@ -39,6 +39,8 @@ const schema = buildClientSchema(body.data);
 const fields = {
   QueryRoot: [
     'node',
+    'bulkOperations',
+    'bulkOperation',
     'orders',
     'customers',
     'products',
@@ -51,12 +53,24 @@ const fields = {
     'webhookSubscriptions',
   ],
   Mutation: [
+    'bulkOperationRunQuery',
     'webhookSubscriptionCreate',
     'fulfillmentOrderReleaseHold',
     'fulfillmentOrderOpen',
     'fulfillmentOrderMove',
     'inventorySetQuantities',
   ],
+  BulkOperation: [
+    'id',
+    'query',
+    'status',
+    'errorCode',
+    'url',
+    'rootObjectCount',
+  ],
+  BulkOperationConnection: ['nodes', 'pageInfo'],
+  BulkOperationUserError: ['field', 'message', 'code'],
+  BulkOperationRunQueryPayload: ['bulkOperation', 'userErrors'],
   Shop: ['id', 'myshopifyDomain'],
   ProductPriceRangeV2: ['minVariantPrice'],
   AppInstallation: ['id', 'accessScopes'],
@@ -195,7 +209,8 @@ const fields = {
     'countryCodeV2',
   ],
   Count: ['count', 'precision'],
-  CustomerConnection: ['nodes', 'pageInfo'],
+  CustomerConnection: ['nodes', 'edges', 'pageInfo'],
+  CustomerEdge: ['node'],
   CustomerEmailAddress: ['emailAddress'],
   CustomerPhoneNumber: ['phoneNumber'],
   MoneyBag: ['shopMoney'],
@@ -281,7 +296,8 @@ for (const type of [
   'FulfillmentOrderLineItem',
   'FulfillmentLineItem',
 ]) {
-  fields[`${type}Connection`] = ['nodes', 'pageInfo'];
+  fields[`${type}Connection`] = ['nodes', 'edges', 'pageInfo'];
+  fields[`${type}Edge`] = ['node'];
 }
 
 const definitions = new Map();

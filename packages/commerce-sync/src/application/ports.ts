@@ -65,6 +65,9 @@ export interface PageCommit {
   /** Set on the last page; finishes the scan and schedules the next one. */
   complete: { nextDueAt: string } | null;
   now: string;
+  /** Provider export is still preparing; keep its checkpoint without claiming coverage. */
+  deferred?: boolean;
+  dueAt?: string;
 }
 
 export interface SyncRun {
@@ -75,6 +78,8 @@ export interface SyncRun {
   kind: ScanKind;
   trigger: ScanPlan['trigger'];
   since: string | null;
+  /** Creation window of a recent-history run; null for other runs. */
+  createdSince?: string | null;
   fullScan: boolean;
   startedAt: string;
   finishedAt: string | null;
@@ -150,12 +155,35 @@ export interface SyncStore {
     tenantId: string,
     token: string,
     leaseMs: number,
+    options?: {
+      connectionId?: string;
+      connectionConcurrency?: number;
+      workspaceConcurrency?: number;
+    },
   ): Promise<SyncStream | null>;
+  /** Saves a history checkpoint before a live scan, within the current lease. */
+  suspendScan(
+    tenantId: string,
+    streamId: string,
+    token: string,
+  ): Promise<SyncStream | null>;
+  /** Defers all streams sharing a connection's provider budget. */
+  deferConnection(
+    tenantId: string,
+    connectionId: string,
+    dueAt: string,
+  ): Promise<void>;
   startScan(
     tenantId: string,
     streamId: string,
     token: string,
-    run: { id: string; plan: ScanPlan; fullScan: boolean; now: string },
+    run: {
+      id: string;
+      plan: ScanPlan;
+      fullScan: boolean;
+      now: string;
+      liveEnabled?: boolean;
+    },
   ): Promise<SyncStream | null>;
   ledger(
     tenantId: string,
