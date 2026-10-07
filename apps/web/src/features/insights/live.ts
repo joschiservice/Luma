@@ -1,7 +1,20 @@
+import type { WorkspaceTopic } from '@luma/api-contract';
 import type { QueryClient } from '@tanstack/react-query';
 
-import { subscribeToWorkspaceMetrics } from '../overview/metric-subscription';
+import {
+  changesAny,
+  subscribeToWorkspaceMetrics,
+} from '../overview/metric-subscription';
 import { insightsKey } from './data';
+
+const chartTopics: readonly WorkspaceTopic[] = [
+  'orders',
+  'issues',
+  'inventory',
+  'procurement',
+  'workflows',
+  'connections',
+];
 
 /**
  * Coalesces live chart invalidations, finishes active reads and limits failed reads to one
@@ -42,7 +55,7 @@ export function subscribeToInsightChanges(
   };
   const stop = subscribeToWorkspaceMetrics(organizationId, {
     onResync: (event) => {
-      if (event.refetch) schedule();
+      if (changesAny(event, chartTopics)) schedule();
     },
     onError: () => undefined,
   });

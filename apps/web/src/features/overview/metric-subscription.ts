@@ -1,3 +1,4 @@
+import { type WorkspaceTopic, workspaceTopics } from '@luma/api-contract';
 import { subscribeToMetrics } from '@luma/api-contract/client';
 
 type Subscriber = Pick<
@@ -6,6 +7,17 @@ type Subscriber = Pick<
 >;
 
 type MetricEvent = Parameters<Subscriber['onResync']>[0];
+
+/** Reports whether an event asks views that depend on any of these areas to read again. */
+export function changesAny(
+  event: MetricEvent,
+  topics: readonly WorkspaceTopic[],
+) {
+  return (
+    event.refetch &&
+    event.topics.some((topic) => (topics as readonly string[]).includes(topic))
+  );
+}
 
 const subscriptions = new Map<string, ReturnType<typeof createSubscription>>();
 
@@ -78,7 +90,13 @@ function createSubscription(organizationId: string) {
       let active = true;
       subscribers.add(subscriber);
       if (subscribers.size === 1) open();
-      else if (lastEvent) subscriber.onResync({ ...lastEvent, refetch: true });
+      // A late consumer has not read since the stream opened, so it reconciles every area.
+      else if (lastEvent)
+        subscriber.onResync({
+          ...lastEvent,
+          refetch: true,
+          topics: [...workspaceTopics],
+        });
 
       return () => {
         if (!active) return;

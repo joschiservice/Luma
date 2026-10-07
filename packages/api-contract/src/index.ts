@@ -163,7 +163,11 @@ export {
   caseEventsContract,
   metricEventsContract,
   metricStreamEventSchema,
+  workspaceTopics,
+  workspaceTopicSchema,
 } from './contracts/events.js';
+
+export type { WorkspaceTopic } from './contracts/events.js';
 
 export * from './playbooks.js';
 

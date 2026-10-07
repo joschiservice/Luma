@@ -1,4 +1,5 @@
 import type { IdentityService } from '@luma/identity';
+import { IdentityError } from '@luma/identity';
 import Fastify from 'fastify';
 import { expect, it, vi } from 'vitest';
 
@@ -26,7 +27,7 @@ it('disconnects a slow consumer and releases its subscription', async () => {
   await app.close();
 });
 
-it('subscribes before the initial read and follows a concurrent change with another invalidation', async () => {
+it('subscribes before the initial read and follows a concurrent change without rechecking fresh access', async () => {
   const app = Fastify();
   const context = testContext({ userId: 'actor' });
   let wake: (() => void) | undefined;
@@ -66,7 +67,7 @@ it('subscribes before the initial read and follows a concurrent change with anot
     } as unknown as IdentityService,
   );
   await app.inject(`/v1/organizations/${context.tenantId}/metrics/events`);
-  expect(reads).toBe(2);
+  expect(reads).toBe(1);
   expect(frames).toHaveLength(2);
   expect(frames.every((frame) => frame.includes('"refetch":true'))).toBe(true);
   expect(wake).toBeUndefined();
@@ -124,25 +125,129 @@ it('bounds concurrent authorization reads across subscriptions', async () => {
   await app.close();
 });
 
-it('refuses a stream once the person can no longer read insights', async () => {
+function streamFrames(
+  context: ReturnType<typeof testContext>,
+  resolveTenant: () => Promise<ReturnType<typeof testContext>>,
+) {
   const app = Fastify();
-  const context = testContext({ userId: 'actor' });
+  const frames: string[] = [];
+  let wake: ((topics?: string[]) => void) | undefined;
   const unsubscribe = vi.fn();
   app.decorateRequest('tenantContext', null);
-  app.addHook('onRequest', async (request) => {
+  app.addHook('onRequest', async (request, reply) => {
     request.tenantContext = context;
+    vi.spyOn(reply.raw, 'write').mockImplementation((frame) => {
+      frames.push(String(frame));
+
+      return true;
+    });
   });
-  registerMetricEvents(app, { connected: true, subscribe: () => unsubscribe }, {
-    resolveTenant: async () =>
-      testContext({
-        userId: 'actor',
-        permissions: [],
-      }),
-  } as unknown as IdentityService);
-  const response = await app.inject(
+  registerMetricEvents(
+    app,
+    {
+      connected: true,
+      subscribe: (_tenant, callback) => {
+        wake = (topics) =>
+          callback(topics ? { connected: true, topics } : { connected: true });
+
+        return unsubscribe;
+      },
+    },
+    { resolveTenant } as unknown as IdentityService,
+  );
+  const response = app.inject(
     `/v1/organizations/${context.tenantId}/metrics/events`,
   );
-  expect(response.statusCode).toBe(503);
-  expect(unsubscribe).toHaveBeenCalledOnce();
-  await app.close();
+
+  return {
+    app,
+    frames,
+    unsubscribe,
+    response,
+    wake: (topics?: string[]) => wake?.(topics),
+    events: () =>
+      frames
+        .filter((frame) => frame.includes('event: resync'))
+        .map(
+          (frame) =>
+            JSON.parse(frame.slice(frame.indexOf('data: ') + 6)) as {
+              refetch: boolean;
+              topics: string[];
+            },
+        ),
+  };
+}
+
+it('names changed areas and keeps areas outside the role silent', async () => {
+  vi.useFakeTimers();
+  try {
+    const context = testContext({
+      userId: 'actor',
+      permissions: ['orders.read'],
+    });
+    const stream = streamFrames(context, async () => context);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(stream.events()).toEqual([
+      expect.objectContaining({
+        refetch: true,
+        topics: ['orders', 'connections', 'decisions'],
+      }),
+    ]);
+
+    stream.wake(['procurement']);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(stream.events()).toHaveLength(1);
+
+    stream.wake(['procurement', 'decisions']);
+    stream.wake(['orders']);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(stream.events().at(-1)).toMatchObject({
+      refetch: true,
+      topics: ['orders', 'decisions'],
+    });
+
+    stream.wake();
+    await vi.advanceTimersByTimeAsync(100);
+    expect(stream.events().at(-1)?.topics).toEqual([
+      'orders',
+      'connections',
+      'decisions',
+    ]);
+
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(stream.events().at(-1)).toMatchObject({
+      refetch: false,
+      topics: [],
+    });
+    await stream.app.close();
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it('rechecks access on the heartbeat and closes once membership is gone', async () => {
+  vi.useFakeTimers();
+  try {
+    const context = testContext({ userId: 'actor' });
+    let reads = 0;
+    const stream = streamFrames(context, async () => {
+      reads++;
+      if (reads > 1) throw new IdentityError(404, 'NOT_FOUND', 'Not found');
+
+      return context;
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    for (let index = 0; index < 20; index++) {
+      stream.wake(['decisions']);
+      await vi.advanceTimersByTimeAsync(100);
+    }
+    expect(reads).toBe(1);
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(reads).toBe(2);
+    expect(stream.frames.at(-1)).toContain('event: access-check');
+    expect(stream.unsubscribe).toHaveBeenCalledOnce();
+    await stream.app.close();
+  } finally {
+    vi.useRealTimers();
+  }
 });
