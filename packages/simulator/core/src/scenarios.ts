@@ -87,7 +87,7 @@ export const workflowScenarios = {
     label: 'Access revoked',
     description: 'The first shop rejects Luma’s credentials for an hour.',
     expected:
-      'Connections shows lost access. No case opens, because detection treats an inactive connection as healthy, so no workflow runs. The scorecard reports the incident as missed.',
+      'Luma revokes the connection and a sync-failure case opens for lost access. Check a failing connection hands it to a person at once with Reconnect. The case closes only after the store is reconnected and completes a fresh scan.',
     steps: [{ kind: 'incident', incident: 'auth-revoked', on: 'shop' }],
   },
 } satisfies Record<string, WorkflowScenario>;

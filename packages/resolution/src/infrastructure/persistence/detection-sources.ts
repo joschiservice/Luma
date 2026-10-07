@@ -26,6 +26,7 @@ const streamRow = z.object({
   provider: z.string(),
   recordType: z.enum(['orders', 'fulfillments', 'products', 'inventory']),
   active: z.boolean(),
+  accessLostAt: time.nullable(),
   attempts: z.number().int(),
   errorCode: z.string().nullable(),
   errorAt: time.nullable(),
@@ -135,10 +136,20 @@ export function createDetectionSources(db: TenantDatabase): DetectionSources {
           `SELECT s.id,s.connection_id AS "connectionId",c.document->>'provider' AS provider,
             s.record_type AS "recordType",
             (NOT s.paused AND s.blocked IS NULL AND c.document->>'status'='active') AS active,
+            CASE WHEN c.document->>'status' IN ('revoked','degraded') AND b.status='active' THEN
+             (SELECT min(l.created_at) FROM connector_lifecycle_events l
+              WHERE l.tenant_id=c.tenant_id AND l.connection_id=c.id AND l.version>b.version)
+            END AS "accessLostAt",
             s.attempts,s.error_code AS "errorCode",s.error_at AS "errorAt",
             s.failing_since AS "failingSince",s.last_complete_at AS "lastCompleteAt"
           FROM commerce_sync_streams s
           JOIN connector_installations c ON c.tenant_id=s.tenant_id AND c.id=s.connection_id
+          -- Access is lost when the last working state was active, not a person's disconnect.
+          -- Only providers set revoked or degraded; the loss starts with the first change after it.
+          LEFT JOIN LATERAL (SELECT version,status FROM connector_lifecycle_events
+            WHERE tenant_id=c.tenant_id AND connection_id=c.id
+             AND (status='active' OR event IN ('disconnected','revoked','app_uninstalled'))
+            ORDER BY version DESC LIMIT 1) b ON true
           WHERE s.tenant_id=$1 AND s.record_type IN ('orders','fulfillments','products','inventory')
           ORDER BY s.connection_id,s.record_type`,
           [context.tenantId],

@@ -50,7 +50,7 @@ Some workflows start on their own when Luma detects an issue:
 
 - **Correct Shopify stock from the ERP** starts when Shopify and your ERP disagree on linked stock. It proposes setting Shopify to the ERP quantity and confirms it with a fresh Shopify read. It never changes ERP stock.
 - **Release an overdue fulfillment hold** starts when a Shopify order stays on a fraud-review or manual hold for too long. It proposes releasing that hold and confirms in Shopify that it's gone. Payment, address and stock holds go to a person, because their cause has to be fixed first.
-- **Check a failing connection** starts when a connection's reads keep failing. Lost access goes to a person straight away. Otherwise it waits 15 minutes, checks again, and hands the issue over only if reads still fail. It changes nothing.
+- **Check a failing connection** starts when a connection's reads keep failing or a provider stopped accepting Luma. Lost access goes to a person straight away, with **Reconnect** on the issue. Otherwise it waits 15 minutes, checks again, and hands the issue over only if reads still fail. It changes nothing.
 
 An owner or admin turns each one on under **Rules**. Runs act as that person, but every change still waits in [Needs you](/docs/needs-you) for a different owner or admin to approve. A proposal stays open for four hours. Right before acting, Luma reads stock again: if the change is still the same, it runs; if it would differ, Luma prepares one new proposal in the same Needs you item. A rejected change, a change Luma can't make safely, or an unclear result hands the issue to a person; nothing is retried behind your back.
 

@@ -93,7 +93,7 @@ export const ReconnectShopify: Story = {
   play: async ({ canvasElement }) => {
     await userEvent.click(
       within(canvasElement).getByRole('button', {
-        name: 'Connection settings',
+        name: 'Reconnect',
       }),
     );
     const d = within(await within(document.body).findByRole('dialog'));

@@ -58,8 +58,7 @@ it.each(['pending', 'degraded', 'disconnected', 'revoked'] as const)(
     const html = render({ ...fixture, status });
     expect(html).toContain('No capabilities enabled');
     expect(html).not.toContain('>Permitted<');
-    if (status === 'disconnected' || status === 'revoked')
-      expect(html).not.toContain('<button');
+    if (status === 'disconnected') expect(html).not.toContain('<button');
   },
 );
 
@@ -69,14 +68,16 @@ it('shows members capability information without management controls', () => {
   expect(html).not.toContain('<button');
 });
 
-it('offers app-owned settings for revoked installations', () => {
+it('offers to reconnect a connection the provider revoked', () => {
   const html = render({
     ...fixture,
     target: { kind: 'shopify', shop: 'dev.myshopify.com' },
     appId: 'shopify',
     status: 'revoked',
   });
-  expect(html).toContain('Connection settings');
+  expect(html).toContain('Access revoked');
+  expect(html).toContain('>Reconnect<');
+  expect(html).toContain('Disconnect');
   expect(html).not.toContain('Replace credentials');
   expect(html).not.toContain('Validate access');
 });

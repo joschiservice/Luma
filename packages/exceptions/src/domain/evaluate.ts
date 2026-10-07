@@ -36,6 +36,9 @@ export function evaluate(
   switch (parsed.exceptionClass) {
     case 'sync_failure': {
       const f = parsed.facts;
+      // A provider that stops accepting Luma blocks the connection's streams; that loss is the
+      // issue. A connection a person disconnected stays clear.
+      if (f.accessLost) return detect('high', 'access_lost');
       if (!f.active) return result('clear', 'inactive_connection');
       if (f.status === 'success')
         return f.scanComplete

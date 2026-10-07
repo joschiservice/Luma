@@ -153,6 +153,9 @@ describe('installed connection lifecycle', () => {
     await service.disconnect(ctx, active.id, 4);
     expect(records.get(`${ctx.tenantId}/${active.id}`)?.secret).toBeNull();
     await expect(service.check(ctx, active.id, 5)).rejects.toThrow();
+    await expect(
+      service.rotate(ctx, active.id, 5, { token: 'after-disconnect' }),
+    ).rejects.toMatchObject({ statusCode: 409 });
     expect(events).toHaveLength(5);
     expect(JSON.stringify(events)).not.toContain('replacement');
   });
@@ -195,9 +198,10 @@ describe('installed connection lifecycle', () => {
       statusCode: 409,
     });
     expect((await service.list(ctx))[0]?.status).toBe('revoked');
-    await expect(
-      service.rotate(ctx, connection.id, 2, { token: 'new' }),
-    ).rejects.toThrow();
+    // Only new credentials from a person reconnect it, and it validates again from pending.
+    expect(
+      await service.rotate(ctx, connection.id, 2, { token: 'new' }),
+    ).toMatchObject({ id: connection.id, status: 'pending', granted: [] });
   });
   it.each([
     { ...input, permissions: ['orders.write'] },
@@ -743,6 +747,12 @@ it('records Shopify authorization failures without overwriting newer credentials
   await expect(
     f.service.credential(f.ctx, installed.id, 'products.read'),
   ).rejects.toThrow();
+  // Reconnecting keeps the connection ID, so its mappings and history stay.
+  await f.service.rotate(f.ctx, installed.id, 7, { token: 'reconnected' });
+  expect(await f.service.check(f.ctx, installed.id, 8)).toMatchObject({
+    id: installed.id,
+    status: 'active',
+  });
 });
 
 async function installedWrite(
