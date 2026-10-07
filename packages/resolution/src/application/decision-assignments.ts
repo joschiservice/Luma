@@ -1,5 +1,5 @@
 import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireTenant } from '@luma/identity';
+import { hasPermission, IdentityError, requireTenant } from '@luma/identity';
 
 export interface DecisionAssignment {
   assigneeId: string | null;
@@ -23,9 +23,10 @@ export interface DecisionAssignmentStore {
 }
 
 /**
- * Creates assignment commands for Needs you decisions. Any member may take an unassigned
- * decision or release their own; owners and admins may assign any decision to a current member.
- * Assignment never grants approval authority; the decision's owner checks roles again.
+ * Creates assignment commands for Needs you decisions. People with `decisions.self_assign` may
+ * take an unassigned decision or release their own; people with `decisions.assign` may assign
+ * any decision to a current member. Others are rejected with 403. Assignment never grants
+ * approval authority; the decision's owner checks permissions again.
  */
 export function createDecisionAssignmentService(deps: {
   store: DecisionAssignmentStore;
@@ -49,6 +50,13 @@ export function createDecisionAssignmentService(deps: {
       requireTenant(fresh, context.tenantId);
       if (fresh.actor.id !== context.actor.id)
         throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+      const assignsAnyone = hasPermission(fresh, 'decisions.assign');
+      if (!assignsAnyone && !hasPermission(fresh, 'decisions.self_assign'))
+        throw new IdentityError(
+          403,
+          'FORBIDDEN',
+          'Your role cannot take or assign decisions.',
+        );
       if (!(await deps.pending(fresh, input.decisionId)))
         throw new IdentityError(
           404,
@@ -63,7 +71,7 @@ export function createDecisionAssignmentService(deps: {
           'Someone changed this assignment. Refresh to see who has it.',
         );
       const holder = current?.assigneeId ?? null;
-      if (fresh.actor.role === 'member') {
+      if (!assignsAnyone) {
         const taking =
           input.assigneeId === fresh.actor.id &&
           (holder === null || holder === fresh.actor.id);
@@ -73,7 +81,7 @@ export function createDecisionAssignmentService(deps: {
           throw new IdentityError(
             403,
             'FORBIDDEN',
-            'Members can take unassigned decisions or release their own. Ask an owner or admin to reassign it.',
+            'You can take unassigned decisions or release your own. Ask someone who assigns decisions to reassign it.',
           );
       }
       if (

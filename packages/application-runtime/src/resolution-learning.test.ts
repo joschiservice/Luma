@@ -1,7 +1,10 @@
 import { isDeepStrictEqual } from 'node:util';
 
 import { IdentityError } from '@luma/identity';
-import { makeTenantContext } from '@luma/identity/composition';
+import {
+  builtInMembership,
+  makeTenantContext,
+} from '@luma/identity/composition';
 import type {
   LearningEventSources,
   LearningRunSources,
@@ -30,7 +33,10 @@ function context(
       dataRegion: 'EU',
       status: 'active',
     },
-    { id: 'membership', organizationId: tenant, userId: actor, role },
+    builtInMembership(
+      { id: 'membership', organizationId: tenant, userId: actor },
+      role,
+    ),
     'request',
   );
 }

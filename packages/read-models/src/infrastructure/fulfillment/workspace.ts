@@ -1,7 +1,11 @@
 import { createHash } from 'node:crypto';
 
 import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireTenant } from '@luma/identity';
+import {
+  IdentityError,
+  requirePermission,
+  requireTenant,
+} from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
 import { z } from 'zod';
 
@@ -58,6 +62,7 @@ export function createFulfillmentWorkspace(
     requireTenant(fresh, context.tenantId);
     if (fresh.actor.id !== context.actor.id)
       throw new IdentityError(403, 'FORBIDDEN', 'Actor changed');
+    requirePermission(fresh, 'fulfillment.read');
 
     return db.transaction(
       fresh.tenantId,

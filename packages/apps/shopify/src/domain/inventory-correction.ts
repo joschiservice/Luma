@@ -102,7 +102,7 @@ export const correctionView = z.object({
     'verified',
     'recovery_required',
   ]),
-  /** A different owner or admin approved this exact action. */
+  /** Someone else who can approve changes approved this exact action. */
   approved: z.boolean().default(false),
   acceptance: z.enum(['not_sent', 'accepted', 'unknown']),
   message: z.string(),

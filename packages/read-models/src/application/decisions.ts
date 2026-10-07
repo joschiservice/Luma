@@ -1,4 +1,4 @@
-import type { TenantContext } from '@luma/identity';
+import type { Permission, TenantContext } from '@luma/identity';
 import type { ReplenishmentDecision } from '@luma/procurement';
 
 import type {
@@ -31,6 +31,11 @@ export type {
 export interface DecisionProvider {
   id: string;
   label: string;
+  /**
+   * The read permission for the owner's area. The queue doesn't ask the owner, and leaves it out
+   * of `sources`, when the reader lacks it.
+   */
+  permission?: Permission;
   pending(context: TenantContext): Promise<DecisionCandidate[]>;
 }
 
@@ -58,7 +63,10 @@ export interface DecisionList {
     domains: Record<DecisionDomain, number>;
     reasons: Record<DecisionReason, number>;
   };
-  /** Owners that failed to answer are `unavailable`; their decisions are missing, not resolved. */
+  /**
+   * Owners that failed to answer are `unavailable`; their decisions are missing, not resolved.
+   * Owners whose area the reader can't read are left out, with their decisions.
+   */
   sources: { id: string; label: string; state: 'available' | 'unavailable' }[];
 }
 
@@ -83,7 +91,9 @@ export type ReplenishmentDecisionReader = (
 
 /**
  * Reads the decisions across owners that need a person, ranked by explicit urgency rules.
- * Responses go through each owner's review; the queue never decides anything.
+ * Responses go through each owner's review; the queue never decides anything. Issue decisions
+ * need `issues.read` and owners' decisions their provider's permission; hidden decisions are
+ * left out of items and counts alike, and record links the reader can't open are null.
  */
 export interface DecisionQueue {
   /** Rejects a cursor produced by another view, filter or page size with a 400 error. */

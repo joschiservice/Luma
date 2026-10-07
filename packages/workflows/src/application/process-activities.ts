@@ -1,7 +1,11 @@
 import type { ActionAdmission } from '@luma/execution';
 import { AdmissionRejected } from '@luma/execution';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireRole, requireTenant } from '@luma/identity';
+import {
+  IdentityError,
+  requirePermission,
+  requireTenant,
+} from '@luma/identity';
 import { canonicalJson } from '@luma/platform';
 
 import type { CodeRunner } from '../domain/code-step.js';
@@ -49,7 +53,8 @@ export function createProcessActivities(deps: {
   async function authorize(run: ProcessRun) {
     const context = await deps.resolveContext(run);
     requireTenant(context, run.tenantId);
-    requireRole(context, ['owner', 'admin']);
+    // The stored principal must still be allowed to prepare actions; admission checks execution.
+    requirePermission(context, 'actions.propose');
     if (run.actor.kind !== 'user' || context.actor.id !== run.actor.id)
       throw new Error('Workflow principal changed');
     const stored = await deps.loadRun(context, run.id);

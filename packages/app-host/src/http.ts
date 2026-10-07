@@ -33,7 +33,25 @@ export function appRoutes(apps?: AppService) {
 
       return {
         status: 200,
-        body: await apps.install(context, params.appId, body.version),
+        body: await apps.install(
+          context,
+          params.appId,
+          body.version,
+          body.scopes,
+        ),
+      };
+    },
+    approveScopes: async ({ request, params, body }) => {
+      const { apps, context } = use(request);
+
+      return {
+        status: 200,
+        body: await apps.approveScopes(
+          context,
+          params.appId,
+          body.version,
+          body.scopes,
+        ),
       };
     },
     uninstall: async ({ request, params, body }) => {

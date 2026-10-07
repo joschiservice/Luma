@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -138,8 +138,27 @@ export async function seedPilot(
     await identity.service.changeMember(context, {
       action: 'add',
       userId: manifest.operatorId,
-      role: 'admin',
+      roleId: 'admin',
     });
+    // An example custom role so the pilot shows how workspaces tailor access.
+    const roles = identity.roles();
+    if (
+      !(await roles.list(context)).roles.some((role) => role.name === 'Buyer')
+    )
+      await roles.create(context, randomUUID(), {
+        name: 'Buyer',
+        description: 'Works with suppliers and purchase orders.',
+        permissions: [
+          'orders.read',
+          'inventory.read',
+          'products.read',
+          'procurement.read',
+          'procurement.manage',
+          'decisions.self_assign',
+          'assistant.use',
+          'activity.read',
+        ],
+      });
     manifest.connections = {};
     // Simulator runs describe their own instances; the plain pilot uses one ERP and one shop.
     const instances = simulator?.instances ?? [
@@ -165,14 +184,14 @@ export async function seedPilot(
             }
           : { kind: 'shopify', shop: instance.shop };
       const appId = instance.kind;
-      const appState = (
-        await connections.apps.list(context)
-      ).installations.find((app) => app.appId === appId);
+      const apps = await connections.apps.list(context);
+      const appState = apps.installations.find((app) => app.appId === appId);
       if (appState?.status !== 'installed')
         await connections.apps.install(
           context,
           appId,
           appState?.version ?? null,
+          apps.catalog.find((app) => app.id === appId)?.scopes ?? [],
         );
       const connection = await connections.install(context, {
         label: `SIMULATED ${instance.label.toUpperCase()} · no live health`,

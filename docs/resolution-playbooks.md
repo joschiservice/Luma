@@ -147,7 +147,7 @@ selector reads immutable published versions; publication and viewing never grant
 execution permission or replace an active version.
 
 Members can inspect versions, historical grants and the 50 most recent runs.
-Owners and admins can review an exact version and activate it for their own
+People with `playbooks.activate` can review an exact version and activate it for their own
 principal, one eligible JTL connection and explicitly selected mapped orders.
 The current connection must grant both `orders.read` and
 `orders.shipping-method.write`. Unsupported capabilities and interpreter versions
@@ -178,7 +178,7 @@ Retry an uncertain response with the same ID and body. Exact retries return the
 original active grant; changed scope, overlapping grants, revoked IDs and stale
 reviews return 409 with a next step. Revocation accepts the exact
 `artifactDigest` and is idempotent. Mutations refresh membership and require an
-owner/admin role. Resources and connections must belong to the current tenant.
+`playbooks.activate` permission. Resources and connections must belong to the current tenant.
 
 The management transaction serializes workspace activation/revocation commands,
 locks current connection grants and commits review, playbook activation and

@@ -5,7 +5,13 @@ import type {
   SupplierSnapshot,
 } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireRole, requireTenant } from '@luma/identity';
+import {
+  hasPermission,
+  IdentityError,
+  isAppPermission,
+  requirePermission,
+  requireTenant,
+} from '@luma/identity';
 import type { ModelGateway, ModelSchema, TraceContext } from '@luma/platform';
 import { canonicalJson } from '@luma/platform';
 import type { PolicyDecision, ProposedAction } from '@luma/policies';
@@ -310,10 +316,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
     requireTenant(context, context.tenantId);
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
-    requireRole(
-      fresh,
-      write ? ['owner', 'admin'] : ['owner', 'admin', 'member'],
-    );
+    requirePermission(fresh, write ? 'procurement.manage' : 'procurement.read');
     if (fresh.actor.id !== context.actor.id)
       throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
 
@@ -435,10 +438,18 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
       submission.state === 'approval_required' &&
       Date.parse(submission.expiresAt) <= deps.now().getTime();
     const requester = context.actor.id === submission.requestedBy;
-    const manager = context.actor.role !== 'member';
+    const manager = hasPermission(context, 'procurement.manage');
+    // Approvers also need permission to approve changes and any app permission the
+    // purchasing capability declares, as policy checks when they respond.
+    const approver =
+      manager &&
+      hasPermission(context, 'decisions.respond') &&
+      (!decision?.permission ||
+        !isAppPermission(decision.permission) ||
+        hasPermission(context, decision.permission));
     const messages: Record<Submission['state'], string> = {
       approval_required: requester
-        ? 'Waiting for a different owner or admin to approve sending this order.'
+        ? 'Waiting for someone else who can approve changes to approve sending this order.'
         : 'Check the supplier, lines and requested date before approving. Luma places the order in the purchasing system right after approval.',
       approved: 'Approved. Luma is placing the order in the purchasing system.',
       rejected: 'Sending was rejected. Nothing was sent.',
@@ -458,7 +469,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
       approvalOutcome: decision?.approval?.outcome ?? null,
       canApprove:
         !expired &&
-        manager &&
+        approver &&
         !requester &&
         submission.state === 'approval_required' &&
         !decision?.approval,
@@ -1105,7 +1116,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
         ...data,
         verified: verifiedRuns,
       });
-      const canManage = context.actor.role !== 'member';
+      const canManage = hasPermission(context, 'procurement.manage');
 
       return {
         ...data,
@@ -1250,7 +1261,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
                 ? !!view?.canApprove
                 : attention.kind === 'submission_uncertain'
                   ? !!view?.canCheck
-                  : context.actor.role !== 'member',
+                  : hasPermission(context, 'procurement.manage'),
           });
         }
       }
@@ -1298,7 +1309,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
         supplier: data.supplier,
         connection,
         confirmationHours: terms(data.supplier).confirmationHours,
-        canManage: context.actor.role !== 'member',
+        canManage: hasPermission(context, 'procurement.manage'),
         communications: data.communications,
         orders: data.orders.map((order) => {
           const { progress, submission } = progressFor(order, {
@@ -1466,8 +1477,8 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
       );
     },
     /**
-     * Approves or rejects a submission. Approval comes from a different owner or admin; Luma then
-     * dispatches it as the requester, exactly once.
+     * Approves or rejects a submission. Approval comes from someone other than the requester who
+     * can manage procurement; Luma then dispatches it as the requester, exactly once.
      */
     async decideSubmission(
       context: TenantContext,

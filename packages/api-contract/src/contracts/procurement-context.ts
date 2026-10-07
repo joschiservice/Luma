@@ -1,7 +1,11 @@
 import { initContract } from '@ts-rest/core';
 import { z } from 'zod';
 
-import { apiErrorSchema, organizationParamsSchema } from '../common.js';
+import {
+  apiErrorSchema,
+  organizationParamsSchema,
+  requires,
+} from '../common.js';
 import {
   purchaseOrderContextSchema,
   supplierContextSchema,
@@ -14,6 +18,7 @@ export const procurementContextContract = c.router(
   {
     order: {
       method: 'GET',
+      metadata: requires('procurement.read'),
       path: `${path}/purchase-orders/:purchaseOrderId/context`,
       pathParams: organizationParamsSchema.extend({
         purchaseOrderId: z.string().uuid(),
@@ -25,6 +30,7 @@ export const procurementContextContract = c.router(
     },
     supplier: {
       method: 'GET',
+      metadata: requires('procurement.read'),
       path: `${path}/suppliers/:supplierId/context`,
       pathParams: organizationParamsSchema.extend({
         supplierId: z.string().uuid(),

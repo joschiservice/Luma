@@ -1,6 +1,11 @@
 import type { AuditEntry } from '@luma/audit';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireRole, requireTenant } from '@luma/identity';
+import {
+  hasPermission,
+  IdentityError,
+  requirePermission,
+  requireTenant,
+} from '@luma/identity';
 
 import type {
   PurchaseOrder,
@@ -77,10 +82,7 @@ export function createProcurementService(deps: {
     requireTenant(context, context.tenantId);
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
-    requireRole(
-      fresh,
-      write ? ['owner', 'admin'] : ['owner', 'admin', 'member'],
-    );
+    requirePermission(fresh, write ? 'procurement.manage' : 'procurement.read');
     if (fresh.actor.id !== context.actor.id)
       throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
 
@@ -168,7 +170,7 @@ export function createProcurementService(deps: {
         (tx) => tx.suppliers(),
       );
 
-      return { items, canManage: context.actor.role !== 'member' };
+      return { items, canManage: hasPermission(context, 'procurement.manage') };
     },
     /** Reads purchase orders after refreshing workspace membership. */
     async orders(context: TenantContext) {
@@ -179,7 +181,7 @@ export function createProcurementService(deps: {
         (tx) => tx.orders(),
       );
 
-      return { items, canManage: context.actor.role !== 'member' };
+      return { items, canManage: hasPermission(context, 'procurement.manage') };
     },
     /** Looks up one tenant supplier without exposing another workspace's records. */
     async supplier(context: TenantContext, id: string) {
@@ -282,7 +284,7 @@ export function createProcurementService(deps: {
         const order = await tx.order(id);
         if (!order)
           throw new IdentityError(404, 'NOT_FOUND', 'Purchase order not found');
-        const canManage = context.actor.role !== 'member';
+        const canManage = hasPermission(context, 'procurement.manage');
 
         return {
           order,

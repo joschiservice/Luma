@@ -1,5 +1,9 @@
 import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireRole, requireTenant } from '@luma/identity';
+import {
+  IdentityError,
+  requirePermission,
+  requireTenant,
+} from '@luma/identity';
 import type { PlaybookRun } from '@luma/workflows';
 
 import type {
@@ -66,7 +70,7 @@ export function createShadowService(deps: {
   async function authorize(context: TenantContext) {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
-    requireRole(fresh, ['owner', 'admin']);
+    requirePermission(fresh, 'playbooks.activate');
     if (fresh.actor.id !== context.actor.id)
       throw new IdentityError(403, 'FORBIDDEN', 'Actor changed');
 
@@ -113,7 +117,7 @@ export function createShadowService(deps: {
             ...request,
             incidentId,
             actorId: context.actor.id,
-            role: context.actor.role,
+            access: context.permissions,
             now: deps.now().toISOString(),
           }),
         candidate,

@@ -24,6 +24,7 @@ import {
 import type { ShopifyOAuth } from './application/oauth.js';
 import { createRecordService } from './application/records.js';
 import { readShopifyConfig } from './config.js';
+import { recordPermission } from './domain/records.js';
 import { createShopifyRecovery } from './fulfillment-recovery.js';
 import { createShopifyConnector } from './infrastructure/adapter.js';
 import {
@@ -130,6 +131,11 @@ export function createApp(context: AppFactoryContext): AppDefinition {
         refreshContext: context.refreshContext,
         verify: createInstallationVerifier({ simulation: context.simulation }),
         requireInstalled: (ctx) => context.requireInstalled(ctx, 'shopify'),
+        authorize: (ctx) =>
+          context.requirePermission(ctx, {
+            app: 'shopify',
+            permission: 'connections.manage',
+          }),
       })
     : undefined;
 
@@ -146,6 +152,11 @@ export function createApp(context: AppFactoryContext): AppDefinition {
     installations,
     reader: createShopifyRecordReader,
     requireInstalled: (ctx) => context.requireInstalled(ctx, 'shopify'),
+    authorize: async (ctx, kind) =>
+      context.requirePermission(await context.refreshContext(ctx), {
+        app: 'shopify',
+        scopes: [recordPermission(kind)],
+      }),
     protectedCustomerDataApproved:
       context.env.SHOPIFY_PROTECTED_CUSTOMER_DATA_APPROVED === 'true',
     protectedCustomerContactApproved:
@@ -173,6 +184,51 @@ export function createApp(context: AppFactoryContext): AppDefinition {
         'fulfillment',
       ],
       connectionTypes: [{ kind: 'shopify', name: 'Shopify' }],
+      permissions: [
+        {
+          key: 'shopify:fulfillment_recovery.run',
+          label: 'Recover Shopify fulfillments',
+          description:
+            'Preview, request approval for and run fulfillment recovery for stuck Shopify orders.',
+          consequential: true,
+        },
+        {
+          key: 'shopify:inventory_corrections.apply',
+          label: 'Correct Shopify inventory',
+          description:
+            'Preview, request approval for and apply stock corrections at Shopify locations.',
+          consequential: true,
+        },
+      ],
+      scopes: [
+        'orders.read',
+        'fulfillment.read',
+        'inventory.read',
+        'products.read',
+        'customers.read',
+        'returns.read',
+        'actions.propose',
+        'actions.execute',
+      ],
+      slotAccess: {
+        connections: 'connections.manage',
+        settings: 'connections.manage',
+        page: 'orders.read',
+        record: 'orders.read',
+        customers: 'customers.read',
+        inventory: 'shopify:inventory_corrections.apply',
+        fulfillment: 'shopify:fulfillment_recovery.run',
+      },
+      decisionAccess: {
+        fulfillment_recovery: {
+          view: 'shopify:fulfillment_recovery.run',
+          respond: 'shopify:fulfillment_recovery.run',
+        },
+        inventory_correction: {
+          view: 'shopify:inventory_corrections.apply',
+          respond: 'shopify:inventory_corrections.apply',
+        },
+      },
     },
     connector: createShopifyProvider({
       ...(oauth ? { oauth } : {}),
@@ -187,17 +243,6 @@ export function createApp(context: AppFactoryContext): AppDefinition {
         : {}),
     }),
     async decisions(tenant) {
-      try {
-        await context.requireInstalled(tenant, 'shopify');
-      } catch (error) {
-        // Absent (404) and not installed (409) apps have no decisions for this workspace.
-        if (
-          error instanceof IdentityError &&
-          [403, 404, 409].includes(error.statusCode)
-        )
-          return [];
-        throw error;
-      }
       const [recoveries, stock] = await Promise.all([
         recovery.pending(tenant),
         corrections.pending(tenant),
@@ -248,6 +293,7 @@ export function createApp(context: AppFactoryContext): AppDefinition {
       registerRecoveryRoutes(server, recovery);
       server.post(
         '/v1/organizations/:organizationId/apps/shopify/record-connections',
+        { config: { access: { access: 'member' } } },
         async (request, reply) => {
           reply.header('cache-control', 'no-store');
           if (!request.tenantContext)
@@ -275,6 +321,7 @@ export function createApp(context: AppFactoryContext): AppDefinition {
       );
       server.post(
         '/v1/organizations/:organizationId/apps/shopify/access',
+        { config: { access: { permission: 'connections.manage' } } },
         async (request, reply) => {
           reply.header('cache-control', 'no-store');
           if (!request.tenantContext)
@@ -300,6 +347,7 @@ export function createApp(context: AppFactoryContext): AppDefinition {
       );
       server.post(
         '/v1/organizations/:organizationId/apps/shopify/authorize',
+        { config: { access: { permission: 'connections.manage' } } },
         async (request) => {
           if (!request.tenantContext)
             throw new IdentityError(

@@ -4,7 +4,7 @@ Inventory offers one bounded source-of-truth policy: a selected JTL ERP source
 supplies the available quantity, and Shopify is the correction destination. Luma
 never writes ERP stock, accepts a manually entered quantity, sums sources, or
 assumes that a source is authoritative merely because its quantity differs.
-The requester selects the ERP authority; a different owner or admin approves the
+The requester selects the ERP authority; someone else with `decisions.respond` and `shopify:inventory_corrections.apply` approves the
 exact persisted proposal. Other source-of-truth policies and delta adjustments
 are unsupported.
 

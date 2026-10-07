@@ -8,7 +8,7 @@ import type { FastifyRequest } from 'fastify';
 import type { SupplierCommitments } from '../application/commitments.js';
 import type { ProcurementService } from '../application/procurement.js';
 
-/** Registers tenant-authenticated procurement reads and administrator writes. */
+/** Registers tenant-authenticated procurement reads and permission-gated writes. */
 export function procurementRoutes(
   service?: ProcurementService,
   commitments?: SupplierCommitments,

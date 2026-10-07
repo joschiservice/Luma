@@ -41,7 +41,7 @@ test('reviews stock in Inventory, obtains approval, then verifies Shopify in bot
     .click();
   await expect(
     panel.getByText(
-      'A different administrator must approve this exact action.',
+      'Someone else who can approve changes must approve this exact action.',
       { exact: true },
     ),
   ).toBeVisible();

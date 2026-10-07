@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { createCommerceServices } from '@luma/application-runtime';
-import { makeTenantContext } from '@luma/identity';
+import { builtInMembership, makeTenantContext } from '@luma/identity';
 
 import { inventoryFixture } from './inventory-fixture.mjs';
 
@@ -18,12 +18,10 @@ export async function productsFixture(t, f) {
   const context = makeTenantContext(
     { userId: f.owner.id, sessionId: 'fixture' },
     { ...f.org, status: 'active', dataRegion: 'EU' },
-    {
-      id: randomUUID(),
-      organizationId: f.org.id,
-      userId: f.owner.id,
-      role: 'owner',
-    },
+    builtInMembership(
+      { id: randomUUID(), organizationId: f.org.id, userId: f.owner.id },
+      'owner',
+    ),
     randomUUID(),
   );
 

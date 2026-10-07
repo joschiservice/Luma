@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { roleReferenceSchema } from './roles.js';
+
 export const workspaceSettingsSchema = z.object({
   name: z.string(),
   slug: z.string(),
@@ -26,7 +28,7 @@ export const deliveryStateSchema = z.enum([
 export const invitationSchema = z.object({
   id: z.string().uuid(),
   email: z.string(),
-  role: z.enum(['admin', 'member']),
+  role: roleReferenceSchema.extend({ archived: z.boolean() }),
   status: z.enum(['pending', 'expired', 'accepted', 'revoked']),
   expiresAt: z.string(),
   createdAt: z.string(),

@@ -85,6 +85,7 @@ export function searchStockTool(inventory: Pick<InventoryWorkspace, 'list'>) {
     name: 'search_stock',
     label: 'Search stock',
     reads: 'stock_position',
+    permission: 'inventory.read',
     description:
       'Search stock positions (SKU at a location) as on the Inventory page. `q` matches SKU codes and keys. Views: `differs` (sources report different quantities), `unknown` (a source reports no quantity), `all`. Each source’s on-hand, reserved, available and incoming quantities are listed separately with when they were read; a missing quantity is unknown, not zero. Returns up to 50 positions per page.',
     jsonSchema: {
@@ -173,6 +174,7 @@ export function searchFulfillmentTool(
     name: 'search_fulfillment',
     label: 'Search fulfillment',
     reads: 'fulfillment',
+    permission: 'fulfillment.read',
     description:
       'Search fulfillment orders and shipments as on the Fulfillment page. Views: `attention` (held, overdue, stalled, failed or delivery problems), `held`, `delayed`, `open`, `in_transit`, `all`. `signals` explain why an item needs attention. `q` matches order numbers, tracking numbers and source IDs. Sort by `waiting` (longest without progress), `recent` or `deadline`. `counts` gives the number of items in each view.',
     jsonSchema: {
@@ -274,6 +276,7 @@ export function searchReturnsTool(returns: Pick<ReturnWorkspace, 'list'>) {
     name: 'search_returns',
     label: 'Search returns',
     reads: 'return',
+    permission: 'returns.read',
     description:
       'Search returns and refunds as on the Returns page. Views: `action` (needs a person), `waiting` (with the customer or payment provider), `done`, `all`; or filter by `stage`. `refunded` is money actually returned to the customer; `pending` is not yet paid out. `q` matches return names and order numbers. `counts` gives the number in each view and stage.',
     jsonSchema: {

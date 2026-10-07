@@ -163,7 +163,7 @@ export function ReplenishmentPanel({
         <p id="replenishment-setup-reason" className="workflow-caption">
           {!data.available
             ? 'Setup is unavailable while the workflow worker is disconnected.'
-            : 'Only owners and admins can add or revoke stock rules.'}
+            : 'Your role doesn’t include Manage procurement, so you can’t add or revoke stock rules.'}
         </p>
       ) : null}
       {query.isPending ? (
@@ -605,7 +605,7 @@ export function ReplenishmentRunReview({
           <p>
             {review.canRespond
               ? 'Review this quantity and supplier before approving the draft.'
-              : 'Waiting for a different owner or admin. Stock evidence must still be fresh when approved.'}
+              : 'Waiting for someone else who can approve changes. Stock evidence must still be fresh when approved.'}
           </p>
           {review.canRespond && review.decisionId ? (
             <div className="workflow-dialog-actions">

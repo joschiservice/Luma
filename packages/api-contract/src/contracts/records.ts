@@ -1,7 +1,12 @@
 import { initContract } from '@ts-rest/core';
 import { z } from 'zod';
 
-import { apiErrorSchema, organizationParamsSchema } from '../common.js';
+import {
+  anyMember,
+  apiErrorSchema,
+  organizationParamsSchema,
+  requires,
+} from '../common.js';
 import {
   recordDetailSchema,
   recordKindSchema,
@@ -14,6 +19,7 @@ const c = initContract();
 export const recordsContract = c.router({
   resolve: {
     method: 'GET',
+    metadata: requires('orders.read'),
     path: '/v1/organizations/:organizationId/record-source',
     pathParams: organizationParamsSchema,
     query: z
@@ -36,6 +42,7 @@ export const recordsContract = c.router({
   },
   list: {
     method: 'GET',
+    metadata: anyMember,
     path: '/v1/organizations/:organizationId/records',
     pathParams: organizationParamsSchema,
     query: recordQuerySchema,
@@ -52,6 +59,7 @@ export const recordsContract = c.router({
   },
   get: {
     method: 'GET',
+    metadata: anyMember,
     path: '/v1/organizations/:organizationId/records/:kind/:recordId',
     pathParams: organizationParamsSchema.extend({
       kind: recordKindSchema,

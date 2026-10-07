@@ -2,7 +2,10 @@ import { createAdmissionEligibility } from '@luma/application-runtime';
 import type { Diagnosis, Incident } from '@luma/exceptions';
 import type { ExecutionRecord } from '@luma/execution';
 import { IdentityError } from '@luma/identity';
-import { makeTenantContext } from '@luma/identity/composition';
+import {
+  builtInMembership,
+  makeTenantContext,
+} from '@luma/identity/composition';
 import type { ProposedAction } from '@luma/policies';
 import type {
   ExceptionWorkflowInput,
@@ -20,12 +23,10 @@ const context = makeTenantContext(
     dataRegion: 'EU',
     status: 'active',
   },
-  {
-    id: 'membership',
-    organizationId: 'tenant',
-    userId: 'requester',
-    role: 'owner',
-  },
+  builtInMembership(
+    { id: 'membership', organizationId: 'tenant', userId: 'requester' },
+    'owner',
+  ),
   'request',
 );
 
@@ -305,12 +306,10 @@ it('deduplicates starts and scopes commands to the current tenant', async () => 
         dataRegion: 'EU',
         status: 'active',
       },
-      {
-        id: 'other-member',
-        organizationId: 'other',
-        userId: 'requester',
-        role: 'owner',
-      },
+      builtInMembership(
+        { id: 'other-member', organizationId: 'other', userId: 'requester' },
+        'owner',
+      ),
       'other-request',
     );
     expect(await client.start(other, input.source)).not.toEqual(first);
@@ -325,12 +324,10 @@ it('deduplicates starts and scopes commands to the current tenant', async () => 
         dataRegion: 'EU',
         status: 'active',
       },
-      {
-        id: 'reader-membership',
-        organizationId: 'tenant',
-        userId: 'reader',
-        role: 'member',
-      },
+      builtInMembership(
+        { id: 'reader-membership', organizationId: 'tenant', userId: 'reader' },
+        'member',
+      ),
       'reader-request',
     );
     expect(await reader.get(member, 'incident')).toMatchObject({

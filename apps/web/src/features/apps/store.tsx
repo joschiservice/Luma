@@ -10,6 +10,7 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { useRef, useState } from 'react';
 
 import { connectionError, connectionsOptions } from '../connections/data';
+import { AppAccessDialog } from './access';
 import { appsOptions, changeApp } from './data';
 
 /** Shows installed apps with connection summaries and a separate catalog for discovery. */
@@ -29,8 +30,9 @@ export function AppStore({
   const [pending, setPending] = useState(false);
   const lock = useRef(false);
   const [message, setMessage] = useState('');
+  const [reviewing, setReviewing] = useState<string | null>(null);
 
-  async function install(id: string) {
+  async function install(id: string, scopes: readonly string[]) {
     if (lock.current) return;
     lock.current = true;
     setPending(true);
@@ -39,7 +41,14 @@ export function AppStore({
       const current = query.data?.installations.find(
         (item) => item.appId === id,
       );
-      await changeApp(organizationId, id, 'install', current?.version ?? null);
+      await changeApp(
+        organizationId,
+        id,
+        'install',
+        current?.version ?? null,
+        scopes,
+      );
+      setReviewing(null);
       await Promise.all([
         client.invalidateQueries({
           queryKey: appsOptions(organizationId).queryKey,
@@ -79,7 +88,8 @@ export function AppStore({
     <>
       {!canManage ? (
         <p className="apps-note">
-          An owner or admin can install and configure apps.
+          Installing apps requires permission to manage apps, which your role
+          doesn’t include.
         </p>
       ) : null}
       <section className="connections-section" aria-labelledby="installed-apps">
@@ -182,7 +192,10 @@ export function AppStore({
               <p className="app-tile-description">{app.description}</p>
               <Button
                 disabled={!canManage || pending}
-                onClick={() => void install(app.id)}
+                onClick={() => {
+                  setMessage('');
+                  setReviewing(app.id);
+                }}
               >
                 Install {app.name}
               </Button>
@@ -214,7 +227,21 @@ export function AppStore({
       {connections.error ? (
         <p role="alert">{connectionError(connections.error)}</p>
       ) : null}
-      <p role="status">{message}</p>
+      {reviewing ? null : <p role="status">{message}</p>}
+      {available.map((app) => (
+        <AppAccessDialog
+          key={app.id}
+          organizationId={organizationId}
+          app={app}
+          scopes={app.scopes}
+          mode="install"
+          open={reviewing === app.id}
+          pending={pending}
+          error={reviewing === app.id ? message : ''}
+          close={() => setReviewing(null)}
+          confirm={() => void install(app.id, app.scopes)}
+        />
+      ))}
     </>
   );
 }

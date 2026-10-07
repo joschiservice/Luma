@@ -109,12 +109,16 @@ describe.skipIf(!databaseUrl)(
         await roleSetup.query(
           "SELECT pg_advisory_lock(hashtext('luma_test_role_setup'))",
         );
-        await owner.query(
-          await readFile(
-            new URL('../migrations/0001_identity.sql', import.meta.url),
-            'utf8',
-          ),
-        );
+        for (const migration of [
+          '0001_identity.sql',
+          '0004_connector_installations.sql',
+        ])
+          await owner.query(
+            await readFile(
+              new URL(`../migrations/${migration}`, import.meta.url),
+              'utf8',
+            ),
+          );
       } finally {
         await roleSetup.query(
           "SELECT pg_advisory_unlock(hashtext('luma_test_role_setup'))",
@@ -127,19 +131,23 @@ describe.skipIf(!databaseUrl)(
           'utf8',
         ),
       );
-      await owner.query(
-        await readFile(
-          new URL(
-            '../migrations/0052_authentication_factors.sql',
-            import.meta.url,
+      // Roles list app permissions, so app installations are part of identity's schema here.
+      for (const migration of [
+        '0024_workspace_apps.sql',
+        '0052_authentication_factors.sql',
+        '0054_workspace_roles.sql',
+        '0055_workspace_app_scopes.sql',
+      ])
+        await owner.query(
+          await readFile(
+            new URL(`../migrations/${migration}`, import.meta.url),
+            'utf8',
           ),
-          'utf8',
-        ),
-      );
+        );
       await admin.query(
         `CREATE ROLE "${login}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`,
       );
-      await admin.query(`GRANT luma_identity TO "${login}"`);
+      await admin.query(`GRANT luma_identity, luma_connectors TO "${login}"`);
       url.username = login;
       url.password = password;
       runtimeUrl = url.toString();
@@ -150,10 +158,14 @@ describe.skipIf(!databaseUrl)(
         baseURL: origin,
         trustedOrigins: [origin],
       });
-      app.get('/v1/organizations/:organizationId/probe', async (request) => ({
-        tenantId: request.tenantContext?.tenantId,
-        actorId: request.tenantContext?.actor.id,
-      }));
+      app.get(
+        '/v1/organizations/:organizationId/probe',
+        { config: { access: { access: 'member' } } },
+        async (request) => ({
+          tenantId: request.tenantContext?.tenantId,
+          actorId: request.tenantContext?.actor.id,
+        }),
+      );
       alice = await signup('alice');
       bob = await signup('bob');
       orgA = await createOrg(alice.cookie, 'alice');
@@ -244,8 +256,9 @@ describe.skipIf(!databaseUrl)(
           type: 'user',
           id: alice.id,
           initiatingUserId: alice.id,
-          role: 'owner',
+          role: { id: 'owner', key: 'owner', name: 'Owner', builtIn: true },
         },
+        allAppPermissions: true,
         requestId: context.headers['x-request-id'],
       });
       expect(JSON.stringify(context.json())).not.toContain(alice.cookie);
@@ -327,7 +340,7 @@ describe.skipIf(!databaseUrl)(
         method: 'POST',
         url: `/v1/organizations/${orgA}/members`,
         headers: headers(alice.cookie),
-        payload: { userId: bob.id, role: 'member' },
+        payload: { userId: bob.id, roleId: 'member' },
       });
       expect(added.statusCode, added.body).toBe(201);
       const memberId = added.json().id;
@@ -340,28 +353,28 @@ describe.skipIf(!databaseUrl)(
         method: 'PATCH',
         url: `/v1/organizations/${orgA}/members/${memberId}`,
         headers: headers(bob.cookie),
-        payload: { role: 'owner' },
+        payload: { roleId: 'owner' },
       });
       expect(forbidden.statusCode).toBe(403);
       const foreign = await app.inject({
         method: 'PATCH',
         url: `/v1/organizations/${orgB}/members/${memberId}`,
         headers: headers(bob.cookie),
-        payload: { role: 'admin' },
+        payload: { roleId: 'admin' },
       });
       expect(foreign.statusCode).toBe(404);
       const promoted = await app.inject({
         method: 'PATCH',
         url: `/v1/organizations/${orgA}/members/${memberId}`,
         headers: headers(alice.cookie),
-        payload: { role: 'admin' },
+        payload: { roleId: 'admin' },
       });
       expect(promoted.statusCode, promoted.body).toBe(200);
       const ownership = await app.inject({
         method: 'PATCH',
         url: `/v1/organizations/${orgA}/members/${memberId}`,
         headers: headers(bob.cookie),
-        payload: { role: 'owner' },
+        payload: { roleId: 'owner' },
       });
       expect(ownership.statusCode).toBe(403);
       const removed = await app.inject({
@@ -449,7 +462,13 @@ describe.skipIf(!databaseUrl)(
       );
     });
     it('enforces RLS, immutable placement/ownership and transaction-local pool context', async () => {
-      for (const table of ['organizations', 'memberships', 'invitations'])
+      for (const table of [
+        'organizations',
+        'memberships',
+        'invitations',
+        'workspace_roles',
+        'workspace_role_permissions',
+      ])
         expect((await runtime.query(`SELECT * FROM ${table}`)).rows).toEqual(
           [],
         );
@@ -515,7 +534,7 @@ describe.skipIf(!databaseUrl)(
         method: 'POST',
         url: `/v1/organizations/${organizationId}/members`,
         headers: headers(alice.cookie),
-        payload: { userId: bob.id, role: 'owner' },
+        payload: { userId: bob.id, roleId: 'owner' },
       });
       expect(added.statusCode).toBe(201);
       const list = await app.inject({
@@ -530,13 +549,13 @@ describe.skipIf(!databaseUrl)(
           method: 'PATCH',
           url: `/v1/organizations/${organizationId}/members/${aliceMember.id}`,
           headers: headers(alice.cookie),
-          payload: { role: 'member' },
+          payload: { roleId: 'member' },
         }),
         app.inject({
           method: 'PATCH',
           url: `/v1/organizations/${organizationId}/members/${added.json().id}`,
           headers: headers(bob.cookie),
-          payload: { role: 'member' },
+          payload: { roleId: 'member' },
         }),
       ]);
       expect(responses.map((r) => r.statusCode).sort()).toEqual([200, 409]);
@@ -831,6 +850,336 @@ describe.skipIf(!databaseUrl)(
         },
       });
       expect(signin.statusCode, signin.body).toBe(200);
+    });
+
+    describe('custom workspace roles', () => {
+      let organizationId: string;
+      let carol: { id: string; cookie: string };
+      let carolMember: string;
+      const commandHeaders = (cookie: string) => ({
+        ...headers(cookie),
+        'x-command-id': randomUUID(),
+      });
+      const createRole = (
+        cookie: string,
+        payload: { name: string; description?: string; permissions: string[] },
+        headerValues = commandHeaders(cookie),
+      ) =>
+        app.inject({
+          method: 'POST',
+          url: `/v1/organizations/${organizationId}/roles`,
+          headers: headerValues,
+          payload: { description: '', ...payload },
+        });
+      const context = async (cookie: string) =>
+        (
+          await app.inject({
+            url: `/v1/organizations/${organizationId}/context`,
+            headers: headers(cookie),
+          })
+        ).json() as {
+          permissions: string[];
+          actor: { role: { name: string } };
+        };
+      const assign = (cookie: string, memberId: string, roleId: string) =>
+        app.inject({
+          method: 'PATCH',
+          url: `/v1/organizations/${organizationId}/members/${memberId}`,
+          headers: commandHeaders(cookie),
+          payload: { roleId },
+        });
+
+      beforeAll(async () => {
+        // Earlier tests sign out; continue with fresh sessions.
+        for (const [person, name] of [
+          [alice, 'alice'],
+          [bob, 'bob'],
+        ] as const) {
+          const signin = await app.inject({
+            method: 'POST',
+            url: '/auth/sign-in/email',
+            headers: { origin },
+            payload: {
+              email: `${name}@example.test`,
+              password: 'test-password-long-enough',
+            },
+          });
+          expect(signin.statusCode, signin.body).toBe(200);
+          person.cookie = responseCookies(signin);
+        }
+        organizationId = await createOrg(alice.cookie, 'roles');
+        carol = await signup('role-tester');
+        const added = await app.inject({
+          method: 'POST',
+          url: `/v1/organizations/${organizationId}/members`,
+          headers: commandHeaders(alice.cookie),
+          payload: { userId: carol.id, roleId: 'member' },
+        });
+        expect(added.statusCode, added.body).toBe(201);
+        carolMember = added.json().id;
+      });
+
+      it('applies a custom role and its edits on the next request', async () => {
+        const created = await createRole(alice.cookie, {
+          name: 'Buyer',
+          permissions: ['procurement.read', 'orders.read'],
+        });
+        expect(created.statusCode, created.body).toBe(201);
+        const role = created.json();
+        expect(role).toMatchObject({
+          key: 'custom',
+          revision: 1,
+          memberCount: 0,
+        });
+        expect(
+          (await assign(alice.cookie, carolMember, role.id)).statusCode,
+        ).toBe(200);
+        const before = await context(carol.cookie);
+        expect(before.actor.role.name).toBe('Buyer');
+        expect(before.permissions).toEqual(['orders.read', 'procurement.read']);
+        expect(
+          (
+            await app.inject({
+              url: `/v1/organizations/${organizationId}/settings/invitations`,
+              headers: headers(carol.cookie),
+            })
+          ).statusCode,
+        ).toBe(403);
+        const edited = await app.inject({
+          method: 'PATCH',
+          url: `/v1/organizations/${organizationId}/roles/${role.id}`,
+          headers: commandHeaders(alice.cookie),
+          payload: {
+            name: 'Buyer',
+            description: 'Purchasing team',
+            permissions: ['procurement.read', 'members.manage'],
+            revision: 1,
+          },
+        });
+        expect(edited.statusCode, edited.body).toBe(200);
+        expect(edited.json()).toMatchObject({ revision: 2, memberCount: 1 });
+        expect((await context(carol.cookie)).permissions).toEqual([
+          'members.manage',
+          'procurement.read',
+        ]);
+        expect(
+          (
+            await app.inject({
+              url: `/v1/organizations/${organizationId}/settings/invitations`,
+              headers: headers(carol.cookie),
+            })
+          ).statusCode,
+        ).toBe(200);
+        const stale = await app.inject({
+          method: 'PATCH',
+          url: `/v1/organizations/${organizationId}/roles/${role.id}`,
+          headers: commandHeaders(alice.cookie),
+          payload: {
+            name: 'Buyer',
+            description: '',
+            permissions: [],
+            revision: 1,
+          },
+        });
+        expect(stale.statusCode).toBe(409);
+        const history = await app.inject({
+          url: `/v1/organizations/${organizationId}/roles/${role.id}/history`,
+          headers: headers(alice.cookie),
+        });
+        expect(history.statusCode, history.body).toBe(200);
+        expect(
+          history.json().items.map((item: { kind: string }) => item.kind),
+        ).toEqual(['updated', 'member_assigned', 'created']);
+        expect(history.json().items[0]).toMatchObject({
+          added: ['members.manage'],
+          removed: ['orders.read'],
+          actor: { id: alice.id, name: 'alice' },
+        });
+      });
+
+      it('returns the original result for a replayed command and rejects a reused ID', async () => {
+        const replay = commandHeaders(alice.cookie);
+        const first = await createRole(
+          alice.cookie,
+          { name: 'Replay', permissions: ['orders.read'] },
+          replay,
+        );
+        const second = await createRole(
+          alice.cookie,
+          { name: 'Replay', permissions: ['orders.read'] },
+          replay,
+        );
+        expect(first.statusCode, first.body).toBe(201);
+        expect(second.json().id).toBe(first.json().id);
+        const reused = await createRole(
+          alice.cookie,
+          { name: 'Different', permissions: [] },
+          replay,
+        );
+        expect(reused.statusCode).toBe(409);
+        expect(
+          (await createRole(alice.cookie, { name: 'replay', permissions: [] }))
+            .statusCode,
+        ).toBe(409);
+        expect(
+          (
+            await createRole(alice.cookie, {
+              name: 'Unknown',
+              permissions: ['orders.write'],
+            })
+          ).statusCode,
+        ).toBe(422);
+      });
+
+      it('rejects concurrent edits of the same revision', async () => {
+        const role = (
+          await createRole(alice.cookie, { name: 'Racer', permissions: [] })
+        ).json();
+        const responses = await Promise.all(
+          [['orders.read'], ['inventory.read']].map((permissions) =>
+            app.inject({
+              method: 'PATCH',
+              url: `/v1/organizations/${organizationId}/roles/${role.id}`,
+              headers: commandHeaders(alice.cookie),
+              payload: {
+                name: 'Racer',
+                description: '',
+                permissions,
+                revision: 1,
+              },
+            }),
+          ),
+        );
+        expect(responses.map((r) => r.statusCode).sort()).toEqual([200, 409]);
+      });
+
+      it('prevents granting or assigning permissions the actor lacks', async () => {
+        const manager = (
+          await createRole(alice.cookie, {
+            name: 'Team lead',
+            permissions: ['members.manage', 'roles.manage', 'orders.read'],
+          })
+        ).json();
+        expect(
+          (await assign(alice.cookie, carolMember, manager.id)).statusCode,
+        ).toBe(200);
+        expect(
+          (
+            await createRole(carol.cookie, {
+              name: 'Escalated',
+              permissions: ['orders.read', 'workspace.approval_policy.manage'],
+            })
+          ).statusCode,
+        ).toBe(403);
+        const allowed = await createRole(carol.cookie, {
+          name: 'Reader',
+          permissions: ['orders.read'],
+        });
+        expect(allowed.statusCode, allowed.body).toBe(201);
+        const self = (await assign(carol.cookie, carolMember, 'admin'))
+          .statusCode;
+        expect(self).toBe(403);
+        const members = await app.inject({
+          url: `/v1/organizations/${organizationId}/members`,
+          headers: headers(alice.cookie),
+        });
+        const aliceMember = members
+          .json()
+          .items.find((m: { userId: string }) => m.userId === alice.id);
+        expect(
+          (await assign(carol.cookie, aliceMember.id, 'member')).statusCode,
+        ).toBe(403);
+        expect(
+          (await assign(alice.cookie, carolMember, 'member')).statusCode,
+        ).toBe(200);
+      });
+
+      it('archives only unused roles and revokes their pending invitations', async () => {
+        const role = (
+          await createRole(alice.cookie, {
+            name: 'Seasonal',
+            permissions: ['orders.read'],
+          })
+        ).json();
+        expect(
+          (await assign(alice.cookie, carolMember, role.id)).statusCode,
+        ).toBe(200);
+        const invitation = randomUUID();
+        await owner.query(
+          `INSERT INTO workspace_invitations(tenant_id,id,email,role,custom_role_id,status,token_hash,inviter_id,expires_at)
+           VALUES($1,$2,'temp@example.test','custom',$3,'pending','x',$4,now()+interval '1 day')`,
+          [organizationId, invitation, role.id, alice.id],
+        );
+        const archive = (revision: number) =>
+          app.inject({
+            method: 'POST',
+            url: `/v1/organizations/${organizationId}/roles/${role.id}/archive`,
+            headers: commandHeaders(alice.cookie),
+            payload: { revision },
+          });
+        expect((await archive(1)).statusCode).toBe(409);
+        expect(
+          (await assign(alice.cookie, carolMember, 'member')).statusCode,
+        ).toBe(200);
+        const archived = await archive(1);
+        expect(archived.statusCode, archived.body).toBe(200);
+        expect(archived.json()).toMatchObject({ archived: true, revision: 2 });
+        expect(
+          (
+            await owner.query(
+              'SELECT status FROM workspace_invitations WHERE tenant_id=$1 AND id=$2',
+              [organizationId, invitation],
+            )
+          ).rows[0],
+        ).toEqual({ status: 'revoked' });
+        expect(
+          (await assign(alice.cookie, carolMember, role.id)).statusCode,
+        ).toBe(409);
+      });
+
+      it('rejects role IDs from another workspace', async () => {
+        const foreign = await app.inject({
+          method: 'POST',
+          url: `/v1/organizations/${orgB}/roles`,
+          headers: commandHeaders(bob.cookie),
+          payload: { name: 'Foreign', description: '', permissions: [] },
+        });
+        expect(foreign.statusCode, foreign.body).toBe(201);
+        expect(
+          (await assign(alice.cookie, carolMember, foreign.json().id))
+            .statusCode,
+        ).toBe(409);
+        const listed = await app.inject({
+          url: `/v1/organizations/${organizationId}/roles`,
+          headers: headers(carol.cookie),
+        });
+        expect(listed.statusCode).toBe(200);
+        expect(
+          listed.json().roles.map((role: { id: string }) => role.id),
+        ).not.toContain(foreign.json().id);
+        expect(
+          (
+            await app.inject({
+              method: 'PATCH',
+              url: `/v1/organizations/${organizationId}/roles/${foreign.json().id}`,
+              headers: commandHeaders(alice.cookie),
+              payload: {
+                name: 'Taken',
+                description: '',
+                permissions: [],
+                revision: 1,
+              },
+            })
+          ).statusCode,
+        ).toBe(404);
+      });
+
+      it('resolves context with one membership query that stays fast', async () => {
+        const started = performance.now();
+        for (let index = 0; index < 50; index += 1) await context(carol.cookie);
+        // Generous bound: the lookup adds one join and a subquery, not a round trip.
+        expect((performance.now() - started) / 50).toBeLessThan(50);
+      });
     });
   },
 );

@@ -1,10 +1,14 @@
 import { createHash } from 'node:crypto';
 
-import { requireTenant } from '@luma/identity';
+import { requirePermission } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
 import { z } from 'zod';
 
-import type { ProductWorkspace } from '../../application/products.js';
+import { hiddenSections } from '../../application/access.js';
+import type {
+  ProductDetailSection,
+  ProductWorkspace,
+} from '../../application/products.js';
 import {
   type CatalogPosition,
   readCatalog,
@@ -29,7 +33,7 @@ const encode = (context: string, position: CatalogPosition) =>
 export function createProductWorkspace(db: TenantDatabase): ProductWorkspace {
   return {
     async list(context, query) {
-      requireTenant(context, context.tenantId);
+      requirePermission(context, 'products.read');
       const scope = createHash('sha256')
         .update(
           JSON.stringify([
@@ -87,7 +91,16 @@ export function createProductWorkspace(db: TenantDatabase): ProductWorkspace {
       );
     },
     async get(context, skuId) {
-      requireTenant(context, context.tenantId);
+      requirePermission(context, 'products.read');
+      const hidden = hiddenSections<ProductDetailSection>(context, [
+        ['stock', 'inventory.read'],
+        ['sales', 'orders.read'],
+        ['orders', 'orders.read'],
+        ['purchaseOrders', 'procurement.read'],
+        ['issues', 'issues.read'],
+      ]);
+      const shown = (section: ProductDetailSection) =>
+        !hidden.includes(section);
 
       return db.transaction(
         context.tenantId,
@@ -116,10 +129,22 @@ export function createProductWorkspace(db: TenantDatabase): ProductWorkspace {
             })),
           };
 
+          const related = await readProductContext(tx, context.tenantId, item);
+
           return {
             item,
             sources,
-            ...(await readProductContext(tx, context.tenantId, item)),
+            ...related,
+            stock: shown('stock') ? related.stock : [],
+            sales: shown('sales')
+              ? related.sales
+              : { since: related.sales.since, sources: [] },
+            orders: shown('orders') ? related.orders : [],
+            purchaseOrders: shown('purchaseOrders')
+              ? related.purchaseOrders
+              : [],
+            issues: shown('issues') ? related.issues : [],
+            hidden,
             asOf: new Date().toISOString(),
           };
         },

@@ -1,5 +1,5 @@
 import type { IdentityService, TenantContext } from '@luma/identity';
-import { requireRole, requireTenant } from '@luma/identity';
+import { requirePermission, requireTenant } from '@luma/identity';
 import type {
   ProcessActivities,
   ProcessProgress,
@@ -32,11 +32,12 @@ export function createProcessCommands(
   identity: Pick<IdentityService, 'refreshContext'>,
 ) {
   async function scope(context: TenantContext, run: ProcessRun) {
+    // Process runs prepare actions as their principal; admission checks execution separately.
     requireTenant(context, run.tenantId);
-    requireRole(context, ['owner', 'admin']);
+    requirePermission(context, 'actions.propose');
     const fresh = await identity.refreshContext(context);
     requireTenant(fresh, run.tenantId);
-    requireRole(fresh, ['owner', 'admin']);
+    requirePermission(fresh, 'actions.propose');
     if (fresh.actor.id !== context.actor.id || fresh.actor.id !== run.actor.id)
       throw new Error('Workflow principal changed');
 

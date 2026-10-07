@@ -6,7 +6,11 @@ import type {
   VerificationAttempt,
 } from '@luma/execution';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireRole, requireTenant } from '@luma/identity';
+import {
+  IdentityError,
+  requirePermission,
+  requireTenant,
+} from '@luma/identity';
 
 import type {
   LearningCommand,
@@ -109,7 +113,7 @@ export interface LearningStore {
   ): Promise<ResolutionHistory>;
 }
 
-/** Resolution history commands that require a current owner or admin role. */
+/** Resolution history commands that require the current `issues.manage` permission. */
 export interface LearningService {
   /** Lists resolution runs for an incident, optionally after a pagination cursor. */
   list(
@@ -153,7 +157,7 @@ export function createLearningService(deps: {
     requireTenant(context, context.tenantId);
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
-    requireRole(fresh, ['owner', 'admin']);
+    requirePermission(fresh, 'issues.manage');
     if (fresh.actor.id !== context.actor.id)
       throw new IdentityError(403, 'FORBIDDEN', 'Actor changed');
 

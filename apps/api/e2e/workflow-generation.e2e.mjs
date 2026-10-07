@@ -46,7 +46,7 @@ async function workspace(api, name) {
     cookie: owner.cookie,
     method: 'POST',
     status: 201,
-    body: { userId: member.userId, role: 'member' },
+    body: { userId: member.userId, roleId: 'member' },
   });
 
   return { org, owner, member, base: `/v1/organizations/${org.id}` };

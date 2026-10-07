@@ -1,7 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 
-import { makeTenantContext } from '@luma/identity/composition';
+import {
+  builtInMembership,
+  makeTenantContext,
+} from '@luma/identity/composition';
 import { createTenantDatabase } from '@luma/platform/composition';
 import { createActivityStore } from '@luma/resolution/composition';
 import { Pool, type PoolClient } from 'pg';
@@ -30,12 +33,10 @@ describe.skipIf(!databaseUrl)('Workspace activity on PostgreSQL', () => {
       status: 'active',
       dataRegion: 'EU',
     },
-    {
-      id: 'membership',
-      organizationId: tenant,
-      userId: 'operator',
-      role: 'owner',
-    },
+    builtInMembership(
+      { id: 'membership', organizationId: tenant, userId: 'operator' },
+      'owner',
+    ),
     randomUUID(),
   );
 

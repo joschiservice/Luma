@@ -11,6 +11,8 @@ import type {
 import { createIdentityService } from '../application/identity.js';
 import type { Membership, Organization } from '../domain/context.js';
 import { IdentityError } from '../domain/context.js';
+import type { BuiltInRoleKey } from '../domain/roles.js';
+import { builtInReference, PermissionSet } from '../domain/roles.js';
 import { identityRoutes, registerIdentityGuards } from './routes.js';
 
 const organization: Organization = {
@@ -21,19 +23,36 @@ const organization: Organization = {
   dataRegion: 'EU',
 };
 
-const owner: Membership = {
-  id: '22222222-2222-4222-8222-222222222222',
-  organizationId: organization.id,
-  userId: '33333333-3333-4333-8333-333333333333',
-  role: 'owner',
+const withRole = (membership: Membership, key: BuiltInRoleKey): Membership => {
+  const role = builtInReference(key);
+
+  return { ...membership, role, permissions: PermissionSet.forRole(role) };
 };
 
-const member: Membership = {
-  ...owner,
-  id: '44444444-4444-4444-8444-444444444444',
-  userId: '55555555-5555-4555-8555-555555555555',
-  role: 'member',
-};
+const owner: Membership = withRole(
+  {
+    id: '22222222-2222-4222-8222-222222222222',
+    organizationId: organization.id,
+    userId: '33333333-3333-4333-8333-333333333333',
+  } as Membership,
+  'owner',
+);
+
+const member: Membership = withRole(
+  {
+    ...owner,
+    id: '44444444-4444-4444-8444-444444444444',
+    userId: '55555555-5555-4555-8555-555555555555',
+  },
+  'member',
+);
+
+const dto = ({ id, organizationId, userId, role }: Membership) => ({
+  id,
+  organizationId,
+  userId,
+  role,
+});
 
 const origin = 'http://localhost:3001';
 
@@ -70,8 +89,19 @@ function fixture() {
       .mockResolvedValue(member),
     updateMember: vi
       .fn<IdentityTransaction['updateMember']>()
-      .mockResolvedValue({ ...member, role: 'admin' }),
+      .mockResolvedValue(withRole(member, 'admin')),
     removeMember: vi.fn<IdentityTransaction['removeMember']>(),
+    findRole: vi
+      .fn<IdentityTransaction['findRole']>()
+      .mockImplementation(async (_organizationId, roleId) => {
+        const reference = builtInReference(roleId as BuiltInRoleKey);
+
+        return {
+          reference,
+          permissions: PermissionSet.forRole(reference),
+          archived: false,
+        };
+      }),
   };
   const getSession = vi
     .fn<IdentityRepository['getSession']>()
@@ -118,11 +148,13 @@ it.each(['context', 'members'])(
     if (resource === 'context') {
       expect(response.json()).toMatchObject({
         tenantId: organization.id,
-        actor: { id: owner.userId, role: 'owner' },
+        actor: { id: owner.userId, role: { id: 'owner', name: 'Owner' } },
+        allAppPermissions: true,
       });
+      expect(response.json().permissions).toContain('roles.manage');
       expect(tx.selectTenant).not.toHaveBeenCalled();
     } else {
-      expect(response.json().items).toEqual([owner, member]);
+      expect(response.json().items).toEqual([dto(owner), dto(member)]);
       expect(tx.selectTenant).toHaveBeenCalledExactlyOnceWith(organization.id);
       expect(tx.listMembers).toHaveBeenCalledExactlyOnceWith(organization.id);
     }
@@ -133,13 +165,13 @@ it.each([
   {
     method: 'POST' as const,
     path: '/members',
-    payload: { userId: member.userId, role: 'member' },
+    payload: { userId: member.userId, roleId: 'member' },
     status: 201,
   },
   {
     method: 'PATCH' as const,
     path: `/members/${member.id}`,
-    payload: { role: 'admin' },
+    payload: { roleId: 'admin' },
     status: 200,
   },
   { method: 'DELETE' as const, path: `/members/${member.id}`, status: 204 },
@@ -175,7 +207,7 @@ it.each(['revoked', 'demoted', 'suspended'] as const)(
     tx.lockOrganization.mockImplementation(async () => {
       if (change === 'revoked') tx.findMembership.mockResolvedValue(null);
       if (change === 'demoted')
-        tx.findMembership.mockResolvedValue({ ...owner, role: 'member' });
+        tx.findMembership.mockResolvedValue(withRole(owner, 'member'));
       if (change === 'suspended')
         tx.findOrganization.mockResolvedValue({
           ...organization,
@@ -186,7 +218,7 @@ it.each(['revoked', 'demoted', 'suspended'] as const)(
       method: 'PATCH',
       url: `${base}/members/${member.id}`,
       headers,
-      payload: { role: 'admin' },
+      payload: { roleId: 'admin' },
     });
     expect(response.statusCode).toBe(change === 'demoted' ? 403 : 404);
     expect(tx.updateMember).not.toHaveBeenCalled();
@@ -200,19 +232,17 @@ it('rehydrates workflow identity from current membership without a serialized se
     organization.id,
     'workflow-request',
   );
-  expect(context.actor.role).toBe('owner');
+  expect(context.actor.role.key).toBe('owner');
   expect(context.actor.sessionId).toBe('workflow:workflow-request');
   expect(getSession).not.toHaveBeenCalled();
-  tx.findMembership.mockResolvedValue({ ...owner, role: 'member' });
-  expect(
-    (
-      await service.resolveWorkflowContext(
-        owner.userId,
-        organization.id,
-        'workflow-request',
-      )
-    ).actor.role,
-  ).toBe('member');
+  tx.findMembership.mockResolvedValue(withRole(owner, 'member'));
+  const demoted = await service.resolveWorkflowContext(
+    owner.userId,
+    organization.id,
+    'workflow-request',
+  );
+  expect(demoted.actor.role.key).toBe('member');
+  expect(demoted.permissions.has('actions.execute')).toBe(false);
   tx.findMembership.mockResolvedValue(null);
   await expect(
     service.resolveWorkflowContext(
@@ -221,4 +251,65 @@ it('rehydrates workflow identity from current membership without a serialized se
       'workflow-request',
     ),
   ).rejects.toThrow('Organization not found');
+});
+
+it('denies routes for callers without the declared permission', async () => {
+  const { app, tx } = fixture();
+  tx.findMembership.mockResolvedValue(withRole(owner, 'member'));
+  const response = await app.inject({
+    method: 'PATCH',
+    url: `${base}/members/${member.id}`,
+    headers,
+    payload: { roleId: 'admin' },
+  });
+  expect(response.statusCode).toBe(403);
+  expect(tx.lockOrganization).not.toHaveBeenCalled();
+});
+
+it('keeps admins from granting ownership or changing owners', async () => {
+  const { app, tx } = fixture();
+  const admin = withRole(
+    { ...owner, id: '77777777-7777-4777-8777-777777777777' },
+    'admin',
+  );
+  tx.findMembership.mockResolvedValue(admin);
+  tx.listMembers.mockResolvedValue([owner, admin, member]);
+  for (const [path, roleId] of [
+    [`/members/${member.id}`, 'owner'],
+    [`/members/${owner.id}`, 'member'],
+  ] as const) {
+    const response = await app.inject({
+      method: 'PATCH',
+      url: `${base}${path}`,
+      headers,
+      payload: { roleId },
+    });
+    expect(response.statusCode).toBe(403);
+  }
+  expect(tx.updateMember).not.toHaveBeenCalled();
+});
+
+it('rejects assigning a custom role with permissions the actor lacks', async () => {
+  const { app, tx } = fixture();
+  const manager = {
+    ...owner,
+    role: {
+      id: '88888888-8888-4888-8888-888888888888',
+      key: 'custom' as const,
+      name: 'Team lead',
+      builtIn: false,
+      revision: 2,
+    },
+    permissions: new PermissionSet(['members.manage', 'orders.read']),
+  };
+  tx.findMembership.mockResolvedValue(manager);
+  tx.listMembers.mockResolvedValue([manager, member]);
+  const response = await app.inject({
+    method: 'PATCH',
+    url: `${base}/members/${member.id}`,
+    headers,
+    payload: { roleId: 'admin' },
+  });
+  expect(response.statusCode).toBe(403);
+  expect(tx.updateMember).not.toHaveBeenCalled();
 });

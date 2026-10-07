@@ -144,7 +144,9 @@ test('sends an order with a second approver, follows the supplier to receipt and
   expect(
     (await call(`/purchase-orders/${order.id}/record`)).submissions,
   ).toHaveLength(1);
-  await buyer.getByText('Waiting for a different owner or admin').waitFor();
+  await buyer
+    .getByText('Waiting for someone else who can approve changes')
+    .waitFor();
 
   // The second admin approves from Needs you; Luma places the order once as the requester.
   const approver = await (await contextFor(approverCookie)).newPage();

@@ -10,7 +10,7 @@ system, supplier confirmations and booked receipts are described in
 A supplier can be linked to its record in one purchasing-system connection, with the
 hours it has to confirm a sent order. Link changes are revision-checked and audited.
 
-Owners and admins can create records and change order status. Members can read.
+`procurement.manage` creates records and changes order status; `procurement.read` reads them.
 Every use case refreshes membership before accessing the tenant store. The
 Procurement page uses the same API and permissions as other workspace pages.
 

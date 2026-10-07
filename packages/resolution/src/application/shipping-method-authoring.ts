@@ -62,7 +62,7 @@ export const shippingMethodVocabulary = {
           minimumRisk: ir.action.minimumRisk,
           approval:
             ir.approval.mode === 'required'
-              ? 'An independent owner or admin must approve each change.'
+              ? 'Someone else who can approve changes must approve each change.'
               : 'Workspace policy decides whether a person must approve each change.',
           parameters: types(ir.action.parameters),
           postcondition,
@@ -126,7 +126,7 @@ export function createShippingMethodTemplate(deps: {
         steps: [
           'Check that the diagnosis is ready and the method is mapped',
           'Propose the mapped shipping method for the order',
-          'Ask an independent owner or admin to approve the change',
+          'Ask someone else who can approve changes to approve the change',
           'Read the order again to confirm the new method',
         ],
         success:

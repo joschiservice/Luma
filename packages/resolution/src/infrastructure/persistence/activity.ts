@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 
+import { hasPermission } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
 import { z } from 'zod';
 
@@ -8,7 +9,7 @@ import type { ActivityEvent, ActivityQuery } from '../../domain/activity.js';
 import { activityOutcomeRules } from '../../domain/activity-outcome.js';
 
 const coverage =
-  'Recorded decisions, execution, verification, issue resolutions and procurement changes. Owners and administrators also see connection changes. Older unrecorded changes and legacy playbook activation history are unavailable. Execution mode is shown only when recorded.';
+  'Recorded decisions, execution, verification, issue resolutions and procurement changes. People who can view restricted activity also see connection changes and changes to members, invitations, roles and workspace settings. Older unrecorded changes and legacy playbook activation history are unavailable. Execution mode is shown only when recorded.';
 
 // Only static domain rules enter this SQL expression; request values remain parameters.
 const literal = (value: string) => "'" + value.replaceAll("'", "''") + "'";
@@ -21,6 +22,43 @@ const outcomeSql =
     )
     .join(' ') +
   " ELSE 'recorded' END";
+
+// Access events carry bounded role, member and invitation values. Summaries name the role or
+// setting that changed; e-mail addresses, permission lists and invitation secrets stay out.
+const accessRole = (value: string) =>
+  `COALESCE(${value}->>'roleName',CASE WHEN jsonb_typeof(${value}->'role')='string' THEN ${value}->>'role' END)`;
+const accessSummarySql = `CASE
+  WHEN event_type='role.app_permissions_removed' THEN 'App '||(after_value->'cause'->>'appId')||' uninstalled'
+  WHEN event_type LIKE 'role.%' THEN COALESCE(after_value->>'name',before_value->>'name')
+  WHEN event_type='member.update' THEN NULLIF(concat_ws(' → ',${accessRole('before_value')},${accessRole('after_value')}),'')
+  WHEN event_type LIKE 'member.%' OR event_type LIKE 'invitation.%' THEN COALESCE(${accessRole('after_value')},${accessRole('before_value')})
+  WHEN event_type='policy.updated' THEN CASE after_value->>'required' WHEN 'true' THEN 'Approval always required' WHEN 'false' THEN 'Approval follows the workspace policy' END
+  WHEN event_type='workspace.updated' THEN after_value->>'name'
+END`;
+
+/**
+ * Restricted access events from `workspace_access_events`, read through the index on
+ * (tenant_id, created_at DESC, id DESC). They have no issue, connection or order subject, so
+ * system, connection and subject filters exclude them.
+ */
+const accessEventsSql = `SELECT x.created_at AS sort_at,x.sort_id,
+      to_char(x.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS at,
+      jsonb_build_object('id',x.sort_id,'recordedAt',to_char(x.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
+      'occurredAt',to_char(x.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),'actorId',x.actor_id::text,'actorKind','user',
+      'action',left(x.event_type,160),'type','access','outcome','recorded','exceptionId',NULL,'proposalId',NULL,
+      'attemptId',NULL,'connectionId',NULL,'connections','[]'::jsonb,'system',NULL,'resource',left(x.target_id,300),
+      'playbookId',NULL,'mode','unrecorded','executionState',NULL,'verificationPhase',NULL,'failureCode',NULL,
+      'summary',left(x.summary,300),'dispatch',NULL,'verification',NULL,'evidenceRefs','[]'::jsonb) AS item
+      FROM (
+        SELECT id,created_at,actor_id,event_type,target_id,'access:'||id::text AS sort_id,${accessSummarySql} AS summary
+        FROM workspace_access_events
+        WHERE $4::boolean AND tenant_id=$1 AND created_at>=$2::timestamptz AND created_at<$3::timestamptz
+        AND $7::text IS NULL AND $8::uuid IS NULL AND $13::text[] IS NULL
+        AND ($9::text IS NULL OR $9::text='access') AND ($10::text IS NULL OR $10::text='recorded')
+        AND ($5::timestamptz IS NULL OR (created_at<=$5::timestamptz AND (created_at,'access:'||id::text)<($5::timestamptz,$6::text)))
+      ) x
+      WHERE ($11::text='' OR position(lower($11) in lower(concat_ws(' ',x.event_type,x.target_id,x.actor_id::text,x.summary)))>0)
+      ORDER BY x.created_at DESC,x.sort_id DESC LIMIT $12`;
 
 // The subject filter compares against uuid::text, which is always lowercase and hyphenated,
 // so only canonical UUID strings can match an issue, run or proposal ID.
@@ -89,12 +127,15 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
   return {
     list: (context, query) =>
       db.transaction(context.tenantId, async (tx) => {
+        // Cursors bind to the visibility they were minted with, so a page link stops working
+        // once restricted access is removed.
+        const restricted = hasPermission(context, 'activity.read_restricted');
         const key = createHash('sha256')
           .update(
             JSON.stringify([
-              'activity-v3',
+              'activity-v4',
               context.tenantId,
-              context.actor.role,
+              restricted,
               query.from,
               query.to,
               query.q ?? '',
@@ -186,8 +227,8 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
             WHERE e.conn_id IS NULL AND p.tenant_id=e.tenant_id AND p.exception_id=e.issue_id
           )
         ) connections ON true
-      )
-      SELECT to_char(recorded_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS at,
+      ), operational AS (
+      SELECT recorded_at AS sort_at,id AS sort_id,to_char(recorded_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS at,
       jsonb_build_object('id',id,'recordedAt',to_char(recorded_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
       'occurredAt',to_char((doc->>'occurredAt')::timestamptz AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),'actorId',left(doc->'actor'->>'id',300),'actorKind',left(doc->'actor'->>'kind',40),
       'action',left(action,160),'type',type,'outcome',outcome,'exceptionId',issue_id,'proposalId',proposal_id,
@@ -200,12 +241,15 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
       AND ($11::text='' OR position(lower($11) in lower(concat_ws(' ',issue_id::text,resource,action,doc->'actor'->>'id',workflow_run_id)))>0)
       AND ($13::text[] IS NULL OR issue_id::text=ANY($13) OR workflow_run_id=ANY($14) OR proposal_id::text=ANY($14)
         OR (resource_kind='order' AND resource=ANY($15)))
-      ORDER BY recorded_at DESC,id DESC LIMIT $12`,
+      ORDER BY recorded_at DESC,id DESC LIMIT $12
+      ), access AS (${accessEventsSql})
+      SELECT at,item FROM (SELECT * FROM operational UNION ALL SELECT * FROM access) events
+      ORDER BY sort_at DESC,sort_id DESC LIMIT $12`,
           [
             context.tenantId,
             query.from,
             query.to,
-            ['owner', 'admin'].includes(context.actor.role),
+            restricted,
             after?.at ?? null,
             after?.id ?? null,
             query.system ?? null,
@@ -224,9 +268,7 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
         const last = rows.at(-1);
 
         return {
-          visibility: ['owner', 'admin'].includes(context.actor.role)
-            ? 'admin'
-            : 'member',
+          visibility: restricted ? 'admin' : 'member',
           items: rows.map((r) => r.item),
           coverage,
           nextCursor:

@@ -96,6 +96,7 @@ export function searchOrdersTool(orders: Pick<OrderWorkspace, 'list'>) {
     name: 'search_orders',
     label: 'Search orders',
     reads: 'order',
+    permission: 'orders.read',
     description:
       'Search current orders from connected sources, as on the Orders page. `q` matches order numbers, source order IDs and SKU text. Views: `outstanding` (open orders not yet fulfilled), `overdue` (outstanding past their due time), `needs_you` (orders with issues needing a person), `differs` (sources disagree), `all`. Filter by status, payment status and placed or updated time ranges (from is inclusive, before is exclusive). Returns the total number of matches and up to `limit` orders; pass `nextCursor` back as `cursor` with the same filters for the next page.',
     jsonSchema: {
@@ -157,6 +158,7 @@ export function getOrderTool(orders: Pick<OrderWorkspace, 'get'>) {
     name: 'get_order',
     label: 'Read an order',
     reads: 'order',
+    permission: 'orders.read',
     description:
       'Read one order by its Luma ID (the UUID in its cite marker): what each source reports, where sources disagree, line quantities with fulfilled and remaining units, fulfillments, returns and refunds, linked issues and workflow runs. Customer and payment details are not available.',
     jsonSchema: {

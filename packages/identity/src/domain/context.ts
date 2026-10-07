@@ -1,4 +1,6 @@
-export type Role = 'owner' | 'admin' | 'member';
+import type { AppPermission, Permission } from './permissions.js';
+import type { BuiltInRoleKey, RoleReference } from './roles.js';
+import { builtInReference, PermissionSet } from './roles.js';
 
 export type DataRegion = 'EU' | 'US' | 'APAC';
 
@@ -16,7 +18,9 @@ export interface Membership {
   id: string;
   organizationId: string;
   userId: string;
-  role: Role;
+  role: RoleReference;
+  /** Effective grants of the role; resolved with the membership. */
+  permissions: PermissionSet;
 }
 
 export interface SessionIdentity {
@@ -35,8 +39,10 @@ export interface TenantContext {
     initiatingUserId: string;
     sessionId: string;
     membershipId: string;
-    role: Role;
+    role: Readonly<RoleReference>;
   }>;
+  /** What the actor may do, resolved from the current membership with the context. */
+  readonly permissions: PermissionSet;
   readonly requestId: string;
 }
 
@@ -44,6 +50,7 @@ export class IdentityError extends Error {
   constructor(
     readonly statusCode: 401 | 403 | 404 | 409 | 422 | 503,
     readonly code:
+      | 'VALIDATION_ERROR'
       | 'UNAUTHENTICATED'
       | 'FORBIDDEN'
       | 'NOT_FOUND'
@@ -89,10 +96,24 @@ export function makeTenantContext(
       initiatingUserId: session.userId,
       sessionId: session.sessionId,
       membershipId: member.id,
-      role: member.role,
+      role: Object.freeze({ ...member.role }),
     }),
+    permissions: member.permissions,
     requestId,
   });
+}
+
+/**
+ * Describes a membership holding a built-in role. Use it for trusted seeds and fixtures; request
+ * handling resolves memberships from storage.
+ */
+export function builtInMembership(
+  member: Omit<Membership, 'role' | 'permissions'>,
+  key: BuiltInRoleKey,
+): Membership {
+  const role = builtInReference(key);
+
+  return { ...member, role, permissions: PermissionSet.forRole(role) };
 }
 
 /** Rejects unresolved contexts and tenant mismatches with a not-found error. */
@@ -101,15 +122,31 @@ export function requireTenant(context: TenantContext, tenantId: string): void {
     throw new IdentityError(404, 'NOT_FOUND', 'Resource not found');
 }
 
-/**
- * Requires a resolved tenant context and one of the supplied organization roles; otherwise
- * throws an identity error.
- */
-export function requireRole(
+/** Reports whether a resolved context grants a core or app permission. */
+export function hasPermission(
   context: TenantContext,
-  roles: readonly Role[],
+  permission: Permission | AppPermission,
+): boolean {
+  return (
+    context[resolvedContext] === true && context.permissions.has(permission)
+  );
+}
+
+/** Requires a resolved tenant context that grants the permission; otherwise throws 403. */
+export function requirePermission(
+  context: TenantContext,
+  permission: Permission | AppPermission,
 ): void {
   requireTenant(context, context.tenantId);
-  if (!roles.includes(context.actor.role))
-    throw new IdentityError(403, 'FORBIDDEN', 'Insufficient organization role');
+  if (!context.permissions.has(permission))
+    throw new IdentityError(
+      403,
+      'FORBIDDEN',
+      'Your role does not allow this. Ask a workspace admin for access.',
+    );
+}
+
+/** Reports whether the actor holds the Owner role, which alone may change ownership. */
+export function isOwner(context: TenantContext): boolean {
+  return context.actor.role.key === 'owner';
 }

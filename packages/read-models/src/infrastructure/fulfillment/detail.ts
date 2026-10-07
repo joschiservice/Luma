@@ -1,7 +1,11 @@
 import type { TenantContext } from '@luma/identity';
 import type { SqlTransaction } from '@luma/platform';
 
-import type { FulfillmentDetail } from '../../application/fulfillment.js';
+import { hiddenSections } from '../../application/access.js';
+import type {
+  FulfillmentDetail,
+  FulfillmentDetailSection,
+} from '../../application/fulfillment.js';
 import type { OrderActivityReader } from '../../application/orders.js';
 import { resolveOrderEntity } from '../orders/identity-references.js';
 import {
@@ -221,16 +225,25 @@ export async function readFulfillment(
       )
     ).rows.map((row) => [row.id, iso(row.at)]),
   );
-  const events = await activity.list(context, {
-    from: new Date(Date.parse(asOf) - activityWindow).toISOString(),
-    to: new Date(Date.parse(asOf) + 1).toISOString(),
-    limit: 25,
-    subjects: {
-      issueIds,
-      runIds: [...new Set(runs.map((run) => run.id))],
-      orderRefs: refs.orderRefs,
-    },
-  });
+  const hidden = hiddenSections<FulfillmentDetailSection>(context, [
+    ['issues', 'issues.read'],
+    ['workflows', 'workflows.read'],
+    ['activity', 'activity.read'],
+  ]);
+  const shown = (section: FulfillmentDetailSection) =>
+    !hidden.includes(section);
+  const events = shown('activity')
+    ? await activity.list(context, {
+        from: new Date(Date.parse(asOf) - activityWindow).toISOString(),
+        to: new Date(Date.parse(asOf) + 1).toISOString(),
+        limit: 25,
+        subjects: {
+          issueIds,
+          runIds: [...new Set(runs.map((run) => run.id))],
+          orderRefs: refs.orderRefs,
+        },
+      })
+    : { items: [], nextCursor: null };
 
   return {
     item,
@@ -256,8 +269,8 @@ export async function readFulfillment(
       fulfillmentId,
       item.connectionId,
     ),
-    issues,
-    workflows: runs.map((run) => ({
+    issues: shown('issues') ? issues : [],
+    workflows: (shown('workflows') ? runs : []).map((run) => ({
       ...run,
       purpose: methodCorrections.has(run.definitionId)
         ? 'method_correction'
@@ -277,6 +290,7 @@ export async function readFulfillment(
       })),
       truncated: events.nextCursor !== null,
     },
+    hidden,
     stalledAfterHours,
     asOf,
   };

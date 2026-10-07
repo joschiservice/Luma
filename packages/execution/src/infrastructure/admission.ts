@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 
 import type { TenantContext } from '@luma/identity';
-import { requireRole, requireTenant } from '@luma/identity';
+import { requireTenant } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
 import { canonicalJson as canonical } from '@luma/platform';
 import { z } from 'zod';
@@ -63,7 +63,11 @@ const artifactSchema = z
 const digest = (value: unknown) =>
   createHash('sha256').update(canonical(value)).digest('hex');
 
-/** Provisioning methods stay in trusted composition; workers receive only the admission port. */
+/**
+ * Provisioning methods stay in trusted composition; workers receive only the admission port.
+ * Callers authorize provisioning with their own permission (procurement, workflow activation or
+ * an app's permission); execution checks the step's permission again before any effect.
+ */
 export function createAdmissionStore(db: TenantDatabase) {
   const reader = {
     step: (context: TenantContext, runId: string, stepId: string) =>
@@ -104,7 +108,7 @@ export function createAdmissionStore(db: TenantDatabase) {
   return {
     ...reader,
     async activate(context: TenantContext, input: unknown) {
-      requireRole(context, ['owner', 'admin']);
+      requireTenant(context, context.tenantId);
       const document = artifactSchema.parse(input);
       const hash = digest(document);
       await db.transaction(context.tenantId, async (tx) => {
@@ -125,7 +129,7 @@ export function createAdmissionStore(db: TenantDatabase) {
       return { ...document, digest: hash, active: true };
     },
     async revoke(context: TenantContext, id: string, version: string) {
-      requireRole(context, ['owner', 'admin']);
+      requireTenant(context, context.tenantId);
       await db.transaction(context.tenantId, async (tx) => {
         await tx.query(
           'UPDATE action_artifacts SET active=false WHERE tenant_id=$1 AND id=$2 AND version=$3',
@@ -137,7 +141,6 @@ export function createAdmissionStore(db: TenantDatabase) {
       context: TenantContext,
       input: Omit<BoundActionStep, 'actionHash'>,
     ) {
-      requireRole(context, ['owner', 'admin']);
       requireTenant(context, input.tenantId);
       const reference = parseAdmissionReference({
         runId: input.runId,

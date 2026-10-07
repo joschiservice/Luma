@@ -112,8 +112,8 @@ export interface CommerceProjections {
   ): Promise<Dependent[]>;
   /**
    * Removes one source's current projection of an entity after that source moved to another
-   * entity. Snapshots remain as history and the removal is recorded; requires an owner or
-   * admin. Returns false when no projection existed.
+   * entity. Snapshots remain as history and the removal is recorded; requires
+   * `sync.manage`. Returns false when no projection existed.
    */
   retire(
     context: TenantContext,

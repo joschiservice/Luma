@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { makeTenantContext } from '@luma/identity';
+import { builtInMembership, makeTenantContext } from '@luma/identity';
 import { expect, it } from 'vitest';
 
 import { createProcurementCapabilities } from './capabilities.js';
@@ -18,7 +18,10 @@ it('evaluates supplier lookup, open orders, creation, transition, retries and ve
       dataRegion: 'EU',
       status: 'active',
     },
-    { id: randomUUID(), organizationId: tenantId, userId, role: 'owner' },
+    builtInMembership(
+      { id: randomUUID(), organizationId: tenantId, userId },
+      'owner',
+    ),
     randomUUID(),
   );
   let tick = 0;
@@ -113,4 +116,54 @@ it('evaluates supplier lookup, open orders, creation, transition, retries and ve
     competing.filter((result) => result.status === 'rejected'),
   ).toHaveLength(1);
   expect((await service.orders(context)).items).toHaveLength(2);
+});
+
+it('lets procurement readers browse but requires procurement.manage to change records', async () => {
+  const tenantId = randomUUID();
+  const organization = {
+    id: tenantId,
+    name: 'Scenario',
+    slug: 'scenario',
+    dataRegion: 'EU',
+    status: 'active',
+  } as const;
+  const contextFor = (role: 'admin' | 'member') => {
+    const userId = randomUUID();
+
+    return makeTenantContext(
+      { userId, sessionId: randomUUID() },
+      organization,
+      builtInMembership(
+        { id: randomUUID(), organizationId: tenantId, userId },
+        role,
+      ),
+      randomUUID(),
+    );
+  };
+  const admin = contextFor('admin');
+  const member = contextFor('member');
+  const service = createSimulatedProcurement({
+    refreshContext: async (context) => context,
+    now: () => new Date(Date.UTC(2026, 0, 1)),
+    id: randomUUID,
+  });
+  const supplierId = randomUUID();
+  await service.createSupplier(admin, {
+    id: supplierId,
+    name: 'Northstar',
+    externalReferences: [],
+  });
+
+  expect(await service.suppliers(admin)).toMatchObject({ canManage: true });
+  expect(await service.suppliers(member)).toMatchObject({
+    canManage: false,
+    items: [{ id: supplierId }],
+  });
+  await expect(
+    service.createSupplier(member, {
+      id: randomUUID(),
+      name: 'Southwind',
+      externalReferences: [],
+    }),
+  ).rejects.toMatchObject({ statusCode: 403 });
 });

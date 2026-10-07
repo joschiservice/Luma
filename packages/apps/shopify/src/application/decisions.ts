@@ -58,7 +58,7 @@ function stage(
       deadline: view.expiresAt,
       why:
         view.requesterId === actorId
-          ? 'Approved by a different administrator. Only you, as the requester, can run it before it expires.'
+          ? 'Approved by someone else. Only you, as the requester, can run it before it expires.'
           : 'Approved. Only the person who requested it can run it before it expires.',
       consequences: [
         {
@@ -76,7 +76,7 @@ function stage(
         ? 'awaiting_other'
         : 'view_only',
     deadline: view.expiresAt,
-    why: 'Changing Shopify needs a second owner or admin to approve this exact action before the requester can run it.',
+    why: 'Changing Shopify needs someone else who can approve changes to approve this exact action before the requester can run it.',
     consequences: [
       {
         response: 'Approve',

@@ -7,7 +7,7 @@ import { useState } from 'react';
 
 import { cancelCodeStep } from './code-data';
 
-/** Shows sandbox evidence and lets administrators stop unfinished code instructions. */
+/** Shows sandbox evidence and lets people who can manage workflow triggers stop unfinished code instructions. */
 export function CodeRunDetails({
   run,
   version,

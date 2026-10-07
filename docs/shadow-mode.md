@@ -4,7 +4,7 @@ Shadow Mode evaluates production observations without dispatching the proposed a
 
 ## Use the workspace UI
 
-Owners and admins can open an issue and use **Shadow evaluation** to select a Playbook and run a prediction against the retained diagnosis and bound candidate. The result is labeled **Shadow — not executed** and shows eligibility, policy, predicted effects, assumptions and any authoritative outcome. Refreshing or reopening the case reloads the latest saved evaluation.
+People with `playbooks.activate` can open an issue and use **Shadow evaluation** to select a Playbook and run a prediction against the retained diagnosis and bound candidate. The result is labeled **Shadow — not executed** and shows eligibility, policy, predicted effects, assumptions and any authoritative outcome. Refreshing or reopening the case reloads the latest saved evaluation.
 
 Use **Save operator comparison** to record whether action was needed, whether the case was eligible, the observed action and optional trust feedback. Choose incident evidence to support the assessment. An alternative action can use a different target. Reviews are immutable; uncertain saves retry the same review.
 

@@ -6,7 +6,7 @@
 
 Apply migration `0004_connector_installations.sql` using the existing migration runner. Grant the runtime database login `luma_connectors`. Use a restricted login; the tables enforce tenant RLS even when a query omits its tenant predicate. Lifecycle events are append-only and commit in the same transaction as each change.
 
-Compose the service with a tenant database, `identity.refreshContext`, an encryption keyring and a trusted `verify` implementation. Every operation refreshes membership. Owners and admins can install, check, rotate and disconnect. Members can list connections and use permitted reads. The credential port is only for trusted adapters and must never be returned by an HTTP route.
+Compose the service with a tenant database, `identity.refreshContext`, an encryption keyring and a trusted `verify` implementation. Every operation refreshes membership. People with `connections.manage` can install, check, rotate and disconnect. Every member can list connections and use permitted reads. The credential port is only for trusted adapters and must never be returned by an HTTP route.
 
 Install accepts a label, provider target, requested capabilities and credentials. Shopify targets use a lowercase `*.myshopify.com` hostname. JTL Cloud targets use the provider tenant UUID. JTL on-premise targets use an HTTPS API root with a trailing slash, app ID and app version; their encrypted credentials also contain the challenge code. Target identity is immutable. Create a new installation when changing the account or endpoint.
 
@@ -38,7 +38,7 @@ JTL shipping-method correction requires both `orders.shipping-method.read` and `
 
 ## Operator interface and HTTP boundary
 
-The workspace Connections page lists apps with connection summaries. Each app management page lists its connections and offers Add connection for setup. Owners and admins can submit Shopify tokens, JTL Cloud tokens, or JTL-Wawi registration tokens and challenge codes. Token acquisition remains with the installation host. Members can view connection summaries. Replacement clears permissions until validation succeeds; disconnected records require a new installation.
+The workspace Connections page lists apps with connection summaries. Each app management page lists its connections and offers Add connection for setup. People with `connections.manage` can submit Shopify tokens, JTL Cloud tokens, or JTL-Wawi registration tokens and challenge codes. Token acquisition remains with the installation host. Members can view connection summaries. Replacement clears permissions until validation succeeds; disconnected records require a new installation.
 
 The shared `apiContract.connections` exposes list/install at `/v1/organizations/:organizationId/connections` and versioned `check`, `credentials`, and `disconnect` commands under `/:connectionId`. Handlers reuse `ConnectionManagement`, refresh membership through that service, and serialize only the public summary schema. Credential fields are never returned. Errors use controlled messages. The web form keeps secrets out of URL state, persistence and the Query mutation cache, clears them after requests, and requires a list refresh after an uncertain result before resubmission.
 

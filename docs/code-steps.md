@@ -12,7 +12,7 @@ Production requires Linux and `/usr/bin/prlimit` from util-linux. Each child has
 
 ## Author a version
 
-Owners and admins can write Code Steps in the browser: open a workflow draft, add a Code Step and edit it in the Code Step editor, or edit the whole draft in the code view. Publishing the draft binds each Code Step to the pinned runtime and its artifact digest under the same compile rules. In composition, use `defineCodeStep` and `compileProcessWorkflow` from `@luma/workflows/composition`, then publish through the authorized catalog. Source review and example evaluation of published versions are available in **Workflows → Code Steps**.
+People with `workflows.author` can write Code Steps in the browser: open a workflow draft, add a Code Step and edit it in the Code Step editor, or edit the whole draft in the code view. Publishing the draft binds each Code Step to the pinned runtime and its artifact digest under the same compile rules. In composition, use `defineCodeStep` and `compileProcessWorkflow` from `@luma/workflows/composition`, then publish through the authorized catalog. Source review and example evaluation of published versions are available in **Workflows → Code Steps**.
 
 ```ts
 function main(input, luma) {

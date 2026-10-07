@@ -1,4 +1,5 @@
 /* global document, window */
+import { appScopes } from './app-scopes.mjs';
 import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, startProcess } from './helpers.mjs';
 import { ordersFixture } from './orders-fixture.mjs';
@@ -24,7 +25,7 @@ test('opens the source customer from an order, resolves its Luma history and cle
     f.owner,
     `${f.base}/apps/shopify/install`,
     'POST',
-    { version: null },
+    { version: null, scopes: appScopes.shopify },
   );
   await f.db.owner.query(
     `UPDATE connector_installations SET document=document || $3::jsonb WHERE tenant_id=$1 AND id=$2`,
@@ -263,7 +264,7 @@ test('opens the source customer from an order, resolves its Luma history and cle
     f.owner,
     `/v1/organizations/${other.id}/members`,
     'POST',
-    { userId: f.member.id, role: 'member' },
+    { userId: f.member.id, roleId: 'member' },
     201,
   );
   await page.goto(`/app/${other.id}/customers`);

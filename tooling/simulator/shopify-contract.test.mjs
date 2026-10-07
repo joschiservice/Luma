@@ -8,7 +8,10 @@ import {
   createShopifyRecordReader,
 } from '@luma/app-shopify';
 import { createCapabilityRuntime } from '@luma/connections/adapters';
-import { makeTenantContext } from '@luma/identity/composition';
+import {
+  builtInMembership,
+  makeTenantContext,
+} from '@luma/identity/composition';
 import {
   charge,
   createMemoryStore,
@@ -40,7 +43,10 @@ const tenant = makeTenantContext(
     status: 'active',
     dataRegion: 'EU',
   },
-  { id: 'member', organizationId: tenantId, userId: 'owner', role: 'owner' },
+  builtInMembership(
+    { id: 'member', organizationId: tenantId, userId: 'owner' },
+    'owner',
+  ),
   'request',
 );
 const config = {

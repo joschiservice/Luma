@@ -17,9 +17,10 @@ import { useRef, useState } from 'react';
 
 import { ConnectionCard } from '../connections/connection-card';
 import { connectionError, connectionsOptions } from '../connections/data';
-import { contextOptions } from '../identity/data';
+import { usePermissions } from '../identity/permissions';
 import { syncOptions } from '../sync/data';
-import { appsOptions, changeApp } from './data';
+import { AppAccessDialog, ScopeList } from './access';
+import { approveAppScopes, appsOptions, changeApp } from './data';
 import { AppExtension } from './extension';
 
 /** Lists an app's connections and hosts its setup and workspace settings contributions. */
@@ -34,16 +35,19 @@ export function AppSettings({
 }) {
   const apps = useQuery(appsOptions(organizationId));
   const connections = useQuery(connectionsOptions(organizationId));
-  const access = useQuery(contextOptions(organizationId));
+  const { can } = usePermissions(organizationId);
   const sync = useQuery(syncOptions(organizationId));
   const client = useQueryClient();
   const navigate = useNavigate();
-  const [dialog, setDialog] = useState<'add' | 'uninstall' | null>(null);
+  const [dialog, setDialog] = useState<'add' | 'uninstall' | 'approve' | null>(
+    null,
+  );
   const [pending, setPending] = useState(false);
   const lock = useRef(false);
   const [message, setMessage] = useState('');
-  const canManage =
-    access.data?.actor.role === 'owner' || access.data?.actor.role === 'admin';
+  // Connections and app lifecycle are separate permissions.
+  const canManage = can('connections.manage');
+  const canManageApp = can('apps.manage');
   const refresh = async () => {
     await client.invalidateQueries({
       queryKey: connectionsOptions(organizationId).queryKey,
@@ -56,6 +60,30 @@ export function AppSettings({
   const installed = installation?.status === 'installed';
   const available = installed && !!app;
   const items = connections.data?.filter((item) => item.appId === appId) ?? [];
+
+  async function approve() {
+    if (lock.current || !installation) return;
+    lock.current = true;
+    setPending(true);
+    setMessage('');
+    try {
+      await approveAppScopes(
+        organizationId,
+        appId,
+        installation.version,
+        installation.pendingScopes,
+      );
+      await client.invalidateQueries({
+        queryKey: appsOptions(organizationId).queryKey,
+      });
+      setDialog(null);
+    } catch (error) {
+      setMessage(connectionError(error));
+    } finally {
+      lock.current = false;
+      setPending(false);
+    }
+  }
 
   async function uninstall() {
     if (lock.current || !installation) return;
@@ -117,7 +145,7 @@ export function AppSettings({
               'This app is unavailable. Historical connections remain accessible.'
             }
             actions={
-              installed && canManage ? (
+              installed && canManageApp ? (
                 <Button
                   variant="outline"
                   onClick={() => setDialog('uninstall')}
@@ -143,9 +171,29 @@ export function AppSettings({
                 : 'Authorization needs attention. Add a connection to try again.'}
             </Alert>
           ) : null}
+          {installation?.status === 'installed' &&
+          installation.pendingScopes.length > 0 &&
+          app ? (
+            <Alert tone="warning">
+              {app.name} was updated and asks for more access. It keeps working
+              with its current access until someone approves.{' '}
+              {canManageApp ? (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setMessage('');
+                    setDialog('approve');
+                  }}
+                >
+                  Review access
+                </Button>
+              ) : null}
+            </Alert>
+          ) : null}
           {!canManage ? (
             <p className="apps-note">
-              An owner or admin can add connections and change app settings.
+              Adding connections and changing app settings requires permission
+              to manage connections, which your role doesn’t include.
             </p>
           ) : null}
           {app?.connectionTypes.length || items.length || !app ? (
@@ -204,7 +252,27 @@ export function AppSettings({
               )}
             </section>
           ) : null}
-          {available && canManage && app.ui.includes('app-settings') ? (
+          {installation?.status === 'installed' ? (
+            <section
+              className="connections-section"
+              aria-labelledby="app-access"
+            >
+              <h2 id="app-access">Access</h2>
+              <p className="apps-note">
+                What {app?.name ?? appId} may use in this workspace. When it
+                acts for someone, it can never do more than their role allows.
+              </p>
+              {installation.grantedScopes.length ? (
+                <ScopeList
+                  organizationId={organizationId}
+                  scopes={installation.grantedScopes}
+                />
+              ) : (
+                <p className="apps-note">No workspace data granted.</p>
+              )}
+            </section>
+          ) : null}
+          {available && canManageApp && app.ui.includes('app-settings') ? (
             <section className="connections-section">
               <h2>App settings</h2>
               <AppExtension
@@ -264,6 +332,13 @@ export function AppSettings({
                 its connections. Historical records remain. Requests already
                 sent may finish.
               </DialogDescription>
+              {installation?.roles.length ? (
+                <Alert tone="warning">
+                  These roles lose {app?.name ?? appId} permissions:{' '}
+                  {installation.roles.map((role) => role.name).join(', ')}.
+                  Reinstalling doesn’t restore them.
+                </Alert>
+              ) : null}
               <div className="connection-actions">
                 <Button
                   variant="outline"
@@ -279,6 +354,19 @@ export function AppSettings({
               <p role="alert">{message}</p>
             </DialogContent>
           </Dialog>
+          {app && installation ? (
+            <AppAccessDialog
+              organizationId={organizationId}
+              app={app}
+              scopes={installation.pendingScopes}
+              mode="approve"
+              open={dialog === 'approve'}
+              pending={pending}
+              error={message}
+              close={() => setDialog(null)}
+              confirm={() => void approve()}
+            />
+          ) : null}
         </>
       )}
     </div>

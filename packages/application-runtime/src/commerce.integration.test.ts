@@ -10,7 +10,10 @@ import {
 } from '@luma/connections/composition';
 import { orderAttentionQuery } from '@luma/exceptions/composition';
 import type { IdentityService } from '@luma/identity';
-import { makeTenantContext } from '@luma/identity/composition';
+import {
+  builtInMembership,
+  makeTenantContext,
+} from '@luma/identity/composition';
 import { createOrderMetricReader } from '@luma/orders/composition';
 import { createTenantDatabase } from '@luma/platform/composition';
 import {
@@ -46,12 +49,10 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
         status: 'active',
         dataRegion: 'EU',
       },
-      {
-        id: 'membership',
-        organizationId: tenantId,
-        userId: 'operator',
-        role: 'owner',
-      },
+      builtInMembership(
+        { id: 'membership', organizationId: tenantId, userId: 'operator' },
+        'owner',
+      ),
       randomUUID(),
     );
   }

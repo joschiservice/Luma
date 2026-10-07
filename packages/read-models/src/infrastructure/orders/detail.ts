@@ -1,9 +1,11 @@
 import type { TenantContext } from '@luma/identity';
 import type { SqlTransaction } from '@luma/platform';
 
+import { hiddenSections } from '../../application/access.js';
 import type {
   OrderActivityReader,
   OrderDetail,
+  OrderDetailSection,
 } from '../../application/orders.js';
 import type { ReturnListItem } from '../../application/returns.js';
 import { itemColumns } from '../returns/list.js';
@@ -79,7 +81,8 @@ async function readFulfillments(
 
 /**
  * Reads one order with every source's facts, differences, fulfillments, history, linked issues,
- * workflow runs and recent activity. Returns null when the order has no current source.
+ * workflow runs and recent activity. Sections of areas the reader can't read are empty and
+ * listed in `hidden`. Returns null when the order has no current source.
  */
 export async function readDetail(
   tx: SqlTransaction,
@@ -140,16 +143,26 @@ export async function readDetail(
      ORDER BY r.requested_key DESC,r.entity_id LIMIT 50`,
     [tenantId, orderId],
   );
-  const events = await activity.list(context, {
-    from: new Date(Date.parse(asOf) - activityWindow).toISOString(),
-    to: new Date(Date.parse(asOf) + 1).toISOString(),
-    limit: 25,
-    subjects: {
-      issueIds,
-      runIds: [...new Set(workflows.map((run) => run.id))],
-      orderRefs: refs.orderRefs,
-    },
-  });
+  const hidden = hiddenSections<OrderDetailSection>(context, [
+    ['fulfillments', 'fulfillment.read'],
+    ['returns', 'returns.read'],
+    ['issues', 'issues.read'],
+    ['workflows', 'workflows.read'],
+    ['activity', 'activity.read'],
+  ]);
+  const shown = (section: OrderDetailSection) => !hidden.includes(section);
+  const events = shown('activity')
+    ? await activity.list(context, {
+        from: new Date(Date.parse(asOf) - activityWindow).toISOString(),
+        to: new Date(Date.parse(asOf) + 1).toISOString(),
+        limit: 25,
+        subjects: {
+          issueIds,
+          runIds: [...new Set(workflows.map((run) => run.id))],
+          orderRefs: refs.orderRefs,
+        },
+      })
+    : { items: [], nextCursor: null };
 
   return {
     redirectedFrom: requestedId === orderId ? null : requestedId,
@@ -166,7 +179,7 @@ export async function readDetail(
       overdue,
       dueAt: selected.dueAt,
       // Needs-you follows the list and metrics rule: removed orders need no attention.
-      issueIds: selected.deleted ? [] : [...needsYou],
+      issueIds: selected.deleted || !shown('issues') ? [] : [...needsYou],
       differs: differences.length > 0,
       sources: sources.map((item) => ({
         connectionId: item.connectionId,
@@ -184,11 +197,18 @@ export async function readDetail(
     },
     sources,
     differences,
-    fulfillments,
-    returns: returns.rows,
-    issues,
-    workflows,
-    history,
+    fulfillments: shown('fulfillments') ? fulfillments : [],
+    returns: shown('returns') ? returns.rows : [],
+    issues: shown('issues') ? issues : [],
+    workflows: shown('workflows') ? workflows : [],
+    history: {
+      ...history,
+      entries: history.entries.filter((entry) =>
+        entry.entityKind === 'fulfillment'
+          ? shown('fulfillments')
+          : entry.entityKind === 'order' || shown('returns'),
+      ),
+    },
     activity: {
       entries: events.items.map((event) => ({
         id: event.id,
@@ -202,6 +222,7 @@ export async function readDetail(
       })),
       truncated: events.nextCursor !== null,
     },
+    hidden,
     asOf,
   };
 }

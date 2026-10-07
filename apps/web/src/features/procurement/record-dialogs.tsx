@@ -116,7 +116,7 @@ function Frame({
 
 /**
  * Requests approval to place an order in the supplier's purchasing system. Shows exactly what
- * will be sent; a different owner or admin approves it.
+ * will be sent; someone else who can approve changes approves it.
  */
 export function SubmitDialog({
   organizationId,
@@ -142,7 +142,7 @@ export function SubmitDialog({
   return (
     <Frame
       title="Send to supplier"
-      description={`Luma places this order in ${connection} for ${supplier} once a different owner or admin approves it. ${connection} then sends it to the supplier.`}
+      description={`Luma places this order in ${connection} for ${supplier} once someone else who can approve changes approves it. ${connection} then sends it to the supplier.`}
       locked={command.locked}
       close={close}
       wide

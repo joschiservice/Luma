@@ -37,6 +37,11 @@ export interface AppUiProps {
     { kind: 'order'; connectionId: string; externalId: string } | undefined;
   /** Closes setup and refreshes workspace data after a successful mutation. */
   done(): Promise<void>;
+  /**
+   * Reports whether the person holds a core or app permission, to hide actions they can't take.
+   * The host enforces permissions again on every app request.
+   */
+  can(permission: string): boolean;
   services: {
     /** Creates a pending connection after server-side app validation. */
     install(input: InstallationInput): Promise<InstalledConnection>;

@@ -2,8 +2,13 @@ import type {
   PlaybookGrantReader,
   PlaybookGrantSource,
 } from '@luma/connections';
-import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireRole, requireTenant } from '@luma/identity';
+import type { Permission, TenantContext } from '@luma/identity';
+import {
+  hasPermission,
+  IdentityError,
+  requirePermission,
+  requireTenant,
+} from '@luma/identity';
 import type { PolicyService } from '@luma/policies';
 import { currentPolicyVersion } from '@luma/policies';
 
@@ -49,7 +54,7 @@ export interface PlaybookLibraryStore {
     actorId: string;
     request: ActivatePlaybook;
   } | null>;
-  /** Records the exact version, scope and approving administrator before activation commits. */
+  /** Records the exact version, scope and person who approved it before activation commits. */
   recordReview(
     context: TenantContext,
     definitionId: string,
@@ -252,15 +257,12 @@ function playbookReadiness(input: {
   });
 }
 
-/** Provides member-readable playbooks and atomic administrator activation commands. */
+/** Provides member-readable playbooks and atomic activation commands for people who can activate playbooks. */
 export function createPlaybookLibrary(deps: PlaybookLibraryDependencies) {
-  async function authorize(context: TenantContext, write = false) {
+  async function authorize(context: TenantContext, permission: Permission) {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
-    requireRole(
-      fresh,
-      write ? ['owner', 'admin'] : ['owner', 'admin', 'member'],
-    );
+    requirePermission(fresh, permission);
     if (fresh.actor.id !== context.actor.id)
       throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
 
@@ -363,14 +365,14 @@ export function createPlaybookLibrary(deps: PlaybookLibraryDependencies) {
       activations,
       policyVersion: currentPolicyVersion,
       principalId: context.actor.id,
-      canManage: context.actor.role !== 'member',
+      canManage: hasPermission(context, 'playbooks.activate'),
       evaluationEvidence: 'unavailable',
     };
   }
 
   return {
     async list(context: TenantContext) {
-      context = await authorize(context);
+      context = await authorize(context, 'workflows.read');
       const versions = await deps.store.versions(context);
       const ids = [...new Set(versions.map((v) => v.definition.id))];
 
@@ -379,10 +381,10 @@ export function createPlaybookLibrary(deps: PlaybookLibraryDependencies) {
       );
     },
     async detail(context: TenantContext, id: string) {
-      return detail(await authorize(context), id, deps);
+      return detail(await authorize(context, 'workflows.read'), id, deps);
     },
     async runs(context: TenantContext, id: string) {
-      context = await authorize(context);
+      context = await authorize(context, 'workflows.read');
       if (!(await deps.store.versions(context, id)).length) return missing();
 
       return deps.store.runs(context, id);
@@ -392,10 +394,10 @@ export function createPlaybookLibrary(deps: PlaybookLibraryDependencies) {
       id: string,
       request: ActivatePlaybook,
     ) {
-      context = await authorize(context, true);
+      context = await authorize(context, 'playbooks.activate');
 
       return deps.transaction(context, async (scope) => {
-        context = await authorize(context, true);
+        context = await authorize(context, 'playbooks.activate');
         const prior = await scope.store.review(context, request.id);
         if (
           prior &&
@@ -489,10 +491,10 @@ export function createPlaybookLibrary(deps: PlaybookLibraryDependencies) {
       activationId: string,
       artifactDigest: string,
     ) {
-      context = await authorize(context, true);
+      context = await authorize(context, 'playbooks.activate');
 
       return deps.transaction(context, async (scope) => {
-        context = await authorize(context, true);
+        context = await authorize(context, 'playbooks.activate');
         const activation = (await scope.store.activations(context, id)).find(
           (a) => a.id === activationId,
         );

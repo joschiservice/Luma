@@ -36,8 +36,8 @@ export const decisionDomainSchema = z.enum([
 
 /**
  * What the reader can do now: `decide` approve or reject; `run` the approved change they requested;
- * `check` an accepted or uncertain write; `investigate` in the issue; `awaiting_other` means a
- * different owner or admin must approve; `view_only` means the reader's role can't respond.
+ * `check` an accepted or uncertain write; `investigate` in the issue; `awaiting_other` means
+ * someone else must approve; `view_only` means the reader's permissions don't allow a response.
  */
 export const decisionResponseSchema = z.enum([
   'decide',

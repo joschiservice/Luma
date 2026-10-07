@@ -1,5 +1,9 @@
-import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireRole, requireTenant } from '@luma/identity';
+import type { Permission, TenantContext } from '@luma/identity';
+import {
+  IdentityError,
+  requirePermission,
+  requireTenant,
+} from '@luma/identity';
 import type {
   ModelErrorCode,
   ModelGateway,
@@ -366,8 +370,9 @@ export async function generateDraft(request: {
 
 /**
  * Generates and refines `workflow/2` drafts from natural language through the Model Gateway.
- * Owners and admins generate; members read availability and provenance. Generation creates or
- * proposes draft content only: it never publishes, activates, approves or starts a workflow.
+ * Generating needs `workflows.author`; reading availability and provenance needs `workflows.read`.
+ * Generation creates or proposes draft content only: it never publishes, activates, approves or
+ * starts a workflow.
  * Tenant text is sent only as sensitive EU data with zero retention and is never logged.
  */
 export function createDraftGeneration(deps: {
@@ -397,13 +402,10 @@ export function createDraftGeneration(deps: {
   const maxAttempts = deps.maxAttempts ?? 3;
   const timeoutMs = deps.timeoutMs ?? 60_000;
 
-  async function authorize(context: TenantContext, write = false) {
+  async function authorize(context: TenantContext, permission: Permission) {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
-    requireRole(
-      fresh,
-      write ? ['owner', 'admin'] : ['owner', 'admin', 'member'],
-    );
+    requirePermission(fresh, permission);
     if (fresh.actor.id !== context.actor.id)
       throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
 
@@ -631,7 +633,7 @@ export function createDraftGeneration(deps: {
     async availability(
       context: TenantContext,
     ): Promise<GenerationAvailability> {
-      await authorize(context);
+      await authorize(context, 'workflows.read');
 
       return { ...deps.availability };
     },
@@ -645,7 +647,7 @@ export function createDraftGeneration(deps: {
       input: { id: string; draftId: string; prompt: string },
       options: GenerationOptions = {},
     ) {
-      context = await authorize(context, true);
+      context = await authorize(context, 'workflows.author');
       const requestDigest = deps.hash({
         kind: 'describe',
         draftId: input.draftId,
@@ -751,7 +753,7 @@ export function createDraftGeneration(deps: {
       input: { id: string; revision: number; instruction: string },
       options: GenerationOptions = {},
     ) {
-      context = await authorize(context, true);
+      context = await authorize(context, 'workflows.author');
       const draft = await deps.drafts.get(context, draftId);
       const requestDigest = deps.hash({
         kind: 'refine',
@@ -838,7 +840,7 @@ export function createDraftGeneration(deps: {
       proposalId: string,
       input: { revision: number; saveId: string },
     ) {
-      context = await authorize(context, true);
+      context = await authorize(context, 'workflows.author');
       const found = await proposal(context, draftId, proposalId);
       const decision = found.proposal!;
       if (decision.state === 'rejected')
@@ -880,7 +882,7 @@ export function createDraftGeneration(deps: {
     },
     /** Rejects a proposal. The draft is unchanged. Rejecting again is safe. */
     async reject(context: TenantContext, draftId: string, proposalId: string) {
-      context = await authorize(context, true);
+      context = await authorize(context, 'workflows.author');
       const found = await proposal(context, draftId, proposalId);
       if (found.proposal!.state === 'accepted')
         conflict('This change was already accepted.');
@@ -914,7 +916,7 @@ export function createDraftGeneration(deps: {
       },
       options: GenerationOptions = {},
     ) {
-      context = await authorize(context, true);
+      context = await authorize(context, 'workflows.author');
       const draft = await deps.drafts.get(context, draftId);
       const requestDigest = deps.hash({
         kind: 'code_step',
@@ -1012,7 +1014,7 @@ export function createDraftGeneration(deps: {
     },
     /** Lists the generation records for a draft, newest first. Members may read them. */
     async generations(context: TenantContext, draftId: string) {
-      context = await authorize(context);
+      context = await authorize(context, 'workflows.read');
       await deps.drafts.get(context, draftId);
 
       return (await deps.store.list(context, draftId)).map((item) => ({

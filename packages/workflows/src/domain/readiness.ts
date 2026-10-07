@@ -174,7 +174,7 @@ export function assessReadiness(input: {
           ? {
               label: input.enable?.label ?? 'Set up this workflow',
               description:
-                'Nothing runs until an owner or admin reviews the exact scope and turns it on.',
+                'Nothing runs until someone reviews the exact scope and turns it on.',
               repair: input.enable,
             }
           : input.enablement === 'paused'
@@ -223,7 +223,7 @@ export function describeApproval(
   if (requirement.mode === 'risk_based')
     return {
       mode: 'risk_based',
-      summary: `Low-risk ${action} can run without a person. Anything riskier waits for a different owner or admin.`,
+      summary: `Low-risk ${action} can run without a person. Anything riskier waits for someone else who can approve changes.`,
       details: [
         'Luma classifies each proposal when it is made. Approval is checked again just before Luma acts.',
         'Turn on “Always require approval” in Settings to make every action wait for a person.',
@@ -232,7 +232,7 @@ export function describeApproval(
 
   return {
     mode: 'every_action',
-    summary: `A different owner or admin approves every ${action} before Luma acts.`,
+    summary: `Someone else who can approve changes approves every ${action} before Luma acts.`,
     details: [
       requirement.reason === 'workspace_policy'
         ? 'Workspace settings require approval for every action.'

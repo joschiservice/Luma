@@ -77,7 +77,7 @@ export function describeStep(
     case 'approval':
       return {
         title,
-        description: `An owner or admin approves ${step.forStep ? `“${step.forStep}”` : 'the next action'} within ${duration(step.expiresAfterSeconds)}.`,
+        description: `Someone who can approve changes decides on ${step.forStep ? `“${step.forStep}”` : 'the next action'} within ${duration(step.expiresAfterSeconds)}.`,
       };
     case 'wait':
       return { title, description: `Wait ${duration(step.seconds)}.` };

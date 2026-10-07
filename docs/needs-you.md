@@ -20,8 +20,9 @@ lives in the app (`packages/apps/shopify/src/application/decisions.ts`).
 
 Providers read persisted state only. They must not call providers or models. A Shopify preview
 can therefore be listed as approvable and still be refused when its review reads Shopify and
-finds a changed revision. Members get no app decisions because the Shopify services require an
-owner or admin.
+finds a changed revision. The app host lists an app's decisions only for installed apps and
+filters each kind by the permissions its manifest declares; people without the respond
+permission see the decision as view only.
 
 ## Ranking and paging
 
@@ -43,8 +44,8 @@ not resolved, and the rest of the queue still loads.
 
 `decision_assignments` (migration `0047_decision_queue.sql`) stores the current owner per
 decision ID with an optimistic revision. Resolution owns the writes
-(`packages/resolution/src/application/decision-assignments.ts`). Any member may take an
-unassigned decision or release their own; owners and admins may assign any decision to a
+(`packages/resolution/src/application/decision-assignments.ts`). `decisions.self_assign` takes
+an unassigned decision or releases one's own; `decisions.assign` assigns any decision to a
 current member. The decision must currently be in the reader's queue. Assignment never grants
 approval authority.
 

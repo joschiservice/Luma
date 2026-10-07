@@ -85,6 +85,9 @@ export interface FulfillmentList {
   asOf: string;
 }
 
+/** Fulfillment detail sections that need another area's read permission. */
+export type FulfillmentDetailSection = 'issues' | 'workflows' | 'activity';
+
 export interface FulfillmentDetail {
   item: FulfillmentItem;
   source: FulfillmentSource;
@@ -129,13 +132,16 @@ export interface FulfillmentDetail {
     progressObservedAt: string | null;
   })[];
   activity: OrderDetail['activity'];
+  /** Sections left empty because the reader can't read their area. */
+  hidden: FulfillmentDetailSection[];
   stalledAfterHours: number;
   asOf: string;
 }
 
 /**
  * Reads fulfillment work and shipments from each source's current projection, classifying
- * holds, delays and failures without merging mirrored work across sources.
+ * holds, delays and failures without merging mirrored work across sources. Requires
+ * `fulfillment.read`; detail sections of other areas need their read permission.
  */
 export interface FulfillmentWorkspace {
   /** Returns up to `limit` fulfillments. A cursor must belong to the same tenant and filters. */

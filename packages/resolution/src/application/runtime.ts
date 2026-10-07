@@ -6,7 +6,7 @@ import type {
 } from '@luma/exceptions';
 import type { ActionAdmission } from '@luma/execution';
 import type { IdentityService, TenantContext } from '@luma/identity';
-import { requireRole, requireTenant } from '@luma/identity';
+import { requirePermission, requireTenant } from '@luma/identity';
 import type { ProposedAction } from '@luma/policies';
 import type {
   PlaybookOutcome,
@@ -163,7 +163,7 @@ export function createExceptionActivities(deps: {
       input.requestId,
     );
     requireTenant(fresh, input.tenantId);
-    requireRole(fresh, ['owner', 'admin']);
+    requirePermission(fresh, 'actions.propose');
     if (fresh.actor.id !== input.userId)
       throw new WorkflowInputError('Actor changed');
 

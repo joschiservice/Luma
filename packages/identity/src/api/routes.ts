@@ -1,8 +1,10 @@
+import type { RouteAccess } from '@luma/api-contract';
 import { apiContract } from '@luma/api-contract';
 import { initServer } from '@ts-rest/fastify';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 
 import type { IdentityService } from '../application/identity.js';
+import type { TenantContext } from '../domain/context.js';
 import { IdentityError } from '../domain/context.js';
 
 /** Extracts the cookie and authorization headers used to resolve a request's session. */
@@ -42,10 +44,21 @@ export function identityRoutes(service?: IdentityService) {
       status: 201,
       body: await use().createOrganization(credentials(request), body),
     }),
-    context: async ({ request }) => ({
-      status: 200,
-      body: tenantContext(request),
-    }),
+    context: async ({ request }) => {
+      const context = tenantContext(request);
+
+      return {
+        status: 200,
+        body: {
+          tenantId: context.tenantId,
+          dataRegion: context.dataRegion,
+          requestId: context.requestId,
+          actor: context.actor,
+          permissions: [...context.permissions],
+          allAppPermissions: context.permissions.allAppPermissions,
+        },
+      };
+    },
     listMembers: async ({ request }) => ({
       status: 200,
       body: {
@@ -54,6 +67,9 @@ export function identityRoutes(service?: IdentityService) {
     }),
     addMember: async ({ request, body }) => {
       const member = await use().changeMember(tenantContext(request), {
+        ...(request.headers['x-command-id']
+          ? { commandId: String(request.headers['x-command-id']) }
+          : {}),
         action: 'add',
         ...body,
       });
@@ -67,7 +83,7 @@ export function identityRoutes(service?: IdentityService) {
           : {}),
         action: 'update',
         memberId: params.memberId,
-        role: body.role,
+        roleId: body.roleId,
       });
 
       return { status: 200, body: member! };
@@ -147,18 +163,58 @@ export function registerIdentityGuards(
       )
     )
       throw new IdentityError(404, 'NOT_FOUND', 'Organization not found');
-    request.tenantContext = await service.resolveTenant(
+    const context = await service.resolveTenant(
       credentials(request),
       params.organizationId,
       request.id,
     );
+    request.tenantContext = context;
+    authorizeRoute(context, routeAccess(request));
   });
+}
+
+/** Reads the access a tenant route declares in its contract metadata or route config. */
+function routeAccess(request: FastifyRequest): RouteAccess | undefined {
+  const config = request.routeOptions.config;
+
+  return (
+    config.access ?? (config.tsRestRoute?.metadata as RouteAccess | undefined)
+  );
+}
+
+/**
+ * Denies tenant routes that declare no access, and callers without any one of the declared
+ * permissions. App permissions are checked again by the app host with installation state.
+ */
+function authorizeRoute(
+  context: TenantContext,
+  access: RouteAccess | undefined,
+) {
+  if (access && 'access' in access && access.access === 'member') return;
+  const permissions =
+    access && 'permission' in access
+      ? typeof access.permission === 'string'
+        ? [access.permission]
+        : access.permission
+      : [];
+  if (!permissions.some((permission) => context.permissions.has(permission)))
+    throw new IdentityError(
+      403,
+      'FORBIDDEN',
+      permissions.length
+        ? 'Your role does not allow this. Ask a workspace admin for access.'
+        : 'This route does not declare who may use it.',
+    );
 }
 
 declare module 'fastify' {
   interface FastifyContextConfig {
     /** App-owned handlers authenticate signed callbacks and webhooks themselves. */
     authentication?: 'app';
+    /** Who may call a tenant route registered outside a ts-rest contract. */
+    access?: import('@luma/api-contract').RouteAccess;
+    /** Set by ts-rest for contract routes; its metadata declares route access. */
+    tsRestRoute?: { metadata?: unknown };
   }
 
   interface FastifyRequest {

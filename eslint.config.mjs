@@ -102,6 +102,48 @@ export default tseslint.config(
     },
   },
   {
+    // Authorization asks for permissions. Role names are identity's concern (LUMA-135).
+    files: [
+      'apps/**/src/**/*.{ts,tsx}',
+      'packages/**/src/**/*.{ts,tsx}',
+      'tooling/**/*.mjs',
+    ],
+    ignores: [
+      'packages/identity/**',
+      'apps/web/src/features/identity/permissions.tsx',
+      '**/*.test.*',
+      '**/*.stories.*',
+      '**/*.fixture.*',
+      '**/test-support/**',
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            'Program > :not(ImportDeclaration):not(ExpressionStatement[directive]) ~ ImportDeclaration',
+          message: 'Keep static imports together at the top of the file.',
+        },
+        {
+          selector: "Identifier[name='requireRole']",
+          message:
+            'Check a permission with requirePermission or hasPermission.',
+        },
+        {
+          selector:
+            'BinaryExpression[operator=/^[!=]==?$/]:has(Literal[value=/^(owner|admin|member)$/]):has(MemberExpression[property.name=/^(role|key)$/])',
+          message:
+            'Do not compare roles; check a permission (or use isOwnerRole for ownership).',
+        },
+        {
+          selector:
+            "CallExpression[callee.property.name='includes']:has(ArrayExpression > Literal[value=/^(owner|admin)$/])",
+          message: 'Do not check role lists; check a permission instead.',
+        },
+      ],
+    },
+  },
+  {
     files: [
       'apps/**/src/**/*.{ts,tsx}',
       'packages/**/src/**/*.{ts,tsx}',

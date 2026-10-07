@@ -1,10 +1,26 @@
 import type { Approval, PolicyDecision, ProposedAction } from './action.js';
 
+/** The permission checks policy needs, satisfied by a tenant context's permission set. */
+export interface PolicyAccess {
+  has(permission: string): boolean;
+}
+
+/**
+ * The capability facts policy evaluates. `permission` is what the actor needs for this step:
+ * the capability's own permission when it declares one, otherwise `actions.propose` when
+ * preparing a proposal and `actions.execute` when running it.
+ */
+export interface PolicyCapability {
+  available: boolean;
+  minimumRisk: ProposedAction['risk'];
+  permission: string;
+}
+
 /** Evaluates the current policy without persisting a decision or granting execution authority. */
 export function evaluatePolicy(
   action: ProposedAction,
-  capability: { available: boolean; minimumRisk: ProposedAction['risk'] },
-  role: string,
+  capability: PolicyCapability,
+  access: PolicyAccess,
   actorId: string,
   now: number,
   approval: Approval | null = null,
@@ -12,7 +28,7 @@ export function evaluatePolicy(
 ): Pick<PolicyDecision, 'outcome' | 'reason'> {
   let outcome: PolicyDecision['outcome'] = 'allowed';
   let reason: PolicyDecision['reason'] = 'authorized';
-  if (!['owner', 'admin'].includes(role)) {
+  if (!access.has(capability.permission)) {
     outcome = 'denied';
     reason = 'permission_denied';
   } else if (!capability.available) {

@@ -48,6 +48,7 @@ import {
 import { isTypingTarget } from '../../lib/keyboard';
 import { SignInRedirect } from '../identity/common';
 import { contextOptions, IdentityError } from '../identity/data';
+import { usePermissions } from '../identity/permissions';
 import { membersOptions } from '../settings/data';
 import {
   assignDecision,
@@ -533,7 +534,12 @@ function TenantQueue({ organizationId }: { organizationId: string }) {
   const context = useQuery(contextOptions(organizationId));
   const members = useQuery(membersOptions(organizationId));
   const self = context.data?.actor.id;
-  const role = context.data?.actor.role;
+  const permissions = usePermissions(organizationId);
+  const assignmentAccess = permissions.can('decisions.assign')
+    ? 'anyone'
+    : permissions.can('decisions.self_assign')
+      ? 'self'
+      : 'none';
   const denied =
     list.error instanceof IdentityError &&
     [403, 404].includes(list.error.status);
@@ -647,7 +653,6 @@ function TenantQueue({ organizationId }: { organizationId: string }) {
     userId: member.userId,
     name: member.name,
     email: member.email,
-    role: member.role,
   }));
   const item = typeof selected === 'object' ? selected : undefined;
   const previousItem = position > 0 ? items[position - 1] : undefined;
@@ -687,7 +692,7 @@ function TenantQueue({ organizationId }: { organizationId: string }) {
             departed={departed}
             members={memberList}
             self={self}
-            role={role}
+            assignmentAccess={assignmentAccess}
             now={now}
             assigning={assignment.isPending}
             assignError={assignError}

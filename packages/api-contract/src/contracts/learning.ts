@@ -1,7 +1,7 @@
 import { initContract } from '@ts-rest/core';
 import { z } from 'zod';
 
-import { apiErrorSchema, caseParams } from '../common.js';
+import { apiErrorSchema, caseParams, requires } from '../common.js';
 import {
   learningCommandSchema,
   learningEventSchema,
@@ -16,6 +16,7 @@ export const resolutionLearningContract = c.router(
   {
     list: {
       method: 'GET',
+      metadata: requires('issues.manage'),
       path: '/v1/organizations/:organizationId/exceptions/:exceptionId/resolution-runs',
       pathParams: caseParams,
       query: z.object({ after: z.string().uuid().optional() }),
@@ -27,20 +28,22 @@ export const resolutionLearningContract = c.router(
       },
       summary: 'List resolution runs',
       description:
-        'Owners and admins can find up to 50 runs for a case. Pass nextCursor as after to continue; IDs provide stable page ordering. Refresh from the first page to discover newly recorded runs.',
+        'People who can manage issues can find up to 50 runs for a case. Pass nextCursor as after to continue; IDs provide stable page ordering. Refresh from the first page to discover newly recorded runs.',
     },
     start: {
       method: 'POST',
+      metadata: requires('issues.manage'),
       path: '/v1/organizations/:organizationId/exceptions/:exceptionId/resolution-runs',
       pathParams: caseParams,
       body: startResolutionRunSchema,
       responses: { 200: resolutionRunSchema },
       summary: 'Record a resolution selection',
       description:
-        'Owners and admins record a run ID, diagnosis revision, resolution version and reason. Reuse the run ID for automated steps. Exact retries return the original record; conflicting IDs return 409.',
+        'People who can manage issues record a run ID, diagnosis revision, resolution version and reason. Reuse the run ID for automated steps. Exact retries return the original record; conflicting IDs return 409.',
     },
     append: {
       method: 'POST',
+      metadata: requires('issues.manage'),
       path: '/v1/organizations/:organizationId/exceptions/:exceptionId/resolution-runs/:runId/events',
       pathParams: caseParams.extend({ runId: z.string().uuid() }),
       body: learningCommandSchema,
@@ -51,12 +54,13 @@ export const resolutionLearningContract = c.router(
     },
     read: {
       method: 'GET',
+      metadata: requires('issues.manage'),
       path: '/v1/organizations/:organizationId/exceptions/:exceptionId/resolution-runs/:runId',
       pathParams: caseParams.extend({ runId: z.string().uuid() }),
       responses: { 200: resolutionHistorySchema },
       summary: 'Read resolution learning history',
       description:
-        'Owners and admins can export the original context, ordered operator records, bound steps, execution and all verification attempts. A pending attempt without completion has no known result. Execution acceptance does not establish business success.',
+        'People who can manage issues can export the original context, ordered operator records, bound steps, execution and all verification attempts. A pending attempt without completion has no known result. Execution acceptance does not establish business success.',
     },
   },
   {

@@ -73,7 +73,7 @@ export function presentResolutionStory(
   const view = presentResolutionRun(run, version, outcome);
   const decisions: Record<PlaybookOutcome['reason'], string> = {
     approval_required:
-      'Waiting for an independent owner or administrator to approve the proposed change.',
+      'Waiting for someone else who can approve changes to decide on the proposed change.',
     verified: 'The expected correction was confirmed by verification.',
     policy_denied: 'Policy denied the proposed change.',
     ineligible: 'The evidence did not meet the workflow conditions.',

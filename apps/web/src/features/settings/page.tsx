@@ -14,6 +14,7 @@ import {
   Bell,
   Building2,
   Check,
+  IdCard,
   KeyRound,
   LayoutDashboard,
   LockKeyhole,
@@ -26,6 +27,7 @@ import { useId, useState } from 'react';
 
 import { Failure } from '../identity/common';
 import { contextOptions, IdentityError } from '../identity/data';
+import { usePermissionLabel, usePermissions } from '../identity/permissions';
 import {
   CommandFeedback,
   useSettingsCommand,
@@ -33,6 +35,7 @@ import {
 } from './command';
 import { settingsApi, settingsOptions, settingsResult } from './data';
 import { AppearanceSettings, HomeSidebarSettings } from './personal';
+import { RolesSettings } from './roles';
 import { SectionHeading } from './section-heading';
 import { SecuritySettings } from './security';
 import { TeamSettings } from './team';
@@ -40,6 +43,7 @@ import { TeamSettings } from './team';
 export const settingsSections = [
   { id: 'workspace', label: 'Workspace', group: 'Workspace', Icon: Building2 },
   { id: 'team', label: 'Team', group: 'Workspace', Icon: Users },
+  { id: 'roles', label: 'Roles', group: 'Workspace', Icon: IdCard },
   {
     id: 'approvals',
     label: 'Approvals',
@@ -75,10 +79,18 @@ export const settingsSections = [
 export type SettingsSection = (typeof settingsSections)[number]['id'];
 
 /** Loads settings within the active workspace and clears protected content on access loss. */
-export function SettingsPage({ section }: { section: SettingsSection }) {
+export function SettingsPage({
+  section,
+  roleId,
+}: {
+  section: SettingsSection;
+  /** The role open in Roles, if any. */
+  roleId?: string | undefined;
+}) {
   const { organizationId } = useParams({ from: '/app/$organizationId' });
   const query = useQuery(settingsOptions(organizationId));
   const access = useQuery(contextOptions(organizationId));
+  const permissions = usePermissions(organizationId);
   const error = access.error ?? query.error;
   if (error instanceof IdentityError && [401, 403, 404].includes(error.status))
     return <Failure error={error} retry={() => void query.refetch()} />;
@@ -86,9 +98,10 @@ export function SettingsPage({ section }: { section: SettingsSection }) {
   return (
     <SettingsView
       section={section}
+      roleId={roleId}
       organizationId={organizationId}
       data={query.data}
-      role={access.data?.actor.role ?? 'member'}
+      can={permissions.can}
       actorId={access.data?.actor.id ?? ''}
       loading={query.isPending}
       error={
@@ -104,31 +117,39 @@ export function SettingsPage({ section }: { section: SettingsSection }) {
 /** Presents linked workspace sections with shared loading, recovery and responsive navigation. */
 export function SettingsView({
   section,
+  roleId,
   organizationId,
   data,
-  role,
+  can,
   actorId,
   loading,
   error,
   retry,
 }: {
   section: SettingsSection;
+  roleId?: string | undefined;
   organizationId: string;
   data?: SettingsSnapshot | undefined;
-  role: 'owner' | 'admin' | 'member';
+  /** Whether the signed-in person holds a permission. */
+  can: (permission: string) => boolean;
   actorId: string;
   loading?: boolean | undefined;
   error?: string | undefined;
   retry: () => void;
 }) {
   const online = useSettingsOnline();
-  const admin = role !== 'member';
+  const required =
+    section === 'workspace'
+      ? 'workspace.settings.manage'
+      : section === 'approvals'
+        ? 'workspace.approval_policy.manage'
+        : null;
 
   return (
     <div className="settings-page">
       <PageHeader
         title="Settings"
-        description="Workspace details, your team and approvals, and the preferences that only affect you."
+        description="Workspace details, your team, roles and approvals, and the preferences that only affect you."
       />
       <div className="settings-layout">
         <SectionNavigation
@@ -182,21 +203,18 @@ export function SettingsView({
           ) : null}
           {data ? (
             <>
-              {!admin &&
-              !['security', 'notifications', 'appearance', 'home'].includes(
-                section,
-              ) ? (
-                <Alert tone="neutral">
-                  <LockKeyhole size={14} /> You have member access. An owner or
-                  admin can change workspace settings.
-                </Alert>
+              {required && !can(required) ? (
+                <ReadOnlyNotice
+                  organizationId={organizationId}
+                  permission={required}
+                />
               ) : null}
               {section === 'workspace' ? (
                 <WorkspaceForm
                   key={`${organizationId}:workspace`}
                   data={data}
                   organizationId={organizationId}
-                  disabled={!admin || !online}
+                  disabled={!can('workspace.settings.manage') || !online}
                 />
               ) : null}
               {section === 'notifications' ? (
@@ -212,7 +230,7 @@ export function SettingsView({
                   key={`${organizationId}:approvals`}
                   data={data}
                   organizationId={organizationId}
-                  disabled={!admin || !online}
+                  disabled={!can('workspace.approval_policy.manage') || !online}
                 />
               ) : null}
               {section === 'security' ? (
@@ -226,8 +244,13 @@ export function SettingsView({
                 <TeamSettings
                   organizationId={organizationId}
                   actorId={actorId}
-                  role={role}
                   deliveryAvailable={data.deliveryAvailable}
+                />
+              ) : null}
+              {section === 'roles' ? (
+                <RolesSettings
+                  organizationId={organizationId}
+                  roleId={roleId}
                 />
               ) : null}
             </>
@@ -500,12 +523,12 @@ function ApprovalsForm({
           </strong>
           <p>
             {data.workspace.alwaysRequireApproval
-              ? 'Every otherwise permitted change needs review by another owner or admin.'
+              ? 'Every otherwise permitted change needs review by someone else who can approve changes.'
               : 'Low-risk permitted changes can proceed. Higher-risk changes require independent approval.'}
           </p>
           <span>
-            Policy revision {data.workspace.policyRevision} · Owners and admins
-            can approve
+            Policy revision {data.workspace.policyRevision} · People whose role
+            includes Approve or reject changes can approve
           </span>
         </div>
       </div>
@@ -530,7 +553,7 @@ function ApprovalsForm({
         <div className="settings-panel">
           <PreferenceRow
             title="Always require approval"
-            description="Require a different owner or admin to approve otherwise permitted changes."
+            description="Require someone else who can approve changes to approve otherwise permitted changes."
             checked={required}
             disabled={disabled || command.locked}
             change={(value) =>
@@ -569,6 +592,24 @@ function ApprovalsForm({
         <CommandFeedback command={command} />
       </form>
     </section>
+  );
+}
+
+/** Explains which permission a read-only settings section needs. */
+function ReadOnlyNotice({
+  organizationId,
+  permission,
+}: {
+  organizationId: string;
+  permission: string;
+}) {
+  const label = usePermissionLabel(organizationId, permission);
+
+  return (
+    <Alert tone="neutral">
+      <LockKeyhole size={14} /> You can view this section. Changing it requires{' '}
+      <strong>{label}</strong>, which your role doesn’t include.
+    </Alert>
   );
 }
 

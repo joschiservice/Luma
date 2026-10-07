@@ -89,7 +89,7 @@ serialize recording. `expectedRevision` rejects concurrent lost updates; identic
 ID/request/actor replays return the original event without revalidating changed
 sources. Conflicting identity or payload returns 409. All supplied references
 must resolve to retained evidence owned by this tenant and incident. Members can
-read; writes require freshly refreshed owner/admin authority. Foreign and missing
+read; writes require a freshly refreshed context with `issues.manage`. Foreign and missing
 incident/evidence IDs both return 404.
 
 ## Shared registry, delivery and bounds

@@ -162,7 +162,7 @@ ownership; a working webhook alone is insufficient.
 Run through the public development origin while the API and tunnel are running.
 Record app ID/version, store, date, deployed commit and results without tokens.
 
-- Sign in as workspace owner/admin; install Shopify in Luma; connect the demo
+- Sign in as a workspace owner or admin; install Shopify in Luma; connect the demo
   hostname. Confirm the Shopify consent screen, callback and active connection.
 - Cancel consent, retry, and reconnect. Confirm recovery and the same connection
   ID without duplicates. A replayed callback must fail.

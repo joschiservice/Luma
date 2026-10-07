@@ -1,6 +1,9 @@
 import { randomUUID } from 'node:crypto';
 
-import { makeTenantContext } from '@luma/identity/composition';
+import {
+  builtInMembership,
+  makeTenantContext,
+} from '@luma/identity/composition';
 import {
   createExceptionClient,
   createExceptionWorker,
@@ -41,12 +44,10 @@ it('propagates an API span through a real Temporal client, workflow and activity
       dataRegion: 'EU',
       status: 'active',
     },
-    {
-      id: 'membership',
-      organizationId: 'tenant',
-      userId: 'requester',
-      role: 'owner',
-    },
+    builtInMembership(
+      { id: 'membership', organizationId: 'tenant', userId: 'requester' },
+      'owner',
+    ),
     randomUUID(),
   );
   const client = await createExceptionClient(settings, {

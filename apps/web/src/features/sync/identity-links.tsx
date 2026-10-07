@@ -43,7 +43,7 @@ type Pending =
   | { operation: 'unlink'; source: Source };
 
 /**
- * Loads linked source records and lets owners and admins confirm matches in other
+ * Loads linked source records and lets people who can manage imports confirm matches in other
  * sources or separate a source again. Refreshes `onChanged` data once a request completes.
  */
 export function IdentityLinks({

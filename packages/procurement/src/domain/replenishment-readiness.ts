@@ -101,7 +101,7 @@ export const replenishmentStepCopy: Record<
   'create-order': {
     title: 'Create a purchase-order draft',
     description:
-      'After a different owner or admin approves, records a draft for the rule’s supplier. Nothing is sent to the supplier.',
+      'After someone else who can approve changes approves, records a draft for the rule’s supplier. Nothing is sent to the supplier.',
   },
   'verify-order': {
     title: 'Check the draft independently',

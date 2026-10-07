@@ -4,7 +4,10 @@ import { readFile } from 'node:fs/promises';
 
 import { createDetectionServices } from '@luma/application-runtime';
 import { defaultConfiguration } from '@luma/exceptions';
-import { makeTenantContext } from '@luma/identity/composition';
+import {
+  builtInMembership,
+  makeTenantContext,
+} from '@luma/identity/composition';
 
 import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, database, startApi, startProcess } from './helpers.mjs';
@@ -109,7 +112,10 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
       dataRegion: 'EU',
       status: 'active',
     },
-    { id: randomUUID(), organizationId, userId: actorId, role: 'owner' },
+    builtInMembership(
+      { id: randomUUID(), organizationId, userId: actorId },
+      'owner',
+    ),
     randomUUID(),
   );
   const corpus = JSON.parse(

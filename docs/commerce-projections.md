@@ -4,7 +4,7 @@
 inventory owners, and the commerce ingestion workflow. Call it with a restricted
 login inheriting `luma_connectors`, `luma_orders` and `luma_inventory`. Close the
 service when its worker stops. All methods require a resolved tenant context;
-ingestion and mapping require an owner or admin.
+ingestion and mapping require `sync.manage`.
 
 ## Ingest and reconcile
 

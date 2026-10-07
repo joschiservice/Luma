@@ -10,7 +10,7 @@ import { initServer } from '@ts-rest/fastify';
 
 import type { FulfillmentWorkspace } from '../application/fulfillment.js';
 
-/** Exposes the tenant's fulfillment work, shipments and their evidence to workspace members. */
+/** Exposes the tenant's fulfillment work, shipments and their evidence to readers with `fulfillment.read`. */
 export function fulfillmentRoutes(service?: FulfillmentWorkspace) {
   return initServer().router(apiContract.fulfillment, {
     list: async ({ request, query }) => {

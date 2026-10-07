@@ -6,7 +6,7 @@ Ask Luma answers workspace questions through a bounded model loop over read-only
 
 `POST /v1/organizations/:organizationId/assistant/answers` (`packages/assistant/src/api/assistant.ts`) calls `ask` in `application/assistant.ts`:
 
-1. Refreshes the context and requires an owner, admin or member whose actor is unchanged.
+1. Refreshes the context and requires `assistant.use` and an unchanged actor. The model is offered only tools the person's permissions allow, and each tool checks its permission again.
 2. Returns 503 with the availability reason, without calling a model, when the `assistant` route isn't an EU zero-retention Bedrock route (`assistantAvailability` in `packages/application-runtime/src/composition/authoring.ts`).
 3. Sends the system prompt, the client's earlier turns and the question with `profile: 'assistant'` and `dataPolicy: { classification: 'sensitive', region: 'EU', zeroDataRetention: true }`.
 4. For each tool batch, refreshes the context again and runs the calls through the tool registry. A removed member or changed actor ends the answer with the identity error.

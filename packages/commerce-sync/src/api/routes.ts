@@ -13,7 +13,7 @@ import type { FastifyRequest } from 'fastify';
 
 import type { SyncService } from '../application/service.js';
 
-/** Exposes sync status to members, and sync controls and link requests to owners and admins. */
+/** Exposes sync status to members, and sync controls and link requests to people with `sync.manage`. */
 export function syncRoutes(service?: SyncService) {
   function use(request: FastifyRequest) {
     if (!request.tenantContext)

@@ -61,6 +61,20 @@ Start at `apps/web/src/features/help/context-help.tsx` for the navbar drawer,
 validation; browser tests are `apps/api/e2e/docs.browser.mjs` and
 `apps/api/e2e/issues-help.browser.mjs`.
 
+## Permissions and roles
+
+The catalog and built-in roles are `packages/identity/src/domain/permissions.ts` and `roles.ts`;
+`requirePermission`/`hasPermission` are in `domain/context.ts`. Custom roles are
+`application/roles.ts` and `infrastructure/roles.ts` with migrations `0054_workspace_roles.sql`
+and `0055_workspace_app_scopes.sql`. Routes declare access in contract `metadata`; the guard is
+`registerIdentityGuards` in `api/routes.ts`. App permissions and scopes are checked in
+`packages/app-host/src/application/installations.ts`. The web hook `usePermissions`/`useCan`
+and `NoAccess` are `apps/web/src/features/identity/permissions.tsx`; Settings → Roles is
+`apps/web/src/features/settings/roles.tsx` and `role-editor.tsx`. Tests: identity domain and
+route-access tests, `identity.integration.test.ts` (custom roles), `registry.test.ts` in app-host
+and `apps/api/e2e/roles.browser.mjs`. See [ADR-009](architecture/009-permissions-and-roles.md)
+and the [permission reference](permissions.md).
+
 ## Workspace settings
 
 Start at `packages/identity/src/application/settings.ts` for authorized edits and invitations,

@@ -1,15 +1,39 @@
 # Workspace settings
 
 Settings is available at `/app/:organizationId/settings/workspace`, with direct
-links to `/team`, `/notifications` and `/approvals`. Workspace controls are shared;
+links to `/team`, `/roles`, `/notifications` and `/approvals`. Workspace controls are shared;
 notification choices belong to the signed-in user in that workspace.
 
-Owners and admins may change the workspace name, display timezone and approval
-preference. Slug and region are read-only. Members can read workspace settings and
-manage their own email preferences. Only owners grant or revoke ownership. Team
-mutations recheck authority under the organization lock, including concurrent
-last-owner changes. Access and policy changes retain actor, timestamp and bounded
+`workspace.settings.manage` changes the workspace name and display timezone, and
+`workspace.approval_policy.manage` changes the approval preference. Slug and region are
+read-only. Every member can read workspace settings and manage their own email preferences.
+Sections a role can't change show which permission they need. `members.manage` invites,
+reassigns and removes people; only owners grant or revoke ownership, and nobody else can assign
+a role with permissions they don't hold. Team mutations recheck authority under the
+organization lock, including concurrent last-owner changes. Access and policy changes retain actor, timestamp and bounded
 before/after evidence in the append-only `workspace_access_events` table.
+
+## Roles
+
+**Settings → Roles** lists built-in and custom roles with member counts. Opening a role shows
+its permissions by group, the people who have it and, for `roles.manage`, its history.
+Built-in roles are read-only; duplicate one to start a custom role. Editing marks sensitive
+permissions, disables permissions the editor can't grant, and previews the change with the
+affected people before saving. Archiving needs the role to be unused and revokes its pending
+invitations, which Team then shows as revoked by archive.
+
+| Route                         | Behavior                                                                  |
+| ----------------------------- | ------------------------------------------------------------------------- |
+| `GET /roles`                  | Roles, member and invitation counts, and the grantable permission catalog |
+| `POST /roles`                 | Create a custom role (`roles.manage`, `x-command-id`)                     |
+| `PATCH /roles/:roleId`        | Change name, description and permissions at the reviewed `revision`       |
+| `POST /roles/:roleId/archive` | Archive an unused role at the reviewed `revision`                         |
+| `GET /roles/:roleId/history`  | Up to 100 role changes and member assignments                             |
+
+Role mutations serialize with membership changes on the organization row and are recorded as
+`role.created`, `role.updated`, `role.archived` and `role.app_permissions_removed` access events
+with bounded before/after values. See [ADR-009](architecture/009-permissions-and-roles.md) and
+the [permission reference](permissions.md).
 
 ## API and retries
 
@@ -23,8 +47,8 @@ All settings routes use the typed `settings` contract. Workspace routes are unde
 | `PATCH /approvals`                | Approval preference, with the reviewed policy revision                                |
 | `PATCH /notifications`            | Personal email preferences, with their reviewed revision                              |
 | `POST /notifications/test`        | Queue an email to the caller                                                          |
-| `GET /invitations`                | Administrator invitation list, including expiry and delivery state                    |
-| `POST /invitations`               | Invite an email address as member or admin                                            |
+| `GET /invitations`                | Invitation list for `members.manage`, including expiry and delivery state             |
+| `POST /invitations`               | Invite an email address with an active non-owner role (`roleId`)                      |
 | `POST /invitations/:invitationId` | Resend or revoke the reviewed generation                                              |
 | `GET /commands/:commandId`        | Check whether the caller's settings command committed                                 |
 
@@ -35,7 +59,8 @@ Version conflicts require refreshing the relevant settings before a new write.
 Forms retain input on failure and do not queue offline writes.
 
 Membership reads and changes continue to use `/members`. Reads include display
-name and email. Role changes and removals accept an `x-command-id` UUID header. The Team screen
+name, email and the role reference. Adding, reassigning (`roleId`) and removing accept an
+`x-command-id` UUID header. The Team screen
 retries the original command; durable receipts prevent overwriting subsequent changes.
 
 ## Invitations
@@ -80,7 +105,8 @@ version and recipient. No historical events are backfilled when a user opts in.
 The worker rechecks membership, workspace state and preference in a short transaction
 before dispatch. Provider calls run outside operational locks. A message already
 dispatched may complete after opt-out or membership removal. Opting out cancels queued optional messages.
-Invitation delivery also rechecks the inviter's management role and link generation.
+Invitation delivery also rechecks that the inviter still holds `members.manage`, that a custom
+role is still active, and the link generation.
 
 Delivery attempts are committed before the provider call. Stable message IDs are
 Resend idempotency keys. Network calls time out after eight seconds; retries use
@@ -104,7 +130,8 @@ using the selected IANA timezone. Activity and Shadow reporting use workspace da
 boundaries, including daylight-saving transitions. The default is UTC.
 
 The workspace approval preference can only strengthen platform policy. It requires
-independent owner/admin approval even for otherwise allowed low-risk changes.
+independent approval by someone else with `decisions.respond` even for otherwise allowed
+low-risk changes.
 Disabling it restores platform rules. Capability restrictions, denial, verification
 and action admission remain mandatory.
 

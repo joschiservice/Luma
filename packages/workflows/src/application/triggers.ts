@@ -1,5 +1,9 @@
-import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireRole, requireTenant } from '@luma/identity';
+import type { Permission, TenantContext } from '@luma/identity';
+import {
+  IdentityError,
+  requirePermission,
+  requireTenant,
+} from '@luma/identity';
 
 import type { PlaybookSnapshot } from '../domain/playbook.js';
 import { validateTriggerSignal } from '../domain/trigger.js';
@@ -43,13 +47,10 @@ export function createWorkflowTriggers(deps: {
   id(): string;
   now(): Date;
 }) {
-  async function authorize(context: TenantContext, write: boolean) {
+  async function authorize(context: TenantContext, permission: Permission) {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
-    requireRole(
-      fresh,
-      write ? ['owner', 'admin'] : ['owner', 'admin', 'member'],
-    );
+    requirePermission(fresh, permission);
     if (fresh.actor.id !== context.actor.id)
       throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
 
@@ -74,7 +75,7 @@ export function createWorkflowTriggers(deps: {
       id: string,
       request: WorkflowTriggerRequest,
     ) {
-      context = await authorize(context, true);
+      context = await authorize(context, 'workflows.triggers.manage');
       const version = await deps.store.version(context, id, request.version);
       if (!version)
         throw new IdentityError(
@@ -150,12 +151,12 @@ export function createWorkflowTriggers(deps: {
     },
     /** Lists the latest scoped runs, including scheduled and cancelled starts. */
     async list(context: TenantContext, id: string) {
-      return deps.store.list(await authorize(context, false), id);
+      return deps.store.list(await authorize(context, 'workflows.read'), id);
     },
     /** Cancels a pending scheduled start. A run that already fired cannot be cancelled here. */
     async cancel(context: TenantContext, id: string, runId: string) {
       const run = await deps.store.cancel(
-        await authorize(context, true),
+        await authorize(context, 'workflows.triggers.manage'),
         id,
         runId,
       );

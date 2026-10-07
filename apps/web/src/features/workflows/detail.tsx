@@ -380,7 +380,7 @@ export function WorkflowDetailView({
                         className="workflow-notice"
                       >
                         {!detail.canManage
-                          ? 'You can inspect workflows. Only workspace owners and admins can activate or revoke them.'
+                          ? 'You can inspect workflows. Your role doesn’t include Activate playbooks, so you can’t activate or revoke them.'
                           : !version.compatible
                             ? 'This version can’t be activated. Technical details list the requirements.'
                             : 'No connection can run this workflow yet. Repair access in Connections, then review the activation.'}
@@ -427,7 +427,6 @@ export function WorkflowDetailView({
                         version={version}
                         organizationId={organizationId}
                         definitionId={detail.summary.id}
-                        canManage={detail.canManage}
                         accessLost={accessLost}
                       />
                     ) : null

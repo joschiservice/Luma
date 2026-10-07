@@ -5,7 +5,7 @@ import type {
   SourceRecords,
 } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
-import { requireRole, requireTenant } from '@luma/identity';
+import { requirePermission, requireTenant } from '@luma/identity';
 import type { CommerceProjections as Inventory } from '@luma/inventory';
 import type { CommerceProjections as Orders } from '@luma/orders';
 
@@ -512,7 +512,7 @@ export function createCommerceIngestion(
       otherId: string,
       reason: string,
     ) {
-      requireRole(context, ['owner', 'admin']);
+      requirePermission(context, 'sync.manage');
       if (targetId === otherId)
         throw new LinkError('These are the same record');
       const [target, other] = await Promise.all([
@@ -557,7 +557,7 @@ export function createCommerceIngestion(
       connectionId: string,
       reason: string,
     ) {
-      requireRole(context, ['owner', 'admin']);
+      requirePermission(context, 'sync.manage');
       const mappings = await sources.mappings(context, kind, entityId);
       const own = mappings.filter(
         (item) => item.source.connectionId === connectionId,
@@ -600,7 +600,7 @@ export function createCommerceIngestion(
     context: TenantContext,
     items: { ingestKey: string; input: CommerceObservation }[],
   ): Promise<ProjectionOutcome[]> {
-    requireRole(context, ['owner', 'admin']);
+    requirePermission(context, 'sync.manage');
     const stored = await sources.recordMany(context, items);
     const evidence = new Map<string, string>();
     for (const item of stored)
@@ -646,7 +646,7 @@ export function createCommerceIngestion(
     observationId: string,
     method: string,
   ) {
-    requireRole(context, ['owner', 'admin']);
+    requirePermission(context, 'sync.manage');
     requireTenant(context, source.tenantId);
     // The key is explicit operator evidence, never an inferred SKU or display number.
     const { owner, entity } = sourceLocalEntity(source, reconciliationKey);

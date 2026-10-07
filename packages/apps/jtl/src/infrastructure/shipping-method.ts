@@ -14,6 +14,7 @@ import {
 } from '@luma/connector-jtl/schemas';
 import { z } from 'zod';
 
+import { jtlPermissions } from '../domain/permissions.js';
 import type { JtlConnectorOptions } from './adapter.js';
 import { adapterVersion } from './outputs.js';
 import { externalId } from './schemas.js';
@@ -180,6 +181,7 @@ export function createJtlShippingMethodCapabilities(
     descriptor: {
       version: '0',
       minimumRisk: 'high',
+      permission: jtlPermissions.shippingMethod,
       idempotency: 'provider_key',
       retry: { maxAttempts: 1, initialDelayMs: 0 },
     },

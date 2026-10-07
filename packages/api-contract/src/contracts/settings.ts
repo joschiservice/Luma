@@ -1,7 +1,12 @@
 import { initContract } from '@ts-rest/core';
 import { z } from 'zod';
 
-import { apiErrorSchema, organizationParamsSchema } from '../common.js';
+import {
+  anyMember,
+  apiErrorSchema,
+  organizationParamsSchema,
+  requires,
+} from '../common.js';
 import { saveWorkspaceLayoutSchema, workspaceLayoutSchema } from '../layout.js';
 import { invitationSchema, settingsSnapshotSchema } from '../settings.js';
 
@@ -23,6 +28,7 @@ export const settingsContract = c.router(
   {
     receipt: {
       method: 'GET',
+      metadata: anyMember,
       path: `${path}/commands/:commandId`,
       pathParams: organizationParamsSchema.extend({
         commandId: z.string().uuid(),
@@ -32,6 +38,7 @@ export const settingsContract = c.router(
     },
     get: {
       method: 'GET',
+      metadata: anyMember,
       path,
       pathParams: organizationParamsSchema,
       responses: { 200: settingsSnapshotSchema },
@@ -39,6 +46,7 @@ export const settingsContract = c.router(
     },
     updateWorkspace: {
       method: 'PATCH',
+      metadata: requires('workspace.settings.manage'),
       path: `${path}/workspace`,
       pathParams: organizationParamsSchema,
       body: command
@@ -65,6 +73,7 @@ export const settingsContract = c.router(
     },
     updateApprovals: {
       method: 'PATCH',
+      metadata: requires('workspace.approval_policy.manage'),
       path: `${path}/approvals`,
       pathParams: organizationParamsSchema,
       body: command
@@ -76,10 +85,11 @@ export const settingsContract = c.router(
       responses: { 200: settingsSnapshotSchema },
       summary: 'Require independent approval for otherwise permitted changes',
       description:
-        'Owners and admins may strengthen approval requirements. Platform denials and required approvals always apply. Changing this preference invalidates previous policy reviews.',
+        'Requires `workspace.approval_policy.manage`. This preference can only strengthen approval requirements. Platform denials and required approvals always apply. Changing this preference invalidates previous policy reviews.',
     },
     updateNotifications: {
       method: 'PATCH',
+      metadata: anyMember,
       path: `${path}/notifications`,
       pathParams: organizationParamsSchema,
       body: command
@@ -94,6 +104,7 @@ export const settingsContract = c.router(
     },
     layout: {
       method: 'GET',
+      metadata: anyMember,
       path: `${path}/layout`,
       pathParams: organizationParamsSchema,
       responses: { 200: workspaceLayoutSchema },
@@ -103,6 +114,7 @@ export const settingsContract = c.router(
     },
     saveLayout: {
       method: 'PUT',
+      metadata: anyMember,
       path: `${path}/layout`,
       pathParams: organizationParamsSchema,
       body: saveWorkspaceLayoutSchema,
@@ -113,6 +125,7 @@ export const settingsContract = c.router(
     },
     testEmail: {
       method: 'POST',
+      metadata: anyMember,
       path: `${path}/notifications/test`,
       pathParams: organizationParamsSchema,
       body: command.strict(),
@@ -121,6 +134,7 @@ export const settingsContract = c.router(
     },
     invitations: {
       method: 'GET',
+      metadata: requires('members.manage'),
       path: `${path}/invitations`,
       pathParams: organizationParamsSchema,
       responses: { 200: z.object({ items: z.array(invitationSchema) }) },
@@ -138,16 +152,18 @@ export const settingsContract = c.router(
             .email()
             .max(254)
             .transform((value) => value.toLowerCase()),
-          role: z.enum(['admin', 'member']),
+          roleId: z.string().min(1),
         })
         .strict(),
       responses: { 200: invitationSchema },
+      metadata: requires('members.manage'),
       summary: 'Invite a teammate by email',
       description:
-        'Sending an invitation does not grant access. An existing pending invitation must be resent or revoked; existing members cannot be invited.',
+        'Sending an invitation does not grant access. The invitation is bound to an active role other than Owner whose permissions you hold. An existing pending invitation must be resent or revoked; existing members cannot be invited.',
     },
     changeInvitation: {
       method: 'POST',
+      metadata: requires('members.manage'),
       path: `${path}/invitations/:invitationId`,
       pathParams: invitationParams,
       body: command
@@ -169,7 +185,7 @@ export const settingsContract = c.router(
         200: z.object({
           name: z.string(),
           email: z.string(),
-          role: z.enum(['admin', 'member']),
+          role: z.object({ id: z.string(), name: z.string() }),
           expiresAt: z.string(),
         }),
       },

@@ -1,5 +1,5 @@
 import type { TenantContext } from '@luma/identity';
-import { requireRole, requireTenant } from '@luma/identity';
+import { requirePermission, requireTenant } from '@luma/identity';
 import { currentPolicyVersion } from '@luma/policies';
 
 import type { PlaybookActivation } from '../domain/playbook.js';
@@ -7,7 +7,7 @@ import type { PlaybookDependencies } from './playbook.js';
 
 const artifactId = (id: string) => `playbook:${id}`;
 
-/** Creates immutable activation and permanent revocation commands with current administrator authorization. */
+/** Creates immutable activation and permanent revocation commands; each command re-checks playbooks.activate on the refreshed context. */
 export function createPlaybookActivations(
   deps: Pick<
     PlaybookDependencies,
@@ -17,7 +17,7 @@ export function createPlaybookActivations(
   async function authorize(context: TenantContext) {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
-    requireRole(fresh, ['owner', 'admin']);
+    requirePermission(fresh, 'playbooks.activate');
     if (fresh.actor.id !== context.actor.id)
       throw new Error('Playbook principal changed');
 

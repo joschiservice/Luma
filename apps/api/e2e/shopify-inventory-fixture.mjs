@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { createMemoryStore, createTransport } from '@luma/simulator-core';
 import { readStock, shopify } from '@luma/simulator-shopify';
 
+import { appScopes } from './app-scopes.mjs';
 import { inventoryFixture } from './inventory-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
@@ -132,14 +133,16 @@ export async function correctionFixture(t, origin = 'http://localhost:3000') {
     f.owner,
     `${f.base}/members`,
     'POST',
-    { userId: admin.id, role: 'admin' },
+    { userId: admin.id, roleId: 'admin' },
     201,
   );
   await f.request(f.owner, `${f.base}/apps/shopify/install`, 'POST', {
     version: null,
+    scopes: appScopes.shopify,
   });
   await f.request(f.owner, `${f.base}/apps/jtl/install`, 'POST', {
     version: null,
+    scopes: appScopes.jtl,
   });
   const installed = await f.request(
     f.owner,

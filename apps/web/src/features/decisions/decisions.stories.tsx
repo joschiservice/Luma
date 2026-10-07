@@ -20,8 +20,8 @@ const alex = '44444444-4444-4444-8444-444444444444';
 const sam = '55555555-5555-4555-8555-555555555555';
 const now = Date.parse('2026-09-30T09:00:00.000Z');
 const members: Member[] = [
-  { userId: alex, name: 'Alex Morgan', role: 'owner' },
-  { userId: sam, name: 'Sam Rivera', role: 'admin' },
+  { userId: alex, name: 'Alex Morgan' },
+  { userId: sam, name: 'Sam Rivera' },
 ];
 
 const base = {
@@ -47,7 +47,7 @@ const replenishment: DecisionItem = {
   reason: 'approval',
   domain: 'procurement',
   title: 'Approve purchase-order draft for 50 × LAMP-01',
-  why: 'Each replenishment proposal needs an owner or admin other than the rule’s principal to approve it before Luma creates the draft. The quantity is above the rule’s 20-unit limit, so it is high risk.',
+  why: 'Each replenishment proposal needs someone who can manage procurement, other than the rule’s principal, to approve it before Luma creates the draft. The quantity is above the rule’s 20-unit limit, so it is high risk.',
   consequences: [
     {
       response: 'Approve',
@@ -95,7 +95,7 @@ const correction: DecisionItem = {
   reason: 'approval',
   domain: 'inventory',
   title: 'Correct Shopify stock at Berlin warehouse',
-  why: 'Changing Shopify needs a second owner or admin to approve this exact action before the requester can run it.',
+  why: 'Changing Shopify needs someone else who can approve changes to approve this exact action before the requester can run it.',
   change: [
     { label: 'Location', value: 'Berlin warehouse' },
     { label: 'Shopify now', value: '12 units' },
@@ -309,7 +309,7 @@ function Content({
             item={item}
             members={members}
             self={alex}
-            role="owner"
+            assignmentAccess="anyone"
             now={now}
             onClose={() => setSearch({ ...search, item: undefined })}
             onAssign={() => {}}

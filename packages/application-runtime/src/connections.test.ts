@@ -9,7 +9,10 @@ import { ConnectorError } from '@luma/connections';
 import type { StoredInstallation } from '@luma/connections/composition';
 import * as connectorComposition from '@luma/connections/composition';
 import { createSecretCipher } from '@luma/connections/composition';
-import { makeTenantContext } from '@luma/identity/composition';
+import {
+  builtInMembership,
+  makeTenantContext,
+} from '@luma/identity/composition';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -69,7 +72,10 @@ const context = (
       dataRegion: 'EU',
       status: 'active',
     },
-    { id: 'membership', organizationId: tenantId, userId: 'user', role },
+    builtInMembership(
+      { id: 'membership', organizationId: tenantId, userId: 'user' },
+      role,
+    ),
     'request',
   );
 

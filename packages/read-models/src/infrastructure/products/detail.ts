@@ -43,7 +43,7 @@ export async function readProductContext(
   tx: SqlTransaction,
   tenantId: string,
   item: CatalogItem,
-): Promise<Omit<ProductDetail, 'item' | 'sources' | 'asOf'>> {
+): Promise<Omit<ProductDetail, 'item' | 'sources' | 'hidden' | 'asOf'>> {
   const productIds = [...new Set(item.listings.map((l) => l.productId))];
   const variants = await tx.query<ProductDetail['variants'][number]>(
     `SELECT * FROM (SELECT DISTINCT ON (o.sku_id,o.connection_id) o.sku_id AS "skuId",

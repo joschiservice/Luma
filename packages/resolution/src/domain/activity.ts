@@ -17,7 +17,9 @@ export type ActivityType =
   | 'verification'
   | 'resolution'
   | 'connection'
-  | 'procurement';
+  | 'procurement'
+  /** Restricted changes to members, invitations, roles and workspace settings. */
+  | 'access';
 
 export interface ActivityQuery {
   from: string;

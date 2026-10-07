@@ -68,7 +68,8 @@ function Preview({
       acceptance: 'not_sent',
       canApprove: false,
       canExecute: false,
-      message: 'A different administrator must approve this exact action.',
+      message:
+        'Someone else who can approve changes must approve this exact action.',
     };
 
     return {

@@ -67,7 +67,8 @@ function Preview({ scenario = 'review' }: { scenario?: Scenario }) {
       decisionId: '77777777-7777-4777-8777-777777777777',
       state: 'approval_required',
       acceptance: 'not_sent',
-      message: 'A different administrator must approve this exact action.',
+      message:
+        'Someone else who can approve changes must approve this exact action.',
       canExecute: false,
       canApprove: scenario === 'approval',
     };
@@ -211,7 +212,7 @@ export const Review: Story = {
     );
     await expect(
       canvas.findByText(
-        'A different administrator must approve this exact action.',
+        'Someone else who can approve changes must approve this exact action.',
       ),
     ).resolves.toBeVisible();
     expect(

@@ -20,7 +20,7 @@ organizations or cases and when leaving the page.
 
 ## Decisions and recovery
 
-Owners and admins may decide. Approval and rejection require an approver different
+Escalating needs `issues.manage`; approval and rejection need `decisions.respond` and an approver different
 from the proposal requester. Review returns `permittedDecisions`; the server checks
 membership, role, current case and diagnosis revisions, immutable proposal ID and
 version, policy decision/version, expiry and current capability preconditions again

@@ -2,7 +2,10 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
 import { createInstalledConnections } from '@luma/connections/composition';
-import { makeTenantContext } from '@luma/identity/composition';
+import {
+  builtInMembership,
+  makeTenantContext,
+} from '@luma/identity/composition';
 import { createTenantDatabase } from '@luma/platform/composition';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -19,7 +22,10 @@ describe.skipIf(!databaseUrl)('installed connections on PostgreSQL', () => {
     makeTenantContext(
       { userId: 'admin', sessionId: 'session' },
       { id, name: 'Store', slug: 'store', dataRegion: 'EU', status: 'active' },
-      { id: 'membership', organizationId: id, userId: 'admin', role: 'admin' },
+      builtInMembership(
+        { id: 'membership', organizationId: id, userId: 'admin' },
+        'admin',
+      ),
       randomUUID(),
     );
   const ctx = context();

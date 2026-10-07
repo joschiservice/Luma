@@ -14,11 +14,16 @@ import type { ConnectionManagement, ProviderCatalog } from '@luma/connections';
 import { connectionRoutes, createConnectors } from '@luma/connections/http';
 import type { CaseService } from '@luma/exceptions';
 import { caseRoutes } from '@luma/exceptions/http';
-import type { IdentityService, SettingsService } from '@luma/identity';
+import type {
+  IdentityService,
+  RolesService,
+  SettingsService,
+} from '@luma/identity';
 import { IdentityError } from '@luma/identity';
 import {
   identityRoutes,
   registerIdentityGuards,
+  rolesRoutes,
   settingsRoutes,
 } from '@luma/identity/http';
 import type { ModelGateway, Observability, Observation } from '@luma/platform';
@@ -137,6 +142,7 @@ export interface AppDependencies {
   modelGateway?: ModelGateway;
   identity?: IdentityService;
   settings?: SettingsService;
+  roles?: RolesService;
   trustedOrigins?: readonly string[];
   providerCatalog?: ProviderCatalog;
   observability?: Observability;
@@ -352,6 +358,7 @@ export function buildApp(
         ),
         identity: identityRoutes(dependencies.identity),
         settings: settingsRoutes(dependencies.settings),
+        roles: rolesRoutes(dependencies.roles),
         apps: appRoutes(dependencies.apps),
         connections: connectionRoutes(dependencies.connections),
         system: {
@@ -429,7 +436,20 @@ export function buildApp(
       },
     );
   });
-  dependencies.appRegistry?.registerHttp(app, dependencies.identity);
+  const apps = dependencies.apps;
+  dependencies.appRegistry?.registerHttp(
+    app,
+    dependencies.identity,
+    async (context, operation) => {
+      if (!apps)
+        throw new IdentityError(
+          503,
+          'SERVICE_UNAVAILABLE',
+          'App management is unavailable',
+        );
+      await apps.requirePermission(context, operation);
+    },
+  );
   registerDeskEvents(
     app,
     dependencies.desk,

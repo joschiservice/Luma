@@ -7,7 +7,7 @@ import type { FastifyRequest } from 'fastify';
 
 import type { WorkflowCatalog } from '../application/catalog.js';
 
-/** Registers tenant-authenticated workflow reads and administrator controls. */
+/** Registers tenant-authenticated workflow reads and permission-gated controls. */
 export function workflowRoutes(service?: WorkflowCatalog) {
   function use(request: FastifyRequest) {
     if (!request.tenantContext)

@@ -244,7 +244,7 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
     .waitFor();
   await page
     .getByText(
-      'Waiting for an independent owner or administrator to approve the proposed change.',
+      'Waiting for someone else who can approve changes to decide on the proposed change.',
     )
     .waitFor();
   await page
@@ -354,7 +354,7 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
   await page.reload();
   await page
     .getByText(
-      'You can inspect workflows. Only workspace owners and admins can activate or revoke them.',
+      'You can inspect workflows. Your role doesn’t include Activate playbooks, so you can’t activate or revoke them.',
     )
     .waitFor();
   expect(

@@ -1,5 +1,5 @@
-import type { TenantContext } from '@luma/identity';
-import { requireRole } from '@luma/identity';
+import type { Permission, TenantContext } from '@luma/identity';
+import { hasPermission, requirePermission } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
 import { z } from 'zod';
 
@@ -14,23 +14,36 @@ import type {
 } from '../../domain/playbook.js';
 import { canonicalPlaybook, compilePlaybook, playbookHash } from './schema.js';
 
+/** Reads shared by playbook publication, activation and bound runs. */
+const readers = [
+  'workflows.publish',
+  'playbooks.activate',
+  'actions.propose',
+] as const satisfies readonly Permission[];
+
 /**
  * Creates tenant-scoped storage for immutable playbook versions, activations, and bound
- * runs.
+ * runs. Each write requires the permission of the command that owns it.
  */
 export function createPlaybookStore(db: TenantDatabase): PlaybookStore {
+  /** Runs one tenant transaction when the context holds any of the allowed permissions. */
   function scoped<T>(
     context: TenantContext,
+    allowed: readonly [Permission, ...Permission[]],
     fn: (tx: SqlTransaction) => Promise<T>,
   ) {
-    requireRole(context, ['owner', 'admin']);
+    requirePermission(
+      context,
+      allowed.find((permission) => hasPermission(context, permission)) ??
+        allowed[0],
+    );
 
     return db.transaction(context.tenantId, fn);
   }
 
   return {
     publish: (context, version) =>
-      scoped(context, async (tx) => {
+      scoped(context, ['workflows.publish'], async (tx) => {
         await tx.query(
           'INSERT INTO playbook_definitions(tenant_id,id,document) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',
           [context.tenantId, version.definition.id, version.definition],
@@ -66,7 +79,7 @@ export function createPlaybookStore(db: TenantDatabase): PlaybookStore {
           throw new Error('Playbook version is immutable');
       }),
     version: (context, id, version) =>
-      scoped(context, async (tx) => {
+      scoped(context, readers, async (tx) => {
         const row = (
           await tx.query<{ document: PlaybookVersion; digest: string }>(
             'SELECT document,digest FROM playbook_versions WHERE tenant_id=$1 AND definition_id=$2 AND version=$3',
@@ -82,7 +95,7 @@ export function createPlaybookStore(db: TenantDatabase): PlaybookStore {
         return compiled;
       }),
     activate: (context, activation) =>
-      scoped(context, async (tx) => {
+      scoped(context, ['playbooks.activate'], async (tx) => {
         await tx.query(
           'INSERT INTO playbook_activations(tenant_id,id,definition_id,version,version_digest,document) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING',
           [
@@ -106,6 +119,7 @@ export function createPlaybookStore(db: TenantDatabase): PlaybookStore {
     activation: (context, id) =>
       scoped(
         context,
+        readers,
         async (tx) =>
           (
             await tx.query<{ document: PlaybookActivation }>(
@@ -115,7 +129,7 @@ export function createPlaybookStore(db: TenantDatabase): PlaybookStore {
           ).rows[0]?.document ?? null,
       ),
     bind: (context, run) =>
-      scoped(context, async (tx) => {
+      scoped(context, ['actions.propose'], async (tx) => {
         z.object({
           incidentId: z.string().uuid(),
           diagnosisRevision: z.number().int().positive(),
@@ -150,6 +164,7 @@ export function createPlaybookStore(db: TenantDatabase): PlaybookStore {
     run: (context, id) =>
       scoped(
         context,
+        readers,
         async (tx) =>
           (
             await tx.query<{ document: PlaybookRun }>(
@@ -159,14 +174,14 @@ export function createPlaybookStore(db: TenantDatabase): PlaybookStore {
           ).rows[0]?.document ?? null,
       ),
     record: (context, id, outcome) =>
-      scoped(context, async (tx) => {
+      scoped(context, ['actions.propose'], async (tx) => {
         await tx.query(
           'INSERT INTO playbook_outcomes(tenant_id,run_id,digest,document) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING',
           [context.tenantId, id, playbookHash(outcome), outcome],
         );
       }),
     outcomes: (context, id) =>
-      scoped(context, async (tx) =>
+      scoped(context, readers, async (tx) =>
         (
           await tx.query<{ document: PlaybookOutcome }>(
             'SELECT document FROM playbook_outcomes WHERE tenant_id=$1 AND run_id=$2 ORDER BY sequence',

@@ -4,7 +4,10 @@ import { readFile } from 'node:fs/promises';
 
 import { createDetectionServices } from '@luma/application-runtime';
 import { defaultConfiguration } from '@luma/exceptions';
-import { makeTenantContext } from '@luma/identity/composition';
+import {
+  builtInMembership,
+  makeTenantContext,
+} from '@luma/identity/composition';
 
 import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, database, startApi, startProcess } from './helpers.mjs';
@@ -67,7 +70,10 @@ test('evaluates, retries, reloads and reviews a Shadow case through the real API
       dataRegion: 'EU',
       status: 'active',
     },
-    { id: randomUUID(), organizationId: tenantId, userId, role: 'owner' },
+    builtInMembership(
+      { id: randomUUID(), organizationId: tenantId, userId },
+      'owner',
+    ),
     randomUUID(),
   );
   const services = createDetectionServices(db.runtimeUrl);
@@ -220,7 +226,7 @@ test('evaluates, retries, reloads and reviews a Shadow case through the real API
     .click();
   await page
     .getByText(
-      'Workspace owners and admins can evaluate and review Shadow predictions.',
+      'Your role doesn’t include Activate playbooks, so you can’t evaluate or review Shadow predictions.',
     )
     .waitFor();
   expect(

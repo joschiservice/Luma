@@ -1,10 +1,15 @@
 import { createHash } from 'node:crypto';
 
 import type { TenantContext } from '@luma/identity';
-import { requireTenant } from '@luma/identity';
+import {
+  IdentityError,
+  requirePermission,
+  requireTenant,
+} from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
 import { z } from 'zod';
 
+import { canReadRecord } from '../application/access.js';
 import type {
   RecordDetail,
   RecordExplorer,
@@ -165,6 +170,15 @@ interface RecordCursor {
 
 const pageSize = 50;
 
+const recordKinds: RecordKind[] = [
+  'order',
+  'fulfillment',
+  'position',
+  'sku',
+  'product',
+  'issue',
+];
+
 const cursorSchema = z
   .object({
     context: z.string(),
@@ -215,7 +229,7 @@ function readCursor(value: string, context: string): RecordCursor {
 
 // Filters are applied inside each record type, so a kind filter reads only that type. Records
 // are ordered by their newest source observation, then kind and ID; the page reads the rows of
-// at most `$10` records after the cursor ($7–$9).
+// at most `$10` records after the cursor ($7–$9). `$11` lists the kinds the reader may read.
 async function recordRows(
   tx: SqlTransaction,
   tenantId: string,
@@ -224,6 +238,7 @@ async function recordRows(
     id?: string | undefined;
     q?: string | undefined;
     connectionId?: string | undefined;
+    kinds: RecordKind[];
   },
   page?: { after: RecordCursor | null; limit: number },
 ) {
@@ -231,7 +246,7 @@ async function recordRows(
   const result = await tx.query<PageRow>(
     `WITH matched AS MATERIALIZED (
      SELECT * FROM (${projectionRows}) records
-     WHERE ($2::text IS NULL OR kind=$2) AND ($3::uuid IS NULL OR id=$3)
+     WHERE ($2::text IS NULL OR kind=$2) AND kind=ANY($11::text[]) AND ($3::uuid IS NULL OR id=$3)
      AND ($6::uuid IS NULL OR "connectionId"=$6)
      AND ($4::text='' OR id::text ILIKE $5 OR "externalId" ILIKE $5
        OR document->'data'->>'displayNumber' ILIKE $5
@@ -257,6 +272,7 @@ async function recordRows(
       page?.after?.kind ?? null,
       page?.after?.id ?? null,
       page ? page.limit : null,
+      filter.kinds,
     ],
   );
 
@@ -267,7 +283,7 @@ async function recordRows(
 export function createRecordExplorer(db: TenantDatabase): RecordExplorer {
   return {
     async resolve(context, query) {
-      requireTenant(context, context.tenantId);
+      requirePermission(context, 'orders.read');
 
       return db.transaction(context.tenantId, async (tx) => {
         const result = await tx.query<{ id: string }>(
@@ -284,14 +300,21 @@ export function createRecordExplorer(db: TenantDatabase): RecordExplorer {
       requireTenant(context, context.tenantId);
       const scope = cursorContext(context.tenantId, query);
       const after = query.cursor ? readCursor(query.cursor, scope) : null;
+      const requested = query.kind ? [query.kind] : recordKinds;
+      const kinds = requested.filter((kind) => canReadRecord(context, kind));
+      const hidden = requested.filter((kind) => !kinds.includes(kind));
 
       return db.transaction(
         context.tenantId,
         async (tx) => {
-          const rows = await recordRows(tx, context.tenantId, query, {
-            after,
-            limit: pageSize + 1,
-          });
+          const rows = kinds.length
+            ? await recordRows(
+                tx,
+                context.tenantId,
+                { ...query, kinds },
+                { after, limit: pageSize + 1 },
+              )
+            : [];
           // Rows arrive grouped by record in page order.
           const groups = new Map<string, PageRow[]>();
           for (const row of rows) {
@@ -318,6 +341,7 @@ export function createRecordExplorer(db: TenantDatabase): RecordExplorer {
               customer: 'unavailable' as const,
               return: 'unavailable' as const,
             },
+            hidden,
           };
         },
         { readOnlySnapshot: true },
@@ -329,13 +353,23 @@ export function createRecordExplorer(db: TenantDatabase): RecordExplorer {
       id: string,
     ): Promise<RecordDetail | null> {
       requireTenant(context, context.tenantId);
+      if (!canReadRecord(context, kind))
+        throw new IdentityError(
+          403,
+          'FORBIDDEN',
+          'Your role does not allow this. Ask a workspace admin for access.',
+        );
 
       return db.transaction(
         context.tenantId,
         async (tx) => {
           if (kind === 'order' || kind === 'fulfillment')
             id = await resolveOrderEntity(tx, context.tenantId, id);
-          const rows = await recordRows(tx, context.tenantId, { kind, id });
+          const rows = await recordRows(tx, context.tenantId, {
+            kind,
+            id,
+            kinds: [kind],
+          });
           if (!rows.length) return null;
           const links: RecordDetail['links'] = [];
           const add = (
@@ -429,10 +463,20 @@ export function createRecordExplorer(db: TenantDatabase): RecordExplorer {
               links.map((link) => [`${link.kind}:${link.id}`, link]),
             ).values(),
           ];
+          const readable = unique.filter((link) =>
+            canReadRecord(context, link.kind),
+          );
 
           return {
             record: summary(rows),
-            links: unique,
+            links: readable,
+            hidden: [
+              ...new Set(
+                unique
+                  .filter((link) => !readable.includes(link))
+                  .map((link) => link.kind),
+              ),
+            ],
             snapshots: rows.flatMap((row) =>
               row.connectionId && row.document?.data
                 ? [
