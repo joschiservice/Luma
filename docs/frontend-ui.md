@@ -47,6 +47,8 @@ Home and sidebar pins are per-member layouts; see [workspace settings](workspace
 
 List pages keep one order: `PageTitle`, `CollectionToolbar`, the coverage line, notices, the table and pagination. The toolbar puts views and Refresh first, then search, one pill per filter, display actions and a single **Sort** menu. Every offered filter stays visible: unset filters are dashed pills that open their values in one click, applied filters are chips. On small screens unset pills collapse into one **Filters** button. Pages describe filters as data (`choice`, `date-range` or link-set `applied` filters) and own their URL state; the toolbar owns presentation, focus and the search draft.
 
+The toolbar and list sit directly on the page, which the shell already insets; don't wrap them in a raised panel. Tables use the framed `DataTable`, and row lists that aren't tables use the same thin border and row dividers, as in the Workflows library. Summaries above a list, such as Procurement's commitments, form one bordered band rather than separate raised cards.
+
 Use `CollectionFilterPanel` only for a narrow feed with five or more filters that people combine to investigate, as in Activity. Tables and split views keep the pills, because a docked panel costs them columns. Use `CollectionViews` for button views; link-based views can keep `Tabs`.
 
 `SyncCoverage` condenses what each source has imported into one line. It leads with sources that need attention and says the list is incomplete while any import runs.
