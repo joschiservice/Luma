@@ -1,7 +1,11 @@
 import { initContract } from '@ts-rest/core';
 import { z } from 'zod';
 
-import { apiErrorSchema, organizationParamsSchema } from '../common.js';
+import {
+  apiErrorSchema,
+  organizationParamsSchema,
+  requires,
+} from '../common.js';
 import {
   draftTestExamplesSchema,
   draftTestRunSchema,
@@ -22,35 +26,39 @@ export const draftTestsContract = c.router(
   {
     list: {
       method: 'GET',
+      metadata: requires('workflows.read'),
       path: `${draft}/tests`,
       pathParams: draftParams,
       responses: { 200: draftTestSummarySchema },
       summary: 'List saved test cases and their results',
       description:
-        'Members can read saved test cases and whether each passed on the current draft revision. A case without a result has not run on this revision yet.',
+        'Requires `workflows.read`. People can read saved test cases and whether each passed on the current draft revision. A case without a result has not run on this revision yet.',
     },
     save: {
       method: 'PUT',
+      metadata: requires('workflows.author'),
       path: `${draft}/tests`,
       pathParams: draftParams,
       body: saveDraftTestsSchema,
       responses: { 200: draftTestSummarySchema },
       summary: 'Save test cases for a draft',
       description:
-        'Owners and admins replace the saved test cases against the revision they loaded (0 before any are saved). If someone else saved first, the request returns 409. Retrying the same body after an uncertain response is safe.',
+        'Requires `workflows.author`. Replaces the saved test cases against the revision you loaded (0 before any are saved). If someone else saved first, the request returns 409. Retrying the same body after an uncertain response is safe.',
     },
     runAll: {
       method: 'POST',
+      metadata: requires('workflows.author'),
       path: `${draft}/tests/run`,
       pathParams: draftParams,
       body: runDraftTestsSchema,
       responses: { 200: draftTestSummarySchema },
       summary: 'Run saved test cases on the current revision',
       description:
-        'Owners and admins run every saved case that has no passing or running result on this draft revision. Call it after saving the draft and before publishing. Repeating the call is safe. Tests use example replies and never contact connected systems.',
+        'Requires `workflows.author`. Runs every saved case that has no passing or running result on this draft revision. Call it after saving the draft and before publishing. Repeating the call is safe. Tests use example replies and never contact connected systems.',
     },
     examples: {
       method: 'GET',
+      metadata: requires('workflows.read'),
       path: `${draft}/test-examples`,
       pathParams: draftParams,
       responses: { 200: draftTestExamplesSchema },
@@ -60,16 +68,18 @@ export const draftTestsContract = c.router(
     },
     start: {
       method: 'POST',
+      metadata: requires('workflows.author'),
       path: `${draft}/test-runs`,
       pathParams: draftParams,
       body: startDraftTestSchema,
       responses: { 200: draftTestRunSchema },
       summary: 'Test a draft with example data',
       description:
-        'Owners and admins run the current draft revision with a saved or unsaved case. The run uses the production workflow interpreter with example replies instead of connected systems, Action Admission or action adapters. A passing test grants no activation or approval. Poll the run until it finishes. Reuse the same ID and body after an uncertain response.',
+        'Requires `workflows.author`. Runs the current draft revision with a saved or unsaved case. The run uses the production workflow interpreter with example replies instead of connected systems, Action Admission or action adapters. A passing test grants no activation or approval. Poll the run until it finishes. Reuse the same ID and body after an uncertain response.',
     },
     get: {
       method: 'GET',
+      metadata: requires('workflows.read'),
       path: `${draft}/test-runs/:runId`,
       pathParams: runParams,
       responses: { 200: draftTestRunSchema },
@@ -79,6 +89,7 @@ export const draftTestsContract = c.router(
     },
     cancel: {
       method: 'POST',
+      metadata: requires('workflows.author'),
       path: `${draft}/test-runs/:runId/cancel`,
       pathParams: runParams,
       body: z.object({}).strict(),

@@ -1,7 +1,12 @@
 import { initContract } from '@ts-rest/core';
 import { z } from 'zod';
 
-import { apiErrorSchema, organizationParamsSchema } from '../common.js';
+import {
+  anyMember,
+  apiErrorSchema,
+  organizationParamsSchema,
+  requires,
+} from '../common.js';
 import {
   installationCredentials,
   installationInput,
@@ -22,6 +27,7 @@ export const connectionsContract = c.router(
   {
     list: {
       method: 'GET',
+      metadata: anyMember,
       path: '/v1/organizations/:organizationId/connections',
       pathParams: organizationParamsSchema,
       responses: {
@@ -31,16 +37,18 @@ export const connectionsContract = c.router(
     },
     install: {
       method: 'POST',
+      metadata: requires('connections.manage'),
       path: '/v1/organizations/:organizationId/connections',
       pathParams: organizationParamsSchema,
       body: installationInput,
       responses: { 201: installedConnectionSchema },
       summary: 'Install a connection',
       description:
-        'Owners and admins can submit credentials. The connection remains pending until a successful permission check.',
+        'Requires `connections.manage`. The connection remains pending until a successful permission check.',
     },
     check: {
       method: 'POST',
+      metadata: requires('connections.manage'),
       path: '/v1/organizations/:organizationId/connections/:connectionId/check',
       pathParams: connectionParams,
       body: connectionVersion,
@@ -49,6 +57,7 @@ export const connectionsContract = c.router(
     },
     rotate: {
       method: 'POST',
+      metadata: requires('connections.manage'),
       path: '/v1/organizations/:organizationId/connections/:connectionId/credentials',
       pathParams: connectionParams,
       body: connectionVersion.extend({ credentials: installationCredentials }),
@@ -59,6 +68,7 @@ export const connectionsContract = c.router(
     },
     disconnect: {
       method: 'POST',
+      metadata: requires('connections.manage'),
       path: '/v1/organizations/:organizationId/connections/:connectionId/disconnect',
       pathParams: connectionParams,
       body: connectionVersion,

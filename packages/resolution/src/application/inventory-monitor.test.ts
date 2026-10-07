@@ -12,19 +12,11 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { InventoryMapping } from './detection.js';
 import { createInventoryMonitor } from './inventory-monitor.js';
-
-vi.mock('@luma/identity', () => ({
-  requireTenant: (context: TenantContext, tenantId: string) => {
-    if (context.tenantId !== tenantId) throw new Error('Tenant mismatch');
-  },
-}));
+import { testContext } from './tenant-context.fixture.js';
 
 const randomUUID = () => crypto.randomUUID();
 const tenantId = randomUUID();
-const context = {
-  tenantId,
-  actor: { id: 'owner', role: 'owner' },
-} as TenantContext;
+const context = testContext({ tenantId });
 const now = new Date('2026-09-24T01:00:00Z');
 
 function fixture() {

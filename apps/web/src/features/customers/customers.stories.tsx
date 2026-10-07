@@ -131,6 +131,7 @@ function Preview({
         <Shopify
           organizationId={organizationId}
           slot="customers"
+          can={() => true}
           customer={{ connectionId, id: detail ? customerId : undefined }}
           services={services}
           done={async () => {}}

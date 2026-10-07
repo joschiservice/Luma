@@ -158,12 +158,15 @@ export interface ReturnDetail {
     }[];
     truncated: boolean;
   };
+  /** `order` is null and listed here when the reader can't read orders. */
+  hidden: 'order'[];
   asOf: string;
 }
 
 /**
  * Reads imported returns and refunds with their order context. Stage and refund state come from
- * the orders owner; no source is asked to change anything.
+ * the orders owner; no source is asked to change anything. Requires `returns.read`; the order
+ * context also needs `orders.read`.
  */
 export interface ReturnWorkspace {
   /** Rejects a cursor produced by other filters or sorting with a 400 error. */

@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
 
 import { connectionsOptions } from '../connections/data';
+import { contextFixture } from '../identity/context.fixture';
 import { contextOptions } from '../identity/data';
 import { appsOptions } from './data';
 import { AppSettings } from './settings';
@@ -27,6 +28,13 @@ const app: AppManifest = {
   category: 'erp',
   ui: ['connections', 'settings'],
   connectionTypes: [{ kind: 'jtl-cloud', name: 'JTL Cloud' }],
+  permissions: [],
+  scopes: ['orders.read'],
+  slotAccess: {
+    connections: 'connections.manage',
+    settings: 'connections.manage',
+    'app-settings': 'apps.manage',
+  },
 };
 const connection: InstalledConnection = {
   id: '11111111-1111-4111-8111-111111111111',
@@ -67,23 +75,17 @@ function render({
         status: installed ? 'installed' : 'uninstalled',
         version: 1,
         updatedAt: connection.updatedAt,
+        grantedScopes: installed ? ['orders.read'] : [],
+        pendingScopes: [],
+        roles: [],
       },
     ],
   });
   client.setQueryData(connectionsOptions(organizationId).queryKey, items);
-  client.setQueryData(contextOptions(organizationId).queryKey, {
-    tenantId: organizationId,
-    dataRegion: 'EU',
-    requestId: 'test',
-    actor: {
-      type: 'user',
-      id: organizationId,
-      initiatingUserId: organizationId,
-      sessionId: organizationId,
-      membershipId: organizationId,
-      role,
-    },
-  });
+  client.setQueryData(
+    contextOptions(organizationId).queryKey,
+    contextFixture(organizationId, role),
+  );
   const html = renderToStaticMarkup(
     <QueryClientProvider client={client}>
       {overview ? (

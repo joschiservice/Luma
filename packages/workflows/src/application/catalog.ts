@@ -1,5 +1,10 @@
-import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireRole, requireTenant } from '@luma/identity';
+import type { Permission, TenantContext } from '@luma/identity';
+import {
+  hasPermission,
+  IdentityError,
+  requirePermission,
+  requireTenant,
+} from '@luma/identity';
 import type { PolicyService } from '@luma/policies';
 
 import type { EvaluateCode } from '../domain/code-evaluation.js';
@@ -94,13 +99,10 @@ export function createWorkflowCatalog(deps: {
     version: PublishedWorkflowVersion,
   ): Promise<string[]>;
 }) {
-  async function authorize(context: TenantContext, write = false) {
+  async function authorize(context: TenantContext, permission: Permission) {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
-    requireRole(
-      fresh,
-      write ? ['owner', 'admin'] : ['owner', 'admin', 'member'],
-    );
+    requirePermission(fresh, permission);
     if (fresh.actor.id !== context.actor.id)
       throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
 
@@ -229,7 +231,8 @@ export function createWorkflowCatalog(deps: {
       activations: [],
       policyVersion: '',
       principalId: context.actor.id,
-      canManage: context.actor.role !== 'member',
+      // Starting and cancelling runs is the primary write on a native workflow's detail.
+      canManage: hasPermission(context, 'workflows.triggers.manage'),
       evaluationEvidence: 'unavailable' as const,
     };
   }
@@ -334,7 +337,7 @@ export function createWorkflowCatalog(deps: {
           enable: runnable
             ? { label: 'Start a run', destination: 'workflow_rules' }
             : null,
-          idle: 'Owners and admins start this workflow from its rules with the evidence it needs.',
+          idle: 'People who can manage workflow triggers start this workflow from its rules with the evidence it needs.',
         }),
       },
     };
@@ -404,7 +407,7 @@ export function createWorkflowCatalog(deps: {
       runId: string,
       stepId: string,
     ) {
-      context = await authorize(context, true);
+      context = await authorize(context, 'workflows.triggers.manage');
       if (!deps.store.cancelCode)
         throw new IdentityError(
           503,
@@ -448,7 +451,7 @@ export function createWorkflowCatalog(deps: {
       context: TenantContext,
       subject: { kind: 'inventory_position'; id: string },
     ) {
-      context = await authorize(context);
+      context = await authorize(context, 'workflows.read');
       if (subject.kind !== 'inventory_position' || !deps.replenishment)
         return [];
 
@@ -496,14 +499,14 @@ export function createWorkflowCatalog(deps: {
     },
     /** Publishes a validated native definition; publication never grants execution authority. */
     async publish(context: TenantContext, input: unknown) {
-      context = await authorize(context, true);
+      context = await authorize(context, 'workflows.publish');
       const version = deps.compile(input);
       await deps.store.publish(context, version);
 
       return version;
     },
     async list(context: TenantContext) {
-      context = await authorize(context);
+      context = await authorize(context, 'workflows.read');
       const [legacy, native] = await Promise.all([
         deps.legacy.list(context),
         deps.store.versions(context),
@@ -540,7 +543,7 @@ export function createWorkflowCatalog(deps: {
       ];
     },
     async detail(context: TenantContext, id: string) {
-      context = await authorize(context);
+      context = await authorize(context, 'workflows.read');
       if (id === deps.replenishment?.definitionId)
         return deps.replenishment.detail(context);
       if (deps.caseWorkflows?.owns(id))
@@ -571,7 +574,7 @@ export function createWorkflowCatalog(deps: {
       };
     },
     async runs(context: TenantContext, id: string) {
-      context = await authorize(context);
+      context = await authorize(context, 'workflows.read');
       const starts = await deps.triggers.list(context, id);
       const evidence = await deps.store.processSteps(
         context,
@@ -618,7 +621,7 @@ export function createWorkflowCatalog(deps: {
     },
     async activate(...args: Parameters<PlaybookLibrary['activate']>) {
       const [context, id, request] = args;
-      const fresh = await authorize(context, true);
+      const fresh = await authorize(context, 'playbooks.activate');
       if (deps.caseWorkflows?.owns(id))
         throw new IdentityError(
           409,

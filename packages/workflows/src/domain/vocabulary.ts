@@ -109,7 +109,10 @@ const unsupported =
   'No installed adapter runs this in custom workflows in this workspace.';
 
 const triggerLabels: Record<TriggerEntry['kind'], [string, string]> = {
-  manual: ['Started by a person', 'An owner or admin starts a run.'],
+  manual: [
+    'Started by a person',
+    'Someone who can manage workflow triggers starts a run.',
+  ],
   event: ['When an event arrives', 'A system reports an event.'],
   schedule: ['At a scheduled time', 'The run starts once at a fixed time.'],
   condition: [
@@ -131,7 +134,7 @@ const stepLabels: Record<StepKindEntry['kind'], [string, string]> = {
   ],
   approval: [
     'Ask for approval',
-    'Wait for an owner or admin to approve the next action.',
+    'Wait for someone who can approve changes to decide on the next action.',
   ],
   wait: ['Wait', 'Pause for a fixed time before continuing.'],
   verification: [

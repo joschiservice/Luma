@@ -911,3 +911,22 @@
     display: none;
   }
 }
+
+/* Areas outside a person's role explain the missing permission instead of looking empty. */
+.no-access[data-slot='empty'] {
+  max-width: 520px;
+  margin: 12vh auto 0;
+}
+
+.no-access strong {
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+.missing-permission {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--foreground-subtle);
+  font-size: 12px;
+}

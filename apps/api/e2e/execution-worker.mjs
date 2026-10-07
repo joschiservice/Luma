@@ -18,6 +18,7 @@ process.once(
     // Resolve a branded context through the real authentication and tenant guards.
     app.get(
       '/v1/organizations/:organizationId/e2e-context',
+      { config: { access: { access: 'member' } } },
       async (request) => {
         context = request.tenantContext;
 

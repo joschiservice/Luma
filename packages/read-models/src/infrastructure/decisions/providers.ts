@@ -18,6 +18,7 @@ export function replenishmentDecisionProvider(
   return {
     id: 'replenishment',
     label: 'Replenishment',
+    permission: 'procurement.read',
     pending: async (context) =>
       (await pending(context)).map((item) =>
         presentReplenishment(item, context.actor.id),
@@ -49,6 +50,7 @@ export function supplierCommitmentDecisionProvider(
   return {
     id: 'supplier-commitments',
     label: 'Supplier orders',
+    permission: 'procurement.read',
     pending: async (context) =>
       (await pending(context)).map((item) =>
         presentSupplierCommitment(item, context.actor.id),

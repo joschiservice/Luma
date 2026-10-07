@@ -35,7 +35,7 @@ const outcomeReasons: Record<TestOutcome, string> = {
   inconclusive_verification:
     'The result check could not confirm the result. A person would review the run.',
   awaiting_decision:
-    'The workflow would wait here for an owner or admin to decide.',
+    'The workflow would wait here for someone who can approve changes to decide.',
 };
 
 const stopBranches: Record<TestOutcome, TestStepResult['branch']> = {
@@ -200,10 +200,10 @@ function note(
     }
     case 'approval':
       return output.state === 'completed'
-        ? 'An owner or admin approved in this example.'
+        ? 'The action was approved in this example.'
         : output.state === 'waiting'
-          ? 'Would wait here for an owner or admin to approve.'
-          : 'An owner or admin denied it in this example, so the workflow stopped.';
+          ? 'Would wait here for someone who can approve changes to decide.'
+          : 'The action was denied in this example, so the workflow stopped.';
     case 'capability':
       return capabilityNote(step, output.state, vocabulary, requested);
     case 'verification': {

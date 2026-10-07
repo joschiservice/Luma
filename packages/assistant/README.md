@@ -4,9 +4,11 @@ Answers workspace questions (Ask Luma) with a bounded model loop over read-only 
 
 ## Responsibilities
 
-Owns the tool registry, the model ↔ tool loop, its budgets and citation resolution. Tools call
-owner read services with the asking member's freshly checked context; the assistant never writes
-and has no tables. Model routing and data policy enforcement belong to the platform gateway.
+Owns the tool registry, the model ↔ tool loop, its budgets and citation resolution. Asking needs
+`assistant.use`. Each tool declares the read permission it needs, and the model is offered only
+the tools the person's freshly checked context allows. Tools call owner read services with that
+context; the assistant never writes and has no tables. Model routing and data policy enforcement
+belong to the platform gateway.
 
 ## Public entry points
 

@@ -18,3 +18,5 @@ export type {
 } from './application/policies.js';
 
 export { approvalRequirement, evaluatePolicy } from './domain/evaluate.js';
+
+export type { PolicyAccess, PolicyCapability } from './domain/evaluate.js';

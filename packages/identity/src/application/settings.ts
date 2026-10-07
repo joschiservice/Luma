@@ -1,9 +1,11 @@
 import type {
-  Role,
+  Membership,
   SessionIdentity,
   TenantContext,
 } from '../domain/context.js';
-import { IdentityError, requireRole } from '../domain/context.js';
+import { IdentityError } from '../domain/context.js';
+import type { Permission } from '../domain/permissions.js';
+import type { PermissionSet, RoleReference } from '../domain/roles.js';
 import type {
   NotificationPreferences,
   SettingsSnapshot,
@@ -19,8 +21,14 @@ export interface InvitationRecord extends WorkspaceInvitation {
 }
 
 export interface SettingsTransaction {
-  /** Reads the current role after acquiring the workspace mutation lock. */
-  role(userId: string): Promise<Role | null>;
+  /** Reads the current membership and grants after acquiring the workspace mutation lock. */
+  member(userId: string): Promise<Membership | null>;
+  /** Reads a built-in or custom role of this workspace, including archived roles. */
+  role(roleId: string): Promise<{
+    reference: RoleReference;
+    permissions: PermissionSet;
+    archived: boolean;
+  } | null>;
   snapshot(userId: string): Promise<SettingsSnapshot>;
   command(
     id: string,
@@ -105,35 +113,36 @@ function publicInvitation(value: InvitationRecord): WorkspaceInvitation {
 export function createSettingsService(deps: SettingsDependencies) {
   async function authorized<T>(
     context: TenantContext,
-    admin: boolean,
-    operation: (tx: SettingsTransaction) => Promise<T>,
+    permission: Permission | null,
+    operation: (tx: SettingsTransaction, actor: Membership) => Promise<T>,
   ) {
     return deps.repository.transaction(
       context.tenantId,
       context.actor.id,
       async (tx) => {
-        const role = await tx.role(context.actor.id);
-        if (!role)
+        const actor = await tx.member(context.actor.id);
+        if (!actor)
           throw new IdentityError(404, 'NOT_FOUND', 'Workspace not found');
-        if (admin)
-          requireRole({ ...context, actor: { ...context.actor, role } }, [
-            'owner',
-            'admin',
-          ]);
+        if (permission && !actor.permissions.has(permission))
+          throw new IdentityError(
+            403,
+            'FORBIDDEN',
+            'Your role does not allow this. Ask a workspace admin for access.',
+          );
 
-        return operation(tx);
+        return operation(tx, actor);
       },
     );
   }
 
   async function command<T>(
     context: TenantContext,
-    admin: boolean,
+    permission: Permission | null,
     input: { commandId: string; invitationId?: string },
     kind: string,
-    operation: (tx: SettingsTransaction) => Promise<T>,
+    operation: (tx: SettingsTransaction, actor: Membership) => Promise<T>,
   ): Promise<T> {
-    return authorized(context, admin, async (tx) => {
+    return authorized(context, permission, async (tx, actor) => {
       const request = JSON.stringify({ kind, ...input });
       const previous = await tx.command(input.commandId);
       if (previous) {
@@ -147,7 +156,7 @@ export function createSettingsService(deps: SettingsDependencies) {
 
         return previous.result as T;
       }
-      const result = await operation(tx);
+      const result = await operation(tx, actor);
       await tx.saveCommand(input.commandId, context.actor.id, request, result);
 
       return result;
@@ -181,8 +190,14 @@ export function createSettingsService(deps: SettingsDependencies) {
             'This invitation is unavailable for your account. Check the email address or ask for a new invitation.',
           );
         }
+        if (invitation.role.archived)
+          throw new IdentityError(
+            404,
+            'NOT_FOUND',
+            'The role in this invitation is no longer available. Ask for a new invitation.',
+          );
         if (accept) {
-          if (await tx.role(session.userId))
+          if (await tx.member(session.userId))
             conflict('You already belong to this workspace.');
           await tx.accept(invitation, session.userId);
           await tx.audit(
@@ -190,7 +205,11 @@ export function createSettingsService(deps: SettingsDependencies) {
             'invitation.accepted',
             invitation.id,
             { status: 'pending' },
-            { status: 'accepted', role: invitation.role },
+            {
+              status: 'accepted',
+              roleId: invitation.role.id,
+              roleName: invitation.role.name,
+            },
           );
         }
         const { workspace } = await tx.snapshot(session.userId);
@@ -198,7 +217,7 @@ export function createSettingsService(deps: SettingsDependencies) {
         return {
           name: workspace.name,
           email: invitation.email,
-          role: invitation.role,
+          role: { id: invitation.role.id, name: invitation.role.name },
           expiresAt: invitation.expiresAt,
         };
       },
@@ -208,14 +227,14 @@ export function createSettingsService(deps: SettingsDependencies) {
   return {
     /** Reconciles a command for its submitting actor after an uncertain response. */
     receipt: (context: TenantContext, commandId: string) =>
-      authorized(context, false, async (tx) => {
+      authorized(context, null, async (tx) => {
         const saved = await tx.command(commandId);
 
         return { committed: saved?.actorId === context.actor.id };
       }),
     /** Reads workspace controls and the caller's preferences. */
     get: (context: TenantContext) =>
-      authorized(context, false, (tx) => tx.snapshot(context.actor.id)),
+      authorized(context, null, (tx) => tx.snapshot(context.actor.id)),
     /** Saves name and timezone only if the reviewed revision is still current. */
     updateWorkspace(
       context: TenantContext,
@@ -226,27 +245,33 @@ export function createSettingsService(deps: SettingsDependencies) {
         timezone: string;
       },
     ) {
-      return command(context, true, input, 'workspace', async (tx) => {
-        const before = (await tx.snapshot(context.actor.id)).workspace;
-        if (before.revision !== input.revision)
-          conflict('Workspace settings changed. Refresh before saving.');
-        const after = {
-          ...before,
-          name: input.name,
-          timezone: input.timezone,
-          revision: before.revision + 1,
-        };
-        await tx.saveWorkspace(after);
-        await tx.audit(
-          context.actor.id,
-          'workspace.updated',
-          context.tenantId,
-          { name: before.name, timezone: before.timezone },
-          { name: after.name, timezone: after.timezone },
-        );
+      return command(
+        context,
+        'workspace.settings.manage',
+        input,
+        'workspace',
+        async (tx) => {
+          const before = (await tx.snapshot(context.actor.id)).workspace;
+          if (before.revision !== input.revision)
+            conflict('Workspace settings changed. Refresh before saving.');
+          const after = {
+            ...before,
+            name: input.name,
+            timezone: input.timezone,
+            revision: before.revision + 1,
+          };
+          await tx.saveWorkspace(after);
+          await tx.audit(
+            context.actor.id,
+            'workspace.updated',
+            context.tenantId,
+            { name: before.name, timezone: before.timezone },
+            { name: after.name, timezone: after.timezone },
+          );
 
-        return tx.snapshot(context.actor.id);
-      });
+          return tx.snapshot(context.actor.id);
+        },
+      );
     },
     /** Versions approval requirements so older reviews cannot authorize a changed policy. */
     updateApprovals(
@@ -257,34 +282,40 @@ export function createSettingsService(deps: SettingsDependencies) {
         alwaysRequireApproval: boolean;
       },
     ) {
-      return command(context, true, input, 'approvals', async (tx) => {
-        const before = (await tx.snapshot(context.actor.id)).workspace;
-        if (before.policyRevision !== input.revision)
-          conflict('Approval settings changed. Refresh before saving.');
-        if (before.alwaysRequireApproval !== input.alwaysRequireApproval) {
-          const after = {
-            ...before,
-            alwaysRequireApproval: input.alwaysRequireApproval,
-            policyRevision: before.policyRevision + 1,
-          };
-          await tx.saveWorkspace(after);
-          await tx.audit(
-            context.actor.id,
-            'policy.updated',
-            context.tenantId,
-            {
-              required: before.alwaysRequireApproval,
-              version: before.policyRevision,
-            },
-            {
-              required: after.alwaysRequireApproval,
-              version: after.policyRevision,
-            },
-          );
-        }
+      return command(
+        context,
+        'workspace.approval_policy.manage',
+        input,
+        'approvals',
+        async (tx) => {
+          const before = (await tx.snapshot(context.actor.id)).workspace;
+          if (before.policyRevision !== input.revision)
+            conflict('Approval settings changed. Refresh before saving.');
+          if (before.alwaysRequireApproval !== input.alwaysRequireApproval) {
+            const after = {
+              ...before,
+              alwaysRequireApproval: input.alwaysRequireApproval,
+              policyRevision: before.policyRevision + 1,
+            };
+            await tx.saveWorkspace(after);
+            await tx.audit(
+              context.actor.id,
+              'policy.updated',
+              context.tenantId,
+              {
+                required: before.alwaysRequireApproval,
+                version: before.policyRevision,
+              },
+              {
+                required: after.alwaysRequireApproval,
+                version: after.policyRevision,
+              },
+            );
+          }
 
-        return tx.snapshot(context.actor.id);
-      });
+          return tx.snapshot(context.actor.id);
+        },
+      );
     },
     /** Saves only the caller's email choices; in-app attention remains available. */
     updateNotifications(
@@ -296,7 +327,7 @@ export function createSettingsService(deps: SettingsDependencies) {
         connections: boolean;
       },
     ) {
-      return command(context, false, input, 'notifications', async (tx) => {
+      return command(context, null, input, 'notifications', async (tx) => {
         const before = (await tx.snapshot(context.actor.id)).preferences;
         if (before.revision !== input.revision)
           conflict('Email preferences changed. Refresh before saving.');
@@ -311,13 +342,13 @@ export function createSettingsService(deps: SettingsDependencies) {
     },
     /** Reads the caller's personal Home layout and pinned pages for this workspace. */
     layout: (context: TenantContext) =>
-      authorized(context, false, (tx) => tx.layout(context.actor.id)),
+      authorized(context, null, (tx) => tx.layout(context.actor.id)),
     /** Saves the caller's layout only if the revision they last read is still current. */
     saveLayout(
       context: TenantContext,
       input: Omit<WorkspaceLayout, 'revision'> & { revision: number },
     ) {
-      return authorized(context, false, async (tx) => {
+      return authorized(context, null, async (tx) => {
         const before = await tx.layout(context.actor.id);
         if (before.revision !== input.revision)
           conflict(
@@ -335,7 +366,7 @@ export function createSettingsService(deps: SettingsDependencies) {
     },
     /** Queues one test message per command; current membership is rechecked before sending. */
     testEmail(context: TenantContext, input: { commandId: string }) {
-      return command(context, false, input, 'test', async (tx) => {
+      return command(context, null, input, 'test', async (tx) => {
         if (!deps.deliveryAvailable) unavailable();
         const last = (await tx.snapshot(context.actor.id)).lastTest;
         if (last?.state === 'queued')
@@ -347,48 +378,76 @@ export function createSettingsService(deps: SettingsDependencies) {
     },
     /** Lists invitations without their acceptance credentials. */
     invitations: (context: TenantContext) =>
-      authorized(context, true, async (tx) =>
+      authorized(context, 'members.manage', async (tx) =>
         (await tx.invitations()).map(publicInvitation),
       ),
-    /** Creates an expiring invitation without granting membership. */
+    /**
+     * Creates an expiring invitation bound to an active non-owner role without granting
+     * membership. Non-owners can only invite with roles whose permissions they hold.
+     */
     invite(
       context: TenantContext,
-      input: { commandId: string; email: string; role: 'admin' | 'member' },
+      input: { commandId: string; email: string; roleId: string },
     ) {
-      return command(context, true, input, 'invite', async (tx) => {
-        if (!deps.deliveryAvailable) unavailable();
-        if (await tx.memberWithEmail(input.email))
-          conflict('This person is already a member.');
-        const existing = await tx.pendingInvitation(input.email);
-        if (existing)
-          conflict(
-            'An invitation already exists. Resend it to provide a new link.',
-          );
-        const id = deps.id();
-        const invitation: InvitationRecord = {
-          id,
-          email: input.email,
-          role: input.role,
-          status: 'pending',
-          generation: 1,
-          expiresAt: new Date(
-            deps.now().getTime() + 7 * 86400000,
-          ).toISOString(),
-          createdAt: deps.now().toISOString(),
-          delivery: 'queued',
-          acceptedBy: null,
-          tokenHash: deps.hash(deps.token(context.tenantId, id, 1)),
-        };
-        await tx.saveInvitation(invitation, context.actor.id);
-        await tx.queueInvitation(invitation);
-        await tx.audit(context.actor.id, 'invitation.created', id, null, {
-          email: invitation.email,
-          role: invitation.role,
-          status: 'pending',
-        });
+      return command(
+        context,
+        'members.manage',
+        input,
+        'invite',
+        async (tx, actor) => {
+          if (!deps.deliveryAvailable) unavailable();
+          const role = await tx.role(input.roleId);
+          if (!role || role.archived)
+            conflict(
+              'This role is no longer available. Refresh and choose another role.',
+            );
+          if (role.reference.key === 'owner')
+            conflict(
+              'Invite people with another role, then make them an owner after they join.',
+            );
+          if (
+            actor.role.key !== 'owner' &&
+            !actor.permissions.covers(role.permissions)
+          )
+            throw new IdentityError(
+              403,
+              'FORBIDDEN',
+              'You can only invite people with roles whose permissions you hold.',
+            );
+          if (await tx.memberWithEmail(input.email))
+            conflict('This person is already a member.');
+          const existing = await tx.pendingInvitation(input.email);
+          if (existing)
+            conflict(
+              'An invitation already exists. Resend it to provide a new link.',
+            );
+          const id = deps.id();
+          const invitation: InvitationRecord = {
+            id,
+            email: input.email,
+            role: { ...role.reference, archived: false },
+            status: 'pending',
+            generation: 1,
+            expiresAt: new Date(
+              deps.now().getTime() + 7 * 86400000,
+            ).toISOString(),
+            createdAt: deps.now().toISOString(),
+            delivery: 'queued',
+            acceptedBy: null,
+            tokenHash: deps.hash(deps.token(context.tenantId, id, 1)),
+          };
+          await tx.saveInvitation(invitation, context.actor.id);
+          await tx.queueInvitation(invitation);
+          await tx.audit(context.actor.id, 'invitation.created', id, null, {
+            email: invitation.email,
+            roleId: invitation.role.id,
+            roleName: invitation.role.name,
+            status: 'pending',
+          });
 
-        return publicInvitation(invitation);
-      });
+          return publicInvitation(invitation);
+        },
+      );
     },
     /** Revokes the current link or replaces it with a newly expiring invitation. */
     changeInvitation(
@@ -402,7 +461,7 @@ export function createSettingsService(deps: SettingsDependencies) {
     ) {
       return command(
         context,
-        true,
+        'members.manage',
         { ...input, invitationId },
         'invitation',
         async (tx) => {
@@ -415,6 +474,10 @@ export function createSettingsService(deps: SettingsDependencies) {
             conflict('The invitation changed. Refresh the team list.');
           if (input.action === 'resend' && !deps.deliveryAvailable)
             unavailable();
+          if (input.action === 'resend' && before.role.archived)
+            conflict(
+              'The role in this invitation was archived. Revoke it and invite again with another role.',
+            );
           if (
             input.action === 'resend' &&
             (await tx.memberWithEmail(before.email))

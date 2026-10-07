@@ -17,7 +17,7 @@ import type {
 } from '@luma/exceptions';
 import { evaluateException } from '@luma/exceptions';
 import type { TenantContext } from '@luma/identity';
-import { requireRole } from '@luma/identity';
+import { requirePermission } from '@luma/identity';
 
 import type { FulfillmentMapping, InventoryMapping } from './detection.js';
 import { fulfillmentRequest } from './detection.js';
@@ -696,7 +696,7 @@ export function createDetectionMonitor(options: DetectionMonitorOptions) {
      * an unavailable source does not stop the others.
      */
     async tick(context: TenantContext) {
-      requireRole(context, ['owner', 'admin']);
+      requirePermission(context, 'sync.manage');
       const incidents = (await exceptions.list(context)).filter(open);
       for (const [name, run] of [
         ['Sync failure detection', syncFailures],

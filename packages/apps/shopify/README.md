@@ -60,9 +60,9 @@ Provider references: [Order](https://shopify.dev/docs/api/admin-graphql/2026-07/
 
 ## Fulfillment recovery
 
-Owners and admins can preview an exact hold release, reopening or move from a
-fulfillment order. Another administrator approves it before Action Admission
-executes it. Mutation acceptance and independently observed fulfillment progress
+People with `shopify:fulfillment_recovery.run` can preview an exact hold release,
+reopening or move from a fulfillment order. Someone else who can approve changes
+approves it before Action Admission executes it. Mutation acceptance and independently observed fulfillment progress
 remain distinct. See [Shopify fulfillment recovery](../../../docs/shopify-fulfillment-recovery.md)
 for claims, retries, scope requirements and validation.
 

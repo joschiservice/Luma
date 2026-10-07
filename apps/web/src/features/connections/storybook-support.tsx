@@ -11,6 +11,7 @@ import { type ReactNode, useState } from 'react';
 
 import appStyles from '../../styles.css?inline';
 import { AppSettings } from '../apps/settings';
+import { contextFixture } from '../identity/context.fixture';
 
 export const organizationId = '22222222-2222-4222-8222-222222222222';
 
@@ -123,6 +124,12 @@ export function mockConnections(state: MockState = 'ready') {
       category: 'storefront',
       ui: ['connections', 'settings'],
       connectionTypes: [{ kind: 'shopify', name: 'Shopify' }],
+      permissions: [],
+      scopes: ['orders.read', 'products.read'],
+      slotAccess: {
+        connections: 'connections.manage',
+        settings: 'connections.manage',
+      },
     },
     {
       id: 'jtl',
@@ -135,6 +142,12 @@ export function mockConnections(state: MockState = 'ready') {
         { kind: 'jtl-cloud', name: 'JTL Cloud' },
         { kind: 'jtl-onprem', name: 'JTL-Wawi on-premise' },
       ],
+      permissions: [],
+      scopes: ['orders.read', 'procurement.read'],
+      slotAccess: {
+        connections: 'connections.manage',
+        settings: 'connections.manage',
+      },
     },
   ];
   const installations =
@@ -145,6 +158,9 @@ export function mockConnections(state: MockState = 'ready') {
           status: 'installed',
           version: 1,
           updatedAt: '2026-09-18T00:00:00Z',
+          grantedScopes: app.scopes,
+          pendingScopes: [] as string[],
+          roles: [] as { id: string; name: string; permissions: number }[],
         }));
   globalThis.fetch = async (input, init) => {
     const url = new URL(
@@ -176,19 +192,13 @@ export function mockConnections(state: MockState = 'ready') {
           );
       });
     if (url.pathname.endsWith('/context'))
-      return Response.json({
-        tenantId: organizationId,
-        dataRegion: 'EU',
-        requestId: 'storybook',
-        actor: {
-          type: 'user',
-          id: organizationId,
-          initiatingUserId: organizationId,
-          sessionId: organizationId,
-          membershipId: organizationId,
-          role: state === 'member' ? 'member' : 'owner',
-        },
-      });
+      return Response.json(
+        contextFixture(
+          organizationId,
+          state === 'member' ? 'member' : 'owner',
+          organizationId,
+        ),
+      );
     if (state === 'error') return fail(503);
     if (url.pathname.endsWith('/apps'))
       return Response.json({ catalog, installations });
@@ -203,6 +213,12 @@ export function mockConnections(state: MockState = 'ready') {
         status: appAction[2] === 'install' ? 'installed' : 'uninstalled',
         version: (previous?.version ?? 0) + 1,
         updatedAt: new Date().toISOString(),
+        grantedScopes:
+          appAction[2] === 'install'
+            ? (catalog.find((app) => app.id === appId)?.scopes ?? [])
+            : [],
+        pendingScopes: [] as string[],
+        roles: [] as { id: string; name: string; permissions: number }[],
       };
       if (previous) Object.assign(previous, next);
       else installations.push(next);

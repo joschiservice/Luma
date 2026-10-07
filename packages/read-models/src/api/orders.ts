@@ -10,7 +10,7 @@ import { initServer } from '@ts-rest/fastify';
 
 import type { OrderWorkspace } from '../application/orders.js';
 
-/** Exposes the tenant's order list and order details to workspace members. */
+/** Exposes the tenant's order list and order details to readers with `orders.read`. */
 export function orderRoutes(service?: OrderWorkspace) {
   return initServer().router(apiContract.orders, {
     list: async ({ request, query }) => {

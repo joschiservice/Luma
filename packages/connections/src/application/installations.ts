@@ -1,5 +1,9 @@
 import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireRole, requireTenant } from '@luma/identity';
+import {
+  IdentityError,
+  requirePermission,
+  requireTenant,
+} from '@luma/identity';
 
 import { ConnectorError } from '../domain/capabilities.js';
 import type {
@@ -35,7 +39,7 @@ export interface SecretCipher {
   open(value: string, binding: string): InstallationCredentials;
 }
 
-/** Tenant-scoped connection commands. Mutations require a current owner or admin role. */
+/** Tenant-scoped connection commands. Mutations require current `connections.manage` permission. */
 export interface ConnectionManagement {
   /** Lists connections visible to the current tenant without credentials. */
   list(context: TenantContext): Promise<InstalledConnection[]>;
@@ -166,11 +170,11 @@ const conflict = () =>
 export function createInstallationService(
   deps: InstallationDependencies,
 ): InstallationService {
-  async function authorize(context: TenantContext, admin = false) {
+  async function authorize(context: TenantContext, manage = false) {
     requireTenant(context, context.tenantId);
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
-    if (admin) requireRole(fresh, ['owner', 'admin']);
+    if (manage) requirePermission(fresh, 'connections.manage');
 
     return fresh;
   }

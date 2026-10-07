@@ -1,6 +1,10 @@
 import type { ConnectionManagement } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireRole } from '@luma/identity';
+import {
+  hasPermission,
+  IdentityError,
+  requirePermission,
+} from '@luma/identity';
 
 import {
   historyWindow,
@@ -42,7 +46,7 @@ export interface SyncServiceDependencies {
 }
 
 const manage = (context: TenantContext) =>
-  context.actor.role === 'owner' || context.actor.role === 'admin';
+  hasPermission(context, 'sync.manage');
 
 function streamView(
   stream: SyncStream,
@@ -122,7 +126,7 @@ const linkView = (request: LinkRequest): LinkRequestView => ({
 
 /**
  * Operator view and controls for imports, sync and source identity links. Members can read;
- * owners and admins can control syncs and request links. Every call refreshes membership.
+ * people with `sync.manage` can control syncs and request links. Every call refreshes membership.
  */
 export function createSyncService(deps: SyncServiceDependencies) {
   const now = deps.now ?? (() => new Date());
@@ -130,7 +134,7 @@ export function createSyncService(deps: SyncServiceDependencies) {
 
   async function manager(context: TenantContext) {
     const fresh = await deps.refreshContext(context);
-    requireRole(fresh, ['owner', 'admin']);
+    requirePermission(fresh, 'sync.manage');
 
     return fresh;
   }

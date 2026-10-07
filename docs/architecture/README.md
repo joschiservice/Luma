@@ -43,3 +43,5 @@ Update ADRs through pull requests. After pushing, link the repository file from 
 - [ADR-007: First-class Workflow ownership](007-workflow-model.md)
 
 - [ADR-008: Workspace read models](008-workspace-read-models.md)
+
+- [ADR-009: Permission catalog and workspace roles](009-permissions-and-roles.md)

@@ -7,7 +7,7 @@ import type { FastifyRequest } from 'fastify';
 
 import type { PlaybookLibrary } from '../application/playbook-library.js';
 
-/** Registers tenant-authenticated playbook reads and administrator controls. */
+/** Registers tenant-authenticated playbook reads and permission-gated controls. */
 export function playbookRoutes(service?: PlaybookLibrary) {
   function use(request: FastifyRequest) {
     if (!request.tenantContext)

@@ -63,7 +63,7 @@ function input() {
     id: 'shadow',
     incidentId: 'incident',
     actorId: 'operator',
-    role: 'owner',
+    access: new Set<string>(['actions.execute']),
     workflow: 'shipping-method-correction',
     now,
     diagnosis,
@@ -140,6 +140,13 @@ describe('Shadow evaluation', () => {
     source.version.ir.action.minimumRisk = 'low';
     source.version.ir.approval.mode = 'policy';
     expect(evaluateShadow(source).policy?.outcome).toBe('approval_required');
+  });
+  it('denies the simulated action when the actor may not execute actions', () => {
+    const source = { ...input(), access: new Set<string>(['actions.propose']) };
+    expect(evaluateShadow(source)).toMatchObject({
+      policy: { outcome: 'denied', reason: 'permission_denied' },
+      simulation: { predictedOutcome: 'inconclusive' },
+    });
   });
   it('keeps missing candidates visible', () => {
     expect(

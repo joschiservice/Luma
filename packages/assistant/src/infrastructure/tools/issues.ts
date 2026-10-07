@@ -82,6 +82,7 @@ export function searchIssuesTool(cases: Pick<CaseService, 'list'>) {
     name: 'search_issues',
     label: 'Search issues',
     reads: 'issue',
+    permission: 'issues.read',
     description:
       'List operational issues Luma detected, as in the Issues inbox. Views: `needs_you` (waiting for a person, for example an approval), `active` (all unresolved), `history` (resolved or closed). Filter by class (sync failure, stuck fulfillment, inventory mismatch, workflow failure), severity or state. `evidence` says whether the issue’s evidence is fresh or stale; `resolution` is `verified` only after an independent check.',
     jsonSchema: {
@@ -129,6 +130,7 @@ export function getIssueTool(cases: Pick<CaseService, 'get'>) {
     name: 'get_issue',
     label: 'Read an issue',
     reads: 'issue',
+    permission: 'issues.read',
     description:
       'Read one issue by its Luma ID: what was detected, its state, and Luma’s diagnosis with facts, likely causes, impact and suggested next steps. A diagnosis is Luma’s conclusion, not a source fact.',
     jsonSchema: {

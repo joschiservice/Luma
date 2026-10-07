@@ -1,10 +1,14 @@
 import { createHash } from 'node:crypto';
 
-import { requireTenant } from '@luma/identity';
+import { requirePermission } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
 import { z } from 'zod';
 
-import type { InventoryWorkspace } from '../../application/inventory.js';
+import { hiddenSections } from '../../application/access.js';
+import type {
+  InventoryDetailSection,
+  InventoryWorkspace,
+} from '../../application/inventory.js';
 import { readPositions } from './positions.js';
 import { readStockContext } from './related.js';
 
@@ -18,7 +22,7 @@ export function createInventoryWorkspace(
 ): InventoryWorkspace {
   return {
     async list(context, query) {
-      requireTenant(context, context.tenantId);
+      requirePermission(context, 'inventory.read');
       const scope = createHash('sha256')
         .update(
           JSON.stringify([
@@ -71,7 +75,12 @@ export function createInventoryWorkspace(
       );
     },
     async get(context, positionId) {
-      requireTenant(context, context.tenantId);
+      requirePermission(context, 'inventory.read');
+      const hidden = hiddenSections<InventoryDetailSection>(context, [
+        ['orders', 'orders.read'],
+        ['purchaseOrders', 'procurement.read'],
+        ['issues', 'issues.read'],
+      ]);
 
       return db.transaction(
         context.tenantId,
@@ -85,9 +94,21 @@ export function createInventoryWorkspace(
           );
           if (!position) return null;
 
+          const related = await readStockContext(
+            tx,
+            context.tenantId,
+            position,
+          );
+
           return {
             position,
-            ...(await readStockContext(tx, context.tenantId, position)),
+            ...related,
+            orders: hidden.includes('orders') ? [] : related.orders,
+            purchaseOrders: hidden.includes('purchaseOrders')
+              ? []
+              : related.purchaseOrders,
+            issues: hidden.includes('issues') ? [] : related.issues,
+            hidden,
             asOf: new Date().toISOString(),
           };
         },

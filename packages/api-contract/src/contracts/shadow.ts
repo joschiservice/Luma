@@ -5,6 +5,7 @@ import {
   apiErrorSchema,
   caseParams,
   organizationParamsSchema,
+  requires,
 } from '../common.js';
 import {
   shadowComparisonSchema,
@@ -19,6 +20,7 @@ export const shadowContract = initContract().router(
   {
     latest: {
       method: 'GET',
+      metadata: requires('playbooks.activate'),
       path: '/v1/organizations/:organizationId/exceptions/:exceptionId/shadow',
       pathParams: caseParams,
       query: z.object({ workflow: z.string().min(1).max(200) }).strict(),
@@ -29,6 +31,7 @@ export const shadowContract = initContract().router(
     },
     evaluate: {
       method: 'POST',
+      metadata: requires('playbooks.activate'),
       path: '/v1/organizations/:organizationId/exceptions/:exceptionId/shadow',
       pathParams: caseParams,
       body: shadowRequestSchema,
@@ -39,6 +42,7 @@ export const shadowContract = initContract().router(
     },
     review: {
       method: 'POST',
+      metadata: requires('playbooks.activate'),
       path: '/v1/organizations/:organizationId/shadow/:evaluationId/review',
       pathParams: organizationParamsSchema.extend({
         evaluationId: z.string().uuid(),
@@ -51,13 +55,14 @@ export const shadowContract = initContract().router(
     },
     report: {
       method: 'GET',
+      metadata: requires('playbooks.activate'),
       path: '/v1/organizations/:organizationId/shadow',
       pathParams: organizationParamsSchema,
       query: shadowWindowSchema,
       responses: { 200: shadowReportSchema },
       summary: 'Compare Shadow predictions with observed outcomes',
       description:
-        'Owners and admins can compare up to 500 incidents for one Workflow within a time window. The latest evaluation per incident is counted. Rates include denominators and exclude unknown observations. Predictions are conditional simulations, not executed or verified resolutions.',
+        'People who can activate playbooks can compare up to 500 incidents for one Workflow within a time window. The latest evaluation per incident is counted. Rates include denominators and exclude unknown observations. Predictions are conditional simulations, not executed or verified resolutions.',
     },
   },
   {

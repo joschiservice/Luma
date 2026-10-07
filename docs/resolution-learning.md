@@ -1,6 +1,6 @@
 # Resolution learning
 
-Resolution runs preserve the structured history of an incident. Owners and admins
+Resolution runs preserve the structured history of an incident. People with `issues.manage`
 can record a selection, append operator observations and export the full chain.
 No new execution authority is granted by a learning record.
 

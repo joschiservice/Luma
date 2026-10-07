@@ -1,5 +1,10 @@
 import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireTenant } from '@luma/identity';
+import {
+  hasPermission,
+  IdentityError,
+  requirePermission,
+  requireTenant,
+} from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
 
 import type {
@@ -35,6 +40,7 @@ export function createOrderWorkspace(
     requireTenant(fresh, context.tenantId);
     if (fresh.actor.id !== context.actor.id)
       throw new IdentityError(403, 'FORBIDDEN', 'Actor changed');
+    requirePermission(fresh, 'orders.read');
     const asOf = now().toISOString();
 
     return db.transaction(
@@ -59,9 +65,17 @@ export function createOrderWorkspace(
 
   return {
     list: (context, query) =>
-      read(context, (tx, _scoped, fresh, asOf) =>
-        listOrders(tx, queries, fresh, query, asOf),
-      ),
+      read(context, async (tx, _scoped, fresh, asOf) => {
+        const list = await listOrders(tx, queries, fresh, query, asOf);
+
+        // The needs-you view still selects by issue, but readers without issue access get no links.
+        return hasPermission(fresh, 'issues.read')
+          ? list
+          : {
+              ...list,
+              items: list.items.map((item) => ({ ...item, issueIds: [] })),
+            };
+      }),
     get: (context, orderId) =>
       read(context, (tx, scoped, fresh, asOf) =>
         readDetail(tx, queries, activity(scoped), fresh, orderId, asOf),

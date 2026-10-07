@@ -1,5 +1,5 @@
-import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
+import type { Permission, TenantContext } from '@luma/identity';
+import { hasPermission, IdentityError } from '@luma/identity';
 import type { JsonValue, ModelTool } from '@luma/platform';
 
 import {
@@ -29,6 +29,8 @@ export interface AssistantTool<Input = unknown> {
   readonly description: string;
   /** The record kind this tool reads, reported by availability. */
   readonly reads: RecordKind;
+  /** The read permission a person needs before the model is offered this tool. */
+  readonly permission: Permission;
   readonly jsonSchema: Readonly<Record<string, JsonValue>>;
   /** Validates arguments, returning field problems the model can correct. */
   parse(value: unknown): { input: Input } | { problems: string[] };
@@ -63,9 +65,10 @@ export interface ToolExecution {
 const validName = /^[a-z][a-z0-9_]{0,63}$/;
 
 /**
- * Holds the assistant's read-only tools. The model sees each tool's name, description and JSON
- * Schema. Arguments are validated here rather than by the gateway, so a mistake comes back to
- * the model as a correctable tool result instead of failing the whole answer.
+ * Holds the assistant's read-only tools. The model sees the name, description and JSON Schema of
+ * each tool the person's permissions allow. Arguments are validated here rather than by the
+ * gateway, so a mistake comes back to the model as a correctable tool result instead of failing
+ * the whole answer.
  */
 export function createToolRegistry(
   tools: readonly AssistantTool[],
@@ -78,7 +81,7 @@ export function createToolRegistry(
     byName.set(tool.name, tool);
   }
 
-  const declarations: ModelTool[] = tools.map((tool) => ({
+  const declare = (tool: AssistantTool): ModelTool => ({
     name: tool.name,
     description: tool.description,
     input: {
@@ -92,7 +95,9 @@ export function createToolRegistry(
         return value;
       },
     },
-  }));
+  });
+  const permitted = (context: TenantContext) =>
+    tools.filter((tool) => hasPermission(context, tool.permission));
 
   const result = (
     tool: string,
@@ -107,12 +112,18 @@ export function createToolRegistry(
   });
 
   return {
-    declarations,
-    reads: [...new Set(tools.map((tool) => tool.reads))],
+    /** Tool declarations for the model, limited to tools the refreshed context may use. */
+    declarations: (context: TenantContext): ModelTool[] =>
+      permitted(context).map(declare),
+    /** Record kinds the refreshed context can read through the assistant. */
+    reads: (context: TenantContext): RecordKind[] => [
+      ...new Set(permitted(context).map((tool) => tool.reads)),
+    ],
 
     /**
-     * Runs one call with a context the caller has just refreshed. Authorization failures are
-     * rethrown so the whole answer stops; other failures become results the model can explain.
+     * Runs one call with a context the caller has just refreshed. Calls to tools the context
+     * may not use are refused without reading. Authorization failures from reads are rethrown so
+     * the whole answer stops; other failures become results the model can explain.
      */
     async execute(
       context: TenantContext,
@@ -123,6 +134,12 @@ export function createToolRegistry(
         return result(call.name, call.name, 'failed', {
           error: 'unknown_tool',
           message: 'This tool does not exist.',
+        });
+      if (!hasPermission(context, tool.permission))
+        return result(tool.name, tool.label, 'failed', {
+          error: 'not_permitted',
+          message:
+            'This person’s role does not allow this read. Answer without it and say what you could not check.',
         });
 
       const parsed = tool.parse(call.arguments);

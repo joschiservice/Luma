@@ -10,7 +10,7 @@ import { initServer } from '@ts-rest/fastify';
 
 import type { ProductWorkspace } from '../application/products.js';
 
-/** Exposes the tenant's product catalog comparison and SKU details to workspace members. */
+/** Exposes the tenant's product catalog comparison and SKU details to readers with `products.read`. */
 export function productRoutes(service?: ProductWorkspace) {
   return initServer().router(apiContract.products, {
     list: async ({ request, query }) => {

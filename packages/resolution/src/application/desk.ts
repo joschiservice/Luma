@@ -1,7 +1,12 @@
 import type { Diagnosis, Incident } from '@luma/exceptions';
 import type { ExecutionRecord } from '@luma/execution';
-import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireRole, requireTenant } from '@luma/identity';
+import type { Permission, TenantContext } from '@luma/identity';
+import {
+  hasPermission,
+  IdentityError,
+  requirePermission,
+  requireTenant,
+} from '@luma/identity';
 import type { Approval, PolicyDecision, ProposedAction } from '@luma/policies';
 import { currentPolicyVersion } from '@luma/policies';
 
@@ -137,6 +142,13 @@ export interface DeskDependencies {
   now(): Date;
 }
 
+/** Approving or rejecting answers the policy decision; escalating changes the case lifecycle. */
+const decisionPermission = {
+  approve: 'decisions.respond',
+  reject: 'decisions.respond',
+  escalate: 'issues.manage',
+} as const satisfies Record<CaseDecision['kind'], Permission>;
+
 function conflict(
   message = 'The case changed. Refresh before deciding.',
 ): never {
@@ -160,16 +172,17 @@ export function createDeskService(deps: DeskDependencies) {
   function permitted(context: TenantContext, s: DeskSnapshot) {
     const decisions: CaseDecision['kind'][] = [];
     if (
-      !['owner', 'admin'].includes(context.actor.role) ||
       s.incident.state === 'resolved' ||
       s.incident.state === 'escalated' ||
       s.execution
     )
       return decisions;
-    decisions.push('escalate');
+    if (hasPermission(context, decisionPermission.escalate))
+      decisions.push('escalate');
     const p = s.proposal,
       d = s.decision;
     if (
+      hasPermission(context, decisionPermission.reject) &&
       p &&
       d &&
       !s.approval &&
@@ -202,13 +215,13 @@ export function createDeskService(deps: DeskDependencies) {
       operation: () => Promise<T>,
     ) {
       context = await fresh(context);
-      requireRole(context, ['owner', 'admin']);
+      requirePermission(context, 'actions.execute');
 
       return deps.store.withRefresh(context, id, operation);
     },
     async refresh(context: TenantContext, id: string) {
       context = await fresh(context);
-      requireRole(context, ['owner', 'admin']);
+      requirePermission(context, 'actions.propose');
       if (!deps.refreshProposal)
         throw new IdentityError(
           409,
@@ -227,7 +240,7 @@ export function createDeskService(deps: DeskDependencies) {
             )
               return;
             context = await fresh(context);
-            requireRole(context, ['owner', 'admin']);
+            requirePermission(context, 'actions.propose');
             await deps.refreshProposal!(context, id);
           })
           .finally(() => refreshing.delete(key));
@@ -255,6 +268,7 @@ export function createDeskService(deps: DeskDependencies) {
     },
     async review(context: TenantContext, id: string) {
       context = await fresh(context);
+      requirePermission(context, 'issues.read');
 
       return deps.store.withCase(
         context,
@@ -264,7 +278,7 @@ export function createDeskService(deps: DeskDependencies) {
           schemaVersion: 1 as const,
           policyStale: s.policyStale ?? false,
           refreshable:
-            ['owner', 'admin'].includes(context.actor.role) &&
+            hasPermission(context, 'actions.propose') &&
             Boolean(deps.refreshProposal) &&
             !approvalBlocksRenewal(s.approval, deps.now().getTime()) &&
             !s.execution &&
@@ -313,7 +327,7 @@ export function createDeskService(deps: DeskDependencies) {
     },
     async decide(context: TenantContext, id: string, request: CaseDecision) {
       context = await fresh(context);
-      requireRole(context, ['owner', 'admin']);
+      requirePermission(context, decisionPermission[request.kind]);
 
       const receipt = await deps.store.withCase(
         context,
@@ -321,7 +335,7 @@ export function createDeskService(deps: DeskDependencies) {
         true,
         async (session) => {
           context = await fresh(context);
-          requireRole(context, ['owner', 'admin']);
+          requirePermission(context, decisionPermission[request.kind]);
           const previous = await session.receipt(request.commandId);
           if (previous) {
             if (
@@ -410,6 +424,7 @@ export function createDeskService(deps: DeskDependencies) {
     },
     async receipt(context: TenantContext, id: string, commandId: string) {
       context = await fresh(context);
+      requirePermission(context, 'issues.read');
 
       return deps.store.withCase(context, id, false, async (session) => {
         const value = await session.receipt(commandId);
@@ -425,6 +440,7 @@ export function createDeskService(deps: DeskDependencies) {
     },
     async progress(context: TenantContext, id: string) {
       context = await fresh(context);
+      requirePermission(context, 'issues.read');
       const snapshot = await deps.store.withCase(
         context,
         id,
@@ -496,6 +512,7 @@ export function createDeskService(deps: DeskDependencies) {
       query: { limit: number; cursor?: string | undefined },
     ) {
       context = await fresh(context);
+      requirePermission(context, 'issues.read');
 
       return deps.store.timeline(context, id, query);
     },

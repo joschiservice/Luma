@@ -7,7 +7,10 @@ import {
   simulationTransport,
 } from '@luma/connections/adapters';
 import { createSimulationTransport } from '@luma/connections/composition';
-import { makeTenantContext } from '@luma/identity/composition';
+import {
+  builtInMembership,
+  makeTenantContext,
+} from '@luma/identity/composition';
 import { createMemoryStore, createTransport } from '@luma/simulator-core';
 import { jtl } from '@luma/simulator-jtl';
 
@@ -30,7 +33,10 @@ const context = makeTenantContext(
     status: 'active',
     dataRegion: 'EU',
   },
-  { id: 'member', organizationId: tenantId, userId: 'owner', role: 'owner' },
+  builtInMembership(
+    { id: 'member', organizationId: tenantId, userId: 'owner' },
+    'owner',
+  ),
   'request',
 );
 const ref = (externalId) => ({ externalId, scopeKey: '' });

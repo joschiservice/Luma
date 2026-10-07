@@ -56,12 +56,12 @@ Observed history on an order shows the states Luma read. A record imported from 
 
 - **Retrying** means a read failed and Luma will try again automatically, waiting a little longer each time.
 - **Failing** means it has failed several times in a row. The message explains why. Fix the cause, such as reconnecting the connection, and choose **Retry now**.
-- **Needs someone to resume** means the person the sync ran as no longer manages the workspace. An owner or admin chooses **Resume with my access**.
+- **Needs someone to resume** means the person the sync ran as no longer manages the workspace. Someone whose role includes **Manage imports** chooses **Resume with my access**.
 - **Paused** means someone paused it. Records already imported stay available.
 
 If a store or ERP stops accepting Luma, for example because its token was revoked or the app was removed there, its connection shows **Access revoked** and an issue opens in **Issues**. Choose **Reconnect** on the issue or the connection and enter new access. The connection keeps its records and links. The issue closes after the next complete sync. Disconnecting a connection yourself opens no issue.
 
-Owners and admins can also choose **Sync now**, **Check all records** or **Re-import history** from the actions menu on each record type.
+If your role includes **Manage imports**, you can also choose **Sync now**, **Check all records** or **Re-import history** from the actions menu on each record type.
 
 ## Link the same SKU across sources
 
@@ -74,8 +74,8 @@ Choose **Link**, say why the records match and confirm. Luma then groups stock, 
 Open the stock position in **Inventory**. In **Reconcile Shopify stock**, choose
 Shopify as the destination and the matching ERP source as authority. Review the
 location, evidence times and proposed available quantity, then select **Review
-correction**. A different owner or admin must approve it before the requester can
-select **Apply to Shopify**.
+correction**. Someone else who can approve changes must approve it before the
+requester can select **Apply to Shopify**.
 
 Luma checks both sources again and refuses stale evidence, ambiguous mappings or
 concurrent Shopify changes. If ERP evidence is stale, run Data sync first.

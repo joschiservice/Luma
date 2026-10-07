@@ -86,7 +86,7 @@ export function connectionError(error: unknown) {
   const status = error instanceof IdentityError ? error.status : 0;
   if (status === 401) return 'Your session expired. Sign in again.';
   if (status === 403)
-    return 'Permission denied. Ask a workspace owner or admin to manage connections.';
+    return 'Permission denied. Your role doesn’t include Manage connections.';
   if (status === 404)
     return 'This connection is no longer available. Refresh the list.';
   if (status === 409)

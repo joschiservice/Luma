@@ -4,6 +4,7 @@ import {
   caseDeadline,
   type CaseDecisionFacts,
   caseDomain,
+  type DecisionReader,
   evidenceState,
   presentCase,
   presentReplenishment,
@@ -11,7 +12,11 @@ import {
 } from './decisions.js';
 
 const asOf = '2026-09-30T09:00:00.000Z';
-const owner = { id: 'reviewer', role: 'owner' as const };
+const reader = (id: string, respond: boolean): DecisionReader => ({
+  id,
+  can: (permission) => respond && permission === 'decisions.respond',
+});
+const owner = reader('reviewer', true);
 
 const facts = (overrides: Partial<CaseDecisionFacts>): CaseDecisionFacts => ({
   exception_id: '6f1c7a52-0f6d-4d0e-9f0b-3a4a5e0f1a2b',
@@ -49,14 +54,24 @@ describe('case decisions', () => {
     expect(caseDeadline(facts({ proposal: null }))).toBeNull();
   });
 
-  it('lets only a different owner or admin decide an approval', () => {
+  it('lets only a different reader who can respond to decisions decide an approval', () => {
     expect(presentCase(facts({}), owner, asOf).response).toBe('decide');
     expect(
-      presentCase(facts({}), { id: 'requester', role: 'admin' }, asOf).response,
+      presentCase(facts({}), reader('requester', true), asOf).response,
     ).toBe('awaiting_other');
     expect(
-      presentCase(facts({}), { id: 'member', role: 'member' }, asOf).response,
-    ).toBe('view_only');
+      presentCase(facts({}), reader('requester', false), asOf).response,
+    ).toBe('awaiting_other');
+    expect(presentCase(facts({}), reader('member', false), asOf).response).toBe(
+      'view_only',
+    );
+    expect(
+      presentCase(
+        facts({ reason: 'manual_intervention' }),
+        reader('member', false),
+        asOf,
+      ).response,
+    ).toBe('investigate');
     const expired = presentCase(facts({ proposal: null }), owner, asOf);
     expect(expired.response).toBe('investigate');
     expect(expired.consequences.map((c) => c.response)).toEqual(['Escalate']);

@@ -26,8 +26,13 @@ export type Member = {
   userId: string;
   name?: string | undefined;
   email?: string | undefined;
-  role: 'owner' | 'admin' | 'member';
 };
+
+/**
+ * Who the reader may assign: anyone with permission to assign decisions, only themselves with
+ * permission to take decisions, or nobody.
+ */
+export type AssignmentAccess = 'anyone' | 'self' | 'none';
 
 /** Shows how long a proposal keeps its authority. Expiring deadlines are emphasized. */
 export function DecisionDeadline({
@@ -123,30 +128,34 @@ function RecordLinks({
   );
 }
 
-/** Lets members take or release a decision; owners and admins can also hand it to anyone. */
+/**
+ * Lets people take or release a decision; people who can assign decisions can also hand it to
+ * anyone.
+ */
 function Assignment({
   item,
   members,
   self,
-  role,
+  access,
   pending,
   onAssign,
 }: {
   item: DecisionItem;
   members: readonly Member[];
   self: string | undefined;
-  role: Member['role'] | undefined;
+  access: AssignmentAccess;
   pending: boolean;
   onAssign: (assigneeId: string | null) => void;
 }) {
   const holder = item.assignment?.assigneeId ?? null;
-  const staff = role === 'owner' || role === 'admin';
+  const staff = access === 'anyone';
+  const selfService = access !== 'none';
   const label = memberName(holder, members, self) ?? 'Unassigned';
 
   return (
     <div className="decision-assignment">
       <span>{label}</span>
-      {holder === self && self ? (
+      {holder === self && self && selfService ? (
         <Button
           variant="ghost"
           size="sm"
@@ -155,7 +164,7 @@ function Assignment({
         >
           Release
         </Button>
-      ) : self && (holder === null || staff) ? (
+      ) : self && selfService && (holder === null || staff) ? (
         <Button
           variant="outline"
           size="sm"
@@ -200,7 +209,7 @@ export function DecisionInspector({
   departed = false,
   members,
   self,
-  role,
+  assignmentAccess,
   now,
   navigation,
   onClose,
@@ -215,7 +224,7 @@ export function DecisionInspector({
   departed?: boolean;
   members: readonly Member[];
   self: string | undefined;
-  role: Member['role'] | undefined;
+  assignmentAccess: AssignmentAccess;
   now: number;
   navigation?: ReactNode;
   onClose: () => void;
@@ -274,14 +283,14 @@ export function DecisionInspector({
           <p>{item.why}</p>
           {item.response === 'awaiting_other' ? (
             <p className="decision-note">
-              You requested this, so a different owner or admin has to approve
-              it. You can still follow it here.
+              You requested this, so someone else who can approve changes has to
+              approve it. You can still follow it here.
             </p>
           ) : item.response === 'view_only' ? (
             <p className="decision-note">
               {item.reason === 'run'
                 ? 'Only the person who requested it can run it.'
-                : 'Your role can follow this decision. Owners and admins respond to it.'}
+                : 'Your role can follow this decision but not respond to it.'}
             </p>
           ) : null}
         </section>
@@ -368,7 +377,7 @@ export function DecisionInspector({
                   item={item}
                   members={members}
                   self={self}
-                  role={role}
+                  access={assignmentAccess}
                   pending={assigning}
                   onAssign={onAssign}
                 />

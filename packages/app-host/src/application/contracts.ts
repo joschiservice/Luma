@@ -8,23 +8,51 @@ import type { SqlTransaction, TenantDatabase } from '@luma/platform';
 import type { CaseWorkflowAdapter } from '@luma/workflows';
 import type { FastifyInstance } from 'fastify';
 
+export type AppSlot =
+  | 'connections'
+  | 'settings'
+  | 'app-settings'
+  | 'page'
+  | 'record'
+  | 'inventory'
+  | 'customers'
+  | 'fulfillment';
+
+/** A permission an app owns. People who can manage roles grant it like a core permission. */
+export interface AppPermissionDeclaration {
+  /** Namespaced as `<appId>:<name>`, for example `shopify:fulfillment_recovery.run`. */
+  key: string;
+  label: string;
+  description: string;
+  /** Grants changes to provider data, money or access. */
+  consequential: boolean;
+}
+
+/**
+ * Plain data describing an app. Permission and access fields are validated when the app
+ * registers, so the same contract can describe apps that are not compiled into Luma.
+ */
 export interface AppManifest {
   id: string;
   name: string;
   description: string;
   version: string;
   category: 'storefront' | 'erp' | 'utility';
-  ui: (
-    | 'connections'
-    | 'settings'
-    | 'app-settings'
-    | 'page'
-    | 'record'
-    | 'inventory'
-    | 'customers'
-    | 'fulfillment'
-  )[];
+  ui: AppSlot[];
   connectionTypes: { kind: string; name: string }[];
+  /** Permissions this app owns. */
+  permissions: AppPermissionDeclaration[];
+  /**
+   * Core permissions the app needs to read or act in a workspace. Installing grants them;
+   * when the app acts for a person it is limited to scopes both the app and the person hold.
+   */
+  scopes: string[];
+  /** The permission a person needs to see each slot in `ui`: a core or this app's permission. */
+  slotAccess: Partial<Record<AppSlot, string>>;
+  /** Permissions to see, and to respond to, each kind of decision the app lists in Needs you. */
+  decisionAccess?: Partial<
+    Record<AppDecision['kind'], { view: string; respond: string }>
+  >;
 }
 
 export type { WorkspaceApp } from '../domain/installation.js';
@@ -83,8 +111,8 @@ export interface AppDefinition {
   connector?: ConnectionProvider;
   /**
    * Lists the tenant's decisions this app waits on a person for, from persisted state only.
-   * Must check workspace installation and roles; return an empty list when the reader can't
-   * see them. Do not perform provider reads.
+   * The host calls it only for installed apps and filters items by `manifest.decisionAccess`.
+   * Do not perform provider reads.
    */
   decisions?(context: TenantContext): Promise<AppDecision[]>;
   /**
@@ -92,7 +120,10 @@ export interface AppDefinition {
    * governed proposal, approval, admission and verification path.
    */
   workflows?: CaseWorkflowAdapter[];
-  /** Registers app-owned HTTP handlers; handlers must check workspace installation. */
+  /**
+   * Registers app-owned HTTP handlers. Each tenant route declares `config.access`; the host
+   * checks installation and that permission before the handler runs.
+   */
   registerHttp?(server: FastifyInstance, identity?: IdentityService): void;
   /** Updates app-owned storage inside the installation transaction. Do not perform network requests. */
   installed?(context: AppLifecycleContext): Promise<void>;
@@ -102,6 +133,18 @@ export interface AppDefinition {
   ready?(): Promise<boolean>;
 }
 
+/**
+ * An app operation performed for a person. `permission` is the app's own permission, or a core
+ * permission for host-level work such as connecting; without one only installation and scopes
+ * are checked. `scopes` are the core permissions the operation uses, which both the app
+ * installation and the person must hold.
+ */
+export interface AppOperation {
+  app: string;
+  permission?: string;
+  scopes?: readonly string[];
+}
+
 export interface AppFactoryContext {
   database: TenantDatabase;
   cipher: SecretCipher;
@@ -109,6 +152,20 @@ export interface AppFactoryContext {
   refreshContext(context: TenantContext): Promise<TenantContext>;
   /** Rejects calls for uninstalled or unavailable apps. */
   requireInstalled(context: TenantContext, appId: string): Promise<number>;
+  /**
+   * Requires the app to be installed and available, the person to hold the operation's
+   * permission, and every listed scope to be granted to the app and held by the person.
+   * Throws 403 naming what is missing. Pass a refreshed context.
+   */
+  requirePermission(
+    context: TenantContext,
+    operation: AppOperation,
+  ): Promise<void>;
+  /** Reports whether `requirePermission` would allow the operation. */
+  hasPermission(
+    context: TenantContext,
+    operation: AppOperation,
+  ): Promise<boolean>;
   /** Routes synthetic connections through their trusted simulator binding. */
   simulation?: (connection: InstalledConnection) => typeof fetch | undefined;
   env: Readonly<Record<string, string | undefined>>;

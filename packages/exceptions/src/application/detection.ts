@@ -1,5 +1,5 @@
 import type { TenantContext } from '@luma/identity';
-import { requireRole, requireTenant } from '@luma/identity';
+import { requirePermission, requireTenant } from '@luma/identity';
 import { measureSync } from '@luma/platform';
 
 import { evaluate, fingerprintMaterial, identity } from '../domain/evaluate.js';
@@ -266,7 +266,7 @@ export function createDetectionService(
       return repository.evidence(context.tenantId, boundary.id(incidentId));
     },
     async verify(context: TenantContext, incidentId: string) {
-      requireRole(context, ['owner', 'admin']);
+      requirePermission(context, 'issues.manage');
       if (!verifier)
         throw new Error('Verification evaluator is not configured');
       const id = boundary.id(incidentId);
@@ -355,7 +355,7 @@ export function createDetectionService(
       incidentId: string,
       disposition: HumanDisposition,
     ) {
-      requireRole(context, ['owner', 'admin']);
+      requirePermission(context, 'issues.manage');
       const parsed = boundary.disposition(disposition);
 
       return repository.resolve(

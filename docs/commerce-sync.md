@@ -44,7 +44,7 @@ for the sync-failure retry window
 ([exception detection](exception-detection.md#scheduled-detection)). A rejected cursor restarts the scan. After five consecutive failures
 the stream is **failing**. Messages are controlled text by connector error code;
 provider text is never stored. A stream whose person no longer manages the
-workspace is blocked until an owner or admin resumes it, which makes them the
+workspace is blocked until someone with `sync.manage` resumes it, which makes them the
 stream's person. Streams stop while their connection is inactive or no longer grants
 the capability, and restart when it returns.
 

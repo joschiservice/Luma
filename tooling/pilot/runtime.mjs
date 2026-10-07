@@ -432,7 +432,7 @@ export async function createPilot(
       identity: identity.service,
       execution: { kind: 'enabled', effects },
       verifier,
-      decisionSources: installations.registry.decisionSources(),
+      decisionSources: installations.decisionSources(),
       workflowSources: installations.registry.workflowSources(),
       ...(simulation ? { refreshStock } : {}),
       ...(simulation
@@ -511,6 +511,9 @@ export async function createPilot(
               observability,
               identity: identity.service,
               settings: identity.settings,
+              roles: identity.roles((tenantId) =>
+                installations.apps.permissions(tenantId),
+              ),
               trustedOrigins: settings.trustedOrigins,
               ...application.http,
               metricEvents,
@@ -548,14 +551,19 @@ export async function createPilot(
       });
       if (inventory) {
         const base = '/v1/organizations/:organizationId/simulator/inventory';
-        app.get(base, (request) =>
+        // Pilot-only routes declare the access the guard enforces, like contract routes.
+        const read = { config: { access: { permission: 'issues.read' } } };
+        app.get(base, read, (request) =>
           inventory.status(request.tenantContext, detection.exceptions),
         );
-        app.post(`${base}/check`, (request) =>
-          inventory.check(request.tenantContext, detection),
+        app.post(
+          `${base}/check`,
+          { config: { access: { permission: 'issues.manage' } } },
+          (request) => inventory.check(request.tenantContext, detection),
         );
         app.get(
           '/v1/organizations/:organizationId/simulator/cases',
+          read,
           (request) =>
             lumaCases(request.tenantContext, {
               detection,
@@ -727,6 +735,7 @@ export async function createPilot(
           safety.policies.evaluate(actor, action, parseAction(action).hash, {
             available: true,
             minimumRisk: 'high',
+            permission: 'actions.propose',
           }),
         now: Date.now,
       })(await context(), exceptionId);

@@ -266,7 +266,7 @@ export function createShopifyCaseWorkflows(deps: {
         'Hand the case to a person when the sources are ambiguous or stale',
         'Stop when Shopify already matches the ERP',
         'Propose setting Shopify to the ERP quantity',
-        'Wait for a different owner or admin to approve',
+        'Wait for someone else who can approve changes to approve',
         'Write with compare-and-set and confirm with a fresh Shopify read',
       ],
       success:
@@ -291,7 +291,7 @@ export function createShopifyCaseWorkflows(deps: {
       'correct-stock': {
         title: 'Correct Shopify stock',
         description:
-          'Proposes the exact quantity. A different owner or admin approves it before Luma writes it with compare-and-set.',
+          'Proposes the exact quantity. Someone else who can approve changes approves it before Luma writes it with compare-and-set.',
       },
       'check-stock': {
         title: 'Confirm the quantity',
@@ -477,7 +477,7 @@ export function createShopifyCaseWorkflows(deps: {
         'Read the fulfillment order and its holds in Shopify',
         'Stop when nothing is held; hand over when several holds or a payment, address or stock hold need their cause fixed',
         'Propose releasing the hold',
-        'Wait for a different owner or admin to approve',
+        'Wait for someone else who can approve changes to approve',
         'Release it and confirm in Shopify that it is gone',
       ],
       success:
@@ -506,7 +506,7 @@ export function createShopifyCaseWorkflows(deps: {
       'release-hold': {
         title: 'Release the hold',
         description:
-          'Proposes releasing that exact hold. A different owner or admin approves it before Luma sends it.',
+          'Proposes releasing that exact hold. Someone else who can approve changes approves it before Luma sends it.',
       },
       'check-hold': {
         title: 'Confirm the release',

@@ -5,7 +5,7 @@ import { mkdir } from 'node:fs/promises';
 import { buildRuntimeApp } from '@luma/application-runtime';
 import { createConnectionCoverage } from '@luma/connections/composition';
 import { createCaseMetricReader } from '@luma/exceptions/composition';
-import { makeTenantContext } from '@luma/identity';
+import { builtInMembership, makeTenantContext } from '@luma/identity';
 import { createTenantDatabase } from '@luma/platform/composition';
 import { createProcurementMetricReader } from '@luma/procurement/composition';
 import { createOperationalSummary } from '@luma/read-models/composition';
@@ -229,12 +229,10 @@ test('keeps cross-domain cohorts live, recovers races and measures committed cha
   const actor = makeTenantContext(
     { userId: f.owner.id, sessionId: 'fixture' },
     { ...f.org, status: 'active', dataRegion: 'EU' },
-    {
-      id: randomUUID(),
-      organizationId: f.org.id,
-      userId: f.owner.id,
-      role: 'owner',
-    },
+    builtInMembership(
+      { id: randomUUID(), organizationId: f.org.id, userId: f.owner.id },
+      'owner',
+    ),
     randomUUID(),
   );
   await createOperationalSummary(measured, {

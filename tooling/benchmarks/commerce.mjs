@@ -4,7 +4,10 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { createJtlConnector } from '@luma/app-jtl';
 import { createShopifyConnector } from '@luma/app-shopify';
 import { createCapabilityRuntime } from '@luma/connections/adapters';
-import { makeTenantContext } from '@luma/identity/composition';
+import {
+  builtInMembership,
+  makeTenantContext,
+} from '@luma/identity/composition';
 import { createMemoryStore, createTransport } from '@luma/simulator-core';
 import { jtl } from '@luma/simulator-jtl';
 import { rateLimit, shopify } from '@luma/simulator-shopify';
@@ -39,7 +42,10 @@ const tenant = makeTenantContext(
     status: 'active',
     dataRegion: 'EU',
   },
-  { id: 'member', organizationId: tenantId, userId: 'owner', role: 'owner' },
+  builtInMembership(
+    { id: 'member', organizationId: tenantId, userId: 'owner' },
+    'owner',
+  ),
   'benchmark',
 );
 const config =

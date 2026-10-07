@@ -21,6 +21,7 @@ export const activityTypes = [
   'resolution',
   'connection',
   'procurement',
+  'access',
 ] as const;
 
 export const activityQuerySchema = z

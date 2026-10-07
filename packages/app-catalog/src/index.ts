@@ -43,6 +43,8 @@ export function createAppHost(
   apps: AppService;
   connections: InstallationService;
   providerCatalog: ProviderCatalog;
+  /** Lists installed apps' decisions, filtered by each decision kind's declared permissions. */
+  decisionSources(): ReturnType<AppRegistry['decisionSources']>;
 } {
   const unavailable = () => {
     throw new IdentityError(
@@ -66,8 +68,16 @@ export function createAppHost(
         env: options.env ?? process.env,
         requireInstalled: (context, appId) =>
           apps.requireInstalled(context, appId),
+        requirePermission: (context, operation) =>
+          apps.requirePermission(context, operation),
+        hasPermission: (context, operation) =>
+          apps.hasPermission(context, operation),
       }),
     ),
+    {
+      beforeWrite: (context, appId) =>
+        apps.requireGranted(context, appId, ['actions.execute']),
+    },
   );
   const apps = createAppService(database, registry, options.refreshContext);
   const provider = (target: InstallationTarget): ConnectionProvider => {
@@ -126,6 +136,12 @@ export function createAppHost(
   return {
     registry,
     apps,
+    decisionSources: () =>
+      registry.decisionSources(
+        (context, app, permission) =>
+          apps.hasPermission(context, { app, permission }),
+        (context, app) => apps.installed(context, app),
+      ),
     connections: {
       ...service,
       async list(context) {

@@ -106,7 +106,7 @@ it('tests drafts with example data, keeps saved cases and never reaches connecte
       cookie: owner.cookie,
       method: 'POST',
       status: 201,
-      body: { userId: user.userId, role },
+      body: { userId: user.userId, roleId: role },
     });
   const base = `/v1/organizations/${org.id}`;
   const as =

@@ -11,7 +11,14 @@ import { useState } from 'react';
 import { expect, userEvent, within } from 'storybook/test';
 
 import appStyles from '../../styles.css?inline';
+import { contextFixture } from '../identity/context.fixture';
+import { contextOptions, sessionOptions } from '../identity/data';
+import { invitationsOptions, membersOptions } from './data';
 import { type SettingsSection, SettingsView } from './page';
+import { membersFixture, rolesFixture } from './roles.fixture';
+import { rolesOptions } from './roles-data';
+
+const organizationId = '11111111-1111-4111-8111-111111111111';
 
 const data: SettingsSnapshot = {
   workspace: {
@@ -32,14 +39,27 @@ function Preview({
   section = 'workspace',
   state = 'ready',
   member = false,
+  roleId,
 }: {
   section?: SettingsSection;
   state?: 'ready' | 'loading' | 'error' | 'mail-unavailable';
   member?: boolean;
+  roleId?: string;
 }) {
-  const [client] = useState(
-    () => new QueryClient({ defaultOptions: { queries: { retry: false } } }),
-  );
+  const [client] = useState(() => {
+    const value = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+    });
+    const context = contextFixture(organizationId, member ? 'member' : 'owner');
+    value.setQueryData(contextOptions(organizationId).queryKey, context);
+    value.setQueryData(sessionOptions().queryKey, null);
+    value.setQueryData(rolesOptions(organizationId).queryKey, rolesFixture);
+    value.setQueryData(membersOptions(organizationId).queryKey, membersFixture);
+    value.setQueryData(invitationsOptions(organizationId).queryKey, []);
+
+    return value;
+  });
+  const context = contextFixture(organizationId, member ? 'member' : 'owner');
   const [router] = useState(() =>
     createRouter({
       history: createMemoryHistory(),
@@ -49,8 +69,12 @@ function Preview({
             <style>{appStyles}</style>
             <SettingsView
               section={section}
-              organizationId="11111111-1111-4111-8111-111111111111"
-              role={member ? 'member' : 'owner'}
+              roleId={roleId}
+              organizationId={organizationId}
+              can={(permission) =>
+                context.allAppPermissions ||
+                context.permissions.includes(permission)
+              }
               actorId="22222222-2222-4222-8222-222222222222"
               data={
                 state === 'loading' || state === 'error'
@@ -131,3 +155,41 @@ export const DeliveryUnavailable: Story = {
 export const Loading: Story = { args: { state: 'loading' } };
 
 export const Unavailable: Story = { args: { state: 'error' } };
+
+export const Roles: Story = {
+  args: { section: 'roles' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByRole('link', { name: /Buyer/ }),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.getByRole('button', { name: 'Create role' }),
+    ).toBeInTheDocument();
+  },
+};
+
+export const CustomRoleEditor: Story = {
+  args: { section: 'roles', roleId: '77777777-7777-4777-8777-777777777777' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const grant = canvas.getByRole('switch', { name: /Approve or reject/ });
+    await userEvent.click(grant);
+    await expect(
+      canvas.getByRole('button', { name: 'Review changes' }),
+    ).toBeEnabled();
+  },
+};
+
+export const BuiltInRoleReadOnly: Story = {
+  args: { section: 'roles', roleId: 'member', member: true },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.queryByRole('switch', { name: /View orders/ }),
+    ).toBeNull();
+    await expect(canvas.getAllByText('Included').length).toBeGreaterThan(0);
+  },
+};
+
+export const TeamWithCustomRoles: Story = { args: { section: 'team' } };

@@ -123,6 +123,7 @@ function Preview({ slot = 'page' }: { slot?: 'page' | 'record' }) {
       <Shopify
         organizationId={organizationId}
         slot={slot}
+        can={() => true}
         record={
           slot === 'record'
             ? { kind: 'order', connectionId, externalId: gid('Order') }

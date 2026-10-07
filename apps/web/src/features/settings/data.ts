@@ -65,7 +65,7 @@ export const membersOptions = (organizationId: string) =>
     },
   });
 
-/** Loads invitations for workspace administrators without exposing acceptance tokens. */
+/** Loads invitations for people who can manage team members, without exposing acceptance tokens. */
 export const invitationsOptions = (organizationId: string) =>
   queryOptions({
     ...privateQueryDefaults,

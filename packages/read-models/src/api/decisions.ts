@@ -13,7 +13,7 @@ import type {
   DecisionQueue,
 } from '../application/decisions.js';
 
-/** Exposes the Needs you queue to workspace members and assignment changes to its owner. */
+/** Exposes the Needs you queue, filtered by the reader's permissions, and assignment changes to its owner. */
 export function decisionRoutes(
   queue?: DecisionQueue,
   assignments?: DecisionAssignments,

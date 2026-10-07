@@ -216,9 +216,9 @@ export function WorkflowCompatibility({
   )
     return (
       <p>
-        Owners and admins start this version from Rules. It computes values from
-        the supplied evidence and doesn’t need connection access or action
-        grants.
+        People who can manage workflow triggers start this version from Rules.
+        It computes values from the supplied evidence and doesn’t need
+        connection access or action grants.
       </p>
     );
   if (detail.presentation === 'procurement.replenishment')
@@ -226,8 +226,8 @@ export function WorkflowCompatibility({
       <>
         <p>
           Each rule covers one stock position and supplier. Stock must be less
-          than five minutes old, and a different owner or admin approves every
-          purchase-order draft.
+          than five minutes old, and someone else who can approve changes
+          approves every purchase-order draft.
         </p>
         {version.blockers.map((reason) => (
           <Alert key={reason}>{reason}</Alert>

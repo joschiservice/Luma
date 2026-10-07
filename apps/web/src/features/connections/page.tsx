@@ -12,7 +12,7 @@ import {
 import { useEffect } from 'react';
 
 import { AppStore } from '../apps/store';
-import { contextOptions } from '../identity/data';
+import { usePermissions } from '../identity/permissions';
 import { connectionsOptions } from './data';
 
 /** Lists apps and forwards existing connection links to their app management page. */
@@ -54,10 +54,9 @@ export function Connections({
   organizationId: string;
   appResult?: string | undefined;
 }) {
-  const access = useQuery(contextOptions(organizationId));
   const client = useQueryClient();
-  const canManage =
-    access.data?.actor.role === 'owner' || access.data?.actor.role === 'admin';
+  const { can } = usePermissions(organizationId);
+  const canManage = can('apps.manage');
 
   return (
     <div className="connections-page apps-page">

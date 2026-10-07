@@ -12,7 +12,10 @@ import {
   parseEvidence,
   parseVerification,
 } from '@luma/execution/composition';
-import { makeTenantContext } from '@luma/identity/composition';
+import {
+  builtInMembership,
+  makeTenantContext,
+} from '@luma/identity/composition';
 import { createPolicyService } from '@luma/policies/composition';
 import {
   activationRequestSchema,
@@ -51,12 +54,10 @@ export function createWorker(
         status: 'active',
         dataRegion: 'EU',
       },
-      {
-        id: `membership:${user}`,
-        organizationId: tenant,
-        userId: user,
-        role: 'owner',
-      },
+      builtInMembership(
+        { id: `membership:${user}`, organizationId: tenant, userId: user },
+        'owner',
+      ),
       'evaluation',
     );
   const actor = context();

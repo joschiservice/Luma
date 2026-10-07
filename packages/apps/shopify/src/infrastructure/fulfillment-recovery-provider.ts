@@ -168,6 +168,7 @@ export function createFulfillmentProvider(
       descriptor: {
         version: '0',
         minimumRisk: 'medium',
+        permission: 'shopify:fulfillment_recovery.run',
         idempotency: 'none',
         retry: { maxAttempts: 1, initialDelayMs: 0 },
       },

@@ -8,7 +8,7 @@ Procurement.
 
 ## Rule and authority
 
-An owner or admin activates one exact position, source connection and supplier.
+Someone with `procurement.manage` activates one exact position, source connection and supplier.
 The immutable rule records minimum stock, target stock, a quantity risk threshold,
 principal, workflow digest and admission artifact. Only one active rule may cover
 a position. Revoke it before changing the scope. The worker uses the activating
@@ -36,7 +36,7 @@ but a request may name each position once.
 
 The risk threshold makes larger proposals high risk. Smaller drafts retain the
 Procurement capability's medium-risk floor. Current workspace policy requires a
-different owner or admin to approve both. This workflow never reduces the
+different person with `decisions.respond` to approve both. This workflow never reduces the
 capability's risk or treats a workflow decision as execution authority.
 
 Action Admission binds the proposal to the run, action step, subject and exact

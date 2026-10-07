@@ -112,7 +112,8 @@ export function AcceptInvitation() {
         ) : (
           <>
             <p>
-              You’re invited as <strong>{invitation.data.role}</strong> using{' '}
+              You’re invited with the{' '}
+              <strong>{invitation.data.role.name}</strong> role using{' '}
               <strong>{invitation.data.email}</strong>.
             </p>
             <p>Accept to access this workspace and its operations.</p>

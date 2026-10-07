@@ -1715,7 +1715,7 @@
     },
     "/v1/organizations/{organizationId}/shadow": {
       "get": {
-        "description": "Owners and admins can compare up to 500 incidents for one Workflow within a time window. The latest evaluation per incident is counted. Rates include denominators and exclude unknown observations. Predictions are conditional simulations, not executed or verified resolutions.",
+        "description": "People who can activate playbooks can compare up to 500 incidents for one Workflow within a time window. The latest evaluation per incident is counted. Rates include denominators and exclude unknown observations. Predictions are conditional simulations, not executed or verified resolutions.",
         "summary": "Compare Shadow predictions with observed outcomes",
         "tags": ["shadow"],
         "parameters": [
@@ -2600,7 +2600,7 @@
     },
     "/v1/organizations/{organizationId}/activity": {
       "get": {
-        "description": "Returns recorded events newest first by recorded timestamp and immutable ID. Date bounds apply to recorded time, including from and excluding to, for at most 366 days. Search matches issue ID, persisted target reference, action label, actor ID and workflow run ID (literal, case-insensitive substring). Raw payloads are not searched. Cursors are bound to workspace, role, filters and page size; any other cursor returns 400 with a message to start from the first page. Connection administration events are visible only to owners and administrators. Approval and provider acceptance do not establish verified resolution.",
+        "description": "Returns recorded events newest first by recorded timestamp and immutable ID. Date bounds apply to recorded time, including from and excluding to, for at most 366 days. Search matches issue ID, persisted target reference, action label, actor ID and workflow run ID (literal, case-insensitive substring). Raw payloads are not searched. Cursors are bound to workspace, restricted-activity access, filters and page size; any other cursor returns 400 with a message to start from the first page. Connection changes and access changes (members, invitations, roles and workspace settings, type `access`) are visible only with the View restricted activity permission; `visibility` is `admin` for those callers. Approval and provider acceptance do not establish verified resolution.",
         "summary": "Search workspace activity",
         "tags": ["activity"],
         "parameters": [
@@ -2668,7 +2668,8 @@
                 "verification",
                 "resolution",
                 "connection",
-                "procurement"
+                "procurement",
+                "access"
               ]
             }
           },
@@ -2764,7 +2765,8 @@
                               "verification",
                               "resolution",
                               "connection",
-                              "procurement"
+                              "procurement",
+                              "access"
                             ]
                           },
                           "outcome": {
@@ -3219,7 +3221,7 @@
     },
     "/v1/organizations/{organizationId}/playbooks": {
       "get": {
-        "description": "Members can inspect published versions and activation status. Viewing a playbook never activates it.",
+        "description": "Requires `workflows.read`. People can inspect published versions and activation status. Viewing a playbook never activates it.",
         "summary": "List workspace playbooks",
         "tags": ["playbooks"],
         "parameters": [
@@ -4829,7 +4831,7 @@
     },
     "/v1/organizations/{organizationId}/playbooks/{definitionId}/activations": {
       "post": {
-        "description": "Owners and admins grant their own principal access to explicit orders on one connection. Review the exact digest, scope and approval behavior. Reuse the same ID and body after an uncertain response. Conflicting, overlapping or stale grants return 409; revoked records cannot be restored.",
+        "description": "Requires `playbooks.activate`. Grants your own principal access to explicit orders on one connection. Review the exact digest, scope and approval behavior. Reuse the same ID and body after an uncertain response. Conflicting, overlapping or stale grants return 409; revoked records cannot be restored.",
         "summary": "Activate a reviewed version",
         "tags": ["playbooks"],
         "parameters": [
@@ -5326,7 +5328,7 @@
     },
     "/v1/organizations/{organizationId}/playbooks/{definitionId}/activations/{activationId}/revoke": {
       "post": {
-        "description": "Owners and admins prevent future admission under this artifact. Repeated revocation is safe. Revocation preserves historical grants and does not undo already-dispatched work.",
+        "description": "Requires `playbooks.activate`. Prevents future admission under this artifact. Repeated revocation is safe. Revocation preserves historical grants and does not undo already-dispatched work.",
         "summary": "Revoke a playbook activation",
         "tags": ["playbooks"],
         "parameters": [
@@ -5789,7 +5791,7 @@
     },
     "/v1/organizations/{organizationId}/workflows/{definitionId}/code-evaluations": {
       "post": {
-        "description": "Owners and admins test an exact version with example inputs, capability replies and expected outputs. Evaluation does not call connected systems. Reuse the same ID and body after an uncertain response.",
+        "description": "Requires `workflows.author`. Tests an exact version with example inputs, capability replies and expected outputs. Evaluation does not call connected systems. Reuse the same ID and body after an uncertain response.",
         "summary": "Evaluate a published Code Step",
         "tags": ["workflows"],
         "parameters": [
@@ -8372,7 +8374,7 @@
     },
     "/v1/organizations/{organizationId}/workflows/{definitionId}/replenishment/activations": {
       "post": {
-        "description": "Owners and admins review a stock position, supplier and quantity limits. Target stock must exceed the minimum. Reuse the exact ID and body when retrying.",
+        "description": "Requires `procurement.manage`. Reviews a stock position, supplier and quantity limits. Target stock must exceed the minimum. Reuse the exact ID and body when retrying.",
         "summary": "Activate a replenishment rule",
         "tags": ["workflows"],
         "parameters": [
@@ -8867,7 +8869,7 @@
     },
     "/v1/organizations/{organizationId}/workflows/{definitionId}/replenishment/previews": {
       "post": {
-        "description": "Owners and admins check up to 25 stock positions before activating rules. Each position shows current stock, whether an active rule already covers it, what the first check would propose and who approves. Nothing changes.",
+        "description": "Requires `procurement.manage`. Checks up to 25 stock positions before activating rules. Each position shows current stock, whether an active rule already covers it, what the first check would propose and who approves. Nothing changes.",
         "summary": "Preview replenishment rules",
         "tags": ["workflows"],
         "parameters": [
@@ -9417,7 +9419,7 @@
     },
     "/v1/organizations/{organizationId}/workflows/{definitionId}/replenishment/activations/batch": {
       "post": {
-        "description": "Owners and admins activate up to 25 reviewed rules, each for exactly one stock position. Each rule succeeds or fails on its own; an existing rule is never replaced. Resend the same items to retry: activated rules are returned unchanged and never duplicated.",
+        "description": "Requires `procurement.manage`. Activates up to 25 reviewed rules, each for exactly one stock position. Each rule succeeds or fails on its own; an existing rule is never replaced. Resend the same items to retry: activated rules are returned unchanged and never duplicated.",
         "summary": "Activate several replenishment rules",
         "tags": ["workflows"],
         "parameters": [
@@ -11607,7 +11609,7 @@
     },
     "/v1/organizations/{organizationId}/workflows/{definitionId}/replenishment/runs/{runId}": {
       "get": {
-        "description": "Returns recorded stock, supplier, policy decision, current purchase-order status and independent verification. Only a different authorized owner or admin can respond to a pending proposal.",
+        "description": "Returns recorded stock, supplier, policy decision, current purchase-order status and independent verification. Only someone other than the requester with `procurement.manage` and `decisions.respond` can respond to a pending proposal.",
         "summary": "Review a replenishment run",
         "tags": ["workflows"],
         "parameters": [
@@ -12111,7 +12113,7 @@
     },
     "/v1/organizations/{organizationId}/workflows/{definitionId}/replenishment/runs/{runId}/decision": {
       "post": {
-        "description": "A different owner or admin decides on the exact proposal. Current stock, activation and policy are checked again before creating the order.",
+        "description": "Requires `procurement.manage` and `decisions.respond`. Someone other than the requester decides on the exact proposal. Current stock, activation and policy are checked again before creating the order.",
         "summary": "Approve or reject a replenishment proposal",
         "tags": ["workflows"],
         "parameters": [
@@ -12637,7 +12639,7 @@
     },
     "/v1/organizations/{organizationId}/workflows": {
       "get": {
-        "description": "Members can inspect published versions and activation status. Viewing a workflow never activates it.",
+        "description": "Requires `workflows.read`. People can inspect published versions and activation status. Viewing a workflow never activates it.",
         "summary": "List workspace workflows",
         "tags": ["workflows"],
         "parameters": [
@@ -15802,7 +15804,7 @@
     },
     "/v1/organizations/{organizationId}/workflows/{definitionId}/starts": {
       "post": {
-        "description": "Owners and admins submit typed signal evidence for an exact version and resource. Reuse the source ID and complete body on retry. Starts do not grant execution authority. Schedules start once at the time specified by the version.",
+        "description": "Requires `workflows.triggers.manage`. Submits typed signal evidence for an exact version and resource. Reuse the source ID and complete body on retry. Starts do not grant execution authority. Schedules start once at the time specified by the version.",
         "summary": "Start or schedule a workflow run",
         "tags": ["workflows"],
         "parameters": [
@@ -17660,7 +17662,7 @@
     },
     "/v1/organizations/{organizationId}/workflows/{definitionId}/activations": {
       "post": {
-        "description": "Owners and admins can activate supported Resolution versions for their own principal and explicit orders on one connection. Other definitions remain available for review. Review the exact digest, scope and approval behavior. Reuse the same ID and body after an uncertain response. Conflicting, overlapping or stale grants return 409; revoked records cannot be restored.",
+        "description": "Requires `playbooks.activate`. Activates supported Resolution versions for your own principal and explicit orders on one connection. Other definitions remain available for review. Review the exact digest, scope and approval behavior. Reuse the same ID and body after an uncertain response. Conflicting, overlapping or stale grants return 409; revoked records cannot be restored.",
         "summary": "Activate a reviewed version",
         "tags": ["workflows"],
         "parameters": [
@@ -18157,7 +18159,7 @@
     },
     "/v1/organizations/{organizationId}/workflows/{definitionId}/case-activations": {
       "post": {
-        "description": "Owners and admins let a built-in workflow start a run for each new case of its issue type. Runs act as the caller; every change still needs policy approval by a different owner or admin. Review the exact version digest and policy version. Reuse the same ID and body after an uncertain response. A second active activation returns 409.",
+        "description": "Requires `workflows.publish`. Lets a built-in workflow start a run for each new case of its issue type. Runs act as the caller; every change still needs policy approval by someone else who can approve changes. Review the exact version digest and policy version. Reuse the same ID and body after an uncertain response. A second active activation returns 409.",
         "summary": "Turn on a case workflow",
         "tags": ["workflows"],
         "parameters": [
@@ -18633,7 +18635,7 @@
     },
     "/v1/organizations/{organizationId}/workflows/{definitionId}/activations/{activationId}/revoke": {
       "post": {
-        "description": "Owners and admins prevent future admission under this artifact. Repeated revocation is safe. Revocation preserves historical grants and does not undo already-dispatched work.",
+        "description": "Requires `playbooks.activate` or `procurement.manage`. Prevents future admission under this artifact. Repeated revocation is safe. Revocation preserves historical grants and does not undo already-dispatched work.",
         "summary": "Revoke a workflow activation",
         "tags": ["workflows"],
         "parameters": [
@@ -19571,7 +19573,7 @@
     },
     "/v1/organizations/{organizationId}/workflow-templates/{templateId}/install": {
       "post": {
-        "description": "Owners and admins publish the template’s reviewed version here so it can be configured. Repeating the request is safe. Adding a template never activates it.",
+        "description": "Requires `workflows.publish`. Publishes the template’s reviewed version here so it can be configured. Repeating the request is safe. Adding a template never activates it.",
         "summary": "Add a template to this workspace",
         "tags": ["workflowDrafts"],
         "parameters": [
@@ -21964,7 +21966,7 @@
     },
     "/v1/organizations/{organizationId}/workflow-drafts": {
       "get": {
-        "description": "Members can read drafts. Drafts never run and grant no access to connected systems.",
+        "description": "Requires `workflows.read`. People can read drafts. Drafts never run and grant no access to connected systems.",
         "summary": "List open workflow drafts",
         "tags": ["workflowDrafts"],
         "parameters": [
@@ -23138,7 +23140,7 @@
         }
       },
       "post": {
-        "description": "Owners and admins start from scratch, from supplied content, or from a published version to edit it. Editing a published workflow never changes that version. Reuse the same ID and body after an uncertain response.",
+        "description": "Requires `workflows.author`. Starts a draft from scratch, from supplied content, or from a published version to edit it. Editing a published workflow never changes that version. Reuse the same ID and body after an uncertain response.",
         "summary": "Start a workflow draft",
         "tags": ["workflowDrafts"],
         "parameters": [
@@ -25533,7 +25535,7 @@
         }
       },
       "put": {
-        "description": "Owners and admins save against the revision they loaded. If someone else saved first, the request returns 409 and nothing is overwritten. Reuse the same save ID and body after an uncertain response.",
+        "description": "Requires `workflows.author`. Saves against the revision you loaded. If someone else saved first, the request returns 409 and nothing is overwritten. Reuse the same save ID and body after an uncertain response.",
         "summary": "Save a workflow draft",
         "tags": ["workflowDrafts"],
         "parameters": [
@@ -26727,7 +26729,7 @@
     },
     "/v1/organizations/{organizationId}/workflow-drafts/{draftId}/publish": {
       "post": {
-        "description": "Owners and admins publish the exact revision they reviewed as an immutable version. Publishing does not activate the workflow or grant it access to anything. Retrying the same revision returns the same version.",
+        "description": "Requires `workflows.publish`. Publishes the exact revision you reviewed as an immutable version. Publishing does not activate the workflow or grant it access to anything. Retrying the same revision returns the same version.",
         "summary": "Publish a draft as a new version",
         "tags": ["workflowDrafts"],
         "parameters": [
@@ -27938,7 +27940,7 @@
     },
     "/v1/organizations/{organizationId}/workflow-drafts/{draftId}/discard": {
       "post": {
-        "description": "Owners and admins discard a draft they no longer need. Discarding again is safe. Published drafts are kept.",
+        "description": "Requires `workflows.author`. Discards a draft you no longer need. Discarding again is safe. Published drafts are kept.",
         "summary": "Discard an unpublished draft",
         "tags": ["workflowDrafts"],
         "parameters": [
@@ -28328,7 +28330,7 @@
     },
     "/v1/organizations/{organizationId}/workflow-authoring/generation": {
       "get": {
-        "description": "Members can check this. Describing workflows needs an EU model route with zero data retention. When none is configured, `reason` explains what an administrator must set up.",
+        "description": "Requires `workflows.read`. Describing workflows needs an EU model route with zero data retention. When none is configured, `reason` explains what an administrator must set up.",
         "summary": "Check whether workflows can be described here",
         "tags": ["workflowGeneration"],
         "parameters": [
@@ -28693,7 +28695,7 @@
     },
     "/v1/organizations/{organizationId}/workflow-authoring/describe": {
       "post": {
-        "description": "Owners and admins describe what should happen and get a new draft with an explanation of each step, the assumptions made and open questions. Each question names the step and field to fill in. The draft uses only what this workspace has installed and still needs review, testing and publishing: generation never publishes, activates, approves or starts a workflow. The model may be asked up to three times; remaining problems are returned as diagnostics. If the model fails, times out or returns nothing usable, the request returns 503, no draft is created, and you can try again. Reuse the same ID and body after an uncertain response.",
+        "description": "Requires `workflows.author`. Describe what should happen and get a new draft with an explanation of each step, the assumptions made and open questions. Each question names the step and field to fill in. The draft uses only what this workspace has installed and still needs review, testing and publishing: generation never publishes, activates, approves or starts a workflow. The model may be asked up to three times; remaining problems are returned as diagnostics. If the model fails, times out or returns nothing usable, the request returns 503, no draft is created, and you can try again. Reuse the same ID and body after an uncertain response.",
         "summary": "Start a draft from a description",
         "tags": ["workflowGeneration"],
         "parameters": [
@@ -30031,7 +30033,7 @@
     },
     "/v1/organizations/{organizationId}/workflow-drafts/{draftId}/proposals": {
       "post": {
-        "description": "Owners and admins describe a change to the revision they loaded. The response is a proposal with step-level changes; the draft is unchanged until the proposal is accepted. Returns 409 if the draft changed since you loaded it, and 503 with nothing changed if the model fails or times out. Reuse the same ID and body after an uncertain response.",
+        "description": "Requires `workflows.author`. Describe a change to the revision you loaded. The response is a proposal with step-level changes; the draft is unchanged until the proposal is accepted. Returns 409 if the draft changed since you loaded it, and 503 with nothing changed if the model fails or times out. Reuse the same ID and body after an uncertain response.",
         "summary": "Propose a change from an instruction",
         "tags": ["workflowGeneration"],
         "parameters": [
@@ -32372,7 +32374,7 @@
     },
     "/v1/organizations/{organizationId}/workflow-drafts/{draftId}/proposals/{proposalId}/accept": {
       "post": {
-        "description": "Owners and admins save the proposed content as a new draft revision. If the draft changed after the proposal was made, the request returns 409 and nothing is applied. Accepting never publishes. Reuse the same save ID after an uncertain response.",
+        "description": "Requires `workflows.author`. Saves the proposed content as a new draft revision. If the draft changed after the proposal was made, the request returns 409 and nothing is applied. Accepting never publishes. Reuse the same save ID after an uncertain response.",
         "summary": "Apply a proposed change",
         "tags": ["workflowGeneration"],
         "parameters": [
@@ -35547,7 +35549,7 @@
     },
     "/v1/organizations/{organizationId}/workflow-drafts/{draftId}/proposals/{proposalId}/reject": {
       "post": {
-        "description": "Owners and admins discard a proposal. The draft is unchanged. Rejecting again is safe.",
+        "description": "Requires `workflows.author`. Discards a proposal. The draft is unchanged. Rejecting again is safe.",
         "summary": "Reject a proposed change",
         "tags": ["workflowGeneration"],
         "parameters": [
@@ -37906,7 +37908,7 @@
     },
     "/v1/organizations/{organizationId}/workflow-drafts/{draftId}/code-step-suggestions": {
       "post": {
-        "description": "Owners and admins describe a calculation and get TypeScript source, returned fields, grants and example cases for the Code Step editor. The source uses only values available at that step and requests only the reads and actions directly after it. Nothing is saved. Returns 503 with nothing changed if the model fails or times out. Reuse the same ID and body after an uncertain response.",
+        "description": "Requires `workflows.author`. Describe a calculation and get TypeScript source, returned fields, grants and example cases for the Code Step editor. The source uses only values available at that step and requests only the reads and actions directly after it. Nothing is saved. Returns 503 with nothing changed if the model fails or times out. Reuse the same ID and body after an uncertain response.",
         "summary": "Suggest a Code Step from a description",
         "tags": ["workflowGeneration"],
         "parameters": [
@@ -38578,7 +38580,7 @@
     },
     "/v1/organizations/{organizationId}/workflow-drafts/{draftId}/generations": {
       "get": {
-        "description": "Members can read the model route, token usage, attempts and outcome of each request for this draft, newest first. Prompts are stored only as a hash. These records show authorship; they don’t approve anything.",
+        "description": "Requires `workflows.read`. People can read the model route, token usage, attempts and outcome of each request for this draft, newest first. Prompts are stored only as a hash. These records show authorship; they don’t approve anything.",
         "summary": "List how a draft was generated",
         "tags": ["workflowGeneration"],
         "parameters": [
@@ -39071,7 +39073,7 @@
     },
     "/v1/organizations/{organizationId}/workflow-drafts/{draftId}/tests": {
       "get": {
-        "description": "Members can read saved test cases and whether each passed on the current draft revision. A case without a result has not run on this revision yet.",
+        "description": "Requires `workflows.read`. People can read saved test cases and whether each passed on the current draft revision. A case without a result has not run on this revision yet.",
         "summary": "List saved test cases and their results",
         "tags": ["draftTests"],
         "parameters": [
@@ -39723,7 +39725,7 @@
         }
       },
       "put": {
-        "description": "Owners and admins replace the saved test cases against the revision they loaded (0 before any are saved). If someone else saved first, the request returns 409. Retrying the same body after an uncertain response is safe.",
+        "description": "Requires `workflows.author`. Replaces the saved test cases against the revision you loaded (0 before any are saved). If someone else saved first, the request returns 409. Retrying the same body after an uncertain response is safe.",
         "summary": "Save test cases for a draft",
         "tags": ["draftTests"],
         "parameters": [
@@ -40608,7 +40610,7 @@
     },
     "/v1/organizations/{organizationId}/workflow-drafts/{draftId}/tests/run": {
       "post": {
-        "description": "Owners and admins run every saved case that has no passing or running result on this draft revision. Call it after saving the draft and before publishing. Repeating the call is safe. Tests use example replies and never contact connected systems.",
+        "description": "Requires `workflows.author`. Runs every saved case that has no passing or running result on this draft revision. Call it after saving the draft and before publishing. Repeating the call is safe. Tests use example replies and never contact connected systems.",
         "summary": "Run saved test cases on the current revision",
         "tags": ["draftTests"],
         "parameters": [
@@ -42316,7 +42318,7 @@
     },
     "/v1/organizations/{organizationId}/workflow-drafts/{draftId}/test-runs": {
       "post": {
-        "description": "Owners and admins run the current draft revision with a saved or unsaved case. The run uses the production workflow interpreter with example replies instead of connected systems, Action Admission or action adapters. A passing test grants no activation or approval. Poll the run until it finishes. Reuse the same ID and body after an uncertain response.",
+        "description": "Requires `workflows.author`. Runs the current draft revision with a saved or unsaved case. The run uses the production workflow interpreter with example replies instead of connected systems, Action Admission or action adapters. A passing test grants no activation or approval. Poll the run until it finishes. Reuse the same ID and body after an uncertain response.",
         "summary": "Test a draft with example data",
         "tags": ["draftTests"],
         "parameters": [
@@ -44860,7 +44862,7 @@
         }
       },
       "post": {
-        "description": "Owners and admins can create suppliers. Retry with the same ID and body after an uncertain response.",
+        "description": "Requires `procurement.manage`. Retry with the same ID and body after an uncertain response.",
         "summary": "Create a supplier",
         "tags": ["procurement"],
         "parameters": [
@@ -45870,7 +45872,7 @@
         }
       },
       "post": {
-        "description": "Owners and admins create a draft with immutable lines and provenance. Luma-owned orders support audited lifecycle changes. External ownership requires an external reference and prevents local lifecycle changes. Reuse the ID and body on retry.",
+        "description": "Requires `procurement.manage`. Creates a draft with immutable lines and provenance. Luma-owned orders support audited lifecycle changes. External ownership requires an external reference and prevents local lifecycle changes. Reuse the ID and body on retry.",
         "summary": "Create a purchase order",
         "tags": ["procurement"],
         "parameters": [
@@ -48093,7 +48095,7 @@
     },
     "/v1/organizations/{organizationId}/procurement/suppliers/{supplierId}/link": {
       "post": {
-        "description": "Owners and admins link the supplier to a supplier in a connected purchasing system, or remove the link, and set how many hours the supplier has to confirm a sent order. Provide the current revision. The purchasing-system supplier is read again before it is linked.",
+        "description": "Requires `procurement.manage`. Links the supplier to a supplier in a connected purchasing system, or removes the link, and sets how many hours the supplier has to confirm a sent order. Provide the current revision. The purchasing-system supplier is read again before it is linked.",
         "summary": "Link a supplier to its purchasing-system record",
         "tags": ["procurement"],
         "parameters": [
@@ -48987,7 +48989,7 @@
     },
     "/v1/organizations/{organizationId}/procurement/purchasing-connections/{connectionId}/suppliers": {
       "get": {
-        "description": "Owners and admins read up to 100 suppliers per page from the connection, for linking. Nothing is stored.",
+        "description": "Requires `procurement.manage`. Reads up to 100 suppliers per page from the connection, for linking. Nothing is stored.",
         "summary": "List suppliers in a purchasing system",
         "tags": ["procurement"],
         "parameters": [
@@ -51697,7 +51699,7 @@
     },
     "/v1/organizations/{organizationId}/procurement/purchase-orders/{purchaseOrderId}/refresh": {
       "post": {
-        "description": "Reads the order in its purchasing system and records any new confirmation or receipt. Members can refresh.",
+        "description": "Reads the order in its purchasing system and records any new confirmation or receipt. Requires `procurement.read`.",
         "summary": "Read the purchasing system now",
         "tags": ["procurement"],
         "parameters": [
@@ -53581,7 +53583,7 @@
     },
     "/v1/organizations/{organizationId}/procurement/purchase-orders/{purchaseOrderId}/submissions": {
       "post": {
-        "description": "Owners and admins ask a different owner or admin to approve placing this draft or open order in the supplier’s linked purchasing system, with a requested delivery date. Every line’s SKU must be linked to a purchasing-system item. After approval Luma places the order once and verifies it with an independent read; the purchasing system sends it to the supplier. Reuse the ID and body after an uncertain response. Requests expire after 24 hours.",
+        "description": "Requires `procurement.manage`. Asks for approval to place this draft or open order in the supplier’s linked purchasing system, with a requested delivery date. Someone else with `procurement.manage` and `decisions.respond` must approve. Every line’s SKU must be linked to a purchasing-system item. After approval Luma places the order once and verifies it with an independent read; the purchasing system sends it to the supplier. Reuse the ID and body after an uncertain response. Requests expire after 24 hours.",
         "summary": "Request approval to send an order to the supplier",
         "tags": ["procurement"],
         "parameters": [
@@ -54144,7 +54146,7 @@
     },
     "/v1/organizations/{organizationId}/procurement/submissions/{submissionId}/decision": {
       "post": {
-        "description": "A different owner or admin than the requester approves or rejects the exact submission. Approval dispatches it as the requester after their membership, the order and the supplier link are checked again.",
+        "description": "Requires `procurement.manage` and `decisions.respond`, plus any app permission the purchasing capability declares. Someone other than the requester approves or rejects the exact submission. Approval dispatches it as the requester after their membership, the order and the supplier link are checked again.",
         "summary": "Approve or reject sending an order",
         "tags": ["procurement"],
         "parameters": [
@@ -55813,7 +55815,7 @@
     },
     "/v1/organizations/{organizationId}/procurement/purchase-orders/{purchaseOrderId}/messages": {
       "post": {
-        "description": "Owners and admins record a supplier message for this order. When an EU model route is configured, Luma lists the commitments it states, each with the exact words it came from; changes, uncertain readings and conditions wait for review. The same message, by message ID or content, is recorded once. Text is removed after the retention period.",
+        "description": "Requires `procurement.manage`. Records a supplier message for this order. When an EU model route is configured, Luma lists the commitments it states, each with the exact words it came from; changes, uncertain readings and conditions wait for review. The same message, by message ID or content, is recorded once. Text is removed after the retention period.",
         "summary": "Record a supplier message",
         "tags": ["procurement"],
         "parameters": [
@@ -56676,7 +56678,7 @@
     },
     "/v1/organizations/{organizationId}/procurement/messages/{communicationId}/remove-text": {
       "post": {
-        "description": "Owners and admins remove the subject and text now. The sender, time, content digest and recorded commitments remain; quotes can no longer be shown.",
+        "description": "Requires `procurement.manage`. Removes the subject and text now. The sender, time, content digest and recorded commitments remain; quotes can no longer be shown.",
         "summary": "Remove a supplier message’s text",
         "tags": ["procurement"],
         "parameters": [
@@ -57131,7 +57133,7 @@
     },
     "/v1/organizations/{organizationId}/procurement/purchase-orders/{purchaseOrderId}/commitments": {
       "post": {
-        "description": "Owners and admins record a confirmed quantity, promised date, shipment or condition by selecting the words in a supplier message, or correct an earlier commitment with a reason. Corrections add a commitment; nothing is overwritten. Receipt cannot be recorded here.",
+        "description": "Requires `procurement.manage`. Records a confirmed quantity, promised date, shipment or condition by selecting the words in a supplier message, or corrects an earlier commitment with a reason. Corrections add a commitment; nothing is overwritten. Receipt cannot be recorded here.",
         "summary": "Record or correct a supplier commitment",
         "tags": ["procurement"],
         "parameters": [
@@ -57796,7 +57798,7 @@
     },
     "/v1/organizations/{organizationId}/procurement/commitments/{commitmentId}/review": {
       "post": {
-        "description": "Owners and admins confirm or reject a commitment that needed review. `acceptChange` also accepts a quantity or date change.",
+        "description": "Requires `procurement.manage`. Confirms or rejects a commitment that needed review. `acceptChange` also accepts a quantity or date change.",
         "summary": "Confirm or reject an extracted commitment",
         "tags": ["procurement"],
         "parameters": [
@@ -58396,7 +58398,7 @@
     },
     "/v1/organizations/{organizationId}/procurement/purchase-orders/{purchaseOrderId}/follow-ups": {
       "post": {
-        "description": "Owners and admins accept a supplier change, or record a follow-up with when Luma should check again (within 60 days). The key must be one of the order’s current attention items.",
+        "description": "Requires `procurement.manage`. Accepts a supplier change, or records a follow-up with when Luma should check again (within 60 days). The key must be one of the order’s current attention items.",
         "summary": "Respond to a change or missed deadline",
         "tags": ["procurement"],
         "parameters": [
@@ -58845,7 +58847,7 @@
     },
     "/v1/organizations/{organizationId}/procurement/purchase-orders/{purchaseOrderId}/transitions": {
       "post": {
-        "description": "Owners and admins move drafts to open or cancelled, and open orders to closed or cancelled. Provide the current revision and a reason. Reuse the command ID and body on retry. Closing records completion; it does not record a warehouse receipt.",
+        "description": "Requires `procurement.manage`. Moves drafts to open or cancelled, and open orders to closed or cancelled. Provide the current revision and a reason. Reuse the command ID and body on retry. Closing records completion; it does not record a warehouse receipt.",
         "summary": "Change purchase order status",
         "tags": ["procurement"],
         "parameters": [
@@ -60534,7 +60536,7 @@
     },
     "/v1/organizations/{organizationId}/exceptions/{exceptionId}/resolution-runs": {
       "get": {
-        "description": "Owners and admins can find up to 50 runs for a case. Pass nextCursor as after to continue; IDs provide stable page ordering. Refresh from the first page to discover newly recorded runs.",
+        "description": "People who can manage issues can find up to 50 runs for a case. Pass nextCursor as after to continue; IDs provide stable page ordering. Refresh from the first page to discover newly recorded runs.",
         "summary": "List resolution runs",
         "tags": ["resolutionLearning"],
         "parameters": [
@@ -61117,7 +61119,7 @@
         }
       },
       "post": {
-        "description": "Owners and admins record a run ID, diagnosis revision, resolution version and reason. Reuse the run ID for automated steps. Exact retries return the original record; conflicting IDs return 409.",
+        "description": "People who can manage issues record a run ID, diagnosis revision, resolution version and reason. Reuse the run ID for automated steps. Exact retries return the original record; conflicting IDs return 409.",
         "summary": "Record a resolution selection",
         "tags": ["resolutionLearning"],
         "parameters": [
@@ -62800,7 +62802,7 @@
     },
     "/v1/organizations/{organizationId}/exceptions/{exceptionId}/resolution-runs/{runId}": {
       "get": {
-        "description": "Owners and admins can export the original context, ordered operator records, bound steps, execution and all verification attempts. A pending attempt without completion has no known result. Execution acceptance does not establish business success.",
+        "description": "People who can manage issues can export the original context, ordered operator records, bound steps, execution and all verification attempts. A pending attempt without completion has no known result. Execution acceptance does not establish business success.",
         "summary": "Read resolution learning history",
         "tags": ["resolutionLearning"],
         "parameters": [
@@ -67083,7 +67085,7 @@
     },
     "/v1/organizations/{organizationId}/exceptions/{exceptionId}/measurements": {
       "post": {
-        "description": "Owners and admins append versioned eligibility, attribution, environment, incorrect-action or measured partner-baseline assessments. Evidence must belong to the incident. Environment is immutable. Expected revision prevents concurrent lost updates; exact retries return the original fact. These facts grant no execution authority.",
+        "description": "People who can manage issues append versioned eligibility, attribution, environment, incorrect-action or measured partner-baseline assessments. Evidence must belong to the incident. Environment is immutable. Expected revision prevents concurrent lost updates; exact retries return the original fact. These facts grant no execution authority.",
         "summary": "Record an evidence-backed measurement fact",
         "tags": ["operations"],
         "parameters": [
@@ -67946,7 +67948,7 @@
         }
       },
       "get": {
-        "description": "Workspace members can read up to 100 immutable measurement facts after a revision. Follow nextRevision for more; revision identifies the current head.",
+        "description": "People who can read issues can read up to 100 immutable measurement facts after a revision. Follow nextRevision for more; revision identifies the current head.",
         "summary": "Read the measurement evidence ledger",
         "tags": ["operations"],
         "parameters": [
@@ -74432,6 +74434,7 @@
     },
     "/v1/organizations/{organizationId}/context": {
       "get": {
+        "description": "Returns your membership, role and effective permissions. Changes to your role apply on the next request.",
         "summary": "Resolve your organization access",
         "tags": ["identity"],
         "parameters": [
@@ -74489,8 +74492,34 @@
                           "format": "uuid"
                         },
                         "role": {
-                          "type": "string",
-                          "enum": ["owner", "admin", "member"]
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "key": {
+                              "type": "string",
+                              "enum": ["owner", "admin", "member", "custom"]
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "builtIn": {
+                              "type": "boolean"
+                            },
+                            "revision": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "exclusiveMinimum": 0
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "key",
+                            "name",
+                            "builtIn",
+                            "revision"
+                          ]
                         }
                       },
                       "required": [
@@ -74501,9 +74530,25 @@
                         "membershipId",
                         "role"
                       ]
+                    },
+                    "permissions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "allAppPermissions": {
+                      "type": "boolean"
                     }
                   },
-                  "required": ["tenantId", "dataRegion", "requestId", "actor"]
+                  "required": [
+                    "tenantId",
+                    "dataRegion",
+                    "requestId",
+                    "actor",
+                    "permissions",
+                    "allAppPermissions"
+                  ]
                 }
               }
             }
@@ -74883,8 +74928,34 @@
                             "format": "uuid"
                           },
                           "role": {
-                            "type": "string",
-                            "enum": ["owner", "admin", "member"]
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "key": {
+                                "type": "string",
+                                "enum": ["owner", "admin", "member", "custom"]
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "builtIn": {
+                                "type": "boolean"
+                              },
+                              "revision": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "exclusiveMinimum": 0
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "key",
+                              "name",
+                              "builtIn",
+                              "revision"
+                            ]
                           }
                         },
                         "required": ["id", "organizationId", "userId", "role"]
@@ -75223,7 +75294,7 @@
         }
       },
       "post": {
-        "description": "Owners and admins can add users. Only owners can grant ownership.",
+        "description": "Requires `members.manage`. Only owners can grant ownership, and others can only assign roles whose permissions they hold.",
         "summary": "Add a registered user to an organization",
         "tags": ["identity"],
         "parameters": [
@@ -75231,6 +75302,14 @@
             "name": "organizationId",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "x-command-id",
+            "in": "header",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -75249,12 +75328,12 @@
                     "type": "string",
                     "format": "uuid"
                   },
-                  "role": {
+                  "roleId": {
                     "type": "string",
-                    "enum": ["owner", "admin", "member"]
+                    "minLength": 1
                   }
                 },
-                "required": ["userId", "role"],
+                "required": ["userId", "roleId"],
                 "additionalProperties": false
               }
             }
@@ -75287,8 +75366,28 @@
                       "format": "uuid"
                     },
                     "role": {
-                      "type": "string",
-                      "enum": ["owner", "admin", "member"]
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "key": {
+                          "type": "string",
+                          "enum": ["owner", "admin", "member", "custom"]
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "builtIn": {
+                          "type": "boolean"
+                        },
+                        "revision": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": 0
+                        }
+                      },
+                      "required": ["id", "key", "name", "builtIn", "revision"]
                     }
                   },
                   "required": ["id", "organizationId", "userId", "role"]
@@ -75625,6 +75724,7 @@
     },
     "/v1/organizations/{organizationId}/members/{memberId}": {
       "patch": {
+        "description": "Requires `members.manage`. Only owners change ownership; others can only assign roles, and change members, whose permissions they hold. The last owner cannot be demoted.",
         "summary": "Change a member role",
         "tags": ["identity"],
         "parameters": [
@@ -75663,12 +75763,12 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "role": {
+                  "roleId": {
                     "type": "string",
-                    "enum": ["owner", "admin", "member"]
+                    "minLength": 1
                   }
                 },
-                "required": ["role"],
+                "required": ["roleId"],
                 "additionalProperties": false
               }
             }
@@ -75701,8 +75801,28 @@
                       "format": "uuid"
                     },
                     "role": {
-                      "type": "string",
-                      "enum": ["owner", "admin", "member"]
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "key": {
+                          "type": "string",
+                          "enum": ["owner", "admin", "member", "custom"]
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "builtIn": {
+                          "type": "boolean"
+                        },
+                        "revision": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": 0
+                        }
+                      },
+                      "required": ["id", "key", "name", "builtIn", "revision"]
                     }
                   },
                   "required": ["id", "organizationId", "userId", "role"]
@@ -77663,7 +77783,7 @@
     },
     "/v1/organizations/{organizationId}/settings/approvals": {
       "patch": {
-        "description": "Owners and admins may strengthen approval requirements. Platform denials and required approvals always apply. Changing this preference invalidates previous policy reviews.",
+        "description": "Requires `workspace.approval_policy.manage`. This preference can only strengthen approval requirements. Platform denials and required approvals always apply. Changing this preference invalidates previous policy reviews.",
         "summary": "Require independent approval for otherwise permitted changes",
         "tags": ["settings"],
         "parameters": [
@@ -79959,8 +80079,38 @@
                             "type": "string"
                           },
                           "role": {
-                            "type": "string",
-                            "enum": ["admin", "member"]
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "key": {
+                                "type": "string",
+                                "enum": ["owner", "admin", "member", "custom"]
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "builtIn": {
+                                "type": "boolean"
+                              },
+                              "revision": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "exclusiveMinimum": 0
+                              },
+                              "archived": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "key",
+                              "name",
+                              "builtIn",
+                              "revision",
+                              "archived"
+                            ]
                           },
                           "status": {
                             "type": "string",
@@ -80330,7 +80480,7 @@
         }
       },
       "post": {
-        "description": "Sending an invitation does not grant access. An existing pending invitation must be resent or revoked; existing members cannot be invited.",
+        "description": "Sending an invitation does not grant access. The invitation is bound to an active role other than Owner whose permissions you hold. An existing pending invitation must be resent or revoked; existing members cannot be invited.",
         "summary": "Invite a teammate by email",
         "tags": ["settings"],
         "parameters": [
@@ -80361,12 +80511,12 @@
                     "format": "email",
                     "maxLength": 254
                   },
-                  "role": {
+                  "roleId": {
                     "type": "string",
-                    "enum": ["admin", "member"]
+                    "minLength": 1
                   }
                 },
-                "required": ["commandId", "email", "role"],
+                "required": ["commandId", "email", "roleId"],
                 "additionalProperties": false
               }
             }
@@ -80388,8 +80538,38 @@
                       "type": "string"
                     },
                     "role": {
-                      "type": "string",
-                      "enum": ["admin", "member"]
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "key": {
+                          "type": "string",
+                          "enum": ["owner", "admin", "member", "custom"]
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "builtIn": {
+                          "type": "boolean"
+                        },
+                        "revision": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": 0
+                        },
+                        "archived": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "key",
+                        "name",
+                        "builtIn",
+                        "revision",
+                        "archived"
+                      ]
                     },
                     "status": {
                       "type": "string",
@@ -80819,8 +80999,38 @@
                       "type": "string"
                     },
                     "role": {
-                      "type": "string",
-                      "enum": ["admin", "member"]
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "key": {
+                          "type": "string",
+                          "enum": ["owner", "admin", "member", "custom"]
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "builtIn": {
+                          "type": "boolean"
+                        },
+                        "revision": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": 0
+                        },
+                        "archived": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "key",
+                        "name",
+                        "builtIn",
+                        "revision",
+                        "archived"
+                      ]
                     },
                     "status": {
                       "type": "string",
@@ -81228,8 +81438,16 @@
                       "type": "string"
                     },
                     "role": {
-                      "type": "string",
-                      "enum": ["admin", "member"]
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["id", "name"]
                     },
                     "expiresAt": {
                       "type": "string"
@@ -81613,6 +81831,2428 @@
                     }
                   },
                   "required": ["organizationId"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/roles": {
+      "get": {
+        "description": "Returns built-in and custom roles with member counts, and the permission catalog including permissions declared by installed apps. Any member can read roles.",
+        "summary": "List workspace roles and the permissions they can grant",
+        "tags": ["roles"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "operationId": "roles.list",
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "roles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "key": {
+                            "type": "string",
+                            "enum": ["owner", "admin", "member", "custom"]
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "builtIn": {
+                            "type": "boolean"
+                          },
+                          "revision": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": 0
+                          },
+                          "archived": {
+                            "type": "boolean"
+                          },
+                          "permissions": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "allAppPermissions": {
+                            "type": "boolean"
+                          },
+                          "memberCount": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "pendingInvitations": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "key",
+                          "name",
+                          "description",
+                          "builtIn",
+                          "revision",
+                          "archived",
+                          "permissions",
+                          "allAppPermissions",
+                          "memberCount",
+                          "pendingInvitations",
+                          "updatedAt"
+                        ]
+                      }
+                    },
+                    "groups": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "app": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "available": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": ["id", "name", "available"],
+                            "nullable": true
+                          }
+                        },
+                        "required": ["id", "label", "description", "app"]
+                      }
+                    },
+                    "permissions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": {
+                            "type": "string"
+                          },
+                          "group": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "consequential": {
+                            "type": "boolean"
+                          },
+                          "introduced": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "key",
+                          "group",
+                          "label",
+                          "description",
+                          "consequential",
+                          "introduced"
+                        ]
+                      }
+                    }
+                  },
+                  "required": ["roles", "groups", "permissions"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "Requires `roles.manage`. You can only grant permissions you hold, unless you are an owner. Reusing `x-command-id` returns the original result.",
+        "summary": "Create a custom role",
+        "tags": ["roles"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "x-command-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "operationId": "roles.create",
+        "requestBody": {
+          "description": "Body",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 300
+                  },
+                  "permissions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 120,
+                      "pattern": "^([a-z][a-z0-9-]{0,39}:)?[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+                    },
+                    "maxItems": 200
+                  }
+                },
+                "required": ["name", "description", "permissions"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "201",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "key": {
+                      "type": "string",
+                      "enum": ["owner", "admin", "member", "custom"]
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "builtIn": {
+                      "type": "boolean"
+                    },
+                    "revision": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "exclusiveMinimum": 0
+                    },
+                    "archived": {
+                      "type": "boolean"
+                    },
+                    "permissions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "allAppPermissions": {
+                      "type": "boolean"
+                    },
+                    "memberCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "pendingInvitations": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "key",
+                    "name",
+                    "description",
+                    "builtIn",
+                    "revision",
+                    "archived",
+                    "permissions",
+                    "allAppPermissions",
+                    "memberCount",
+                    "pendingInvitations",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "422",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/roles/{roleId}": {
+      "patch": {
+        "description": "Send the revision you last read; a newer revision returns 409. Changes apply to every member with the role on their next request. Built-in roles cannot be changed.",
+        "summary": "Change a custom role",
+        "tags": ["roles"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roleId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "x-command-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "operationId": "roles.update",
+        "requestBody": {
+          "description": "Body",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 300
+                  },
+                  "permissions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 120,
+                      "pattern": "^([a-z][a-z0-9-]{0,39}:)?[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+                    },
+                    "maxItems": 200
+                  },
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": 0
+                  }
+                },
+                "required": ["name", "description", "permissions", "revision"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "key": {
+                      "type": "string",
+                      "enum": ["owner", "admin", "member", "custom"]
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "builtIn": {
+                      "type": "boolean"
+                    },
+                    "revision": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "exclusiveMinimum": 0
+                    },
+                    "archived": {
+                      "type": "boolean"
+                    },
+                    "permissions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "allAppPermissions": {
+                      "type": "boolean"
+                    },
+                    "memberCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "pendingInvitations": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "key",
+                    "name",
+                    "description",
+                    "builtIn",
+                    "revision",
+                    "archived",
+                    "permissions",
+                    "allAppPermissions",
+                    "memberCount",
+                    "pendingInvitations",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "422",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/roles/{roleId}/archive": {
+      "post": {
+        "description": "Reassign every member first; a role in use returns 409. Archiving revokes pending invitations for the role.",
+        "summary": "Archive a custom role",
+        "tags": ["roles"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roleId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "x-command-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "operationId": "roles.archive",
+        "requestBody": {
+          "description": "Body",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": 0
+                  }
+                },
+                "required": ["revision"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "key": {
+                      "type": "string",
+                      "enum": ["owner", "admin", "member", "custom"]
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "builtIn": {
+                      "type": "boolean"
+                    },
+                    "revision": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "exclusiveMinimum": 0
+                    },
+                    "archived": {
+                      "type": "boolean"
+                    },
+                    "permissions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "allAppPermissions": {
+                      "type": "boolean"
+                    },
+                    "memberCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "pendingInvitations": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "key",
+                    "name",
+                    "description",
+                    "builtIn",
+                    "revision",
+                    "archived",
+                    "permissions",
+                    "allAppPermissions",
+                    "memberCount",
+                    "pendingInvitations",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/roles/{roleId}/history": {
+      "get": {
+        "description": "Lists up to 100 recent changes to the role and its member assignments, newest first.",
+        "summary": "Read a role’s change history",
+        "tags": ["roles"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roleId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "operationId": "roles.history",
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "created",
+                              "updated",
+                              "archived",
+                              "app_permissions_removed",
+                              "member_assigned",
+                              "member_unassigned"
+                            ]
+                          },
+                          "occurredAt": {
+                            "type": "string"
+                          },
+                          "actor": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": ["id", "name"],
+                            "nullable": true
+                          },
+                          "revision": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "name": {
+                            "type": "object",
+                            "properties": {
+                              "before": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "after": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": ["before", "after"],
+                            "nullable": true
+                          },
+                          "added": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "removed": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "member": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": ["id", "name"],
+                            "nullable": true
+                          },
+                          "cause": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": ["app_uninstalled"]
+                              },
+                              "appId": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["kind", "appId"],
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "occurredAt",
+                          "actor",
+                          "revision",
+                          "name",
+                          "added",
+                          "removed",
+                          "member",
+                          "cause"
+                        ]
+                      }
+                    }
+                  },
+                  "required": ["items"]
                 }
               }
             }
@@ -82476,7 +85116,7 @@
         }
       },
       "post": {
-        "description": "Owners and admins can submit credentials. The connection remains pending until a successful permission check.",
+        "description": "Requires `connections.manage`. The connection remains pending until a successful permission check.",
         "summary": "Install a connection",
         "tags": ["connections"],
         "parameters": [
@@ -84744,6 +87384,7 @@
     },
     "/v1/organizations/{organizationId}/apps": {
       "get": {
+        "description": "Includes the permissions each app declares, the access it requests, the scopes granted to each installation and roles that hold its permissions.",
         "summary": "List available apps and workspace installations",
         "tags": ["apps"],
         "parameters": [
@@ -84817,6 +87458,44 @@
                               },
                               "required": ["kind", "name"]
                             }
+                          },
+                          "permissions": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "key": {
+                                  "type": "string"
+                                },
+                                "label": {
+                                  "type": "string"
+                                },
+                                "description": {
+                                  "type": "string"
+                                },
+                                "consequential": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": [
+                                "key",
+                                "label",
+                                "description",
+                                "consequential"
+                              ]
+                            }
+                          },
+                          "scopes": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "slotAccess": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            }
                           }
                         },
                         "required": [
@@ -84826,7 +87505,10 @@
                           "version",
                           "category",
                           "ui",
-                          "connectionTypes"
+                          "connectionTypes",
+                          "permissions",
+                          "scopes",
+                          "slotAccess"
                         ]
                       }
                     },
@@ -84850,9 +87532,47 @@
                           "updatedAt": {
                             "type": "string",
                             "format": "date-time"
+                          },
+                          "grantedScopes": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "pendingScopes": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "roles": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "permissions": {
+                                  "type": "integer"
+                                }
+                              },
+                              "required": ["id", "name", "permissions"]
+                            }
                           }
                         },
-                        "required": ["appId", "status", "version", "updatedAt"]
+                        "required": [
+                          "appId",
+                          "status",
+                          "version",
+                          "updatedAt",
+                          "grantedScopes",
+                          "pendingScopes",
+                          "roles"
+                        ]
                       }
                     }
                   },
@@ -85190,7 +87910,7 @@
     },
     "/v1/organizations/{organizationId}/apps/{appId}/install": {
       "post": {
-        "description": "Owners and admins can install an available app. Use null for a first installation or the current version to reinstall.",
+        "description": "Requires `apps.manage` and every scope the app requests: you can only grant access you have. Send the requested scopes you reviewed; a changed request returns 409. Use null for a first installation or the current version to reinstall. Reinstalling restores no role permissions.",
         "summary": "Install an app in this workspace",
         "tags": ["apps"],
         "parameters": [
@@ -85226,9 +87946,16 @@
                     "minimum": 0,
                     "exclusiveMinimum": 0,
                     "nullable": true
+                  },
+                  "scopes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 100
                   }
                 },
-                "required": ["version"]
+                "required": ["version", "scopes"]
               }
             }
           }
@@ -85256,9 +87983,442 @@
                     "updatedAt": {
                       "type": "string",
                       "format": "date-time"
+                    },
+                    "grantedScopes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
                     }
                   },
-                  "required": ["appId", "status", "version", "updatedAt"]
+                  "required": [
+                    "appId",
+                    "status",
+                    "version",
+                    "updatedAt",
+                    "grantedScopes"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/apps/{appId}/scopes": {
+      "post": {
+        "description": "Requires `apps.manage` and each approved scope. Until approved, the app keeps working with the scopes granted earlier.",
+        "summary": "Approve access an upgraded app requests",
+        "tags": ["apps"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "appId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+            }
+          }
+        ],
+        "operationId": "apps.approveScopes",
+        "requestBody": {
+          "description": "Body",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": 0
+                  },
+                  "scopes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "minItems": 1,
+                    "maxItems": 100
+                  }
+                },
+                "required": ["version", "scopes"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "appId": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["installed", "uninstalled"]
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "exclusiveMinimum": 0
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "grantedScopes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "appId",
+                    "status",
+                    "version",
+                    "updatedAt",
+                    "grantedScopes"
+                  ]
                 }
               }
             }
@@ -85592,7 +88752,7 @@
     },
     "/v1/organizations/{organizationId}/apps/{appId}/uninstall": {
       "post": {
-        "description": "Stops new app operations and deletes its connection credentials. Historical records remain. Requests already dispatched may finish.",
+        "description": "Requires `apps.manage`. Stops new app operations, deletes connection credentials and scope grants, and removes the app’s permissions from every role. Historical records remain. Requests already dispatched may finish.",
         "summary": "Uninstall an app",
         "tags": ["apps"],
         "parameters": [
@@ -85657,9 +88817,21 @@
                     "updatedAt": {
                       "type": "string",
                       "format": "date-time"
+                    },
+                    "grantedScopes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
                     }
                   },
-                  "required": ["appId", "status", "version", "updatedAt"]
+                  "required": [
+                    "appId",
+                    "status",
+                    "version",
+                    "updatedAt",
+                    "grantedScopes"
+                  ]
                 }
               }
             }
@@ -96857,7 +100029,7 @@
     },
     "/v1/organizations/{organizationId}/sync/{streamId}/commands": {
       "post": {
-        "description": "Owners and admins can pause or resume a sync, retry now, request a full check against the source (`reconcile`) or import the history again (`reimport`). Resuming, retrying and re-importing continue with the caller’s access. Re-importing keeps every imported record; unchanged records are recognized and not duplicated. Commands are idempotent.",
+        "description": "Requires `sync.manage`. Pauses or resumes a sync, retries now, requests a full check against the source (`reconcile`) or imports the history again (`reimport`). Resuming, retrying and re-importing continue with the caller’s access. Re-importing keeps every imported record; unchanged records are recognized and not duplicated. Commands are idempotent.",
         "summary": "Control a sync",
         "tags": ["sync"],
         "parameters": [
@@ -98095,7 +101267,7 @@
     },
     "/v1/organizations/{organizationId}/identities/links": {
       "post": {
-        "description": "Owners and admins can confirm that another SKU, location or order is the same record (`link`), or separate one connection’s source from it (`unlink`). Luma applies the change in the background, keeps the previous mapping as history and re-projects affected projections. Order links keep each source’s lines and shipments separate and preserve old references. Poll the returned request for its outcome.",
+        "description": "Requires `sync.manage`. Confirms that another SKU, location or order is the same record (`link`), or separates one connection’s source from it (`unlink`). Luma applies the change in the background, keeps the previous mapping as history and re-projects affected projections. Order links keep each source’s lines and shipments separate and preserve old references. Poll the returned request for its outcome.",
         "summary": "Link or unlink source records",
         "tags": ["sync"],
         "parameters": [
@@ -98982,7 +102154,7 @@
     },
     "/v1/organizations/{organizationId}/decisions": {
       "get": {
-        "description": "List the workspace decisions waiting on a person: issue approvals, manual steps and uncertainty, replenishment purchase-order approvals, purchase orders waiting to be sent, supplier messages to review, supplier changes and overdue confirmations or deliveries, and app-owned stock corrections and fulfillment recoveries. Each item explains why a person is needed, what each response causes, the exact proposed change, evidence freshness and the deadline after which the proposal loses its authority. Items are projections of their owners’ decisions: respond through the owner’s review, which checks the exact proposal, revisions, expiry and approver again. Items sort by urgency (proposals expiring within 30 minutes, then high impact, then the rest), then by deadline, oldest request and ID. Unknown impact is labeled, not ranked low. `response` says what the reader can do; members see decisions but cannot approve. `sources` reports owners that failed to answer; their decisions are missing rather than resolved. Results contain up to `limit` items (at most 100); nextCursor continues the same view and filters. An empty queue does not mean operations are healthy.",
+        "description": "List the workspace decisions waiting on a person: issue approvals, manual steps and uncertainty, replenishment purchase-order approvals, purchase orders waiting to be sent, supplier messages to review, supplier changes and overdue confirmations or deliveries, and app-owned stock corrections and fulfillment recoveries. Each item explains why a person is needed, what each response causes, the exact proposed change, evidence freshness and the deadline after which the proposal loses its authority. Items are projections of their owners’ decisions: respond through the owner’s review, which checks the exact proposal, revisions, expiry and approver again. Items sort by urgency (proposals expiring within 30 minutes, then high impact, then the rest), then by deadline, oldest request and ID. Unknown impact is labeled, not ranked low. `response` says what the reader can do; approving needs the permission the owner requires, such as responding to decisions or managing procurement. Requires permission to read issues or procurement. Issue decisions appear only to readers who can read issues, procurement decisions only to readers who can read procurement and app decisions only to readers with the app’s permissions; hidden decisions are left out of the counts too, and record links the reader can’t open are null. `sources` lists the owners the reader can see; owners that failed to answer are unavailable, and their decisions are missing rather than resolved. Results contain up to `limit` items (at most 100); nextCursor continues the same view and filters. An empty queue does not mean operations are healthy.",
         "summary": "List decisions that need a person",
         "tags": ["decisions"],
         "parameters": [
@@ -99788,7 +102960,7 @@
     },
     "/v1/organizations/{organizationId}/decisions/assignments": {
       "post": {
-        "description": "Take, hand over or release a decision in the Needs you queue. Any member can take an unassigned decision or release their own; owners and admins can assign any decision to a current member. Send the `revision` from the item’s assignment (0 when unassigned); a changed assignment returns 409. The decision must currently need a person. Assigning does not grant approval authority: the owner still checks roles and requires an approver different from the requester.",
+        "description": "Take, hand over or release a decision in the Needs you queue. Taking an unassigned decision or releasing your own needs permission to take decisions; assigning any decision to a current member needs permission to assign decisions. Send the `revision` from the item’s assignment (0 when unassigned); a changed assignment returns 409. The decision must currently need a person. Assigning does not grant approval authority: the owner still checks permissions and requires an approver different from the requester.",
         "summary": "Assign a decision",
         "tags": ["decisions"],
         "parameters": [
@@ -101630,7 +104802,7 @@
     },
     "/v1/organizations/{organizationId}/assistant": {
       "get": {
-        "description": "Members can check this. Asking Luma needs an EU model route with zero data retention. When none is configured, `available` is false and `reason` explains what whoever runs the server must set up. `reads` lists the records the assistant can look up.",
+        "description": "Any member can check this. Asking Luma needs the Use Ask Luma permission and an EU model route with zero data retention. Without either, `available` is false and `reason` explains what is missing. `reads` lists the records the assistant can look up for you, based on your role.",
         "summary": "Check whether you can ask Luma here",
         "tags": ["assistant"],
         "parameters": [

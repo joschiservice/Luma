@@ -10,10 +10,20 @@ import { useState } from 'react';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 
 import appStyles from '../../styles.css?inline';
+import { contextFixture } from './context.fixture';
+import { contextOptions } from './data';
 import { WorkspaceSearch } from './workspace-search';
 
 function SearchExample() {
-  const [client] = useState(() => new QueryClient());
+  const [client] = useState(() => {
+    const value = new QueryClient();
+    value.setQueryData(
+      contextOptions('demo').queryKey,
+      contextFixture('demo', 'owner'),
+    );
+
+    return value;
+  });
   const [router] = useState(() =>
     createRouter({
       history: createMemoryHistory(),

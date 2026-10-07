@@ -65,7 +65,7 @@ test('built API supports the identity lifecycle over HTTP and survives restart',
     .body;
   assert.strictEqual(context.tenantId, organization.id);
   assert.strictEqual(context.actor.id, alice.userId);
-  assert.strictEqual(context.actor.role, 'owner');
+  assert.strictEqual(context.actor.role.key, 'owner');
   const bob = await signup(api, 'bob');
   assert.deepStrictEqual(
     (await api.request('/v1/organizations', { cookie: bob.cookie })).body.items,

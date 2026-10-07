@@ -1,3 +1,4 @@
+import type { Membership } from '@luma/api-contract';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -8,14 +9,15 @@ import {
   DialogTitle,
 } from '@luma/ui/components/primitives/dialog';
 import { Input } from '@luma/ui/components/primitives/input';
-import { Select } from '@luma/ui/components/primitives/select';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import { Mail, MoreHorizontal, Search, UserPlus, Users } from 'lucide-react';
 import { useState } from 'react';
 
 import { Failure } from '../identity/common';
 import { IdentityError } from '../identity/data';
+import { isOwnerRole, usePermissions } from '../identity/permissions';
 import {
   CommandFeedback,
   useSettingsCommand,
@@ -27,63 +29,81 @@ import {
   settingsApi,
   settingsResult,
 } from './data';
+import { type RoleChoice, RolePicker } from './role-picker';
+import { rolesOptions, type WorkspaceRole } from './roles-data';
 
-type Role = 'owner' | 'admin' | 'member';
-
-type Member = {
-  id: string;
-  userId: string;
-  role: Role;
-  name?: string | undefined;
-  email?: string | undefined;
-};
-
-const roles = [
-  { value: 'member' as const, label: 'Member' },
-  { value: 'admin' as const, label: 'Admin' },
-];
-
-/** Manages member access and email invitations with explicit confirmation and delivery status. */
+/**
+ * Manages member access and email invitations with explicit confirmation and delivery status.
+ * People can only assign roles whose permissions they hold; only owners change ownership.
+ */
 export function TeamSettings({
   organizationId,
   actorId,
-  role,
   deliveryAvailable,
 }: {
   organizationId: string;
   actorId: string;
-  role: Role;
   deliveryAvailable: boolean;
 }) {
+  const access = usePermissions(organizationId);
+  const manage = access.can('members.manage');
   const members = useQuery(membersOptions(organizationId));
+  const roles = useQuery(rolesOptions(organizationId));
   const invitations = useQuery({
     ...invitationsOptions(organizationId),
-    enabled: role !== 'member',
+    enabled: manage,
   });
   const online = useSettingsOnline();
   const command = useSettingsCommand(organizationId);
   const [search, setSearch] = useState('');
   const [inviteOpen, setInviteOpen] = useState(false);
   const [email, setEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState<'member' | 'admin'>('member');
-  const [selected, setSelected] = useState<Member | null>(null);
-  const [nextRole, setNextRole] = useState<Role>('member');
-  const admin = role !== 'member';
+  const [inviteRole, setInviteRole] = useState('member');
+  const [selected, setSelected] = useState<Membership | null>(null);
+  const [nextRole, setNextRole] = useState('member');
   const blocked = !online || command.locked;
   const error = members.error ?? invitations.error;
-  if (error instanceof IdentityError && [401, 403, 404].includes(error.status))
+  if (error instanceof IdentityError && [401, 404].includes(error.status))
     return <Failure error={error} retry={() => void members.refetch()} />;
+  const active = roles.data?.roles.filter((role) => !role.archived) ?? [];
   const visible = members.data?.filter((member) =>
-    `${member.name ?? ''} ${member.email ?? ''} ${member.role}`
+    `${member.name ?? ''} ${member.email ?? ''} ${member.role.name}`
       .toLowerCase()
       .includes(search.toLowerCase()),
   );
-  const pending = invitations.data?.filter((invitation) =>
-    ['pending', 'expired'].includes(invitation.status),
+  const outstanding = invitations.data?.filter(
+    (invitation) =>
+      ['pending', 'expired'].includes(invitation.status) ||
+      (invitation.status === 'revoked' && invitation.role.archived),
   );
-  const lastOwner =
-    selected?.role === 'owner' &&
-    members.data?.filter((member) => member.role === 'owner').length === 1;
+  const pendingCount = outstanding?.filter(
+    (invitation) => invitation.status === 'pending',
+  ).length;
+  const owners =
+    members.data?.filter((member) => isOwnerRole(member.role)).length ?? 0;
+  const lastOwner = isOwnerRole(selected?.role) && owners === 1;
+  const fullRole = (id: string) => active.find((role) => role.id === id);
+  // Changing someone needs their current role, and the new one, within your own permissions.
+  const changeable = (member: Membership) => {
+    const current = roles.data?.roles.find(
+      (role) => role.id === member.role.id,
+    );
+
+    return (
+      manage &&
+      (!isOwnerRole(member.role) || access.owner) &&
+      (!current || access.covers(current))
+    );
+  };
+  const choice = (role: WorkspaceRole): RoleChoice => ({
+    role,
+    unavailable:
+      isOwnerRole(role) && !access.owner
+        ? 'Only owners can make someone an owner.'
+        : access.covers(role)
+          ? undefined
+          : 'Includes permissions your role doesn’t have.',
+  });
 
   async function changeMember(remove: boolean) {
     if (!selected) return;
@@ -99,14 +119,34 @@ export function TeamSettings({
             : await settingsApi.identity.updateMember({
                 params: { organizationId, memberId: target.id },
                 headers: { 'x-command-id': commandId },
-                body: { role: nextRole },
+                body: { roleId: nextRole },
               }),
         );
         setSelected(null);
       },
-      remove ? 'Workspace access removed.' : 'Member role updated.',
+      remove
+        ? 'Workspace access removed.'
+        : 'Role updated. It applies on their next request.',
     );
   }
+
+  function invitationState(
+    invitation: NonNullable<typeof outstanding>[number],
+  ) {
+    if (invitation.status === 'revoked')
+      return 'Revoked because its role was archived · Invite again with another role';
+    if (invitation.status === 'expired') return 'Expired';
+    if (invitation.delivery === 'sent')
+      return 'Email sent · Pending acceptance';
+    if (invitation.delivery === 'failed')
+      return 'Delivery failed · Resend to retry';
+    if (invitation.delivery === 'cancelled')
+      return 'Delivery cancelled · Resend to retry';
+
+    return 'Email queued';
+  }
+
+  const inviteChoice = fullRole(inviteRole);
 
   return (
     <section>
@@ -117,16 +157,19 @@ export function TeamSettings({
           </h2>
           <p>The people who keep your operations moving.</p>
         </div>
-        {admin ? (
+        {manage ? (
           <Button
             disabled={blocked || !deliveryAvailable}
-            onClick={() => setInviteOpen(true)}
+            onClick={() => {
+              setInviteRole('member');
+              setInviteOpen(true);
+            }}
           >
             <UserPlus size={15} /> Invite teammate
           </Button>
         ) : null}
       </header>
-      {!deliveryAvailable && admin ? (
+      {!deliveryAvailable && manage ? (
         <Alert tone="warning">
           Email delivery is unavailable. Configure email before inviting
           teammates.
@@ -139,7 +182,7 @@ export function TeamSettings({
             variant="outline"
             onClick={() => {
               void members.refetch();
-              if (admin) void invitations.refetch();
+              if (manage) void invitations.refetch();
             }}
           >
             Retry
@@ -169,8 +212,18 @@ export function TeamSettings({
               </strong>
               <span>{member.email ?? member.userId}</span>
             </div>
-            <Badge>{member.role}</Badge>
-            {admin && (member.role !== 'owner' || role === 'owner') ? (
+            <Link
+              className="team-role-link"
+              to="/app/$organizationId/settings/$section"
+              params={{ organizationId, section: 'roles' }}
+              search={{ role: member.role.id }}
+              aria-label={`${member.role.name} role: see what it allows`}
+            >
+              <Badge tone={member.role.builtIn ? 'neutral' : 'info'}>
+                {member.role.name}
+              </Badge>
+            </Link>
+            {changeable(member) ? (
               <Button
                 variant="ghost"
                 size="icon"
@@ -178,7 +231,7 @@ export function TeamSettings({
                 aria-label={`Manage ${member.name ?? member.email ?? 'member'}`}
                 onClick={() => {
                   setSelected(member);
-                  setNextRole(member.role);
+                  setNextRole(member.role.id);
                 }}
               >
                 <MoreHorizontal size={17} />
@@ -200,92 +253,105 @@ export function TeamSettings({
           </div>
         ) : null}
       </div>
-      {admin ? (
+      {manage ? (
         <div className="settings-invitations">
           <h3>
-            Invitations <span>{pending?.length ?? '—'}</span>
+            Invitations <span>{pendingCount ?? '—'}</span>
           </h3>
           <p>Access starts only after the recipient accepts.</p>
           {invitations.isPending ? (
             <p role="status">Loading invitations…</p>
-          ) : pending?.length === 0 ? (
+          ) : outstanding?.length === 0 ? (
             <div className="settings-invitation-empty">
               <Mail size={18} />
               <span>No outstanding invitations. Your team is up to date.</span>
             </div>
           ) : (
-            pending?.map((invitation) => (
-              <div className="settings-invitation" key={invitation.id}>
+            outstanding?.map((invitation) => (
+              <div
+                className="settings-invitation"
+                key={invitation.id}
+                data-revoked={invitation.status === 'revoked' || undefined}
+              >
                 <Mail size={17} />
                 <div>
                   <strong>{invitation.email}</strong>
                   <span>
-                    {invitation.role} ·{' '}
-                    {invitation.status === 'expired'
-                      ? 'Expired'
-                      : invitation.delivery === 'sent'
-                        ? 'Email sent · Pending acceptance'
-                        : invitation.delivery === 'failed'
-                          ? 'Delivery failed · Resend to retry'
-                          : invitation.delivery === 'cancelled'
-                            ? 'Delivery cancelled · Resend to retry'
-                            : 'Email queued'}
+                    {invitation.role.name} · {invitationState(invitation)}
                   </span>
-                  <small>
-                    Expires <WorkspaceDate value={invitation.expiresAt} />
-                  </small>
+                  {invitation.status !== 'revoked' ? (
+                    <small>
+                      Expires <WorkspaceDate value={invitation.expiresAt} />
+                    </small>
+                  ) : null}
                 </div>
                 <div className="settings-invitation-actions">
-                  <Button
-                    variant="ghost"
-                    disabled={blocked || !deliveryAvailable}
-                    onClick={() =>
-                      void command.run(
-                        async (commandId) =>
-                          settingsResult(
-                            await settingsApi.settings.changeInvitation({
-                              params: {
-                                organizationId,
-                                invitationId: invitation.id,
-                              },
-                              body: {
-                                commandId,
-                                generation: invitation.generation,
-                                action: 'resend',
-                              },
-                            }),
-                          ),
-                        'New invitation queued. The previous link no longer works.',
-                      )
-                    }
-                  >
-                    Resend
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    disabled={blocked}
-                    onClick={() =>
-                      void command.run(
-                        async (commandId) =>
-                          settingsResult(
-                            await settingsApi.settings.changeInvitation({
-                              params: {
-                                organizationId,
-                                invitationId: invitation.id,
-                              },
-                              body: {
-                                commandId,
-                                generation: invitation.generation,
-                                action: 'revoke',
-                              },
-                            }),
-                          ),
-                        'Invitation revoked.',
-                      )
-                    }
-                  >
-                    Revoke
-                  </Button>
+                  {invitation.status === 'revoked' ? (
+                    <Button
+                      variant="ghost"
+                      disabled={blocked || !deliveryAvailable}
+                      onClick={() => {
+                        setEmail(invitation.email);
+                        setInviteRole('member');
+                        setInviteOpen(true);
+                      }}
+                    >
+                      Invite again
+                    </Button>
+                  ) : (
+                    <>
+                      <Button
+                        variant="ghost"
+                        disabled={blocked || !deliveryAvailable}
+                        onClick={() =>
+                          void command.run(
+                            async (commandId) =>
+                              settingsResult(
+                                await settingsApi.settings.changeInvitation({
+                                  params: {
+                                    organizationId,
+                                    invitationId: invitation.id,
+                                  },
+                                  body: {
+                                    commandId,
+                                    generation: invitation.generation,
+                                    action: 'resend',
+                                  },
+                                }),
+                              ),
+                            'New invitation queued. The previous link no longer works.',
+                          )
+                        }
+                      >
+                        Resend
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        disabled={blocked}
+                        onClick={() =>
+                          void command.run(
+                            async (commandId) =>
+                              settingsResult(
+                                await settingsApi.settings.changeInvitation({
+                                  params: {
+                                    organizationId,
+                                    invitationId: invitation.id,
+                                  },
+                                  body: {
+                                    commandId,
+                                    generation: invitation.generation,
+                                    action: 'revoke',
+                                  },
+                                }),
+                              ),
+                            'Invitation revoked.',
+                          )
+                        }
+                      >
+                        Revoke
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
             ))
@@ -299,11 +365,11 @@ export function TeamSettings({
           if (!command.locked) setInviteOpen(open);
         }}
       >
-        <DialogContent>
+        <DialogContent className="team-dialog">
           <DialogTitle>Invite a teammate</DialogTitle>
           <DialogDescription>
             Send a personal invitation. They’ll sign in with this email address
-            to join your workspace.
+            to join your workspace with the role you choose.
           </DialogDescription>
           <form
             className="settings-dialog-form"
@@ -316,7 +382,7 @@ export function TeamSettings({
                     body: {
                       commandId,
                       email: email.trim().toLowerCase(),
-                      role: inviteRole,
+                      roleId: inviteRole,
                     },
                   }),
                 );
@@ -336,23 +402,33 @@ export function TeamSettings({
               disabled={blocked}
               onChange={(event) => setEmail(event.target.value)}
             />
-            <label id="invite-role-label">Role</label>
-            <Select
-              aria-labelledby="invite-role-label"
-              options={roles}
-              value={inviteRole}
-              disabled={blocked}
-              onValueChange={(value) => {
-                if (value) setInviteRole(value);
-              }}
-            />
+            {roles.isError ? (
+              <Alert tone="danger">Roles could not be loaded.</Alert>
+            ) : (
+              <RolePicker
+                label="Role"
+                choices={active
+                  .filter((role) => !isOwnerRole(role))
+                  .map(choice)}
+                value={inviteRole}
+                disabled={blocked}
+                onChange={setInviteRole}
+              />
+            )}
             <p className="settings-note">
-              {inviteRole === 'admin'
-                ? 'Admins manage workspace settings, members, and approvals.'
-                : 'Members can view operations and manage their own email preferences.'}
+              Invitations can’t grant ownership. Make someone an owner after
+              they join.
             </p>
             {inviteOpen ? <CommandFeedback command={command} /> : null}
-            <Button type="submit" disabled={blocked || !email.trim()}>
+            <Button
+              type="submit"
+              disabled={
+                blocked ||
+                !email.trim() ||
+                !inviteChoice ||
+                !!choice(inviteChoice).unavailable
+              }
+            >
               {command.pending ? 'Queuing invitation…' : 'Send invitation'}
             </Button>
           </form>
@@ -364,26 +440,19 @@ export function TeamSettings({
           if (!open && !command.locked) setSelected(null);
         }}
       >
-        <DialogContent>
+        <DialogContent className="team-dialog">
           <DialogTitle>Manage access</DialogTitle>
           <DialogDescription>
             {selected?.name ?? selected?.email} · {selected?.email}
             <br />
-            Changes take effect immediately in this workspace.
+            Role changes apply on their next request.
           </DialogDescription>
-          <Select
-            aria-label="Member role"
+          <RolePicker
+            label="Role"
+            choices={active.map(choice)}
             value={nextRole}
-            options={[
-              ...roles,
-              ...(role === 'owner'
-                ? [{ value: 'owner' as const, label: 'Owner' }]
-                : []),
-            ]}
             disabled={blocked || lastOwner}
-            onValueChange={(value) => {
-              if (value) setNextRole(value);
-            }}
+            onChange={setNextRole}
           />
           {lastOwner ? (
             <Alert tone="neutral">
@@ -401,7 +470,12 @@ export function TeamSettings({
               Remove access
             </Button>
             <Button
-              disabled={blocked || lastOwner || nextRole === selected?.role}
+              disabled={
+                blocked ||
+                lastOwner ||
+                nextRole === selected?.role.id ||
+                !fullRole(nextRole)
+              }
               onClick={() => void changeMember(false)}
             >
               Save role

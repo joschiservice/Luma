@@ -4,7 +4,10 @@ import { readFile } from 'node:fs/promises';
 
 import { createDetectionServices } from '@luma/application-runtime';
 import { defaultConfiguration } from '@luma/exceptions';
-import { makeTenantContext } from '@luma/identity/composition';
+import {
+  builtInMembership,
+  makeTenantContext,
+} from '@luma/identity/composition';
 
 import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, database, startApi, startProcess } from './helpers.mjs';
@@ -56,7 +59,10 @@ test('opens contextual issue guides and preserves the investigation across help 
   const tenant = makeTenantContext(
     { userId: user.id, sessionId: randomUUID() },
     { ...organization, status: 'active' },
-    { id: randomUUID(), organizationId, userId: user.id, role: 'owner' },
+    builtInMembership(
+      { id: randomUUID(), organizationId, userId: user.id },
+      'owner',
+    ),
     randomUUID(),
   );
   const services = createDetectionServices(db.runtimeUrl);

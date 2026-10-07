@@ -1,5 +1,10 @@
-import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireTenant } from '@luma/identity';
+import type { Permission, TenantContext } from '@luma/identity';
+import {
+  hasPermission,
+  IdentityError,
+  requirePermission,
+  requireTenant,
+} from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
 
 import type {
@@ -24,6 +29,15 @@ import {
 import { fulfillmentChart, fulfillmentRecords } from './fulfillment.js';
 import { orderChart, orderRecords } from './orders.js';
 
+/** The read permission of the area each chart counts, required on top of `insights.read`. */
+const chartPermissions = {
+  orders: 'orders.read',
+  fulfillment: 'fulfillment.read',
+  stock: 'inventory.read',
+  cases: 'issues.read',
+  procurement: 'procurement.read',
+} as const satisfies Record<InsightChart, Permission>;
+
 /** How old a chart's evaluation time may be when its records are listed. */
 const maxRecordLagMs = 15 * 60 * 1000;
 
@@ -34,7 +48,9 @@ const badRequest = (message: string) =>
  * Creates the operational charts. Commerce charts read canonical projections in one
  * read-only, repeatable-read snapshot under tenant row security. Stock risk and purchase-order
  * stages come from the procurement owner, which evaluates them in code. A chart and its record
- * list share the same rules and evaluation time, so their totals agree.
+ * list share the same rules and evaluation time, so their totals agree. Readers need
+ * `insights.read` and the read permission of the chart's area; otherwise reads fail with 403.
+ * Records keep links to issues and purchase orders only when the reader can read those.
  */
 export function createInsights(
   db: TenantDatabase,
@@ -58,18 +74,27 @@ export function createInsights(
 ): Insights {
   const now = deps.now ?? (() => new Date());
 
+  async function authorize(context: TenantContext, chart: InsightChart) {
+    const fresh = await deps.refreshContext(context);
+    requireTenant(fresh, context.tenantId);
+    if (fresh.actor.id !== context.actor.id)
+      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+    requirePermission(fresh, 'insights.read');
+    requirePermission(fresh, chartPermissions[chart]);
+
+    return fresh;
+  }
+
   async function read<T>(
     context: TenantContext,
+    chart: InsightChart,
     operation: (
       tx: SqlTransaction,
       scoped: TenantDatabase,
       fresh: TenantContext,
     ) => Promise<T>,
   ) {
-    const fresh = await deps.refreshContext(context);
-    requireTenant(fresh, context.tenantId);
-    if (fresh.actor.id !== context.actor.id)
-      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+    const fresh = await authorize(context, chart);
 
     return db.transaction(
       fresh.tenantId,
@@ -108,10 +133,7 @@ export function createInsights(
   }
 
   async function procurement(context: TenantContext) {
-    const fresh = await deps.refreshContext(context);
-    requireTenant(fresh, context.tenantId);
-
-    return deps.procurement(fresh);
+    return deps.procurement(await authorize(context, 'procurement'));
   }
 
   /** Validates a chart's evaluation time: not in the future and at most 15 minutes old. */
@@ -135,6 +157,7 @@ export function createInsights(
 
       return read(
         context,
+        chart,
         async (tx, scoped, fresh): Promise<InsightChartResponse> => {
           if (chart === 'orders')
             return orderChart(tx, fresh.tenantId, query, asOf);
@@ -174,11 +197,29 @@ export function createInsights(
       if (chart === 'procurement')
         return list(procurementRecords(await procurement(context), query));
 
-      return read(context, async (tx, scoped, fresh) => {
-        if (chart === 'orders')
-          return list(
-            await orderRecords(tx, deps.orders, fresh.tenantId, query, asOf),
+      return read(context, chart, async (tx, scoped, fresh) => {
+        if (chart === 'orders') {
+          const result = await orderRecords(
+            tx,
+            deps.orders,
+            fresh.tenantId,
+            query,
+            asOf,
           );
+
+          return list(
+            hasPermission(fresh, 'issues.read')
+              ? result
+              : {
+                  ...result,
+                  items: result.items.map((item) =>
+                    item.kind === 'order'
+                      ? { ...item, attentionIssueIds: [] }
+                      : item,
+                  ),
+                },
+          );
+        }
         if (chart === 'fulfillment')
           return list(
             await fulfillmentRecords(tx, fresh.tenantId, query, asOf),
@@ -195,7 +236,20 @@ export function createInsights(
           query.connectionId,
         );
 
-        return list(stockRecords(positions, labels, query));
+        const records = stockRecords(positions, labels, query);
+
+        return list(
+          hasPermission(fresh, 'procurement.read')
+            ? records
+            : {
+                ...records,
+                items: records.items.map((item) =>
+                  item.kind === 'stock_position'
+                    ? { ...item, purchaseOrderIds: [] }
+                    : item,
+                ),
+              },
+        );
       });
     },
   };

@@ -1,7 +1,11 @@
 import { initContract } from '@ts-rest/core';
 import { z } from 'zod';
 
-import { apiErrorSchema, organizationParamsSchema } from '../common.js';
+import {
+  apiErrorSchema,
+  organizationParamsSchema,
+  requires,
+} from '../common.js';
 import {
   orderDetailSchema,
   orderListQuerySchema,
@@ -13,6 +17,7 @@ const c = initContract();
 export const ordersContract = c.router({
   list: {
     method: 'GET',
+    metadata: requires('orders.read'),
     path: '/v1/organizations/:organizationId/orders',
     pathParams: organizationParamsSchema,
     query: orderListQuerySchema,
@@ -29,6 +34,7 @@ export const ordersContract = c.router({
   },
   get: {
     method: 'GET',
+    metadata: requires('orders.read'),
     path: '/v1/organizations/:organizationId/orders/:orderId',
     pathParams: organizationParamsSchema.extend({
       orderId: z.string().uuid(),

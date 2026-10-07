@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import type { TenantContext } from '@luma/identity';
-import { requireRole, requireTenant } from '@luma/identity';
+import { requirePermission, requireTenant } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
 import { z } from 'zod';
 
@@ -221,7 +221,7 @@ export function createCommerceProjections(
     context: TenantContext,
     inputs: CanonicalSnapshot[],
   ) {
-    requireRole(context, ['owner', 'admin']);
+    requirePermission(context, 'sync.manage');
     const values = inputs.map(
       (input) => snapshotSchema.parse(input) as CanonicalSnapshot,
     );
@@ -241,7 +241,7 @@ export function createCommerceProjections(
 
   return {
     async identify(context, kind, reconciliationKey) {
-      requireRole(context, ['owner', 'admin']);
+      requirePermission(context, 'sync.manage');
       z.string().min(1).max(1024).parse(reconciliationKey);
 
       return db.transaction(context.tenantId, async (tx) => {
@@ -263,7 +263,7 @@ export function createCommerceProjections(
       });
     },
     async identifyMany(context, items) {
-      requireRole(context, ['owner', 'admin']);
+      requirePermission(context, 'sync.manage');
       for (const item of items)
         z.string().min(1).max(1024).parse(item.reconciliationKey);
       const found = new Map<string, string>();
@@ -338,7 +338,7 @@ export function createCommerceProjections(
       });
     },
     async retire(context, entityId, connectionId, reason) {
-      requireRole(context, ['owner', 'admin']);
+      requirePermission(context, 'sync.manage');
       z.string().uuid().parse(entityId);
       z.string().uuid().parse(connectionId);
       z.string().min(1).max(2000).parse(reason);

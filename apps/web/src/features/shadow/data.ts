@@ -164,7 +164,7 @@ export function shadowError(error: unknown) {
   if (error instanceof IdentityError) {
     if (error.status === 401) return 'Your session expired. Sign in again.';
     if (error.status === 403)
-      return 'Only workspace owners and admins can use Shadow evaluations.';
+      return 'Your role doesn’t include Activate playbooks, which Shadow evaluations require.';
     if (error.status === 404)
       return 'This case or evaluation is no longer available.';
     if (error instanceof ShadowError) return error.feedback;

@@ -38,17 +38,36 @@ function fixture() {
   const reader = vi.fn<Parameters<typeof createRecordService>[0]['reader']>(
     () => read,
   );
+  const authorize = vi.fn(async () => undefined);
   const service = createRecordService({
     installations: { credential },
     requireInstalled,
+    authorize,
     reader,
     protectedCustomerDataApproved: false,
   });
 
-  return { connection, credential, requireInstalled, read, reader, service };
+  return {
+    connection,
+    credential,
+    requireInstalled,
+    authorize,
+    read,
+    reader,
+    service,
+  };
 }
 
 describe('Shopify record authorization', () => {
+  it('checks the record kind permission before reading credentials', async () => {
+    const f = fixture();
+    f.authorize.mockRejectedValueOnce(new Error('Forbidden'));
+    await expect(
+      f.service(context, { connectionId, kind: 'Customer' }),
+    ).rejects.toThrow('Forbidden');
+    expect(f.authorize).toHaveBeenCalledWith(context, 'Customer');
+    expect(f.credential).not.toHaveBeenCalled();
+  });
   it('uses the tenant-scoped capability port and rechecks credentials on every request', async () => {
     const f = fixture();
     await f.service(context, input);

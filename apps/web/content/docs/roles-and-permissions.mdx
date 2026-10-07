@@ -1,0 +1,57 @@
+---
+title: Roles and permissions
+description: Decide what each person can see and do, create custom roles, and control what installed apps may use.
+---
+
+Every person in a workspace has one role. A role is a set of permissions, such as **View orders**, **Manage procurement** or **Approve or reject changes**. Open **Settings → Roles** to see what each role allows.
+
+## Built-in roles
+
+Every workspace has three roles you can't change:
+
+- **Owner** can do everything, including making other people owners. Every workspace keeps at least one owner.
+- **Admin** can do everything except change owners.
+- **Member** can see operations, records and workflows, take decisions in **Needs you** and use Ask Luma, but can't change data or settings.
+
+Owner and Admin gain new permissions as Luma adds features. Custom roles only change when someone edits them.
+
+## Create a custom role
+
+You need **Manage roles**, and you can only grant permissions your own role includes.
+
+1. Open **Settings → Roles** and select **Create role**.
+2. Enter a name, such as _Buyer_, and a short description. Choose **No permissions** or start from an existing role.
+3. Turn on the permissions the role needs. Permissions marked **Sensitive** let people change data in connected systems, money, access or policy, or see personal data.
+4. Select **Review and create**, check the list, then select **Create role**.
+
+To start from a built-in role, open it and select **Duplicate**.
+
+## Give someone a role
+
+You need **Manage team members**. In **Settings → Team**, choose a role when you invite someone, or select **⋯** next to a teammate to change their role. You can only assign roles whose permissions you hold, and only owners can make someone an owner. Invitations can't grant ownership.
+
+Changes apply the next time the person does something in Luma. Work Luma runs on their behalf, such as imports and workflows, checks their permissions again at each step and stops with an explanation if a permission is gone.
+
+## Change or archive a role
+
+Open the role, change its name, description or permissions, and select **Review changes**. The review lists what is granted and removed and how many people are affected. If someone else changed the role meanwhile, review their version before saving.
+
+The **History** tab shows who changed the role, when, which permissions changed, and who was given the role.
+
+To retire a role, give everyone who has it another role, then select **Archive**. Pending invitations for an archived role are revoked; invite those people again with another role.
+
+## What people without access see
+
+Areas a role doesn't include are hidden from the sidebar and search. If someone opens one through a link, Luma says which permission is missing instead of showing an empty page. Needs you, Home, Insights and Ask Luma only include records the person may see.
+
+## Approvals
+
+Approving or rejecting a change needs **Approve or reject changes**, and the approver must be someone other than the person who proposed it. Some actions also need their own permission. For example, approving a JTL purchase order needs **Submit purchase orders to JTL**, so a buyer role can approve purchase orders without being able to change shipping methods.
+
+## Apps
+
+Installing an app needs **Manage apps**. Luma lists what the app will be able to use, such as orders or customer details, and you can only grant access your role includes. When an app does something for a person, it can never do more than that person's role allows.
+
+Apps can add their own permissions, such as **Recover Shopify fulfillments**. Owners and Admins have them automatically; add them to custom roles in **Settings → Roles**. When an app update asks for more access, the app's page shows **Review access**; until someone approves, the app keeps working with its earlier access.
+
+Uninstalling an app removes its permissions from every role. Reinstalling doesn't bring them back.

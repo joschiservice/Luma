@@ -16,4 +16,6 @@ export function registerIdentityHttp(
   registerAuthHandler(app, identity.handler, identity.baseURL);
 }
 
+export { rolesRoutes } from './api/roles.js';
+
 export { settingsRoutes } from './api/settings.js';

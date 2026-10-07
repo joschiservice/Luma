@@ -1,6 +1,10 @@
 import { initContract } from '@ts-rest/core';
 
-import { apiErrorSchema, organizationParamsSchema } from '../common.js';
+import {
+  apiErrorSchema,
+  organizationParamsSchema,
+  requires,
+} from '../common.js';
 import {
   insightChartResponseSchema,
   insightChartSchema,
@@ -24,6 +28,7 @@ const errors = {
 export const insightsContract = c.router({
   chart: {
     method: 'GET',
+    metadata: requires('insights.read'),
     path: '/v1/organizations/:organizationId/insights/:chart',
     pathParams: params,
     query: insightQuerySchema,
@@ -34,6 +39,7 @@ export const insightsContract = c.router({
   },
   records: {
     method: 'GET',
+    metadata: requires('insights.read'),
     path: '/v1/organizations/:organizationId/insights/:chart/records',
     pathParams: params,
     query: insightRecordQuerySchema,

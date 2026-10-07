@@ -129,13 +129,24 @@ export function caseDeadline(facts: CaseDecisionFacts): string | null {
     : null;
 }
 
+/** The workspace permissions that change what a reader may do with a presented decision. */
+export type DecisionPermission = 'decisions.respond';
+
+/** The person reading the queue and a check of their current permissions. */
+export interface DecisionReader {
+  id: string;
+  can(permission: DecisionPermission): boolean;
+}
+
 /**
  * Presents a case that needs a person. Stale diagnoses keep only their identity; their summary
- * and manual step are withheld as the case inbox does.
+ * and manual step are withheld as the case inbox does. Approvals are decided by readers who can
+ * respond to decisions, except the requester; the other reasons ask the reader to investigate
+ * in the issue, which every reader of the case may open.
  */
 export function presentCase(
   facts: CaseDecisionFacts,
-  reader: { id: string; role: 'owner' | 'admin' | 'member' },
+  reader: DecisionReader,
   asOf: string,
 ): DecisionCandidate {
   const label = classLabels[facts.class] ?? 'Operational issue';
@@ -162,15 +173,14 @@ export function presentCase(
     facts.severity === 'low'
       ? facts.severity
       : 'unknown';
-  const staff = reader.role !== 'member';
   const response: DecisionResponse =
     facts.reason !== 'approval' || !proposal
       ? 'investigate'
-      : !staff
-        ? 'view_only'
-        : facts.requester_id === reader.id
-          ? 'awaiting_other'
-          : 'decide';
+      : facts.requester_id === reader.id
+        ? 'awaiting_other'
+        : reader.can('decisions.respond')
+          ? 'decide'
+          : 'view_only';
   const escalate = {
     response: 'Escalate',
     text: 'No action runs. The issue stays open and is marked for investigation.',
@@ -197,7 +207,7 @@ export function presentCase(
       ...base,
       title: action ? `Approve ${action}` : `${label} needs approval`,
       why: proposal
-        ? 'Workspace policy requires an owner or admin other than the requester to approve this exact proposal before Luma acts.'
+        ? 'Workspace policy requires someone else who can approve changes to approve this exact proposal before Luma acts.'
         : 'The proposal expired before anyone approved it. Open the issue to review what changed or escalate it.',
       consequences: proposal
         ? [
@@ -333,7 +343,7 @@ export function presentReplenishment(
     reason: 'approval',
     domain: 'procurement',
     title: `Approve purchase-order draft for ${item.quantity} × ${item.sku}`,
-    why: `Each replenishment proposal needs an owner or admin other than the rule’s principal to approve it before Luma creates the draft.${
+    why: `Each replenishment proposal needs someone who can manage procurement, other than the rule’s principal, to approve it before Luma creates the draft.${
       high
         ? ` The quantity is above the rule’s ${item.approvalQuantity}-unit limit, so it is high risk.`
         : ''
@@ -481,7 +491,7 @@ export function presentSupplierCommitment(
         ...base,
         reason: 'approval',
         title: `Approve sending ${item.reference} to ${item.supplierName}`,
-        why: 'Placing an order with a supplier is an external commitment. A different owner or admin than the requester approves the exact order first.',
+        why: 'Placing an order with a supplier is an external commitment. Someone who can manage procurement, other than the requester, approves the exact order first.',
         consequences: [
           {
             response: 'Approve',

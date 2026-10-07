@@ -5,7 +5,7 @@ import type {
   ExecutionResult,
 } from '@luma/execution';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireRole, requireTenant } from '@luma/identity';
+import { IdentityError, requireTenant } from '@luma/identity';
 import type { PolicyService, ProposedAction } from '@luma/policies';
 import { z } from 'zod';
 
@@ -52,6 +52,14 @@ export interface RecoveryStore {
 
 export interface RecoveryDependencies {
   store: RecoveryStore;
+  /**
+   * The person's access to this app feature, checked by the app host with installation, the
+   * app's permission and its scopes. Pass a refreshed context.
+   */
+  permission: {
+    require(context: TenantContext): Promise<void>;
+    allowed(context: TenantContext): Promise<boolean>;
+  };
   admission: ActionAdmission;
   policies: PolicyService;
   effects: EffectRegistry;
@@ -76,7 +84,7 @@ export function createFulfillmentRecovery(deps: RecoveryDependencies) {
   async function authorize(context: TenantContext) {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
-    requireRole(fresh, ['owner', 'admin']);
+    await deps.permission.require(fresh);
     if (fresh.actor.id !== context.actor.id)
       throw new IdentityError(403, 'FORBIDDEN', 'Sign in again.');
 
@@ -158,13 +166,13 @@ export function createFulfillmentRecovery(deps: RecoveryDependencies) {
               : expired
                 ? 'This preview expired. Refresh fulfillment details and review a new action.'
                 : rejected
-                  ? 'Another administrator rejected this action.'
+                  ? 'Someone else who can approve changes rejected this action.'
                   : decision?.outcome === 'denied'
                     ? 'This action is no longer eligible. Refresh fulfillment details.'
                     : state === 'approval_required'
                       ? decision?.approval?.outcome === 'approved'
                         ? 'Approved. The requester can run the action after a fresh eligibility check.'
-                        : 'A different administrator must approve this exact action.'
+                        : 'Someone else who can approve changes must approve this exact action.'
                       : 'Review the exact change. Shopify eligibility is checked again before dispatch.';
 
     return {
@@ -326,6 +334,7 @@ export function createFulfillmentRecovery(deps: RecoveryDependencies) {
         {
           available: !!effect && (await effect.checkPreconditions(action)),
           minimumRisk: 'medium',
+          permission: effect?.permission ?? 'actions.propose',
         },
       );
       await deps.store.decision(context, run.id, decision.id);
@@ -409,12 +418,15 @@ export function createFulfillmentRecovery(deps: RecoveryDependencies) {
     /**
      * Lists recoveries that wait on a person: an approval, a run by the requester, or a check of an
      * accepted or uncertain write. Reads persisted state only, so an approvable preview may still
-     * prove stale when its review reads Shopify. Members, who can't respond, get none.
+     * prove stale when its review reads Shopify. People without the app permission get none.
      */
     async pending(context: TenantContext): Promise<RecoveryView[]> {
       const fresh = await deps.refreshContext(context);
       requireTenant(fresh, context.tenantId);
-      if (fresh.actor.role === 'member' || fresh.actor.id !== context.actor.id)
+      if (
+        fresh.actor.id !== context.actor.id ||
+        !(await deps.permission.allowed(fresh))
+      )
         return [];
       const views = await Promise.all(
         (await deps.store.open(fresh)).map((run) =>

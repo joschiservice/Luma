@@ -1,16 +1,17 @@
 import type {
   Membership,
   Organization,
-  Role,
   SessionIdentity,
   TenantContext,
 } from '../domain/context.js';
 import {
   IdentityError,
+  isOwner,
   makeTenantContext,
-  requireRole,
+  requirePermission,
   requireTenant,
 } from '../domain/context.js';
+import type { PermissionSet, RoleReference } from '../domain/roles.js';
 
 export type Credentials = Readonly<Record<string, string>>;
 
@@ -22,7 +23,7 @@ export interface IdentityTransaction {
   ): Promise<{
     actorId: string;
     request: string;
-    result: Membership | null;
+    result: MemberDto | null;
   } | null>;
   /** Persists the membership outcome atomically with its mutation. */
   saveMemberCommand(
@@ -30,16 +31,25 @@ export interface IdentityTransaction {
     id: string,
     actorId: string,
     request: string,
-    result: Membership | null,
+    result: MemberDto | null,
   ): Promise<void>;
   /** Records bounded access evidence in the membership transaction. */
   auditMember(
     organizationId: string,
     actorId: string,
     action: string,
-    before: Membership | null,
-    after: Membership | null,
+    before: AuditedMember | null,
+    after: AuditedMember | null,
   ): Promise<void>;
+  /** Reads an assignable role in the selected tenant, including archived custom roles. */
+  findRole(
+    organizationId: string,
+    roleId: string,
+  ): Promise<{
+    reference: RoleReference;
+    permissions: PermissionSet;
+    archived: boolean;
+  } | null>;
   listOrganizations(): Promise<Organization[]>;
   findMembership(organizationId: string): Promise<Membership | null>;
   findOrganization(organizationId: string): Promise<Organization | null>;
@@ -53,14 +63,44 @@ export interface IdentityTransaction {
   addMember(
     organizationId: string,
     userId: string,
-    role: Role,
+    roleId: string,
   ): Promise<Membership>;
   updateMember(
     organizationId: string,
     memberId: string,
-    role: Role,
+    roleId: string,
   ): Promise<Membership>;
   removeMember(organizationId: string, memberId: string): Promise<void>;
+}
+
+/** A membership as returned to API callers, without its permission set. */
+export interface MemberDto {
+  id: string;
+  organizationId: string;
+  userId: string;
+  name?: string | undefined;
+  email?: string | undefined;
+  role: RoleReference;
+}
+
+/** The bounded membership values recorded in access events. */
+interface AuditedMember {
+  id: string;
+  userId: string;
+  roleId: string;
+  roleName: string;
+}
+
+/** Strips grants from a membership for API responses and command receipts. */
+export function memberDto(member: Membership): MemberDto {
+  return {
+    id: member.id,
+    organizationId: member.organizationId,
+    userId: member.userId,
+    ...(member.name !== undefined ? { name: member.name } : {}),
+    ...(member.email !== undefined ? { email: member.email } : {}),
+    role: member.role,
+  };
 }
 
 export interface IdentityRepository {
@@ -180,14 +220,22 @@ export function createIdentityService(repository: IdentityRepository) {
         resolve(tx, session, organizationId, requestId),
       );
     },
+    /** Lists members with their roles; any member may read the team. */
     listMembers(context: TenantContext) {
-      return withTenant(context, (tx) => tx.listMembers(context.tenantId));
+      return withTenant(context, async (tx) =>
+        (await tx.listMembers(context.tenantId)).map(memberDto),
+      );
     },
+    /**
+     * Adds, reassigns or removes a member under the organization lock. Requires
+     * `members.manage`; only owners change ownership, the last owner stays, and nobody else can
+     * assign a role or change a member whose permissions exceed their own.
+     */
     changeMember(
       initialContext: TenantContext,
       command: { commandId?: string } & (
-        | { action: 'add'; userId: string; role: Role }
-        | { action: 'update'; memberId: string; role: Role }
+        | { action: 'add'; userId: string; roleId: string }
+        | { action: 'update'; memberId: string; roleId: string }
         | { action: 'remove'; memberId: string }
       ),
     ) {
@@ -201,7 +249,7 @@ export function createIdentityService(repository: IdentityRepository) {
           sessionId: initialContext.actor.sessionId,
         };
         const context = await resolve(tx, session, organizationId, requestId);
-        requireRole(context, ['owner', 'admin']);
+        requirePermission(context, 'members.manage');
         const request = JSON.stringify(command);
         if (command.commandId) {
           const previous = await tx.memberCommand(
@@ -229,16 +277,39 @@ export function createIdentityService(repository: IdentityRepository) {
             : members.find((m) => m.id === command.memberId);
         if (command.action !== 'add' && !target)
           throw new IdentityError(404, 'NOT_FOUND', 'Member not found');
+        const next =
+          command.action === 'remove'
+            ? null
+            : await tx.findRole(organizationId, command.roleId);
+        if (command.action !== 'remove' && (!next || next.archived))
+          throw new IdentityError(
+            409,
+            'CONFLICT',
+            'This role is no longer available. Refresh and choose another role.',
+          );
         if (
-          target?.role === 'owner' ||
-          (command.action !== 'remove' && command.role === 'owner')
+          (target?.role.key === 'owner' || next?.reference.key === 'owner') &&
+          !isOwner(context)
         )
-          requireRole(context, ['owner']);
+          throw new IdentityError(
+            403,
+            'FORBIDDEN',
+            'Only owners can grant or remove ownership.',
+          );
         if (
-          target?.role === 'owner' &&
-          (command.action === 'remove' ||
-            (command.action === 'update' && command.role !== 'owner')) &&
-          members.filter((m) => m.role === 'owner').length === 1
+          !isOwner(context) &&
+          ((target && !context.permissions.covers(target.permissions)) ||
+            (next && !context.permissions.covers(next.permissions)))
+        )
+          throw new IdentityError(
+            403,
+            'FORBIDDEN',
+            'You can only assign roles, and change members, whose permissions you hold yourself.',
+          );
+        if (
+          target?.role.key === 'owner' &&
+          next?.reference.key !== 'owner' &&
+          members.filter((m) => m.role.key === 'owner').length === 1
         )
           throw new IdentityError(
             409,
@@ -250,22 +321,22 @@ export function createIdentityService(repository: IdentityRepository) {
           result = await tx.addMember(
             organizationId,
             command.userId,
-            command.role,
+            command.roleId,
           );
         else if (command.action === 'update')
           result = await tx.updateMember(
             organizationId,
             command.memberId,
-            command.role,
+            command.roleId,
           );
         else await tx.removeMember(organizationId, command.memberId);
         const bounded = (member: Membership | null | undefined) =>
           member
             ? {
                 id: member.id,
-                organizationId: member.organizationId,
                 userId: member.userId,
-                role: member.role,
+                roleId: member.role.id,
+                roleName: member.role.name,
               }
             : null;
         await tx.auditMember(
@@ -275,17 +346,17 @@ export function createIdentityService(repository: IdentityRepository) {
           bounded(target),
           bounded(result),
         );
-
+        const dto = result ? memberDto(result) : null;
         if (command.commandId)
           await tx.saveMemberCommand(
             organizationId,
             command.commandId,
             context.actor.id,
             request,
-            result,
+            dto,
           );
 
-        return result;
+        return dto;
       });
     },
   };

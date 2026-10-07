@@ -43,7 +43,7 @@ State changes and append-only audit events commit together in `exception_outbox`
 
 ## Resolution
 
-`exceptions.resolve` accepts an owner/admin context, an explicit human disposition, a reason and existing tenant evidence references. The record identifies the actor and is not counted as autonomous verified success. Caller-supplied verification results are rejected.
+`exceptions.resolve` accepts a context with `issues.manage`, an explicit human disposition, a reason and existing tenant evidence references. The record identifies the actor and is not counted as autonomous verified success. Caller-supplied verification results are rejected.
 
 `exceptions.verify(context, incidentId)` requests verification from the `VerificationEvaluator` installed by the composition root. It fails closed when no evaluator is configured. The evaluator receives the tenant context and persisted incident, reads authoritative state, and checks the business postcondition. Neither evidence nor success flags come from the verification request.
 

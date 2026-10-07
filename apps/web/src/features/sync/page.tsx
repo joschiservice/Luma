@@ -58,7 +58,8 @@ import { useRef, useState } from 'react';
 import { statuses } from '../connections/presentation';
 import { ProviderIcon } from '../connections/provider-icon';
 import { SignInRedirect } from '../identity/common';
-import { contextOptions, IdentityError } from '../identity/data';
+import { IdentityError } from '../identity/data';
+import { usePermissions } from '../identity/permissions';
 import { sendSyncCommand, syncKey, syncOptions } from './data';
 import {
   ago,
@@ -82,7 +83,7 @@ import {
 export function SyncPage() {
   const { organizationId } = useParams({ from: '/app/$organizationId/sync' });
   const query = useQuery(syncOptions(organizationId));
-  const access = useQuery(contextOptions(organizationId));
+  const { can } = usePermissions(organizationId);
   const client = useQueryClient();
   const [pending, setPending] = useState<string | null>(null);
   const [message, setMessage] = useState<{
@@ -106,7 +107,7 @@ export function SyncPage() {
         tone: 'danger',
         text:
           error instanceof IdentityError && error.status === 403
-            ? 'Only owners and admins can control syncs.'
+            ? 'Your role doesn’t include Manage imports, so you can’t control syncs.'
             : 'Luma could not update this sync. Refresh and try again.',
       });
     } finally {
@@ -124,10 +125,7 @@ export function SyncPage() {
       error={query.error ? 'Sync status could not be loaded.' : undefined}
       offline={query.isPaused}
       refreshing={query.isFetching}
-      canManage={
-        access.data?.actor.role === 'owner' ||
-        access.data?.actor.role === 'admin'
-      }
+      canManage={can('sync.manage')}
       pending={pending}
       message={message}
       command={(stream, action) => void command(stream, action)}

@@ -2,7 +2,7 @@ import type { AuditEntry, AuditLog } from '@luma/audit';
 import type { EffectRegistry, VerificationResult } from '@luma/connections';
 import { ConnectorError } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
-import { requireRole, requireTenant } from '@luma/identity';
+import { hasPermission, IdentityError, requireTenant } from '@luma/identity';
 import type {
   PolicyDecision,
   PolicyService,
@@ -50,6 +50,8 @@ export interface ExecutionRecord {
     number: 1;
     policyDecisionId: string;
     approvalId?: string;
+    /** The permission the requester needed: the capability's own, or `actions.execute`. */
+    permission?: string;
     dispatchIdentity?: string;
     mechanism: string;
     executor: Provenance;
@@ -244,6 +246,26 @@ export function createExecutionService(deps: ExecutionDependencies) {
     return observation;
   }
 
+  /**
+   * Execution records are visible to people who may act: anyone proposing or running actions,
+   * or holding the capability permission the record was evaluated against.
+   */
+  function requireReader(context: TenantContext, record?: ExecutionRecord) {
+    if (
+      !hasPermission(context, 'actions.execute') &&
+      !hasPermission(context, 'actions.propose') &&
+      !(
+        record?.attempt.permission &&
+        context.permissions.has(record.attempt.permission)
+      )
+    )
+      throw new IdentityError(
+        403,
+        'FORBIDDEN',
+        'Your role does not allow viewing action runs.',
+      );
+  }
+
   return {
     async get(
       context: TenantContext,
@@ -252,8 +274,8 @@ export function createExecutionService(deps: ExecutionDependencies) {
       requireTenant(context, context.tenantId);
       const fresh = await deps.refreshContext(context);
       requireTenant(fresh, context.tenantId);
-      requireRole(fresh, ['owner', 'admin']);
       const record = await deps.repository.get(fresh.tenantId, proposalId);
+      requireReader(fresh, record ?? undefined);
       if (!record) return null;
       await flush(fresh.tenantId, proposalId);
 
@@ -292,9 +314,11 @@ export function createExecutionService(deps: ExecutionDependencies) {
         adapter.capability === action.capability &&
         adapter.version === action.capabilityVersion &&
         (await adapter.checkPreconditions(action)) === true;
+      const permission = adapter?.permission ?? 'actions.execute';
       const decision = await deps.policies.evaluate(context, action, hash, {
         available,
         minimumRisk: adapter?.minimumRisk ?? 'high',
+        permission,
       });
       if (decision.outcome !== 'allowed')
         return { state: decision.outcome, decision };
@@ -315,6 +339,7 @@ export function createExecutionService(deps: ExecutionDependencies) {
           businessOutcome: 'pending',
           policyDecisionId: decision.id,
           ...(decision.approvalId ? { approvalId: decision.approvalId } : {}),
+          permission,
           ...(adapter.dispatchIdentity
             ? { dispatchIdentity: adapter.dispatchIdentity }
             : {}),
@@ -368,10 +393,14 @@ export function createExecutionService(deps: ExecutionDependencies) {
       }
       // A durable reservation is never automatically redelivered after a crash.
       await flush(context.tenantId, action.id);
-      // Audit persistence can take time; expired decisions never authorize a call.
-      const admissionCurrent = admissionGuard
-        ? await admissionGuard().catch(() => false)
-        : true;
+      // Audit persistence can take time; expired decisions never authorize a call, and a
+      // requester who lost the permission meanwhile is withheld before dispatch.
+      const admissionCurrent =
+        (await deps
+          .refreshContext(context)
+          .then((current) => current.permissions.has(permission))
+          .catch(() => false)) &&
+        (admissionGuard ? await admissionGuard().catch(() => false) : true);
       if (
         !admissionCurrent ||
         (await deps.policies.currentVersion(context.tenantId)) !==
@@ -501,8 +530,8 @@ export function createExecutionService(deps: ExecutionDependencies) {
     ): Promise<ExecutionResult> {
       requireTenant(context, context.tenantId);
       context = await deps.refreshContext(context);
-      requireRole(context, ['owner', 'admin']);
       const record = await deps.repository.get(context.tenantId, proposalId);
+      requireReader(context, record ?? undefined);
       if (!record) throw new Error('Execution not found');
       await flush(context.tenantId, proposalId);
       if (record.state === 'succeeded' || record.state === 'failed')

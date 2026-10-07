@@ -42,11 +42,16 @@ export interface ReplenishmentTrace {
   verifiedAt: string | null;
 }
 
+/** Procurement context sections that need another area's read permission. */
+export type ProcurementContextSection = 'positions' | 'issues';
+
 export interface PurchaseOrderContext {
   lines: (SkuContext & { lineId: string })[];
   issues: { id: string; label: string; state: string }[];
   replenishment: ReplenishmentTrace | null;
   truncated: boolean;
+  /** Sections left empty because the reader can't read their area; positions are per line. */
+  hidden: ProcurementContextSection[];
   asOf: string;
 }
 
@@ -54,12 +59,15 @@ export interface SupplierContext {
   skus: (SkuContext & { onOrder: { quantity: number; unit: string }[] })[];
   issues: { id: string; label: string; state: string }[];
   truncated: boolean;
+  /** Sections left empty because the reader can't read their area; positions are per SKU. */
+  hidden: ProcurementContextSection[];
   asOf: string;
 }
 
 /**
  * Reads the stock, products, issues and replenishment evidence around purchase orders. Returns
- * null when the tenant has no such order or supplier.
+ * null when the tenant has no such order or supplier. Requires `procurement.read`; stock and
+ * issues also need `inventory.read` and `issues.read`.
  */
 export interface ProcurementContextReader {
   order(

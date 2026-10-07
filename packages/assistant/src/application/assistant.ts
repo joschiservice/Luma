@@ -1,5 +1,10 @@
 import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireRole, requireTenant } from '@luma/identity';
+import {
+  hasPermission,
+  IdentityError,
+  requirePermission,
+  requireTenant,
+} from '@luma/identity';
 import type {
   ModelErrorCode,
   ModelGateway,
@@ -137,7 +142,7 @@ function failureReason(code: ModelErrorCode) {
 
 /**
  * Answers workspace questions by letting the model call read-only tools with the person's own,
- * freshly checked access. Any member can ask. Every question reads current records; answers
+ * freshly checked access. People with `assistant.use` can ask. Every question reads current records; answers
  * cite only records read for that question. Nothing is written, approved or executed. Questions,
  * answers and read results are sent as sensitive EU data with zero retention and never logged;
  * spans record the route, token counts and latency only.
@@ -156,12 +161,18 @@ export function createAssistant(deps: {
 }) {
   const limits = { ...defaultLimits, ...deps.limits };
 
-  async function authorize(context: TenantContext) {
+  async function member(context: TenantContext) {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
-    requireRole(fresh, ['owner', 'admin', 'member']);
     if (fresh.actor.id !== context.actor.id)
       throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+
+    return fresh;
+  }
+
+  async function authorize(context: TenantContext) {
+    const fresh = await member(context);
+    requirePermission(fresh, 'assistant.use');
 
     return fresh;
   }
@@ -192,11 +203,21 @@ export function createAssistant(deps: {
   });
 
   return {
-    /** Whether members can ask here, why not, and which records the assistant reads. */
+    /**
+     * Whether this person can ask here, why not, and which records the assistant reads for
+     * them. People without `assistant.use` get an unavailable answer rather than an error.
+     */
     async availability(
       context: TenantContext,
     ): Promise<AssistantAvailability & { reads: RecordKind[] }> {
-      await authorize(context);
+      const fresh = await member(context);
+      if (!hasPermission(fresh, 'assistant.use'))
+        return {
+          available: false,
+          reason:
+            'Your role doesn’t include Ask Luma. Ask a workspace admin for access.',
+          reads: [],
+        };
       const available = deps.availability.available && !!deps.gateway;
 
       return {
@@ -205,22 +226,22 @@ export function createAssistant(deps: {
           ? null
           : (deps.availability.reason ??
             'Asking Luma isn’t set up on this server.'),
-        reads: deps.tools.reads,
+        reads: deps.tools.reads(fresh),
       };
     },
 
     /**
-     * Answers one question. Throws 503 with a reason, without calling a model, when the
-     * assistant is unavailable, and 503 when the model fails, times out or is cancelled.
-     * Membership is checked again before every batch of reads, so a removed member gets no
-     * further data.
+     * Answers one question; requires `assistant.use`. Throws 503 with a reason, without calling
+     * a model, when the assistant is unavailable, and 503 when the model fails, times out or is
+     * cancelled. Access is checked again before every model call and batch of reads: the model
+     * is offered only tools the person may use, and a removed member gets no further data.
      */
     async ask(
       context: TenantContext,
       request: AssistantQuestion,
       options: AskOptions = {},
     ): Promise<AssistantAnswer> {
-      await authorize(context);
+      let current = await authorize(context);
       if (!deps.availability.available || !deps.gateway)
         throw new IdentityError(
           503,
@@ -268,12 +289,13 @@ export function createAssistant(deps: {
               usage.outputTokens < limits.outputTokens
             ) {
               usage.modelCalls += 1;
+              const tools = deps.tools.declarations(current);
               const result = await untilAborted(
                 gateway.generate(trace, {
                   profile: assistantModelProfile,
                   dataPolicy,
                   messages,
-                  tools: deps.tools.declarations,
+                  tools,
                   maxOutputTokens: Math.min(
                     limits.outputTokensPerCall,
                     limits.outputTokens - usage.outputTokens,
@@ -289,7 +311,7 @@ export function createAssistant(deps: {
                 break;
               }
 
-              const current = await authorize(context);
+              current = await authorize(context);
               const budget = Math.max(0, limits.toolCalls - usage.toolCalls);
               const executions = await untilAborted(
                 Promise.all(

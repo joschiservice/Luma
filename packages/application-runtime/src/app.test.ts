@@ -7,8 +7,12 @@ import { createApiClient } from '@luma/api-contract/client';
 import { openApiDocument } from '@luma/api-contract/openapi';
 import { buildApp } from '@luma/application-runtime';
 import { createProviderCatalog } from '@luma/connections/composition';
-import type { IdentityService, TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
+import type { IdentityService } from '@luma/identity';
+import {
+  builtInMembership,
+  IdentityError,
+  makeTenantContext,
+} from '@luma/identity';
 import { createObservability } from '@luma/platform/composition';
 import {
   InMemorySpanExporter,
@@ -232,19 +236,25 @@ function fixture() {
       if (!credentials.cookie)
         throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
 
-      return {
-        tenantId,
-        dataRegion: 'EU',
-        requestId,
-        actor: {
-          type: 'user',
-          id: 'private-user',
-          sessionId: 'private-session',
-          initiatingUserId: 'private-user',
-          membershipId: 'private-membership',
-          role: 'owner',
+      return makeTenantContext(
+        { userId: 'private-user', sessionId: 'private-session' },
+        {
+          id: tenantId,
+          name: 'Workspace',
+          slug: 'workspace',
+          dataRegion: 'EU',
+          status: 'active',
         },
-      } as TenantContext;
+        builtInMembership(
+          {
+            id: 'private-membership',
+            organizationId: tenantId,
+            userId: 'private-user',
+          },
+          'owner',
+        ),
+        requestId,
+      );
     }),
   };
 
@@ -261,6 +271,7 @@ describe('observability baseline', () => {
     );
     app.post(
       '/v1/organizations/:organizationId/test-operation',
+      { config: { access: { access: 'member' } } },
       async (request) => {
         const parent = request.observation!.context;
         expect(parent.tenantRef).toMatch(/^[a-f0-9]{64}$/);
@@ -378,14 +389,18 @@ describe('observability baseline', () => {
   it('isolates concurrent tenants and requests, rejecting client request IDs and malformed action IDs', async () => {
     const { spans, observability, identity } = fixture();
     const app = buildApp({}, { observability, identity });
-    app.get('/v1/organizations/:organizationId/concurrent', async (request) => {
-      const context = request.observation!.context;
-      await observability.run(context, 'workflow.run', async () => {
-        await new Promise((resolve) => setTimeout(resolve, 5));
-      });
+    app.get(
+      '/v1/organizations/:organizationId/concurrent',
+      { config: { access: { access: 'member' } } },
+      async (request) => {
+        const context = request.observation!.context;
+        await observability.run(context, 'workflow.run', async () => {
+          await new Promise((resolve) => setTimeout(resolve, 5));
+        });
 
-      return {};
-    });
+        return {};
+      },
+    );
     try {
       const responses = await Promise.all(
         [

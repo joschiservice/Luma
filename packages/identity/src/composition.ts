@@ -4,11 +4,14 @@ import { Pool } from 'pg';
 
 import { createIdentityService } from './application/identity.js';
 import type { MailProvider } from './application/mail.js';
+import type { AppPermissionSource } from './application/roles.js';
+import { createRolesService } from './application/roles.js';
 import { createSettingsService } from './application/settings.js';
 import type { AuthSettings } from './infrastructure/auth.js';
 import { createResendMail } from './infrastructure/mail.js';
 import { createMailDelivery } from './infrastructure/mail-delivery.js';
 import { createRepository } from './infrastructure/repository.js';
+import { createRolesRepository } from './infrastructure/roles.js';
 import { createSettingsRepository } from './infrastructure/settings.js';
 
 /**
@@ -59,6 +62,14 @@ export function createIdentity(
   return {
     service,
     settings: workspaceSettings,
+    /** Creates the roles service; app permissions come from the workspace app host. */
+    roles: (appPermissions: AppPermissionSource = async () => []) =>
+      createRolesService({
+        repository: createRolesRepository(pool),
+        appPermissions,
+        id: randomUUID,
+        now: () => new Date(),
+      }),
     mailDelivery,
     trustedOrigins: settings.trustedOrigins,
     handler: auth.handler,
@@ -83,4 +94,4 @@ export function createIdentity(
   };
 }
 
-export { makeTenantContext } from './domain/context.js';
+export { builtInMembership, makeTenantContext } from './domain/context.js';

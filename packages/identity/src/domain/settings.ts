@@ -1,3 +1,5 @@
+import type { RoleReference } from './roles.js';
+
 export interface WorkspaceSettings {
   name: string;
   slug: string;
@@ -39,7 +41,7 @@ export type DeliveryState = 'queued' | 'sent' | 'failed' | 'cancelled';
 export interface WorkspaceInvitation {
   id: string;
   email: string;
-  role: 'admin' | 'member';
+  role: RoleReference & { archived: boolean };
   status: 'pending' | 'expired' | 'accepted' | 'revoked';
   expiresAt: string;
   createdAt: string;

@@ -10,7 +10,7 @@ export async function readStockContext(
   tx: SqlTransaction,
   tenantId: string,
   position: StockPosition,
-): Promise<Omit<InventoryDetail, 'position' | 'asOf'>> {
+): Promise<Omit<InventoryDetail, 'position' | 'hidden' | 'asOf'>> {
   const history = await tx.query<{
     id: string;
     connectionId: string;

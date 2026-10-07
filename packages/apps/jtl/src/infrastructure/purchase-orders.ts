@@ -17,6 +17,7 @@ import {
 import { API_VERSION, createClient, fail, parse } from '@luma/connector-jtl';
 import { z } from 'zod';
 
+import { jtlPermissions } from '../domain/permissions.js';
 import type { JtlConnectorOptions } from './adapter.js';
 import { adapterVersion, outputs } from './outputs.js';
 import * as s from './schemas.js';
@@ -504,6 +505,7 @@ export function createJtlPurchaseOrderCapabilities(
     descriptor: {
       version: '0',
       minimumRisk: 'high',
+      permission: jtlPermissions.purchaseOrders,
       idempotency: 'provider_key',
       retry: { maxAttempts: 1, initialDelayMs: 0 },
     },

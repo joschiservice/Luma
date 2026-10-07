@@ -1,5 +1,9 @@
-import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireRole, requireTenant } from '@luma/identity';
+import type { Permission, TenantContext } from '@luma/identity';
+import {
+  IdentityError,
+  requirePermission,
+  requireTenant,
+} from '@luma/identity';
 
 import {
   type AuthoringMode,
@@ -175,13 +179,10 @@ export function createWorkflowDrafts(deps: {
   id(): string;
   now(): Date;
 }) {
-  async function authorize(context: TenantContext, write = false) {
+  async function authorize(context: TenantContext, permission: Permission) {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
-    requireRole(
-      fresh,
-      write ? ['owner', 'admin'] : ['owner', 'admin', 'member'],
-    );
+    requirePermission(fresh, permission);
     if (fresh.actor.id !== context.actor.id)
       throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
 
@@ -505,15 +506,17 @@ export function createWorkflowDrafts(deps: {
     },
     /** Lists what authors can use here, including entries that cannot run and why. */
     async vocabulary(context: TenantContext): Promise<AuthoringVocabulary> {
-      return vocabulary(await authorize(context));
+      return vocabulary(await authorize(context, 'workflows.read'));
     },
     /** Lists open drafts in the workspace. */
     async list(context: TenantContext) {
-      return (await deps.store.list(await authorize(context))).map(view);
+      return (
+        await deps.store.list(await authorize(context, 'workflows.read'))
+      ).map(view);
     },
     /** Reads one draft. Discarded drafts are not found. */
     async get(context: TenantContext, id: string) {
-      return view(await open(await authorize(context), id));
+      return view(await open(await authorize(context, 'workflows.read'), id));
     },
     /**
      * Creates a draft. Reuse the same ID and body after an uncertain response; a different body
@@ -523,7 +526,7 @@ export function createWorkflowDrafts(deps: {
       context: TenantContext,
       input: { id: string; mode: AuthoringMode; start: DraftStart },
     ) {
-      context = await authorize(context, true);
+      context = await authorize(context, 'workflows.author');
       const createDigest = deps.hash({ ...input, actorId: context.actor.id });
       let content: WorkflowDraftContent;
       let basedOn: DraftOrigin | null = null;
@@ -624,7 +627,7 @@ export function createWorkflowDrafts(deps: {
         codeView?: string | null | undefined;
       },
     ) {
-      context = await authorize(context, true);
+      context = await authorize(context, 'workflows.author');
       const content = readable(input.content);
       if (input.codeView) {
         const code = readCode(input.codeView);
@@ -684,7 +687,7 @@ export function createWorkflowDrafts(deps: {
         code?: string | undefined;
       },
     ): Promise<DraftValidation> {
-      context = await authorize(context);
+      context = await authorize(context, 'workflows.read');
       const draft = input.draftId ? await open(context, input.draftId) : null;
       const code = input.code === undefined ? null : readCode(input.code);
       if (code && !code.content) return unreadable(draft, code.diagnostics);
@@ -706,7 +709,7 @@ export function createWorkflowDrafts(deps: {
       id: string,
       input: { revision: number; notes?: string | undefined },
     ) {
-      context = await authorize(context, true);
+      context = await authorize(context, 'workflows.publish');
 
       return deps.store.transaction(context, async (tx) => {
         const draft = await tx.lock(id);
@@ -763,7 +766,7 @@ export function createWorkflowDrafts(deps: {
       id: string,
       input: { revision: number },
     ) {
-      context = await authorize(context, true);
+      context = await authorize(context, 'workflows.author');
 
       return deps.store.transaction(context, async (tx) => {
         const draft = await tx.lock(id);

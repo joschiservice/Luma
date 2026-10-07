@@ -11,7 +11,7 @@ import { initServer } from '@ts-rest/fastify';
 
 import type { Insights } from '../application/insights.js';
 
-/** Exposes operational charts and the records behind each point to workspace members. */
+/** Exposes operational charts and the records behind each point to readers with `insights.read`. */
 export function insightRoutes(service?: Insights) {
   const ready = (context: TenantContext | null | undefined) => {
     if (!context)

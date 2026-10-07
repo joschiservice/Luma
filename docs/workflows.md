@@ -58,8 +58,8 @@ author, a revision and, when the code view made the last edit, its verbatim text
 Drafts never run and grant nothing.
 
 - **API:** `/v1/organizations/:organizationId/workflow-drafts` (list, create,
-  read, save, publish, discard) and `/workflow-authoring/validate`. Owners and
-  admins write; members read drafts and validate content.
+  read, save, publish, discard) and `/workflow-authoring/validate`. `workflows.author`
+  writes; `workflows.read` reads drafts and validates content.
 - **Saves** send the revision the editor loaded. A stale revision returns 409 and
   nothing is overwritten. Reuse the save ID and body after an uncertain response.
   Creates are idempotent by draft ID and body.
@@ -71,7 +71,7 @@ Drafts never run and grant nothing.
   publication; warnings say what cannot run in this workspace yet. Validation also
   returns each step's available values (its scope), a readable summary and the
   canonical code view text.
-- **Publication** re-authorizes an owner or admin, validates the exact saved
+- **Publication** re-authorizes `workflows.publish`, validates the exact saved
   revision and stores it in the existing immutable catalog in the same transaction
   as the draft update and audit entry. Provenance is `native` with
   `authoring: { mode, draftId, revision, notes }`. A new version must be higher
@@ -228,7 +228,7 @@ supply a normalized `belowThreshold` fact for replenishment. Events use their
 context kind as the event type. These contracts introduce no event bus or
 expression language.
 
-Owners and admins submit signals to
+People with `workflows.triggers.manage` submit signals to
 `POST /v1/organizations/:organizationId/workflows/:definitionId/starts`.
 The request includes the reviewed version digest, explicit subject kind and ID,
 source ID and occurrence time, and a typed input/evidence snapshot. The server
@@ -331,7 +331,7 @@ lists them with `workflowSources()`.
   of case workflows return 409.
 - **Actions:** the Shopify adapters call the app's existing correction and
   recovery services as the run's principal: persisted preview, policy approval
-  by a different owner or admin in Needs you, execution by the requester,
+  by someone else with `decisions.respond` in Needs you, execution by the requester,
   claims, compare-and-set or hold identity, and reconciliation. Previews stay
   open for a four-hour decision window. A preview whose change differs on a
   fresh read is replaced with one new proposal, up to 12 times, and Needs you
@@ -413,7 +413,7 @@ contributes its six simulator scenarios. Their replies apply to any draft step
 with the same read source, action or result check, so customized copies of the
 template get them too.
 
-Owners and admins save up to 20 cases with `PUT .../tests` against the tests
+People with `workflows.author` save up to 20 cases with `PUT .../tests` against the tests
 revision they loaded (0 before any are saved). A stale revision returns 409;
 retrying the same body is safe. `POST .../tests/run` runs every saved case that
 has no completed or running result on the current draft revision. Run IDs
@@ -432,7 +432,7 @@ Cases in a batch run one after another. A run's deadline is the Code Steps'
 wall time plus five seconds, multiplied by its position in a batch. A run left
 running past its deadline reads as failed and can be run again.
 
-Members can read saved cases, results and examples. Owners and admins save,
+Members can read saved cases, results and examples. People with `workflows.author` save,
 run and cancel. A run belongs to the person who started it; others get 404.
 Migration `0035_workflow_draft_tests.sql` stores cases and runs under tenant
 row-level security.
@@ -446,7 +446,7 @@ matrix outcomes) and `apps/api/e2e/workflow-draft-tests.e2e.mjs`.
 
 ## Describe a workflow
 
-Owners and admins can describe what should happen and get a draft to review,
+People with `workflows.author` can describe what should happen and get a draft to review,
 test and publish. The model is an author, not an authority: a generated draft
 goes through the same validation, tests, publication, activation, Action
 Admission and verification as a hand-built one. Generation never publishes,
@@ -457,7 +457,7 @@ activates, approves or starts a workflow.
   Gateway route on `bedrock-eu` with zero data retention and Bedrock settings
   (see [Model gateway](model-gateway.md#workflow-authoring-profile)). Without
   it, every generation request returns 503 with that reason and no model is
-  called. Roles are checked first, so members get 403.
+  called. Permissions are checked first, so people without `workflows.author` get 403.
 - **Describe:** `POST /workflow-authoring/describe` with
   `{ id, draftId, prompt }` creates draft `draftId` in `language` mode. The
   response has the draft and `generation`: an explanation per step,

@@ -298,8 +298,8 @@ const actions = (
   <div className="fulfillment-cell">
     <strong>Release hold · Incorrect address</strong>
     <small>
-      Needs approval from another owner or admin. Luma verifies with a fresh
-      read.
+      Needs approval from someone else who can approve changes. Luma verifies
+      with a fresh read.
     </small>
     <Button variant="outline">Preview release</Button>
   </div>

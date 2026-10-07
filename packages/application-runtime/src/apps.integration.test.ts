@@ -3,12 +3,16 @@ import { readFile } from 'node:fs/promises';
 
 import { createAppHost } from '@luma/app-catalog';
 import type { AppFactory } from '@luma/app-host';
-import { makeTenantContext } from '@luma/identity/composition';
+import {
+  builtInMembership,
+  makeTenantContext,
+} from '@luma/identity/composition';
 import { createTenantDatabase } from '@luma/platform/composition';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
+const actorId = '00000000-0000-4000-8000-0000000000ad';
 const fixtureApp: AppFactory = () => ({
   manifest: {
     id: 'fixture',
@@ -18,6 +22,9 @@ const fixtureApp: AppFactory = () => ({
     category: 'utility',
     ui: ['settings'],
     connectionTypes: [{ kind: 'fixture', name: 'Fixture' }],
+    permissions: [],
+    scopes: [],
+    slotAccess: { settings: 'connections.manage' },
   },
   connector: {
     appId: 'fixture',
@@ -40,6 +47,16 @@ const uiApp: AppFactory = () => ({
     category: 'utility',
     ui: ['page'],
     connectionTypes: [],
+    permissions: [
+      {
+        key: 'notes:notes.write',
+        label: 'Write notes',
+        description: 'Create and edit workspace notes.',
+        consequential: false,
+      },
+    ],
+    scopes: ['orders.read'],
+    slotAccess: { page: 'notes:notes.write' },
   },
 });
 
@@ -54,9 +71,12 @@ describe.skipIf(!databaseUrl)('workspace app lifecycle on PostgreSQL', () => {
     role: 'admin' | 'member' = 'admin',
   ) =>
     makeTenantContext(
-      { userId: 'admin', sessionId: 'session' },
+      { userId: actorId, sessionId: 'session' },
       { id, name: 'Store', slug: 'store', dataRegion: 'EU', status: 'active' },
-      { id: 'membership', organizationId: id, userId: 'admin', role },
+      builtInMembership(
+        { id: 'membership', organizationId: id, userId: actorId },
+        role,
+      ),
       randomUUID(),
     );
   const host = (factories: readonly AppFactory[] = [fixtureApp, uiApp]) =>
@@ -78,8 +98,12 @@ describe.skipIf(!databaseUrl)('workspace app lifecycle on PostgreSQL', () => {
         "SELECT pg_advisory_lock(hashtext('luma_test_role_setup'))",
       );
       for (const file of [
+        '0001_identity.sql',
         '0004_connector_installations.sql',
+        '0023_workspace_settings.sql',
         '0024_workspace_apps.sql',
+        '0054_workspace_roles.sql',
+        '0055_workspace_app_scopes.sql',
       ])
         await owner.query(
           await readFile(
@@ -121,7 +145,7 @@ describe.skipIf(!databaseUrl)('workspace app lifecycle on PostgreSQL', () => {
     await expect(app.connections.install(ctx, input)).rejects.toThrow(
       'Install this app',
     );
-    await app.apps.install(ctx, 'fixture', null);
+    await app.apps.install(ctx, 'fixture', null, []);
     const first = await app.connections.install(ctx, input),
       second = await app.connections.install(ctx, input);
     await app.connections.check(ctx, first.id, 1);
@@ -154,7 +178,7 @@ describe.skipIf(!databaseUrl)('workspace app lifecycle on PostgreSQL', () => {
         )
       ).rowCount,
     ).toBe(6);
-    await app.apps.install(ctx, 'fixture', 2);
+    await app.apps.install(ctx, 'fixture', 2, []);
     await expect(
       app.connections.credential(ctx, first.id, 'products.read'),
     ).rejects.toThrow();
@@ -172,7 +196,7 @@ describe.skipIf(!databaseUrl)('workspace app lifecycle on PostgreSQL', () => {
         };
       },
     ]);
-    await app.apps.install(ctx, 'fixture', null);
+    await app.apps.install(ctx, 'fixture', null, []);
     const connection = await app.connections.install(ctx, {
       label: 'Legacy',
       target: { kind: 'fixture' },
@@ -191,9 +215,11 @@ describe.skipIf(!databaseUrl)('workspace app lifecycle on PostgreSQL', () => {
     const ctx = context(),
       app = host();
     await expect(
-      app.apps.install(context(ctx.tenantId, 'member'), 'notes', null),
+      app.apps.install(context(ctx.tenantId, 'member'), 'notes', null, [
+        'orders.read',
+      ]),
     ).rejects.toThrow();
-    await app.apps.install(ctx, 'notes', null);
+    await app.apps.install(ctx, 'notes', null, ['orders.read']);
     expect((await app.apps.list(context())).installations).toEqual([]);
     const direct = await createTenantDatabase(runtime).transaction(
       context().tenantId,
@@ -213,7 +239,7 @@ describe.skipIf(!databaseUrl)('workspace app lifecycle on PostgreSQL', () => {
   });
   it('keeps the host usable when an app package is absent', async () => {
     const ctx = context();
-    await host().apps.install(ctx, 'notes', null);
+    await host().apps.install(ctx, 'notes', null, ['orders.read']);
     const empty = host([]);
     expect(empty.registry.list()).toEqual([]);
     expect(empty.providerCatalog.list()).toEqual([]);
@@ -230,7 +256,7 @@ describe.skipIf(!databaseUrl)('workspace app lifecycle on PostgreSQL', () => {
       factories: [uiApp],
       env: {},
     });
-    await app.apps.install(ctx, 'notes', null);
+    await app.apps.install(ctx, 'notes', null, ['orders.read']);
     expect(await app.apps.requireInstalled(ctx, 'notes')).toBe(1);
   });
   it('rolls back connection revocation when an app cleanup hook fails', async () => {
@@ -242,7 +268,7 @@ describe.skipIf(!databaseUrl)('workspace app lifecycle on PostgreSQL', () => {
     });
     const ctx = context(),
       app = host([failing]);
-    await app.apps.install(ctx, 'fixture', null);
+    await app.apps.install(ctx, 'fixture', null, []);
     const connection = await app.connections.install(ctx, {
       label: 'Test',
       target: { kind: 'fixture' },
@@ -262,7 +288,7 @@ describe.skipIf(!databaseUrl)('workspace app lifecycle on PostgreSQL', () => {
   it('rejects late credential persistence after uninstall at the database boundary', async () => {
     const ctx = context(),
       app = host();
-    await app.apps.install(ctx, 'fixture', null);
+    await app.apps.install(ctx, 'fixture', null, []);
     const connection = await app.connections.install(ctx, {
       label: 'Test',
       target: { kind: 'fixture' },
@@ -278,7 +304,7 @@ describe.skipIf(!databaseUrl)('workspace app lifecycle on PostgreSQL', () => {
         ),
       ),
     ).rejects.toThrow('App is not installed');
-    await app.apps.install(ctx, 'fixture', 2);
+    await app.apps.install(ctx, 'fixture', 2, []);
     await expect(
       createTenantDatabase(runtime).transaction(ctx.tenantId, (tx) =>
         tx.query(

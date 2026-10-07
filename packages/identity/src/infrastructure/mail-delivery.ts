@@ -1,6 +1,9 @@
 import type { Pool } from 'pg';
 
 import type { MailProvider } from '../application/mail.js';
+import { builtInRoles, isBuiltInRole } from '../domain/roles.js';
+import type { MembershipRow } from './access.js';
+import { membershipFromRow, membershipSelect } from './access.js';
 import { workspaceTransaction } from './settings.js';
 
 interface Delivery {
@@ -93,15 +96,40 @@ export function createMailDelivery(
             let text = `Email delivery is working. Manage your preferences: ${origin}/app/${tenantId}/settings/notifications`;
             if (message.kind === 'invitation') {
               const invite = (
-                await tx.query<{ email: string; role: string }>(
-                  `SELECT i.email,i.role FROM workspace_invitations i JOIN memberships m ON m.tenant_id=i.tenant_id AND m.user_id=i.inviter_id
-              WHERE i.tenant_id=$1 AND i.id=$2 AND i.generation=$3 AND i.status='pending' AND i.expires_at>now() AND m.role IN ('admin','owner')`,
+                await tx.query<{
+                  email: string;
+                  role: string;
+                  roleName: string | null;
+                  inviterId: string;
+                }>(
+                  `SELECT i.email,i.role,r.name AS "roleName",i.inviter_id AS "inviterId" FROM workspace_invitations i
+              LEFT JOIN workspace_roles r ON r.tenant_id=i.tenant_id AND r.id=i.custom_role_id AND r.archived_at IS NULL
+              WHERE i.tenant_id=$1 AND i.id=$2 AND i.generation=$3 AND i.status='pending' AND i.expires_at>now()`,
                   [tenantId, message.invitation_id, message.generation],
                 )
               ).rows[0];
-              to = invite?.email;
+              // The inviter must still be allowed to invite when the message is sent.
+              const inviter = invite
+                ? (
+                    await tx.query<MembershipRow>(
+                      `${membershipSelect} WHERE m.tenant_id=$1 AND m.user_id=$2`,
+                      [tenantId, invite.inviterId],
+                    )
+                  ).rows[0]
+                : undefined;
+              const allowed =
+                invite &&
+                inviter &&
+                (invite.role !== 'custom' || invite.roleName) &&
+                membershipFromRow(inviter).permissions.has('members.manage');
+              const roleName =
+                invite?.roleName ??
+                (invite && isBuiltInRole(invite.role)
+                  ? builtInRoles[invite.role].name
+                  : 'Member');
+              to = allowed ? invite.email : undefined;
               subject = 'You’re invited to a Luma workspace';
-              text = `You have been invited as ${invite?.role ?? 'a member'}. Sign in with this email address to review and accept the invitation. This link expires in seven days.\n\n${origin}/app/invitations/${tenantId}/${message.invitation_id}#${token(tenantId, message.invitation_id!, message.generation!)}`;
+              text = `You have been invited with the ${roleName} role. Sign in with this email address to review and accept the invitation. This link expires in seven days.\n\n${origin}/app/invitations/${tenantId}/${message.invitation_id}#${token(tenantId, message.invitation_id!, message.generation!)}`;
             } else {
               const recipient = (
                 await tx.query<{

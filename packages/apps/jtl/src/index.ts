@@ -8,6 +8,7 @@ import { simulationTransport } from '@luma/connections/adapters';
 import { z } from 'zod';
 
 import { type JtlEndpoint, readJtlEndpoints } from './config.js';
+import { jtlPermissions } from './domain/permissions.js';
 import { createJtlConnector } from './infrastructure/adapter.js';
 import { approvedJtlFetch } from './infrastructure/approved-jtl-fetch.js';
 import {
@@ -167,6 +168,36 @@ export function createApp(context: AppFactoryContext): AppDefinition {
         { kind: 'jtl-cloud', name: 'JTL Cloud' },
         { kind: 'jtl-onprem', name: 'JTL-Wawi on-premise' },
       ],
+      permissions: [
+        {
+          key: jtlPermissions.purchaseOrders,
+          label: 'Submit purchase orders to JTL',
+          description:
+            'Propose, approve and send purchase orders to JTL. Approving also needs permission to approve changes.',
+          consequential: true,
+        },
+        {
+          key: jtlPermissions.shippingMethod,
+          label: 'Change JTL shipping methods',
+          description:
+            'Propose, approve and apply shipping-method corrections on JTL orders. Approving also needs permission to approve changes.',
+          consequential: true,
+        },
+      ],
+      scopes: [
+        'orders.read',
+        'fulfillment.read',
+        'inventory.read',
+        'products.read',
+        'customers.read',
+        'procurement.read',
+        'actions.propose',
+        'actions.execute',
+      ],
+      slotAccess: {
+        connections: 'connections.manage',
+        settings: 'connections.manage',
+      },
     },
     connector: createJtlProvider({
       jtlEndpoints: readJtlEndpoints(context.env),

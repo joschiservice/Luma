@@ -21,11 +21,11 @@ Provider incoming quantities are not available in current canonical projections 
 are explicitly unknown in the UI. SKUs are labeled with a source SKU code from the
 product catalog when one is known, otherwise with the canonical key (shortened for
 imported records). `skuKey` keeps the canonical key that purchase orders use. The
-detail page lists the sources behind the SKU and lets owners and admins link or
+detail page lists the sources behind the SKU and lets people with `sync.manage` link or
 unlink matching SKUs from other sources. **Product listings for this SKU** opens the
 [Products workspace](products-workspace.md).
 
-Owners and admins can review an ERP-backed Shopify available-stock correction on
+People with `shopify:inventory_corrections.apply` can review an ERP-backed Shopify available-stock correction on
 stock detail. A different administrator approves the exact source, location and
 quantity. Writes require fresh evidence, unambiguous mappings and inventory write
 access. Acceptance and independently verified stock remain separate states; see

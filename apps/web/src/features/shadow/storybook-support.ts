@@ -1,5 +1,6 @@
 import type { WorkflowSummary } from '@luma/api-contract';
 
+import { contextFixture } from '../identity/context.fixture';
 import type { ShadowComparison, ShadowReport } from './data';
 
 export const organizationId = '22222222-2222-4222-8222-222222222222';
@@ -184,19 +185,13 @@ export function mockShadow(state: PreviewState) {
         { status },
       );
     if (url.pathname.endsWith('/context'))
-      return Response.json({
-        tenantId: organizationId,
-        dataRegion: 'EU',
-        requestId: 'preview',
-        actor: {
-          type: 'user',
-          id: organizationId,
-          initiatingUserId: organizationId,
-          sessionId: organizationId,
-          membershipId: organizationId,
-          role: state === 'member' ? 'member' : 'owner',
-        },
-      });
+      return Response.json(
+        contextFixture(
+          organizationId,
+          state === 'member' ? 'member' : 'owner',
+          organizationId,
+        ),
+      );
     if (state === 'denied') return fail(403);
     if (state === 'error') return fail(503);
     if (url.pathname.endsWith('/playbooks'))

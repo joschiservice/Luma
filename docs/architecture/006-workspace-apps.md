@@ -12,6 +12,10 @@ App UI has separate build entry points and loads only after workspace installati
 
 Uninstall atomically revokes credentials and grants while retaining historical evidence. Installation versions reject stale authorization and credential persistence. Missing app implementations produce an unavailable contribution rather than a core startup dependency.
 
+## App permissions, scopes and consent
+
+Added by [ADR-009](009-permissions-and-roles.md). Manifests declare the app's own permissions (`<app-id>:<name>`), the core scopes it needs, and a permission for each UI slot and decision kind; registration validates them. Installing grants exactly the requested scopes, which the installer must hold; scopes added by an upgrade wait for approval. When an app acts for a person it is limited to what the person's permissions, the app's granted scopes and the app's own permission all allow. The host checks installation and declared permissions before app routes run, mounts slots only for people who hold their permission, and filters app decisions; apps hold no role logic. Uninstalling removes scope grants and the app's permissions from every role in the same transaction; reinstalling restores neither.
+
 ## Consequences
 
 The deployment catalog is generated from app directories. App removal requires catalog regeneration and dependency installation, followed by a rebuild. Core code is unchanged. App migrations are namespaced and immutable; removing code does not drop data.

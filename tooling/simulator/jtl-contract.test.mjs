@@ -3,7 +3,10 @@ import { test } from 'node:test';
 
 import { createInstallationVerifier, createJtlConnector } from '@luma/app-jtl';
 import { createCapabilityRuntime } from '@luma/connections/adapters';
-import { makeTenantContext } from '@luma/identity/composition';
+import {
+  builtInMembership,
+  makeTenantContext,
+} from '@luma/identity/composition';
 
 import {
   createMemoryStore,
@@ -28,7 +31,10 @@ const tenant = makeTenantContext(
     status: 'active',
     dataRegion: 'EU',
   },
-  { id: 'member', organizationId: tenantId, userId: 'owner', role: 'owner' },
+  builtInMembership(
+    { id: 'member', organizationId: tenantId, userId: 'owner' },
+    'owner',
+  ),
   'request',
 );
 

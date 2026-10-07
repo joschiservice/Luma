@@ -1,8 +1,8 @@
-import { makeTenantContext } from '@luma/identity';
 import { expect, it, vi } from 'vitest';
 
 import type { MeasurementStore } from './measurement.js';
 import { createMeasurementService } from './measurement.js';
+import { testContext } from './tenant-context.fixture.js';
 
 const tenant = '00000000-0000-4000-8000-000000000001';
 
@@ -11,18 +11,7 @@ function context(
   userId = 'operator',
   tenantId = tenant,
 ) {
-  return makeTenantContext(
-    { userId, sessionId: 'session' },
-    {
-      id: tenantId,
-      name: 'Workspace',
-      slug: 'workspace',
-      status: 'active',
-      dataRegion: 'EU',
-    },
-    { id: 'membership', organizationId: tenantId, userId, role },
-    'test',
-  );
+  return testContext({ role, userId, tenantId });
 }
 
 it.each(['role', 'actor', 'tenant'] as const)(

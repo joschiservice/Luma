@@ -85,6 +85,10 @@ export interface ProductSales {
   daily: { date: string; quantity: string }[];
 }
 
+/** Product detail sections that need another area's read permission. */
+export type ProductDetailSection =
+  'stock' | 'sales' | 'orders' | 'purchaseOrders' | 'issues';
+
 export interface ProductDetail {
   item: CatalogItem;
   sources: CatalogSource[];
@@ -130,12 +134,15 @@ export interface ProductDetail {
   }[];
   issues: { id: string; label: string; state: string }[];
   relatedTruncated: boolean;
+  /** Sections left empty because the reader can't read their area. */
+  hidden: ProductDetailSection[];
   asOf: string;
 }
 
 /**
  * Reads the tenant's product catalog by canonical SKU and compares each source's listing,
- * price and status without choosing an authoritative source.
+ * price and status without choosing an authoritative source. Requires `products.read`; detail
+ * sections of other areas need their read permission.
  */
 export interface ProductWorkspace {
   /** Returns up to `limit` SKUs. A cursor must belong to the same tenant and filters. */

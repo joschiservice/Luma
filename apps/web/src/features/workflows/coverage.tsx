@@ -152,7 +152,7 @@ function CoverageDetail({
           <strong>{nextAction.label}</strong>
           <p>
             {setup && !item.canManage
-              ? 'An owner or admin can set up a stock rule for this position.'
+              ? 'Your role doesn’t include Manage procurement, so you can’t set up a stock rule for this position.'
               : nextAction.description}
           </p>
         </div>

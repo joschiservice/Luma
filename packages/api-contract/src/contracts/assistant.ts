@@ -5,7 +5,12 @@ import {
   assistantAnswerSchema,
   assistantAvailabilitySchema,
 } from '../assistant.js';
-import { apiErrorSchema, organizationParamsSchema } from '../common.js';
+import {
+  anyMember,
+  apiErrorSchema,
+  organizationParamsSchema,
+  requires,
+} from '../common.js';
 
 const c = initContract();
 const path = '/v1/organizations/:organizationId/assistant';
@@ -13,6 +18,8 @@ const path = '/v1/organizations/:organizationId/assistant';
 export const assistantContract = c.router({
   availability: {
     method: 'GET',
+    // Answers "unavailable" with a reason for people without assistant.use.
+    metadata: anyMember,
     path,
     pathParams: organizationParamsSchema,
     responses: {
@@ -24,10 +31,11 @@ export const assistantContract = c.router({
     },
     summary: 'Check whether you can ask Luma here',
     description:
-      'Members can check this. Asking Luma needs an EU model route with zero data retention. When none is configured, `available` is false and `reason` explains what whoever runs the server must set up. `reads` lists the records the assistant can look up.',
+      'Any member can check this. Asking Luma needs the Use Ask Luma permission and an EU model route with zero data retention. Without either, `available` is false and `reason` explains what is missing. `reads` lists the records the assistant can look up for you, based on your role.',
   },
   ask: {
     method: 'POST',
+    metadata: requires('assistant.use'),
     path: `${path}/answers`,
     pathParams: organizationParamsSchema,
     body: askAssistantSchema,

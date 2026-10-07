@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { requireRole, requireTenant } from '@luma/identity';
+import { requirePermission, requireTenant } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
 import { z } from 'zod';
 
@@ -116,7 +116,7 @@ function stored(row: Row): StoredCustomerProfile {
 export function createCustomerProfiles(db: TenantDatabase): CustomerProfiles {
   return {
     async upsert(context, input) {
-      requireRole(context, ['owner', 'admin']);
+      requirePermission(context, 'sync.manage');
       const value = profileSchema.parse(input);
 
       return db.transaction(context.tenantId, async (tx) => {
@@ -185,7 +185,7 @@ export function createCustomerProfiles(db: TenantDatabase): CustomerProfiles {
       });
     },
     async erase(context, connectionId, externalIds) {
-      requireRole(context, ['owner', 'admin']);
+      requirePermission(context, 'sync.manage');
       z.string().uuid().parse(connectionId);
       if (externalIds)
         z.array(z.string().min(1).max(1024)).max(10000).parse(externalIds);

@@ -35,6 +35,7 @@ import { usesCommandKey } from '../../lib/keyboard';
 import { setThemePreference, type ThemePreference } from '../../lib/theme';
 import { ordersOptions, suppliersOptions } from '../procurement/data';
 import { recordsOptions } from '../records/data';
+import { usePermissions } from './permissions';
 import { workspaceDestinations } from './workspace-destinations';
 
 const subscribePlatform = () => () => undefined;
@@ -131,6 +132,7 @@ export function WorkspaceSearch({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [recordQuery, setRecordQuery] = useState('');
+  const { can } = usePermissions(organizationId);
   const modifier = useSyncExternalStore(
     subscribePlatform,
     platformModifier,
@@ -171,7 +173,7 @@ export function WorkspaceSearch({
   });
 
   // Procurement records are Luma-owned, so they are searched here rather than in Records.
-  const purchasing = open && recordQuery.length >= 2;
+  const purchasing = open && recordQuery.length >= 2 && can('procurement.read');
   const procurementOrders = useQuery({
     ...ordersOptions(organizationId),
     enabled: purchasing,
@@ -209,18 +211,24 @@ export function WorkspaceSearch({
           })),
       ]
     : [];
-  const pages = workspaceDestinations.filter((item) =>
-    matches(query, `${item.label} ${item.description}`),
+  const pages = workspaceDestinations.filter(
+    (item) =>
+      (!item.permission || can(item.permission)) &&
+      matches(query, `${item.label} ${item.description}`),
   );
   // Any longer query can become a question for Luma.
-  const question = query.trim().length >= 3 ? query.trim() : '';
+  const question =
+    query.trim().length >= 3 && can('assistant.use') ? query.trim() : '';
+  const offered = commands.filter(
+    (item) => item.kind !== 'assistant' || can('assistant.use'),
+  );
   const actions = query.trim()
-    ? commands.filter(
+    ? offered.filter(
         (item) =>
           (item.kind === 'assistant' && question) ||
           matches(query, `${item.label} ${item.description} ${item.keywords}`),
       )
-    : commands;
+    : offered;
   const focusable = () =>
     Array.from(
       results.current?.querySelectorAll<HTMLElement>('a, button') ?? [],

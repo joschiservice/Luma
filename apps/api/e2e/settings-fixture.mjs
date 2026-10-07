@@ -91,7 +91,7 @@ export async function settingsFixture(
     owner,
     `${base}/members`,
     'POST',
-    { userId: member.id, role: 'member' },
+    { userId: member.id, roleId: 'member' },
     201,
   );
   const command = (body) => ({ commandId: randomUUID(), ...body });

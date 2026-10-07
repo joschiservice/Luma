@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto';
 
-import { requireTenant } from '@luma/identity';
+import { requirePermission } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
 import { z } from 'zod';
 
+import { hiddenSections } from '../../application/access.js';
 import type { ReturnWorkspace } from '../../application/returns.js';
 import { readReturnDetail } from './detail.js';
 import { readReturns, readReturnSources, type ReturnPosition } from './list.js';
@@ -23,7 +24,7 @@ const encode = (context: string, position: ReturnPosition) =>
 export function createReturnWorkspace(db: TenantDatabase): ReturnWorkspace {
   return {
     async list(context, query) {
-      requireTenant(context, context.tenantId);
+      requirePermission(context, 'returns.read');
       const scope = createHash('sha256')
         .update(
           JSON.stringify([
@@ -86,14 +87,24 @@ export function createReturnWorkspace(db: TenantDatabase): ReturnWorkspace {
       );
     },
     async get(context, id) {
-      requireTenant(context, context.tenantId);
+      requirePermission(context, 'returns.read');
+      const hidden = hiddenSections<'order'>(context, [
+        ['order', 'orders.read'],
+      ]);
 
       return db.transaction(
         context.tenantId,
         async (tx) => {
           const detail = await readReturnDetail(tx, context.tenantId, id);
 
-          return detail ? { ...detail, asOf: new Date().toISOString() } : null;
+          return detail
+            ? {
+                ...detail,
+                order: hidden.length ? null : detail.order,
+                hidden,
+                asOf: new Date().toISOString(),
+              }
+            : null;
         },
         { readOnlySnapshot: true },
       );

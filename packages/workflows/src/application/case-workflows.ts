@@ -1,5 +1,14 @@
-import type { IdentityService, TenantContext } from '@luma/identity';
-import { IdentityError, requireRole, requireTenant } from '@luma/identity';
+import type {
+  IdentityService,
+  Permission,
+  TenantContext,
+} from '@luma/identity';
+import {
+  hasPermission,
+  IdentityError,
+  requirePermission,
+  requireTenant,
+} from '@luma/identity';
 import { canonicalJson } from '@luma/platform';
 import type { PolicyService } from '@luma/policies';
 
@@ -201,13 +210,13 @@ export function createCaseWorkflows(deps: {
   // Case subjects never change, so each case is mapped once per process.
   const subjects = new Map<string, { kind: string; id: string } | null>();
 
-  async function authorize(context: TenantContext, write = false) {
+  async function authorize(
+    context: TenantContext,
+    permission: Permission = 'workflows.read',
+  ) {
     const fresh = await deps.identity.refreshContext(context);
     requireTenant(fresh, context.tenantId);
-    requireRole(
-      fresh,
-      write ? ['owner', 'admin'] : ['owner', 'admin', 'member'],
-    );
+    requirePermission(fresh, permission);
     if (fresh.actor.id !== context.actor.id)
       throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
 
@@ -442,13 +451,13 @@ export function createCaseWorkflows(deps: {
           inputs: version.inputs,
           context: version.context,
           approval:
-            'Each change waits for policy approval by a different owner or admin before it is sent.',
+            'Each change waits for policy approval by someone else who can approve changes before it is sent.',
         },
       ],
       activations: mine.map(view),
       connections: [],
       principalId: context.actor.id,
-      canManage: context.actor.role !== 'member',
+      canManage: hasPermission(context, 'workflows.publish'),
       policyVersion,
       evaluationEvidence: 'unavailable',
     };
@@ -462,7 +471,7 @@ export function createCaseWorkflows(deps: {
       run.id,
     );
     requireTenant(context, run.tenantId);
-    requireRole(context, ['owner', 'admin']);
+    requirePermission(context, 'actions.propose');
     if (run.actor.kind !== 'user' || context.actor.id !== run.actor.id)
       throw new Error('Workflow principal changed');
     const stored = await deps.runs.run(context, run.id);
@@ -659,7 +668,10 @@ export function createCaseWorkflows(deps: {
     },
     content: () => draftFromVersion(found.version),
     async install(context) {
-      await deps.catalog.publish(await authorize(context, true), found.version);
+      await deps.catalog.publish(
+        await authorize(context, 'workflows.publish'),
+        found.version,
+      );
     },
   }));
 
@@ -717,7 +729,7 @@ export function createCaseWorkflows(deps: {
         policyVersion: string;
       },
     ) {
-      context = await authorize(context, true);
+      context = await authorize(context, 'workflows.publish');
       const found = adapter(id);
       const existing = (await deps.store.list(context)).find(
         (item) => item.id === input.id,
@@ -785,7 +797,7 @@ export function createCaseWorkflows(deps: {
       activationId: string,
       digest: string,
     ) {
-      context = await authorize(context, true);
+      context = await authorize(context, 'workflows.publish');
       adapter(id);
       const current = (await deps.store.list(context)).find(
         (item) => item.id === activationId && item.definitionId === id,
@@ -814,7 +826,8 @@ export function createCaseWorkflows(deps: {
      * recently. Runs as the activating principal; other principals' runs are left to them.
      */
     async tick(context: TenantContext) {
-      context = await authorize(context, true);
+      // Runs prepare actions as the activating principal; admission checks execution.
+      context = await authorize(context, 'actions.propose');
       if (!available) return;
       const activations = (await deps.store.list(context)).filter(
         (item) => item.principalId === context.actor.id,

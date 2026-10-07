@@ -10,7 +10,7 @@ import { initServer } from '@ts-rest/fastify';
 
 import type { RecordExplorer } from '../application/records.js';
 
-/** Exposes scoped record search and detail reads to workspace members. */
+/** Exposes record search and detail reads for the record kinds the reader may read. */
 export function recordRoutes(service?: RecordExplorer) {
   return initServer().router(apiContract.records, {
     resolve: async ({ request, query }) => {

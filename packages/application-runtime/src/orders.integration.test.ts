@@ -13,7 +13,10 @@ import {
   orderAttentionQuery,
 } from '@luma/exceptions/composition';
 import type { IdentityService } from '@luma/identity';
-import { makeTenantContext } from '@luma/identity/composition';
+import {
+  builtInMembership,
+  makeTenantContext,
+} from '@luma/identity/composition';
 import {
   createOrderListRebuilder,
   createOrderMetricReader,
@@ -64,12 +67,10 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
         status: 'active',
         dataRegion: 'EU',
       },
-      {
-        id: 'membership',
-        organizationId: tenantId,
-        userId: 'operator',
-        role: 'owner',
-      },
+      builtInMembership(
+        { id: 'membership', organizationId: tenantId, userId: 'operator' },
+        'owner',
+      ),
       randomUUID(),
     );
   }

@@ -21,7 +21,10 @@ import {
   orderAttentionQuery,
 } from '@luma/exceptions/composition';
 import type { TenantContext } from '@luma/identity';
-import { makeTenantContext } from '@luma/identity/composition';
+import {
+  builtInMembership,
+  makeTenantContext,
+} from '@luma/identity/composition';
 import {
   createOrderMetricReader,
   orderStateQueries,
@@ -234,7 +237,10 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
         status: 'active',
         dataRegion: 'EU',
       },
-      { id: `m-${user}`, organizationId: tenant, userId: user, role },
+      builtInMembership(
+        { id: `m-${user}`, organizationId: tenant, userId: user },
+        role,
+      ),
       randomUUID(),
     );
   }

@@ -659,11 +659,15 @@ describe.skipIf(!databaseUrl)(
         baseURL: origin,
         trustedOrigins: [origin],
       });
-      app.get('/v1/organizations/:organizationId/capture', async (request) => {
-        contexts.set(request.id, request.tenantContext!);
+      app.get(
+        '/v1/organizations/:organizationId/capture',
+        { config: { access: { access: 'member' } } },
+        async (request) => {
+          contexts.set(request.id, request.tenantContext!);
 
-        return { requestId: request.id };
-      });
+          return { requestId: request.id };
+        },
+      );
       const a = await signup('alice');
       const b = await signup('bob');
       const m = await signup('member');
@@ -678,7 +682,7 @@ describe.skipIf(!databaseUrl)(
           method: 'POST',
           url: `/v1/organizations/${tenantId}/members`,
           headers: { cookie: a.cookie, origin },
-          payload: { userId: user.id, role },
+          payload: { userId: user.id, roleId: role },
         });
         expect(response.statusCode).toBe(201);
         if (role === 'admin') bobMembership = response.json().id;
@@ -1481,7 +1485,7 @@ describe.skipIf(!databaseUrl)(
           'approved',
           expiry,
         ),
-      ).rejects.toThrow('Insufficient');
+      ).rejects.toThrow('Your role does not allow');
       await expect(
         safety.policies.respond(
           outsider,
@@ -1653,7 +1657,7 @@ describe.skipIf(!databaseUrl)(
       ]);
       try {
         await expect(safety.execution.get(bob, randomUUID())).rejects.toThrow(
-          'Insufficient organization role',
+          'Your role does not allow',
         );
         expect(
           (

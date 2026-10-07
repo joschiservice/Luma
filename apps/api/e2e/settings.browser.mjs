@@ -166,10 +166,11 @@ test('manages workspace preferences and the complete invitation journey on deskt
   await recipient.waitForURL(`**/app/${f.org.id}/home*`);
   await page.reload();
   await page.getByRole('button', { name: 'Manage Outsider' }).click();
-  await page.getByRole('combobox', { name: 'Member role' }).click();
-  await page.getByRole('option', { name: 'Admin', exact: true }).click();
+  await page.getByRole('radio', { name: /^Admin/ }).check();
   await page.getByRole('button', { name: 'Save role' }).click();
-  await page.getByText('Member role updated.').waitFor();
+  await page
+    .getByText('Role updated. It applies on their next request.')
+    .waitFor();
   await page.getByRole('button', { name: 'Manage Outsider' }).click();
   await page.getByRole('button', { name: 'Remove access' }).click();
   await page.getByText('Workspace access removed.').waitFor();

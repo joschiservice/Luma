@@ -4,7 +4,11 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 import type { TenantContext } from '@luma/identity';
-import { IdentityError, makeTenantContext } from '@luma/identity';
+import {
+  builtInMembership,
+  IdentityError,
+  makeTenantContext,
+} from '@luma/identity';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -51,7 +55,10 @@ function context(
       dataRegion: 'EU',
       status: 'active',
     },
-    { id: `membership-${userId}`, organizationId: tenant, userId, role },
+    builtInMembership(
+      { id: `membership-${userId}`, organizationId: tenant, userId },
+      role,
+    ),
     'request',
   );
 }
@@ -484,13 +491,14 @@ describe('draft test runs', () => {
       outcome: 'awaiting_decision',
       stoppedAt: 'review',
       passed: true,
-      reason: 'The workflow would wait here for an owner or admin to decide.',
+      reason:
+        'The workflow would wait here for someone who can approve changes to decide.',
     });
     expect(pending.result!.steps.at(-1)).toMatchObject({
       stepId: 'review',
       state: 'waiting',
       branch: 'paused',
-      note: 'Would wait here for an owner or admin to approve.',
+      note: 'Would wait here for someone who can approve changes to decide.',
     });
 
     const withoutApproval = omit(example().replies, 'review');

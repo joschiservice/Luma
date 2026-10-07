@@ -63,7 +63,7 @@ export interface SourceRecords {
     connectionId: string,
     ingestKey: string,
   ): Promise<CommerceObservation | null>;
-  /** Records an evidence-backed mapping to an existing canonical entity; requires an owner or admin. */
+  /** Records an evidence-backed mapping to an existing canonical entity; requires `sync.manage`. */
   bind(
     context: TenantContext,
     source: SourceIdentity,
@@ -72,7 +72,7 @@ export interface SourceRecords {
     method: string,
   ): Promise<void>;
   /**
-   * Records many evidence-backed mappings in one sorted write; requires an owner or admin.
+   * Records many evidence-backed mappings in one sorted write; requires `sync.manage`.
    * A source already mapped elsewhere, missing evidence or a missing target rejects the batch.
    */
   bindMany(
@@ -118,7 +118,7 @@ export interface SourceRecords {
   ): Promise<SourceMapping[]>;
   /**
    * Moves a source mapping from `from` to `to` and appends a revision with the actor, method and
-   * reason; requires an owner or admin. Returns false without changes when the source no
+   * reason; requires `sync.manage`. Returns false without changes when the source no
    * longer maps to `from`. Callers must re-project affected snapshots afterwards.
    */
   remap(

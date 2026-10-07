@@ -15,7 +15,10 @@ import {
   createWorkspaceAssistant,
 } from '@luma/assistant/composition';
 import { IdentityError } from '@luma/identity';
-import { makeTenantContext } from '@luma/identity/composition';
+import {
+  builtInMembership,
+  makeTenantContext,
+} from '@luma/identity/composition';
 import type {
   JsonValue,
   ModelAdapter,
@@ -46,12 +49,10 @@ function context(userId = 'member-id') {
       dataRegion: 'EU',
       status: 'active',
     },
-    {
-      id: `membership-${userId}`,
-      organizationId: tenantId,
-      userId,
-      role: 'member',
-    },
+    builtInMembership(
+      { id: `membership-${userId}`, organizationId: tenantId, userId },
+      'member',
+    ),
     'request',
   );
 }

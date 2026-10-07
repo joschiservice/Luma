@@ -1,7 +1,11 @@
 import { randomUUID } from 'node:crypto';
 
 import type { EffectIntent } from '@luma/connections';
-import { IdentityError, makeTenantContext } from '@luma/identity';
+import {
+  builtInMembership,
+  IdentityError,
+  makeTenantContext,
+} from '@luma/identity';
 import type { ProcurementService } from '@luma/procurement';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -20,7 +24,10 @@ const context = makeTenantContext(
     dataRegion: 'EU',
     status: 'active',
   },
-  { id: randomUUID(), organizationId: tenantId, userId, role: 'owner' },
+  builtInMembership(
+    { id: randomUUID(), organizationId: tenantId, userId },
+    'owner',
+  ),
   randomUUID(),
 );
 const line = {

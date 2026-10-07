@@ -10,7 +10,7 @@ import type {
 } from '@luma/connections';
 import type { CustomerProfiles } from '@luma/customers';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireRole } from '@luma/identity';
+import { IdentityError, requirePermission } from '@luma/identity';
 
 import {
   failureMessage,
@@ -153,7 +153,7 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
       tenantId,
       `commerce-sync:${stream.id}`,
     );
-    requireRole(resolved, ['owner', 'admin']);
+    requirePermission(resolved, 'sync.manage');
 
     return resolved;
   }
