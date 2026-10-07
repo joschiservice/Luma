@@ -181,6 +181,11 @@ export async function placeOrder(
     id?: string | undefined;
     /** Injected incidents this order carries, by kind. */
     planned?: Partial<Record<IncidentKindName, string>> | undefined;
+    /**
+     * `payment-stuck`: the payment stays pending and never settles. `manual`: paid, but the
+     * merchant handles it by hand, so it's never imported, cancelled or shipped by the world.
+     */
+    handling?: 'payment-stuck' | 'manual' | undefined;
   },
 ) {
   const random = keyedRandom(
@@ -208,9 +213,14 @@ export async function placeOrder(
       ...(Object.keys(options.planned ?? {}) as IncidentKindName[]),
     ]),
   ].filter((kind) => kind !== 'shipping-method-mismatch' || express);
-  const pending = random.chance(
-    profile.payments.pendingRate + profile.payments.failedRate,
-  );
+  const stuck = options.handling === 'payment-stuck';
+  const manual = !!options.handling;
+  const pending =
+    stuck ||
+    (!manual &&
+      random.chance(
+        profile.payments.pendingRate + profile.payments.failedRate,
+      ));
   const fraudCheck = random.chance(profile.payments.fraudCheckRate);
   const holds =
     incidents.includes('fraud-hold') || fraudCheck
@@ -290,7 +300,8 @@ export async function placeOrder(
         order: order.order,
       },
     );
-  if (pending)
+  // Injected orders only progress through their incident.
+  if (pending && !manual)
     await schedule(
       world,
       world.now + logNormal(random, 20 * minute, 8 * hour),
@@ -304,8 +315,8 @@ export async function placeOrder(
             (profile.payments.pendingRate + profile.payments.failedRate),
       },
     );
-  else await planImport(world, order);
-  if (random.chance(profile.cancellations.rate))
+  else if (!pending && !manual) await planImport(world, order);
+  if (!manual && random.chance(profile.cancellations.rate))
     await schedule(
       world,
       world.now + logNormal(random, 30 * minute, 6 * hour),

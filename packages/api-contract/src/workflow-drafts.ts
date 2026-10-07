@@ -361,6 +361,8 @@ export const workflowTemplateSchema = z.object({
     'resolution',
     'inventory',
     'fulfillment',
+    'orders',
+    'returns',
     'connections',
   ]),
   trigger: z.string(),

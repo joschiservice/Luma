@@ -12,7 +12,10 @@ import type {
 } from '../domain/decision-item.js';
 import type { SupplierCommitmentDecision } from '../domain/decisions.js';
 
-export type { SupplierCommitmentDecision } from '../domain/decisions.js';
+export type {
+  SupplierCommitmentDecision,
+  WorkflowHandoverDecision,
+} from '../domain/decisions.js';
 
 export type {
   DecisionAssignment,

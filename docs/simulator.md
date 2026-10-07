@@ -106,22 +106,25 @@ Luma's sync process runs [scheduled detection](exception-detection.md#scheduled-
 
 A new workspace is set up the way a merchant would configure Luma, so workflows run on the simulated operations:
 
-- **Case workflows on:** _Correct Shopify stock from the ERP_, _Release an overdue fulfillment hold_ and _Check a failing connection_ are turned on as the workspace owner (`pilot-requester@example.test`). Each change waits in Needs you for a different admin, so sign in with `.luma/simulator-login.json` (`pilot-operator@example.test`) to approve it.
+- **Case workflows on:** _Correct Shopify stock from the ERP_, _Release an overdue fulfillment hold_, _Check a failing connection_ and the three follow-ups (_Follow up on an overdue supplier order_, _Chase a refund after a return arrives_, _Follow up on a payment that stays pending_) are turned on as the workspace owner (`pilot-requester@example.test`). Each change waits in Needs you for a different admin, so sign in with `.luma/simulator-login.json` (`pilot-operator@example.test`) to approve it.
 - **Suppliers and stock rules:** the suppliers of the eight most-demanded linked SKUs are created in Procurement and linked to JTL, and each SKU gets a _Replenish low stock_ rule. Two rules start just above current stock, so a purchase-order proposal follows the next fresh stock read. The new run gives these suppliers different answers (full, partial, delayed, short and silent), so sent purchase orders meet each.
-- **Detection timing:** with `--detection demo`, fulfillment counts as stuck after 20 minutes instead of two hours, and a hold is overdue after 30 minutes instead of a day. The workspace keeps its timing across restarts.
+- **Detection timing:** with `--detection demo`, fulfillment counts as stuck after 20 minutes instead of two hours, and a hold is overdue after 30 minutes instead of a day. Follow-ups are shorter too: the supplier follow-up waits 15 minutes, refunds count as missing 8 hours after the items arrive and payments 1 hour after the order. The workspace keeps its timing across restarts.
 
 The API process completes the setup once the records are imported and linked, retrying on each minute's pass; `tooling/simulator/demo.mjs` owns it. Proposals stay open for four hours. Luma rereads stock right before it acts, and replenishment rereads the stock of its rules while they wait, so proposals follow soon after stock falls.
 
 **Workflow scenarios** in the Incidents tab start a reproducible situation and state what Luma should do:
 
-| Scenario                     | What happens                                                                                                              |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Stock correction             | Stock drift; approve the proposed correction; Luma writes, verifies, and detection closes the case.                       |
-| Stock moves while waiting    | The same drift; let the shop sell before approving, and one new proposal replaces the old one in the same Needs you item. |
-| Write commits, response lost | The correction commits but its response is lost; Luma reconciles by reading and never writes twice.                       |
-| Overdue fraud hold           | A held order; after approval the hold is released, and the case stays open until the order ships.                         |
-| Shop outage                  | Reads fail; the connection check waits 15 minutes, then ends or hands the case over.                                      |
-| Access revoked               | A lost-access case opens and the connection check hands it to a person with Reconnect; it closes after a fresh scan.      |
+| Scenario                     | What happens                                                                                                                |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Stock correction             | Stock drift; approve the proposed correction; Luma writes, verifies, and detection closes the case.                         |
+| Stock moves while waiting    | The same drift; let the shop sell before approving, and one new proposal replaces the old one in the same Needs you item.   |
+| Write commits, response lost | The correction commits but its response is lost; Luma reconciles by reading and never writes twice.                         |
+| Overdue fraud hold           | A held order; after approval the hold is released, and the case stays open until the order ships.                           |
+| Shop outage                  | Reads fail; the connection check waits 15 minutes, then ends or hands the case over.                                        |
+| Supplier stays silent        | Suppliers stop confirming; the supplier follow-up notes a follow-up, waits, and hands a still-silent order back to a buyer. |
+| Refund never issued          | A shipped order's return arrives without a refund; the refund follow-up hands it to a person in Needs you.                  |
+| Payment stuck pending        | A new order's payment never settles; the payment follow-up hands it to a person in Needs you.                               |
+| Access revoked               | A lost-access case opens and the connection check hands it to a person with Reconnect; it closes after a fresh scan.        |
 
 A repeated request with the same ID starts nothing new. Definitions live in `packages/simulator/core/src/scenarios.ts`; `POST /api/runs/:id/scenarios` starts one. The incident list links each case to its latest workflow run and shows the run's state.
 

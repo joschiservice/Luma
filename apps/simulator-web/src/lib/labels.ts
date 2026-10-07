@@ -59,6 +59,7 @@ export const surfaceLabels: Record<string, string> = {
   fulfillment: 'Fulfillment view',
   returns: 'Returns view',
   orders: 'Orders view',
+  procurement: 'Supplier orders',
   connections: 'Connection status',
 };
 

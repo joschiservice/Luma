@@ -19,7 +19,13 @@ export interface WorkflowTemplate {
   name: string;
   purpose: string;
   category:
-    'procurement' | 'resolution' | 'inventory' | 'fulfillment' | 'connections';
+    | 'procurement'
+    | 'resolution'
+    | 'inventory'
+    | 'fulfillment'
+    | 'orders'
+    | 'returns'
+    | 'connections';
   trigger: string;
   steps: string[];
   success: string;

@@ -11,6 +11,7 @@ export const decisionKindSchema = z.enum([
   'fulfillment_recovery',
   'inventory_correction',
   'supplier_commitment',
+  'workflow_handover',
 ]);
 
 /**

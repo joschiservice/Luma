@@ -50,6 +50,7 @@ import {
   createReturnWorkspace,
   replenishmentDecisionProvider,
   supplierCommitmentDecisionProvider,
+  workflowHandoverDecisionProvider,
 } from '@luma/read-models/composition';
 import {
   createShippingMethodTemplate,
@@ -78,7 +79,11 @@ import {
 } from '@luma/workflows/composition';
 
 import { createAdmissionEligibility } from './admission.js';
-import { createCaseWorkflowServices } from './case-workflows.js';
+import {
+  createCaseWorkflowServices,
+  createFollowUpWorkflows,
+  type FollowUpTiming,
+} from './case-workflows.js';
 import { createPersistentPlaybookLibrary } from './playbook-library.js';
 import { createProcurementEffects } from './procurement-effects.js';
 import {
@@ -177,6 +182,8 @@ export interface ApplicationOptions {
    * current stock. See `createStockRefreshService`.
    */
   refreshStock?: (context: TenantContext, positionId: string) => Promise<void>;
+  /** How long the follow-up workflows wait; the simulator demo shortens them. */
+  followUps?: FollowUpTiming;
   /** Installed purchasing-system connections. Without them, orders cannot be sent from Luma. */
   purchasing?: {
     runtime: InstalledPurchaseOrderRuntime;
@@ -308,7 +315,18 @@ export function createApplicationServices(
     identity,
     exceptions: detection.exceptions,
     policies: safety.policies,
-    ...(options.workflowSources ? { sources: options.workflowSources } : {}),
+    sources: [
+      ...(options.workflowSources ?? []),
+      // Orders and returns are composed below; follow-ups read them only once runs start.
+      ...createFollowUpWorkflows({
+        commitments,
+        suppliers: async (context) =>
+          (await procurement.suppliers(context)).items,
+        returns: () => returns,
+        orders: () => orders,
+        ...(options.followUps ? { timing: options.followUps } : {}),
+      }),
+    ],
     ...(options.replenishmentTransport
       ? { transport: options.replenishmentTransport }
       : {}),
@@ -413,6 +431,18 @@ export function createApplicationServices(
                 reasons: item.commitment.reviewReasons,
               }
             : null,
+        })),
+      ),
+      workflowHandoverDecisionProvider(async (context) =>
+        (await caseWorkflows.handovers(context)).map((item) => ({
+          definitionId: item.definitionId,
+          name: item.name,
+          runId: item.runId,
+          handedOverAt: item.handedOverAt,
+          title: item.signal.title,
+          detail: item.signal.detail,
+          domain: item.signal.domain,
+          record: item.signal.record,
         })),
       ),
       ...(options.decisionSources ?? []).map(appDecisionProvider),

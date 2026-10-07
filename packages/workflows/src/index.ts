@@ -136,4 +136,6 @@ export type {
   CaseRunTransport,
   CaseWorkflowAdapter,
   CaseWorkflows,
+  SignalReader,
+  WorkflowHandover,
 } from './application/case-workflows.js';

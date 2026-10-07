@@ -19142,6 +19142,8 @@
                               "resolution",
                               "inventory",
                               "fulfillment",
+                              "orders",
+                              "returns",
                               "connections"
                             ]
                           },
@@ -19633,6 +19635,8 @@
                         "resolution",
                         "inventory",
                         "fulfillment",
+                        "orders",
+                        "returns",
                         "connections"
                       ]
                     },
@@ -102266,7 +102270,8 @@
                               "replenishment",
                               "fulfillment_recovery",
                               "inventory_correction",
-                              "supplier_commitment"
+                              "supplier_commitment",
+                              "workflow_handover"
                             ]
                           },
                           "reason": {

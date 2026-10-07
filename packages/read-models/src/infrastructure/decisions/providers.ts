@@ -9,6 +9,8 @@ import type {
 import {
   presentReplenishment,
   presentSupplierCommitment,
+  presentWorkflowHandover,
+  type WorkflowHandoverDecision,
 } from '../../domain/decisions.js';
 
 /** Adapts the procurement owner's pending purchase-order proposals to the queue. */
@@ -55,5 +57,17 @@ export function supplierCommitmentDecisionProvider(
       (await pending(context)).map((item) =>
         presentSupplierCommitment(item, context.actor.id),
       ),
+  };
+}
+
+/** Adapts workflow runs that handed an owner's follow-up to a person. */
+export function workflowHandoverDecisionProvider(
+  pending: (context: TenantContext) => Promise<WorkflowHandoverDecision[]>,
+): DecisionProvider {
+  return {
+    id: 'workflow-handovers',
+    label: 'Workflow follow-ups',
+    pending: async (context) =>
+      (await pending(context)).map(presentWorkflowHandover),
   };
 }

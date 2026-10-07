@@ -101,6 +101,18 @@ export { connectionCheckSource } from './domain/connection-check.js';
 export { createConnectionCheckWorkflow } from './application/connection-check.js';
 
 export {
+  paymentFollowUpSource,
+  refundFollowUpSource,
+} from './domain/follow-ups.js';
+
+export {
+  createPaymentFollowUp,
+  createRefundFollowUp,
+  type PaymentCandidate,
+  type RefundCandidate,
+} from './application/follow-ups.js';
+
+export {
   createStockRefresh,
   type StockRefresh,
 } from './application/stock-refresh.js';

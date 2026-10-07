@@ -670,3 +670,53 @@ export function presentSupplierCommitment(
       };
   }
 }
+
+/** A workflow run that handed an owner's follow-up to a person, while it is still open. */
+export interface WorkflowHandoverDecision {
+  definitionId: string;
+  name: string;
+  runId: string;
+  handedOverAt: string;
+  title: string;
+  detail: string;
+  domain: DecisionDomain;
+  record: DecisionCandidate['record'];
+}
+
+/** Presents a handed-over follow-up. It leaves the queue once its owner no longer reports it. */
+export function presentWorkflowHandover(
+  item: WorkflowHandoverDecision,
+): DecisionCandidate {
+  return {
+    id: `workflow-handover:${item.runId}`,
+    kind: 'workflow_handover',
+    reason: 'manual_intervention',
+    domain: item.domain,
+    title: item.title,
+    why: `${item.name} checked it again and it still needs a person. Luma can’t resolve it by itself.`,
+    consequences: [
+      {
+        response: 'Follow up',
+        text: 'Act on the record. This leaves Needs you once Luma no longer sees the follow-up.',
+      },
+    ],
+    change: [{ label: 'Context', value: item.detail }],
+    impact: { level: 'medium', text: null },
+    requestedAt: item.handedOverAt,
+    deadline: null,
+    requesterId: null,
+    evidence: { observedAt: item.handedOverAt, validUntil: null },
+    response: 'investigate',
+    subject: { label: item.title, detail: item.detail },
+    record: item.record,
+    owner: {
+      kind: 'workflow_run',
+      definitionId: item.definitionId,
+      runId: item.runId,
+    },
+    group: {
+      key: `workflow-handover:${item.definitionId}`,
+      label: item.name,
+    },
+  };
+}

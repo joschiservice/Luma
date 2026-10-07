@@ -11,6 +11,22 @@ export interface CaseSignal {
   open: boolean;
 }
 
+/**
+ * A follow-up its owner reports instead of detection, such as a return still waiting for its
+ * refund. It starts a run like a case does and is open until the owner no longer reports it.
+ */
+export interface WorkflowSignal extends CaseSignal {
+  /** What needs following up, for people, such as “Refund for return #1001”. */
+  title: string;
+  /** The context a person needs when the run hands it over. */
+  detail: string;
+  domain: 'orders' | 'fulfillment' | 'inventory' | 'procurement' | 'operations';
+  record: {
+    kind: 'order' | 'fulfillment' | 'position' | 'sku' | 'product';
+    id: string;
+  } | null;
+}
+
 /** One stored piece of case evidence. Facts are the detector's recorded values. */
 export interface CaseEvidence {
   key: string;
@@ -43,7 +59,10 @@ export interface CaseActivation {
   revokedBy: string | null;
 }
 
-/** Why a run must not prepare or send a new change, or null when it may. */
+/**
+ * Why a run must not prepare or send a new change, or null when it may. `case_resolved` also
+ * covers an owner's signal that is no longer reported.
+ */
 export type CaseRunStop = 'activation_revoked' | 'case_resolved' | null;
 
 /**

@@ -79,7 +79,24 @@ it('saves, validates and publishes tenant drafts without activating them', async
     ['connection-sync-check', 'case'],
     ['shopify-stock-correction', 'case'],
     ['shopify-hold-release', 'case'],
+    ['supplier-follow-up', 'case'],
+    ['refund-follow-up', 'case'],
+    ['payment-follow-up', 'case'],
   ]);
+  // A follow-up that can't run here names what's missing and where to fix it.
+  expect(
+    templates.find((item) => item.id === 'supplier-follow-up'),
+  ).toMatchObject({
+    category: 'procurement',
+    readiness: 'blocked',
+    requirements: expect.arrayContaining([
+      expect.objectContaining({
+        label: 'A supplier linked to a purchasing system',
+        met: false,
+        fix: { label: 'Open suppliers', destination: 'procurement' },
+      }),
+    ]),
+  });
   // Case workflows need a Shopify connection with write access, so they explain what's missing.
   expect(
     templates.find((item) => item.id === 'shopify-stock-correction'),

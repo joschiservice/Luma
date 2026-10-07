@@ -24,6 +24,10 @@ export type {
 
 export { createReplenishmentService } from './application/replenishment-workflow.js';
 
+export { supplierFollowUpSource } from './application/supplier-follow-up-version.js';
+
+export { createSupplierFollowUp } from './application/supplier-follow-up.js';
+
 export type {
   ReplenishmentDecision,
   ReplenishmentTransport,

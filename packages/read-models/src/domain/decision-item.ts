@@ -5,7 +5,8 @@ export type DecisionKind =
   | 'replenishment'
   | 'fulfillment_recovery'
   | 'inventory_correction'
-  | 'supplier_commitment';
+  | 'supplier_commitment'
+  | 'workflow_handover';
 
 export type DecisionReason =
   'approval' | 'run' | 'recovery' | 'manual_intervention' | 'uncertainty';

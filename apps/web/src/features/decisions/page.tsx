@@ -724,6 +724,7 @@ function TenantQueue({ organizationId }: { organizationId: string }) {
               <OwnerReview
                 organizationId={organizationId}
                 owner={item.owner}
+                handover={item.kind === 'workflow_handover'}
                 onChange={() =>
                   client.invalidateQueries({
                     queryKey: decisionsKey(organizationId),

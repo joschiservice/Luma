@@ -434,6 +434,9 @@ export async function createPilot(
       verifier,
       decisionSources: installations.decisionSources(),
       workflowSources: installations.registry.workflowSources(),
+      ...(detectionTiming.followUps
+        ? { followUps: detectionTiming.followUps }
+        : {}),
       ...(simulation ? { refreshStock } : {}),
       ...(simulation
         ? {
