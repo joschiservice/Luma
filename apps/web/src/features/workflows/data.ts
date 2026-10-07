@@ -1,4 +1,5 @@
 import {
+  type ActivateCaseWorkflow,
   type ActivateWorkflow,
   playbookSummarySchema,
   replenishmentBatchResultSchema,
@@ -102,6 +103,24 @@ export async function activateWorkflow(
   body: ActivateWorkflow,
 ) {
   const result = await api.workflows.activate({
+    params: { organizationId, definitionId },
+    body,
+  });
+  if (result.status !== 200) return failure(result);
+
+  return workflowActivationSchema.parse(result.body);
+}
+
+/**
+ * Turns on a case workflow for the workspace as the signed-in person. Keep the same request ID and
+ * body when retrying an uncertain response.
+ */
+export async function activateCaseWorkflow(
+  organizationId: string,
+  definitionId: string,
+  body: ActivateCaseWorkflow,
+) {
+  const result = await api.workflows.activateCase({
     params: { organizationId, definitionId },
     body,
   });

@@ -160,11 +160,13 @@ export function createShopifyInventoryCorrection(
     const snapshot = await (
       await provider(tenant, target.connectionId)
     ).read(authority.inventoryItemId, authority.locationId);
+    // The source revision identifies the authoritative ERP value, independent of which read
+    // reported it; freshness is checked from `observedAt`.
     const revision = createHash('sha256')
       .update(
         canonicalJson({
           targetRevision: snapshot.targetRevision,
-          source: authority.source,
+          source: authority.source.revision,
         }),
       )
       .digest('hex');

@@ -31,6 +31,8 @@ export function createScheduledDetection(options: {
   category(provider: string): 'erp' | 'storefront' | null;
   detection(): Detection;
   configuration?: Configuration;
+  /** How long a hold may explain missing progress; see `createDetectionMonitor`. */
+  holdOverdueSeconds?: number;
   log?: (message: string, error?: unknown) => void;
 }) {
   const commerce = createCommerceServices(options.database);
@@ -58,6 +60,9 @@ export function createScheduledDetection(options: {
     },
     category: options.category,
     configuration: options.configuration ?? defaultConfiguration,
+    ...(options.holdOverdueSeconds
+      ? { holdOverdueSeconds: options.holdOverdueSeconds }
+      : {}),
     hash: (value) => createHash('sha256').update(value).digest('hex'),
     ...(options.log ? { log: options.log } : {}),
   });

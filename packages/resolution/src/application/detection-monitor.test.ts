@@ -524,6 +524,23 @@ describe('detection monitor', () => {
     expect(f.exceptions.incidents).toHaveLength(0);
   });
 
+  it('counts a hold as the cause once the work has not progressed for a day', async () => {
+    const f = fixture({
+      work: [work()],
+      fulfillment: {
+        holds: [{ reason: 'high_risk_of_fraud' }],
+        lastProgressAt: ago(25 * 60),
+      },
+    });
+
+    await f.monitor.tick(context);
+
+    expect(f.exceptions.incidents).toHaveLength(1);
+    expect(f.exceptions.incidents[0]).toMatchObject({
+      exceptionClass: 'stuck_fulfillment',
+    });
+  });
+
   it('runs every rule even when one source is unavailable', async () => {
     const f = fixture({ work: [work()] });
     vi.mocked(f.sources.streams).mockRejectedValueOnce(

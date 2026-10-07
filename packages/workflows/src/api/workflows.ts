@@ -220,6 +220,20 @@ export function workflowRoutes(service?: WorkflowCatalog) {
         body: await s.service.activate(s.context, params.definitionId, body),
       };
     },
+    activateCase: async ({ request, params, body }) => {
+      const s = use(request);
+      const { id, version, reviewedDigest, policyVersion } = body;
+
+      return {
+        status: 200,
+        body: await s.service.activateCase(s.context, params.definitionId, {
+          id,
+          version,
+          reviewedDigest,
+          policyVersion,
+        }),
+      };
+    },
     revoke: async ({ request, params, body }) => {
       const s = use(request);
 

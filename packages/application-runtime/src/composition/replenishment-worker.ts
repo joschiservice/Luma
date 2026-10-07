@@ -5,24 +5,34 @@ import {
   createProcessWorker,
   type TemporalSettings,
 } from '@luma/workflow-temporal';
-import type { ProcessActivities, ProcessRun } from '@luma/workflows';
+import type {
+  CaseWorkflows,
+  ProcessActivities,
+  ProcessRun,
+} from '@luma/workflows';
 import type { createCodeProcesses } from '@luma/workflows/composition';
 import type { Pool } from 'pg';
 
 import type { createReplenishmentRuntime } from './replenishment.js';
 
-/** Runs durable procurement activities and recovers committed starts after API or worker restarts. */
+/**
+ * Runs durable process activities for replenishment, case workflows and computation workflows,
+ * starts case runs for new cases, and recovers committed starts after API or worker restarts.
+ */
 export async function createReplenishmentWorker(
   settings: TemporalSettings,
   runtime: ReturnType<typeof createReplenishmentRuntime>,
   pool: Pool,
   identity: Pick<IdentityService, 'resolveWorkflowContext'>,
   codeProcesses?: ReturnType<typeof createCodeProcesses>,
+  caseWorkflows?: CaseWorkflows,
 ) {
   const select = (run: ProcessRun) =>
     run.definitionId === 'inventory-replenishment'
       ? runtime.activities
-      : codeProcesses?.activities;
+      : caseWorkflows?.owns(run.definitionId)
+        ? caseWorkflows.activities
+        : codeProcesses?.activities;
   const activities: ProcessActivities = {
     read: (run, step) => select(run)!.read(run, step),
     decision: (run, step) => select(run)!.decision(run, step),
@@ -61,6 +71,29 @@ export async function createReplenishmentWorker(
               'Replenishment check could not complete; retrying.',
               error,
             );
+          }
+        }
+        if (caseWorkflows) {
+          const caseScopes = await pool.query<{
+            tenant_id: string;
+            principal_id: string;
+          }>('SELECT * FROM case_workflow_worker_scopes()');
+          for (const scope of caseScopes.rows) {
+            if (stop.signal.aborted) break;
+            try {
+              await caseWorkflows.tick(
+                await identity.resolveWorkflowContext(
+                  scope.principal_id,
+                  scope.tenant_id,
+                  'case-workflow-monitor',
+                ),
+              );
+            } catch (error) {
+              console.error(
+                'Case workflow starts could not complete; retrying.',
+                error,
+              );
+            }
           }
         }
         if (codeProcesses) {

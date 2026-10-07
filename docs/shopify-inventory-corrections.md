@@ -37,8 +37,10 @@ resends a mutation. Shopify simulator receipts persist with the provider state.
 
 A successful receipt is acceptance, not resolution. Reconciliation independently
 reads Shopify and requires the approved quantity at the same item and location,
-complete tracked inventory and unchanged ERP authority. A changed ERP observation
-or mapping leaves reconciliation unverified. Luma records verification evidence and
+complete tracked inventory and unchanged ERP authority. A changed ERP quantity,
+availability or mapping leaves reconciliation unverified. A newer ERP read that
+reports the same values is not a change, so detection's frequent rereads don't
+invalidate a reviewed correction; its expiry still follows the reviewed read. Luma records verification evidence and
 shows **Quantity verified**; it does not optimistically rewrite canonical snapshots
 or close related operational issues. Data sync and the independent issue monitor
 retain ownership of those updates.

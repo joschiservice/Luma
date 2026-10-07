@@ -36,6 +36,7 @@ import { createPrivacyIntake } from './infrastructure/privacy.js';
 import { createShopifyRecordReader } from './infrastructure/records.js';
 import { createInstallationVerifier } from './infrastructure/verifier.js';
 import { createShopifyInventoryCorrection } from './inventory-correction.js';
+import { createShopifyWorkflows } from './workflows.js';
 
 export {
   createShopifyConnector,
@@ -144,7 +145,15 @@ export function createApp(context: AppFactoryContext): AppDefinition {
   });
   const records = createRecordService({
     installations,
-    reader: createShopifyRecordReader,
+    reader: ({ connection, ...reader }) => {
+      // Simulated connections must reach the simulator, never a live shop.
+      const fetch = simulationTransport(connection, context.simulation);
+
+      return createShopifyRecordReader({
+        ...reader,
+        ...(fetch ? { fetch } : {}),
+      });
+    },
     requireInstalled: (ctx) => context.requireInstalled(ctx, 'shopify'),
     protectedCustomerDataApproved:
       context.env.SHOPIFY_PROTECTED_CUSTOMER_DATA_APPROVED === 'true',
@@ -154,6 +163,11 @@ export function createApp(context: AppFactoryContext): AppDefinition {
 
   const recovery = createShopifyRecovery(context, installations);
   const corrections = createShopifyInventoryCorrection(context, installations);
+  const workflows = createShopifyWorkflows(context, {
+    installations,
+    recovery,
+    corrections,
+  });
 
   return {
     manifest: {
@@ -208,6 +222,7 @@ export function createApp(context: AppFactoryContext): AppDefinition {
         ...stock.map((view) => correctionDecision(view, tenant.actor.id)),
       ];
     },
+    workflows,
     async uninstalled({ tenantId, transaction }) {
       if (config)
         await transaction.query(

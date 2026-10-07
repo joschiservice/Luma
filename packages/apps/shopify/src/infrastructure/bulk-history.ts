@@ -20,8 +20,9 @@ const operation = z.object({
   query: z.string(),
   url: z.string().nullable(),
   rootObjectCount: z.string().regex(/^\d+$/),
+  createdAt: z.string().datetime({ offset: true }),
 });
-const fields = 'id status query url rootObjectCount';
+const fields = 'id status query url rootObjectCount createdAt';
 const childField: Record<string, string> = {
   LineItem: 'lineItems',
   ProductVariant: 'variants',
@@ -38,6 +39,8 @@ export interface BulkHistoryPage {
   deferred: boolean;
   offset: number;
   total: number;
+  /** When Shopify started the export; its records may be no newer than this. */
+  snapshotAt: string | null;
 }
 
 /**
@@ -126,7 +129,14 @@ export async function readBulkHistory(options: {
     }
     if (!current) {
       if (active >= 5)
-        return { nodes: [], cursor: null, deferred: true, offset, total: 0 };
+        return {
+          nodes: [],
+          cursor: null,
+          deferred: true,
+          offset,
+          total: 0,
+          snapshotAt: null,
+        };
       const data = await options.request(
         `mutation LumaBulkStart($query: String!) { bulkOperationRunQuery(query: $query, groupObjects: true) { bulkOperation { ${fields} } userErrors { field message } } }`,
         { query },
@@ -153,12 +163,26 @@ export async function readBulkHistory(options: {
   const total = Number(current.rootObjectCount);
   if (!Number.isSafeInteger(total)) fail('invalid_response');
   if (['CREATED', 'RUNNING', 'CANCELING'].includes(current.status))
-    return { nodes: [], cursor: cursor(offset), deferred: true, offset, total };
+    return {
+      nodes: [],
+      cursor: cursor(offset),
+      deferred: true,
+      offset,
+      total,
+      snapshotAt: null,
+    };
   if (current.status !== 'COMPLETED') fail('export_unavailable');
   if (!current.url) {
     if (total !== 0) fail('invalid_response');
 
-    return { nodes: [], cursor: null, deferred: false, offset, total };
+    return {
+      nodes: [],
+      cursor: null,
+      deferred: false,
+      offset,
+      total,
+      snapshotAt: null,
+    };
   }
   const url = new URL(current.url);
   // Shopify serves signed exports from Google Cloud Storage. Never send shop credentials.
@@ -283,5 +307,6 @@ export async function readBulkHistory(options: {
     deferred: false,
     offset,
     total,
+    snapshotAt: new Date(current.createdAt).toISOString(),
   };
 }

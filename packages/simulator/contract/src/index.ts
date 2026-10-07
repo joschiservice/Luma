@@ -3,6 +3,8 @@ import {
   incidentKindNames,
   type JournalEntry,
   transportFaults,
+  type WorkflowScenarioName,
+  workflowScenarioNames,
 } from '@luma/simulator-core';
 import { z } from 'zod';
 
@@ -175,6 +177,21 @@ export const injectIncidentSchema = z
 
 export type InjectIncident = z.infer<typeof injectIncidentSchema>;
 
+/** Starts a workflow scenario; repeating the ID returns its incidents without another change. */
+export const runScenarioSchema = z
+  .object({
+    id: z.string().uuid(),
+    scenario: z.enum(
+      workflowScenarioNames as [
+        WorkflowScenarioName,
+        ...WorkflowScenarioName[],
+      ],
+    ),
+  })
+  .strict();
+
+export type RunScenario = z.infer<typeof runScenarioSchema>;
+
 export const webhookTargetsSchema = z.object({
   targets: z
     .array(
@@ -298,6 +315,8 @@ export interface IncidentView {
     detectedAt: number | null;
     resolved: boolean;
     verified: boolean;
+    /** The latest workflow run Luma started for the case, if any. */
+    workflow: { name: string; state: string; url: string } | null;
   } | null;
 }
 

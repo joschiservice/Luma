@@ -85,7 +85,13 @@ const suites = {
   ],
   // Prebuilt platform suites used by verify:feature after its single build step.
   simulator: [
-    ['--filter', '@luma/api', 'test:e2e', 'simulator.e2e.mjs'],
+    [
+      '--filter',
+      '@luma/api',
+      'test:e2e',
+      'simulator.e2e.mjs',
+      'case-workflows.e2e.mjs',
+    ],
     ['--filter', '@luma/api', 'test:browser', 'simulator.browser.mjs'],
   ],
 };

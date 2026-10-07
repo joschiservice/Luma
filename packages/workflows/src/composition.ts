@@ -1,6 +1,6 @@
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 
-import type { TenantContext } from '@luma/identity';
+import type { IdentityService, TenantContext } from '@luma/identity';
 import { IdentityError } from '@luma/identity';
 import type {
   ModelGateway,
@@ -9,6 +9,13 @@ import type {
 } from '@luma/platform';
 import type { PolicyService } from '@luma/policies';
 
+import {
+  type CaseReader,
+  type CaseRunTransport,
+  type CaseWorkflowAdapter,
+  type CaseWorkflows,
+  createCaseWorkflows,
+} from './application/case-workflows.js';
 import { createWorkflowCatalog } from './application/catalog.js';
 import { createCodeEvaluations } from './application/code-evaluations.js';
 import {
@@ -39,6 +46,7 @@ import {
 import type { AuthoringVocabulary } from './domain/vocabulary.js';
 import { checkVocabulary } from './domain/vocabulary.js';
 import type { PublishedWorkflowVersion } from './domain/workflow.js';
+import { createCaseActivationStore } from './infrastructure/case-activations.js';
 import {
   compilePublishedWorkflow,
   createWorkflowCatalogStore,
@@ -70,6 +78,7 @@ import {
   parseDraftShape,
   parseProcessSnapshot,
 } from './infrastructure/process-schema.js';
+import { createProcessStepStore } from './infrastructure/process-store.js';
 import { createWorkflowTriggerStore } from './infrastructure/triggers.js';
 
 /**
@@ -134,7 +143,7 @@ export { runProcess } from './application/process-runtime.js';
 
 export { createProcessActivities } from './application/process-activities.js';
 
-export { createProcessStepStore } from './infrastructure/process-store.js';
+export { createProcessStepStore };
 
 export type {
   ProcessActivities,
@@ -164,9 +173,11 @@ export function createWorkflows(
     context: TenantContext,
     version: PublishedWorkflowVersion,
   ) => Promise<string[]>,
+  caseWorkflows?: CaseWorkflows,
 ) {
   return createWorkflowCatalog({
     ...(explain ? { explain } : {}),
+    ...(caseWorkflows ? { caseWorkflows } : {}),
     ...(codeProcesses ? { codeProcesses } : {}),
     ...(process.env.LUMA_CODE_RUNTIME_DIR
       ? {
@@ -218,6 +229,80 @@ export function createWorkflows(
     compile: compilePublishedWorkflow,
     refreshContext,
     approvalPolicy,
+  });
+}
+
+/**
+ * Composes case workflows with tenant persistence. Runs are recorded before Temporal starts them,
+ * and only an active activation by the acting principal can record a run.
+ */
+export function createCaseWorkflowRuntime(
+  db: TenantDatabase,
+  deps: {
+    adapters: CaseWorkflowAdapter[];
+    cases: CaseReader;
+    identity: Pick<
+      IdentityService,
+      'refreshContext' | 'resolveWorkflowContext'
+    >;
+    policies: Pick<PolicyService, 'approvalRequirement' | 'currentVersion'>;
+    audit: { append(entry: WorkflowAuditEntry): Promise<void> };
+    transport?: CaseRunTransport;
+    enabled: boolean;
+  },
+) {
+  const runs = createWorkflowTriggerStore(db);
+  const store = createCaseActivationStore(db);
+
+  return createCaseWorkflows({
+    ...deps,
+    store,
+    runs,
+    triggers: createWorkflowTriggers({
+      store: {
+        ...runs,
+        insert: async (context, key, run) => {
+          const activation = (await store.list(context)).find(
+            (item) => item.id === run.context.inputs.activationId,
+          );
+          if (
+            !activation?.active ||
+            activation.definitionId !== run.definitionId ||
+            activation.principalId !== context.actor.id
+          )
+            throw new IdentityError(
+              409,
+              'CONFLICT',
+              'The workflow was turned off or changed. No run was started.',
+            );
+
+          return runs.insert(context, key, {
+            ...run,
+            activationId: activation.id,
+            artifactDigest: activation.artifactDigest,
+          });
+        },
+      },
+      refreshContext: deps.identity.refreshContext,
+      parseSnapshot: (input, version) => {
+        if (version.format !== 'workflow/2')
+          throw new Error('Case workflows are process versions');
+
+        return parseProcessSnapshot(input, version);
+      },
+      hash: playbookHash,
+      id: randomUUID,
+      now: () => new Date(),
+    }),
+    steps: createProcessStepStore(db),
+    catalog: createWorkflowCatalogStore(db),
+    hash: playbookHash,
+    id: (value) => {
+      const hex = createHash('sha256').update(value).digest('hex');
+
+      return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+    },
+    now: () => new Date(),
   });
 }
 

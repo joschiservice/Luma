@@ -95,3 +95,7 @@ export type {
 } from './application/metric-events.js';
 
 export type { DecisionAssignmentService } from './application/decision-assignments.js';
+
+export { connectionCheckSource } from './domain/connection-check.js';
+
+export { createConnectionCheckWorkflow } from './application/connection-check.js';

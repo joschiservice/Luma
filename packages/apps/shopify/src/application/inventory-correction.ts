@@ -186,6 +186,18 @@ export function createInventoryCorrection(deps: CorrectionDependencies) {
       decisionId: run.decisionId,
       state,
       approved: decision?.approval?.outcome === 'approved',
+      denial:
+        state !== 'denied'
+          ? null
+          : withheld
+            ? 'withheld'
+            : rejected
+              ? 'rejected'
+              : policyChanged || decision?.outcome === 'denied'
+                ? 'policy'
+                : changed
+                  ? 'changed'
+                  : 'expired',
       acceptance: accepted
         ? 'accepted'
         : record && !withheld
@@ -232,6 +244,19 @@ export function createInventoryCorrection(deps: CorrectionDependencies) {
   }
 
   return {
+    /**
+     * Reads a saved preview's current state, rereading Shopify while it can still run. Returns
+     * null when the tenant has no preview with this ID. Changes nothing except releasing a
+     * settled target lock.
+     */
+    async status(context: TenantContext, id: string) {
+      context = await authorize(context);
+      const run = await deps.store.get(context, id);
+      if (!run) return null;
+      await deps.authorize(context, run.target.connectionId);
+
+      return view(context, run);
+    },
     async candidates(context: TenantContext, input: unknown) {
       context = await authorize(context);
       const { positionId } = z

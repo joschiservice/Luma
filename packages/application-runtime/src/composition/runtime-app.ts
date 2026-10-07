@@ -124,7 +124,10 @@ export async function buildRuntimeApp(
       ...(processClient ? { replenishmentTransport: processClient } : {}),
       desk: workflowReader ? { workflow: workflowReader.get } : {},
       ...(installedConnections
-        ? { decisionSources: installedConnections.registry.decisionSources() }
+        ? {
+            decisionSources: installedConnections.registry.decisionSources(),
+            workflowSources: installedConnections.registry.workflowSources(),
+          }
         : {}),
       ...(modelGateway ? { modelGateway } : {}),
       authoring: authoringAvailability(modelSettings, !!modelGateway),

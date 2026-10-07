@@ -92,6 +92,9 @@ it('publishes native workflows without cases, retains immutable versions and exp
   expect(items.map((v) => v.id).sort()).toEqual(
     [
       'inventory-replenishment',
+      'connection-sync-check',
+      'shopify-stock-correction',
+      'shopify-hold-release',
       native.definition.id,
       legacy.version.definition.id,
     ].sort(),

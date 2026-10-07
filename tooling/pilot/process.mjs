@@ -7,8 +7,8 @@ import { startJourney } from './journey.mjs';
 
 /**
  * Runs commerce sync in the background like the sync worker, one pass at a time and briefly
- * idle between passes. Once a minute it links the next SKUs a merchant reviewed and runs the
- * inventory scenario check and scheduled detection. Failures go to `log`. Returns a function
+ * idle between passes. Once a minute it links the next SKUs a merchant reviewed, completes the
+ * demo workflow setup, and runs the inventory scenario check and scheduled detection. Failures go to `log`. Returns a function
  * that stops after the current pass.
  */
 function startSync(pilot, log) {
@@ -22,7 +22,7 @@ function startSync(pilot, log) {
         .observe({ passes: 1, refresh: false, check })
         .catch((error) => log('Pilot sync pass failed', error));
       if (check)
-        for (const step of [pilot.link, pilot.detect])
+        for (const step of [pilot.link, pilot.demo, pilot.detect])
           await step().catch((error) => log('Pilot sync step failed', error));
       await delay(2_000);
     }

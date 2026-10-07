@@ -42,9 +42,17 @@ const categories = {
   procurement: 'Procurement',
   resolution: 'Resolution',
   inventory: 'Inventory',
+  fulfillment: 'Fulfillment',
+  connections: 'Connections',
 } as const;
 
-const categoryKeys = ['procurement', 'resolution', 'inventory'] as const;
+const categoryKeys = [
+  'procurement',
+  'resolution',
+  'inventory',
+  'fulfillment',
+  'connections',
+] as const;
 
 export interface GallerySearch {
   category?: keyof typeof categories | undefined;

@@ -18,6 +18,7 @@ import {
   waitForRun,
 } from './connect.mjs';
 import { provisionSimulatorDatabase, simulatorPassword } from './database.mjs';
+import { configureDemoSuppliers } from './demo.mjs';
 import { createOperationsClient } from './platform-client.mjs';
 
 let simulator;
@@ -58,8 +59,13 @@ try {
       chaos: { type: 'string', default: 'realistic' },
       seed: { type: 'string', default: '44' },
       'approval-required': { type: 'boolean', default: false },
+      'demo-workflows': { type: 'boolean', default: true },
+      detection: { type: 'string', default: 'demo' },
     },
+    allowNegative: true,
   });
+  if (!['demo', 'production'].includes(flags.detection))
+    throw new Error('--detection must be demo or production');
   const saved = await state(true);
   await compose(saved, [
     '--profile',
@@ -137,7 +143,8 @@ try {
     return response.json();
   };
   const runId = 'pilot-44';
-  if (!(await call('runs')).some((item) => item.id === runId)) {
+  const created = !(await call('runs')).some((item) => item.id === runId);
+  if (created) {
     console.log(
       `Creating simulator run ${runId}: ${flags.profile} merchant, ${flags.chaos} failures.`,
     );
@@ -165,9 +172,15 @@ try {
       token,
       runId,
       ...simulatorInstances(ready),
+      demo: {
+        workflows: flags['demo-workflows'],
+        detection: flags.detection,
+      },
     },
   );
   await registerWebhooks(call, manifest, `http://127.0.0.1:${generated.PORT}`);
+  // Only a new run gets the demo's supplier answers; later panel changes are kept.
+  if (created) await configureDemoSuppliers(call, manifest);
   client = createOperationsClient({
     apiOrigin: `http://127.0.0.1:${generated.PORT}`,
     webOrigin,

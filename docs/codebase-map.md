@@ -135,6 +135,14 @@ used by the stock and purchase-order pages, and bulk stock-rule setup is
 and the replenishment and playbooks browser journeys. See
 [Workflow readiness](workflows.md#readiness).
 
+Case workflows, which start from detected cases, are `packages/workflows/src/application/case-workflows.ts`
+with activations in `infrastructure/case-activations.ts` and migration `0053_case_workflows.sql`.
+Adapters live with their owners: `packages/apps/shopify/src/application/case-workflows.ts` (stock
+correction and hold release) and `packages/resolution/src/application/connection-check.ts`;
+`packages/application-runtime/src/composition/case-workflows.ts` composes them. The web view is
+`apps/web/src/features/workflows/case.tsx`. Tests: `case-workflows.test.ts` and
+`apps/api/e2e/case-workflows.e2e.mjs`. See [case workflows](workflows.md#case-workflows).
+
 General workflow starts enter through `packages/workflows/src/application/triggers.ts`.
 Versioned signal checks live in `domain/trigger.ts`; tenant-isolated persistence
 lives in `infrastructure/triggers.ts`. Migration `0025_workflow_triggers.sql`

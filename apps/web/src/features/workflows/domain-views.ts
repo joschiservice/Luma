@@ -1,6 +1,7 @@
 import type { WorkflowDetail, WorkflowRunView } from '@luma/api-contract';
 import type { ComponentType } from 'react';
 
+import { CaseRunContext, CaseWorkflowPanel } from './case';
 import { ReplenishmentPanel, ReplenishmentRunReview } from './replenishment';
 
 interface WorkflowDomainView {
@@ -17,6 +18,10 @@ const views: Record<string, WorkflowDomainView> = {
   'procurement.replenishment': {
     Controls: ReplenishmentPanel,
     RunContext: ReplenishmentRunReview,
+  },
+  'workflows.case': {
+    Controls: CaseWorkflowPanel,
+    RunContext: CaseRunContext,
   },
 };
 

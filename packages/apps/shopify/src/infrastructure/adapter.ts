@@ -330,7 +330,7 @@ export function createShopifyConnector(
 
           return parsed;
         };
-        const observedAt = now().toISOString();
+        let observedAt = now().toISOString();
         const items: Observation<unknown>[] = [];
 
         function emit(
@@ -485,6 +485,8 @@ export function createShopifyConnector(
             deferred: true,
             retryAfterMs: 2000,
           }) as CapabilityOutput<K>;
+        // Export records reflect the shop when the export started, not when Luma reads the file.
+        if (bulk?.snapshotAt) observedAt = bulk.snapshotAt;
 
         // The first page of a scan reports the collection size and any history limit.
         if (

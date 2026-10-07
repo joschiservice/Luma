@@ -244,6 +244,31 @@ describe.skipIf(!adminUrl)('simulator host', () => {
     ]);
   });
 
+  it('starts a workflow scenario once, however often the request repeats', async () => {
+    const request = {
+      id: randomUUID(),
+      scenario: 'stock-correction-lost-response',
+    };
+    const [incident] = await call<{ id: string; kind: string }[]>(
+      'runs/host/scenarios',
+      request,
+    );
+    expect(incident).toMatchObject({ kind: 'inventory-drift' });
+    expect(await call('runs/host/scenarios', request)).toEqual([
+      expect.objectContaining({ id: incident!.id }),
+    ]);
+    const run = await call<{
+      faults: { operation: string; kind: string; status: string }[];
+    }>('runs/host');
+    expect(run.faults.filter((item) => item.kind === 'response-loss')).toEqual([
+      expect.objectContaining({
+        operation: 'inventory.available.reconcile',
+        status: 'armed',
+      }),
+    ]);
+    await call(`runs/host/incidents/${incident!.id}/recover`, {});
+  });
+
   it('delivers signed webhooks, including duplicates of the same event', async () => {
     const deliveries: { topic: string; event: string; valid: boolean }[] = [];
     const secret = 'webhook-test-secret-value';
