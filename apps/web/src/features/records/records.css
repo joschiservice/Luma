@@ -8,9 +8,6 @@
   display: grid;
   gap: 14px;
 }
-.records-list > .page-header {
-  margin-bottom: 0;
-}
 .record-coverage {
   margin: 0;
   color: var(--muted-foreground);

@@ -5,10 +5,6 @@
   margin: 0 auto;
 }
 
-.orders-page > .page-header {
-  margin-bottom: 0;
-}
-
 .orders-row-flags {
   display: flex;
   flex-wrap: wrap;

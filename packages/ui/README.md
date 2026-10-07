@@ -20,7 +20,7 @@ Owned React source, initialized with shadcn's Base UI registry. `components.json
 - **StateDot, StatePill:** operational state with a required text label.
 - **DomainIcon:** domain landmarks for navigation and record identity.
 - **LumaMark, LumaLockup, AurenMark, Kbd:** brand marks and keyboard hints.
-- **PageHeader, WorkspaceSwitcher, WorkspaceAccountMenu:** workspace chrome in `components/workspace`.
+- **PageTitle, PageHeader, WorkspaceSwitcher, WorkspaceAccountMenu:** workspace chrome in `components/workspace`.
 
 Components, stories and fixtures are grouped by responsibility under `src/components`:
 

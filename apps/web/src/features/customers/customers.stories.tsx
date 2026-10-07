@@ -1,5 +1,5 @@
 import type { AppUiProps } from '@luma/app-host/web';
-import { PageHeader } from '@luma/ui/components/workspace/page-header';
+import { PageTitle } from '@luma/ui/components/workspace/page-header';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { type ComponentType, lazy, Suspense, useMemo } from 'react';
 import { expect, userEvent, within } from 'storybook/test';
@@ -123,10 +123,7 @@ function Preview({
 
   return (
     <main style={{ padding: 24 }}>
-      <PageHeader
-        title="Customers"
-        description="Understand a customer’s orders, service history and work in Luma."
-      />
+      <PageTitle title="Customers" />
       <Suspense fallback={<p>Loading…</p>}>
         <Shopify
           organizationId={organizationId}

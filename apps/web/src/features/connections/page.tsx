@@ -1,7 +1,7 @@
 import '../apps/apps.css';
 
 import { Alert } from '@luma/ui/components/primitives/alert';
-import { PageHeader } from '@luma/ui/components/workspace/page-header';
+import { PageTitle } from '@luma/ui/components/workspace/page-header';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   useLocation,
@@ -60,10 +60,7 @@ export function Connections({
 
   return (
     <div className="connections-page apps-page">
-      <PageHeader
-        title="Apps"
-        description="Connect the systems Luma works across. Install an app, then connect accounts and choose what Luma may read and change."
-      />
+      <PageTitle title="Apps" />
       {appResult ? (
         <Alert
           role="status"

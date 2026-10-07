@@ -10,6 +10,7 @@ import {
   ShoppingCart,
   Truck,
   Undo2,
+  Users,
   Workflow,
 } from 'lucide-react';
 
@@ -18,6 +19,7 @@ import { cn } from '../../lib/utils';
 /** Operational areas that receive a recognizable landmark color in navigation. */
 export type Domain =
   | 'orders'
+  | 'customers'
   | 'inventory'
   | 'products'
   | 'returns'
@@ -31,6 +33,7 @@ export type Domain =
 
 const domainIcons: Record<Domain, LucideIcon> = {
   orders: Receipt,
+  customers: Users,
   inventory: Boxes,
   products: Package,
   returns: Undo2,

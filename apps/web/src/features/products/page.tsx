@@ -19,10 +19,9 @@ import {
   type DataTableColumn,
   DataTableRowLink,
 } from '@luma/ui/components/primitives/data-table';
-import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { Empty } from '@luma/ui/components/primitives/empty';
 import { StatePill } from '@luma/ui/components/primitives/state';
-import { PageHeader } from '@luma/ui/components/workspace/page-header';
+import { PageTitle } from '@luma/ui/components/workspace/page-header';
 import { onlineManager, useQuery } from '@tanstack/react-query';
 import {
   Link,
@@ -302,11 +301,7 @@ export function ProductsView({
   return (
     <main className="products-page">
       {from ? <Link to={from}>← Back to context</Link> : null}
-      <PageHeader
-        title="Products"
-        icon={<DomainIcon domain="products" size="md" />}
-        description="See how each SKU is listed in your store and ERP, and find listings that are missing or disagree."
-      />
+      <PageTitle title="Products" />
       <CollectionToolbar
         refreshLabel="Refresh products"
         refreshing={refreshing}

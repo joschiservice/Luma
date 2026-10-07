@@ -11,7 +11,7 @@ import {
 import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { Empty } from '@luma/ui/components/primitives/empty';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
-import { PageHeader } from '@luma/ui/components/workspace/page-header';
+import { PageTitle } from '@luma/ui/components/workspace/page-header';
 import { useQuery } from '@tanstack/react-query';
 import {
   Link,
@@ -174,10 +174,8 @@ export function WorkflowLibraryView({
 
   return (
     <div className="workflows-page workflow-library-page">
-      <PageHeader
-        icon={<DomainIcon domain="workflows" size="lg" />}
+      <PageTitle
         title="Workflows"
-        description="Workflows watch for issues and stock conditions, propose the changes you’ve agreed on, and verify the result. Each one shows whether it’s on, whether it can run and what needs to happen next."
         actions={
           <Link
             className={buttonVariants()}
