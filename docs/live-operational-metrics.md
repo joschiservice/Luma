@@ -1,9 +1,12 @@
 # Live operational metrics
 
-Overview subscribes to `/v1/organizations/:organizationId/metrics/events` before
-its first metric query. A `resync` frame with `refetch: true` lists the changed
-`topics`; a view reads again only when a topic it depends on is listed. Counts always come from the shared,
-authorized PostgreSQL query. Events never increment counters.
+Home and Insights subscribe to `/v1/organizations/:organizationId/metrics/events`
+before their first metric read. Each page reads all of its metric sections in one
+request, `POST /v2/organizations/:organizationId/metrics/summary`, and passes each
+section its part (`useLiveMetricSummary` in `metrics-live.ts`). A `resync` frame
+with `refetch: true` lists the changed `topics`; a page reads again only when a
+topic one of its sections depends on is listed. Counts always come from the
+shared, authorized PostgreSQL query. Events never increment counters.
 
 ## Commit and recovery
 
@@ -68,10 +71,12 @@ minutes. Shutdown clears subscriptions and closes the listener.
 
 A false socket write closes a slow consumer immediately; no per-client event queue
 is retained. EventSource reconnects after one second and requests a fresh snapshot.
-The client serializes invalidation reads and cancels older requests before fetching
-new current state. Changes during a read schedule one subsequent read. A change
-while paging returns the cohort to page one, preserving the selected metric and
-open dialog.
+The client loads the page as soon as the stream opens. Later changes are throttled
+to one summary read per two seconds (`liveRefreshMs`): the first change after a
+quiet period reads at once, and a burst reads again when the interval ends. Reads
+are serialized and cancel older requests. Paging a section's records uses that
+section's own query endpoint with the summary part's snapshot; a live refresh
+returns the cohort to page one, preserving the selected metric and open dialog.
 
 ## Time and freshness
 

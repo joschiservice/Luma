@@ -49,6 +49,11 @@ test('updates visible totals and cohorts, crosses deadlines, and measures delive
   );
   const page = await context.newPage();
   const streamResponses = [];
+  const metricReads = [];
+  page.on('request', (request) => {
+    const path = new URL(request.url()).pathname;
+    if (/\/metrics\/(query|summary)$/.test(path)) metricReads.push(path);
+  });
   context.on('response', (response) => {
     if (response.url().endsWith('/metrics/events'))
       streamResponses.push({
@@ -75,6 +80,11 @@ test('updates visible totals and cohorts, crosses deadlines, and measures delive
     .getByText('Live updates', { exact: true })
     .waitFor();
   expect(streamResponses.map(({ status }) => status)).toEqual([200]);
+  // Every metric section on the page shares one summary read.
+  expect(metricReads.length).toBeGreaterThan(0);
+  expect(metricReads.every((path) => path.endsWith('/metrics/summary'))).toBe(
+    true,
+  );
   const extraPages = await Promise.all([context.newPage(), context.newPage()]);
   for (const extra of extraPages) {
     await extra.goto(`/app/${f.org.id}/insights`);
@@ -104,7 +114,7 @@ test('updates visible totals and cohorts, crosses deadlines, and measures delive
     release = resolve;
   });
   await page.route(
-    '**/v1/organizations/*/metrics/query',
+    '**/v2/organizations/*/metrics/summary',
     async (route) => {
       const response = await route.fetch();
       held = true;
@@ -177,7 +187,8 @@ test('updates visible totals and cohorts, crosses deadlines, and measures delive
     fulfillment.snapshotId,
   ]);
   // All deadlines move into the future. The next boundary includes orders beyond page one.
-  const due = new Date(Date.now() + 2000).toISOString();
+  // Far enough ahead that the throttled live read shows the interim state first.
+  const due = new Date(Date.now() + 5000).toISOString();
   await f.db.owner.query(
     "UPDATE orders_snapshots SET document=jsonb_set(document,'{data,dueAt}',to_jsonb($2::text)) WHERE tenant_id=$1 AND kind='order'",
     [f.org.id, due],
@@ -230,12 +241,13 @@ test('updates visible totals and cohorts, crosses deadlines, and measures delive
     maxFrameBytes: Math.max(...subscriptions.map((s) => s.maxFrameBytes)),
   };
   await performanceReport('metric-live', measurements, {
-    commitToVisibleP95Ms: 1000,
+    // Dashboards refresh at most every two seconds (liveRefreshMs).
+    commitToVisibleP95Ms: 3000,
     maxFrameBytes: 4096,
     subscriberBytes: 128 * 1024,
   });
   console.log(JSON.stringify(measurements));
-  expect(measurements.commitToVisibleP95Ms).toBeLessThan(1000);
+  expect(measurements.commitToVisibleP95Ms).toBeLessThan(3000);
   // Session loss clears the visible private result and stops further live reads.
   await f.db.owner.query('DELETE FROM sessions WHERE user_id=$1', [f.owner.id]);
   await expect.poll(() => values.count(), { timeout: 10000 }).toBe(0);

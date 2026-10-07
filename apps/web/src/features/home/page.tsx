@@ -48,8 +48,10 @@ import { decisionsOptions } from '../decisions/data';
 import { sessionOptions } from '../identity/data';
 import { useWorkspaceLayout } from '../layout/data';
 import { overviewOptions } from '../overview/data';
+import { useLiveMetricSummary } from '../overview/metrics-live';
 import { OperationalMetrics } from '../overview/operational-metrics';
-import { OrderMetrics } from '../overview/order-metrics';
+import { operationalMetricRequest } from '../overview/operational-metrics-data';
+import { orderMetricRequest, OrderMetrics } from '../overview/order-metrics';
 import {
   ActivityModule,
   AttentionModule,
@@ -276,6 +278,13 @@ export function HomePage() {
   const hidden = homeModuleIds.filter(
     (id) => !modules.some((module) => module.id === id),
   );
+  // Visible metric modules share one live summary read.
+  const live = useLiveMetricSummary(organizationId, {
+    operational: hidden.includes('operational-metrics')
+      ? undefined
+      : operationalMetricRequest,
+    orders: hidden.includes('order-metrics') ? undefined : orderMetricRequest,
+  });
   const data =
     overview.isError || overview.isPaused ? undefined : overview.data;
   const notice = data ? setupNotice(data) : null;
@@ -294,11 +303,16 @@ export function HomePage() {
           <OperationalMetrics
             key={`summary-${organizationId}`}
             organizationId={organizationId}
+            live={live.operational}
           />
         );
       case 'order-metrics':
         return (
-          <OrderMetrics key={organizationId} organizationId={organizationId} />
+          <OrderMetrics
+            key={organizationId}
+            organizationId={organizationId}
+            live={live.orders}
+          />
         );
       case 'activity':
         return <ActivityModule organizationId={organizationId} />;

@@ -1,6 +1,6 @@
 import './order-metrics.css';
 
-import type { MetricResponse } from '@luma/api-contract';
+import type { MetricRequest, MetricResponse } from '@luma/api-contract';
 import {
   CaseLoading,
   CaseNotice,
@@ -27,25 +27,51 @@ import {
 import { useRef, useState } from 'react';
 
 import { IdentityError } from '../identity/data';
-import { useLiveMetrics } from './metrics-live';
+import { metricsOptions } from './metrics-data';
+import { type LiveMetricView, usePagedMetric } from './metrics-live';
 
 type Metric = MetricResponse['metrics'][number];
 
 const icons = [PackageOpen, Clock3, ListChecks];
 
-/** Presents source-aware order counts and lets operators inspect their exact matching records. */
-export function OrderMetrics({ organizationId }: { organizationId: string }) {
+/** The order view a page requests in its metric summary. */
+export const orderMetricRequest: MetricRequest = {};
+
+/**
+ * Presents source-aware order counts and lets operators inspect their exact matching records.
+ * `live` is this widget's slice of the page's metric summary, read with `orderMetricRequest`.
+ */
+export function OrderMetrics({
+  organizationId,
+  live,
+}: {
+  organizationId: string;
+  live: LiveMetricView<MetricResponse>;
+}) {
   return (
-    <LiveOrderMetrics key={organizationId} organizationId={organizationId} />
+    <LiveOrderMetrics
+      key={organizationId}
+      organizationId={organizationId}
+      live={live}
+    />
   );
 }
 
-function LiveOrderMetrics({ organizationId }: { organizationId: string }) {
+function LiveOrderMetrics({
+  organizationId,
+  live,
+}: {
+  organizationId: string;
+  live: LiveMetricView<MetricResponse>;
+}) {
   const location = useLocation();
   const restoredMetric = new URLSearchParams(location.searchStr).get('metric');
   const trigger = useRef<HTMLButtonElement>(null);
-  const { query, request, setRequest, connection } =
-    useLiveMetrics(organizationId);
+  const { query, request, setRequest, connection } = usePagedMetric(
+    live,
+    orderMetricRequest,
+    (paged: MetricRequest) => metricsOptions(organizationId, paged),
+  );
   const [selected, setSelected] = useState(
     restoredMetric?.startsWith('orders.') ? restoredMetric : 'orders.open',
   );

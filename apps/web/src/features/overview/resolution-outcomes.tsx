@@ -1,9 +1,12 @@
-import type { OperationalMetricRequest } from '@luma/api-contract';
+import type {
+  OperationalMetricRequest,
+  OperationalMetricResponse,
+} from '@luma/api-contract';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Select } from '@luma/ui/components/primitives/select';
 import { CheckCheck, Fingerprint, Timer } from 'lucide-react';
-import { useMemo, useState } from 'react';
 
+import type { LiveMetricView } from './metrics-live';
 import { OperationalMetrics } from './operational-metrics';
 
 const groups: {
@@ -50,9 +53,23 @@ const groups: {
   },
 ];
 
-type Environment = NonNullable<
-  OperationalMetricRequest['scope']
->['environment'];
+export type OutcomeEnvironment = NonNullable<
+  NonNullable<OperationalMetricRequest['scope']>['environment']
+>;
+
+export type OutcomeWindow = '24h' | '7d';
+
+/** The resolution view a page requests in its metric summary for the chosen cohort. */
+export function resolutionMetricRequest(
+  environment: OutcomeEnvironment,
+  window: OutcomeWindow,
+): OperationalMetricRequest {
+  return {
+    definitionVersion: 2,
+    metrics: groups.flatMap((g) => g.metrics),
+    scope: { environment, window },
+  };
+}
 
 const environments = [
   { value: 'live', label: 'Live operations' },
@@ -66,25 +83,25 @@ const windows = [
   { value: '7d', label: 'Detected in last 7 days' },
 ] as const;
 
-/** Shows verified outcomes and attribution with explicit environment/window controls and authorized evidence drilldowns. */
+/**
+ * Shows verified outcomes and attribution with explicit environment/window controls and authorized
+ * evidence drilldowns. The page owns the cohort so its metric summary reads the matching request.
+ */
 export function ResolutionOutcomes({
   organizationId,
-  initialWindow = '7d',
+  live,
+  environment,
+  window,
+  onEnvironmentChange,
+  onWindowChange,
 }: {
   organizationId: string;
-  initialWindow?: '24h' | '7d';
+  live: LiveMetricView<OperationalMetricResponse>;
+  environment: OutcomeEnvironment;
+  window: OutcomeWindow;
+  onEnvironmentChange: (environment: OutcomeEnvironment) => void;
+  onWindowChange: (window: OutcomeWindow) => void;
 }) {
-  const [environment, setEnvironment] = useState<Environment>('live');
-  const [window, setWindow] = useState<'24h' | '7d'>(initialWindow);
-  const request = useMemo<OperationalMetricRequest>(
-    () => ({
-      definitionVersion: 2,
-      metrics: groups.flatMap((g) => g.metrics),
-      scope: { environment, window },
-    }),
-    [environment, window],
-  );
-
   return (
     <div className="outcome-measurement">
       <div className="outcome-measurement-controls">
@@ -94,7 +111,7 @@ export function ResolutionOutcomes({
           options={environments}
           value={environment}
           onValueChange={(value) => {
-            if (value) setEnvironment(value);
+            if (value) onEnvironmentChange(value);
           }}
         />
         <Select
@@ -103,7 +120,7 @@ export function ResolutionOutcomes({
           options={windows}
           value={window}
           onValueChange={(value) => {
-            if (value) setWindow(value);
+            if (value) onWindowChange(value);
           }}
         />
         {environment !== 'live' ? (
@@ -113,7 +130,8 @@ export function ResolutionOutcomes({
       <OperationalMetrics
         key={`${organizationId}:${environment}:${window}`}
         organizationId={organizationId}
-        initialRequest={request}
+        live={live}
+        initialRequest={resolutionMetricRequest(environment, window)}
         metricGroups={groups}
         heading="Verified outcomes & human work"
         description="See what finished correctly, where people helped, and what the evidence cannot yet establish."

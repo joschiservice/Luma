@@ -87,18 +87,32 @@ test('explains unknown order totals, opens accessible cohorts and recovers from 
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
+  // The page reads every metric view in one summary; only the order part fails.
   await page.route(
-    '**/v1/organizations/*/metrics/query',
-    (route) =>
-      route.fulfill({
-        status: 503,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          code: 'SERVICE_UNAVAILABLE',
-          message: 'Unavailable',
-          requestId: 'test',
-        }),
-      }),
+    '**/v2/organizations/*/metrics/summary',
+    async (route) => {
+      const response = await route.fetch();
+      const body = await response.json();
+      await route.fulfill({
+        response,
+        json: {
+          ...body,
+          parts: body.parts.map((part) =>
+            part.kind === 'orders'
+              ? {
+                  kind: 'orders',
+                  status: 503,
+                  error: {
+                    code: 'SERVICE_UNAVAILABLE',
+                    message: 'Unavailable',
+                    requestId: 'test',
+                  },
+                }
+              : part,
+          ),
+        },
+      });
+    },
     { times: 1 },
   );
   await section

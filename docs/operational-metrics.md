@@ -122,6 +122,16 @@ Set `LUMA_METRIC_BENCHMARK=1` when running that PostgreSQL suite to generate
 `/tmp/luma84-query-plans.json` with EXPLAIN ANALYZE/BUFFERS plans and five samples.
 See [query measurements](operational-metrics-performance.md).
 
+## Page summary
+
+`POST /v2/organizations/:organizationId/metrics/summary` reads up to four parts in one
+request. Each part is an order (`kind: 'orders'`, v1 request) or operational
+(`kind: 'operational'`, v2 request) query and follows that endpoint's rules. Parts return in
+request order with their own status: a part that fails, such as a 409 for a changed snapshot
+or a 403 without `orders.read`, carries its error while the others succeed. Each part keeps
+its own snapshot; page a part through its own query endpoint. `nextRefreshAt` is the
+earliest boundary across the parts that were read.
+
 ## Current operational registry (v2)
 
 `GET /v2/organizations/:organizationId/metrics` lists the order v1 definitions

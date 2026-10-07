@@ -28,22 +28,15 @@ import {
   Plug,
   RefreshCw,
 } from 'lucide-react';
-import { useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { IdentityError } from '../identity/data';
-import { useLiveMetricQuery } from './metrics-live';
+import { type LiveMetricView, usePagedMetric } from './metrics-live';
 import {
   operationalMetricRequest,
   operationalMetricsOptions,
 } from './operational-metrics-data';
 import { ResolutionEvidence } from './resolution-evidence';
-
-const defaultConfig = {
-  initial: operationalMetricRequest,
-  key: 'operational-metrics',
-  topics: ['issues', 'inventory', 'procurement', 'connections'],
-  options: operationalMetricsOptions,
-} as const;
 
 type Metric = OperationalMetricResponse['metrics'][number];
 
@@ -98,15 +91,20 @@ const reasonLabels: Record<string, string> = {
   unobserved: 'Unobserved reads',
 };
 
-/** Groups current operational priorities and opens their authorized matching records. */
+/**
+ * Groups current operational priorities and opens their authorized matching records. `live` is
+ * this widget's slice of the page's metric summary, read with `initialRequest`.
+ */
 export function OperationalMetrics({
   organizationId,
+  live,
   initialRequest,
   heading = 'Your operational pulse',
   description = 'Find the work that needs your next move.',
   metricGroups = groups,
 }: {
   organizationId: string;
+  live: LiveMetricView<OperationalMetricResponse>;
   initialRequest?: OperationalMetricRequest;
   heading?: string;
   description?: string;
@@ -118,22 +116,13 @@ export function OperationalMetrics({
     metrics?: string[];
   }[];
 }) {
-  const config = useMemo(
-    () =>
-      initialRequest
-        ? {
-            initial: initialRequest,
-            key: 'resolution-metrics',
-            topics: ['issues', 'resolution', 'connections'] as const,
-            options: operationalMetricsOptions,
-          }
-        : defaultConfig,
-    [initialRequest],
+  const initial = initialRequest ?? operationalMetricRequest;
+  const { query, request, setRequest, connection } = usePagedMetric(
+    live,
+    initial,
+    (paged: OperationalMetricRequest) =>
+      operationalMetricsOptions(organizationId, paged),
   );
-  const { query, request, setRequest, connection } = useLiveMetricQuery<
-    OperationalMetricRequest,
-    OperationalMetricResponse
-  >(organizationId, config);
   const [selected, setSelected] = useState<string | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const unavailable =
@@ -146,7 +135,7 @@ export function OperationalMetrics({
   const conflict =
     query.error instanceof IdentityError && query.error.status === 409;
   const refresh = () => {
-    if (request.snapshot) setRequest(config.initial);
+    if (request.snapshot) setRequest(initial);
     else void query.refetch();
   };
 
@@ -240,7 +229,7 @@ export function OperationalMetrics({
                           onClick={(event) => {
                             trigger.current = event.currentTarget;
                             setSelected(m.definition.id);
-                            if (request.snapshot) setRequest(config.initial);
+                            if (request.snapshot) setRequest(initial);
                           }}
                         >
                           <span className="operational-label">
@@ -269,7 +258,7 @@ export function OperationalMetrics({
         onOpenChange={(open) => {
           if (!open) {
             setSelected(null);
-            if (request.snapshot) setRequest(config.initial);
+            if (request.snapshot) setRequest(initial);
           }
         }}
       >
@@ -390,7 +379,7 @@ export function OperationalMetrics({
                     disabled={!data.offset || query.isFetching}
                     onClick={() =>
                       setRequest({
-                        ...config.initial,
+                        ...initial,
                         asOf: data.asOf,
                         snapshot: data.snapshot,
                         offset: Math.max(0, data.offset - data.limit),
@@ -409,7 +398,7 @@ export function OperationalMetrics({
                     }
                     onClick={() =>
                       setRequest({
-                        ...config.initial,
+                        ...initial,
                         asOf: data.asOf,
                         snapshot: data.snapshot,
                         offset: data.offset + data.limit,

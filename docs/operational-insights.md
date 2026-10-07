@@ -42,7 +42,7 @@ The orders chart returns 503 while an existing tenant's order-list projection aw
 repeating the chart request does not advance it.
 
 Charts share the workspace metric stream and refresh for the orders, issues, inventory,
-procurement, workflows and connections topics. Live invalidations coalesce over one second and
+procurement, workflows and connections topics. Live invalidations read at most once per two seconds and
 let active reads finish before processing further changes. After a failed read, stream
 events cannot start another attempt for 30 seconds. Explicit refresh, filter changes,
 focus and reconnect still request current data. Failed charts hide earlier values.
