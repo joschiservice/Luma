@@ -45,6 +45,8 @@ export function createAppRegistry(definitions: readonly AppDefinition[] = []) {
             ]
           : [],
       ),
+    /** Lists the case workflows installed apps contribute. */
+    workflowSources: () => [...apps.values()].flatMap((a) => a.workflows ?? []),
     /** Registers app-owned routes after host identity guards are attached. */
     registerHttp(server: FastifyInstance, identity?: IdentityService) {
       for (const app of apps.values()) app.registerHttp?.(server, identity);

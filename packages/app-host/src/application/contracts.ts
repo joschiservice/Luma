@@ -5,6 +5,7 @@ import type {
 } from '@luma/connections';
 import type { IdentityService, TenantContext } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
+import type { CaseWorkflowAdapter } from '@luma/workflows';
 import type { FastifyInstance } from 'fastify';
 
 export interface AppManifest {
@@ -83,6 +84,11 @@ export interface AppDefinition {
    * see them. Do not perform provider reads.
    */
   decisions?(context: TenantContext): Promise<AppDecision[]>;
+  /**
+   * Built-in workflows that start for new cases. Each must send changes through the app's
+   * governed proposal, approval, admission and verification path.
+   */
+  workflows?: CaseWorkflowAdapter[];
   /** Registers app-owned HTTP handlers; handlers must check workspace installation. */
   registerHttp?(server: FastifyInstance, identity?: IdentityService): void;
   /** Updates app-owned storage inside the installation transaction. Do not perform network requests. */

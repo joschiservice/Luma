@@ -700,6 +700,9 @@ importers:
       '@luma/platform':
         specifier: workspace:*
         version: link:../platform
+      '@luma/workflows':
+        specifier: workspace:*
+        version: link:../workflows
       '@ts-rest/fastify':
         specifier: 'catalog:'
         version: 3.52.1(@ts-rest/core@3.52.1(@types/node@24.13.5)(zod@3.25.76))(fastify@5.12.5)(zod@3.25.76)
@@ -910,6 +913,9 @@ importers:
       '@luma/ui':
         specifier: workspace:*
         version: link:../../ui
+      '@luma/workflows':
+        specifier: workspace:*
+        version: link:../../workflows
       '@tanstack/react-form':
         specifier: 'catalog:'
         version: 1.33.5(@tanstack/react-start@1.168.54(esbuild@0.28.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.8)))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)

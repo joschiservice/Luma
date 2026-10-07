@@ -124,3 +124,16 @@ export {
   describeApproval,
   summarizeOutcomes,
 } from './domain/readiness.js';
+
+export type * from './domain/case-workflow.js';
+
+export { caseRunOutcome, caseStartable } from './domain/case-workflow.js';
+
+export type {
+  CaseActivationStore,
+  CaseReader,
+  CaseRun,
+  CaseRunTransport,
+  CaseWorkflowAdapter,
+  CaseWorkflows,
+} from './application/case-workflows.js';

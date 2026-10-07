@@ -29,6 +29,8 @@ const view = (context: RequestContext, item: StoredRecord<BulkData>) => ({
       : item.data.status,
   url: `https://storage.googleapis.com/luma-bulk/${item.id}`,
   rootObjectCount: item.data.rootObjectCount,
+  // The export file is the shop's state when the operation started.
+  createdAt: new Date(item.createdAt).toISOString(),
 });
 
 /** Executes simulator bulk queries and exposes persisted operations through the Admin API. */

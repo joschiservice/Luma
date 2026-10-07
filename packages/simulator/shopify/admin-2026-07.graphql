@@ -80,6 +80,7 @@ The `ID` scalar type represents a unique identifier, often used to refetch an ob
 scalar ID
 
 type BulkOperation implements Node {
+  createdAt: DateTime!
   errorCode: BulkOperationErrorCode
   id: ID!
   query: String!

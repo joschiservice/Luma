@@ -76,7 +76,14 @@ it('saves, validates and publishes tenant drafts without activating them', async
   expect(templates.map((item) => [item.id, item.configure])).toEqual([
     ['inventory-replenishment', 'replenishment'],
     ['shipping-method-correction', 'resolution'],
+    ['connection-sync-check', 'case'],
+    ['shopify-stock-correction', 'case'],
+    ['shopify-hold-release', 'case'],
   ]);
+  // Case workflows need a Shopify connection with write access, so they explain what's missing.
+  expect(
+    templates.find((item) => item.id === 'shopify-stock-correction'),
+  ).toMatchObject({ readiness: 'blocked', status: 'unavailable' });
   const replenishment = templates[0];
   expect(replenishment.readiness).toBe('blocked');
   expect(replenishment.requirements).toContainEqual(

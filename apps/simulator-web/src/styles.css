@@ -601,3 +601,26 @@
     flex-basis: 100%;
   }
 }
+
+.sim-scenarios {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sim-scenarios > li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-block: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+@media (max-width: 640px) {
+  .sim-scenarios > li {
+    flex-direction: column;
+  }
+}

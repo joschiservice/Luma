@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,6 +14,7 @@ import {
   type Profiles,
   recordQuerySchema,
   runIdSchema,
+  runScenarioSchema,
   webhookTargetsSchema,
 } from '@luma/simulator-contract';
 import {
@@ -22,6 +24,7 @@ import {
   type ChaosProfile,
   type FaultRule,
   incidentKinds,
+  workflowScenarios,
 } from '@luma/simulator-core';
 import type { JtlCommand } from '@luma/simulator-jtl';
 import type { ShopifyCommand } from '@luma/simulator-shopify';
@@ -34,7 +37,7 @@ import { advanceWorld } from './engine/advance.js';
 import { injectIncident, recoverIncident } from './engine/incidents.js';
 import { forgetModel, worldModel } from './engine/model.js';
 import { placeOrder } from './engine/orders.js';
-import { erp, shop } from './engine/world.js';
+import { erp, type Incident, shop, type World } from './engine/world.js';
 import { createDispatcher } from './runtime/dispatch.js';
 import { clearRun, provisionRun } from './runtime/provision.js';
 import {
@@ -136,6 +139,45 @@ export async function createApp(options: SimulatorOptions) {
     app.log.warn(error, 'Simulator database connection closed'),
   );
   const dispatcher = createDispatcher(pool);
+
+  /**
+   * Arms a fault rule in the run's session. With `origin`, an existing rule from the same
+   * request is kept instead of arming another.
+   */
+  async function armFault(
+    client: pg.PoolClient,
+    run: RunRecord,
+    world: World,
+    input: Omit<FaultRule, 'id' | 'matches' | 'status' | 'expiresAt'> & {
+      lifetimeMs?: number | undefined;
+    },
+    origin?: string,
+  ) {
+    if (origin) {
+      const existing = await client.query(
+        "SELECT 1 FROM sim_faults WHERE run_id = $1 AND rule->>'origin' = $2",
+        [run.id, origin],
+      );
+      if (existing.rowCount) return;
+    }
+    const { lifetimeMs, ...rule } = input;
+    const position = await world.store('world').sequence('fault');
+    const fault: FaultRule = {
+      ...rule,
+      id: `fault-${position}`,
+      matches: 0,
+      status: 'armed',
+      ...(lifetimeMs ? { expiresAt: run.now + lifetimeMs } : {}),
+      ...(origin ? { origin } : {}),
+    };
+    // The session holds the run lock, so its own connection writes the rule.
+    await client.query(
+      'INSERT INTO sim_faults (run_id, id, rule) VALUES ($1, $2, $3)',
+      [run.id, fault.id, fault],
+    );
+    dispatcher.rulesChanged(run.id);
+  }
+
   const webhooks = createWebhookDelivery(pool);
   const provisioning = new Set<Promise<void>>();
   const assets =
@@ -392,24 +434,9 @@ export async function createApp(options: SimulatorOptions) {
           });
           break;
         }
-        case 'fault': {
-          const { lifetimeMs, ...rule } = input.rule;
-          const position = await world.store('world').sequence('fault');
-          const fault: FaultRule = {
-            ...rule,
-            id: `fault-${position}`,
-            matches: 0,
-            status: 'armed',
-            ...(lifetimeMs ? { expiresAt: run.now + lifetimeMs } : {}),
-          };
-          // The session holds the run lock, so its own connection writes the rule.
-          await client.query(
-            'INSERT INTO sim_faults (run_id, id, rule) VALUES ($1, $2, $3)',
-            [run.id, fault.id, fault],
-          );
-          dispatcher.rulesChanged(run.id);
+        case 'fault':
+          await armFault(client, run, world, input.rule);
           break;
-        }
         case 'disable': {
           const { rows } = await client.query<{ rule: FaultRule }>(
             'SELECT rule FROM sim_faults WHERE run_id = $1 AND id = $2',
@@ -484,6 +511,53 @@ export async function createApp(options: SimulatorOptions) {
     if (!incident) throw notFound('Incident not found');
 
     return viewIncident(incident, null, Date.now());
+  });
+  app.post('/api/runs/:id/scenarios', async (request) => {
+    const id = runIdSchema.parse((request.params as { id: string }).id);
+    const input = runScenarioSchema.parse(request.body);
+    const scenario = workflowScenarios[input.scenario];
+    const incidents = await withRun(
+      pool,
+      id,
+      async ({ client, run, world }) => {
+        if (run.status !== 'ready') throw new Error('The run is not ready');
+        await advanceWorld(world, actionTime(run));
+        const shop = world.model.shops[0]!.name;
+        const started: Incident[] = [];
+        for (const [index, step] of scenario.steps.entries()) {
+          const origin = `${input.id}:${index}`;
+          if (step.kind === 'fault')
+            await armFault(
+              client,
+              run,
+              world,
+              {
+                instance: shop,
+                operation: step.operation,
+                kind: step.fault,
+                occurrence: 1,
+                remaining: step.remaining,
+                lifetimeMs: step.lifetimeMs,
+              },
+              origin,
+            );
+          else
+            started.push(
+              await injectIncident(world, {
+                id: scenarioIncidentId(origin),
+                kind: step.incident,
+                instance: shop,
+              }),
+            );
+        }
+
+        return started;
+      },
+    );
+
+    return incidents.map((incident) =>
+      viewIncident(incident, null, Date.now()),
+    );
   });
   app.get('/api/runs/:id/scorecard', async (request) =>
     scorecard(
@@ -666,4 +740,11 @@ export async function createApp(options: SimulatorOptions) {
       return worldModel(run.id, run.profile, run.seed);
     },
   });
+}
+
+/** A stable incident ID for one scenario step, so a repeated request injects nothing new. */
+function scenarioIncidentId(origin: string) {
+  const hex = createHash('sha256').update(origin).digest('hex');
+
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }

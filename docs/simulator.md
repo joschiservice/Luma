@@ -14,6 +14,8 @@ Run `mise exec -- pnpm simulator` from the repository root. It starts PostgreSQL
 | `--chaos`             | `realistic` | Failure preset for a new run: `calm`, `realistic`, `bad-day` or `outage-drill`.       |
 | `--seed`              | `44`        | Seed for a new run. The same profile, chaos and seed produce the same merchant.       |
 | `--approval-required` | off         | Adds the synthetic shipping-method approval example to a newly provisioned workspace. |
+| `--no-demo-workflows` | demo on     | Skips the [workflow demo](#workflow-demo) setup in a newly provisioned workspace.     |
+| `--detection`         | `demo`      | `demo` uses faster stuck and hold windows; `production` uses the default thresholds.  |
 
 Flags only apply when the run does not exist yet. Open <http://127.0.0.1:5890> for the control panel. Credentials for Luma are in `.luma/simulator-login.json`.
 
@@ -100,6 +102,29 @@ Ground truth stays in the simulator database. The **Scorecard** compares it with
 
 Luma's sync process runs [scheduled detection](exception-detection.md#scheduled-detection) for sync failures, stock mismatches between linked SKUs and stuck fulfillment. Kinds without a rule report as not covered. A revoked credential makes the connection inactive, which the sync-failure rule treats as clear, so **Credentials revoked** reports as missed.
 
+## Workflow demo
+
+A new workspace is set up the way a merchant would configure Luma, so workflows run on the simulated operations:
+
+- **Case workflows on:** _Correct Shopify stock from the ERP_, _Release an overdue fulfillment hold_ and _Check a failing connection_ are turned on as the workspace owner (`pilot-requester@example.test`). Each change waits in Needs you for a different admin, so sign in with `.luma/simulator-login.json` (`pilot-operator@example.test`) to approve it.
+- **Suppliers and stock rules:** the suppliers of the eight most-demanded linked SKUs are created in Procurement and linked to JTL, and each SKU gets a _Replenish low stock_ rule. Two rules start just above current stock, so a purchase-order proposal follows the next fresh stock read. The new run gives these suppliers different answers (full, partial, delayed, short and silent), so sent purchase orders meet each.
+- **Detection timing:** with `--detection demo`, fulfillment counts as stuck after 20 minutes instead of two hours, and a hold is overdue after 30 minutes instead of a day. The workspace keeps its timing across restarts.
+
+The API process completes the setup once the records are imported and linked, retrying on each minute's pass; `tooling/simulator/demo.mjs` owns it. JTL stock is reread every 30 minutes, and replenishment acts only on stock read in the last five minutes, so its proposals follow those reads. Approve a proposal within five minutes: after that its evidence is stale and Luma prepares a new one.
+
+**Workflow scenarios** in the Incidents tab start a reproducible situation and state what Luma should do:
+
+| Scenario                     | What happens                                                                                         |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Stock correction             | Stock drift; approve the proposed correction; Luma writes, verifies, and detection closes the case.  |
+| Approval expires             | The same drift; leave it for five minutes, and a new proposal from fresh stock replaces the old one. |
+| Write commits, response lost | The correction commits but its response is lost; Luma reconciles by reading and never writes twice.  |
+| Overdue fraud hold           | A held order; after approval the hold is released, and the case stays open until the order ships.    |
+| Shop outage                  | Reads fail; the connection check waits 15 minutes, then ends or hands the case over.                 |
+| Access revoked               | Connections shows lost access; no case opens, so the scorecard reports it missed.                    |
+
+A repeated request with the same ID starts nothing new. Definitions live in `packages/simulator/core/src/scenarios.ts`; `POST /api/runs/:id/scenarios` starts one. The incident list links each case to its latest workflow run and shows the run's state.
+
 ## Luma wiring
 
 The pilot provisions one connection per instance (`jtl`, then one per shop) with all read capabilities and the write capabilities each provider supports. The simulation manifest `.luma/simulator/pilot.json` binds each connection to its run and instance. The transport selector checks tenant, connection, provider and target, and fails closed for unbound synthetic installations. Simulation is rejected in production.
@@ -128,6 +153,7 @@ The control API at `/api` requires the bearer token. `@luma/simulator-contract` 
 | `GET /api/runs/:id/skus?q=`, `…/skus/:sku`                 | SKU search and ERP-to-shop stock comparison.                                                    |
 | `PUT /api/runs/:id/webhooks`                               | Webhook targets and secrets per shop.                                                           |
 | `GET, POST /api/runs/:id/operations[/check]`               | Luma's inventory check for the bound run.                                                       |
+| `POST /api/runs/:id/scenarios`                             | Starts a workflow scenario: its fault rules and incidents, once per request ID.                 |
 | `POST /api/runs/:id/providers/:instance/request`           | The provider transport used by Luma's simulation binding.                                       |
 
 ## Extending and checking
@@ -136,4 +162,4 @@ The control API at `/api` requires the bearer token. `@luma/simulator-contract` 
 - **Merchant behavior** belongs to `apps/simulator/src/engine`, profile data to `@luma/simulator-commerce`, and failure decisions to `@luma/simulator-core`.
 - **New incident kinds** need their kind entry, where they start in the engine, a recovery, and an expected exception class once a detector exists. Use the [operational scenario recipe](adding-operational-scenarios.md).
 
-Run `mise exec -- pnpm test:simulator` for package tests, the database-backed host tests, adapter contracts and the panel. `pnpm verify:feature simulator` adds the platform journeys. Platform tests reuse `setupSimulator(t)`, which creates a disposable simulator database, a paused `test` run with `calm` failures, and a workspace. They advance time and call `pilot.observe()` explicitly.
+Run `mise exec -- pnpm test:simulator` for package tests, the database-backed host tests, adapter contracts and the panel. `pnpm verify:feature simulator` adds the platform journeys. Platform tests reuse `setupSimulator(t)`, which creates a disposable simulator database, a paused `test` run with `calm` failures, and a workspace. They advance time and call `pilot.observe()` explicitly. `observe()` waits for Shopify bulk exports that are still being prepared, so a test's later provider changes aren't hidden behind an import that finishes from an older export.

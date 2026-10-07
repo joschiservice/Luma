@@ -20,6 +20,8 @@ export interface LumaCase {
   /** Provider record IDs in the case's subject and evidence. */
   identifiers: string[];
   url: string | null;
+  /** The latest workflow run this case started, with its process state. */
+  workflow?: { name: string; state: string; url: string } | null;
 }
 
 /** Reads Luma's cases for a run; rejects when Luma is unreachable. */
@@ -67,8 +69,14 @@ function matches(incident: Incident, item: LumaCase) {
   if (expected === 'sync_failure')
     return !!incident.instance && item.instances.includes(incident.instance);
   const ids = new Set(item.identifiers);
+  // Every case at a location names it, so match on the record itself when one is known.
+  const specific = incident.resources.filter(
+    (resource) => resource.kind !== 'Location',
+  );
 
-  return incident.resources.some((resource) => ids.has(resource.id));
+  return (specific.length ? specific : incident.resources).some((resource) =>
+    ids.has(resource.id),
+  );
 }
 
 /** Combines an incident with the Luma case that detected it, if any. */
@@ -98,6 +106,7 @@ export function viewIncident(
           detectedAt: found ? Date.parse(found.detectedAt) : null,
           resolved: !!found?.resolvedAt,
           verified: !!found?.verified,
+          workflow: found?.workflow ?? null,
         }
       : null;
   }

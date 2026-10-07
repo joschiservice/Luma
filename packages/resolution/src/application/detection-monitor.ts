@@ -121,6 +121,11 @@ export interface DetectionMonitorOptions {
   hash(value: string): string;
   /** Fresh stock and fulfillment checks per workspace and pass. */
   limits?: { stock?: number; fulfillment?: number };
+  /**
+   * How long a hold may explain missing progress. After it, the hold counts as the reason the
+   * order is stuck. Defaults to 24 hours.
+   */
+  holdOverdueSeconds?: number;
   now?: () => Date;
   log?: (message: string, error?: unknown) => void;
 }
@@ -160,6 +165,7 @@ export function createDetectionMonitor(options: DetectionMonitorOptions) {
     stock: options.limits?.stock ?? 25,
     fulfillment: options.limits?.fulfillment ?? 25,
   };
+  const holdOverdueSeconds = options.holdOverdueSeconds ?? 86_400;
 
   /** Pairs every ERP report with every storefront report of the same position. */
   function stockMappings(
@@ -276,12 +282,18 @@ export function createDetectionMonitor(options: DetectionMonitorOptions) {
       order: work.order,
       lines: work.lines,
     };
-    const { holds, fulfillAt } = observation.data;
+    const { holds, fulfillAt, lastProgressAt } = observation.data;
+    // A hold explains missing progress until it is overdue; then the hold is why it is stuck.
+    const holdOverdue =
+      !!holds?.length &&
+      lastProgressAt !== null &&
+      Date.parse(observation.observedAt) - Date.parse(lastProgressAt) >=
+        holdOverdueSeconds * 1000;
     // Holds and a later scheduled start explain missing progress; unread holds stay unknown.
     const eligibility =
       holds === undefined
         ? ('unknown' as const)
-        : holds.length ||
+        : (holds.length && !holdOverdue) ||
             (fulfillAt &&
               Date.parse(fulfillAt) > Date.parse(observation.observedAt))
           ? ('exempt' as const)
@@ -299,6 +311,7 @@ export function createDetectionMonitor(options: DetectionMonitorOptions) {
       facts: {
         eligibility,
         holds: holds?.map((hold) => hold.reason) ?? null,
+        holdOverdue,
         fulfillAt: fulfillAt ?? null,
       },
     };

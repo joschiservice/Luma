@@ -1,5 +1,6 @@
 import { createDefaultExceptionWorker } from '@luma/application-runtime/worker';
 import {
+  readConnectionsConfig,
   readIdentityConfig,
   readObservabilityConfig,
   readWorkflowConfig,
@@ -38,6 +39,8 @@ export async function main(
           captureActivityError: observability.captureActivityError,
         },
       },
+      readConnectionsConfig(process.env),
+      process.env,
     );
     const shutdown = () => worker.shutdown();
     for (const signal of ['SIGINT', 'SIGTERM'] as const)

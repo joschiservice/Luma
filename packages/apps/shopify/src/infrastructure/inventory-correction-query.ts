@@ -79,6 +79,21 @@ export function createCorrectionQuery(database: TenantDatabase) {
   }
 
   return {
+    /** Finds the stock position that projects a canonical SKU at a canonical location. */
+    position: (context: TenantContext, skuId: string, locationId: string) =>
+      database.transaction(context.tenantId, async (tx) => {
+        const result = await tx.query<{ id: string }>(
+          `SELECT p.entity_id AS id FROM inventory_projections p
+           JOIN inventory_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id
+           WHERE p.tenant_id=$1 AND s.kind='position' AND s.document->'data'->>'skuId'=$2
+            AND s.document->'data'->>'locationId'=$3
+           GROUP BY p.entity_id ORDER BY p.entity_id LIMIT 2`,
+          [context.tenantId, skuId, locationId],
+        );
+
+        // Two positions for one SKU and location would make the subject ambiguous.
+        return result.rows.length === 1 ? result.rows[0]!.id : null;
+      }),
     async candidates(
       context: TenantContext,
       positionId: string,
@@ -169,6 +184,23 @@ export function createCorrectionQuery(database: TenantDatabase) {
           'The ERP available quantity must be a known, nonnegative whole number.',
         );
 
+      // The revision covers the authoritative value and mappings, not which read reported it:
+      // a newer read of the same quantity keeps a reviewed correction valid. Freshness is
+      // checked separately against `observedAt`.
+      const authority = {
+        connectionId: erp.connectionId,
+        provider: erp.provider,
+        active: erp.active,
+        installed: erp.installed,
+        readable: erp.readable,
+        deleted: erp.deleted,
+        skuId: erp.skuId,
+        locationId: erp.locationId,
+        unit: erp.unit,
+        available: erp.available,
+        mappings: erp.mappings,
+      };
+
       return {
         inventoryItemId,
         locationId,
@@ -179,7 +211,12 @@ export function createCorrectionQuery(database: TenantDatabase) {
           observedAt: erp.observedAt,
           available: quantity,
           revision: createHash('sha256')
-            .update(canonicalJson({ erp, targetMappings: shopify.mappings }))
+            .update(
+              canonicalJson({
+                erp: authority,
+                targetMappings: shopify.mappings,
+              }),
+            )
             .digest('hex'),
         },
       };

@@ -179,6 +179,11 @@ export const recoveryView = z.object({
   ]),
   /** A different owner or admin approved this exact action. */
   approved: z.boolean().default(false),
+  /** Why a denied action stopped; null unless the state is `denied`. */
+  denial: z
+    .enum(['rejected', 'expired', 'changed', 'policy', 'withheld'])
+    .nullable()
+    .default(null),
   acceptance: z.enum(['not_sent', 'accepted', 'unknown']),
   message: z.string(),
   canExecute: z.boolean(),

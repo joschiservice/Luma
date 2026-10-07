@@ -160,6 +160,30 @@ test('ERP authority, separate approval, one dispatch, reconciliation and tenant 
   }
 });
 
+test('a newer ERP read of the same quantity keeps an approved correction valid', async (t) => {
+  const { f, admin, call, target, mutations, stock } =
+    await correctionFixture(t);
+  const preview = await call(f.owner, 'preview', {
+    ...target,
+    requestId: randomUUID(),
+  });
+  await call(admin, 'approve', { id: preview.id, outcome: 'approved' });
+  // Detection rereads linked stock often; the same authoritative quantity is not a change.
+  await stock.stock({
+    connectionId: stock.erp,
+    external: '77',
+    location: stockLocation,
+    amount: '9',
+  });
+  const executed = await call(f.owner, 'execute', { id: preview.id });
+  assert.equal(executed.acceptance, 'accepted');
+  assert.equal(mutations.length, 1);
+  assert.equal(
+    (await call(f.owner, 'check', { id: preview.id })).state,
+    'verified',
+  );
+});
+
 test('source freshness, ambiguous mappings, source changes and provider CAS stop writes', async (t) => {
   const { f, admin, call, target, mutations, stock, race, level } =
     await correctionFixture(t);

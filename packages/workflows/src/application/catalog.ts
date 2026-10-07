@@ -19,6 +19,7 @@ import type {
   WorkflowTriggerRun,
 } from '../domain/workflow.js';
 import { resolutionWorkflow } from '../domain/workflow.js';
+import type { CaseWorkflows } from './case-workflows.js';
 import type { createCodeEvaluations } from './code-evaluations.js';
 import type { PlaybookOutcome, PlaybookRun } from './playbook.js';
 import type { PlaybookLibrary } from './playbook-library.js';
@@ -78,6 +79,8 @@ export function createWorkflowCatalog(deps: {
   };
   codeEvaluations?: ReturnType<typeof createCodeEvaluations>;
   replenishment?: ReplenishmentWorkflow;
+  /** Built-in workflows that start for new cases. */
+  caseWorkflows?: CaseWorkflows;
   legacy: PlaybookLibrary;
   triggers: ReturnType<typeof createWorkflowTriggers>;
   store: WorkflowCatalogStore;
@@ -475,6 +478,12 @@ export function createWorkflowCatalog(deps: {
           'CONFLICT',
           'Use the replenishment stock check to start this workflow.',
         );
+      if (deps.caseWorkflows?.owns(id))
+        throw new IdentityError(
+          409,
+          'CONFLICT',
+          'This workflow starts from detected cases. Turn it on instead of starting it by hand.',
+        );
 
       const run = await deps.triggers.fire(context, id, request);
       await deps.codeProcesses?.start(context, run);
@@ -506,15 +515,21 @@ export function createWorkflowCatalog(deps: {
           v,
         ]);
 
-      const replenishmentDetail = await deps.replenishment?.detail(context);
+      const [replenishmentDetail, caseSummaries] = await Promise.all([
+        deps.replenishment?.detail(context),
+        deps.caseWorkflows?.summaries(context) ?? [],
+      ]);
 
       return [
         ...(replenishmentDetail ? [replenishmentDetail.summary] : []),
+        ...caseSummaries,
         ...legacy.map((v) => ({ ...v, category: 'resolution' })),
         ...(await Promise.all(
           [...groups.values()]
             .filter(
-              (v) => v[0]!.definition.id !== deps.replenishment?.definitionId,
+              (v) =>
+                v[0]!.definition.id !== deps.replenishment?.definitionId &&
+                !deps.caseWorkflows?.owns(v[0]!.definition.id),
             )
             .map(
               async (v) =>
@@ -528,6 +543,8 @@ export function createWorkflowCatalog(deps: {
       context = await authorize(context);
       if (id === deps.replenishment?.definitionId)
         return deps.replenishment.detail(context);
+      if (deps.caseWorkflows?.owns(id))
+        return deps.caseWorkflows.detail(context, id);
       const native = await deps.store.versions(context, id);
       if (native.length)
         return withReadiness(context, native, await explain(context, native));
@@ -565,6 +582,7 @@ export function createWorkflowCatalog(deps: {
       );
       if (
         id === deps.replenishment?.definitionId ||
+        deps.caseWorkflows?.owns(id) ||
         (await deps.store.versions(context, id)).length
       )
         return triggered;
@@ -601,10 +619,27 @@ export function createWorkflowCatalog(deps: {
     async activate(...args: Parameters<PlaybookLibrary['activate']>) {
       const [context, id, request] = args;
       const fresh = await authorize(context, true);
+      if (deps.caseWorkflows?.owns(id))
+        throw new IdentityError(
+          409,
+          'CONFLICT',
+          'Turn this workflow on for the workspace instead of choosing orders.',
+        );
       if ((await deps.store.versions(fresh, id)).length)
         throw new IdentityError(409, 'CONFLICT', nativeBlocker);
 
       return deps.legacy.activate(fresh, id, request);
+    },
+    /** Turns a case workflow on for the workspace as the caller, after reviewing its version and policy. */
+    activateCase(
+      context: TenantContext,
+      id: string,
+      input: Parameters<CaseWorkflows['activate']>[2],
+    ) {
+      if (!deps.caseWorkflows?.owns(id))
+        throw new IdentityError(404, 'NOT_FOUND', 'Workflow not found.');
+
+      return deps.caseWorkflows.activate(context, id, input);
     },
     /** Revokes the exact reviewed activation. */
     revoke: (
@@ -615,7 +650,9 @@ export function createWorkflowCatalog(deps: {
     ) =>
       id === deps.replenishment?.definitionId
         ? deps.replenishment.revoke(context, activationId, digest)
-        : deps.legacy.revoke(context, id, activationId, digest),
+        : deps.caseWorkflows?.owns(id)
+          ? deps.caseWorkflows.revoke(context, id, activationId, digest)
+          : deps.legacy.revoke(context, id, activationId, digest),
   };
 }
 

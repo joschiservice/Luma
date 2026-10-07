@@ -1,6 +1,7 @@
 import { setTimeout as delay } from 'node:timers/promises';
 
-import type { WorkflowConfig } from '@luma/config';
+import { createAppHost } from '@luma/app-catalog';
+import type { ConnectionsConfig, WorkflowConfig } from '@luma/config';
 import type { Diagnosis } from '@luma/exceptions';
 import type { IdentityService, TenantContext } from '@luma/identity';
 import { createIdentity } from '@luma/identity/composition';
@@ -183,10 +184,15 @@ export function createExceptionWorkflowRuntime(
   };
 }
 
-/** Start a worker for persisted incidents and diagnoses. */
+/**
+ * Start a worker for persisted incidents, diagnoses and process workflows. With `connections`,
+ * installed apps contribute their case workflows; without it, only Luma's own run.
+ */
 export async function createDefaultExceptionWorker(
   identitySettings: Parameters<typeof createIdentity>[0],
   settings: WorkflowConfig & { temporal: TemporalSettings },
+  connections?: ConnectionsConfig,
+  env?: Readonly<Record<string, string | undefined>>,
 ) {
   const resources = createResourceScope();
   try {
@@ -202,13 +208,29 @@ export async function createDefaultExceptionWorker(
       identity.service,
     );
     resources.add(processClient.close);
-    const { detection, safety, desk, http, replenishment, codeProcesses } =
-      createApplicationServices({
-        database: createTenantDatabase(pool),
-        identity: identity.service,
-        execution: { kind: 'enabled', effects: { resolve: async () => null } },
-        replenishmentTransport: processClient,
-      });
+    const database = createTenantDatabase(pool);
+    const host = connections
+      ? createAppHost(database, {
+          ...connections,
+          refreshContext: identity.service.refreshContext,
+          ...(env ? { env } : {}),
+        })
+      : undefined;
+    const {
+      detection,
+      safety,
+      desk,
+      http,
+      replenishment,
+      codeProcesses,
+      caseWorkflows,
+    } = createApplicationServices({
+      database,
+      identity: identity.service,
+      execution: { kind: 'enabled', effects: { resolve: async () => null } },
+      replenishmentTransport: processClient,
+      ...(host ? { workflowSources: host.registry.workflowSources() } : {}),
+    });
     const runtime = createExceptionWorkflowRuntime(
       settings.temporal,
       identity.service,
@@ -242,6 +264,7 @@ export async function createDefaultExceptionWorker(
       pool,
       identity.service,
       codeProcesses,
+      caseWorkflows,
     );
     resources.add(procurementWorker.close);
 

@@ -22,6 +22,8 @@ export async function createSimulatorEnvironment({
   temporal = null,
   profile = 'test',
   chaos = 'calm',
+  detection,
+  demo,
 }) {
   const token = 'operational-simulator-test-token';
   const databaseUrl = await testSimulatorDatabase(t);
@@ -67,8 +69,11 @@ export async function createSimulatorEnvironment({
       token,
       runId: 'operations',
       ...simulatorInstances(run),
+      ...(demo ? { demo } : {}),
     });
-    pilot = await createPilot(env, directory, manifest, temporal);
+    pilot = await createPilot(env, directory, manifest, temporal, {
+      ...(detection ? { detection } : {}),
+    });
     const apiOrigin = await pilot.app.listen({ host: '127.0.0.1', port: 0 });
     await registerWebhooks(call, manifest, apiOrigin);
     client = createOperationsClient({

@@ -14,6 +14,7 @@ import {
   workflowCoverageSchema,
 } from '../replenishment.js';
 import {
+  activateCaseWorkflowSchema,
   activateWorkflowSchema,
   fireWorkflowSchema,
   workflowActivationSchema,
@@ -208,6 +209,16 @@ export const workflowsContract = c.router(
       summary: 'Activate a reviewed version',
       description:
         'Owners and admins can activate supported Resolution versions for their own principal and explicit orders on one connection. Other definitions remain available for review. Review the exact digest, scope and approval behavior. Reuse the same ID and body after an uncertain response. Conflicting, overlapping or stale grants return 409; revoked records cannot be restored.',
+    },
+    activateCase: {
+      method: 'POST',
+      path: `${path}/:definitionId/case-activations`,
+      pathParams: params,
+      body: activateCaseWorkflowSchema,
+      responses: { 200: workflowActivationSchema },
+      summary: 'Turn on a case workflow',
+      description:
+        'Owners and admins let a built-in workflow start a run for each new case of its issue type. Runs act as the caller; every change still needs policy approval by a different owner or admin. Review the exact version digest and policy version. Reuse the same ID and body after an uncertain response. A second active activation returns 409.',
     },
     revoke: {
       method: 'POST',
