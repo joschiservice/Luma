@@ -67,6 +67,8 @@ export interface RecoveryDependencies {
   bind(context: TenantContext, run: RecoveryRun): Promise<void>;
   hash(action: ProposedAction): string;
   now(): Date;
+  /** How long a person has to decide on a preview. Defaults to four hours. */
+  decisionWindowMs?: number;
 }
 
 /** Offers source-bound previews and reference-only execution, preserving the shared approval and reconciliation controls. */
@@ -281,8 +283,9 @@ export function createFulfillmentRecovery(deps: RecoveryDependencies) {
       const before = await deps.read(context, target);
       const blocker = recoveryBlocker(before, choice, granted);
       if (blocker) throw new IdentityError(409, 'CONFLICT', blocker);
+      // People get a decision window; Shopify is reread and the revision checked before sending.
       const expiresAt = new Date(
-        deps.now().getTime() + 10 * 60_000,
+        deps.now().getTime() + (deps.decisionWindowMs ?? 4 * 60 * 60_000),
       ).toISOString();
       const action: ProposedAction = {
         schemaVersion: 1,

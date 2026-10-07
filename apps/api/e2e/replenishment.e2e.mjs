@@ -534,3 +534,40 @@ it('reports readiness, previews bulk setup and keeps every surface honest when s
     coverage: { covered: 0 },
   });
 }, 120000);
+
+it('keeps a proposal open for hours and rereads stock before creating the order', async (t) => {
+  const f = await replenishmentFixture(t);
+  const rule = await f.configure();
+  await f.pilot.replenishment.tick(f.actor);
+  const [run] = (await f.request('/runs')).items;
+  await f.waitFor(run.id, 'awaiting_decision');
+  const [item] = (
+    await f.pilot.app.inject({
+      url: `/v1/organizations/${f.actor.tenantId}/decisions`,
+      headers: { cookie: f.approverCookie },
+    })
+  )
+    .json()
+    .items.filter((entry) => entry.kind === 'replenishment');
+  expect(Date.parse(item.deadline)).toBeGreaterThan(Date.now() + 3 * 3_600_000);
+  // A rule with a waiting run starts no second run, however often stock is read.
+  await f.pilot.replenishment.tick(f.actor);
+  expect((await f.request('/runs')).items).toHaveLength(1);
+
+  // Stock evidence ages past five minutes before the approval; the order uses a fresh read.
+  const old = new Date(Date.now() - 6 * 60_000).toISOString();
+  await f.db.owner.query(
+    `UPDATE inventory_snapshots SET observed_at=$3::timestamptz,document=jsonb_set(document,'{observedAt}',to_jsonb($4::text))
+     WHERE tenant_id=$1 AND entity_id=$2`,
+    [f.actor.tenantId, f.position.positionId, old, old],
+  );
+  await f.decide(run);
+  await f.waitFor(run.id, 'verified');
+  expect((await f.pilot.procurement.orders(f.actor)).items).toEqual([
+    expect.objectContaining({
+      status: 'draft',
+      origin: expect.objectContaining({ workflowRunId: run.id }),
+    }),
+  ]);
+  expect(rule.active).toBe(true);
+}, 120000);

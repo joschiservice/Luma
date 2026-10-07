@@ -34,7 +34,10 @@ export type { WorkspaceApp } from '../domain/installation.js';
  * responses still go through the app's own review, which checks the exact proposal again.
  */
 export interface AppDecision {
-  /** Stable and app-prefixed, such as `shopify:inventory_correction:<id>`. */
+  /**
+   * Stable and app-prefixed, such as `shopify:inventory_correction:<target>`. Keep it while the
+   * same problem waits on a person, so a refreshed proposal updates the item in place.
+   */
   id: string;
   kind: 'fulfillment_recovery' | 'inventory_correction';
   reason: 'approval' | 'run' | 'recovery';
@@ -109,6 +112,11 @@ export interface AppFactoryContext {
   /** Routes synthetic connections through their trusted simulator binding. */
   simulation?: (connection: InstalledConnection) => typeof fetch | undefined;
   env: Readonly<Record<string, string | undefined>>;
+  /**
+   * Rereads a stock position's stale sources through installed capabilities and stores them as
+   * current, so an app can act on fresh stock. Absent where the host has no capability runtime.
+   */
+  refreshStock?(context: TenantContext, positionId: string): Promise<void>;
 }
 
 /** Builds deployment contributions using explicit host services and environment configuration. */

@@ -156,6 +156,8 @@ export function createShopifyInventoryCorrection(
     tenant: TenantContext,
     target: CorrectionRun['target'],
   ) => {
+    // Stock moves while people decide; read stale sources again before judging them.
+    await context.refreshStock?.(tenant, target.positionId);
     const authority = await query.authority(tenant, target);
     const snapshot = await (
       await provider(tenant, target.connectionId)

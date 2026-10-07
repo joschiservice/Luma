@@ -69,7 +69,7 @@ it('lists replenishment approvals in Needs you and follows decisions made on the
     reason: 'approval',
     domain: 'procurement',
     response: 'awaiting_other',
-    urgency: 'expiring',
+    urgency: 'high',
     requesterId: f.actor.actor.id,
     record: { kind: 'position', id: f.position.positionId },
     owner: {

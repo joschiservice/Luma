@@ -99,3 +99,8 @@ export type { DecisionAssignmentService } from './application/decision-assignmen
 export { connectionCheckSource } from './domain/connection-check.js';
 
 export { createConnectionCheckWorkflow } from './application/connection-check.js';
+
+export {
+  createStockRefresh,
+  type StockRefresh,
+} from './application/stock-refresh.js';

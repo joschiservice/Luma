@@ -51,14 +51,18 @@ test('ERP authority, separate approval, one dispatch, reconciliation and tenant 
   assert.equal(recovered.id, preview.id);
   assert.equal(recovered.state, 'approval_required');
   // Needs you projects the same app-owned decision for each reader.
+  // Waiting decisions keep one ID per target; checks of a sent change use the attempt's ID.
   const decision = async (user) =>
     (await f.request(user, `${f.base}/decisions?domain=inventory`)).items.find(
-      (item) => item.id === `shopify:inventory_correction:${preview.id}`,
+      (item) =>
+        item.id ===
+          `shopify:inventory_correction:${target.positionId}:${target.connectionId}` ||
+        item.id === `shopify:inventory_correction:${preview.id}`,
     );
   const pending = await decision(admin);
   assert.equal(pending.reason, 'approval');
   assert.equal(pending.response, 'decide');
-  assert.equal(pending.urgency, 'expiring');
+  assert.equal(pending.urgency, 'normal');
   assert.deepEqual(pending.owner, {
     kind: 'app_inventory',
     appId: 'shopify',

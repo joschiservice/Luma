@@ -332,9 +332,10 @@ lists them with `workflowSources()`.
 - **Actions:** the Shopify adapters call the app's existing correction and
   recovery services as the run's principal: persisted preview, policy approval
   by a different owner or admin in Needs you, execution by the requester,
-  claims, compare-and-set or hold identity, and reconciliation. A preview that
-  expires or goes stale before anyone decides is replaced with a fresh one, up
-  to 12 times. A rejection, policy denial, withheld write or uncertain write ends
+  claims, compare-and-set or hold identity, and reconciliation. Previews stay
+  open for a four-hour decision window. A preview whose change differs on a
+  fresh read is replaced with one new proposal, up to 12 times, and Needs you
+  keeps one item for the target while it waits. A rejection, policy denial, withheld write or uncertain write ends
   the attempt. Turning the workflow off, or the case closing, stops any change
   that wasn't sent; sent changes still reconcile.
 - **Closure:** runs never close cases. Detection verifies them independently.
