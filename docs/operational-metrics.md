@@ -1,183 +1,246 @@
-# Shared operational metrics
+# Operational metrics
 
-The overview exposes three version 1 metrics: `orders.open`, `orders.overdue`
-and `orders.attention`. Select **Inspect orders & definition** to see the rule,
-known matches, unknown classifications, source coverage and observation times.
-Counts are calculated on the server. The browser never counts a loaded page.
+The metric registry holds domain-owned, versioned counting rules for orders, cases, stock,
+purchase orders, connections and resolution outcomes. The server computes every count and its
+matching records (the cohort) from the same facts in one authorized PostgreSQL snapshot; the
+browser never counts a loaded page. Live delivery only tells clients to read again; events
+never carry or increment counts.
 
-## Counting rules
+Code: definitions and SQL stay with their owners (`@luma/orders`, `@luma/exceptions`,
+`@luma/procurement`, `@luma/connections`, `@luma/resolution`); `@luma/read-models` composes
+them. Every metric route and the stream require `insights.read`.
 
-The counting unit is a canonical order ID from `orders_entities`. Explicit source
-mappings reconcile provider orders and lines; matching display numbers never
-establish identity. Without a connection filter, the accepted order snapshot with
-the latest source-update time wins (null timestamps last), then latest observation,
-then connection ID. This deterministic selection does not imply that providers
-have synchronized clocks. A connection filter selects that source before this
-choice. Fulfillment quantities come only from the selected connection, preventing
-mirrored shipments from being added twice.
+## Order metrics (v1)
 
-- **Open:** a nondeleted order has status `open` and at least one line has positive
-  remaining quantity: ordered minus cancelled minus completed/shipped/delivered
-  fulfillment quantities. Partial fulfillment counts once. Pending, processing,
-  failed, cancelled and deleted fulfillments do not reduce remaining work.
-  Completed or cancelled orders never count, including cancellation after shipment.
-  A newer accepted open snapshot can reopen an order if work remains. Empty lines,
-  unknown statuses and missing cancellation quantities produce unknown classification
-  unless another line establishes remaining work or fulfillment covers all units.
-- **Overdue:** an open order has a source-provided `dueAt` strictly before `asOf`.
-  Equality is not overdue. Missing deadlines are unknown for open orders. Providers
-  may supply the optional deadline through the observation contract; ingestion
-  preserves it without deriving promises from receipt times. Existing adapters
-  without a deadline therefore produce unknown overdue classifications.
-- **Attention:** a nondeleted order has at least one mapped fulfillment issue
-  satisfying the inbox's persisted approval, manual-intervention or uncertainty
-  rules. Multiple issues count the order once. Source-local fulfillment IDs are
-  resolved through explicit connection mappings with an empty scope, matching the
-  current fulfillment subject contract. Unlinked workflow, stock and connection
-  issues do not imply order-level attention. Issue links explain each match.
+The counting unit is a canonical order ID. Explicit source mappings reconcile provider orders
+and lines; matching display numbers never establish identity. Without a connection filter,
+the accepted order snapshot with the latest source update time wins (null timestamps last),
+then the latest observation, then connection ID. This deterministic choice does not imply
+synchronized provider clocks. A connection filter selects that source first. Fulfillment
+quantities come only from the selected connection, so mirrored shipments are not added
+twice.
 
-Accepted projections remain authoritative: duplicate replay is idempotent, older
-source revisions are retained in history but do not replace current state, and
-newer corrections replace it. Reading history by observation time would incorrectly
-revive rejected source updates. No metric maintains a second aggregate projection.
+- **`orders.open`:** a nondeleted order has status `open` and at least one line has positive
+  remaining quantity: ordered minus cancelled minus completed, shipped or delivered
+  fulfillment quantities. Partial fulfillment counts once. Pending, processing, failed,
+  cancelled and deleted fulfillments do not reduce remaining work. Completed or cancelled
+  orders never count, including cancellation after shipment. A newer accepted open snapshot
+  can reopen an order if work remains. Empty lines, unknown statuses and missing cancellation
+  quantities make the classification unknown unless another line establishes remaining work
+  or fulfillment covers all units.
+- **`orders.overdue`:** an open order has a source-provided `dueAt` strictly before `asOf`.
+  Equality is not overdue. A missing deadline is unknown. Luma never derives a promise from
+  receipt times, and the current adapters supply no deadline, so overdue is unknown for their
+  open orders.
+- **`orders.attention`:** a nondeleted order has at least one mapped fulfillment issue
+  satisfying the inbox's approval, manual-intervention or uncertainty rules. Multiple issues
+  count the order once. Unlinked workflow, stock and connection issues do not imply
+  order-level attention.
 
-Resolution owns [verified outcome and human-involvement facts](resolution-measurement.md).
-Its `resolution.*` v2 family is registered separately from order metrics.
+Accepted projections are authoritative: duplicate replay is idempotent, older source
+revisions stay in history without replacing current state, and newer corrections replace it.
+Reading history by observation time would revive rejected source updates.
 
-## API and consistency
+The Orders workspace views use the same SQL; see [Orders workspace](orders-workspace.md).
 
-`GET /v1/organizations/:organizationId/metrics` returns the registry.
-`POST /v1/organizations/:organizationId/metrics/query` accepts:
+## Operational registry (v2)
 
-```json
-{
-  "definitionVersion": 1,
-  "scope": { "connectionId": "a-connection-uuid" },
-  "limit": 20,
-  "offset": 0
-}
-```
+The v2 registry lists the order v1 definitions plus the domain-owned v2 families. A v2 query
+requires `definitionVersion: 2` and an explicit `metrics` list, and reads only the selected
+families. Each cohort is typed by `kind`.
 
-Omit `scope` for all workspace connections. Optional `updatedFrom` and
-`updatedBefore` select accepted order source-update instants in the half-open
-interval `[from, before)`. Missing source-update times are excluded when either
-bound is present. Bounds must be offset-qualified timestamps; no browser timezone
-is inferred. The response uses UTC instants and the UI formats them in the workspace
-timezone. These are current-state filters, not historical event counts.
-
-The response contains all three definitions, known counts, unknown counts and up
-to 100 matching records per metric. Every count and cohort uses the same facts
-inside one read-only PostgreSQL repeatable-read transaction, including coverage
-and case attention. `asOf` freezes deadline and attention-expiry evaluation;
-`readAt` identifies the actual read time. An initial request chooses its own `asOf`.
-
-Reuse `asOf` and `snapshot` for subsequent pages. Offsets are bounded at 10,000.
-The snapshot fingerprint binds tenant, definition version, filters, evaluation
-time, canonical facts and coverage. Changed records return `409`; restart at
-zero. Tokens expire after 15 minutes. They are consistency checks, not access
-credentials or historical snapshots. Authorization runs on every request.
-
-Saved dashboard specifications can retain the definition version and validated
-scope. Unknown properties, executable SQL/JavaScript, unsupported versions,
-invalid windows and excessive limits are rejected. Workspace members can read
-all workspace order dimensions under the existing membership model. Foreign and
-nonexistent connection filters both return `404`. PostgreSQL RLS also isolates
-records and source mappings. No connector credential columns are granted.
-
-## Coverage and time
-
-Observation freshness does not prove a complete scan. Current ingestion has no
-persisted authoritative order-and-fulfillment scan watermark, so `total` and
-`dataThrough` are null. `observedCount` always reconciles with the known matching
-cohort; it is not a complete business total. Coverage is `partial` when scoped
-canonical orders exist and `unavailable` otherwise. Empty known matches never
-establish a complete zero. Unknown classification is separate from missing source
-coverage; it cannot quantify unobserved orders.
-
-`observedAt` is the latest nonfuture selected order observation. Freshness requires
-all selected orders to have observations within 24 hours and all monitored scoped
-connections to have fresh granted reads. Otherwise it is stale or unobserved.
-Future observations do not establish current order state or freshness. Failures
-and offline states hide previous UI counts.
-
-A new evaluation can become overdue solely because time passes. Pagination holds
-the evaluation time fixed. LUMA-85 owns live scheduling and invalidation; this
-feature supports explicit refresh and refresh on focus/reconnect.
-
-## Storage and validation
-
-Definitions live in `packages/orders/src/domain/metrics.ts`; canonical SQL is in
-`orders/src/infrastructure/metrics.ts`. The exceptions owner shares its existing
-attention query. Resolution composes public readers within one transaction.
-Migration `0030_order_metric_reads.sql` adds tenant-scoped read grants and a
-connection index. Each statement has a three-second timeout; attention linking
-also has a 10,000-record bound and fails rather than truncating a total.
-
-Run `pnpm test` for commerce integration coverage and
-`pnpm test:browser metrics.browser.mjs` for authenticated desktop/mobile coverage.
-The commerce fixture covers partial/full fulfillment, cancellation, reopening,
-correction, duplicate delivery, out-of-order updates, mirrored identities,
-deadline boundaries, unknown dates, filters, tenant isolation and snapshot changes.
-Set `LUMA_METRIC_BENCHMARK=1` when running that PostgreSQL suite to generate
-`/tmp/luma84-query-plans.json` with EXPLAIN ANALYZE/BUFFERS plans and five samples.
-See [query measurements](operational-metrics-performance.md).
-
-## Page summary
-
-`POST /v2/organizations/:organizationId/metrics/summary` reads up to four parts in one
-request. Each part is an order (`kind: 'orders'`, v1 request) or operational
-(`kind: 'operational'`, v2 request) query and follows that endpoint's rules. Parts return in
-request order with their own status: a part that fails, such as a 409 for a changed snapshot
-or a 403 without `orders.read`, carries its error while the others succeed. Each part keeps
-its own snapshot; page a part through its own query endpoint. `nextRefreshAt` is the
-earliest boundary across the parts that were read.
-
-## Current operational registry (v2)
-
-`GET /v2/organizations/:organizationId/metrics` lists the order v1 definitions
-and eight domain-owned v2 definitions. Order v1 request/results remain unchanged.
-`POST /v2/organizations/:organizationId/metrics/query` requires
-`definitionVersion: 2` and explicit `metrics`. It reads only selected families.
-The v2 cohort is discriminated by `kind`: `case`, `stock_position`,
-`purchase_order`, or `connection`.
-
-| Metric                              | Unit           | Scope and predicate                                                                                             |
+| Metric                              | Unit           | Predicate                                                                                                       |
 | ----------------------------------- | -------------- | --------------------------------------------------------------------------------------------------------------- |
 | `cases.active`                      | case           | Distinct unresolved incidents, across all subjects                                                              |
 | `cases.attention`                   | case           | The inbox projection, with exclusive approval/manual intervention/uncertainty reasons                           |
-| `cases.oldest_unresolved_age`       | second         | Maximum age since first detection; retains first detection after reopening                                      |
-| `inventory.below_minimum`           | stock position | Active-rule positions whose configured-source stock passes `planReplenishment` and is strictly below minimum    |
+| `cases.oldest_unresolved_age`       | second         | Maximum age since first detection; keeps first detection after reopening                                        |
+| `inventory.below_minimum`           | stock position | Active-rule positions whose configured-source stock passes the replenishment plan check and is below minimum    |
 | `inventory.replenishment_unknown`   | stock position | Active-rule positions with absent, deleted, nonnumeric, invalid-time, future or expired configured-source stock |
 | `procurement.purchase_orders.draft` | purchase order | Exact current draft status, distinct persisted IDs                                                              |
 | `procurement.purchase_orders.open`  | purchase order | Exact current open status, distinct persisted IDs                                                               |
-| `connections.needing_attention`     | connection     | Pending/degraded/revoked, or active with stale/unobserved permitted granted reads; excludes disconnected        |
+| `connections.needing_attention`     | connection     | Pending, degraded or revoked, or active with stale or unobserved permitted granted reads; excludes disconnected |
 
-Cases and procurement have complete coverage within their recorded workspace scope.
-An empty case cohort has age `null`; missing/future detection times make the maximum
-unknown (`value: null`, `unknownCount > 0`), while the oldest valid incident remains
-inspectable. Count metrics use `value` for known matches. Stock below minimum has
-`total: null` when unusable positions prevent a complete total. The unknown-stock
-metric counts the unusable cohort exactly. No active rules means unavailable
-inventory coverage, not healthy inventory. `population` counts active-rule positions,
-never quantities or all warehouse SKUs.
+The `resolution.*` family uses the same request; its rules are in
+[resolution measurement](resolution-measurement.md).
 
-Stock commitments share the workflow predicate: any draft/open PO with the exact
-rule SKU, across suppliers and inventory sources. Each position links distinct PO
-IDs. Commitments do not establish acceptance, sufficient incoming quantity, or
-receipt. PO status and authority do not establish a complete external supplier sync.
-Connection coverage measures permitted read freshness, not provider record completeness.
-`dataThrough` stays null; a latest observation never becomes a scan watermark.
+Filters: inventory and connection metrics accept `connectionId`; procurement accepts
+`supplierId` and `authority`; resolution accepts `environment` and a `24h` or `7d`
+first-detection `window`; cases accept none. Every selected metric must support every
+supplied filter, so use separate requests when families need different scopes.
 
-Inventory and connection metrics accept `connectionId`. Procurement accepts
-`supplierId` and `authority`. Cases accept no filters. Every selected metric must
-support every supplied filter; unsupported fields and historical windows are rejected.
-Use separate requests when families need different scopes.
+- An empty case cohort has age `null`. Missing or future detection times make the maximum
+  unknown (`value: null`, `unknownCount > 0`) while the oldest valid incident stays
+  inspectable.
+- Stock below minimum has `total: null` when unusable positions prevent a complete total; the
+  unknown-stock metric counts that cohort exactly. No active rules means unavailable
+  inventory coverage, not healthy inventory. `population` counts active-rule positions, never
+  quantities or all warehouse SKUs.
+- Stock commitments share the workflow predicate: any draft or open purchase order with the
+  exact rule SKU, across suppliers and inventory sources. Commitments do not establish
+  acceptance, sufficient incoming quantity or receipt.
+- Supplier names on purchase orders are the persisted recorded names, so the supplier table
+  is not a metric dependency.
 
-Composition injects public Exceptions, Procurement and Connections readers into a
-single authorized repeatable-read transaction. Definitions and business predicates
-stay with those owners. Full compact cohorts determine counts and the SHA-256
-snapshot before transport pagination (20 default, 100 maximum). Snapshot hashes bind
-the tenant, metric selection, filters, evaluation time and results. Reuse `snapshot`
-and `asOf` for pages; changes or snapshots older than 15 minutes return 409.
-The readers materialize scoped cohorts in server memory; query plans and the measured
-load boundary are recorded in [cross-domain measurements](operational-metrics-cross-domain-performance.md).
+## Page summary
+
+`POST /v2/organizations/:organizationId/metrics/summary` reads up to four parts in one request.
+Each part is an order (v1) or operational (v2) query and follows that endpoint's rules. Parts
+return in request order with their own status: a failing part, such as a 409 for a changed
+snapshot or a 403 without `orders.read`, carries its error while the others succeed. Each part
+keeps its own snapshot, so page a part through its own query endpoint. `nextRefreshAt` is the
+earliest boundary across the parts that were read.
+
+## Snapshots and paging
+
+Every count and cohort in a response uses the same facts inside one read-only, repeatable-read
+transaction, including coverage and case attention. `asOf` freezes deadline and expiry
+evaluation; `readAt` is the actual read time. The first request chooses its own `asOf`.
+
+Cohort pages default to 20 records and allow 100; offsets stop at 10,000. Full cohorts
+determine the counts and a SHA-256 `snapshot` before pagination. The snapshot binds the
+tenant, definition version or metric selection, filters, evaluation time, facts and coverage.
+Reuse `asOf` and `snapshot` for later pages; changed records or a snapshot older than 15
+minutes return 409, and the client restarts at offset zero. Snapshots are consistency checks,
+not access credentials or historical snapshots; authorization runs on every request.
+
+v1 `updatedFrom`/`updatedBefore` select accepted source update instants in `[from, before)`.
+Bounds must carry an offset; no browser time zone is inferred. Missing source update times
+are excluded when either bound is set. These filter current state; they are not historical
+event counts. v2 rejects historical windows except the resolution window.
+
+Saved dashboard specifications keep the definition version and validated scope. Unknown
+properties, executable code, unsupported versions, invalid windows and excessive limits are
+rejected. Foreign and nonexistent connection filters both return 404, and RLS also isolates
+records and mappings.
+
+## Coverage and time
+
+Observation freshness does not prove a complete scan. Ingestion has no authoritative
+order-and-fulfillment scan watermark, so order `total` and `dataThrough` are null and
+`observedCount` is the known matching cohort, not a complete business total. Order coverage is
+`partial` when scoped canonical orders exist and `unavailable` otherwise. An empty known cohort
+never establishes a complete zero, and unknown classification cannot quantify unobserved
+orders. Cases and procurement have complete coverage within their recorded scope. Connection
+coverage measures permitted read freshness, not provider record completeness; a latest
+observation never becomes a scan watermark.
+
+`observedAt` is the latest nonfuture selected observation. Fresh means every selected order was
+observed within 24 hours and every monitored connection in scope has fresh granted reads;
+otherwise data is stale or unobserved. Future observations establish neither state nor
+freshness. Failures and offline states hide previous counts.
+
+Counts change without writes as time passes. Responses carry `nextRefreshAt`: the earliest
+future deadline, freshness, attention, diagnosis or proposal expiry across the whole
+population, not just the visible page. Stock expires exactly five minutes after observation,
+and future stock becomes eligible at its observation time. A refresh at most every 60 seconds
+advances case and purchase-order ages.
+
+## Live delivery
+
+Home and Insights subscribe to `/v1/organizations/:organizationId/metrics/events` before
+their first metric read, and each page reads all of its metric sections through one
+[page summary](#page-summary) request. A `resync` frame with `refetch: true` lists the changed
+`topics`; a page reads again, through the normal authorized query, only when a topic one of
+its sections depends on is listed. Overview metrics,
+Insights charts and Needs you share one subscription per browser page, which closes after its
+last consumer unmounts.
+
+### Notifications
+
+Every table a metric reader depends on carries an INSERT, UPDATE and DELETE trigger that
+names the areas it affects. The payload on `luma_metrics` is `tenant:topic,topic`, with no
+record data; a bare tenant UUID means every area changed. PostgreSQL delivers notifications only after
+commit, so a rollback delivers nothing, and identical payloads within one transaction
+coalesce. There is no outbox or replay cursor: canonical state is durable, and any reconnect
+reads current state. `Last-Event-ID` does not select a replay position.
+
+Traps:
+
+- A new reader dependency must extend the trigger list with its topics, or its changes
+  appear only at the next reconciliation. The migration that maps tables to topics fails if
+  a `metric_change` trigger names no topic.
+- TRUNCATE is not a supported canonical write path; administrative imports must use normal
+  writes or force reconciliation.
+- Invalidation is per tenant, not per row, to keep the shared count/cohort snapshot
+  consistent. Row triggers favor complete write-path coverage over minimum write overhead.
+
+### Topics
+
+`workspaceTopics` in the API contract lists the areas: `orders`, `connections`, `issues`,
+`inventory`, `workflows`, `procurement`, `resolution` and `decisions`. Every table that feeds
+Needs you also carries `decisions`. Each consumer declares its topics: order metrics use
+orders, issues and connections; operational metrics use issues, inventory, procurement and
+connections; resolution outcomes use issues, resolution and connections. A view that reads a
+new table must subscribe to that table's topic. Listener reconnection, the first frame of a
+stream, a consumer joining an open stream and the 30-second reconciliation list every topic.
+
+### Listener and recovery
+
+Each API process owns a dedicated listener connection, separate from the query pool, and
+LISTENs independently. Reconnection backs off from 100 ms to 10 seconds, and a completed
+LISTEN broadcasts a reconciliation request. A stream opened while the listener is down
+reports degraded delivery and still permits authorized reads. Every stream also reconciles
+every 30 seconds, which repairs a lost wake-up.
+
+The browser marks delivery interrupted after 12 seconds without a heartbeat, reconciles every
+30 seconds while delivery is unavailable, reconnects with a backoff from one to 10 seconds,
+and opens a new subscription when it comes back online. A page loads as soon as the stream
+opens; later changes are throttled to one summary read per two seconds, where the first
+change after a quiet period reads at once and a burst reads again when the interval ends.
+Reads are serialized and cancel older requests. A live refresh returns a paged cohort to page
+one, keeping the selected metric and open dialog. The UI keeps delivery state (live, reconnecting, offline, denied)
+separate from source observation age, stale source data and partial coverage. A live stream
+does not prove complete provider coverage.
+
+### Stream access and bounds
+
+Any workspace member may open the stream. Each topic requires its area's read permission
+(`orders.read`, `issues.read`, `inventory.read`, `workflows.read`, `procurement.read`, and
+`insights.read` for resolution); `connections` and `decisions` go to every member because
+their readers filter records themselves. Changes only in unreadable areas send nothing.
+
+The session and membership are resolved again on the five-second heartbeat and before any
+frame whose last check is older than five seconds, so a burst costs one authorization read.
+Denial closes the stream, and the browser confirms through an authenticated query
+and removes the metric cache on 401, 403 or 404. A stream lives five minutes. Changes coalesce
+over 75 ms with at most one authorization read in flight and one pending invalidation per
+stream. Each API process allows 100 streams, three per workspace and user (429 beyond),
+eight concurrent authorization reads and 100 queued (503 beyond). A failed socket write
+closes a slow consumer immediately; no per-client queue is kept. Shutdown closes all streams
+and the listener.
+
+### Operating the listener
+
+- `pg_stat_activity` should show one `application_name = 'luma-metric-listener'` per API
+  process.
+- A transaction-pooling proxy cannot hold LISTEN state; use a direct or session-pooled
+  database URL.
+- If delivery lags, inspect `pg_notification_queue_usage()` and keep long transactions off
+  listener connections.
+- Restarting an API, terminating its listener or losing a browser connection must produce a
+  fresh authorized read. Never repair a count by replaying messages.
+
+## Limits
+
+Each metric statement has a 3-second timeout; a timeout fails the request rather than
+returning a partial calculation as a complete answer. The runtime's metric query pool has
+five connections. No metric maintains an aggregate table: order reads over a 10,000-order,
+two-connection fixture took under 200 ms per statement, so a durable projection with its
+rebuild machinery was not justified. Larger orders with many lines, long source histories,
+many connections or many attention links need new measurements before raising traffic
+limits. `LUMA_METRIC_BENCHMARK=1` on the commerce integration suite records order query plans.
+
+The v2 readers materialize scoped cohorts in server memory before paging, so memory and query
+cost grow with the workspace population. They were checked with about 200 cases, stock
+positions and rules and 60 purchase orders; the stock projection join is the most expensive
+reader.
+
+Browser tests enforce these budgets and write their measurements to `.luma/performance`:
+
+- Commit to visible count p95 below one second, with two API instances, six subscribers and
+  sequential writes (`metric-live.browser.mjs`). Frames stay under 4 KiB, and subscribers
+  receive under 128 KiB in that run.
+- At most 12 SQL statements per cross-domain summary read (`operational-metrics.browser.mjs`).
+
+Not measured: saturation at the 100-stream limit, internet latency, concurrent writers or
+large tenants. Source observation age is not a provider-to-Luma ingestion delay.

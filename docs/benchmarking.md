@@ -1,57 +1,64 @@
-# Test benchmarks
+# Performance measurement
 
-Use Hyperfine for repeated whole-command measurements. Install the pinned CLI
-once with `pnpm setup:benchmarks` (macOS or Linux, arm64 or x64). Setup verifies
-the official release archive's SHA-256 before installing into `.luma/tools`.
-It does not add an application dependency.
+Measure before claiming a performance change, and keep raw results in the pull request or
+Linear issue rather than in these guides. Guides record the resulting limits and budgets.
+
+## Performance budgets
+
+Performance scenarios in the backend and browser suites write measurements, budgets and
+violations to `.luma/performance`; CI uploads them per shard and summarizes budgets in the
+job summary. Reports are written before a budget failure is raised. Current ceilings:
+
+- Order page payloads: 128 KiB for 50 items.
+- Metric SSE frames: 4 KiB; the five measured subscribers: 128 KiB in total.
+- Cross-domain operational summary: 12 SELECT/WITH statements for its six readers.
+- Live metrics: p95 commit-to-visible below one second.
+
+These are regression ceilings, not production latency guarantees. Review the scenario and
+its report before changing a budget; never raise one just to silence a failure.
+
+Some feature tests take an opt-in size variable for larger synthetic datasets, such as
+`LUMA_ORDER_BENCHMARK` or `LUMA_RETURN_BENCHMARK`; the feature guides name them.
+
+## Whole-command benchmarks
+
+Hyperfine measures repeated whole-command runs. Install the pinned binary once with
+`pnpm setup:benchmarks`; it verifies the release checksum and installs into `.luma/tools`
+without adding a dependency.
 
 ```sh
-pnpm setup:benchmarks
 pnpm benchmark --suite browser --workers 1 --label serial
 pnpm benchmark --suite browser --workers 6 --label parallel
 pnpm benchmark --suite e2e --workers 4 --runs 5 --warmup 1 --label backend
-pnpm benchmark --suite workflows --runs 2 --warmup 0 --label smoke
 ```
 
-Suites are `main`, `e2e`, `browser`, `full`, and `workflows`. The first four run
-the corresponding root test command, including its build and database setup.
-`workflows` builds its prerequisites once before timing that package's Vitest
-suite directly. `--workers` is supported
-for `browser` and `e2e`; omit it to measure the configured default.
-The default is five measured runs after one warmup. Add `--show-output` for test
-logs. A failing command stops the benchmark with a nonzero exit code.
+Suites are `main`, `e2e`, `browser`, `full` and `workflows`. The defaults are one warmup and
+five measured runs; `--workers` applies to `browser` and `e2e`, and `--show-output` prints
+test logs. A failing run stops the benchmark. Each invocation writes `results.json` and
+`metadata.json` (revision, dirty state, tool versions and hardware) to
+`.luma/benchmarks/<timestamp>-<label>/`.
 
-Each invocation creates `.luma/benchmarks/<timestamp>-<label>/` containing:
+For CI numbers, dispatch the **Test benchmarks** workflow. Hosted-runner variance makes
+small differences unreliable; it is not a PR gate.
 
-- `results.json`: Hyperfine samples, summary statistics and command exit codes
-  for a successful benchmark.
-- `metadata.json`: command, run counts, worker override, Git revision and dirty
-  state, tool versions, CPU, available parallelism, memory and completion status.
+## Comparing fairly
 
-Run comparisons sequentially on an idle machine. Keep test selection, Node,
-hardware, database configuration and cache conditions the same. Normal warmups
-populate build caches; use separate clean checkouts for cold-build experiments.
-The runner does not clear caches between samples. Compare means and variability,
-and check every run passed before claiming an improvement.
+- Run comparisons one after another on an idle machine, with the same Node version, test
+  selection, worker count, database settings and cache state.
+- Warm runs populate build caches. Measure cold builds separately in clean checkouts.
+- Compare means and variability, and confirm every run passed; retries or skips hide
+  regressions.
+- To separate import cost from fixture and test time, use Vitest's
+  `--experimental.importDurations.print`.
+- For database work, capture `EXPLAIN (ANALYZE, BUFFERS)` as the restricted runtime role
+  with RLS enabled. Plans as the administrator can differ.
 
-For CI measurements, dispatch **Test benchmarks** in GitHub Actions, selecting
-the suite, run count and optional worker count. The job uploads results and any
-Playwright diagnostics even on failure. Hosted-runner variance makes small
-differences unreliable; this workflow is not a required PR gate.
+## Test tooling decisions
 
-## Browser diagnostics
-
-Playwright Test writes its latest HTML report, JSON results and failure artifacts
-under `.luma/playwright/`. Open the HTML report with `pnpm test:browser:report`.
-Failures retain screenshots and traces with actions, DOM snapshots and network
-activity. Each CI browser shard uploads its own report. Local runs overwrite the
-previous browser report, including successive Hyperfine samples; benchmark JSON
-and metadata remain in their timestamped directories.
-
-Browser files run in parallel; tests within each file run sequentially. Workers
-reuse Chromium, while each test creates fresh contexts and isolated databases.
-The disposable PostgreSQL container allows 300 connections for concurrent service
-pools. A supplied `TEST_DATABASE_URL` uses that server's existing limits; provision
-enough connections for the worker count or lower `--workers`.
-Retries are disabled. Use `--workers=1` to investigate ordering or resource
-contention, `--grep` to select a journey, and `--shard=1/4` to reproduce a CI shard.
+- Unit and backend tests stay on Vitest 4: Vitest 5 showed no speedup here, and the stable
+  Storybook Vitest addon does not support it yet. Revisit when it does, validating
+  Storybook, Temporal, database and E2E suites.
+- Browser journeys use Playwright Test for fixture ownership, traces and reports. Reusing
+  Chromium per worker did not measurably speed them up; server startup per test dominates.
+- E2E parallelism, not package changes, produced the large local gains. The worker caps are
+  described in [local development](development.md#tests).

@@ -1,17 +1,20 @@
-# Playbook release evaluation
+# Release evaluations
 
-Run `pnpm evaluate:playbook` to evaluate the pinned shipping-method Playbook against the versioned JTL/Shopify corpus. Exit code 0 means every scenario passed; any mismatch exits 1. CI runs the gate and uploads its report.
+Deterministic evaluation gates for Playbooks, Code Steps and workflow authoring. CI runs the Playbook gate and uploads its report.
+
+## Playbook evaluation
+
+`pnpm evaluate:playbook` evaluates the pinned shipping-method Playbook against the versioned JTL and Shopify corpus. Exit code 0 means every scenario passed; any mismatch exits 1. `pnpm test:evaluation` tests the evaluators themselves.
 
 ```sh
 pnpm evaluate:playbook --candidate candidate.json --corpus corpus.json --output .luma/evaluations/candidate.json
-pnpm test:evaluation
 ```
 
-The candidate is a compiled `PlaybookVersion`, including its content digest. Use `compilePlaybook` from `@luma/resolution/composition` to compile a source definition. The evaluator recomputes and checks the digest. The checked-in candidate pins the current shipping-method Playbook; update it deliberately when that definition changes.
+The candidate is a compiled `PlaybookVersion`, including its content digest; compile a source definition with `compilePlaybook` from `@luma/resolution/composition`. The evaluator recomputes and checks the digest. The checked-in `fixtures/candidate.json` pins the current shipping-method Playbook; update it deliberately when that definition changes.
 
-The report records the candidate hash, corpus version and hash, interpreter/admission versions, capability and adapter versions, and each fixture's version and hash. Scenario traces include capability calls, observations, interpreter outcomes, provider journal, execution reservations, policy decisions, approvals, failures and verification attempts. Identical inputs produce identical JSON. Reports are written atomically with private file permissions.
+The report records the candidate, corpus and fixture hashes and the interpreter, admission, capability and adapter versions. Scenario traces include capability calls, observations, interpreter outcomes, the provider journal, execution reservations, policy decisions, approvals, failures and verification attempts. Identical inputs produce identical JSON. Reports are written atomically with private file permissions.
 
-## Fixture contract
+### Fixture contract
 
 `fixtures/corpus.json` contains shared `fixture` inputs and an ordered `scenarios` array. A scenario overrides top-level shared fields; `incident` overrides individual incident fields. All other nested values replace their shared value completely. The resulting fixture is hashed before replay.
 
@@ -28,7 +31,7 @@ Expectations are reviewed fixtures, never regenerated from a candidate's output.
 
 The corpus covers successful correction, approval denial, stale evidence, replay/idempotency, tenant isolation, lost response after commit, uncertain dispatch without commit, verification outage after a successful write, delayed/failed verification, exceeded verification windows, and worker restart with a persisted reservation.
 
-## Capture a historical incident
+### Capture a historical incident
 
 Export the authorized incident history and reconstruct its **initial** provider state and evidence snapshot. Preserve the original timestamps, mappings, authority and known diagnosis/cause. Supply reviewed expectations for the intended behavior. The learning history alone does not contain a complete provider snapshot; obtain missing facts from retained incident evidence rather than assuming current provider state was the initial state.
 
@@ -57,7 +60,7 @@ pnpm evaluate:playbook --candidate original-version.json --corpus historical-cor
 
 Capture validates the original Playbook hash, snapshot, action tenant and membership in the retained action sequence. It preserves the source history and its hash, and refuses to overwrite an existing corpus file. Replay can use the original exact version or a separately pinned candidate to compare behavior against the same reviewed expectations. Keep sensitive incident exports and reports outside Git; `.luma/` is ignored.
 
-## Execution boundary
+### Execution boundary
 
 The harness calls production Playbook, admission, policy/approval, execution, shipping-effect, capability-runtime and JTL/Shopify connector code. Only persistence, identity refresh and incident eligibility data use isolated fixture adapters. Both providers use the existing stateful simulators through an injected transport; no credentials or live endpoints are used.
 
@@ -69,4 +72,4 @@ Run `pnpm setup:code`, then `pnpm evaluate:code [corpus.json] [report.json]` to 
 
 ## Authoring evaluation
 
-Configure the EU `authoring` model route, then run `pnpm evaluate:authoring [corpus.json] [report.json]` to describe each workflow in `fixtures/authoring-corpus.json` through the production authoring path. The report (default `.luma/evaluations/authoring.json`) gives the valid-draft rate and the structural equivalence rate against each reference. `pnpm test:evaluation` runs the evaluator against a deterministic fake model. See [Describe a workflow](../../docs/workflows.md#authoring-evaluation) for the corpus, the equivalence rules and where to record results.
+Configure the EU `authoring` model route, then run `pnpm evaluate:authoring [corpus.json] [report.json]` to describe each workflow in `fixtures/authoring-corpus.json` through the production authoring path. The report (default `.luma/evaluations/authoring.json`) gives the valid-draft rate and the structural equivalence rate against each reference. `pnpm test:evaluation` runs the evaluator against a deterministic fake model. See [Authoring evaluation](../../docs/workflows.md#authoring-evaluation) for the corpus and the equivalence rules.

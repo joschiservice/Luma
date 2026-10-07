@@ -1,33 +1,11 @@
 # @luma/api
 
-Runs the Luma HTTP API process.
+The Luma HTTP API process.
 
-## Responsibilities
-
-The bootstrap initializes instrumentation and starts application-runtime. Keep service assembly in application-runtime, HTTP contracts in api-contract, and domain rules in their owning packages.
-
-## Entry points
-
-- [src/composition/bootstrap.ts](src/composition/bootstrap.ts)
-- [src/index.ts](src/index.ts)
-
-## Workspace dependencies
-
-[@luma/application-runtime](../../packages/application-runtime/README.md), [@luma/config](../../packages/config/README.md), [@luma/platform](../../packages/platform/README.md).
-
-## Development
-
-Run commands from the repository root after installing workspace dependencies.
-
-```sh
-pnpm dev
-pnpm test:e2e
-pnpm exec turbo run build --filter=@luma/api...
-pnpm exec turbo run typecheck --filter=@luma/api
-pnpm exec turbo run test --filter=@luma/api
-```
+`src/composition/bootstrap.ts` installs instrumentation before loading the application, then `src/index.ts` starts the application-runtime HTTP server. Service assembly belongs to application-runtime, HTTP contracts to api-contract and domain rules to their owning packages. Backend and browser journey tests live in `e2e`; provider schema update scripts live in `scripts`.
 
 ## Further reading
 
-- [Engineering guide](../../docs/api.md)
+- [API](../../docs/api.md)
+- [Local development](../../docs/development.md)
 - [Package boundaries and runtime composition](../../docs/architecture/005-domain-packages-and-runtimes.md)

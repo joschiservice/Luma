@@ -49,7 +49,7 @@ import {
   vi,
 } from 'vitest';
 
-import corpus from '../../../docs/fixtures/exceptions-v0.json' with { type: 'json' };
+import corpus from '../../exceptions/fixtures/exceptions-v0.json' with { type: 'json' };
 import { detectionFixtures } from './test-support/detection-fixtures.js';
 import { createSafetyFixture as createSafetyServices } from './test-support/safety-fixtures.js';
 

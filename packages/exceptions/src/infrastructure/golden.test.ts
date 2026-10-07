@@ -68,7 +68,7 @@ const corpusSchema = z
 const corpus = corpusSchema.parse(
   JSON.parse(
     readFileSync(
-      new URL('../../../../docs/fixtures/exceptions-v0.json', import.meta.url),
+      new URL('../../fixtures/exceptions-v0.json', import.meta.url),
       'utf8',
     ),
   ),

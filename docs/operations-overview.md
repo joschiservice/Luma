@@ -1,66 +1,50 @@
 # Operations overview
 
-Home reads the operations overview to show what needs attention, what Luma is
-handling and connection health. The same data backs the optional resolution
-outcomes module. The authenticated workspace overview reads
-`GET /v1/organizations/:organizationId/operations/overview?window=24h|7d`.
-The default window is 24 hours. The server returns its exact UTC start, end and
-snapshot time. Verified resolutions use `[start, end)`; active cases, attention
-and connection health describe the current state, including older unresolved cases.
+The operations overview tells Home what needs attention, what Luma is handling and how
+healthy each connection is. Reads never run diagnosis or a model, and connection and case
+projections stay in their owning modules; the workflow application service composes their
+public readers. The summary fails as a whole if either required reader fails.
 
-Counts and the five priority decisions use the inbox's persisted attention rules.
-Severity descending, oldest attention request, then ID determine the order.
-Decisions link to case details in the `needs_you` view. Home's attention module and
-its headline count read the [Needs you queue](needs-you.md) instead, which adds
-replenishment and app decisions to these case decisions. Reads never run diagnosis
-or a model. Connection and case projections remain in their owning modules;
-the workflow application service composes their public readers.
+## Windows
 
-Connection freshness uses the newest persisted commerce observation for each
-requested and granted read capability. All must fall within the last 24 hours;
-future observations do not count. Missing capability observations are unobserved,
-even if another capability has recent data. Installation or credential update
-times never establish freshness. A recent observation does not prove complete
-source coverage. The UI distinguishes onboarding, missing observations, stale
-data, inactive connections, active work, explicit attention and healthy observed
-operations. Intentionally disconnected installations remain visible as history but
-do not affect monitored health. Revoked, degraded and pending connections still
-require attention. When all connections are retired, health remains unknown.
-Failures hide previous health claims and totals until retry succeeds. Offline
-queries show a paused notice and hide health and totals, including before the
-first load. Reconnection resumes the query automatically.
+`window` is `24h` (default) or `7d`. The server returns its exact UTC start, end and snapshot
+time. Verified resolutions use `[start, end)` by completion time. Active cases, attention and
+connection health describe the current state, including older unresolved cases.
 
-Overview now composes the versioned [resolution measurement](resolution-measurement.md)
-reader. The nested `measurement` summary uses live incidents first detected in the
-selected window, distinct from `verifiedResolutions`, whose legacy completion-time
-window is preserved. Home's outcomes module labels its detection cohort explicitly.
-Exact `automaticallyResolved` and `automation` are available only with complete
-relevant classification; unknown facts and unclassified environments remain visible.
-A known zero denominator displays no percentage. The shared registry supplies the
-same numerator, eligibility denominator and authorized cohorts on Insights. No
-verified outcome is relabelled automatic without complete human-work attribution.
+The nested `measurement` summary comes from the versioned
+[resolution measurement](resolution-measurement.md) reader and uses live incidents first
+detected in the window, a different cohort from `verifiedResolutions`. Exact
+`automaticallyResolved` and `automation` are available only with complete classification;
+unknown facts and unclassified environments remain visible, and a known zero denominator
+displays no percentage. No verified outcome is relabelled automatic without complete
+human-work attribution.
 
-TanStack Query isolates caches by organization and window, discards unused private
-data, polls every 30 seconds while visible, and refreshes on focus or reconnect.
-The window is shareable URL state. Requests use cancellation and no-store caching.
-The summary fails as a whole if either required reader fails.
+## Attention
 
-Migration `0009_overview_reads.sql` grants the case-reader role tenant-scoped,
-read-only access to connection documents and observations. It does not grant
-access to encrypted credentials. Existing identity guards protect the endpoint.
+Counts and the five priority decisions use the inbox's persisted attention rules, ordered by
+severity descending, oldest attention request, then ID. Home's attention module and its
+headline count read the [Needs you queue](needs-you.md) instead, which adds replenishment,
+supplier and app decisions to these case decisions.
 
-Validation covers summary windows, tenant isolation, bounded priority ordering,
-per-capability freshness, future timestamps, credential denial, response validation,
-Storybook accessibility and keyboard interactions, and connected browser navigation,
-retry and mobile layout.
+## Connection health
 
-The order operations section on Insights, also available as a Home module, uses the [shared metric registry](operational-metrics.md)
-for open, overdue and attention orders. Its observed counts and drill-down records
-share a consistent database snapshot. Incomplete coverage remains visible; missing
-deadlines and complete totals are never replaced with fabricated zeros.
+Freshness uses the newest persisted commerce observation for each requested and granted read
+capability. All must fall within the last 24 hours; future observations do not count. A
+capability without observations is unobserved, even if another capability has recent data.
+Installation or credential update times never establish freshness, and a recent observation
+does not prove complete source coverage.
 
-Order metrics and their matching records now follow committed changes through a
-scoped SSE subscription. Delivery health is separate from source freshness and
-coverage. Deadline changes refresh without a database write. See
-[Live operational metrics](live-operational-metrics.md) for recovery, limits and
-operational checks.
+Intentionally disconnected installations remain visible as history but do not affect
+monitored health. Revoked, degraded and pending connections still require attention. When all
+connections are retired, health is unknown. The case-reader role reads connection documents
+and observations, never encrypted credentials.
+
+## Client behavior
+
+Caches are isolated by organization and window. The client polls every 30 seconds while
+visible and refreshes on focus or reconnect, with cancellation and no-store caching. Failures
+and offline states hide previous health claims and totals, including before the first load,
+until a read succeeds.
+
+The order operations section on Insights uses the [shared metric registry](operational-metrics.md)
+and follows committed changes through the live metric stream.

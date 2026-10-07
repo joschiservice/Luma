@@ -23,7 +23,10 @@ export const readJson = async (path) =>
   JSON.parse(await readFile(path, 'utf8'));
 
 export const corpus = await readJson(
-  new URL('../../docs/fixtures/exceptions-v0.json', import.meta.url),
+  new URL(
+    '../../packages/exceptions/fixtures/exceptions-v0.json',
+    import.meta.url,
+  ),
 );
 
 export const jtl = await readJson(

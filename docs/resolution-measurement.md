@@ -1,129 +1,110 @@
 # Verified outcomes and human involvement
 
-Resolution owns schema v1 measurement facts and business rules. The shared v2
-registry composes its public reader into the existing authorized PostgreSQL
-repeatable-read query. No aggregate store or analytics service is added.
+Resolution measurement reports how many incidents reached an independently verified
+outcome, how many did so without human work, and what is still pending or unknown. It
+counts persisted incidents only, never infers completeness it cannot prove, and withholds
+a number rather than guessing. `@luma/resolution` owns the facts and rules; the `resolution.*`
+metric family is read through the shared metric registry's authorized PostgreSQL
+repeatable-read query. There is no aggregate store.
 
 ## Counting and time
 
-The counting unit is one persisted incident ID, across every resolution run and
-execution attempt. The window is the incident's first detection in
-`[asOf - 24h|7d, asOf)`, defaulting to seven days. Late verification updates that
-incident in its original detection cohort; it never creates another outcome or
-moves it into a completion-time cohort. Once it ages out, choose the appropriate
-reporting window; this API is deliberately limited to 24 hours and seven days.
+- **Unit:** one persisted incident ID, across every resolution run and execution attempt.
+  Retries, duplicate deliveries and multiple approvals add nothing.
+- **Cohort:** incidents first detected in `[asOf - 24h|7d, asOf)`, seven days by default.
+  Late verification updates the incident in its detection cohort; it never moves it to a
+  completion-time cohort or creates another outcome. Only 24-hour and seven-day windows
+  exist.
+- **Recurrence:** resolved incidents are immutable. A repeat creates a new incident linked
+  by `previousExceptionId` with its own cohort; it adds pending work and recurrence, and the
+  earlier verification stays retained. Recurrence counts linked incidents, not repeated
+  observations within an active case.
+- **Verified:** current resolved state plus an authoritative, complete, passed independent
+  incident verification with evidence and a non-future timestamp. An old resolution field
+  or an accepted execution never counts.
+- **Durations:** time to outcome runs from first detection to that verification, across
+  all attempts; the median uses every verified incident. Unresolved age is the maximum age
+  of incidents without verification, including human dispositions. Empty cohorts return
+  null.
+- **Incorrect actions:** a failed execution alone never proves an incorrect action. The
+  metric counts incidents with an assessment bound to a proposal for that incident and
+  owned evidence, not execution attempts.
 
-Resolved incidents are immutable in the existing lifecycle. A repeated problem
-creates a new incident linked through `previousExceptionId`, with its own first
-detection cohort. The earlier verification remains retained evidence. The new
-incident contributes pending work and recurrence. An unresolved incident never
-counts as verified merely because an old resolution field or accepted execution
-exists. Retries, duplicate deliveries and multiple approvals do not add units.
-Recurrence counts linked incidents, not repeat observations within an active case.
+`asOf` freezes cohort boundaries and ages; `readAt` is when the snapshot was read. This is
+a current-state query, not time travel. Each page hashes the full authorized cohort before
+pagination, so any change, including late assessments or verification, rejects stale
+pages with 409. Data-through stays null: no provider scan or attribution watermark is
+inferred from the latest observation. Complete coverage means every recorded incident in
+scope is classified, never complete provider coverage.
 
-A verified outcome requires current resolved state and an authoritative, complete,
-passed independent incident verification with evidence and a nonfuture timestamp.
-Time to outcome includes every attempt, from first detection to that verification.
-The median uses all verified incidents; unresolved age is the maximum age among
-incidents without verification, including human dispositions. Empty duration
-cohorts return null. Failed execution alone never proves an incorrect action;
-incorrect-action assessments require a proposal bound to the incident and owned
-evidence. The incorrect-action metric counts incidents with such assessments,
-not execution attempts.
+## Assessment facts
 
-`asOf` freezes cohort boundaries and ages; `readAt` is the actual snapshot read.
-This is a current-state query, not historical time travel. Every page hashes the
-full authorized cohort before transport pagination. Current changes, including
-late assessments and verification, reject stale pagination with 409. Data-through
-remains null: no complete provider scan or attribution watermark is inferred from
-a latest observation. Complete coverage means complete classification of recorded
-incidents within scope, never complete provider coverage.
+People with `issues.manage` append facts to an incident's measurement ledger:
 
-## Facts and attribution
-
-Owners/admins append facts with `POST /v1/organizations/:organizationId/exceptions/:exceptionId/measurements`:
-
-- **Environment:** immutable live, partner pilot, synthetic, shadow or unknown.
-  Unclassified historical incidents remain unknown. Known synthetic source markers and simulated installation targets
-  override a live assessment. Detection inputs resolve through their retained
-  evidence mappings; input IDs are not assumed to be source evidence IDs. A missing environment is excluded from live metrics,
-  reported explicitly, and inspectable by choosing the unknown environment cohort.
-  Classify from trusted deployment/source evidence; deployment mode alone does not
-  establish whether provider data is live. Historical rows are not backfilled as live.
-- **Eligibility:** eligible, ineligible or unknown, with rule version, reason and
-  owned evidence. A later revision replaces its classification while retaining
-  earlier assessments. This records reporting eligibility, grants no execution
-  authority, and does not replace Action Admission or policy decisions.
-- **Attribution:** none, approval, manual repair, operator correction or unknown,
-  with a coverage interval, completeness and owned evidence. Absence requires a
-  complete audit covering first detection through the current verification. A
-  partial or expired interval leaves attribution unknown. A newer unknown assessment
-  revokes a prior absence claim. Known human work is retained monotonically.
-- **Incorrect action:** bound proposal identity, reason and evidence. No automated
-  classifier upgrades a failed action into an incorrect action.
+- **Environment:** live, partner pilot, synthetic, shadow or unknown; immutable. Classify
+  from trusted deployment and source evidence; deployment mode alone does not establish
+  that provider data is live. Known synthetic source markers and simulated installation
+  targets override a live assessment. Detection inputs resolve through their retained
+  evidence mappings; input IDs are not source evidence IDs. Unclassified incidents stay
+  unknown, are excluded from live metrics and are inspectable through the unknown cohort.
+- **Eligibility:** eligible, ineligible or unknown, with rule version, reason and owned
+  evidence. A later revision replaces the classification and keeps earlier assessments.
+  This is reporting eligibility only; it grants no execution authority and does not
+  replace admission or policy.
+- **Attribution:** none, approval, manual repair, operator correction or unknown, with a
+  coverage interval, completeness and owned evidence. Claiming no human work requires a
+  complete audit from first detection through the current verification; a partial or
+  expired interval leaves attribution unknown, and a newer unknown assessment revokes an
+  earlier absence claim. Known human work is retained monotonically.
+- **Incorrect action:** bound proposal identity, reason and evidence. No classifier
+  upgrades a failed action into an incorrect one.
 - **Partner baseline:** measured duration in seconds, nonzero sample count, partner
-  reference, process version, sample interval and evidence. Recording rejects future
-  coverage and durations longer than the sample interval. These are measured
-  assessments, not model estimates. This release makes no time-saved or monetary
-  value claim; later claims must reference retained comparable partner samples.
+  reference, process version, sample interval and evidence. Future coverage and durations
+  longer than the sample interval are rejected. Baselines are measurements, not model
+  estimates; no time-saved or monetary claim is made, and any future claim must reference
+  retained comparable partner samples.
 
-Approvals (including rejections), case decisions, operator run selections,
-manual repair/intervention/edit and operator-investigation learning records and historical human dispositions are read directly from their
-immutable authoritative owners across all runs. Their evidence identities appear
-in the cohort. No absence assertion can clear them. Merely using a user principal
-for a worker or having a manually authored workflow does not establish human work.
-Known incorrect actions exclude a verified incident from the autonomous numerator.
+Facts record trusted actor, recording time, schema version, incident identity and sequence.
+Writes serialize on event and incident locks; `expectedRevision` rejects lost updates.
+Identical ID, request and actor replays return the original event without revalidating
+changed sources, and conflicting identity or payload returns 409. Every reference must
+resolve to retained evidence of this tenant and incident; foreign and missing IDs both
+return 404. Reads need `issues.read` and page 100 facts at a time by revision.
 
-A fully autonomous outcome requires known eligibility, independent verification,
-complete absence-of-human-work attribution and no recorded incorrect action. The
-rate denominator is **all eligible incidents in the detection cohort**, including
-pending ones. Overview withholds its exact count/rate when relevant eligibility,
-attribution or environment is unknown. The shared metric exposes the known count,
-null total and unknown count instead. A classified ineligible-only cohort has a
-known zero denominator and no percentage; no classified population is unavailable.
+## Human work and autonomy
 
-`GET .../exceptions/:exceptionId/measurements?after=0` returns up to 100 facts and
-the current revision. Follow `nextRevision`. Facts retain trusted actor, recording
-time, schema version, incident identity and sequence. Event and incident locks
-serialize recording. `expectedRevision` rejects concurrent lost updates; identical
-ID/request/actor replays return the original event without revalidating changed
-sources. Conflicting identity or payload returns 409. All supplied references
-must resolve to retained evidence owned by this tenant and incident. Members can
-read; writes require a freshly refreshed context with `issues.manage`. Foreign and missing
-incident/evidence IDs both return 404.
+Human work is also read directly from its immutable owners across all runs: approvals
+(including rejections), case decisions, operator run selections, manual repair,
+intervention, edit and investigation learning records, and historical human dispositions.
+Their evidence appears in the cohort, and no absence assertion can clear them. Running a
+worker as a user principal or using a manually authored workflow does not count as human
+work.
 
-## Shared registry, delivery and bounds
+A **fully autonomous outcome** needs known eligibility, independent verification, complete
+absence-of-human-work attribution and no recorded incorrect action. Its denominator is all
+eligible incidents in the cohort, including pending ones. When relevant eligibility,
+attribution or environment is unknown, the Overview withholds the exact count and rate,
+while the shared metric exposes the known count, a null total and the unknown count. A
+cohort classified as only ineligible has a known zero denominator and no percentage.
 
-The `resolution.*` family registers eligible, unknown eligibility, verified,
-autonomous, human involvement, unknown attribution, pending, recurrence, incorrect
-actions, median time to outcome and oldest pending outcome. Its only filters are
-`environment` and `window`; mixing unsupported family filters returns 400. Defaults
-are live/seven days. Every known count equals its full matching cohort length.
-`unknownCount` is unresolved classification, while the unknown-specific metrics
-count their known unknown cohorts. Breakdown figures describe the same population;
-unknown environment describes the excluded detection population.
+## Registry and bounds
 
-Queries use a three-second statement timeout and fail above 10,000 detected
-incidents rather than truncating totals. Pages contain at most 100 items and offsets
-stop at 10,000. Transport includes at most 50 evidence/fact identities per incident
-and their full counts; the ledger and issue detail provide the remainder. A ledger
-permits at most 1,000 immutable facts. These are workload bounds, not measured
-latency guarantees.
+The family covers eligible, unknown eligibility, verified, autonomous, human involvement,
+unknown attribution, pending, recurrence, incorrect actions, median time to outcome and
+oldest pending outcome. Its only filters are `environment` and `window` (default live,
+seven days); other filters return 400. Every known count equals its full cohort length.
+`unknownCount` is unresolved classification, while the unknown-specific metrics count
+known-unknown cohorts. Breakdowns describe the same population; unknown environment
+describes the excluded population. Live, synthetic, pilot and shadow are never combined.
+Offline, unavailable and access-loss states hide previous counts.
 
-Migration `0046_resolution_measurement.sql` grants RLS-scoped reads, append-only
-owner writes and indexes. It adds committed notification triggers to measurement,
-learning, admission binding, incident inputs/evidence/source and disposition-outbox rows.
-Existing exception, policy approval and case-command triggers cover state and human
-changes. The existing tenant SSE subscription invalidates the shared query; rollback
-produces no change notification. Reconnect and periodic reconciliation recover
-missed wake-ups. No incremental client counters are maintained.
+Workload bounds, not latency guarantees: a three-second statement timeout; failure above
+10,000 detected incidents rather than truncated totals; pages of at most 100 with offsets
+up to 10,000; at most 50 evidence or fact identities per incident in transport, with full
+counts (the ledger and issue detail have the rest); at most 1,000 facts per ledger.
 
-Home shows the live measurement summary and links to Insights. The focused outcome
-section provides environment/window controls, definition/cohort dialogs, evidence
-ledgers and pagination. Live, synthetic, pilot and shadow are never combined.
-Offline, unavailable and access-loss states hide previous counts; keyboard dismissal
-restores focus. The broader performance Insights work remains separate (LUMA-65).
-
-Validation: `measurement.test.ts`, `resolution-measurement.e2e.mjs` and
-`resolution-measurement.browser.mjs`, plus the existing overview, shared registry
-and notification suites.
+Committed changes to measurement, learning, admission binding, incident inputs, evidence
+and sources, disposition outbox, exception, approval and case-command rows notify the
+tenant's live stream, which invalidates the shared query; rollbacks notify nothing.
+Reconnects and periodic reconciliation recover missed wake-ups. Clients keep no
+incremental counters.

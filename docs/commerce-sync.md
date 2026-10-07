@@ -1,212 +1,174 @@
 # Commerce sync
 
-Commerce sync imports each connection's history into the canonical projections, keeps
-it current and reconciles it against the source. It reads through installed connection
-capabilities and never writes to a source.
+Commerce sync imports each connection's history into the
+[canonical projections](commerce-projections.md), keeps it current and reconciles it
+against the source. It reads only through installed connection capabilities and never
+writes to a source. Code: `@luma/commerce-sync`; the process runs in `apps/worker`.
 
 ## Streams, scans and runs
 
-A **stream** exists per connection and record type (`orders`, `fulfillments`,
-`products`, `inventory`, `customers`, `returns`) whose read capability the connection grants.
-The runner creates streams for active connections, running as the person who first
-installed the connection. Each stream has one active **scan**, with a suspended history checkpoint during a live read; every scan is a
-**run** in `commerce_sync_runs`.
+A **stream** exists per connection and record type (`orders`, `fulfillments`, `products`,
+`inventory`, `customers`, `returns`) whose read capability the connection grants. Each
+stream runs as a person, initially the one who installed the connection, with that
+person's current permissions. Each stream has one active **scan**; every scan is a
+**run**.
 
 | Scan          | When                                                       | Reads                                    |
 | ------------- | ---------------------------------------------------------- | ---------------------------------------- |
-| `backfill`    | Once after the stream is created, or on **Re-import**      | Every record the source shares           |
+| `backfill`    | Once after the stream is created, or on re-import          | Every record the source shares           |
 | `incremental` | Every 5 minutes, or 10 seconds after a change notification | Records changed since the last scan      |
 | `reconcile`   | Daily, or on **Check all records**                         | Every record; flags records not returned |
 
 Incremental reads send `updatedSince` (the previous scan's start minus a 10-minute
-overlap) only to handlers whose descriptor lists `filters: ['updatedSince']`. Other
-handlers are reread in full every 30 minutes. The overlap and daily full check cover
-clock skew and missed notifications; ordering of snapshots still follows the
-projection rules, not these times. Fulfillment and return history waits for the
-connection's order history, or its completed recent window where supported. The returns stream stores both returns and refunds in its
-ledger.
+overlap) only to handlers that declare `filters: ['updatedSince']`; other handlers are
+reread in full every 30 minutes. The overlap and the daily full check cover clock skew and
+missed notifications. Snapshot ordering still follows the
+[projection rules](commerce-projections.md#projection-rules), not these times.
+Fulfillment and return history waits for the connection's order history, or its
+completed recent window where supported.
 
 ## Pages, checkpoints and retries
 
-The runner leases one stream (5 minutes) and requests a page of 100 records; adapters
+The runner leases one stream for 5 minutes and requests a page of 100 records; adapters
 may return fewer (Shopify returns at most 25, or 5 for fulfillments and returns). It
-imports the page's changed records in one ingestion transaction, then commits the ledger
-entries, counters and next cursor in one transaction. A restarted or second runner
+imports the page's changed records in one ingestion transaction, then commits ledger
+entries, counters and the next cursor in one transaction. A restarted or second runner
 continues from the committed cursor; a lost lease discards the page's ledger write, and
 the next attempt re-imports idempotently.
 
-Provider transports first repeat a failed read briefly (see
-[connectors](connectors.md#errors-retries-and-evidence)), so a single transient
-request failure rarely fails a page. Page failures keep the cursor and back off from
-30 seconds to at most an hour, honoring `retryAfterMs`. `failing_since` records when the
-current run of failures began; a successful page clears it. Scheduled detection uses it
-for the sync-failure retry window
-([exception detection](exception-detection.md#scheduled-detection)). A rejected cursor restarts the scan. After five consecutive failures
-the stream is **failing**. Messages are controlled text by connector error code;
-provider text is never stored. A stream whose person no longer manages the
-workspace is blocked until someone with `sync.manage` resumes it, which makes them the
-stream's person. Streams stop while their connection is inactive or no longer grants
-the capability, and restart when it returns.
+Transports first retry a transient read briefly (see
+[connectors](connectors.md#errors-retries-and-evidence)). A page failure keeps the cursor
+and backs off from 30 seconds to at most an hour, honoring `retryAfterMs`. A rejected
+cursor restarts the scan. After five consecutive failures the stream is **failing**.
+`failing_since` marks when the current run of failures began and is cleared by a
+successful page; scheduled detection uses it for the sync-failure retry window
+([exception detection](exception-detection.md#scheduled-detection)). Stored messages are
+controlled text by connector error code; provider text is never stored.
 
-A record that fails Luma's validation is marked `failed` in the ledger with a
-controlled problem and does not stop the page: the page's ingestion transaction is
-rolled back and its records are imported one at a time, so only that record fails. Records whose related records are not
-imported yet (for example a fulfillment before its order) are `pending` and retried
-on the next scan.
+A record that fails Luma's validation is marked `failed` with a controlled problem
+without failing the page: the page transaction rolls back and its records are imported
+one at a time. Records whose related records are not imported yet, such as a fulfillment
+before its order, are `pending` and retried on the next scan. If PostgreSQL cancels a page
+transaction to break a lock cycle, the import is retried once before the page fails.
+
+A stream whose person no longer manages the workspace is blocked until someone with
+`sync.manage` resumes it, which makes them the stream's person. Streams stop while their
+connection is inactive or no longer grants the capability, and restart when it returns.
 
 ## Ledger and coverage
 
-`commerce_sync_items` holds one row per source record: a digest of the normalized
-observation, status, source creation and update times, first/last seen and the last
-scan that saw it. A record whose digest and status are unchanged is not projected
-again, so re-imports and duplicate notifications add no snapshots. Full scans set
-`missing_since` on records they no longer return; nothing is deleted.
+The ledger holds one row per source record: a digest of the normalized observation,
+status, source creation and update times, first/last seen and the last scan that saw it.
+A record whose digest and status are unchanged is not projected again, so re-imports and
+duplicate notifications add no snapshots. Full scans set `missing_since` on records they
+no longer return; nothing is deleted. The returns stream's ledger holds both returns and
+refunds.
 
-Coverage per stream comes from the ledger (counts, oldest/newest creation date) and
+Coverage per stream comes from the ledger (counts, oldest and newest creation date) and
 from the page `history` limit. `history_from` is the limit reported when the history
-import started; a later scan without a limit sets `olderHistoryAvailable`. Shopify
-reports a 60-day order window unless `read_all_orders` is granted. Pages also report
-`total` when the source counts the collection cheaply; it only drives progress.
+import started; a later scan without a limit reports that older history is available.
+Shopify limits orders to 60 days unless `read_all_orders` is granted, and granting it does
+not backfill: an operator re-imports order history. Page `total` drives progress only.
 
-Imports use `ingestion.import` (see
-[commerce projections](commerce-projections.md#imports-products-and-links)).
-Observations are stored with ingest key `sync:<observation id>`. Read checks record
-each page outcome for connection freshness; only product pages keep their items.
+Observations are stored with ingest key `sync:<observation id>`. Each page outcome is
+recorded as a read check for connection freshness; only product pages keep their items.
 
 ## Change notifications
 
 Shopify connections subscribe to order, fulfillment, product, inventory-level, refund,
-return and, when approved, customer topics at `/api/v1/shopify/changes/:organizationId/:connectionId`.
-The route verifies the HMAC and shop, then inserts a `connector_refresh_hints` row
-(deduplicated by event) before acknowledging. The runner turns hints into stream
-`hint_at` times. Notification bodies are never imported. Existing connections
-subscribe on their next authorization.
+return and, when approved, customer topics. The change route verifies the HMAC and shop,
+then stores a deduplicated refresh hint before acknowledging; the runner turns hints into
+stream hint times. Notification bodies are never imported. Existing connections subscribe
+on their next authorization. Subscriptions are best effort; scheduled scans still cover
+every record.
 
 ## Customers
 
 `customers.read` returns profiles only when the deployment sets
 `SHOPIFY_PROTECTED_CUSTOMER_DATA_APPROVED`; contact fields also need
-`SHOPIFY_CUSTOMER_CONTACT_APPROVED` and addresses `SHOPIFY_CUSTOMER_ADDRESS_APPROVED`.
-Profiles bypass observation storage: `customer_profiles` (owned by `@luma/customers`)
-keeps only the current version, and customer read checks carry no items.
-`customers/redact` and `shop/redact` intake calls `erase_shopify_customer_data` in the
-intake transaction, which deletes the profiles and ledger rows and remembers erased
-customer IDs by digest so later reads skip them. Other retained data still follows the
-[privacy operations](shopify-production.md#privacy-operations) workflow.
+`SHOPIFY_CUSTOMER_CONTACT_APPROVED`, and default addresses
+`SHOPIFY_CUSTOMER_ADDRESS_APPROVED`. Profiles bypass observation storage: `@luma/customers`
+keeps only the current version, and customer read checks carry no items. A
+`customers/redact` or `shop/redact` request erases the affected imported profiles and
+ledger rows in its intake transaction and remembers erased customer IDs by digest, so
+later reads skip them. Other retained data still follows the
+[privacy operations](shopify-production.md#privacy-operations) procedure.
 
 ## Links
 
-SKU, location and order links are requested through the API (`commerce_identity_links`) and
-applied by the runner with the requester's current permissions, because only the
-worker login may write projections. Suggestions come from equal normalized SKU codes
-in other connections. Order suggestions require a JTL external marketplace order number
-matching a Shopify order number. Dates and totals support review; neither establishes identity.
-Multiple candidates stay visible and are never applied automatically.
+SKU, location and order links are requested through the API and applied by the runner
+with the requester's current permissions, because only the worker login may write
+projections. Suggestions come from equal normalized SKU codes in other connections. Order
+suggestions require a JTL external marketplace order number matching a Shopify order
+number; dates and totals support review but never establish identity. Multiple candidates
+stay visible and are never applied automatically.
 
-Order link/unlink runs in one ingestion transaction that holds the tenant's ingestion
-lock exclusively. Imports hold it shared, so a link waits for running imports and new
-imports wait for the link. Children
-receive canonical IDs keyed by the current order mapping revision; parent bindings remain
-immutable. Old pointers are retired by the orders owner, with snapshots and actor/reason history
-retained. Redirects preserve old order and child links, cases and activity. The order list, search,
-Home metrics and Insights read current projections and count the linked order once.
-A restart before commit rolls back the change; a restart after commit resumes the request
-without reapplying effects.
-
-## Running it
-
-`pnpm dev` starts the sync process (`apps/worker`, `src/sync-bootstrap.ts`). In
-production run `pnpm --filter @luma/worker start:sync` with `WORKFLOW_DATABASE_URL`, the
-identity settings, `CONNECTIONS_ACTIVE_KEY_ID`/`CONNECTIONS_KEYS`, provider settings and
-optionally `COMMERCE_SYNC_CONCURRENCY` (tenants in parallel, default 4). Several
-processes can run; leases keep each page with one of them. The worker login needs
-`luma_commerce_sync` and `luma_customers` in addition to the commerce owner roles;
-the API login needs `luma_commerce_sync`. Simulated connections without a local
-transport report unavailable and back off.
-
-## Validation
-
-`packages/commerce-sync/src/domain/*.test.ts` covers scheduling, backoff, status and
-coverage rules. `packages/application-runtime/src/commerce-sync.integration.test.ts`
-runs the store, runner, ingestion and customer profiles against PostgreSQL: paged
-import with checkpoints, re-import without duplicates, out-of-order updates, retry
-from a checkpoint, fulfillments after orders, missing-record detection, change
-notifications, customer erasure and suppression, SKU and order link/unlink, stale replays, interrupted order linking, reference
-redirects, ambiguous suggestions, tenant isolation and principal recovery. It also covers
-page imports that fail only a rejected record, concurrent imports of overlapping streams
-and connections, and imports sharing the ingestion lock while a link waits. Shopify adapter tests validate the new queries against the 2026-07 schema.
-The web Data sync page has `Data sync/Workspace` stories and presentation tests.
-
-Set `LUMA_IMPORT_BENCHMARK=<records>` when running that test file to measure end-to-end
-history imports through the runner with production defaults and an in-memory source
-without latency. Results are written to `/tmp/luma-import-benchmark-<records>.json`. On
-October 6, 2026, PostgreSQL 17 in Docker on a development laptop with durable commits
-measured, for 2,000 records per stream:
-
-| Stream                                 | Before batched imports | After |
-| -------------------------------------- | ---------------------: | ----: |
-| Products, records/s                    |                    126 |   908 |
-| Inventory, records/s                   |                    200 | 1,515 |
-| Orders with two lines, records/s       |                     41 |   399 |
-| Fulfillments, records/s                |                     71 | 1,056 |
-| Orders from two connections, records/s |                     39 | 1,040 |
-
-These figures exclude provider latency and rate limits. Order imports are now limited
-mostly by search indexing of order mappings and the order list refresh.
+Link and unlink wait for running imports and block new ones (see
+[commerce projections](commerce-projections.md#imports-products-and-links)). Redirects
+preserve old order and child links, cases and activity. Order lists, search, Home metrics
+and Insights read current projections and count a linked order once. A restart before
+commit rolls back the change; a restart after commit resumes the request without
+reapplying effects.
 
 ## Recent history, live reads and exports
 
 Shopify order, fulfillment and return backfills first read a 30-day creation window,
-newest first. The durable `recent_history_from` and `recent_history_completed_at`
-checkpoint distinguishes that window from completed full history. Recent child
-streams may start after recent orders finish; providers without `createdSince`
-retain the full-order dependency. A second scan reads the complete history the
-source shares. Shopify's 60-day limit still applies without `read_all_orders`.
-A recent-window read never establishes absence or full-history coverage.
+newest first, then a second scan reads the complete history the source shares. A durable
+checkpoint distinguishes the completed recent window from completed full history. Recent
+child streams may start after recent orders finish; providers without `createdSince` keep
+the full-order dependency. A recent-window read never establishes absence or full-history
+coverage.
 
-The workspace runs up to `COMMERCE_SYNC_WORKSPACE_CONCURRENCY` pages concurrently
-(default 4, range 1–8). Admission per connection is limited by
-`COMMERCE_SYNC_CONNECTION_CONCURRENCY` (default 2, range 1–4), including leases held
-by other processes. The workspace page limit also counts leases across processes;
-use the same concurrency settings on all sync workers. `COMMERCE_SYNC_CONCURRENCY` still limits parallel workspaces.
-A short tenant advisory lock serializes admission; provider reads run outside it.
-The worker pool allows `tenant concurrency × workspace concurrency × 2 + 2`
-connections. Size PostgreSQL's connection limit for the total number of workers.
+Scheduling order: idle hints and incremental scans precede history pages. During an
+active scan, only its due time makes the next page eligible; a hint cannot bypass failure
+backoff. At a page boundary a due live read can suspend a filterable history scan; its
+cursor, counters and export state are persisted and restored afterwards, so live reads
+still run every five minutes during long imports. A provider cooldown defers the entire
+connection, including hinted work. Shopify clients share a query-cost budget per tenant
+and connection.
 
-Pages of one workspace import concurrently. Owners take the order and inventory entity
-locks of a page in sorted order, and new entities and mappings are inserted in sorted
-order, so overlapping pages (for example orders and their fulfillments) wait for each
-other instead of deadlocking. If PostgreSQL still cancels a transaction to break a lock
-cycle, the page's import is retried once before the page fails.
+Full Shopify backfills of orders, products, inventory and permitted customers use Bulk
+Operations; recent windows, incremental reads and full checks stay paged.
 
-Idle hints and incremental scans precede history pages. During an active scan,
-only `due_at` makes its next page eligible; a saved hint cannot bypass failure
-backoff. At a page boundary, a due live read can suspend a filterable history scan.
-Its cursor, counters and export state are persisted, then restored after the live
-scan finishes. Live reads also run every five minutes during long history imports.
-A provider cooldown defers the entire connection, including hinted work. Shopify
-clients share a budget per tenant/connection, using requested query cost, refunded
-balance, restore rate and `Retry-After` before sending the next request.
+- A stable, hashed scan alias identifies an export, so a lost start response recovers
+  without repeating the mutation. The cursor stores the operation ID, byte offset and
+  root count. Preparing exports release their lease and poll later; they record no
+  successful read or coverage. The adapter queues when all five query slots are occupied.
+- Completed exports stream as grouped JSONL in chunks of 500 root records, joining
+  children through `__parentId` before normalizing. The file is never saved.
+- Each observation's `observedAt` is the export's `createdAt`, because the file shows the
+  shop when the export started; freshness checks then treat old exports as old.
+- The ledger and cursor commit together, so replay after a crash recognizes unchanged
+  records. The final root count must match the export's count. Failed, canceled, expired,
+  malformed or truncated exports never complete coverage.
+- Transient download failures are retried. When the operation or its seven-day download
+  URL is no longer usable (`export_unavailable`), start a new export with **Re-import
+  history**.
 
-Full Shopify backfills of orders, products, inventory and permitted customers use
-Bulk Operations on Admin API 2026-07. Recent windows, incremental reads and full
-checks remain paged. A stable, hashed scan alias identifies an export, allowing
-recovery after a lost start response without repeating the mutation. An opaque
-cursor stores the operation ID, byte offset and root count. Preparing exports
-release their lease and poll later; they do not record successful reads or coverage.
-The adapter queues when all five query slots are occupied.
+## Concurrency and running it
 
-Completed exports are streamed as grouped JSONL in chunks of 500 root records.
-Children are joined through `__parentId` before normalizing a complete observation.
-Each observation's `observedAt` is the export's `createdAt`, because the file shows
-the shop when the export started, not when Luma reads it; freshness checks then
-treat old exports as old. The file is never saved. The ledger and cursor commit together, so replay after a
-crash recognizes unchanged records. The final root count must match the completed
-export's count. Failed, canceled, expired, malformed or truncated exports never
-complete coverage. Retry transient download failures; use **Re-import history** to
-start a new export when its operation or seven-day download URL is no longer usable.
-Customer selections obey the same protected-data approvals as paged reads, and
-customer read checks contain no profiles.
+Several sync processes can run; leases keep each page with one of them. Limits:
 
-See [connector import measurements](connectors.md#import-read-patterns-and-measurements)
-for reproducible simulator measurements and their limits.
+- `COMMERCE_SYNC_CONCURRENCY` (default 4): workspaces in parallel per process.
+- `COMMERCE_SYNC_WORKSPACE_CONCURRENCY` (default 4, 1–8): concurrent pages per workspace.
+- `COMMERCE_SYNC_CONNECTION_CONCURRENCY` (default 2, 1–4): concurrent pages per
+  connection.
+
+The workspace and connection limits count leases held by other processes, so use the same
+settings on every sync worker. A short tenant advisory lock serializes admission; provider
+reads run outside it. Each worker's pool allows `tenant concurrency × workspace
+concurrency × 2 + 2` database connections; size PostgreSQL's connection limit for all
+workers together.
+
+`pnpm dev` starts the sync process. In production run it with the workflow database URL,
+identity settings, the connection keyring, provider settings and the concurrency settings
+above. The worker login needs `luma_commerce_sync` and `luma_customers` in addition to the
+commerce owner roles; the API login needs `luma_commerce_sync`. Simulated connections
+without a local transport report unavailable and back off.
+
+To measure end-to-end import throughput through the runner against PostgreSQL, set
+`LUMA_IMPORT_BENCHMARK=<records>` when running the commerce sync integration test in
+`@luma/application-runtime`. It uses an in-memory source without latency, so results
+exclude provider latency and rate limits; order imports are limited mostly by order
+mapping search indexing and the order list refresh. Provider-side read patterns are
+covered in [connector import measurements](connectors.md#import-read-patterns-and-measurements).

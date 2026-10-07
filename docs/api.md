@@ -1,83 +1,53 @@
 # HTTP API foundation
 
-One contract is shared by Fastify, the web client and OpenAPI. Follow the [identity setup](identity.md) to configure PostgreSQL and authentication before starting the API.
+One ts-rest contract in `@luma/api-contract` is shared by the Fastify server, the typed web client and the generated OpenAPI document. Requests and responses are validated on both sides, errors have one sanitized shape, and every tenant route is authorized by the identity guard before a handler runs. Session routes and tenant authorization are described in the [identity guide](identity.md).
 
-## Run and consume
+## Serving and consuming
 
-Run `pnpm dev`. The API listens on `127.0.0.1:3001`; Vite proxies `/api/*` to it, removing `/api`. The proxy uses the default API address; update its target in `apps/web/vite.config.ts` if changing the local API host/port. Production hosting must provide the same-origin `/api` proxy. Cross-origin browser access is not enabled.
+Browsers reach the API only through the same-origin `/api` proxy, which removes the `/api` prefix. Vite proxies to `API_PROXY_TARGET`, which `pnpm dev` sets to this worktree's API port; production hosting must provide the same proxy. Cross-origin browser access is not enabled.
 
-```sh
-curl http://127.0.0.1:3001/health
-curl http://127.0.0.1:3001/ready
-curl 'http://127.0.0.1:3001/v1/connector-providers?category=erp'
-curl http://127.0.0.1:3001/v1/connector-providers/shopify
-curl http://127.0.0.1:3001/openapi.json
-```
+- Browser clients call `/api`; server-side callers pass an absolute API origin.
+- Create credential-bearing clients per request, never as a server singleton. Session forwarding must stay explicit in the server authentication layer.
+- Query cancellation reaches `fetch`. Malformed responses and undocumented status codes are rejected by the client and never enter the query cache.
+- Tenant queries include the organization ID in their cache keys.
 
-`connector-providers` is a public, static sample catalog owned by the connectors module. It describes Shopify/JTL provider names and categories, not installed connections or working integrations. It exposes no tenant data. The application owns the catalog; HTTP handlers only map validated requests and use-case results.
+`@luma/api-contract/openapi` is a separate server and tooling entry point, so schema generation stays out of browser bundles. The server serves the document at `/openapi.json`; the committed copy in `packages/api-contract` must be regenerated with `pnpm --filter @luma/api-contract generate:openapi` after contract changes, and a test rejects a stale copy.
 
-Web consumers use `createWebApiClient()` from `apps/web/src/lib/api-client.ts` and `connectorProviderQueryOptions(client, providerId)` from the feature directory:
+`/v1/connector-providers` is a public, static catalog of provider names and categories. It describes no installed connections and exposes no tenant data.
 
-```ts
-const provider = await queryClient.fetchQuery(
-  connectorProviderQueryOptions(createWebApiClient(), 'shopify'),
-);
-// provider.name and provider.category are inferred from the shared contract.
-```
+## Contract rules
 
-This adapter is tested without adding a sample screen to the product. Browser calls use `/api`; SSR callers pass an absolute API origin. Create credential-bearing clients per request, never as a server singleton. Future session forwarding must be explicit in the server authentication layer. Query cancellation reaches fetch; malformed responses and non-success results do not enter the data cache. Tenant queries must later include the organization ID in their cache keys.
+- Business endpoints use `/v1`. Additive changes may stay in v1. Removing or renaming fields, changing types or narrowing accepted inputs needs a new major path and an explicit migration. Health and readiness stay unversioned.
+- Route keys form OpenAPI operation IDs; keep them stable.
+- Declare every intended response status. Use strict mutation objects so unexpected tenant or region fields are rejected.
+- A new resource adds its schemas and routes to the shared contract, implements the owning package's application port and API mapping, and is wired in application runtime composition. Only API layers import the contract; inner layers stay framework independent. HTTP handlers map validated requests and use-case results; they hold no business rules.
+- Tenant resources follow [ADR-003](architecture/003-tenant-isolation-and-data-residency.md): `/v1/organizations/:organizationId/<resource>`, camelCase fields and UUID organization IDs. Schemas reserve `EU | US | APAC`, but only EU provisioning is enabled. Never treat path IDs or caller-supplied region or context as authorization.
 
-## Contract and versioning
+## Errors
 
-`@luma/api-contract` exports runtime schemas and `apiContract`. `@luma/api-contract/client` exports `createApiClient` with response validation and rejection of undocumented status codes. `@luma/api-contract/openapi` is a separate server/tooling entry point so schema generation does not enter browser bundles.
+Errors have `{ code, message, requestId }`, and `requestId` matches the `x-request-id` header.
 
-Business endpoints use `/v1`. Additive changes may stay in v1; removing/renaming fields, changing types or narrowing accepted inputs requires a new major path and an explicit migration. Keep route keys stable because they form OpenAPI operation IDs. Health/readiness probes remain unversioned.
+| Condition                                         | Response                                        |
+| ------------------------------------------------- | ----------------------------------------------- |
+| Request fails schema validation                   | `400 VALIDATION_ERROR`                          |
+| Body parser failure                               | normalized 400, 413 or 415                      |
+| No session                                        | `401 UNAUTHENTICATED`                           |
+| Member lacks the declared permission              | `403 FORBIDDEN`                                 |
+| Unknown route or resource, or inaccessible tenant | `404 NOT_FOUND`                                 |
+| Provisioning in an inactive region                | `422 REGION_UNAVAILABLE`                        |
+| Request served by the wrong regional cell         | `503 REGION_UNAVAILABLE`                        |
+| Unexpected exception or invalid handler output    | sanitized `500 INTERNAL_ERROR`, details in logs |
 
-New resources add schemas and routes to the shared contract, implement the owning module's application port and API mapping, then wire its composition factory in `app.ts`. Only module API layers may import the root contract export; inner layers remain framework independent. Declare every intended response status and use strict mutation objects to reject unexpected tenant/region fields.
+Authenticated routes declare 401, 403, 404 and the regional errors where they apply. Responses carry `Cache-Control: no-store`.
 
-Tenant resources must follow ADR-003: `/v1/organizations/:organizationId/<resource>`, camelCase fields and UUID organization IDs. Shared schemas reserve `EU | US | APAC`; only EU provisioning is enabled. Identity guards verify session, membership, organization state and placement before tenant routes are served. Never treat path IDs or caller-supplied region/context as authorization. Provisioning rejects inactive regions with `422 REGION_UNAVAILABLE`; wrong-cell execution uses `503 REGION_UNAVAILABLE`.
+## Probes and shutdown
 
-## Errors and probes
+`/health` reports process liveness without probing dependencies. `/ready` checks the identity database, schema and restricted runtime role, and returns 503 on failure, an exception or a one-second timeout. That timeout does not cancel the underlying operation, so every readiness check must bound and cancel its own I/O. Shutdown marks the app as draining before closing connections; a pending readiness check cannot report ready after draining begins.
 
-Errors have `{ code, message, requestId }`; `x-request-id` matches the server request ID. Validation returns `400 VALIDATION_ERROR`. Unknown resources/routes return `404 NOT_FOUND`. Parser failures normalize 400/413/415. Unexpected exceptions and invalid handler output return sanitized `500 INTERNAL_ERROR`, with details only in server logs. Client response schemas are validated at runtime. Responses use `Cache-Control: no-store`.
+## Correlation headers
 
-Authenticated routes declare `401 UNAUTHENTICATED`, `403 FORBIDDEN`, `404 NOT_FOUND` for inaccessible tenants/resources, and regional errors where applicable. See the [identity guide](identity.md) for session routes and tenant authorization.
+Responses include a server-generated `x-request-id` and, when observability is wired, an `x-trace-id`. Clients send a UUIDv4 `x-luma-action-id` to correlate the requests of one user action; invalid values are ignored. These IDs are diagnostics, never authentication or tenant access. See [observability](observability.md).
 
-`/health` reports process liveness without probing dependencies. `/ready` checks the identity database, schema and restricted runtime role. `buildApp` accepts an injected readiness check, returning 503 on false, exceptions or a one-second timeout. Future checks must bound/cancel their own I/O; the HTTP timeout does not cancel an underlying dependency operation. Shutdown marks the app as draining before closing connections; pending readiness checks cannot return ready after draining begins. Existing SIGINT/SIGTERM handling closes Fastify.
+## Dependency trap
 
-## OpenAPI and verification
-
-The server serves the generated OpenAPI 3 document at `/openapi.json`. The committed SDK artifact is `packages/api-contract/openapi.json`.
-
-```sh
-pnpm --filter @luma/api-contract generate:openapi
-pnpm format
-pnpm check
-```
-
-Contract tests reject a stale artifact and check concrete schemas, parameters, error responses and unique operation IDs. API tests cover real HTTP with the typed client, path/query validation, response validation, sanitized failures, parser errors and readiness failures/timeouts. Web tests exercise the Query consumer and reject malformed responses before caching.
-
-The stable ts-rest packages are pinned to 3.52.1 with Zod 3.25.76 isolated to the transport packages; existing web forms keep Zod 4. The stable adapter declares a Fastify 4 peer even though the repository uses Fastify 5.12.5. A version-specific `peerDependencyRules.allowedVersions` exception permits this pairing; strict peer checking remains enabled elsewhere. Real HTTP and error-path tests cover the integration. Review/remove this exception when upgrading ts-rest; it is not upstream certification of Fastify 5 support. See the [ts-rest adapter](https://ts-rest.com/server/fastify) and [upstream Fastify 5 work](https://github.com/ts-rest/ts-rest/pull/702).
-
-## Request tracing
-
-Responses include a server-generated `x-request-id`. When observability is wired, `x-trace-id` identifies the trace in Sentry and Langfuse. Send a UUIDv4 `x-luma-action-id` to correlate related requests from one user action. Invalid action IDs are ignored. These IDs provide diagnostics, not authentication or tenant access. See the [observability guide](observability.md).
-
-## Exception Desk
-
-Tenant-scoped [case reads](case-inbox.md) include bounded evidence pagination.
-[Decision and progress APIs](case-decisions.md) provide immutable proposal review,
-approve/reject/escalate commands, retry receipts, execution and verification reads,
-audit history and authenticated SSE. All contracts and the stream client are
-exported by `@luma/api-contract`; overview and installed-connection endpoints retain
-their existing module ownership.
-
-## Workspace Activity
-
-The tenant-scoped [Activity API](workspace-activity.md) searches recorded decisions,
-execution and resolution history with bounded date ranges and cursor pagination.
-The shared contract defines searchable fields, outcome distinctions and role-based visibility.
-
-## Workspace Settings
-
-The `settings` contract provides authorized workspace edits, email invitations, personal notifications and approval preferences. See [workspace settings](workspace-settings.md) for routes, command reconciliation and mail configuration.
+The stable ts-rest Fastify adapter declares a Fastify 4 peer, while the repository uses Fastify 5. A version-specific `peerDependencyRules` exception in `pnpm-workspace.yaml` allows this pairing; strict peer checking stays on elsewhere, and the API's real HTTP and error-path tests cover the integration. Because ts-rest needs Zod 3, the contract and server-side packages use the `zod3` catalog entry; only the web app and UI package use Zod 4. Review both exceptions when upgrading ts-rest; the pairing is not certified upstream ([upstream Fastify 5 work](https://github.com/ts-rest/ts-rest/pull/702)).

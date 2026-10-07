@@ -69,7 +69,10 @@ test('opens contextual issue guides and preserves the investigation across help 
   t.onTestFinished(() => services.close());
   const corpus = JSON.parse(
     await readFile(
-      new URL('../../../docs/fixtures/exceptions-v0.json', import.meta.url),
+      new URL(
+        '../../../packages/exceptions/fixtures/exceptions-v0.json',
+        import.meta.url,
+      ),
       'utf8',
     ),
   );

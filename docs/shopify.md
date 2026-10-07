@@ -1,212 +1,154 @@
-# Shopify read adapter
+# Shopify connector
 
-`createShopifyConnector` from the connectors composition entry implements `orders.read`, `products.read`, `inventory.read`, `fulfillment.read` and `returns.read` using the official `@shopify/admin-api-client` and Shopify Admin GraphQL API `2026-07`. Workflows use the existing `CapabilityReader`; provider queries and normalization stay inside connectors.
+The Shopify app reads orders, products, inventory, fulfillment work, shipments, returns,
+refunds and (when approved) customers through the Admin GraphQL API `2026-07`, and offers
+[governed actions](shopify-actions.md) for fulfillment recovery and inventory
+corrections. Merchants connect through standalone OAuth. Reads are observations, not a
+transactional snapshot of the shop, and scope-limited visibility never establishes
+shop-wide absence. Code: `@luma/app-shopify`, with the protocol client in
+`@luma/connector-shopify`.
 
-## Connection and authentication
+Production app settings, approvals and privacy operations are in
+[Shopify partner readiness](shopify-production.md). The app's live record browser is
+described in its [package README](../packages/apps/shopify/README.md#operational-records).
 
-Compose one adapter per trusted tenant/connection/shop binding. Supply the lowercase `*.myshopify.com` hostname, an `accessToken()` function backed by tenant-scoped secret storage, and an awaited `recordObservations()` persistence function. The token is resolved for every request to support rotation. Requests use HTTPS, reject redirects and time out after 15 seconds by default. `timeoutMs` accepts 1–120,000 milliseconds. Tokens never appear in descriptors, observations or normalized failures.
+## Access and grants
 
-The runtime resolver must check current tenant ownership and connection state on each invocation. Return the adapter only for an active connection. Installation, OAuth token acquisition, connection storage and HTTP webhook registration belong to the host composition; this adapter does not register a shop globally or introduce environment credentials.
+- `read_orders` normally covers the last 60 days; older orders need Shopify-approved
+  `read_all_orders`.
+- `read_products` and `read_inventory` cover variants, inventory items and stock levels.
+- Fulfillment visibility follows the granted fulfillment-order categories. Luma requests
+  merchant-managed and third-party categories, not `read_assigned_fulfillment_orders`,
+  because it is not a fulfillment service.
+- `returns.read` is granted with `read_orders` and `read_returns`; connections authorized
+  before it existed must reconnect.
+- `read_customers` is requested only when the deployment has protected customer data
+  approval (see [commerce sync](commerce-sync.md#customers)).
 
-Required grants:
+A missing grant returns `permission_denied`; it never becomes an empty successful page.
 
-- `read_orders`; Shopify normally limits order access to the last 60 days. Request approved `read_all_orders` access when historical reconciliation needs older orders.
-- `read_products` and `read_inventory` for variants, inventory items and stock levels.
-- The applicable fulfillment-order read scopes: `read_merchant_managed_fulfillment_orders`, `read_assigned_fulfillment_orders` and/or `read_third_party_fulfillment_orders`. Visibility depends on the installation's granted scopes. Provision all scopes required for the locations being reconciled.
+## Read and mapping rules
 
-No write capabilities are advertised. A missing grant returns `permission_denied`; it never becomes an empty successful page. Scope-restricted collections cannot establish shop-wide deletion.
+`limit` (1–100) bounds parent orders, products or inventory items; a parent can produce
+several observations. Cursors bind tenant, connection, shop, API version, capability,
+page size and filters; preserve them and repeat the same query for the next page. Filters
+accept GIDs only (InventoryItem and Location for inventory, Order for fulfillment and
+returns), never SKU labels or raw Shopify search expressions.
 
-## Read and mapping semantics
+Nested collections (order lines, variants, inventory locations, fulfillment orders and
+lines, returns and refunds) are fully paginated before a page returns. Missing or repeated
+cursors, malformed fields, GraphQL partial errors or failed child requests reject the
+whole page, and more than 1,000 continuation pages in one nested collection rejects the
+scan rather than truncating it. No read emits inferred tombstones.
 
-`limit` accepts 1–100 and bounds the number of parent orders, products or inventory items scanned. A parent can produce multiple observations. Cursors bind the tenant, connection, shop, API version, capability, page size and filters. Preserve them unchanged and use the same query when requesting the next page.
+- **Orders:** original ordered quantities. `cancelledQuantity` is null because refunds and
+  removals do not establish cancelled units. Deleted or custom variants have no SKU
+  identity. Unknown financial statuses stay `unknown`; malformed descriptive fields become
+  null without rejecting the order.
+- **Products:** per variant, the inventory-item SKU identity, variant title (none for
+  `Default Title`), price in shop currency and barcode. SKU text preserves case and is
+  never identity.
+- **Inventory:** `on_hand`, `committed` and `available` map to on-hand, reserved and
+  available in `each`. Untracked values stay null; zero and negative stock are kept.
+  Identity is the InventoryItem scoped by Location; SKU and location references stay
+  account-wide.
+- **Fulfillment work vs shipments:** each FulfillmentOrder is outstanding work
+  (`fulfillment_order`), each Fulfillment a separate `shipment`. Work line quantities are
+  the total work; shipment line quantities support split shipments. An on-hold order
+  without a readable hold reason reports one `other` hold.
+- **Returns and refunds:** a returns page checks one page of orders cheaply and reads
+  returns and refunds only for orders that have them, emitting returns before the refunds
+  that refer to them. Units received count every disposition except `MISSING`. Return
+  notes are not read. Only successful `REFUND` transactions count as money returned.
 
-Nested order lines, product variants, inventory locations, fulfillment orders and fulfillment lines are fully paginated before returning a page. Missing/repeated cursors, malformed fields, GraphQL partial errors or failed child requests reject the whole page. A safety ceiling of 1,000 continuation pages per nested collection rejects oversized scans instead of returning truncated data. Reads across requests are observations, not a transactional Shopify snapshot. Only a successful full scan within the granted visibility supports absence checks; no read emits inferred tombstones.
+Shopify `updatedAt` has whole-second precision; the
+[projection rules](commerce-projections.md#projection-rules) let an equal time with a later
+read win. Returns report no update time. `updatedAt` is the best available progress time
+for fulfillment work, but unrelated edits also change it. Source revisions are null
+because these reads expose no conditional revision token.
 
-| Resource         | Mapping                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Order            | Shopify GID, display number, creation time as `placedAt`, current total in shop currency, cancellation/closed state, financial summary and original ordered quantities with line title and SKU text. Unknown financial statuses remain `unknown`. `cancelledQuantity` is null because refunds/removals do not establish cancelled units. Deleted/custom variants have null SKU identity. Malformed descriptive fields become null without rejecting the order.                                                              |
-| Product          | Product GID, title, active/draft/archived status, vendor, Online Store publication (`publishedAt`), and per variant the inventory-item SKU identity, variant title, price in the shop currency (from `priceRangeV2`) and barcode. Unlisted or unrecognized status is `unknown`; a variant named `Default Title` has no variant title. SKU text preserves case and is never used as identity. Adapter version `shopify/2`.                                                                                                   |
-| Inventory        | InventoryItem GID plus Location GID. `on_hand` → onHand, `committed` → reserved, `available` → available, in `each`. Missing/untracked values stay null; zero and negative stock are preserved. Availability is provider-reported only when available is known.                                                                                                                                                                                                                                                             |
-| Fulfillment work | Each FulfillmentOrder is a separate operation (`kind: fulfillment_order`). Line quantities represent the total work. Open/scheduled/on-hold → pending; in-progress → processing; closed → completed; cancelled → cancelled; incomplete → failed. Holds keep their reason; an on-hold order without a readable hold reports one `other` hold. The assigned location, `fulfillAt`, `fulfillBy` and delivery method are read as descriptive facts. Adapter version `shopify/3`.                                                |
-| Shipment         | Each Fulfillment is separate from outstanding work (`kind: shipment`). Successful shipment → shipped, or delivered when delivery time is present; open/pending/cancelled/error/failure retain their corresponding lifecycle. Actual fulfillment-line quantities support split shipments. The shipping location, estimated delivery, up to ten tracking entries with an http(s) link or number, and the carrier display status (in transit, attempted, delayed, failed, delivered) are read.                                 |
-| Return           | Return GID with name, requested/open/closed/declined/cancelled status (`CANCELED` → cancelled; others `unknown`), creation, approval and close times and decline reason. Per return line: order line (null for unverified lines), quantity, reason label, refunded quantity and discounted value. Reverse fulfillment dispositions give units received (everything except `MISSING`), restocked units and the latest receipt time. Notes are not read. Shopify reports no return update time, so `sourceUpdatedAt` is null. |
-| Refund           | Refund GID with its return, creation and update time, source total, lines (restock type) and `REFUND` transactions. `SUCCESS` → success; `PENDING` and `AWAITING_RESPONSE` → pending; `FAILURE` and `ERROR` → failed; others `unknown`. Only successful transactions count as money returned.                                                                                                                                                                                                                               |
+## Evidence, errors and webhooks
 
-Order-line identities include the parent Order GID as `scopeKey`. Inventory observation identities use the InventoryItem GID with Location GID as scope; their SKU and location references remain account-wide. All observations carry tenant/connection identity, source update time, observation time, adapter version (`shopify/1`) and schema version. Projections advance a Shopify snapshot when its `updatedAt` is newer, or equal with a later read, because `updatedAt` has whole-second precision and a second change within one second keeps the same value. Source revisions are null because these reads do not expose a conditional revision token. Shopify `updatedAt` supplies the best available progress timestamp for outstanding fulfillment work; unrelated provider edits may also change it.
+`recordObservations` must durably save the batch before a read succeeds. Raw capture is
+off by default; when enabled it passes allowlisted fields with an explicit expiry and
+excludes unknown fields, customer and address payloads, credentials, headers and error
+messages. Tokens are resolved per request and never appear in descriptors, observations
+or failures.
 
-Inventory filters accept InventoryItem and Location GIDs with empty scope. Fulfillment and returns filtering accept an Order GID. A returns page reads one page of orders with a cheap check and reads returns and refunds only for orders that have them; returns are emitted before the refunds that may refer to them. `returns.read` is granted when the store granted `read_orders` and `read_returns`. Filters do not accept SKU labels or raw Shopify search expressions.
+Requests use HTTPS, reject redirects and time out after 15 seconds by default.
+`Retry-After` and GraphQL throttle cost become delay advice; the shared transport retries
+only short-delay transient queries (see
+[connectors](connectors.md#errors-retries-and-evidence)), and the SDK's own retries are
+disabled. GraphQL errors reject partial data, and an unexpected `X-Shopify-API-Version`
+rejects silent version fallback. Token-store failures return `transient`; empty
+credentials return `authentication`.
 
-## Evidence and events
+Webhooks are verified with HMAC-SHA256 over the original request bytes and the expected
+shop, and deduplicated by tenant, connection, topic and event ID. They only produce
+refresh hints for [commerce sync](commerce-sync.md#change-notifications); partial webhook
+fields are never projected, and missing fields never mean deletion. Persist the hint
+before acknowledging.
 
-`recordObservations` must durably save the validated batch before resolving. A persistence failure prevents a successful read result. Supply the observation-ID generator from ingestion when retrying an existing ingestion batch; the default generates new UUIDs for new polls. The ingestion layer owns stable run/page/item keys, deduplication and canonical projection through module interfaces.
+Emitted queries are validated against an offline snapshot of the versioned Admin schema.
+When changing `API_VERSION`, regenerate it with
+`pnpm --filter @luma/api exec node scripts/update-shopify-schema.mjs <version>`, format it,
+review the schema diff and rerun the adapter tests.
 
-Raw capture is off by default. Set a positive `rawRetentionMs` to pass allowlisted provider fields and an explicit expiry alongside the observations. Unknown fields, customer/address payloads, credentials, headers and error messages are excluded. The storage implementation must encrypt retained bytes, enforce tenant access, link them to observations and purge them on expiry. No raw bytes are persisted by the transport itself.
+## Authorization and recovery guarantees
 
-`mapShopifyWebhook` verifies HMAC-SHA256 over the original request bytes and checks the expected shop. Pass the app client secret, `X-Shopify-Hmac-Sha256`, `X-Shopify-Shop-Domain`, `X-Shopify-Topic` and `X-Shopify-Event-Id` from the verified installation boundary. Its tenant/connection/topic/event key supports durable deduplication. It returns capability refresh hints for order, product, inventory and fulfillment events; unsupported topics return null. It never projects partial webhook fields or treats missing fields as deletion. Persist and enqueue the refresh hint before acknowledging delivery; run periodic scans to recover missed events.
+People with `connections.manage` choose **Connect Shopify** and enter the store's
+`*.myshopify.com` hostname; Shopify asks them to approve access and Luma verifies it on
+return. **Reconnect Shopify** reauthorizes the same connection, including disconnected or
+revoked ones.
 
-## Errors and verification
+- The start route requires current `connections.manage`, the installed app and a trusted
+  request origin. State is random, stored as a hash, expires after ten minutes and is
+  consumed once. It binds the login session, operator, tenant, shop and app environment.
+- Callbacks require Shopify's HMAC over the complete decoded, sorted query; duplicate
+  parameters and mismatches are rejected. Credentials never reach the browser, query
+  cache or request logs.
+- Tokens are expiring (`expiring=1`). Access and refresh tokens, expiry, app binding and
+  granted scopes share the tenant-bound encrypted envelope. Advisory and row locks
+  serialize authorization and refresh across processes. A token is refreshed within 60
+  seconds of expiry on the next read, including workflow reads without a browser
+  session. Temporary failures keep the stored pair; rejected or expired refresh
+  credentials revoke the connection and require reconnect.
+- An uncertain authorization exchange can require reconnect, because a remote token issue
+  and the local commit cannot be one transaction.
+- One app/shop pair belongs to one workspace. Reconnect reuses its connection ID; another
+  tenant cannot claim it.
+- Authorization registers connection-specific `app/uninstalled` and `app/scopes_update`
+  subscriptions. A signed uninstall checks the stored shop/app binding and current token
+  (refreshing an expired one) before revoking, so a delayed delivery cannot disable a
+  newer working install. Revocation deletes the encrypted secret and disables
+  capabilities. Scope updates are rechecked against current grants, not the event
+  payload.
+- Provider authentication and permission errors also update connection health, without
+  storing raw provider errors.
 
-HTTP authentication/permission/not-found errors, rate limits, server failures, network failures, timeouts and malformed responses map to the SDK error codes. HTTP `Retry-After` and GraphQL throttle cost produce delay advice. SDK retries are explicitly disabled; the adapter performs no automatic retries and returns `effect: none` for reads. GraphQL errors reject partial data, and an unexpected `X-Shopify-API-Version` rejects silent version fallback. Unclassified token-store failures return `transient` with delay advice; explicitly classified connector errors are preserved. Empty credentials return `authentication`. Raw provider error text is discarded.
+## Local development app
 
-`infrastructure/shopify/fixtures/commerce.json` is a synthetic deterministic fixture for a split order, an unmapped variant and stock across two locations. Adapter tests exercise the public capability runtime, pagination, isolation, filters, unknown values, evidence capture failures, transport errors and webhook signatures. They require no Shopify account. A live shop smoke test still requires an installation with the scopes above.
+1. Create a development app and development store in Shopify's Dev Dashboard with
+   synthetic data only. Configure it as in
+   [partner readiness](shopify-production.md#app-configuration) (non-embedded, legacy
+   install flow, scopes, webhook version).
+2. Run setup, then expose this checkout's printed **web** port through a public HTTPS
+   tunnel; the web server proxies `/api`. With Tailscale:
+   `tailscale funnel --bg http://127.0.0.1:<web-port>` (use a neutral device hostname if
+   certificate transparency logs should not show your machine name).
+3. In the ignored `apps/api/.env`, set `SHOPIFY_CLIENT_ID`, `SHOPIFY_CLIENT_SECRET`,
+   `SHOPIFY_APP_ENVIRONMENT=development`,
+   `SHOPIFY_CALLBACK_URL=https://<public-host>/api/v1/shopify/callback` and
+   `SHOPIFY_WEB_ORIGIN=https://<public-host>`. Never put app secrets in `VITE_*`
+   variables.
+4. Set the app URL to the web origin, allow the exact callback URL and publish the
+   configuration version. Restart `pnpm dev`; it uses `SHOPIFY_WEB_ORIGIN` for auth and
+   allows that host in Vite. Manually managed environments must also set
+   `BETTER_AUTH_URL` and `AUTH_TRUSTED_ORIGINS` to that origin and allow the host in Vite.
+5. Sign in through the public origin, connect the store and confirm **Validated**. Keep
+   the tunnel running for webhook delivery; afterwards stop it with
+   `tailscale funnel --https=443 off`.
 
-Query contract tests validate every emitted operation against `fixtures/admin-2026-07.graphql`, an offline snapshot extracted from Shopify’s versioned public schema. The snapshot retains the adapter’s fields, their complete argument definitions and referenced types. Negative cases reject unknown fields, unknown arguments and incompatible variable types. A separate version assertion requires a fixture refresh when `API_VERSION` changes.
-
-Regenerate the snapshot from the repository root, then review the schema diff and rerun the tests:
-
-```sh
-pnpm --filter @luma/api exec node scripts/update-shopify-schema.mjs 2026-07
-pnpm exec prettier --write packages/apps/shopify/src/infrastructure/fixtures/admin-2026-07.graphql
-```
-
-References: [orders and historical access](https://shopify.dev/docs/api/admin-graphql/latest/queries/orders), [inventory items](https://shopify.dev/docs/api/admin-graphql/latest/objects/InventoryItem), [fulfillment orders](https://shopify.dev/docs/api/admin-graphql/latest/objects/FulfillmentOrder), [order shipments](https://shopify.dev/docs/api/admin-graphql/latest/objects/Order#field-Order.fields.fulfillments), [webhook verification](https://shopify.dev/docs/apps/build/webhooks/verify-deliveries), [API limits](https://shopify.dev/docs/api/usage/limits).
-
-## Connect Shopify
-
-People with `connections.manage` choose **Connect Shopify**, name the connection, and enter the
-store's permanent `*.myshopify.com` hostname. Shopify asks them to approve read
-access. On return, Luma verifies access and enables the connection. No merchant
-app creation or token entry is required. **Reconnect Shopify** reauthorizes the
-same connection, including disconnected or revoked installations.
-
-The app requests `read_orders`, `read_products`, `read_inventory`,
-`read_merchant_managed_fulfillment_orders` and
-`read_third_party_fulfillment_orders`, plus optional `read_returns` and
-`read_locations`. Approved deployments also request `read_customers`. It does not request write scopes or
-`read_assigned_fulfillment_orders`: Luma is not a fulfillment service. Historical
-orders beyond 60 days require separately approved `read_all_orders`; add this
-only when historical reconciliation is approved and supported.
-
-### Development app and store
-
-1. Create a Luma development app and development store in Shopify's Dev Dashboard.
-   Use synthetic orders, products, inventory and fulfillment data. Coordinate
-   shared pilot fixtures with LUMA-31; do not use production customer data.
-2. Configure the app as non-embedded. Enable the legacy installation flow
-   (`use_legacy_install_flow = true`) for the standalone authorization-code grant.
-   Set the scopes above and webhook API version `2026-07`.
-3. Run `mise run setup`, then expose this checkout's printed **web** port through
-   a public HTTPS tunnel. The web server proxies `/api` to the local API. For
-   Tailscale, use `tailscale funnel --bg http://127.0.0.1:<web-port>` after granting
-   Funnel to your account. Use a neutral device hostname if certificate
-   transparency records should not contain your personal machine name.
-4. Put the following in `apps/api/.env`, which is ignored by Git:
-
-   ```dotenv
-   SHOPIFY_CLIENT_ID=<development app client ID>
-   SHOPIFY_CLIENT_SECRET=<development app client secret>
-   SHOPIFY_APP_ENVIRONMENT=development
-   SHOPIFY_CALLBACK_URL=https://<public-host>/api/v1/shopify/callback
-   SHOPIFY_WEB_ORIGIN=https://<public-host>
-   ```
-
-5. Set Shopify's app URL to the web origin and allow the **exact** callback URL.
-   Publish the app configuration version. Restart `mise run dev`; the managed
-   development environment uses `SHOPIFY_WEB_ORIGIN` for auth and allows that
-   host through Vite. Sign in through the public HTTPS origin before connecting.
-   Manually managed environments must also set `BETTER_AUTH_URL` and
-   `AUTH_TRUSTED_ORIGINS` to that origin, and permit its hostname in Vite.
-6. Open Connections, connect the development store, approve access, and confirm
-   **Validated**. Luma registers an installation-specific `app/uninstalled`
-   subscription before activation. Keep the tunnel running for webhook delivery.
-7. After testing, stop public exposure with `tailscale funnel --https=443 off`.
-
-The managed setup provides connection encryption keys. Other environments must
-configure `CONNECTIONS_ACTIVE_KEY_ID` and `CONNECTIONS_KEYS` and apply migration
-`0006_shopify_oauth.sql`. Never put app secrets in `VITE_*` variables.
-
-### Optional live pilot and public production app
-
-Use a separate custom-distribution app only for an eligible live merchant pilot.
-Custom distribution has merchant restrictions and cannot be converted to public
-distribution. The merchant later installs the public app and reconnects. Use a
-separate database/environment for the pilot; do not share credentials with the
-local development app.
-
-Production uses **one Luma-owned public app** for unrelated merchants. Each shop
-has its own installation and offline token pair. Set all five Shopify settings
-to production values, use a stable public HTTPS origin, and keep app credentials
-in the deployment secret manager. Code is shared; credentials, redirects,
-encryption keys and installations are separate per environment.
-
-Before public launch:
-
-- Complete Shopify public-app review and distribution approval.
-- Obtain protected customer data access required for order reads. Request only
-  the data needed by Luma; the adapter excludes customer and address fields.
-- Register `customers/data_request`, `customers/redact`, and `shop/redact` at
-  `/api/v1/shopify/privacy`. Assign and rehearse the privacy-queue operator
-  workflow before production onboarding. The uninstall endpoint does not
-  replace compliance handling.
-- Verify production scopes, callback allowlists, uninstall delivery, encrypted
-  backups, key rotation and recovery with the approved app.
-
-### Authorization and recovery guarantees
-
-The start route requires current `connections.manage`, the installed app and a trusted request origin. State
-is random, stored as a hash, expires after ten minutes, and is consumed once. It
-binds the current login session, operator, tenant, shop and app environment.
-Callbacks require Shopify's HMAC over the complete decoded, sorted query;
-duplicate parameters and mismatches are rejected. Credentials never enter the
-browser response, query cache or request logs.
-
-Tokens use `expiring=1`. Access tokens, refresh tokens, provider expiry metadata,
-app binding and granted scopes share the existing tenant-bound AES-GCM envelope.
-PostgreSQL advisory and installation-row locks serialize authorization and
-refresh across processes. Both rotated credentials and their lifecycle event
-commit together. A token is refreshed within 60 seconds of expiry on the next
-read, including workflow reads with no browser session. Temporary failures keep
-the stored pair for retry; rejected or expired refresh credentials revoke the
-connection and require reconnect. An uncertain authorization exchange can require
-reconnect because a remote token issue and local database commit cannot be one
-transaction.
-
-One app/shop pair is reserved to one workspace. Reconnect reuses its connection
-ID; another tenant cannot claim it. Existing duplicate manual installations must
-be resolved before migration. Manual token setup remains available to internal
-fixtures and deployments without OAuth configured; the normal UI uses OAuth.
-
-A signed uninstall request checks the stored shop/app binding and current token
-before revoking, so delayed deliveries cannot disable a newer working install.
-Expired tokens are refreshed before that check. Revocation deletes the encrypted
-secret and disables capabilities. Failed verification is retried by Shopify;
-requests already sent may finish. Provider authentication and permission errors
-also update connection health, without storing raw provider errors.
-
-### Validation record
-
-Automated coverage includes PostgreSQL RLS, callback HMAC and replay, operator and
-session binding, app isolation, cancellation, missing scopes, concurrent refresh,
-rotated credentials, transient failures, revocation, uninstall and reconnect.
-Browser coverage checks Connect Shopify without credential fields and callback
-recovery messages.
-
-Live smoke test, 2026-09-18: Shopify development store
-`luma-dev-store-1dmrgwsn.myshopify.com`, development app version `luma-2`, API
-`2026-07`. Safari completed Connect Shopify and reconnect through a public HTTPS
-callback. The connection became active with all four read capabilities and kept
-its ID on reconnect. Both token expiries and all five scopes were present in the
-encrypted credential envelope. An installation-specific uninstall subscription
-was registered. After signing out a separate test login, the installed runtime
-resolved workflow identity and successfully read two products and two inventory
-observations; orders and fulfillment returned valid empty pages. Expiry/rotation,
-uninstall and replay were exercised with automated fixtures; the live test did
-not wait for the one-hour token expiry or uninstall the development app.
-
-The first live attempt exposed an incorrect GraphQL scalar in uninstall webhook
-registration. The mutation now uses `String!`, and OAuth integration tests validate
-emitted operations against the versioned Shopify schema snapshot.
-
-References: [standalone authentication](https://shopify.dev/docs/apps/build/authentication-authorization/authenticate-standalone-apps),
-[access tokens and rotation](https://shopify.dev/docs/apps/build/authentication-authorization/access-tokens),
-[app distribution](https://shopify.dev/docs/apps/launch/distribution),
-[protected customer data](https://shopify.dev/docs/apps/launch/protected-customer-data),
-[privacy webhooks](https://shopify.dev/docs/apps/build/privacy-law-compliance).
-
-## Operational record pages
-
-Open **Shopify** in the workspace sidebar to select a store, browse orders or
-products, and follow linked records. See the [operational records guide](../packages/apps/shopify/README.md#operational-records) for coverage, protected-data approval and validation.
-
-Production configuration, approval requests, privacy operations and smoke-test
-evidence are documented in [Shopify partner readiness](shopify-production.md).
+Use a separate custom-distribution app only for an eligible live merchant pilot, in a
+separate database and environment. Custom distribution cannot convert to public; the
+merchant later installs the public app and reconnects.
