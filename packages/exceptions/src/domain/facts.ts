@@ -26,6 +26,8 @@ interface FactMap {
     capability:
       'inventory.read' | 'orders.read' | 'fulfillment.read' | 'products.read';
     active: boolean;
+    /** The provider rejected Luma's credentials or grants, and nobody reconnected since. */
+    accessLost?: boolean;
     status: 'failed' | 'success';
     errorCode:
       | 'authentication'

@@ -45,7 +45,10 @@ export interface ConnectionManagement {
   list(context: TenantContext): Promise<InstalledConnection[]>;
   /** Validates settings and stores encrypted credentials in a pending connection. */
   install(context: TenantContext, input: unknown): Promise<InstalledConnection>;
-  /** Replaces credentials and clears grants; rejects stale versions or terminal connections. */
+  /**
+   * Replaces credentials and clears grants, which reconnects a connection the provider revoked
+   * under the same ID. Rejects stale versions and disconnected connections.
+   */
   rotate(
     context: TenantContext,
     id: string,
@@ -249,9 +252,11 @@ export function createInstallationService(
     ) {
       const fresh = await authorize(context, true);
       const record = await get(fresh, id);
+      // Only providers revoke; people disconnect. A revoked connection keeps its mappings and
+      // history when someone reconnects it.
       if (
         record.connection.version !== version ||
-        ['revoked', 'disconnected'].includes(record.connection.status)
+        record.connection.status === 'disconnected'
       )
         throw conflict();
       await deps.provider?.(fresh, record.connection.target);

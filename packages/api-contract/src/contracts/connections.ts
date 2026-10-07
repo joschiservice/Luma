@@ -64,7 +64,7 @@ export const connectionsContract = c.router(
       responses: { 200: installedConnectionSchema },
       summary: 'Replace connection credentials',
       description:
-        'Replaces credentials and clears verified permissions. Check the connection again to restore access. Use the latest connection version.',
+        'Replaces credentials and clears verified permissions. Check the connection again to restore access. Also reconnects a connection whose provider revoked access, keeping its ID, mappings and history; a disconnected connection returns 409. Use the latest connection version.',
     },
     disconnect: {
       method: 'POST',

@@ -337,7 +337,16 @@ export function diagnose(snapshot: DiagnosisInput, now: string): Diagnosis {
           'Check provider status, adapter version and retry-after advice.',
         ],
       );
-      immediate = decision.reason === 'hard_read_failure';
+      if (decision.reason === 'access_lost')
+        result.facts.push(
+          finding(
+            'access_lost',
+            'The provider rejected Luma’s credentials or grants, so the connection stopped reading.',
+          ),
+        );
+      immediate = ['hard_read_failure', 'access_lost'].includes(
+        decision.reason,
+      );
       step(
         immediate ? 'manual_intervention' : 'read_investigate',
         'restore_complete_scan',

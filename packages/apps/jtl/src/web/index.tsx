@@ -26,9 +26,9 @@ export default function JtlSettings({
   services,
   done,
 }: AppUiProps) {
+  // A revoked connection takes new credentials under its ID; a disconnected one is replaced.
   const connection =
-    suppliedConnection &&
-    !['disconnected', 'revoked'].includes(suppliedConnection.status)
+    suppliedConnection && suppliedConnection.status !== 'disconnected'
       ? suppliedConnection
       : undefined;
   const [kind, setKind] = useState(

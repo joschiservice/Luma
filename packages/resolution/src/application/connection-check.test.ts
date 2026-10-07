@@ -35,6 +35,7 @@ const stream = (overrides: Partial<SyncStreamState>): SyncStreamState => ({
   provider: 'shopify',
   capability: 'orders.read',
   active: true,
+  accessLostAt: null,
   attempts: 6,
   errorCode: 'unavailable',
   errorAt: '2026-10-06T09:59:00.000Z',

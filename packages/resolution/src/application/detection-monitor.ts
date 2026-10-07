@@ -35,6 +35,11 @@ export interface SyncStreamState {
   capability: SyncCapability;
   /** The connection is active and the stream is neither paused nor blocked. */
   active: boolean;
+  /**
+   * When the provider last rejected the connection's credentials or grants, if nobody has
+   * reconnected or disconnected it since.
+   */
+  accessLostAt: string | null;
   attempts: number;
   errorCode: string | null;
   errorAt: string | null;
@@ -366,7 +371,55 @@ export function createDetectionMonitor(options: DetectionMonitorOptions) {
     };
   }
 
+  /** Lost access blocks every stream of the connection; one case on its first stream reports it. */
+  function accessLost(
+    context: TenantContext,
+    stream: SyncStreamState & { accessLostAt: string },
+  ) {
+    const event: Evidence = {
+      key: `connection-access:${stream.connectionId}:${stream.accessLostAt}`,
+      tenantId: context.tenantId,
+      connectionId: stream.connectionId,
+      source: {
+        provider: stream.provider,
+        resource: 'connection',
+        externalId: stream.connectionId,
+        scopeKey: '',
+      },
+      observedAt: stream.accessLostAt,
+      sourceUpdatedAt: null,
+      adapterVersion: 'connections-v1',
+      schemaVersion: 1,
+      facts: { accessLostAt: stream.accessLostAt },
+    };
+
+    return exceptions.ingest(context, {
+      key: hash(JSON.stringify(['access', stream.connectionId, event.key])),
+      input: {
+        exceptionClass: 'sync_failure',
+        facts: {
+          tenantId: context.tenantId,
+          evidenceTenantId: context.tenantId,
+          subjectId: stream.connectionId,
+          evidenceRefs: [event.key],
+          connectionId: stream.connectionId,
+          capability: stream.capability,
+          active: false,
+          accessLost: true,
+          status: 'failed',
+          errorCode: null,
+          firstFailureAt: stream.accessLostAt,
+          retryExhausted: false,
+          scanComplete: false,
+        },
+      },
+      configuration,
+      evidence: [event],
+    });
+  }
+
   async function syncFailures(context: TenantContext, incidents: Incident[]) {
+    const reported = new Set<string>();
     for (const stream of await sources.streams(context)) {
       const incident = incidents.find(
         (item) =>
@@ -374,7 +427,13 @@ export function createDetectionMonitor(options: DetectionMonitorOptions) {
           item.subject.subjectId === stream.connectionId &&
           item.subject.scope[0] === stream.capability,
       );
-      if (stream.attempts > 0 && stream.failingSince) {
+      const { accessLostAt } = stream;
+      if (accessLostAt) {
+        if (reported.has(stream.connectionId)) continue;
+        reported.add(stream.connectionId);
+        const result = await accessLost(context, { ...stream, accessLostAt });
+        await diagnoseNew(context, result, incident);
+      } else if (stream.attempts > 0 && stream.failingSince) {
         const errorCode = (
           syncErrorCodes.includes(stream.errorCode ?? '')
             ? stream.errorCode

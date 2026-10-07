@@ -33,6 +33,7 @@ export const factSchemas = {
         'products.read',
       ]),
       active: z.boolean(),
+      accessLost: z.boolean().optional(),
       status: z.enum(['failed', 'success']),
       errorCode: z
         .enum([

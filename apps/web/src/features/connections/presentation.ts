@@ -30,5 +30,5 @@ export const statuses = {
   active: 'Validated',
   degraded: 'Needs attention',
   disconnected: 'Disconnected',
-  revoked: 'Revoked',
+  revoked: 'Access revoked',
 };
