@@ -13,6 +13,7 @@ const event = {
   scope: 'order-metrics' as const,
   connected: true,
   refetch: false,
+  topics: [] as string[],
   sentAt: '2026-09-28T00:00:00.000Z',
 };
 const subscriber = () => ({ onResync: vi.fn(), onError: vi.fn() });
@@ -39,7 +40,11 @@ it('shares a stream, resynchronizes late consumers and closes only after the las
   const closeSummary = subscribeToWorkspaceMetrics('workspace', summary);
   cleanup.push(closeSummary);
   expect(transport).toHaveBeenCalledOnce();
-  expect(summary.onResync).toHaveBeenCalledWith({ ...event, refetch: true });
+  expect(summary.onResync).toHaveBeenCalledWith({
+    ...event,
+    refetch: true,
+    topics: expect.arrayContaining(['orders', 'decisions']),
+  });
   const closeTransport = transport.mock.results[0]!.value;
   closeOrders();
   expect(closeTransport).not.toHaveBeenCalled();

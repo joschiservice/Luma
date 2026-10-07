@@ -41,8 +41,9 @@ import { ResolutionEvidence } from './resolution-evidence';
 const defaultConfig = {
   initial: operationalMetricRequest,
   key: 'operational-metrics',
+  topics: ['issues', 'inventory', 'procurement', 'connections'],
   options: operationalMetricsOptions,
-};
+} as const;
 
 type Metric = OperationalMetricResponse['metrics'][number];
 
@@ -123,6 +124,7 @@ export function OperationalMetrics({
         ? {
             initial: initialRequest,
             key: 'resolution-metrics',
+            topics: ['issues', 'resolution', 'connections'] as const,
             options: operationalMetricsOptions,
           }
         : defaultConfig,

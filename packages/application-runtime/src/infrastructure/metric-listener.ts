@@ -1,20 +1,25 @@
 import { Client } from 'pg';
 
-/** Owns one dedicated LISTEN connection; reconnection always requests full reconciliation. */
+type Wakeup = { connected: boolean; topics?: readonly string[] };
+
+const payloadPattern = /^([0-9a-f-]{36})(?::([a-z,]{1,400}))?$/;
+
+/**
+ * Owns one dedicated LISTEN connection. Payloads are `tenant` or `tenant:topic,topic`; a wake-up
+ * without topics, including every reconnection, asks subscribers to reconcile everything.
+ */
 export function createMetricListener(databaseUrl: string) {
-  const subscribers = new Map<
-    string,
-    Set<(event: { connected: boolean }) => void>
-  >();
+  const subscribers = new Map<string, Set<(event: Wakeup) => void>>();
   let client: Client | undefined;
   let connected = false;
   let stopped = false;
   let retry: ReturnType<typeof setTimeout> | undefined;
   let delay = 100;
-  const wake = (tenantId?: string) => {
+  const wake = (tenantId?: string, topics?: readonly string[]) => {
     for (const [id, callbacks] of subscribers) {
       if (tenantId && tenantId !== id) continue;
-      for (const callback of callbacks) callback({ connected });
+      for (const callback of callbacks)
+        callback(topics ? { connected, topics } : { connected });
     }
   };
   const connect = async () => {
@@ -49,7 +54,12 @@ export function createMetricListener(databaseUrl: string) {
         stopped
       )
         return;
-      if (/^[0-9a-f-]{36}$/.test(message.payload)) wake(message.payload);
+      const match = payloadPattern.exec(message.payload);
+      if (match)
+        wake(
+          match[1],
+          match[2]?.split(',').filter((topic) => topic !== ''),
+        );
     });
     try {
       await current.connect();
@@ -74,10 +84,7 @@ export function createMetricListener(databaseUrl: string) {
     get connected() {
       return connected;
     },
-    subscribe(
-      tenantId: string,
-      callback: (event: { connected: boolean }) => void,
-    ) {
+    subscribe(tenantId: string, callback: (event: Wakeup) => void) {
       const entries = subscribers.get(tenantId) ?? new Set();
       entries.add(callback);
       subscribers.set(tenantId, entries);

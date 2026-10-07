@@ -1,4 +1,8 @@
-import type { MetricRequest, MetricResponse } from '@luma/api-contract';
+import type {
+  MetricRequest,
+  MetricResponse,
+  WorkspaceTopic,
+} from '@luma/api-contract';
 import {
   useQuery,
   useQueryClient,
@@ -7,10 +11,13 @@ import {
 import { useEffect, useState } from 'react';
 
 import { IdentityError } from '../identity/data';
-import { subscribeToWorkspaceMetrics } from './metric-subscription';
+import { changesAny, subscribeToWorkspaceMetrics } from './metric-subscription';
 import { metricsOptions } from './metrics-data';
 
-/** Subscribes before loading, serializes refreshes, and replaces paginated snapshots on changes. */
+/**
+ * Subscribes before loading, serializes refreshes, and replaces paginated snapshots when one of
+ * the areas in `topics` changes.
+ */
 export function useLiveMetricQuery<
   Request,
   Response extends {
@@ -22,6 +29,8 @@ export function useLiveMetricQuery<
   config: {
     initial: Request;
     key: string;
+    /** Areas whose changes can alter this read. */
+    topics: readonly WorkspaceTopic[];
     options: (
       organizationId: string,
       request: Request,
@@ -91,7 +100,7 @@ export function useLiveMetricQuery<
       onResync: (event) => {
         if (!active) return;
         connected = event.connected;
-        if (event.refetch) void refresh();
+        if (changesAny(event, config.topics)) void refresh();
         else if (!connected) setConnection('reconnecting');
       },
       onError: () => {
@@ -151,6 +160,7 @@ export function useLiveMetricQuery<
 const orderConfig = {
   initial: {} as MetricRequest,
   key: 'order-metrics',
+  topics: ['orders', 'issues', 'connections'] as const,
   options: metricsOptions,
 };
 

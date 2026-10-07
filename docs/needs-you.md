@@ -51,12 +51,16 @@ approval authority.
 
 ## Live refresh
 
-Migration 0047 adds `luma_metrics` notification triggers to assignments, workflow process
-steps, replenishment claims, executed actions and the Shopify preview and claim tables.
-Migration 0049 adds the supplier-commitment tables. Case, proposal, policy and purchase-order
-tables already notify. The web queue subscribes to the shared workspace
-metric stream and refetches on every `refetch` event, and polls every 30 seconds while the
-stream is interrupted.
+Every table the queue reads for its items carries the `decisions` topic on the shared
+workspace stream (migration 0056): case, proposal and policy tables, admission steps, workflow
+process steps, replenishment activations, purchase orders, supplier submissions, commitments
+and follow-ups, executed actions, the Shopify recovery and claim tables, and assignments. Record
+links and handover signals from orders refresh with the stream's 30-second reconciliation. The
+web queue and the sidebar count refetch when an event lists `decisions`, coalescing bursts over
+500 ms and letting active reads finish. They poll every 30 seconds as a fallback.
+
+Reading the queue must not write to a `decisions` table unless state changes; otherwise each read
+wakes the next one. Shopify claim settlement therefore updates only unsettled claims.
 
 ## Web
 
@@ -75,7 +79,7 @@ attention module and the sidebar count read the same API.
 2. Present each decision with a stable, prefixed ID, the reason, why, consequences, exact
    change, deadline and evidence validity. Say `unknown` for impact without an explicit rule.
 3. Give it a `DecisionOwner` the web can mount, and add a case in `owner-review.tsx` if needed.
-4. Add its tables to the metric notification triggers.
+4. Add its tables to the metric notification triggers with the `decisions` topic.
 5. Cover the reader-specific `response`, removal after a response on another surface, and
    tenant isolation in `apps/api/e2e/decisions.e2e.mjs` or the owner's e2e suite.
 

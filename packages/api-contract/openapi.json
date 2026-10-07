@@ -105961,8 +105961,8 @@
     },
     "/v1/organizations/{organizationId}/metrics/events": {
       "get": {
-        "description": "Authenticated SSE invalidates order metrics and their matching records. Subscribe before the first query. Refetch on resync events with refetch: true and on reconnect. Events contain no totals or replay history. Last-Event-ID requests current state. Access is rechecked before delivery and every five seconds. Slow consumers disconnect and must resynchronize. Reconciliation runs every 30 seconds.",
-        "summary": "Follow operational metric changes",
+        "description": "Authenticated SSE tells workspace members which areas of data changed. Subscribe before the first query. On resync events with refetch: true, read again the views that depend on a listed topic; on reconnect, read all of them. Topics are limited to areas the member can read; decisions is available to every member. Events contain no records, totals or replay history. Last-Event-ID requests current state. Access is rechecked at least every five seconds and the stream closes when it is lost. Slow consumers disconnect and must resynchronize. Reconciliation lists every readable topic every 30 seconds.",
+        "summary": "Follow workspace changes",
         "tags": ["metricEvents"],
         "parameters": [
           {
