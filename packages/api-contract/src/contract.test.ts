@@ -200,6 +200,7 @@ it('validates metric scope and leaves network errors reconnectable', () => {
       scope: 'order-metrics',
       connected: true,
       refetch: true,
+      topics: ['decisions', 'a-topic-from-a-newer-server'],
       sentAt: '2026-09-28T00:00:00.000Z',
     };
     listeners.get('resync')!({ data: JSON.stringify(event) });

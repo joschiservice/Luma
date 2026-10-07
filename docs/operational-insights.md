@@ -41,7 +41,8 @@ The orders chart returns 503 while an existing tenant's order-list projection aw
 [backfill](orders-workspace.md#backfill-and-rollout). This marker requires the rebuild command;
 repeating the chart request does not advance it.
 
-Charts share the workspace metric stream. Live invalidations coalesce over one second and
+Charts share the workspace metric stream and refresh for the orders, issues, inventory,
+procurement, workflows and connections topics. Live invalidations coalesce over one second and
 let active reads finish before processing further changes. After a failed read, stream
 events cannot start another attempt for 30 seconds. Explicit refresh, filter changes,
 focus and reconnect still request current data. Failed charts hide earlier values.

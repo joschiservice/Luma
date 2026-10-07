@@ -29,12 +29,36 @@ export const caseEventsContract = c.router({
   },
 });
 
+/**
+ * Areas of workspace data a change event can name. `decisions` covers every source of the Needs
+ * you queue, so a source table belongs to its own area and to `decisions`.
+ */
+export const workspaceTopics = [
+  'orders',
+  'connections',
+  'issues',
+  'inventory',
+  'workflows',
+  'procurement',
+  'resolution',
+  'decisions',
+] as const;
+
+export const workspaceTopicSchema = z.enum(workspaceTopics);
+
+export type WorkspaceTopic = z.infer<typeof workspaceTopicSchema>;
+
 export const metricStreamEventSchema = z.object({
   schemaVersion: z.literal(1),
   organizationId: z.string().uuid(),
   scope: z.literal('order-metrics'),
   connected: z.boolean(),
   refetch: z.boolean(),
+  /**
+   * Areas to read again when `refetch` is true. Unknown names from a newer server are kept so an
+   * open page does not drop its stream; clients ignore names they do not use.
+   */
+  topics: z.array(z.string().min(1).max(40)).max(20),
   sentAt: z.string().datetime(),
 });
 
@@ -55,8 +79,8 @@ export const metricEventsContract = c.router({
       429: apiErrorSchema,
       503: apiErrorSchema,
     },
-    summary: 'Follow operational metric changes',
+    summary: 'Follow workspace changes',
     description:
-      'Authenticated SSE invalidates order metrics and their matching records. Subscribe before the first query. Refetch on resync events with refetch: true and on reconnect. Events contain no totals or replay history. Last-Event-ID requests current state. Access is rechecked before delivery and every five seconds. Slow consumers disconnect and must resynchronize. Reconciliation runs every 30 seconds.',
+      'Authenticated SSE tells workspace members which areas of data changed. Subscribe before the first query. On resync events with refetch: true, read again the views that depend on a listed topic; on reconnect, read all of them. Topics are limited to areas the member can read; decisions is available to every member. Events contain no records, totals or replay history. Last-Event-ID requests current state. Access is rechecked at least every five seconds and the stream closes when it is lost. Slow consumers disconnect and must resynchronize. Reconciliation lists every readable topic every 30 seconds.',
   },
 });

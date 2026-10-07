@@ -1,8 +1,8 @@
 # Live operational metrics
 
 Overview subscribes to `/v1/organizations/:organizationId/metrics/events` before
-its first metric query. A `resync` frame with `refetch: true` invalidates the
-workspace's active order metrics and cohort. Counts always come from the shared,
+its first metric query. A `resync` frame with `refetch: true` lists the changed
+`topics`; a view reads again only when a topic it depends on is listed. Counts always come from the shared,
 authorized PostgreSQL query. Events never increment counters.
 
 ## Commit and recovery
@@ -15,8 +15,10 @@ triggers on every table used by the order, attention and coverage readers:
 - Attention: exceptions, diagnosis heads, diagnoses, uncertainty, case commands,
   proposals, policy decisions and approvals.
 
-These cover ingestion, corrections, tombstones and physical deletes. The trigger
-emits only a tenant UUID on `luma_metrics`. PostgreSQL delivers notifications only
+These cover ingestion, corrections, tombstones and physical deletes. Since
+migration `0056_workspace_change_topics.sql` each trigger names its areas, and the
+payload on `luma_metrics` is `tenant:topic,topic`, with no record data. A bare tenant
+UUID means every area changed. PostgreSQL delivers notifications only
 after commit; a rollback delivers nothing. Repeated payloads within one transaction
 coalesce. No outbox consumer or cursor is added: canonical state remains durable,
 and reconnect reads current state. Existing domain outboxes retain their existing
@@ -30,6 +32,20 @@ listener is unavailable reports degraded connectivity and still permits authoriz
 reads. Changes before LISTEN or during downtime are recovered by the next snapshot.
 `Last-Event-ID` does not select a replay cursor.
 
+## Topics
+
+`workspaceTopics` in the API contract lists the areas: `orders`, `connections`,
+`issues`, `inventory`, `workflows`, `procurement`, `resolution` and `decisions`.
+Every table that feeds Needs you also carries `decisions`. Migration 0056 holds the
+table map and fails if a `metric_change` trigger names no topic. A new trigger must
+pass its topics, and a view that reads a new table must subscribe to its topic.
+
+Each consumer declares its topics: order metrics use orders, issues and connections;
+operational metrics use issues, inventory, procurement and connections; resolution
+outcomes use issues, resolution and connections. Listener reconnection, the first
+frame of a stream, a consumer joining an open stream and the 30-second reconciliation
+list every topic.
+
 ## Bounds and access
 
 Streams coalesce changes over 75 ms, with at most one authorization read in flight
@@ -38,8 +54,14 @@ workspace/user, eight concurrent stream authorization reads and at most 100 queu
 reads. The runtime's metric query pool has five connections; SQL statements retain
 the three-second metric timeout.
 
-The original cookie session and membership are resolved before every frame and on
-a five-second heartbeat. Denial closes the stream. The browser confirms failure
+Any workspace member may open the stream. Each topic requires its area's read
+permission (`orders.read`, `issues.read`, `inventory.read`, `workflows.read`,
+`procurement.read`, and `insights.read` for resolution); `connections` and
+`decisions` go to every member because their readers filter records themselves.
+Changes only in unreadable areas send nothing. The original cookie session and
+membership are resolved on the five-second heartbeat and before any frame whose
+last check is older than five seconds, so a burst costs one authorization read.
+Denial closes the stream. The browser confirms failure
 through an authenticated query and removes the metric cache on 401/403/404. Normal
 metric reads also pass through the identity guards. A stream lifetime is five
 minutes. Shutdown clears subscriptions and closes the listener.
