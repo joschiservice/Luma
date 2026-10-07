@@ -2,17 +2,23 @@ import { createHash } from 'node:crypto';
 
 import { generateCatalog, merchantProfile } from '@luma/simulator-commerce';
 
-/** Workflows the demo turns on: each starts a run when detection opens its kind of case. */
+/**
+ * Workflows the demo turns on. Each starts a run when detection opens its kind of case, or when
+ * an owner reports a follow-up such as an overdue supplier order.
+ */
 export const demoCaseWorkflows = [
   'shopify-stock-correction',
   'shopify-hold-release',
   'connection-sync-check',
+  'supplier-follow-up',
+  'refund-follow-up',
+  'payment-follow-up',
 ];
 
 /** Supplier answers the demo spreads over its suppliers, so purchase orders meet each one. */
 const answerProfiles = ['full', 'partial', 'delayed', 'short', 'silent'];
 
-/** Faster detection for the demo: stuck after 20 minutes, holds overdue after 30. */
+/** Faster windows for the demo: stuck after 20 minutes, holds overdue after 30, short follow-ups. */
 export const demoDetection = (configuration) => ({
   configuration: {
     ...configuration,
@@ -20,6 +26,12 @@ export const demoDetection = (configuration) => ({
     thresholds: { ...configuration.thresholds, stuckSeconds: 1200 },
   },
   holdOverdueSeconds: 1800,
+  // Follow-ups: 15 minutes for the supplier, refunds after 8 hours, payments after 1 hour.
+  followUps: {
+    supplierWaitSeconds: 900,
+    refundWaitMs: 8 * 3_600_000,
+    paymentWaitMs: 3_600_000,
+  },
 });
 
 const stableId = (value) => {

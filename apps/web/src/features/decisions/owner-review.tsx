@@ -18,10 +18,13 @@ import { ReplenishmentRunReview } from '../workflows/replenishment';
 export function OwnerReview({
   organizationId,
   owner,
+  handover = false,
   onChange,
 }: {
   organizationId: string;
   owner: DecisionOwner;
+  /** A workflow handed a follow-up to a person; there is nothing to approve. */
+  handover?: boolean;
   /** Refreshes the queue after the owner reports a completed change. */
   onChange: () => Promise<void>;
 }) {
@@ -35,7 +38,20 @@ export function OwnerReview({
         />
       );
     case 'workflow_run':
-      return (
+      return handover ? (
+        <p className="decision-note">
+          The workflow did what it can and handed this to a person. Act on the
+          record; this item leaves Needs you once Luma no longer sees the
+          follow-up.{' '}
+          <Link
+            to="/app/$organizationId/workflows/$definitionId"
+            params={{ organizationId, definitionId: owner.definitionId }}
+            hash={`run-${owner.runId}`}
+          >
+            Open the workflow run
+          </Link>
+        </p>
+      ) : (
         <RunReview
           organizationId={organizationId}
           definitionId={owner.definitionId}

@@ -21,6 +21,10 @@ const realisticIncidents = {
   'carrier-delay': 5,
   'lost-parcel': 0.5,
   'refund-failure': 2,
+  // Injected from scenarios only; the merchant world doesn't produce them on its own.
+  'refund-missing': 0,
+  'payment-stuck': 0,
+  'supplier-silent': 0,
   'shipping-method-mismatch': 0.5,
   'provider-outage': 0.5,
   'auth-revoked': 0.05,

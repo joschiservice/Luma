@@ -54,6 +54,16 @@ Some workflows start on their own when Luma detects an issue:
 
 An owner or admin turns each one on under **Rules**. Runs act as that person, but every change still waits in [Needs you](/docs/needs-you) for a different owner or admin to approve. A proposal stays open for four hours. Right before acting, Luma reads stock again: if the change is still the same, it runs; if it would differ, Luma prepares one new proposal in the same Needs you item. A rejected change, a change Luma can't make safely, or an unclear result hands the issue to a person; nothing is retried behind your back.
 
+## Workflows that follow up
+
+Others start when something stays undone too long. They never change anything in your store or with your suppliers:
+
+- **Follow up on an overdue supplier order** starts when a supplier hasn't confirmed a sent order in time, or a delivery is past its expected date. Luma notes the follow-up on the order, so nobody is asked yet, waits, and checks again. If the supplier is still silent, the order comes back to a buyer in Needs you.
+- **Chase a refund after a return arrives** starts when returned items arrived but no refund is recorded within the waiting window. It hands the return to a person in Needs you. Luma never refunds by itself.
+- **Follow up on a payment that stays pending** starts when an order's payment is still pending well after it was placed. It hands the order to a person in Needs you. Luma never holds or cancels it.
+
+A follow-up leaves Needs you on its own once Luma sees it's done, for example when the refund is recorded or the payment settles. If a workflow can't run in your workspace, its template says what's missing, such as returns access or a supplier linked to your purchasing system, and links to where to fix it.
+
 A workflow never closes an issue. Luma closes it only after its own check confirms the problem is gone. Releasing a hold, for example, doesn't ship the order, so the issue stays open until the warehouse makes progress.
 
 Turning a workflow off stops new runs. A change that's waiting for approval is then never sent.

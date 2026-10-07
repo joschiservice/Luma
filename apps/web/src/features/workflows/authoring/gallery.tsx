@@ -43,6 +43,8 @@ const categories = {
   resolution: 'Resolution',
   inventory: 'Inventory',
   fulfillment: 'Fulfillment',
+  orders: 'Orders',
+  returns: 'Returns',
   connections: 'Connections',
 } as const;
 
@@ -51,6 +53,8 @@ const categoryKeys = [
   'resolution',
   'inventory',
   'fulfillment',
+  'orders',
+  'returns',
   'connections',
 ] as const;
 

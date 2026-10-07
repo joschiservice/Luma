@@ -83,6 +83,29 @@ export const workflowScenarios = {
       'Reads fail, and after the retry window a sync-failure case opens. Check a failing connection waits 15 minutes and checks again: it ends when reads recovered, or hands the case to a person.',
     steps: [{ kind: 'incident', incident: 'provider-outage', on: 'shop' }],
   },
+  'supplier-silent': {
+    label: 'Supplier stays silent',
+    description:
+      'ERP suppliers stop confirming purchase orders placed from now on.',
+    expected:
+      'Once a sent order passes its confirmation time, Follow up on an overdue supplier order notes a follow-up, so Needs you stays quiet while it waits. If the supplier is still silent afterwards, the order returns to Needs you for a buyer.',
+    steps: [{ kind: 'incident', incident: 'supplier-silent', on: 'shop' }],
+  },
+  'refund-missing': {
+    label: 'Refund never issued',
+    description:
+      'A shipped order is returned now; the items arrive, but no refund follows.',
+    expected:
+      'After the refund window, Chase a refund after a return arrives hands the return to a person in Needs you. Luma never refunds by itself; the item leaves Needs you once a refund is recorded.',
+    steps: [{ kind: 'incident', incident: 'refund-missing', on: 'shop' }],
+  },
+  'payment-stuck': {
+    label: 'Payment stuck pending',
+    description: 'A new order’s payment stays pending and never settles.',
+    expected:
+      'After the payment window, Follow up on a payment that stays pending hands the order to a person in Needs you. Luma never holds or cancels it; the item leaves once the payment settles.',
+    steps: [{ kind: 'incident', incident: 'payment-stuck', on: 'shop' }],
+  },
   'access-revoked': {
     label: 'Access revoked',
     description: 'The first shop rejects Luma’s credentials for an hour.',

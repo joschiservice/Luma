@@ -1,6 +1,6 @@
 /** Where Luma is expected to show an operational incident. */
 export type IncidentSurface =
-  'case' | 'fulfillment' | 'returns' | 'orders' | 'connections';
+  'case' | 'fulfillment' | 'returns' | 'orders' | 'procurement' | 'connections';
 
 export interface IncidentKind {
   label: string;
@@ -89,6 +89,29 @@ export const incidentKinds = {
     unit: 'order',
     exceptionClass: null,
     surface: 'returns',
+  },
+  'refund-missing': {
+    label: 'Refund never issued',
+    description:
+      'Returned items arrive at the shop, but nobody refunds the customer.',
+    unit: 'order',
+    exceptionClass: null,
+    surface: 'returns',
+  },
+  'payment-stuck': {
+    label: 'Payment stuck pending',
+    description: 'An order’s payment stays pending and never settles.',
+    unit: 'order',
+    exceptionClass: null,
+    surface: 'orders',
+  },
+  'supplier-silent': {
+    label: 'Suppliers stop answering',
+    description:
+      'ERP suppliers stop confirming purchase orders placed from now on, until recovered.',
+    unit: 'day',
+    exceptionClass: null,
+    surface: 'procurement',
   },
   'shipping-method-mismatch': {
     label: 'Shipping method lost',

@@ -304,15 +304,21 @@ Record links carry `from` so their Back link returns to the original context.
 Case workflows are built-in `workflow/2` versions with an `exception` trigger.
 They start a run for each open case of their issue type and run on the process
 runtime, so runs, step evidence, Activity and readiness work as for replenishment.
+Follow-up workflows use the same engine with an `event` trigger: an adapter's
+`signals` reader lists what its owner reports, such as an overdue supplier order,
+and the run's inputs are `activationId` and `signalId`.
 `createCaseWorkflows` (`application/case-workflows.ts`) owns activation, starts,
 readiness and the activities; each `CaseWorkflowAdapter` owns its reads, action
 and result check.
 
-| Workflow                   | Owner              | Trigger              | Action                          | Result check                          |
-| -------------------------- | ------------------ | -------------------- | ------------------------------- | ------------------------------------- |
-| `shopify-stock-correction` | Shopify app        | `inventory_mismatch` | `inventory.available.reconcile` | `shopify-inventory-reconciliation/1`  |
-| `shopify-hold-release`     | Shopify app        | `stuck_fulfillment`  | `fulfillment.hold.release`      | `shopify-hold-released/1` (hold gone) |
-| `connection-sync-check`    | `@luma/resolution` | `sync_failure`       | none; waits and rereads         | none                                  |
+| Workflow                   | Owner               | Trigger                          | Action                                            | Result check                          |
+| -------------------------- | ------------------- | -------------------------------- | ------------------------------------------------- | ------------------------------------- |
+| `shopify-stock-correction` | Shopify app         | `inventory_mismatch`             | `inventory.available.reconcile`                   | `shopify-inventory-reconciliation/1`  |
+| `shopify-hold-release`     | Shopify app         | `stuck_fulfillment`              | `fulfillment.hold.release`                        | `shopify-hold-released/1` (hold gone) |
+| `connection-sync-check`    | `@luma/resolution`  | `sync_failure`                   | none; waits and rereads                           | none                                  |
+| `supplier-follow-up`       | `@luma/procurement` | `supplier_order_overdue` (event) | `procurement.follow-up.record` (Luma's own order) | `procurement-follow-up-recorded/1`    |
+| `refund-follow-up`         | `@luma/resolution`  | `refund_overdue` (event)         | none; rereads and hands over                      | none                                  |
+| `payment-follow-up`        | `@luma/resolution`  | `payment_pending` (event)        | none; rereads and hands over                      | none                                  |
 
 Apps contribute adapters through `AppDefinition.workflows`; the app registry
 lists them with `workflowSources()`.
@@ -339,6 +345,18 @@ lists them with `workflowSources()`.
   the attempt. Turning the workflow off, or the case closing, stops any change
   that wasn't sent; sent changes still reconcile.
 - **Closure:** runs never close cases. Detection verifies them independently.
+- **Follow-ups:** signals come from owners and read models, as the run's
+  principal or the reader, so access checks apply. A signal ID names one
+  occurrence, such as an order's submission, so a recorded follow-up doesn't
+  start a second run. A run that hands over appears in Needs you as a
+  `workflow_handover` item while its signal stays open (`handover: 'needs_you'`);
+  the supplier follow-up uses the order's own item instead (`handover: 'owner'`).
+  Its only write is the owner's follow-up response, so its readiness says no
+  approval is needed. Windows default to 4 hours for suppliers, 48 hours for
+  refunds after items arrive and 24 hours for pending payments after the order
+  was placed; `createApplicationServices({ followUps })` changes them, and the
+  simulator demo shortens them. Refunds, holds and cancellations are never sent:
+  no governed capability exists for them yet.
 
 Readiness reports enablement, worker availability, adapter requirements (such as
 Shopify write access), open cases of the type, waiting approvals and recent
