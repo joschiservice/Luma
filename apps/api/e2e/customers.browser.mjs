@@ -1,11 +1,13 @@
 /* global document, window */
+import { randomUUID } from 'node:crypto';
+
 import { appScopes } from './app-scopes.mjs';
 import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, startProcess } from './helpers.mjs';
 import { ordersFixture } from './orders-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
-test('opens the source customer from an order, resolves its Luma history and clears revoked or switched context', async ({
+test('opens an imported customer from an order, reads live history and keeps other stores and workspaces apart', async ({
   resources: t,
 }) => {
   const port = await availablePort();
@@ -87,32 +89,9 @@ test('opens the source customer from an order, resolves its Luma history and cle
   });
   let revoked = false;
   const requests = [];
-  let hold = false;
-  let release;
-  let held;
-  let responseSent;
-  await page.route('**/apps/shopify/record-connections', (route) =>
-    route.fulfill({
-      json: [
-        { id: source.store, label: 'Tokyo store' },
-        { id: source.erp, label: 'Second store' },
-      ],
-    }),
-  );
   await page.route('**/apps/shopify/records', async (route) => {
     const input = route.request().postDataJSON();
     requests.push(input);
-    if (
-      hold &&
-      input.kind === 'Customer' &&
-      input.connectionId === source.store
-    ) {
-      await new Promise((resolve) => {
-        release = resolve;
-        held?.();
-      });
-      hold = false;
-    }
     if (revoked)
       return route.fulfill({ status: 403, json: { code: 'FORBIDDEN' } });
     const contact = row(
@@ -174,17 +153,42 @@ test('opens the source customer from an order, resolves its Luma history and cle
         nextCursor: null,
       },
     });
-    responseSent?.();
   });
+  const profile = async (externalId, name) => {
+    const id = randomUUID();
+    await f.db.owner.query(
+      `INSERT INTO customer_profiles(tenant_id,connection_id,external_id,id,display_name,email,phone,address,state,
+        source_created_at,order_count,amount_spent,currency,tags,contact_shared,address_shared,source_updated_at,
+        observed_at,observation_id)
+       VALUES($1,$2,$3,$4,$5,$6,NULL,NULL,'enabled',$7,2,'84.00','EUR','{}',true,false,NULL,now(),$8)`,
+      [
+        f.org.id,
+        source.store,
+        externalId,
+        id,
+        name,
+        `${externalId.split('/').at(-1)}@example.test`,
+        timestamp,
+        randomUUID(),
+      ],
+    );
+
+    return id;
+  };
+  const averyId = await profile(customerId, 'Avery Tan');
+  await profile('gid://shopify/Customer/72', 'Avery Tan');
+
+  // The order's source panel links to the source customer, which opens the imported profile.
   await page.goto(`/app/${f.org.id}/orders/${orderId}`);
   await page.getByRole('link', { name: 'Open customer workspace' }).click();
-  await page.getByRole('heading', { name: 'Avery Tan' }).waitFor();
-  expect(new URL(page.url()).searchParams.get('customerId')).toBe(customerId);
+  await page.waitForURL(`**/customers/${averyId}`);
+  await page.getByRole('heading', { name: 'Avery Tan', level: 1 }).waitFor();
+  await page.getByText('71@example.test', { exact: true }).waitFor();
   await page.getByRole('button', { name: '#2001', exact: true }).click();
   await page.getByText('12.00 EUR', { exact: true }).waitFor();
   await page.getByRole('link', { name: 'Open #2001 in Luma' }).waitFor();
   await page.screenshot({
-    path: '/tmp/luma100-customer-desktop.png',
+    path: '/tmp/luma-customer-desktop.png',
     fullPage: true,
   });
   await page.setViewportSize({ width: 390, height: 844 });
@@ -194,65 +198,51 @@ test('opens the source customer from an order, resolves its Luma history and cle
     ),
   ).toBe(true);
   await page.screenshot({
-    path: '/tmp/luma100-customer-mobile.png',
+    path: '/tmp/luma-customer-mobile.png',
     fullPage: true,
   });
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.screenshot({
-    path: '/tmp/luma100-customer-dark.png',
+    path: '/tmp/luma-customer-dark.png',
     fullPage: true,
   });
+
+  // Revoked store access withholds live history; retry reads it again.
   revoked = true;
-  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Refresh orders', exact: true })
+    .click();
   await page
     .getByRole('alert')
     .filter({ hasText: 'does not have access' })
     .waitFor();
-  expect(
-    await page.getByText('avery@example.test', { exact: true }).count(),
-  ).toBe(0);
   expect(await page.getByText('12.00 EUR', { exact: true }).count()).toBe(0);
   revoked = false;
   await page.getByRole('button', { name: 'Retry', exact: true }).click();
-  await page.getByRole('heading', { name: 'Avery Tan' }).waitFor();
-  await page.getByRole('link', { name: 'All customers' }).click();
-  await page.getByLabel('Customer name', { exact: true }).fill('Avery');
-  await page.getByRole('button', { name: 'Search', exact: true }).click();
-  await page
-    .getByText('Multiple customer identities match.', { exact: false })
-    .waitFor();
-  expect(page.url()).not.toContain('Avery');
-  expect(requests.some((input) => input.search?.value === 'Avery')).toBe(true);
-  await page.getByLabel('Source', { exact: true }).selectOption(source.erp);
-  await page.getByRole('heading', { name: 'No customers found' }).waitFor();
-  expect(
-    await page.getByText('avery@example.test', { exact: true }).count(),
-  ).toBe(0);
+  await page.getByRole('button', { name: '#2001', exact: true }).waitFor();
+
+  // The list keeps same-name customers apart and search text out of the URL.
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.getByLabel('Source', { exact: true }).selectOption(source.store);
-  await page.getByRole('link', { name: 'Avery Tan', exact: true }).waitFor();
+  await page.getByRole('link', { name: 'Back to customers' }).click();
+  await page.getByRole('link', { name: 'Avery Tan' }).first().waitFor();
+  await page.getByRole('searchbox', { name: 'Search customers' }).fill('72@');
+  await page.keyboard.press('Enter');
+  await page.getByText('72@example.test', { exact: true }).waitFor();
+  expect(await page.getByText('71@example.test', { exact: true }).count()).toBe(
+    0,
+  );
+  expect(page.url()).not.toContain('72');
   await page.screenshot({
-    path: '/tmp/luma100-customers-list.png',
+    path: '/tmp/luma-customers-list.png',
     fullPage: true,
   });
-  await page.getByLabel('Source', { exact: true }).selectOption(source.erp);
-  await page.getByRole('heading', { name: 'No customers found' }).waitFor();
-  hold = true;
-  const waiting = new Promise((resolve) => {
-    held = resolve;
-  });
-  await page.getByLabel('Source', { exact: true }).selectOption(source.store);
-  await waiting;
-  await page.getByLabel('Source', { exact: true }).selectOption(source.erp);
-  await page.getByRole('heading', { name: 'No customers found' }).waitFor();
-  const completed = new Promise((resolve) => {
-    responseSent = resolve;
-  });
-  release();
-  await completed;
-  expect(
-    await page.getByText('avery@example.test', { exact: true }).count(),
-  ).toBe(0);
+
+  // A source customer Luma has not imported says so instead of guessing.
+  await page.goto(
+    `/app/${f.org.id}/customers?${new URLSearchParams({ connectionId: source.store, customerId: 'gid://shopify/Customer/999' })}`,
+  );
+  await page.getByText('This customer is not in Luma yet.').waitFor();
+
   const other = await f.request(
     f.owner,
     '/v1/organizations',
@@ -269,18 +259,16 @@ test('opens the source customer from an order, resolves its Luma history and cle
   );
   await page.goto(`/app/${other.id}/customers`);
   await page
-    .getByRole('heading', { name: 'Connect a customer source' })
+    .getByRole('heading', { name: 'Customers are not shared yet' })
     .waitFor();
-  expect(
-    await page.getByText('avery@example.test', { exact: true }).count(),
-  ).toBe(0);
+  expect(await page.getByText('Avery Tan', { exact: true }).count()).toBe(0);
+  await page.goto(`/app/${other.id}/customers/${averyId}`);
+  await page.getByRole('heading', { name: 'Customer not found' }).waitFor();
   await page.goto(`/app/${f.org.id}/customers`);
-  await page.getByRole('link', { name: 'Avery Tan', exact: true }).waitFor();
+  await page.getByRole('link', { name: 'Avery Tan' }).first().waitFor();
   await context.clearCookies();
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
   await page.waitForURL('**/sign-in**');
-  expect(
-    await page.getByText('avery@example.test', { exact: true }).count(),
-  ).toBe(0);
+  expect(await page.getByText('Avery Tan', { exact: true }).count()).toBe(0);
   expect(errors).toEqual([]);
 });

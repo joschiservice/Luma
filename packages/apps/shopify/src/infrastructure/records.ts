@@ -9,7 +9,6 @@ import {
 import { z } from 'zod';
 
 import {
-  type CustomerSearch,
   recordKinds,
   type ShopifyRecordDetail,
   type ShopifyRecordKind,
@@ -20,7 +19,6 @@ import {
   contactRow,
   customerContact,
   customerContactFields,
-  readCustomerPage,
 } from './customer-records.js';
 import * as s from './record-schemas.js';
 
@@ -128,7 +126,6 @@ export function createShopifyRecordReader(
     kind: ShopifyRecordKind,
     id?: string,
     cursor?: string,
-    search?: CustomerSearch,
   ): Promise<ShopifyRecordDetail> => {
     parse(z.enum(recordKinds), kind);
     if (
@@ -254,73 +251,6 @@ export function createShopifyRecordReader(
       return values;
     }
 
-    if (!id && kind === 'Customer') {
-      const contactsApproved =
-        options.protectedCustomerContactApproved === true;
-      if (search && search.field !== 'order' && !contactsApproved)
-        sections.push({
-          key: 'records',
-          title: 'Customer search',
-          status: 'approval_required',
-          requiredScopes: ['read_customers'],
-          message:
-            'Name and email search requires approved customer contact access. You can browse source identities or search by order number.',
-          rows: [],
-        });
-      else
-        await section(
-          'records',
-          'Customers',
-          search?.field === 'order'
-            ? ['read_customers', 'read_orders']
-            : ['read_customers'],
-          async () => {
-            const page = await readCustomerPage(
-              request,
-              customerFields,
-              cursor,
-              search,
-              contactsApproved,
-            );
-            nextCursor = page.nextCursor;
-
-            return page.rows;
-          },
-          true,
-        );
-      if (!contactsApproved)
-        sections.push({
-          key: 'contact',
-          title: 'Contact access',
-          status: 'approval_required',
-          requiredScopes: ['read_customers'],
-          message:
-            'Contact access is unavailable. Browse source identities or search by order number.',
-          rows: [],
-        });
-      if (search?.field === 'order' && !has('read_all_orders'))
-        sections.push({
-          key: 'history',
-          title: 'Order search coverage',
-          status: 'partial',
-          requiredScopes: ['read_all_orders'],
-          message:
-            'Order search covers the granted Shopify history window, normally 60 days.',
-          rows: [],
-        });
-
-      return {
-        tenantId: options.tenantId,
-        connectionId: options.connectionId,
-        shop: options.shop,
-        kind,
-        id: '',
-        observedAt: (options.now ?? (() => new Date()))().toISOString(),
-        apiVersion: API_VERSION,
-        sections,
-        nextCursor,
-      };
-    }
     if (!id) {
       if (kind !== 'Order' && kind !== 'Product') fail('invalid_input');
       const isOrder = kind === 'Order';

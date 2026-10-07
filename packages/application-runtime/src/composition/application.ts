@@ -37,6 +37,7 @@ import {
 } from '@luma/procurement/composition';
 import {
   appDecisionProvider,
+  createCustomerWorkspace,
   createDecisionQueue,
   createFulfillmentWorkspace,
   createInsights,
@@ -154,6 +155,7 @@ export interface ApplicationServices {
     procurementContext: ReturnType<typeof createProcurementContext>;
     fulfillment: ReturnType<typeof createFulfillmentWorkspace>;
     returns: ReturnType<typeof createReturnWorkspace>;
+    customers: ReturnType<typeof createCustomerWorkspace>;
     orders: ReturnType<typeof createOrderWorkspace>;
     decisions: ReturnType<typeof createDecisionQueue>;
     decisionAssignments: ReturnType<typeof createDecisionAssignments>;
@@ -546,6 +548,7 @@ export function createApplicationServices(
       products: createProductWorkspace(database),
       procurementContext: createProcurementContext(database),
       returns,
+      customers: createCustomerWorkspace(database),
       records: createRecordExplorer(database),
       orders,
       fulfillment,

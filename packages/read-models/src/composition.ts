@@ -14,6 +14,8 @@ export { createFulfillmentWorkspace } from './infrastructure/fulfillment/workspa
 
 export { createReturnWorkspace } from './infrastructure/returns/workspace.js';
 
+export { createCustomerWorkspace } from './infrastructure/customers/workspace.js';
+
 export { createDecisionQueue } from './infrastructure/decisions/queue.js';
 
 export { createInsights } from './infrastructure/insights/workspace.js';

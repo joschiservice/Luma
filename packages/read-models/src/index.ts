@@ -17,6 +17,8 @@ export type { FulfillmentWorkspace } from './application/fulfillment.js';
 
 export type { ReturnWorkspace } from './application/returns.js';
 
+export type { CustomerWorkspace } from './application/customers.js';
+
 export type {
   AppOwnedDecision,
   DecisionAssignment,

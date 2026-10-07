@@ -83,7 +83,7 @@ UI slots have distinct responsibilities:
   it for each order source. Read through the app's own authorized operations; do not
   retain the returned details.
 
-- `customers`: app-owned live customer search and source context for the Customers workspace.
+- `customers`: live order history and service context for one source customer (`customer.connectionId` and `customer.id`) on the Customers detail page. The host lists imported profiles.
 - `inventory`: app-owned governed corrections for the supplied canonical
   `inventory.positionId`. The app must resolve exact source identity, authority and
   grants on the server; the host does not supply a writable quantity.

@@ -32,6 +32,7 @@ import type { ProcurementService } from '@luma/procurement';
 import type { SupplierCommitments } from '@luma/procurement/composition';
 import { procurementRoutes } from '@luma/procurement/http';
 import type {
+  CustomerWorkspace,
   DecisionAssignments,
   DecisionQueue,
   FulfillmentWorkspace,
@@ -46,6 +47,7 @@ import type {
   ReturnWorkspace,
 } from '@luma/read-models';
 import {
+  customerRoutes,
   decisionRoutes,
   fulfillmentRoutes,
   insightRoutes,
@@ -128,6 +130,7 @@ export interface AppDependencies {
   procurementContext?: ProcurementContextReader;
   fulfillment?: FulfillmentWorkspace;
   returns?: ReturnWorkspace;
+  customers?: CustomerWorkspace;
   orders?: OrderWorkspace;
   decisions?: DecisionQueue;
   decisionAssignments?: DecisionAssignments;
@@ -415,6 +418,7 @@ export function buildApp(
         fulfillment: fulfillmentRoutes(dependencies.fulfillment),
         orders: orderRoutes(dependencies.orders),
         returns: returnRoutes(dependencies.returns),
+        customers: customerRoutes(dependencies.customers),
         sync: syncRoutes(dependencies.sync),
         decisions: decisionRoutes(
           dependencies.decisions,
