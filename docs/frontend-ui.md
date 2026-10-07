@@ -6,20 +6,21 @@ Feature compositions live separately in `components/issues` and `components/work
 
 ## Reusable patterns
 
-| Pattern                              | Component                                                                         | Use it for                                                                                   |
-| ------------------------------------ | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| Page title, description and actions  | `PageHeader` (`components/workspace/page-header`)                                 | The single `h1` of a workspace page, with an optional domain icon                            |
-| Operational state                    | `StateDot`, `StatePill`                                                           | Where a piece of work stands: running, approval, attention, error, verified, waiting, idle   |
-| Domain landmark                      | `DomainIcon`                                                                      | Navigation and record identity for orders, inventory, procurement, workflows and other areas |
-| Brand marks                          | `LumaMark`, `LumaLockup`, `AurenMark`                                             | Entry pages, the favicon and attribution                                                     |
-| Keyboard hints                       | `Kbd`                                                                             | Shortcut hints next to commands that stay accessible elsewhere                               |
-| Bordered content and nested surfaces | `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`, `CardFooter` | Home modules, record sections, app tiles and dialogs                                         |
-| Notices and warnings                 | `Alert`, `AlertTitle`, `AlertDescription`                                         | Issue notices, setup guidance, permissions, offline and recovery messages                    |
-| Short labels                         | `Badge`                                                                           | Severity, activation status, personal settings and counts                                    |
-| Empty collections                    | `Empty`                                                                           | Lists with nothing to show; describe this view, not the whole business                       |
-| Expandable supporting content        | `Disclosure`                                                                      | Evidence, audit events, metadata and technical details                                       |
-| Record lists and fact tables         | `DataTable`, `DataTableRowLink`                                                   | Sortable lists whose rows open a record, and numeric fact tables inside record sections      |
-| Counts over time or by category      | `BarChart`, `ChartLegend`                                                         | Stacked bars whose bars open their records; pair each chart with a table of the same values  |
+| Pattern                               | Component                                                                         | Use it for                                                                                   |
+| ------------------------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Top-level page title and actions      | `PageTitle` (`components/workspace/page-header`)                                  | The single `h1` of a page the workspace bar already names; actions move into the bar         |
+| Record title, description and actions | `PageHeader` (`components/workspace/page-header`)                                 | The visible `h1` of a page about one record or subject, with an optional domain icon         |
+| Operational state                     | `StateDot`, `StatePill`                                                           | Where a piece of work stands: running, approval, attention, error, verified, waiting, idle   |
+| Domain landmark                       | `DomainIcon`                                                                      | Navigation and record identity for orders, inventory, procurement, workflows and other areas |
+| Brand marks                           | `LumaMark`, `LumaLockup`, `AurenMark`                                             | Entry pages, the favicon and attribution                                                     |
+| Keyboard hints                        | `Kbd`                                                                             | Shortcut hints next to commands that stay accessible elsewhere                               |
+| Bordered content and nested surfaces  | `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`, `CardFooter` | Home modules, record sections, app tiles and dialogs                                         |
+| Notices and warnings                  | `Alert`, `AlertTitle`, `AlertDescription`                                         | Issue notices, setup guidance, permissions, offline and recovery messages                    |
+| Short labels                          | `Badge`                                                                           | Severity, activation status, personal settings and counts                                    |
+| Empty collections                     | `Empty`                                                                           | Lists with nothing to show; describe this view, not the whole business                       |
+| Expandable supporting content         | `Disclosure`                                                                      | Evidence, audit events, metadata and technical details                                       |
+| Record lists and fact tables          | `DataTable`, `DataTableRowLink`                                                   | Sortable lists whose rows open a record, and numeric fact tables inside record sections      |
+| Counts over time or by category       | `BarChart`, `ChartLegend`                                                         | Stacked bars whose bars open their records; pair each chart with a table of the same values  |
 
 `Button`, `Input`, `Textarea`, `Select`, `SearchableSelect`, `Field`, `Switch`, `Dialog`, `DropdownMenu`, `Tabs`, `Pagination` and `SectionNavigation` remain the interaction primitives. `Pagination` omits the total when a source doesn't report one. `Button` has default (Cobalt), outline, ghost and destructive variants in default, `sm`, `lg` and `icon` sizes; coarse pointers receive 44px targets. Link-styled buttons use `buttonVariants()` on the link itself so link semantics are preserved.
 
@@ -42,7 +43,7 @@ themes; validate again when changing `--chart-*` tokens.
 
 ## Workspace shell
 
-`WorkspaceLayout` renders a persistent sidebar on the canvas and an inset page surface. The sidebar holds the workspace switcher, search, core areas (Home, Needs you, Issues, Records, Activity, Insights), pinned pages, operations domains (Orders, Customers, Products, Inventory, Workflows, Procurement), installed apps, and Apps and Settings. It collapses to an icon rail with `[` and moves into a drawer below 900px. The top bar shows breadcrumbs, page controls portaled through `WorkspaceHeaderSlot`, the pin control and contextual help.
+`WorkspaceLayout` renders a persistent sidebar on the canvas and an inset page surface. The sidebar holds the workspace switcher, search, core areas (Home, Needs you, Issues, Records, Activity, Insights), pinned pages, operations domains (Orders, Customers, Products, Inventory, Workflows, Procurement), installed apps, and Apps and Settings. It collapses to an icon rail with `[` and moves into a drawer below 900px. The top bar shows breadcrumbs, page controls portaled through `WorkspaceHeaderSlot`, page actions portaled through `WorkspacePageActionsSlot`, the pin control and contextual help. Top-level pages are named once, by the breadcrumb; their `h1` is visually hidden and page-level explanations belong in contextual help or empty states. Pages about one record keep a visible `PageHeader` under the section breadcrumb.
 
 Search opens a command menu with ⌘K or Ctrl K. It lists pages and actions such as switching appearance. `G` followed by a letter jumps to a destination, for example G then I for Issues.
 
@@ -78,7 +79,7 @@ Badges and state pills always contain a text label. Keep source freshness separa
 
 ## Collection pages
 
-List pages share one order: `PageHeader`, then `CollectionToolbar`, then the coverage line, notices, the table and pagination. The toolbar places views and Refresh on the first row, then search, one pill per filter, page display actions and one **Sort** menu. Every offered filter stays visible: unset filters are dashed pills that open their values in one click, and applied filters are chips that edit or remove the value. On small screens unset pills give way to one **Filters** button that lists every filter in a sheet. Pages describe filters as data (`choice`, `date-range` or link-set `applied` filters) and own their URL state; the toolbar owns presentation, focus and the search draft.
+List pages share one order: `PageTitle`, then `CollectionToolbar`, then the coverage line, notices, the table and pagination. The toolbar places views and Refresh on the first row, then search, one pill per filter, page display actions and one **Sort** menu. Every offered filter stays visible: unset filters are dashed pills that open their values in one click, and applied filters are chips that edit or remove the value. On small screens unset pills give way to one **Filters** button that lists every filter in a sheet. Pages describe filters as data (`choice`, `date-range` or link-set `applied` filters) and own their URL state; the toolbar owns presentation, focus and the search draft.
 
 Wrap a collection in `CollectionFilterPanel` and pass `panel` to its toolbar only when it has five or more filters that people combine to investigate, and the content is a narrow feed. Activity is the example. On wide screens the panel lists every filter and value beside the feed while the toolbar keeps the applied chips; below that the pills return. Tables and split views keep the pills, because a docked panel costs them columns. Use `CollectionViews` for button views; link-based views can keep `Tabs`.
 

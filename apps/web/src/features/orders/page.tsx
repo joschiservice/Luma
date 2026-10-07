@@ -3,11 +3,10 @@ import './orders.css';
 import type { OrderList } from '@luma/api-contract';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
-import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { Empty } from '@luma/ui/components/primitives/empty';
 import { Pagination } from '@luma/ui/components/primitives/pagination';
 import { WorkspaceTimezone } from '@luma/ui/components/primitives/workspace-date';
-import { PageHeader } from '@luma/ui/components/workspace/page-header';
+import { PageTitle } from '@luma/ui/components/workspace/page-header';
 import { onlineManager, useQuery } from '@tanstack/react-query';
 import {
   Link,
@@ -167,11 +166,7 @@ export function OrdersView({
 
   return (
     <main className="orders-page">
-      <PageHeader
-        title="Orders"
-        icon={<DomainIcon domain="orders" size="md" />}
-        description="Search current orders from your connected stores and ERPs, see what still needs work, and inspect the source facts behind each order."
-      />
+      <PageTitle title="Orders" />
       <OrderFilters
         search={search}
         sources={sources}

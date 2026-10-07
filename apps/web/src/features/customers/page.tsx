@@ -1,7 +1,7 @@
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Empty } from '@luma/ui/components/primitives/empty';
-import { PageHeader } from '@luma/ui/components/workspace/page-header';
+import { PageTitle } from '@luma/ui/components/workspace/page-header';
 import { useQuery } from '@tanstack/react-query';
 import { useParams, useSearch } from '@tanstack/react-router';
 import { useState } from 'react';
@@ -29,10 +29,7 @@ export function CustomersPage() {
 
   return (
     <main className="page-wide">
-      <PageHeader
-        title="Customers"
-        description="Understand a customer’s orders, service history and work in Luma."
-      />
+      <PageTitle title="Customers" />
       <SyncCoverage organizationId={organizationId} type="customers" />
       {apps.isPending ? (
         <p role="status">Loading customer sources…</p>

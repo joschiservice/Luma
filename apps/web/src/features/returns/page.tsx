@@ -19,11 +19,10 @@ import {
   type DataTableColumn,
   DataTableRowLink,
 } from '@luma/ui/components/primitives/data-table';
-import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { Empty } from '@luma/ui/components/primitives/empty';
 import { StateDot, StatePill } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
-import { PageHeader } from '@luma/ui/components/workspace/page-header';
+import { PageTitle } from '@luma/ui/components/workspace/page-header';
 import { onlineManager, useQuery } from '@tanstack/react-query';
 import {
   Link,
@@ -377,11 +376,7 @@ export function ReturnsView({
   return (
     <main className="returns-page">
       {from ? <Link to={from}>← Back to context</Link> : null}
-      <PageHeader
-        title="Returns"
-        icon={<DomainIcon domain="returns" size="md" />}
-        description="Follow every return from request to refund, with its order and evidence. Only successful refund payments count as money returned."
-      />
+      <PageTitle title="Returns" />
       {shownList ? (
         <StageStrip
           list={shownList}
@@ -454,7 +449,7 @@ export function ReturnsView({
       {coverage}
       <p className="returns-note">
         Luma reads returns from your store and never approves, receives or
-        refunds them.
+        refunds them. Only successful refund payments count as money returned.
       </p>
       {missingAccess.map((source) => (
         <Alert key={source.connectionId} tone="info">

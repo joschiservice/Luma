@@ -7,7 +7,7 @@ import { Input } from '@luma/ui/components/primitives/input';
 import { SearchableSelect } from '@luma/ui/components/primitives/searchable-select';
 import { SectionNavigation } from '@luma/ui/components/primitives/section-navigation';
 import { Switch } from '@luma/ui/components/primitives/switch';
-import { PageHeader } from '@luma/ui/components/workspace/page-header';
+import { PageTitle } from '@luma/ui/components/workspace/page-header';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from '@tanstack/react-router';
 import {
@@ -147,10 +147,7 @@ export function SettingsView({
 
   return (
     <div className="settings-page">
-      <PageHeader
-        title="Settings"
-        description="Workspace details, your team, roles and approvals, and the preferences that only affect you."
-      />
+      <PageTitle title="Settings" />
       <div className="settings-layout">
         <SectionNavigation
           className="settings-navigation"

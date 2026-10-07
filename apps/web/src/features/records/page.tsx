@@ -19,7 +19,7 @@ import {
 } from '@luma/ui/components/primitives/data-table';
 import { Pagination } from '@luma/ui/components/primitives/pagination';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
-import { PageHeader } from '@luma/ui/components/workspace/page-header';
+import { PageTitle } from '@luma/ui/components/workspace/page-header';
 import { useQuery } from '@tanstack/react-query';
 import {
   Link,
@@ -185,10 +185,7 @@ export function RecordsPage() {
 
   return (
     <main className="records-page records-list">
-      <PageHeader
-        title="Records"
-        description="Follow the source facts behind orders, stock, fulfillments and issues."
-      />
+      <PageTitle title="Records" />
       <CollectionToolbar
         views={
           <CollectionViews

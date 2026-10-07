@@ -21,13 +21,6 @@
   padding: 18px 20px 12px;
 }
 
-.inbox-heading h1 {
-  font-size: 20px;
-  font-weight: 600;
-  line-height: 28px;
-  letter-spacing: -0.02em;
-}
-
 .issue-summary {
   display: flex;
   align-items: center;

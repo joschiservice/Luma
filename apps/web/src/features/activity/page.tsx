@@ -19,7 +19,7 @@ import {
   WorkspaceDate,
   WorkspaceTimezone,
 } from '@luma/ui/components/primitives/workspace-date';
-import { PageHeader } from '@luma/ui/components/workspace/page-header';
+import { PageTitle } from '@luma/ui/components/workspace/page-header';
 import { workspaceDateValue } from '@luma/ui/lib/timezone';
 import { onlineManager, useQuery } from '@tanstack/react-query';
 import {
@@ -240,10 +240,7 @@ export function ActivityView({
 
   return (
     <div className="activity-page">
-      <PageHeader
-        title="Activity"
-        description="Actions, decisions and results recorded in this workspace, newest first."
-      />
+      <PageTitle title="Activity" />
       <CollectionFilterPanel filters={toolbarFilters}>
         <CollectionToolbar
           panel

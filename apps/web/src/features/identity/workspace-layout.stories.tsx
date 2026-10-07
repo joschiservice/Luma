@@ -1,5 +1,7 @@
-import { PageHeader } from '@luma/ui/components/workspace/page-header';
+import { Button } from '@luma/ui/components/primitives/button';
+import { PageTitle } from '@luma/ui/components/workspace/page-header';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { Plus } from 'lucide-react';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { MINIMAL_VIEWPORTS } from 'storybook/viewport';
 
@@ -8,16 +10,25 @@ import { StoryShell } from './storybook-shell';
 function ShellExample({
   workspaceName = 'Northstar Commerce',
   accountName = 'Alex Morgan',
+  action,
 }: {
   workspaceName?: string;
   accountName?: string;
+  /** Label of a page-level action shown in the workspace bar. */
+  action?: string;
 }) {
   return (
     <StoryShell workspace={workspaceName} account={accountName}>
       {(page) => (
-        <PageHeader
+        <PageTitle
           title={page}
-          description="Review your operations, investigate issues, and manage connected systems."
+          actions={
+            action ? (
+              <Button>
+                <Plus aria-hidden="true" /> {action}
+              </Button>
+            ) : undefined
+          }
         />
       )}
     </StoryShell>
@@ -45,6 +56,11 @@ export const Desktop: Story = {
     );
     await userEvent.click(navigation.getByRole('link', { name: /^Issues/ }));
     await expect(canvas.getByRole('heading', { name: 'Issues' })).toBeVisible();
+    await expect(
+      within(canvas.getByRole('navigation', { name: 'Breadcrumb' })).getByText(
+        'Issues',
+      ),
+    ).toBeVisible();
     await expect(
       navigation.getByRole('link', { name: /^Issues/ }),
     ).toHaveAttribute('aria-current', 'page');
@@ -112,6 +128,21 @@ export const LongNames: Story = {
       'Northstar Commerce — International Operations and Fulfilment',
     accountName: 'Alexandra Morgan-Sutherland',
   },
+};
+
+export const PageAction: Story = {
+  args: { action: 'New purchase order' },
+  play: async ({ canvasElement }) => {
+    const action = within(canvasElement).getByRole('button', {
+      name: 'New purchase order',
+    });
+    await expect(action.closest('.desk-header')).not.toBeNull();
+  },
+};
+
+export const PageActionMobile: Story = {
+  args: { action: 'New purchase order' },
+  globals: { viewport: { value: 'mobile1', isRotated: false } },
 };
 
 export const Mobile: Story = {

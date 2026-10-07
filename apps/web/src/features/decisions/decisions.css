@@ -1,18 +1,5 @@
 /* Needs you: the shared decision queue. Frame, rows and inspector chrome reuse the inbox layout. */
 
-.decisions-heading-copy {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.decisions-heading-copy p {
-  margin: 0;
-  color: var(--foreground-subtle);
-  font-size: 13px;
-  line-height: 18px;
-}
-
 .decisions-live {
   display: inline-flex;
   align-items: center;

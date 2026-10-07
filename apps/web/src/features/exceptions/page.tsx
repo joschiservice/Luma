@@ -146,7 +146,7 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
   return (
     <div className={`inbox page-full ${exceptionId ? 'inbox-selected' : ''}`}>
       <header className="inbox-heading">
-        <h1>Issues</h1>
+        <h1 className="sr-only">Issues</h1>
         <IssueSummary
           review={
             overview.isError || overview.isPaused

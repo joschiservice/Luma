@@ -1,4 +1,4 @@
-import { PageHeader } from '@luma/ui/components/workspace/page-header';
+import { PageTitle } from '@luma/ui/components/workspace/page-header';
 import {
   useLocation,
   useNavigate,
@@ -26,10 +26,7 @@ export function InsightsPage() {
 
   return (
     <div className="insights">
-      <PageHeader
-        title="Insights"
-        description="Live counts and trends across your operations. Select a metric or a bar to see the records behind it."
-      />
+      <PageTitle title="Insights" />
       <OperationalMetrics
         key={`summary-${organizationId}`}
         organizationId={organizationId}

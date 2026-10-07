@@ -287,6 +287,10 @@
   --domain-color: var(--domain-orders);
 }
 
+.lu-domain-icon[data-domain='customers'] {
+  --domain-color: var(--domain-customers);
+}
+
 .lu-domain-icon[data-domain='inventory'] {
   --domain-color: var(--domain-inventory);
 }

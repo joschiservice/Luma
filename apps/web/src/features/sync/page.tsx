@@ -27,7 +27,6 @@ import {
   DialogTitle,
 } from '@luma/ui/components/primitives/dialog';
 import { Disclosure } from '@luma/ui/components/primitives/disclosure';
-import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,7 +38,7 @@ import { Empty } from '@luma/ui/components/primitives/empty';
 import { Progress } from '@luma/ui/components/primitives/progress';
 import { StateDot, StatePill } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
-import { PageHeader } from '@luma/ui/components/workspace/page-header';
+import { PageTitle } from '@luma/ui/components/workspace/page-header';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from '@tanstack/react-router';
 import {
@@ -173,10 +172,8 @@ export function SyncView({
 
   return (
     <main className="sync-page">
-      <PageHeader
+      <PageTitle
         title="Data sync"
-        icon={<DomainIcon domain="apps" icon={RefreshCw} size="md" />}
-        description="Luma imports the history of every connected system, then keeps it current with each change."
         actions={
           <Button
             variant="outline"

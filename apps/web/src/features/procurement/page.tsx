@@ -19,11 +19,10 @@ import {
   type DataTableColumn,
   DataTableRowLink,
 } from '@luma/ui/components/primitives/data-table';
-import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { Empty } from '@luma/ui/components/primitives/empty';
 import { StatePill } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
-import { PageHeader } from '@luma/ui/components/workspace/page-header';
+import { PageTitle } from '@luma/ui/components/workspace/page-header';
 import { useQuery } from '@tanstack/react-query';
 import {
   Link,
@@ -334,10 +333,8 @@ export function ProcurementPage() {
 
   return (
     <div className="procurement-page">
-      <PageHeader
-        icon={<DomainIcon domain="procurement" size="lg" />}
+      <PageTitle
         title="Procurement"
-        description="Suppliers and purchase orders, from draft to goods received, with every supplier commitment and its evidence."
         actions={
           canManage ? (
             <Button
