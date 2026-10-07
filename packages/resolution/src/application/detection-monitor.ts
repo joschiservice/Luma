@@ -75,8 +75,21 @@ export interface FulfillmentWork {
   observedAt: string;
 }
 
+/** One connection's stored report for a stock position, with when it was observed. */
+export interface PositionSource extends StockSource {
+  observedAt: string;
+}
+
 /** Tenant-scoped reads of stored sync, stock and fulfillment state. */
 export interface DetectionSources {
+  /**
+   * Every readable connection's current report for one stock position, with exactly one SKU and
+   * location mapping each. Sources without an exact mapping are left out.
+   */
+  positionSources(
+    context: TenantContext,
+    positionId: string,
+  ): Promise<PositionSource[]>;
   streams(context: TenantContext): Promise<SyncStreamState[]>;
   /**
    * Positions whose stored reports disagree, plus the positions named in `include`, most

@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 
 import { replenishmentRuleSchema } from '@luma/api-contract';
 import { createAuditLog } from '@luma/audit/composition';
-import type { IdentityService } from '@luma/identity';
+import type { IdentityService, TenantContext } from '@luma/identity';
 import { IdentityError } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
 import type { ProcurementService } from '@luma/procurement';
@@ -37,6 +37,7 @@ export function createReplenishmentRuntime(deps: {
   safety: ReturnType<typeof createSafetyServices>;
   transport?: ReplenishmentTransport;
   enabled: boolean;
+  refreshStock?: (context: TenantContext, positionId: string) => Promise<void>;
 }) {
   const version = compileProcessWorkflow(replenishmentSource);
   const store = createReplenishmentStore(deps.db);

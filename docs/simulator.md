@@ -110,18 +110,18 @@ A new workspace is set up the way a merchant would configure Luma, so workflows 
 - **Suppliers and stock rules:** the suppliers of the eight most-demanded linked SKUs are created in Procurement and linked to JTL, and each SKU gets a _Replenish low stock_ rule. Two rules start just above current stock, so a purchase-order proposal follows the next fresh stock read. The new run gives these suppliers different answers (full, partial, delayed, short and silent), so sent purchase orders meet each.
 - **Detection timing:** with `--detection demo`, fulfillment counts as stuck after 20 minutes instead of two hours, and a hold is overdue after 30 minutes instead of a day. The workspace keeps its timing across restarts.
 
-The API process completes the setup once the records are imported and linked, retrying on each minute's pass; `tooling/simulator/demo.mjs` owns it. JTL stock is reread every 30 minutes, and replenishment acts only on stock read in the last five minutes, so its proposals follow those reads. Approve a proposal within five minutes: after that its evidence is stale and Luma prepares a new one.
+The API process completes the setup once the records are imported and linked, retrying on each minute's pass; `tooling/simulator/demo.mjs` owns it. Proposals stay open for four hours. Luma rereads stock right before it acts, and replenishment rereads the stock of its rules while they wait, so proposals follow soon after stock falls.
 
 **Workflow scenarios** in the Incidents tab start a reproducible situation and state what Luma should do:
 
-| Scenario                     | What happens                                                                                         |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------- |
-| Stock correction             | Stock drift; approve the proposed correction; Luma writes, verifies, and detection closes the case.  |
-| Approval expires             | The same drift; leave it for five minutes, and a new proposal from fresh stock replaces the old one. |
-| Write commits, response lost | The correction commits but its response is lost; Luma reconciles by reading and never writes twice.  |
-| Overdue fraud hold           | A held order; after approval the hold is released, and the case stays open until the order ships.    |
-| Shop outage                  | Reads fail; the connection check waits 15 minutes, then ends or hands the case over.                 |
-| Access revoked               | Connections shows lost access; no case opens, so the scorecard reports it missed.                    |
+| Scenario                     | What happens                                                                                                              |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Stock correction             | Stock drift; approve the proposed correction; Luma writes, verifies, and detection closes the case.                       |
+| Stock moves while waiting    | The same drift; let the shop sell before approving, and one new proposal replaces the old one in the same Needs you item. |
+| Write commits, response lost | The correction commits but its response is lost; Luma reconciles by reading and never writes twice.                       |
+| Overdue fraud hold           | A held order; after approval the hold is released, and the case stays open until the order ships.                         |
+| Shop outage                  | Reads fail; the connection check waits 15 minutes, then ends or hands the case over.                                      |
+| Access revoked               | Connections shows lost access; no case opens, so the scorecard reports it missed.                                         |
 
 A repeated request with the same ID starts nothing new. Definitions live in `packages/simulator/core/src/scenarios.ts`; `POST /api/runs/:id/scenarios` starts one. The incident list links each case to its latest workflow run and shows the run's state.
 

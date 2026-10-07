@@ -2,6 +2,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 import { createAppHost } from '@luma/app-catalog';
 import type { ConnectionsConfig, WorkflowConfig } from '@luma/config';
+import { createInstalledRuntime } from '@luma/connections/composition';
 import type { Diagnosis } from '@luma/exceptions';
 import type { IdentityService, TenantContext } from '@luma/identity';
 import { createIdentity } from '@luma/identity/composition';
@@ -24,6 +25,7 @@ import {
 import { Pool } from 'pg';
 
 import { createApplicationServices } from './application.js';
+import { createStockRefreshService } from './detection-worker.js';
 import { createReplenishmentWorker } from './replenishment-worker.js';
 import { createResourceScope } from './resources.js';
 import { createDetectionServices, createSafetyServices } from './services.js';
@@ -209,13 +211,31 @@ export async function createDefaultExceptionWorker(
     );
     resources.add(processClient.close);
     const database = createTenantDatabase(pool);
+    // Owners reread stale stock right before they act; the reread needs the host's providers.
+    let stockRefresh: ReturnType<typeof createStockRefreshService> | undefined;
+    const refreshStock = async (context: TenantContext, positionId: string) =>
+      stockRefresh?.refresh(context, positionId);
     const host = connections
       ? createAppHost(database, {
           ...connections,
           refreshContext: identity.service.refreshContext,
+          refreshStock,
           ...(env ? { env } : {}),
         })
       : undefined;
+    if (host) {
+      stockRefresh = createStockRefreshService({
+        database,
+        capabilities: createInstalledRuntime({
+          installations: host.connections,
+          providers: host.registry.providers(),
+          // Owners record the reads they use as evidence; telemetry has no sink here.
+          record: async () => undefined,
+          recordObservations: async () => undefined,
+        }),
+      });
+      resources.add(stockRefresh.close);
+    }
     const {
       detection,
       safety,
@@ -229,7 +249,9 @@ export async function createDefaultExceptionWorker(
       identity: identity.service,
       execution: { kind: 'enabled', effects: { resolve: async () => null } },
       replenishmentTransport: processClient,
-      ...(host ? { workflowSources: host.registry.workflowSources() } : {}),
+      ...(host
+        ? { workflowSources: host.registry.workflowSources(), refreshStock }
+        : {}),
     });
     const runtime = createExceptionWorkflowRuntime(
       settings.temporal,

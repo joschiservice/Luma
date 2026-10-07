@@ -13,6 +13,7 @@ import {
   createReplenishmentWorker,
   createResourceScope,
   createScheduledDetection,
+  createStockRefreshService,
 } from '@luma/application-runtime';
 import { createCommerceSyncService } from '@luma/application-runtime/sync';
 import { createSyncRunner } from '@luma/commerce-sync';
@@ -108,7 +109,12 @@ export async function createPilot(
     const simulation = manifest.simulator
       ? createSimulationTransport(manifest.simulator)
       : undefined;
+    // Owners reread stale stock right before they act; created once capabilities exist.
+    let stockRefresh = null;
+    const refreshStock = async (actor, positionId) =>
+      stockRefresh?.refresh(actor, positionId);
     const installations = createInstalledConnections(db, {
+      refreshStock,
       ...(simulation
         ? {
             simulation,
@@ -279,6 +285,14 @@ export async function createPilot(
             // The synthetic pilot does not export capability telemetry.
           },
         });
+    if (simulation) {
+      stockRefresh = createStockRefreshService({
+        database: db,
+        capabilities,
+        log: failureLog,
+      });
+      resources.add(stockRefresh.close);
+    }
     const inventory = simulation
       ? await createInventoryScenario({
           commerce,
@@ -420,6 +434,7 @@ export async function createPilot(
       verifier,
       decisionSources: installations.registry.decisionSources(),
       workflowSources: installations.registry.workflowSources(),
+      ...(simulation ? { refreshStock } : {}),
       ...(simulation
         ? {
             purchasing: {

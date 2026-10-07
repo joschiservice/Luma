@@ -12,9 +12,13 @@ Both sources must be active, installed, readable, and mapped to the same canonic
 SKU, location and `each` unit. Every source must have exactly one unscoped SKU and
 location mapping. Shopify requires real InventoryItem and Location IDs, tracked
 inventory and an active location. The ERP quantity must be a known, nonnegative
-integer. Evidence expires after five minutes; the preview's expiry cannot extend
-its ERP observation's authority. Refreshing Inventory reloads saved observations.
-Run Data sync to refresh stale ERP evidence.
+integer, and evidence must be less than five minutes old when Luma judges it. A
+preview stays open for a four-hour decision window. Each read of the target,
+including the check right before the write, first rereads stale stock sources
+through the host's `refreshStock` (`createStockRefreshService`), so a late
+approval acts on current stock. When the reread changes the correction, the
+preview no longer runs and a new one needs a new approval. A source that can't
+be reread keeps its stored report, and stale evidence still stops the write.
 
 The app-owned service in `packages/apps/shopify/src/application/inventory-correction.ts`
 uses shared policy, audit, Action Admission and execution. Membership, installation,

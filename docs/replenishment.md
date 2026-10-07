@@ -42,8 +42,16 @@ capability's risk or treats a workflow decision as execution authority.
 Action Admission binds the proposal to the run, action step, subject and exact
 artifact. Procurement uses a subject reference instead of an incident ID. Before
 dispatch, eligibility rechecks the active scope, current inventory, quantity,
-unit, supplier and existing orders. Evidence expires five minutes after the
-trigger's source observation; approval does not extend that deadline.
+unit, supplier and existing orders. A proposal stays open for a four-hour
+decision window, and the approval lasts as long as the proposal. Right before
+the order is created, the position's stock is reread through the installed
+capabilities, so a late approval acts on current stock. A different quantity
+then stops the run, and the next check proposes again from the current stock.
+
+While a rule waits, the monitor rereads its stock when the stored report is
+older than four minutes, at most once a minute, so proposals follow soon after
+stock falls instead of waiting for the source's next sync. A rule with a run in
+progress gets no second run.
 
 ## Durability and outcomes
 
@@ -97,7 +105,8 @@ inventory, add a supplier in Procurement, and open **Workflows → Replenish low
 stock → Rules → Add stock rules**. Activate a rule with a minimum above current
 stock, then use **Check stock now** or let the worker detect the condition. Sign
 in as the other workspace admin to approve the exact proposal in Activity or in
-[Needs you](needs-you.md), which lists the same decision until it expires.
+[Needs you](needs-you.md), which lists the same decision until it expires
+four hours later.
 
 Readiness follows [the workflow model](workflows.md#readiness). A rule whose stock
 is missing, deleted, unreadable or older than five minutes is blocked, using the

@@ -375,3 +375,82 @@ test('the simulator demo turns workflows on and shows a scenario’s run on the 
     15_000,
   );
 });
+
+test('a proposal waits hours for a decision, one item follows a stock change, and a late approval acts on a fresh read', async (t) => {
+  const f = await caseWorkflowFixture(t);
+  await f.activate(stock);
+  await driftedStock(f);
+  await f.tick();
+  const [run] = await f.runs(stock);
+  const waiting = await f.waitFor(stock, run.id, 'awaiting_decision');
+  const first = f.proposal(waiting, 'correct-stock');
+  const items = async () =>
+    (
+      await f.request('/decisions', undefined, { cookie: f.approverCookie })
+    ).items.filter((item) => item.kind === 'inventory_correction');
+  const [item] = await items();
+  // People get a decision window instead of five minutes.
+  expect(Date.parse(item.deadline)).toBeGreaterThan(Date.now() + 3 * 3_600_000);
+
+  // Shopify moves while nobody decides: the workflow prepares one replacement, in the same item.
+  await f.call('runs/operations/control', {
+    action: 'command',
+    instance: 'shopify',
+    command: { kind: 'available', variant: '1', location: '1', quantity: 41 },
+  });
+  await f.wake(run.id);
+  await until(
+    async () => {
+      const current = await items();
+
+      return (
+        current.length === 1 &&
+        current[0].id === item.id &&
+        current[0].change.some((fact) => fact.value === '41 units')
+      );
+    },
+    'one item shows the replacement proposal',
+    30_000,
+  );
+  await f.request(
+    '/apps/shopify/inventory-correction-approve',
+    { id: first, outcome: 'approved' },
+    { cookie: f.approverCookie, status: 409 },
+  );
+
+  const inspected = await f.request(
+    '/apps/shopify/inventory-correction-inspect',
+    {
+      positionId: run.subject.id,
+      connectionId: f.manifest.connections.shopify,
+      sourceConnectionId: f.manifest.connections.jtl,
+    },
+    { cookie: f.approverCookie },
+  );
+  const current = inspected.runs.find(
+    (entry) => entry.state === 'approval_required',
+  );
+  expect(current.id).not.toBe(first);
+  await f.request(
+    '/apps/shopify/inventory-correction-approve',
+    { id: current.id, outcome: 'approved' },
+    { cookie: f.approverCookie },
+  );
+  // The ERP report ages past five minutes after approval; the write rereads it first.
+  const old = new Date(Date.now() - 6 * 60_000).toISOString();
+  await f.db.owner.query(
+    `UPDATE inventory_snapshots SET observed_at=$3::timestamptz,document=jsonb_set(document,'{observedAt}',to_jsonb($4::text))
+     WHERE tenant_id=$1 AND connection_id=$2`,
+    [f.manifest.organizationId, f.manifest.connections.jtl, old, old],
+  );
+
+  await f.wake(run.id);
+  const verified = await f.waitFor(stock, run.id, 'verified');
+  expect(
+    verified.processSteps.find((step) => step.stepId === 'check-stock').values
+      .available,
+  ).toBe((await f.call('runs/operations/skus/LUMA-001')).erp.available);
+  expect(await shopStock(f)).toBe(
+    (await f.call('runs/operations/skus/LUMA-001')).erp.available,
+  );
+});

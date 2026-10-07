@@ -7,10 +7,10 @@ import type { CapabilityReader } from '@luma/connections';
 import { createInstalledRuntime } from '@luma/connections/composition';
 import type { Configuration } from '@luma/exceptions';
 import { defaultConfiguration } from '@luma/exceptions';
-import type { IdentityService } from '@luma/identity';
+import type { IdentityService, TenantContext } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
 import { createFailureLog } from '@luma/platform';
-import { createDetectionMonitor } from '@luma/resolution';
+import { createDetectionMonitor, createStockRefresh } from '@luma/resolution';
 import { createDetectionSources } from '@luma/resolution/composition';
 import type { Pool } from 'pg';
 
@@ -20,6 +20,39 @@ type Detection = Pick<
   ReturnType<typeof createDetectionServices>,
   'exceptions' | 'diagnoses'
 >;
+
+/**
+ * Composes the stock reread owners use right before they act: stale sources of one position are
+ * read through the installed capabilities and stored as their current report. Returns the
+ * function owners receive; it never throws for an unreadable source.
+ */
+export function createStockRefreshService(options: {
+  database: TenantDatabase;
+  capabilities: Pick<CapabilityReader, 'read'>;
+  log?: (message: string, error?: unknown) => void;
+}) {
+  const commerce = createCommerceServices(options.database);
+  const refresh = createStockRefresh({
+    sources: createDetectionSources(options.database),
+    capabilities: options.capabilities,
+    project: async (context, observation, positionId) => {
+      const outcome = await commerce.ingestion.ingest(
+        context,
+        `refresh:${observation.id}`,
+        { capability: 'inventory.read', observation },
+      );
+
+      return outcome.status === 'applied' && outcome.entityId === positionId;
+    },
+    ...(options.log ? { log: options.log } : {}),
+  });
+
+  return {
+    refresh: (context: TenantContext, positionId: string) =>
+      refresh.refresh(context, positionId).then(() => undefined),
+    close: commerce.close,
+  };
+}
 
 /**
  * Composes scheduled detection over stored commerce state. `detection` is read on every call,

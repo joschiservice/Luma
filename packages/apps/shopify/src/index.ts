@@ -217,10 +217,16 @@ export function createApp(context: AppFactoryContext): AppDefinition {
         corrections.pending(tenant),
       ]);
 
-      return [
+      const items = [
         ...recoveries.map((view) => recoveryDecision(view, tenant.actor.id)),
         ...stock.map((view) => correctionDecision(view, tenant.actor.id)),
       ];
+
+      // Owners list newest first, so the current proposal for a target wins its item.
+      return items.filter(
+        (item, index) =>
+          items.findIndex((other) => other.id === item.id) === index,
+      );
     },
     workflows,
     async uninstalled({ tenantId, transaction }) {

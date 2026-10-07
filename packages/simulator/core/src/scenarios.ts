@@ -39,15 +39,15 @@ export const workflowScenarios = {
     description:
       'Shopify stock stops following JTL for the most-demanded SKU of the first shop.',
     expected:
-      'A stock case opens, and Correct Shopify stock from the ERP proposes the JTL quantity. Approve it in Needs you within five minutes. Luma writes it, confirms it with a fresh Shopify read, and detection then closes the case.',
+      'A stock case opens, and Correct Shopify stock from the ERP proposes the JTL quantity. Approve it in Needs you; it stays open for four hours. Luma rereads stock, writes it, confirms it with a fresh Shopify read, and detection then closes the case.',
     steps: [drift],
   },
-  'stock-correction-expired': {
-    label: 'Approval expires',
+  'stock-correction-moves': {
+    label: 'Stock moves while waiting',
     description:
-      'The same drift, but leave the proposal waiting for more than five minutes.',
+      'The same drift, but let the shop sell before approving the proposal.',
     expected:
-      'The first proposal expires because its stock evidence went stale. Luma prepares a new proposal from fresh stock, which needs a new approval. Nothing is written until someone approves a current one.',
+      'When Shopify’s quantity changes, the waiting proposal no longer runs. Luma prepares one new proposal from current stock, in the same Needs you item, and nothing is written until someone approves it.',
     steps: [drift],
   },
   'stock-correction-lost-response': {

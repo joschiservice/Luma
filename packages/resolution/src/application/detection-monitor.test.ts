@@ -162,6 +162,7 @@ function fixture(
     fulfillment: overrides.fulfillment ?? {},
   };
   const sources: DetectionSources = {
+    positionSources: vi.fn(async () => []),
     streams: vi.fn(async () => structuredClone(state.streams)),
     stockPositions: vi.fn<DetectionSources['stockPositions']>(
       async (_context, { include, limit }) =>

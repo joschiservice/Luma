@@ -17,7 +17,7 @@ import {
   orderAttentionForOrders,
   orderAttentionQuery,
 } from '@luma/exceptions/composition';
-import type { IdentityService } from '@luma/identity';
+import type { IdentityService, TenantContext } from '@luma/identity';
 import {
   createOrderMetricReader,
   orderStateQueries,
@@ -172,6 +172,11 @@ export interface ApplicationOptions {
   decisionSources?: Parameters<typeof appDecisionProvider>[0][];
   /** Installed-app case workflows, such as `registry.workflowSources()`. */
   workflowSources?: CaseWorkflowAdapter[];
+  /**
+   * Rereads a stock position's stale sources through installed capabilities, so owners act on
+   * current stock. See `createStockRefreshService`.
+   */
+  refreshStock?: (context: TenantContext, positionId: string) => Promise<void>;
   /** Installed purchasing-system connections. Without them, orders cannot be sent from Luma. */
   purchasing?: {
     runtime: InstalledPurchaseOrderRuntime;
@@ -291,6 +296,7 @@ export function createApplicationServices(
     ...(options.replenishmentTransport
       ? { transport: options.replenishmentTransport }
       : {}),
+    ...(options.refreshStock ? { refreshStock: options.refreshStock } : {}),
   });
   const codeProcesses = createCodeProcesses(
     database,
