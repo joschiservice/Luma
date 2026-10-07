@@ -63,7 +63,11 @@ describe('Shopify record authorization', () => {
     const f = fixture();
     f.authorize.mockRejectedValueOnce(new Error('Forbidden'));
     await expect(
-      f.service(context, { connectionId, kind: 'Customer' }),
+      f.service(context, {
+        connectionId,
+        kind: 'Customer',
+        id: 'gid://shopify/Customer/1',
+      }),
     ).rejects.toThrow('Forbidden');
     expect(f.authorize).toHaveBeenCalledWith(context, 'Customer');
     expect(f.credential).not.toHaveBeenCalled();

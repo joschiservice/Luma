@@ -72,8 +72,9 @@ Set `SHOPIFY_CUSTOMER_CONTACT_APPROVED=true` only after Shopify also approves
 name, email and phone access for this deployment. Set
 `SHOPIFY_CUSTOMER_ADDRESS_APPROVED=true` only after Shopify approves address access;
 Data sync then imports default addresses with customer profiles. It defaults to false. Without
-it, Customers shows source identities and authorized order history, and withholds
-contact fields and name/email search. Restart after changing this flag.
+it, Customers shows source identities and authorized order history, and imported
+profiles and live reads withhold names, email addresses and phone numbers. Restart after
+changing this flag.
 
 ## External approvals
 

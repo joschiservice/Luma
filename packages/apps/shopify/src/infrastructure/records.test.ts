@@ -378,14 +378,8 @@ describe('Shopify operational records', () => {
     );
     const f = fixture();
     for (const kind of recordKinds) await f.read(kind, gid(kind));
-    await f.read('Customer');
     const contacts = fixture(scopes, true, true);
-    await contacts.read('Customer');
     await contacts.read('Customer', gid('Customer'));
-    await contacts.read('Customer', undefined, undefined, {
-      field: 'order',
-      value: '#1001',
-    });
     f.fetch.mock.calls.push(...contacts.fetch.mock.calls);
     await f.read('Order');
     await f.read('Product');
@@ -397,29 +391,20 @@ describe('Shopify operational records', () => {
       ).toEqual([]);
     }
   });
-  it('withholds contact fields and name/email search without explicit contact approval', async () => {
+  it('withholds contact fields without explicit contact approval', async () => {
     const f = fixture();
-    const list = await f.read('Customer');
-    expect(JSON.stringify(list)).not.toMatch(
+    const detail = await f.read('Customer', gid('Customer'));
+    expect(JSON.stringify(detail)).not.toMatch(
       /Avery|avery|81312345678|must-not-leak/,
     );
-    expect(list.sections[0]?.rows[0]?.fields.Orders).toBe('3');
-    f.fetch.mockClear();
-    const denied = await f.read('Customer', undefined, undefined, {
-      field: 'email',
-      value: 'avery@example.test',
-    });
-    expect(denied.sections[0]).toMatchObject({
+    expect(detail.sections.find((v) => v.key === 'contact')).toMatchObject({
       status: 'approval_required',
       rows: [],
     });
-    expect(f.fetch).toHaveBeenCalledTimes(1);
-    const unapproved = fixture(scopes, false, true);
-    expect((await unapproved.read('Customer')).sections[0]).toMatchObject({
-      status: 'approval_required',
-      rows: [],
-    });
-    expect(unapproved.fetch).toHaveBeenCalledTimes(1);
+    expect(
+      detail.sections.find((v) => v.key === 'customer')?.rows[0]?.fields.Orders,
+    ).toBe('3');
+    await expect(f.read('Customer')).rejects.toThrow('invalid_input');
   });
   it('reads approved contacts and follows order identity rather than matching customer text', async () => {
     const f = fixture(scopes, true, true);
@@ -434,44 +419,19 @@ describe('Shopify operational records', () => {
     expect(detail.sections.find((v) => v.key === 'orders')?.rows[0]?.id).toBe(
       gid('Order'),
     );
-    const list = await f.read('Customer', undefined, undefined, {
-      field: 'order',
-      value: '#1001',
-    });
-    expect(list.sections[0]?.rows[0]?.id).toBe(gid('Customer'));
-    expect(JSON.stringify(list)).not.toContain('must-not-leak');
+    expect(JSON.stringify(detail)).not.toContain('must-not-leak');
     const missing = fixture(['read_customers'], true, true);
     expect(
-      (
-        await missing.read('Customer', undefined, undefined, {
-          field: 'order',
-          value: '#1001',
-        })
-      ).sections[0],
+      (await missing.read('Customer', gid('Customer'))).sections.find(
+        (v) => v.key === 'orders',
+      ),
     ).toMatchObject({ status: 'missing_scope', rows: [] });
-    expect(missing.fetch).toHaveBeenCalledTimes(1);
   });
-  it('preserves distinct customer IDs, deduplicates repeated order relations and pages source results', async () => {
+  it('pages customer order history with source cursors', async () => {
     const f = fixture(scopes, true, true);
     const fallback = f.fetch.getMockImplementation()!;
     f.fetch.mockImplementation((url, init) => {
       const { query, variables } = JSON.parse(String(init?.body));
-      if (query.includes('LumaCustomerList'))
-        return Promise.resolve(
-          Response.json({
-            data: {
-              records: page(
-                [
-                  { customer },
-                  { customer },
-                  { customer: { ...customer, id: 'gid://shopify/Customer/2' } },
-                  { customer: null },
-                ],
-                variables.after ? null : 'next',
-              ),
-            },
-          }),
-        );
       if (query.includes('LumaCustomerOrders'))
         return Promise.resolve(
           Response.json({
@@ -483,13 +443,6 @@ describe('Shopify operational records', () => {
 
       return fallback(url, init);
     });
-    const search = { field: 'order' as const, value: '#1001' };
-    const first = await f.read('Customer', undefined, undefined, search);
-    expect(first.sections[0]?.rows).toHaveLength(2);
-    expect(first.nextCursor).toBe('next');
-    expect(
-      (await f.read('Customer', undefined, 'next', search)).nextCursor,
-    ).toBeNull();
     expect((await f.read('Customer', gid('Customer'))).nextCursor).toBe('next');
     expect(
       (await f.read('Customer', gid('Customer'), 'next')).nextCursor,
