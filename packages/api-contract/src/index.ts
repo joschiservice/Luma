@@ -193,6 +193,8 @@ export * from './procurement.js';
 
 export * from './replenishment.js';
 
+export * from './metric-summary.js';
+
 export * from './metrics.js';
 
 export * from './operational-metrics.js';

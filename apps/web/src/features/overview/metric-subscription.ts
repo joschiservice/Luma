@@ -8,6 +8,18 @@ type Subscriber = Pick<
 
 type MetricEvent = Parameters<Subscriber['onResync']>[0];
 
+/**
+ * The shortest interval between live reads of one dashboard view. The first change after a quiet
+ * period reads at once; further changes wait for the interval, so a busy workspace refreshes each
+ * view about once per interval rather than once per change.
+ */
+export const liveRefreshMs = 2000;
+
+/** Returns how long a change must wait when the view's last read started at `lastReadAt`. */
+export function liveRefreshDelay(lastReadAt: number) {
+  return Math.max(0, lastReadAt + liveRefreshMs - Date.now());
+}
+
 /** Reports whether an event asks views that depend on any of these areas to read again. */
 export function changesAny(
   event: MetricEvent,

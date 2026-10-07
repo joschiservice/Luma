@@ -339,7 +339,8 @@ Operational trend charts and their record drilldowns start at
 Live metrics use `0031_metric_notifications.sql`, the process listener in
 `packages/application-runtime/src/infrastructure/metric-listener.ts`, and the
 bounded SSE route in `packages/resolution/src/api/metric-events.ts`. The browser
-subscription and recovery hook is `apps/web/src/features/overview/metrics-live.ts`.
+subscription and recovery hook is `apps/web/src/features/overview/metrics-live.ts`; it reads
+each page's metric sections through one summary request (`metric-summary-data.ts`).
 See [Live operational metrics](live-operational-metrics.md); validation is
 `metric-stream.e2e.mjs`, `metric-live.browser.mjs` and the stream unit tests.
 

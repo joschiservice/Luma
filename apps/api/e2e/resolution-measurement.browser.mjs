@@ -137,30 +137,39 @@ test('explains measured and unknown outcomes, exposes evidence, and recovers fro
   });
   await page.keyboard.press('Escape');
   // A failed read hides prior claims; retry loads authoritative facts again.
-  await page.route('**/v2/organizations/*/metrics/query', async (route) => {
-    if (
-      route
-        .request()
-        .postDataJSON()
-        .metrics.some((id) => id.startsWith('resolution.'))
-    )
-      await route.fulfill({
-        status: 503,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          code: 'SERVICE_UNAVAILABLE',
-          message: 'Unavailable',
-          requestId: 'test',
-        }),
-      });
-    else await route.continue();
+  // Only the resolution part of the page's metric summary fails.
+  await page.route('**/v2/organizations/*/metrics/summary', async (route) => {
+    const requested = route.request().postDataJSON().parts;
+    const response = await route.fetch();
+    const body = await response.json();
+    await route.fulfill({
+      response,
+      json: {
+        ...body,
+        parts: body.parts.map((part, index) =>
+          requested[index].request.metrics?.some((id) =>
+            id.startsWith('resolution.'),
+          )
+            ? {
+                kind: part.kind,
+                status: 503,
+                error: {
+                  code: 'SERVICE_UNAVAILABLE',
+                  message: 'Unavailable',
+                  requestId: 'test',
+                },
+              }
+            : part,
+        ),
+      },
+    });
   });
   await section
     .getByRole('button', { name: 'Refresh summary', exact: true })
     .click();
   await section.getByText('Summary unavailable', { exact: true }).waitFor();
   expect(await section.locator('[data-metric]').count()).toBe(0);
-  await page.unroute('**/v2/organizations/*/metrics/query');
+  await page.unroute('**/v2/organizations/*/metrics/summary');
   await section
     .getByRole('button', { name: 'Refresh summary', exact: true })
     .click();

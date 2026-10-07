@@ -208,3 +208,67 @@ it('reuses permitted-read health through failure, recovery, revocation and disco
   );
   expect((await read()).items[0].reasons).toEqual(['unobserved']);
 });
+
+it('reads several metric views in one summary and keeps a failed part to itself', async (t) => {
+  const f = await settingsFixture(t);
+  await seedOperationalMetrics(f);
+  const summary = `/v2/organizations/${f.org.id}/metrics/summary`;
+  const parts = [
+    { kind: 'operational', request: operationalRequest },
+    { kind: 'orders', request: {} },
+  ];
+  const read = await f.request(f.owner, summary, 'POST', { parts });
+  expect(read.parts.map((part) => [part.kind, part.status])).toEqual([
+    ['operational', 200],
+    ['orders', 200],
+  ]);
+  const direct = await f.request(
+    f.owner,
+    operationalEndpoint(f),
+    'POST',
+    operationalRequest,
+  );
+  // Ages grow between the two reads; counts must match.
+  const counts = (metrics) =>
+    metrics
+      .filter((m) => m.definition.unit !== 'second')
+      .map((m) => [m.definition.id, m.value]);
+  expect(counts(read.parts[0].body.metrics)).toEqual(counts(direct.metrics));
+  expect(read.parts[1].body.metrics.map((m) => m.definition.id)).toEqual([
+    'orders.open',
+    'orders.overdue',
+    'orders.attention',
+  ]);
+  const boundaries = read.parts
+    .map((part) => part.body.nextRefreshAt)
+    .filter(Boolean)
+    .map(Date.parse);
+  expect(read.nextRefreshAt && Date.parse(read.nextRefreshAt)).toBe(
+    boundaries.length ? Math.min(...boundaries) : null,
+  );
+
+  // A changed order snapshot fails only its part.
+  const stale = await f.request(f.owner, summary, 'POST', {
+    parts: [
+      parts[0],
+      {
+        kind: 'orders',
+        request: {
+          asOf: new Date().toISOString(),
+          snapshot: '0'.repeat(64),
+          offset: 20,
+        },
+      },
+    ],
+  });
+  expect(stale.parts[0].status).toBe(200);
+  expect(stale.parts[1]).toMatchObject({
+    kind: 'orders',
+    status: 409,
+    error: { code: 'CONFLICT' },
+  });
+
+  await f.request(f.owner, summary, 'POST', { parts: [] }, 400);
+  await f.request(f.outsider, summary, 'POST', { parts }, 404);
+  await f.request(null, summary, 'POST', { parts }, 401);
+});

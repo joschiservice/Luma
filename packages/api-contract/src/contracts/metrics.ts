@@ -7,6 +7,10 @@ import {
   requires,
 } from '../common.js';
 import {
+  metricSummaryRequestSchema,
+  metricSummaryResponseSchema,
+} from '../metric-summary.js';
+import {
   metricDefinitionSchema,
   metricRequestSchema,
   metricResponseSchema,
@@ -53,6 +57,22 @@ export const metricsContract = c.router({
     summary: 'Read selected operational metrics and matching records',
     description:
       'Reads cases, monitored stock, purchase orders, connection health and evidence-backed resolution outcomes in one authorized snapshot. Select metric IDs explicitly. Filters must be supported by every selected metric. Reuse snapshot and asOf for pagination; refresh on 409. Resolution alone accepts environment and a 24-hour or seven-day first-detection window; other families describe current state. Null values, unknown classification and unavailable coverage are distinct from zero.',
+  },
+  summary: {
+    method: 'POST',
+    metadata: requires('insights.read'),
+    path: '/v2/organizations/:organizationId/metrics/summary',
+    pathParams: organizationParamsSchema,
+    body: metricSummaryRequestSchema,
+    responses: {
+      200: metricSummaryResponseSchema,
+      400: apiErrorSchema,
+      401: apiErrorSchema,
+      404: apiErrorSchema,
+    },
+    summary: 'Read several metric views in one request',
+    description:
+      'Reads up to four parts, each an order (v1) or operational (v2) metric query, with the same rules as those endpoints, and returns them in request order. A part that fails carries its own status and error; the other parts are unaffected. Each part has its own snapshot and asOf; page a part through its own query endpoint. nextRefreshAt is the earliest boundary across the parts that were read.',
   },
   definitions: {
     method: 'GET',

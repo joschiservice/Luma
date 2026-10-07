@@ -5,16 +5,24 @@ import {
   useParams,
   useSearch,
 } from '@tanstack/react-router';
+import { useMemo, useState } from 'react';
 
 import { OperationalCharts } from '../insights/charts';
 import type { InsightsSearch } from '../insights/data';
+import { useLiveMetricSummary } from './metrics-live';
 import { OperationalMetrics } from './operational-metrics';
-import { OrderMetrics } from './order-metrics';
-import { ResolutionOutcomes } from './resolution-outcomes';
+import { operationalMetricRequest } from './operational-metrics-data';
+import { orderMetricRequest, OrderMetrics } from './order-metrics';
+import {
+  type OutcomeEnvironment,
+  type OutcomeWindow,
+  resolutionMetricRequest,
+  ResolutionOutcomes,
+} from './resolution-outcomes';
 
 /**
  * Shows live operational metrics, trends over time and order flow, with drill-downs into the
- * matching records.
+ * matching records. The metric sections share one live summary read.
  */
 export function InsightsPage() {
   const { organizationId } = useParams({
@@ -23,6 +31,17 @@ export function InsightsPage() {
   const search = useSearch({ from: '/app/$organizationId/insights' });
   const navigate = useNavigate({ from: '/app/$organizationId/insights' });
   const location = useLocation();
+  const [environment, setEnvironment] = useState<OutcomeEnvironment>('live');
+  const [window, setWindow] = useState<OutcomeWindow>('7d');
+  const resolution = useMemo(
+    () => resolutionMetricRequest(environment, window),
+    [environment, window],
+  );
+  const live = useLiveMetricSummary(organizationId, {
+    operational: operationalMetricRequest,
+    resolution,
+    orders: orderMetricRequest,
+  });
 
   return (
     <div className="insights">
@@ -30,6 +49,7 @@ export function InsightsPage() {
       <OperationalMetrics
         key={`summary-${organizationId}`}
         organizationId={organizationId}
+        live={live.operational}
       />
       <OperationalCharts
         key={`charts-${organizationId}`}
@@ -46,8 +66,17 @@ export function InsightsPage() {
       <ResolutionOutcomes
         key={`resolution-${organizationId}`}
         organizationId={organizationId}
+        live={live.resolution}
+        environment={environment}
+        window={window}
+        onEnvironmentChange={setEnvironment}
+        onWindowChange={setWindow}
       />
-      <OrderMetrics key={organizationId} organizationId={organizationId} />
+      <OrderMetrics
+        key={organizationId}
+        organizationId={organizationId}
+        live={live.orders}
+      />
     </div>
   );
 }
