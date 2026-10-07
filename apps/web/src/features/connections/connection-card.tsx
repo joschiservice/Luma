@@ -62,8 +62,9 @@ export function ConnectionCard({
   const lock = useRef(false);
   const summary =
     sync && syncAsOf && appAvailable ? connectionSummary(sync, syncAsOf) : null;
-  const terminal =
-    connection.status === 'disconnected' || connection.status === 'revoked';
+  // People disconnect; only providers revoke, and a revoked connection can be reconnected.
+  const terminal = connection.status === 'disconnected';
+  const revoked = connection.status === 'revoked';
   const permitted =
     connection.status === 'active' && appAvailable
       ? connection.permissions.filter((p) => connection.granted.includes(p))
@@ -131,9 +132,11 @@ export function ConnectionCard({
           ? 'This app is unavailable in the workspace. Historical connection data remains accessible.'
           : terminal
             ? 'Access stopped. Add a connection to reconnect.'
-            : connection.status === 'active'
-              ? 'Credentials and requested permissions validated.'
-              : 'Validate access or open connection settings to restore access.'}
+            : revoked
+              ? 'The provider stopped accepting Luma’s access. Reconnect to resume reads and changes.'
+              : connection.status === 'active'
+                ? 'Credentials and requested permissions validated.'
+                : 'Validate access or open connection settings to restore access.'}
       </p>
       {summary ? (
         <p className="connection-sync">
@@ -183,11 +186,17 @@ export function ConnectionCard({
             open={dialog === 'settings'}
             onOpenChange={(open) => setDialog(open ? 'settings' : null)}
           >
-            <DialogTrigger render={<Button variant="outline" />}>
-              Connection settings
+            <DialogTrigger
+              render={<Button variant={revoked ? 'default' : 'outline'} />}
+            >
+              {revoked ? 'Reconnect' : 'Connection settings'}
             </DialogTrigger>
             <DialogContent className="connection-dialog">
-              <DialogTitle>Connection settings</DialogTitle>
+              <DialogTitle>
+                {revoked
+                  ? `Reconnect ${connection.label}`
+                  : 'Connection settings'}
+              </DialogTitle>
               <DialogDescription>
                 Manage this connection through its app.
               </DialogDescription>
@@ -207,6 +216,7 @@ export function ConnectionCard({
         {canManage && !terminal ? (
           <div className="connection-actions">
             {appAvailable &&
+            !revoked &&
             (!connection.management ||
               connection.management.includes('check')) ? (
               <Button disabled={pending} onClick={() => void run('check')}>

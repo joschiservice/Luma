@@ -302,6 +302,7 @@ const stream = (overrides: Partial<SyncStreamState> = {}): SyncStreamState => ({
   provider: 'jtl',
   capability: 'orders.read',
   active: true,
+  accessLostAt: null,
   attempts: 0,
   errorCode: null,
   errorAt: null,
@@ -413,6 +414,38 @@ describe('detection monitor', () => {
     await f.monitor.tick(context);
 
     expect(f.exceptions.verify).toHaveBeenCalledTimes(1);
+    expect(f.exceptions.incidents[0]!.state).toBe('resolved');
+  });
+
+  it('opens one case when the provider revokes access and verifies it after reconnecting', async () => {
+    const lost = { active: false, accessLostAt: ago(2) };
+    const f = fixture({
+      streams: [
+        stream(lost),
+        stream({ ...lost, capability: 'products.read' }),
+        // A connection a person disconnected stays clear.
+        stream({ connectionId: connections.de, active: false }),
+      ],
+    });
+
+    await f.monitor.tick(context);
+    await f.monitor.tick(context);
+
+    expect(f.exceptions.incidents).toHaveLength(1);
+    expect(f.exceptions.incidents[0]).toMatchObject({
+      state: 'detected',
+      subject: { subjectId: connections.erp, scope: ['orders.read'] },
+    });
+    expect(f.diagnose).toHaveBeenCalledTimes(1);
+
+    f.state.streams[0] = {
+      ...f.state.streams[0]!,
+      active: true,
+      accessLostAt: null,
+      lastCompleteAt: now.toISOString(),
+    };
+    await f.monitor.tick(context);
+
     expect(f.exceptions.incidents[0]!.state).toBe('resolved');
   });
 

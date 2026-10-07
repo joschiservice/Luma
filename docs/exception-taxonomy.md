@@ -55,7 +55,7 @@ If a connector failure causes a workflow failure, preserve both subjects and lin
 
 **Normal:** a successful, complete scan for the requested scope advances its checkpoint. Quiet webhook traffic and an idle worker are normal without a scheduled job failure.
 
-**Trigger:** an active connection has a normalized failed read. `authentication`, `permission_denied`, `invalid_response`, `unsupported_capability` or `unsupported_version` detect immediately with severity `high`. `transient`, `timeout` or `rate_limited` detect with severity `medium` only when `retryExhausted = true` and elapsed time since `firstFailureAt >= 900 s`. A success resets the failure window. Other errors defer for classification. Intentional inactive connections are excluded. A failed pagination page qualifies as a read failure; retain every last-good snapshot.
+**Trigger:** an active connection has a normalized failed read. `authentication`, `permission_denied`, `invalid_response`, `unsupported_capability` or `unsupported_version` detect immediately with severity `high`. `transient`, `timeout` or `rate_limited` detect with severity `medium` only when `retryExhausted = true` and elapsed time since `firstFailureAt >= 900 s`. A success resets the failure window. Other errors defer for classification. A connection the provider stopped accepting (`accessLost`: Luma recorded the credential or grant rejection and nobody reconnected since) detects immediately with severity `high`, even though its streams no longer read. Connections a person disconnected are excluded. A failed pagination page qualifies as a read failure; retain every last-good snapshot.
 
 **Evidence:** connection, capability, failed scan/event ID, normalized error code, first/latest failure time, retry exhaustion, retry-after advice and last successful checkpoint. No error-message parsing. Failed or incomplete scans never prove deletion.
 
@@ -67,7 +67,7 @@ If a connector failure causes a workflow failure, preserve both subjects and lin
 
 **Escalate:** immediate operator review for hard errors; transient failure still present 30 minutes after detection; no authorized credential owner; repeated invalid response; unknown effects on a related write.
 
-**Golden cases:** `sync-*` cover hard errors, retry-window edges, incomplete pagination, disabled connections and unclassified errors.
+**Golden cases:** `sync-*` cover hard errors, retry-window edges, incomplete pagination, disabled connections, lost access and unclassified errors.
 
 ## 2. `stuck_fulfillment`
 
@@ -149,3 +149,7 @@ If a connector failure causes a workflow failure, preserve both subjects and lin
 | Only stale/partial/uncertain recovery evidence                        | Remain unresolved; request authoritative refresh.                 |
 
 Detection output never grants execution. Resolution follows ADR-002: passed verification, or explicit human disposition with actor, reason and evidence. Human disposition is not counted as autonomous verified success.
+
+## Changes
+
+- **2026-10-07, `sync_failure` lost access ([LUMA-138](https://linear.app/auren-labs/issue/LUMA-138)).** Added the optional fact `accessLost` and the decision `detect`/`high`/`access_lost`, evaluated before the inactive-connection branch. Before, an inactive connection was always clear, so a provider revoking Luma's access opened no case and people learned of it only from stale data. Inputs without the fact evaluate exactly as before, so the rule stays `v0.1` and stored evaluations remain reproducible. Golden case: `sync-access-lost`.

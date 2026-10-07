@@ -169,6 +169,21 @@
       }
     },
     {
+      "id": "sync-access-lost",
+      "exceptionClass": "sync_failure",
+      "input": {
+        "active": false,
+        "accessLost": true,
+        "status": "success",
+        "errorCode": null
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "high",
+        "reason": "access_lost"
+      }
+    },
+    {
       "id": "sync-healthy",
       "exceptionClass": "sync_failure",
       "input": {

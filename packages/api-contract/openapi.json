@@ -83625,7 +83625,7 @@
     },
     "/v1/organizations/{organizationId}/connections/{connectionId}/credentials": {
       "post": {
-        "description": "Replaces credentials and clears verified permissions. Check the connection again to restore access. Use the latest connection version.",
+        "description": "Replaces credentials and clears verified permissions. Check the connection again to restore access. Also reconnects a connection whose provider revoked access, keeping its ID, mappings and history; a disconnected connection returns 409. Use the latest connection version.",
         "summary": "Replace connection credentials",
         "tags": ["connections"],
         "parameters": [

@@ -100,7 +100,7 @@ Ground truth stays in the simulator database. The **Scorecard** compares it with
 - **Closed without verification:** cases resolved by a verification that wasn't passed, complete and authoritative.
 - **Repeated writes:** provider writes committed more than once for the same idempotency key, or the same body when no key was sent.
 
-Luma's sync process runs [scheduled detection](exception-detection.md#scheduled-detection) for sync failures, stock mismatches between linked SKUs and stuck fulfillment. Kinds without a rule report as not covered. A revoked credential makes the connection inactive, which the sync-failure rule treats as clear, so **Credentials revoked** reports as missed.
+Luma's sync process runs [scheduled detection](exception-detection.md#scheduled-detection) for sync failures, stock mismatches between linked SKUs and stuck fulfillment. Kinds without a rule report as not covered. A rejected credential revokes the connection; the sync-failure rule reports that lost access, so **Access revoked** is detected. To close the case, reconnect the store with any token in its connection settings; the simulator accepts it once the incident ends.
 
 ## Workflow demo
 
@@ -121,7 +121,7 @@ The API process completes the setup once the records are imported and linked, re
 | Write commits, response lost | The correction commits but its response is lost; Luma reconciles by reading and never writes twice.                       |
 | Overdue fraud hold           | A held order; after approval the hold is released, and the case stays open until the order ships.                         |
 | Shop outage                  | Reads fail; the connection check waits 15 minutes, then ends or hands the case over.                                      |
-| Access revoked               | Connections shows lost access; no case opens, so the scorecard reports it missed.                                         |
+| Access revoked               | A lost-access case opens and the connection check hands it to a person with Reconnect; it closes after a fresh scan.      |
 
 A repeated request with the same ID starts nothing new. Definitions live in `packages/simulator/core/src/scenarios.ts`; `POST /api/runs/:id/scenarios` starts one. The incident list links each case to its latest workflow run and shows the run's state.
 

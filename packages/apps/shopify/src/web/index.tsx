@@ -46,10 +46,64 @@ export default function ShopifySettings(props: AppUiProps) {
       />
     ) : null;
 
-  return props.slot === 'page' ? (
-    <ShopifyRecordPage {...props} />
+  if (props.slot === 'page') return <ShopifyRecordPage {...props} />;
+
+  // Without OAuth, such as in the simulator, a store reconnects with a new access token.
+  return props.connection?.management?.includes('rotate') &&
+    props.connection.status !== 'disconnected' ? (
+    <ShopifyToken {...props} />
   ) : (
     <ShopifyAuthorization {...props} />
+  );
+}
+
+/** Replaces a token-based store's access token, which also reconnects a revoked store. */
+function ShopifyToken({ connection, services, done }: AppUiProps) {
+  const [token, setToken] = useState('');
+  const [message, setMessage] = useState('');
+  const [pending, setPending] = useState(false);
+  if (!connection) return null;
+
+  return (
+    <form
+      className="connection-setup-form"
+      aria-busy={pending}
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (pending || !token.trim()) return;
+        setPending(true);
+        setMessage('');
+        services
+          .rotate(connection, { token: token.trim() })
+          .then(done)
+          .catch((error: unknown) => setMessage(services.error(error)))
+          .finally(() => {
+            setToken('');
+            setPending(false);
+          });
+      }}
+    >
+      <p className="field-help">
+        Enter a new Admin API access token for {connection.target.shop}. Then
+        validate access to resume reads.
+      </p>
+      <div className="form-field">
+        <label htmlFor="shopify-token">Access token</label>
+        <Input
+          id="shopify-token"
+          type="password"
+          autoComplete="off"
+          value={token}
+          onChange={(event) => setToken(event.target.value)}
+          required
+          disabled={pending}
+        />
+      </div>
+      <p role="alert">{message}</p>
+      <Button type="submit" disabled={pending || !token.trim()}>
+        {pending ? 'Saving…' : 'Save access token'}
+      </Button>
+    </form>
   );
 }
 

@@ -47,6 +47,10 @@ function IssueWorkspace({
   const item = observation.denied
     ? undefined
     : observation.snapshot.data?.detail;
+  const connection =
+    item?.subject.kind === 'connection'
+      ? connections.data?.find(({ id }) => id === item.subject.id)
+      : undefined;
 
   return (
     <IssuePageLayout
@@ -86,6 +90,22 @@ function IssueWorkspace({
               }}
             >
               Inspect product <ArrowRight size={14} />
+            </Link>
+          ) : null}
+          {connection ? (
+            <Link
+              to={
+                connection.appId
+                  ? '/app/$organizationId/apps/$appId/settings'
+                  : '/app/$organizationId/apps'
+              }
+              params={{ organizationId, appId: connection.appId ?? '' }}
+              hash={`connection-${connection.id}`}
+            >
+              {connection.status === 'active'
+                ? 'Open connection'
+                : `Reconnect ${connection.label}`}{' '}
+              <ArrowRight size={14} aria-hidden="true" />
             </Link>
           ) : null}
           {item?.subject.kind === 'fulfillment' ? (
