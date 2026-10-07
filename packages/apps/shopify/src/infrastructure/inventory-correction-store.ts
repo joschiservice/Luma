@@ -79,7 +79,7 @@ export function createCorrectionStore(
     settle: (context, id) =>
       database.transaction(context.tenantId, async (tx) => {
         await tx.query(
-          'UPDATE shopify_inventory_claims SET settled=true WHERE tenant_id=$1 AND run_id=$2',
+          'UPDATE shopify_inventory_claims SET settled=true WHERE tenant_id=$1 AND run_id=$2 AND NOT settled',
           [context.tenantId, id],
         );
       }),
