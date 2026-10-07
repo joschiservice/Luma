@@ -1,32 +1,15 @@
 # @luma/worker
 
-Runs the Temporal worker process for exception resolution.
+Runs Luma's two background processes. Both install instrumentation in a bootstrap file before loading the application.
 
-## Responsibilities
+- **Workflow worker** (`start`, `dev:worker`; `src/bootstrap.ts`): the Temporal worker for exception, process and replenishment workflows. It also advances scheduled workflow starts.
+- **Commerce sync worker** (`start:sync`, `dev`; `src/sync-bootstrap.ts`): history import and sync, supplier follow-up and scheduled detection.
 
-The bootstrap initializes instrumentation and starts the shared worker runtime. The default runtime disables provider writes; effects require explicit configuration. Keep workflow implementation in workflow-temporal and service assembly in application-runtime.
-
-## Entry points
-
-- [src/bootstrap.ts](src/bootstrap.ts)
-- [src/index.ts](src/index.ts)
-
-## Workspace dependencies
-
-[@luma/application-runtime](../../packages/application-runtime/README.md), [@luma/config](../../packages/config/README.md), [@luma/platform](../../packages/platform/README.md).
-
-## Development
-
-Run commands from the repository root after installing workspace dependencies.
-
-```sh
-pnpm dev:workflows
-pnpm exec turbo run build --filter=@luma/worker...
-pnpm exec turbo run typecheck --filter=@luma/worker
-pnpm exec turbo run test --filter=@luma/worker
-```
+The default workflow worker composes execution without effect adapters, so admitted playbook actions fail their capability check and make no provider writes; effects require explicit configuration. Workflow implementation belongs to workflow-temporal and service assembly to application-runtime.
 
 ## Further reading
 
-- [Engineering guide](../../docs/exception-workflows.md)
+- [Exception workflows](../../docs/exception-workflows.md)
+- [Workflows](../../docs/workflows.md)
+- [Commerce sync](../../docs/commerce-sync.md)
 - [Package boundaries and runtime composition](../../docs/architecture/005-domain-packages-and-runtimes.md)

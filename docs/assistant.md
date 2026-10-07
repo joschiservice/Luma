@@ -1,40 +1,45 @@
 # Ask Luma assistant
 
-Ask Luma answers workspace questions through a bounded model loop over read-only tools. It runs inside the API with the asking member's `TenantContext`. It doesn't call the Luma HTTP API or an MCP server, and the model never holds a credential. Users find it in the top bar, with ⌘ J and in the command menu; see the [user guide](../apps/web/content/docs/ask-luma.mdx).
+Ask Luma answers workspace questions through a bounded model loop over read-only tools. It
+runs inside the API with the asking member's `TenantContext`, does not call the Luma HTTP
+API or an MCP server, and never gives the model a credential. Answers can only cite records
+that were read for the current question. The [user guide](../apps/web/content/docs/ask-luma.mdx)
+describes the feature for users.
 
 ## Request path
 
-`POST /v1/organizations/:organizationId/assistant/answers` (`packages/assistant/src/api/assistant.ts`) calls `ask` in `application/assistant.ts`:
+- The context is refreshed and must hold `assistant.use` with an unchanged actor. The
+  model is offered only the tools the person's permissions allow, and each tool checks its
+  permission again.
+- Without an EU zero-retention Bedrock route for the `assistant` profile, the request
+  returns 503 with the reason and no model is called.
+- Requests are `sensitive`, EU, zero-retention. Before each tool batch the context is
+  refreshed again; a removed member or changed actor ends the answer with the identity
+  error.
 
-1. Refreshes the context and requires `assistant.use` and an unchanged actor. The model is offered only tools the person's permissions allow, and each tool checks its permission again.
-2. Returns 503 with the availability reason, without calling a model, when the `assistant` route isn't an EU zero-retention Bedrock route (`assistantAvailability` in `packages/application-runtime/src/composition/authoring.ts`).
-3. Sends the system prompt, the client's earlier turns and the question with `profile: 'assistant'` and `dataPolicy: { classification: 'sensitive', region: 'EU', zeroDataRetention: true }`.
-4. For each tool batch, refreshes the context again and runs the calls through the tool registry. A removed member or changed actor ends the answer with the identity error.
-5. Resolves citation markers in the final text and returns the answer, the cited records, the reads made and usage.
-
-Conversations aren't stored. The client sends up to 20 earlier turns. The prompt tells the model to read again rather than rely on them, and citations only resolve to records read for the current question.
+Conversations are not stored. The client sends up to 20 earlier turns; the prompt tells the
+model to read again rather than rely on them.
 
 ## Tools
 
-`application/tools.ts` defines the registry; the tools live in `infrastructure/tools`. A tool has a stable name, a model-facing description, a JSON Schema, a parser, a person-facing summary of a call, and a handler that receives the freshly checked context. Filter values are typed against the read ports, and `composition/assistant.test.ts` checks them against the API contract. Handlers call owner read services (`OrderWorkspace`, `CaseService`, `InventoryWorkspace`, `FulfillmentWorkspace`, `ReturnWorkspace`), never SQL, so scoping, RLS and metric definitions match the pages.
+Tool handlers call owner read services (orders, cases, inventory, fulfillment, returns),
+never SQL, so scoping, RLS and metric definitions match the pages. To add a tool, define it
+next to the others, register it in the assistant composition, and, if it cites a new record
+kind, add the kind to the assistant record-kind schema and the web `RecordLink`. Keep
+projections small: only fields that answer questions, with provider text clipped. Filter
+values are typed against the read ports and tested against the API contract.
 
-| Tool                 | Reads                                     | Cites                             |
-| -------------------- | ----------------------------------------- | --------------------------------- |
-| `search_orders`      | `OrderWorkspace.list` with `count: exact` | orders                            |
-| `get_order`          | `OrderWorkspace.get`                      | the order, its issues and returns |
-| `search_issues`      | `CaseService.list`                        | issues                            |
-| `get_issue`          | `CaseService.get` with its diagnosis      | the issue                         |
-| `search_stock`       | `InventoryWorkspace.list`                 | stock positions                   |
-| `search_fulfillment` | `FulfillmentWorkspace.list`               | fulfillment orders and shipments  |
-| `search_returns`     | `ReturnWorkspace.list`                    | returns and refunds               |
+The tool registry validates arguments, not the gateway, whose tool parser only requires a
+JSON object. Invalid arguments and stale cursors come back to the model as tool results
+with field problems, so it can correct them within the budget. Undeclared tools are still
+rejected by the gateway (`invalid_output`), which fails the answer before anything runs.
 
-To add a tool, write it with `defineTool` next to the others, register it in `createWorkspaceAssistant` (`src/composition.ts`), and add its record kind to `assistantRecordKindSchema` and the web `RecordLink` if it cites a new kind. Keep the projection small: only fields that answer questions, with provider text clipped.
+## Citations
 
-Arguments are validated by the registry, not the gateway: the gateway tool parser only requires a JSON object. Invalid arguments and stale cursors become tool results with field problems, so the model can correct them within the read budget. Undeclared tools are still rejected by the gateway (`invalid_output`), which fails the answer before anything runs.
-
-## Citations and evidence
-
-Every record in a tool result carries a `cite` marker, `[[kind:id]]`. The model copies markers into its answer. `resolveCitations` (`domain/answer.ts`) keeps a marker only when that record was in a tool result shown to the model for this question, and returns the record's source labels, `observedAt` and `sourceUpdatedAt`. For issues, `observedAt` is the last activity. The web panel renders markers as numbered links and lists the sources under the answer.
+Every record in a tool result carries a `[[kind:id]]` marker that the model copies into its
+answer. A marker survives only when that record was in a tool result shown to the model for
+this question. Resolved citations carry the record's source labels, `observedAt` and
+`sourceUpdatedAt`; for issues, `observedAt` is the last activity.
 
 ## Limits
 
@@ -47,21 +52,20 @@ Every record in a tool result carries a `cite` marker, `[[kind:id]]`. The model 
 | Deadline                   | 60 s              | 503, combined with client disconnects                  |
 | Tool result size           | 12,000 characters | Items dropped from the end with `omitted`              |
 
-Model failures map to fixed 503 reasons. No retries or fallback happen beyond gateway behavior; asking again is safe because nothing is written.
+Model failures map to fixed 503 reasons. Nothing retries or falls back beyond gateway
+behavior; asking again is safe because nothing is written.
 
 ## Untrusted data and telemetry
 
-Tool results include provider text, such as titles and return reasons. The system prompt marks tool results as data, not instructions. Prompt injection can at most change the wording of an answer: tools are read-only, scoped to the asking member, and citations only resolve to records actually read.
+Tool results include provider text such as titles and return reasons. The system prompt
+marks tool results as data, not instructions. Prompt injection can at most change an
+answer's wording: tools are read-only, scoped to the asking member, and citations resolve
+only to records actually read.
 
-Questions, answers and tool data stay out of logs, spans and Langfuse. `agent.run` wraps a question, `tool.execute` each read, and `model.generate` records the route, token counts and latency.
+Questions, answers and tool data stay out of logs, spans and Langfuse. `agent.run` wraps a
+question, `tool.execute` each read, and `model.generate` records the route, token counts and
+latency.
 
-## Availability and deployment
-
-Route the `assistant` profile like authoring; see [Model gateway](model-gateway.md#assistant-profile). Synthetic local data doesn't need the [processing-path review](architecture/003-model-processing-path-review.md); tenant data does.
-
-## Tests
-
-- `packages/application-runtime/src/composition/assistant.test.ts`: scripted Bedrock responses through the real gateway, covering citations, unavailability, removed members, actor changes, invalid arguments, undeclared tools, read and call limits, cancellation, deadlines, result bounds and history.
-- `packages/assistant/src/domain/answer.test.ts`: marker resolution and result bounding.
-- `packages/application-runtime/src/composition/authoring.test.ts`: route availability.
-- `apps/web/src/features/assistant/presentation.test.ts`: answer parsing, history and suggestions; `Assistant/Panel` stories cover the panel states.
+Route the `assistant` profile like authoring; see
+[Model gateway](model-gateway.md#assistant-profile). Synthetic local data does not need the
+[processing-path review](architecture/003-model-processing-path-review.md); tenant data does.

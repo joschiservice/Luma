@@ -1,42 +1,17 @@
 # Shopify partner readiness
 
-Luma uses a standalone OAuth app. Merchants authorize in Shopify; they do not
-create an app or paste credentials. Development and production must use separate
-app credentials, databases and encryption keys.
+Luma uses one Luma-owned, non-embedded public Shopify app with standalone OAuth for
+unrelated merchants; each shop gets its own installation and token pair. Merchants never
+create an app or paste credentials. Code is shared across environments, but app
+credentials, redirect URLs, databases, encryption keys and installations are separate per
+environment. This guide covers app configuration, the external approvals Shopify gates,
+privacy request handling and the pre-launch smoke test.
 
-## Developer portal settings
+## App configuration
 
-Use the development store `luma-dev-store-1dmrgwsn.myshopify.com` for synthetic
-smoke tests. There is no production deployment or approved public app yet.
-
-| Setting                    | Value                                                                                                                                                                                                                                              |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Distribution               | Public distribution for unrelated merchants; select before requesting protected data                                                                                                                                                               |
-| Embedded app               | Off                                                                                                                                                                                                                                                |
-| App URL                    | The public HTTPS Luma web origin (development: the running tunnel)                                                                                                                                                                                 |
-| Allowed redirection URL    | `https://<luma-host>/api/v1/shopify/callback` (exact match)                                                                                                                                                                                        |
-| Installation               | Authorization-code grant; `use_legacy_install_flow = true`                                                                                                                                                                                         |
-| API and webhook version    | `2026-07`                                                                                                                                                                                                                                          |
-| Required scopes            | `read_orders,read_products,read_inventory,write_inventory,read_merchant_managed_fulfillment_orders,read_third_party_fulfillment_orders,read_returns,read_locations,write_merchant_managed_fulfillment_orders,write_third_party_fulfillment_orders` |
-| Customer scope             | Add `read_customers` after enabling the protected-data selection for development or receiving production approval                                                                                                                                  |
-| Historical scope           | Add `read_all_orders` only after Shopify grants this scope                                                                                                                                                                                         |
-| Compliance topics          | `customers/data_request`, `customers/redact`, `shop/redact`                                                                                                                                                                                        |
-| Compliance URL (all three) | `https://<luma-host>/api/v1/shopify/privacy`                                                                                                                                                                                                       |
-
-Fulfillment recovery requires the fulfillment write scopes. Existing read-only
-connections keep their read access and must reconnect to enable recovery.
-Inventory corrections require `write_inventory` and a separate approval. See
-[Shopify inventory corrections](shopify-inventory-corrections.md).
-
-Publish the configuration version after changing URLs or scopes. The server
-registers connection-specific `app/uninstalled` and `app/scopes_update`
-subscriptions during authorization, plus order, fulfillment, product,
-inventory-level and (when approved) customer change notifications at
-`/api/v1/shopify/changes/:organizationId/:connectionId`. Change subscriptions are
-best effort; scheduled reads still cover their records. Existing connections must reconnect once
-to install the new scope-change subscription.
-
-Example configuration (replace placeholders; no secrets belong in this file):
+Configure each environment's app with these values (replace placeholders; secrets never
+belong in this file). The scopes must match what the server requests; check the OAuth
+scope list in `@luma/app-shopify` when changing them.
 
 ```toml
 client_id = "<app-client-id>"
@@ -59,62 +34,74 @@ compliance_topics = ["customers/data_request", "customers/redact", "shop/redact"
 uri = "/api/v1/shopify/privacy"
 ```
 
-Set `SHOPIFY_CLIENT_ID`, `SHOPIFY_CLIENT_SECRET`, `SHOPIFY_APP_ENVIRONMENT`,
-`SHOPIFY_CALLBACK_URL`, and `SHOPIFY_WEB_ORIGIN` on the server. Keep the web origin
-and callback origin identical so the signed-in session survives the redirect.
-Set `SHOPIFY_PROTECTED_CUSTOMER_DATA_APPROVED=true` only after the development
-selection or production approval; set `SHOPIFY_ALL_ORDERS_APPROVED=true` only
-when Shopify grants older-order access. Both default to false. Restart the
-server and reconnect after changing either flag. These flags request access;
-they cannot grant it. The record reader checks actual grants for each request.
+- The redirect URL must match exactly. In development, the app URL is the running tunnel.
+- Add `read_customers` only after enabling the protected-data selection (development) or
+  receiving production approval, and `read_all_orders` only after Shopify grants it.
+- Publish the configuration version after changing URLs or scopes. Existing connections
+  must reconnect to receive new scopes or subscriptions; until then they keep their
+  current access (read-only connections cannot run [Shopify actions](shopify-actions.md)).
+- Change subscriptions are registered per connection during authorization (see
+  [commerce sync](commerce-sync.md#change-notifications)).
 
-Set `SHOPIFY_CUSTOMER_CONTACT_APPROVED=true` only after Shopify also approves
-name, email and phone access for this deployment. Set
-`SHOPIFY_CUSTOMER_ADDRESS_APPROVED=true` only after Shopify approves address access;
-Data sync then imports default addresses with customer profiles. It defaults to false. Without
-it, Customers shows source identities and authorized order history, and withholds
-contact fields and name/email search. Restart after changing this flag.
+Server settings: `SHOPIFY_CLIENT_ID`, `SHOPIFY_CLIENT_SECRET`, `SHOPIFY_APP_ENVIRONMENT`,
+`SHOPIFY_CALLBACK_URL` and `SHOPIFY_WEB_ORIGIN`, kept in the deployment secret manager
+with a stable public HTTPS origin. Keep the web origin and callback origin identical so
+the signed-in session survives the redirect.
+
+Approval flags request access; they cannot grant it, and the record reader checks actual
+grants on every request. All default to false. Restart the server and reconnect after
+changing one.
+
+| Flag                                       | Set only after Shopify approves                          |
+| ------------------------------------------ | -------------------------------------------------------- |
+| `SHOPIFY_PROTECTED_CUSTOMER_DATA_APPROVED` | Protected customer data (requests `read_customers`)      |
+| `SHOPIFY_CUSTOMER_CONTACT_APPROVED`        | Name, email and phone access                             |
+| `SHOPIFY_CUSTOMER_ADDRESS_APPROVED`        | Address access; data sync then imports default addresses |
+| `SHOPIFY_ALL_ORDERS_APPROVED`              | Older-order access (requests `read_all_orders`)          |
+
+Without contact approval, Customers shows source identities and authorized order history,
+and imported profiles and live reads withhold names, email addresses and phone numbers.
 
 ## External approvals
 
-| Approval                | Where to request it                                                                   | Current state / effect                                                                                                                                                       |
-| ----------------------- | ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Protected customer data | Partner Dashboard → Apps → app → API access requests → Protected customer data access | Not confirmed. Select protected customer data, explain the use, and save. Development-store-only testing does not require submission for review. Production requires review. |
-| Older orders            | Partner Dashboard → Apps → app → API access → Read all orders scope → Request access  | Not confirmed. Explain historical operational reconciliation. Without approval and a merchant grant, coverage is normally 60 days.                                           |
-| Public app              | Public distribution / app review submission                                           | Not submitted. Complete listing, support/privacy URLs, review credentials, installation instructions and data-protection details before submission.                          |
+Shopify gives no guaranteed approval date; treat review, possible resubmission and
+permission approval as onboarding lead time, and do not promise a merchant date until
+approval and deployed-store validation pass.
 
-Suggested protected-data rationale: “Luma reads order, payment, fulfillment and
-customer purchase context to investigate merchant operational exceptions. It
-does not request customer names, addresses, email or phone in commerce reads.”
-Privacy webhook requests can themselves contain email or phone identifiers;
-include their encrypted, restricted processing in the data-protection details.
-
-Suggested older-order rationale: “Merchants need to investigate unresolved
-orders, returns and fulfillment discrepancies older than 60 days and reconcile
-historical operational records.” Granting the scope alone does not backfill
-records: Data sync reports that older orders are available and an operator
-re-imports order history (see [Commerce sync](commerce-sync.md)). LUMA-104 supplies
-live operational record reads.
-
-Shopify does not give a guaranteed approval date in the linked guides. Treat
-review, possible resubmission and permission approval as external onboarding
-lead time. Record submission date, response and approval evidence on LUMA-115;
-do not promise a partner date until approval and deployed-store validation pass.
+- **Protected customer data:** Partner Dashboard → Apps → app → API access requests →
+  Protected customer data access. Select the data, explain the use and save.
+  Development-store testing needs no review; production does. Suggested rationale: "Luma
+  reads order, payment, fulfillment and customer purchase context to investigate merchant
+  operational exceptions." Privacy webhook requests can contain email or phone
+  identifiers; describe their encrypted, restricted processing in the data-protection
+  details.
+- **Older orders:** Partner Dashboard → Apps → app → API access → Read all orders scope →
+  Request access. Suggested rationale: "Merchants need to investigate unresolved orders,
+  returns and fulfillment discrepancies older than 60 days and reconcile historical
+  operational records." Granting the scope does not backfill: data sync reports that
+  older orders are available and an operator re-imports order history.
+- **Public distribution:** select public distribution before requesting protected data,
+  and complete the listing, support and privacy URLs, review credentials, installation
+  instructions and data-protection details before submitting for review.
 
 ## Privacy operations
 
-Migration `0038_shopify_privacy_requests.sql` provides app-wide durable intake,
-including after uninstall or workspace removal. Invalid HMAC returns 401. A 204
-means the encrypted request was committed, not that deletion/export is complete.
-Retries of the same signed body and topic are deduplicated, including after
-completion. No body, shop or customer identifiers are written to logs. The
-runtime database role can insert but cannot read or complete requests.
+The privacy endpoint durably stores encrypted `customers/data_request`,
+`customers/redact` and `shop/redact` requests app-wide, including after uninstall or
+workspace removal. An invalid HMAC returns 401. A 204 means the request was committed, not
+that export or deletion is complete. Retries of the same signed body and topic are
+deduplicated, including after completion. No body, shop or customer identifier is logged.
+The runtime role can insert requests but cannot read or complete them.
 
-Assign an operator before production onboarding. Check the queue daily and alert
-on pending requests approaching their 30-day deadline. Use a restricted operator
-session with database-owner/BYPASSRLS access, never the API runtime credentials.
-Supply `SHOPIFY_PRIVACY_DATABASE_URL` and the deployment encryption key settings
-through the secret manager. Build `@luma/connections` first.
+Imported customer profiles are erased automatically on intake (see
+[commerce sync](commerce-sync.md#customers)). Everything else is an operator procedure;
+the endpoint alone does not make a deployment compliant.
+
+Assign an operator before production onboarding. Check the queue daily and alert on
+requests approaching their 30-day deadline. Use a restricted operator session with
+database-owner or BYPASSRLS access, never the API runtime credentials. Supply
+`SHOPIFY_PRIVACY_DATABASE_URL` and the encryption key settings through the secret manager,
+and build `@luma/connections` first.
 
 ```sh
 node tooling/shopify/privacy.mjs list <environment:clientId>
@@ -122,69 +109,59 @@ node tooling/shopify/privacy.mjs export <environment:clientId> <event-key> /priv
 node tooling/shopify/privacy.mjs complete <environment:clientId> <event-key> <restricted-evidence-reference>
 ```
 
-Export creates a new mode-0600 file and never prints the decrypted request.
-Completion is an operator attestation: it removes the encrypted request and
-retains only topic, timestamps, event digest and the evidence reference. Do not
-complete a request merely because the webhook was received.
+Export creates a new mode-0600 file and never prints the decrypted request. Completion is
+an operator attestation: it removes the encrypted request and keeps only topic,
+timestamps, event digest and the evidence reference. Never complete a request merely
+because the webhook arrived.
 
 For each request:
 
-1. Resolve the authenticated app/shop against `shopify_installation_bindings` in
-   the operator database session. Never select a tenant from customer-supplied
-   data. Include prior connection history for that installation.
-2. For `customers/data_request`, locate the supplied customer/order IDs in retained
-   source observations and mappings, order snapshots/projections, raw evidence,
-   workflow and issue evidence, logs and exports. Live customer-context reads are
-   not persisted by the Shopify record reader. Provide the retained data (or a
-   documented no-data result) to the verified merchant through a secure channel.
-3. For `customers/redact`, imported customer profiles for the verified shop are
-   erased automatically when the request is received and are not imported again;
-   `shop/redact` erases all of the shop's imported profiles. Remove or anonymize the
-   remaining corresponding retained data
-   across those stores. Pause ingestion while doing so and ensure replay/backups
-   cannot restore erased data. Preserve only any documented legal retention.
-4. For `shop/redact`, stop the installation's ingestion, erase its secrets and
-   all retained shop data, including derived evidence and exports. Check current
-   installation status before acting on delayed requests after reinstall. Do not
-   delete another tenant's data or erase a newer installation solely from an old
-   uninstall delivery.
+1. Resolve the authenticated app and shop against the installation bindings in the
+   operator session, including prior connection history for that installation. Never
+   select a tenant from customer-supplied data.
+2. `customers/data_request`: locate the customer and order IDs in retained observations
+   and mappings, order snapshots and projections, raw evidence, workflow and issue
+   evidence, logs and exports. Live customer-context reads are not persisted. Deliver the
+   retained data, or a documented no-data result, to the verified merchant through a
+   secure channel.
+3. `customers/redact`: remove or anonymize the corresponding retained data across those
+   stores. Pause ingestion while doing so, and make sure replay and backups cannot restore
+   erased data. Keep only documented legal retention.
+4. `shop/redact`: stop the installation's ingestion and erase its secrets and all
+   retained shop data, including derived evidence and exports. Check current installation
+   status before acting on a delayed request after reinstall; never delete another
+   tenant's data or a newer installation's data.
 5. Record affected stores, actions, backup expiry or legal retention, verification,
-   merchant delivery when applicable, and the operator in restricted evidence.
-   Remove the temporary request/export files and then record completion.
+   merchant delivery and the operator in restricted evidence. Remove the temporary files,
+   then record completion.
 
-Automated cross-domain redaction and secure merchant delivery are not supplied
-by the intake command. The operator must perform and verify these actions.
-Production readiness requires a rehearsed fulfillment procedure and monitored
-ownership; a working webhook alone is insufficient.
+## Smoke test
 
-## Smoke-test evidence
+Run before onboarding a production merchant, through the public origin with the API and
+tunnel running, first on the development store `luma-dev-store-1dmrgwsn.myshopify.com` and
+then with the approved production app and a real merchant store. A development-store pass
+is not evidence of production access approval. Record app ID and version, store, date,
+deployed commit and results, without tokens.
 
-Run through the public development origin while the API and tunnel are running.
-Record app ID/version, store, date, deployed commit and results without tokens.
+- As a workspace owner or admin, install Shopify and connect the store. Confirm consent,
+  callback and an active connection.
+- Cancel consent, retry and reconnect. The connection ID stays the same without
+  duplicates; a replayed callback fails.
+- Read a known order, product, stock level and fulfillment and compare IDs and quantities
+  with Shopify. Check customer context and an older order with and without their grants:
+  denied access shows a coverage warning, not an empty successful section. Confirm data
+  sync imports separately.
+- Change granted scopes, confirm webhook delivery and degraded health, reconnect and
+  confirm recovery. Replay a scope event; current grants must prevail over its payload.
+- Uninstall in Shopify and confirm webhook delivery, revoked health and erased tokens.
+  Reinstall and reconnect; a delayed uninstall must not revoke the new credentials.
+- Send all three compliance topics, check durable pending receipts, retry one, confirm a
+  bad HMAC gets 401 and rehearse export and redaction completion. A CLI trigger tests the
+  endpoint, not the deployed subscription; also inspect delivery evidence in Shopify.
 
-- Sign in as a workspace owner or admin; install Shopify in Luma; connect the demo
-  hostname. Confirm the Shopify consent screen, callback and active connection.
-- Cancel consent, retry, and reconnect. Confirm recovery and the same connection
-  ID without duplicates. A replayed callback must fail.
-- Read a known order, product, stock level and fulfillment; compare IDs and
-  quantities with Shopify. Check customer context and an older order with and
-  without their grants. Denied access must show a coverage warning, not an empty
-  successful section. Confirm LUMA-96 ingestion separately before claiming sync.
-- Change granted scopes, confirm actual webhook delivery and degraded health,
-  then reconnect and confirm recovery. Replay a scope event and verify current
-  grants prevail over its old payload.
-- Uninstall in Shopify. Confirm webhook delivery, revoked health and erased
-  tokens. Reinstall and reconnect; delayed uninstall must not revoke valid new
-  credentials.
-- Send all three compliance topics, check durable pending receipts, retry one,
-  reject a bad HMAC with 401, and rehearse export/redaction completion. A CLI
-  trigger tests the endpoint, not the deployed subscription; inspect actual
-  delivery evidence in Shopify as well.
-
-Repeat with an approved production app and real merchant store before closing
-LUMA-115. A development-store pass is not evidence of production access approval.
-
-References: [protected customer data](https://shopify.dev/docs/apps/launch/protected-customer-data),
+References: [standalone authentication](https://shopify.dev/docs/apps/build/authentication-authorization/authenticate-standalone-apps),
+[access tokens](https://shopify.dev/docs/apps/build/authentication-authorization/access-tokens),
+[app distribution](https://shopify.dev/docs/apps/launch/distribution),
+[protected customer data](https://shopify.dev/docs/apps/launch/protected-customer-data),
 [orders permissions](https://shopify.dev/docs/api/usage/access-scopes#orders-permissions),
-[privacy webhooks](https://shopify.dev/docs/apps/build/compliance/privacy-law-compliance),
-[standalone authentication](https://shopify.dev/docs/apps/build/authentication-authorization/authenticate-standalone-apps).
+[privacy webhooks](https://shopify.dev/docs/apps/build/compliance/privacy-law-compliance).

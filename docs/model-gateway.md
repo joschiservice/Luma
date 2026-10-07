@@ -1,6 +1,10 @@
 # Model gateway
 
-LUMA-24 provides a `ModelGateway` port in `platform/index.ts`. Application services depend on this port; provider protocols stay in infrastructure. The API composition root creates one gateway at startup, exposes it as `app.modelGateway` and passes it to application services through `ApplicationOptions.modelGateway`. No public generation endpoint is installed.
+The `ModelGateway` port in `@luma/platform` is the only way application services call a
+model. Provider protocols stay in infrastructure, model calls are denied until routes are
+configured, and tenant or personal data may only go to an EU, zero-retention route.
+There is no public generation endpoint: callers reach a model only through their own
+authorized application services.
 
 ## Configuration
 
@@ -14,42 +18,66 @@ LUMA-24 provides a `ModelGateway` port in `platform/index.ts`. Application servi
 | `MODEL_GATEWAY_BEDROCK_SESSION_TOKEN`     | Set only with temporary AWS credentials; server-only secret                                                            |
 | `MODEL_GATEWAY_TIMEOUT_MS`                | Request timeout, including Bedrock account checks and reading the response; 1–120000 ms, default 30000                 |
 
-Example for public or synthetic input:
+`apps/api/.env.example` has route examples for every profile. Unknown profiles, empty
+provider lists, partial credentials and invalid route settings fail closed, and route
+errors never include configuration values or secrets. Startup fails when a `bedrock-eu`
+route has no or partial Bedrock settings, or a region outside the list; London
+(`eu-west-2`) and Zurich (`eu-central-2`) are outside the EU.
 
-```dotenv
-MODEL_GATEWAY_ROUTES={"reasoning":{"adapter":"vercel","model":"anthropic/claude-sonnet-4.5","providers":["anthropic"],"zeroDataRetention":true}}
-```
+`ModelRoutingPolicy` may pick another configured profile or return `null` to deny. It sees
+the profile and data policy, never the prompt, and its choice must still pass residency and
+retention checks. Routes are frozen at composition; credentials, destination URLs and
+provider options are never request parameters.
 
-To change providers, replace the model and provider allowlist in the profile, for example with `openai/gpt-4.1` and `["openai"]`. Check model availability and structured output/tool support in the provider account. Application requests continue to use `profile: 'reasoning'`. Unknown profiles, empty provider lists, partial credentials and invalid route settings fail closed. Route errors never include configuration values or secrets.
+### Local setup
 
-Set the three required Bedrock variables together. Startup fails when a `bedrock-eu` route has no Bedrock settings, when the settings are partial, or when the region is not in the list above. London (`eu-west-2`) and Zurich (`eu-central-2`) are outside the EU and are rejected.
+Managed commands do not generate model settings; put them in `apps/api/.env`. Until a
+`bedrock-eu` route exists, describing workflows, reading supplier messages and Ask Luma
+report why they are unavailable and call no model. Seeded and simulator data is synthetic,
+so the processing-path review does not block local use.
 
-`ModelRoutingPolicy` can choose another configured profile or return `null` to deny a request. It sees the profile and data policy, not the prompt. Selected routes must still satisfy mandatory residency and retention checks. Routes and provider lists are copied and frozen at composition. Credentials, destination URLs and provider options are not request parameters.
+To enable them, create a dedicated IAM principal with the permissions under
+[Bedrock EU adapter](#bedrock-eu-adapter), set the account's retention mode to `none` in the
+configured region, copy the Bedrock variables and routes from `apps/api/.env.example`, and
+restart `pnpm dev`. `pnpm evaluate:authoring` reads the same file and makes synthetic calls
+through the `authoring` route.
 
-## Local development
+## Data policy
 
-Managed commands do not generate model settings; put them in `apps/api/.env`. Until a `bedrock-eu` route and Bedrock settings exist, describing workflows, reading supplier messages and Ask Luma report why they are unavailable and call no model. Local seeded and simulator data is synthetic, so the processing-path review does not block local use.
+Applications assign `dataPolicy` after authorization and classify the whole input,
+including system messages, retrieved context, tool definitions and tool results. Any tenant
+or personal data is `sensitive`, requires `region: 'EU'` and a zero-retention route. Never
+take the classification or profile from an HTTP body. Trace context is correlation
+metadata, not authorization.
 
-To enable these features, get credentials for a dedicated IAM principal with the permissions listed under [Bedrock EU adapter](#bedrock-eu-adapter) and set the account's retention mode to `none` in the configured region. Copy the Bedrock variables and the `MODEL_GATEWAY_ROUTES` example from `apps/api/.env.example`, fill in the credentials and restart `pnpm dev`. Startup fails on partial or non-EU settings. `pnpm evaluate:authoring` reads the same file and makes synthetic calls through the `authoring` route.
+The Vercel adapter accepts only `public` input with `region: 'unrestricted'`; EU requests
+fail before network I/O. Vercel's
+[regional inference](https://vercel.com/docs/ai-gateway/security-and-compliance/regional-inference)
+pins provider inference but not gateway TLS termination and processing, so it does not meet
+[ADR-003](architecture/003-tenant-isolation-and-data-residency.md). Never use it for tenant
+prompts, even with zero data retention. It sends the provider allowlist and retention flag
+to the gateway, so providers outside the list cannot be fallbacks.
 
-## Workflow authoring profile
+Use `bedrock-eu` for tenant data. Without Bedrock settings it returns `adapter_unavailable`
+and never falls back to Vercel or a global route. Its EU declaration is not evidence of
+provider compliance: complete the
+[processing-path review](architecture/003-model-processing-path-review.md) before sending
+tenant data.
 
-Natural-language workflow authoring sends workflow descriptions, field names, supplier names and example records to the model. These are tenant data. Authoring services use `authoringModelProfile` (`'authoring'`, exported by `@luma/platform`) with `dataPolicy: { classification: 'sensitive', region: 'EU', zeroDataRetention: true }`. Route this profile to Bedrock in the EU:
+Luma performs no automatic retries or model fallback. Failures return a fixed
+`ModelGatewayError` code without response bodies or upstream causes; callers may escalate or
+retry explicitly under the same policy. Redirects are rejected.
 
-```dotenv
-MODEL_GATEWAY_BEDROCK_REGION=eu-central-1
-MODEL_GATEWAY_BEDROCK_ACCESS_KEY_ID=<access key ID>
-MODEL_GATEWAY_BEDROCK_SECRET_ACCESS_KEY=<secret access key>
-MODEL_GATEWAY_ROUTES={"authoring":{"adapter":"bedrock-eu","model":"eu.anthropic.claude-sonnet-4-5-20250929-v1:0","providers":["bedrock"],"zeroDataRetention":true}}
-```
+## Profiles
 
-Callers reach the model only through their own authorized application services; there is no public generation endpoint. Complete the [processing-path review](architecture/003-model-processing-path-review.md) before sending tenant data.
-
-Describing workflows ([Describe a workflow](workflows.md#describe-a-workflow)) is the authoring caller. The runtime composition enables it only when the `authoring` route uses `bedrock-eu` with `zeroDataRetention: true` and Bedrock settings exist (`packages/application-runtime/src/composition/authoring.ts`); otherwise its availability endpoint and every generation request return a reason, and no model is called. The service authorizes the caller before building model input, sends every request as `sensitive` EU data with zero retention, and uses structured output limited to the workspace's installed vocabulary. It makes at most three calls per request, re-asking with server diagnostics, under one 60-second deadline combined with the client's cancellation. It records the route, token usage and a hash of the request text; prompts and answers stay out of logs and traces. Gateway errors become a retry message and never include model text.
+The three tenant-data profiles share one rule: the feature is available only when its
+profile routes to `bedrock-eu` with `zeroDataRetention: true` and Bedrock settings exist.
+Otherwise the feature reports the reason and calls no model. Each sends `sensitive`, EU,
+zero-retention requests.
 
 | Situation                                                                                    | Result                                                                 |
 | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| No `authoring` route                                                                         | `route_denied`                                                         |
+| No route for the profile                                                                     | `route_denied`                                                         |
 | `bedrock-eu` route without Bedrock settings, or a region outside the EU                      | Startup error                                                          |
 | Route with `zeroDataRetention: false`                                                        | `route_denied`                                                         |
 | Route to Vercel                                                                              | `route_denied`, or `adapter_unavailable` when Vercel is not configured |
@@ -60,41 +88,40 @@ Describing workflows ([Describe a workflow](workflows.md#describe-a-workflow)) i
 | Deadline reached or caller cancelled                                                         | `timeout` or `aborted`                                                 |
 | Truncated, filtered, refused or malformed output                                             | `invalid_output`                                                       |
 
-## Supplier extraction profile
+### Workflow authoring profile
 
-Reading supplier messages ([Supplier commitments](supplier-commitments.md)) uses profile
-`supplier-extraction` with the same sensitive, EU, zero-retention policy and the same route
-requirements as authoring (`supplierExtractionAvailability`). Without such a route, messages
-are stored and people record facts by selecting text; no model is called. Route it like
-authoring, for example `"supplier-extraction":{"adapter":"bedrock-eu",...}` in
-`MODEL_GATEWAY_ROUTES`. The processing-path review applies before sending tenant data.
+`authoring` ([Describe a workflow](workflows.md#describe-a-workflow)) sends workflow
+descriptions, field names, supplier names and example records. It uses structured output
+limited to the workspace's installed vocabulary, at most three calls per request under one
+60-second deadline. It records the route, token usage and a hash of the request text;
+prompts and answers stay out of logs and traces.
 
-## Assistant profile
+### Supplier extraction profile
 
-Ask Luma ([assistant](assistant.md)) uses profile `assistant` with the same sensitive, EU,
-zero-retention policy and route requirements as authoring (`assistantAvailability`). Questions,
-earlier turns and read results are tenant data. Without such a route, the panel shows the reason
-and no model is called. Route it like authoring, for example
-`"assistant":{"adapter":"bedrock-eu",...}` in `MODEL_GATEWAY_ROUTES`. The model must support
-tool use. The processing-path review applies before sending tenant data.
+`supplier-extraction` ([Supplier commitments](supplier-commitments.md#supplier-messages))
+reads supplier messages. Without a route, messages are stored and people record facts by
+selecting text.
 
-## Data policy
+### Assistant profile
 
-Applications assign `dataPolicy` after authorization. Classify the whole input, including system messages, retrieved context, tool definitions and tool results. Any tenant or personal data is `sensitive`, requires `region: 'EU'` and uses a route with zero data retention. Trace context is correlation metadata, not authorization. Never accept the classification or profile directly from an HTTP body.
-
-The Vercel adapter accepts only `public` input with `region: 'unrestricted'`. Requests requiring EU processing fail before network I/O. Vercel's [regional inference](https://vercel.com/docs/ai-gateway/security-and-compliance/regional-inference) pins provider inference but does not pin gateway TLS termination and processing. This does not meet [ADR-003](architecture/003-tenant-isolation-and-data-residency.md). Do not use that adapter for tenant prompts, even with zero data retention enabled.
-
-The adapter sends the configured provider allowlist through `providerOptions.gateway.only` and retention through `zeroDataRetention`. Providers outside the list cannot be used as fallbacks. Luma performs no automatic retries or model fallback. Failures return a fixed `ModelGatewayError` code; callers may escalate or explicitly retry under the same policy. No response bodies or upstream exception causes appear in errors. Redirects are rejected.
-
-Use the `bedrock-eu` route for tenant data. Composition installs it from the Bedrock settings and requires its declared processing region to be EU. Without Bedrock settings, a `bedrock-eu` route returns `adapter_unavailable`; it never falls back to Vercel or a global route. The declaration is not evidence of provider compliance; the [processing-path review](architecture/003-model-processing-path-review.md) records what is verified and what an operator must confirm.
+`assistant` ([Ask Luma](assistant.md)) sends questions, earlier turns and read results. The
+model must support tool use.
 
 ## Bedrock EU adapter
 
-The adapter calls the Amazon Bedrock [Converse API](https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_Converse.html) at `https://bedrock-runtime.<region>.amazonaws.com` for the configured region. It signs requests with AWS Signature Version 4 and rejects redirects. It does not retry and never switches region, route or adapter.
+The adapter calls the Bedrock
+[Converse API](https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_Converse.html)
+in the configured region with Signature Version 4. It rejects redirects, does not retry, and
+never switches region, route or adapter.
 
-Use an `eu.` cross-region inference profile, such as `eu.anthropic.claude-sonnet-4-5-20250929-v1:0`, or a foundation model ID that runs in the configured region, such as `anthropic.claude-3-haiku-20240307-v1:0`. Global profiles (`global.`), other geographic profiles (`us.`, `us-gov.`, `apac.`, `jp.`, `au.`, `ca.`) and ARNs, including application inference profiles and provisioned throughput, fail with `route_denied` before any network call.
+Use an `eu.` cross-region inference profile, such as
+`eu.anthropic.claude-sonnet-4-5-20250929-v1:0`, or a foundation model that runs in the
+configured region. Global (`global.`) and other geographic profiles (`us.`, `us-gov.`,
+`apac.`, `jp.`, `au.`, `ca.`) and ARNs, including application inference profiles and
+provisioned throughput, fail with `route_denied` before any network call.
 
-Before the first request, and again after five minutes, the adapter checks the AWS account in the configured region. Only successful checks are reused. No prompt is sent until all checks pass.
+Before the first request, and again after five minutes, the adapter checks the account in
+the configured region. Only successful checks are reused; no prompt is sent until all pass.
 
 | Check                                 | Control plane request           | Passes when                                                                                 | Otherwise             |
 | ------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------- | --------------------- |
@@ -102,40 +129,52 @@ Before the first request, and again after five minutes, the adapter checks the A
 | Invocation logging                    | `GET /logging/modelinvocations` | Logging is off, or `textDataDeliveryEnabled` is `false` and no other data type is delivered | `adapter_unavailable` |
 | Profile destinations (`eu.` profiles) | `GET /inference-profiles/<id>`  | Every destination region is in the EU region list                                           | `route_denied`        |
 
-With retention mode `none`, Bedrock stores no inputs or outputs and rejects models that require retention, for example models retained for [abuse detection](https://docs.aws.amazon.com/bedrock/latest/userguide/abuse-detection.html). Set it in the configured region with `PUT /data-retention` and `{"mode":"none"}`; see [data retention](https://docs.aws.amazon.com/bedrock/latest/userguide/data-retention.html). A request that fails any check never reaches the runtime endpoint.
+With retention mode `none`, Bedrock stores no inputs or outputs and rejects models that
+require retention, such as those retained for
+[abuse detection](https://docs.aws.amazon.com/bedrock/latest/userguide/abuse-detection.html).
+Set it in the configured region with `PUT /data-retention` and `{"mode":"none"}`; see
+[data retention](https://docs.aws.amazon.com/bedrock/latest/userguide/data-retention.html).
 
-Grant the IAM principal `bedrock:InvokeModel` on the `eu.` profile in the configured region and on the foundation model in every destination region, plus `bedrock:GetAccountDataRetention`, `bedrock:GetModelInvocationLoggingConfiguration` and `bedrock:GetInferenceProfile`. Use a dedicated principal without other permissions. The adapter does not refresh temporary credentials; restart with new values before a session token expires.
+Grant the IAM principal `bedrock:InvokeModel` on the `eu.` profile in the configured region
+and on the foundation model in every destination region, plus
+`bedrock:GetAccountDataRetention`, `bedrock:GetModelInvocationLoggingConfiguration` and
+`bedrock:GetInferenceProfile`, and nothing else. The adapter does not refresh temporary
+credentials; restart with new values before a session token expires.
 
-Structured output uses a tool named after the output schema. The adapter forces that tool and returns its input as the JSON output, which the gateway then validates. Output schemas must describe a JSON object, and the model must support forced tool choice. When tools are also declared, the model must call either a declared tool or the output tool. System messages become Converse system prompts. Tool results become user content, and consecutive messages with the same role are merged. Stop reasons other than `end_turn` and `tool_use`, such as `max_tokens`, `guardrail_intervened` or `content_filtered`, fail with `invalid_output`. HTTP 429 and `ThrottlingException` return `rate_limited`; other failures return `provider_error` without reading the response body. Bedrock reports token usage but not cost, so `costUsd` is `null`.
+Structured output uses a forced tool named after the output schema, so output schemas must
+describe a JSON object and the model must support forced tool choice. When tools are also
+declared, the model must call a declared tool or the output tool. Consecutive messages with
+the same role are merged. Stop reasons other than `end_turn` and `tool_use` fail with
+`invalid_output`. HTTP 429 and `ThrottlingException` return `rate_limited`; other failures
+return `provider_error` without reading the body. Bedrock reports tokens but not cost, so
+`costUsd` is `null`.
 
 ## Requests and outputs
 
-```ts
-const result = await modelGateway.generate(traceContext, {
-  profile: 'reasoning',
-  dataPolicy: {
-    classification: 'public',
-    region: 'unrestricted',
-    zeroDataRetention: true,
-  },
-  messages: [{ role: 'user', content: 'Explain an inventory reservation.' }],
-  maxOutputTokens: 256,
-});
-// result.output is a string, or null when tool calls are proposed.
-```
-
-For structured output, provide `output: ModelSchema<T>` with a stable name, JSON Schema and matching `parse(unknown): T` function. The Vercel adapter requests strict JSON Schema output and the Bedrock adapter forces an output tool; the gateway parses and validates the response locally in both cases. Keep the schema and parser aligned. Refused, truncated, malformed or invalid responses fail with `invalid_output`.
-
-Tools carry a name, description and input schema/parser. Returned calls include their ID, name and parsed JSON arguments. The gateway rejects undeclared tools, duplicate call IDs and arguments that fail the parser. Parsers validate tool arguments; their transformed return values are not used. Tool proposals have `output: null`. The gateway never executes tools. Pass write proposals through the existing policy/approval/execution services, then append an assistant message containing the calls and tool messages referencing their IDs. Before provider I/O, historical calls must have non-empty, unique IDs and match the currently declared tools and input schemas. Every assistant tool batch must be followed by exactly one result per call, in any order, before another turn. Incomplete, orphaned or duplicate results fail with `invalid_request`. Each call generates one response; the caller owns the bounded reasoning loop.
-
-`maxOutputTokens` is required and bounded to 1–32768. An optional `AbortSignal` cancels a call. Results expose adapter, configured model, input/output tokens, latency and `costUsd`. No automatic model fallback means the configured model identifies the requested route; provider-specific revision names are not exposed. Missing cost is `null`, never zero. The Chat Completions response guarantees token usage but not billed cost, so this adapter returns `null`; Langfuse can calculate cost from its model catalog. Other adapters can supply an actual USD cost through the same port. These values are diagnostic metadata, not billing records.
+- `maxOutputTokens` is required (1–32768). An optional `AbortSignal` cancels a call.
+- Structured output takes a `ModelSchema` with a stable name, JSON Schema and matching
+  parser. The gateway parses and validates the response locally for every adapter; keep
+  schema and parser aligned. Invalid responses fail with `invalid_output`.
+- The gateway never executes tools. It rejects undeclared tools, duplicate call IDs and
+  arguments that fail the parser; parser return values are not used. Route write proposals
+  through the policy, approval and execution services.
+- Before provider I/O, historical calls must have unique IDs and match the currently
+  declared tools. Every assistant tool batch needs exactly one result per call before the
+  next turn; incomplete, orphaned or duplicate results fail with `invalid_request`. Each
+  call generates one response; the caller owns the bounded loop.
+- Results report adapter, configured model, tokens, latency and `costUsd`. Missing cost is
+  `null`, never zero. These are diagnostic metadata, not billing records.
 
 ## Tracing and verification
 
-Each call creates a `model.generate` generation under the explicit parent trace. Only startup-approved model names, token counts, latency and reported cost are attached. Prompts, responses, tool data, credentials and upstream errors are excluded. The existing Langfuse masking and exporter restrictions remain active; SDK auto-instrumentation is not enabled.
+Each call creates a `model.generate` generation under the explicit parent trace with only
+startup-approved model names, token counts, latency and reported cost. Prompts, responses,
+tool data, credentials and upstream errors are excluded, and SDK auto-instrumentation stays
+off. Every adapter must pass the shared adapter contract suite in `@luma/platform`,
+including redaction from errors and exported traces; add a fixture there for a new adapter.
 
-Tests run with intercepted HTTP responses and in-memory Langfuse export. They do not contact paid providers. Every adapter runs the shared contract suite in `packages/platform/src/infrastructure/model-adapter-contract.test.ts`: text, structured output, tool proposals and history, invalid output, HTTP and network errors, cancellation, deadlines, and redaction of prompts, responses, tool data and credentials from errors and exported traces. Add a fixture there for each new adapter. Gateway tests cover configuration-based provider switching, denied egress and tool history. Bedrock tests cover the region list, model ID rules, account checks, profile destinations, message mapping and the sensitive authoring route. The signer is tested against published AWS Signature Version 4 examples and signatures produced by the AWS SDK signer.
-
-To verify an account, configure a route and credentials, invoke the port with synthetic data, and inspect the provider records and matching Langfuse trace. For Bedrock, CloudTrail records each `Converse` call in the configured region; `additionalEventData.inferenceRegion` shows where an `eu.` profile processed it. Tenant data requires operator sign-off on the processing-path review.
-
-References: [Vercel Chat Completions](https://vercel.com/docs/ai-gateway/sdks-and-apis/openai-chat-completions), [provider routing](https://vercel.com/docs/ai-gateway/models-and-providers/provider-options), [zero data retention](https://vercel.com/docs/ai-gateway/security-and-compliance/zdr), [Langfuse OpenTelemetry attributes](https://langfuse.com/integrations/native/opentelemetry), [Bedrock cross-region inference](https://docs.aws.amazon.com/bedrock/latest/userguide/cross-region-inference.html), [model invocation logging](https://docs.aws.amazon.com/bedrock/latest/userguide/model-invocation-logging.html), [Bedrock CloudTrail events](https://docs.aws.amazon.com/bedrock/latest/userguide/logging-using-cloudtrail.html), [Signature Version 4](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_sigv-create-signed-request.html).
+To verify an account, configure a route and credentials, call the port with synthetic data,
+and compare the provider records with the Langfuse trace. CloudTrail records each Bedrock
+`Converse` call in the configured region; `additionalEventData.inferenceRegion` shows where
+an `eu.` profile processed it. Tenant data requires operator sign-off on the processing-path
+review.

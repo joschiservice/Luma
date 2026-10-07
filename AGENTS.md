@@ -28,7 +28,7 @@ Understand the constraint, then choose the smallest model that makes the correct
 
 Keep changes scoped. Follow established patterns unless there is a clear reason to change them. The developer's explicit task and preferences take precedence over these defaults.
 
-Start with the [codebase map](docs/codebase-map.md) to find the owning feature, entry points and relevant tests. Follow imports from there. Use the [operational scenario recipe](docs/adding-operational-scenarios.md) when adding detection and recovery scenarios.
+Use the [codebase map](docs/codebase-map.md) to find the owning package, then search and follow imports from there. Read the feature's guide in the [docs index](docs/README.md) before changing its rules. Use the [operational scenario recipe](docs/adding-operational-scenarios.md) when adding detection and recovery scenarios.
 
 ## Shared vocabulary
 
@@ -111,11 +111,11 @@ Start with the smallest meaningful proof. Test observable behavior and important
 - Backend journey: `pnpm test:e2e <file.e2e.mjs>`. Browser journey: `pnpm test:browser <file.browser.mjs>`.
 - Shared UI: `pnpm test:ui`; inspect relevant stories and test the integrated journey when routing, authentication or live data changes.
 - Feature checks: `pnpm verify:feature <simulator|workflows|orders>`. Extend the explicit test selection when adding scenarios.
-- Before review of code changes, run `pnpm check` and the relevant integration/browser suites. Documentation-only changes need formatting and link checks.
+- Before review of code changes, run `pnpm check` and the relevant integration/browser suites. Documentation-only changes need `pnpm format:check` and `pnpm test:architecture`, which checks links and paths.
 - `pnpm test:full` prepares the Code Step runtime and runs all CI gates, including simulator tooling and release evaluations, with a shared disposable PostgreSQL server. Its command coverage is checked against [CI](.github/workflows/ci.yml).
 - `pnpm test:local` does not provision PostgreSQL and can skip database integration tests. Report that limitation when using it.
 
-Backend E2E uses Vitest; browser E2E uses Playwright Test. Browser failures retain traces and screenshots under `.luma/playwright`; open the report with `pnpm test:browser:report`. See [development validation](docs/development.md#feature-validation) and [benchmarking](docs/benchmarking.md) for focused checks and performance measurements.
+Backend E2E uses Vitest; browser E2E uses Playwright Test. Browser failures retain traces and screenshots under `.luma/playwright`; open the report with `pnpm test:browser:report`. See [feature validation](docs/development.md#feature-validation) and [performance measurement](docs/benchmarking.md).
 
 Report what was checked, the result, and any unverified behavior. Do not describe a skipped suite as passing.
 
@@ -123,8 +123,11 @@ Report what was checked, the result, and any unverified behavior. Do not describ
 
 - Write API descriptions and user-facing strings for the people using them: capabilities, expected behavior and necessary usage details. Use short sentences and concrete terms. Mention limitations when they affect correct use.
 - Public product guides live in `apps/web/content/docs`. Explain how to accomplish a task; keep implementation choices, project history and contributor tooling out of them.
-- Engineering guides live in `docs`; architecture decisions live in `docs/architecture`. Document durable reasons, cross-cutting constraints and operational traps. Keep local implementation explanations near the code.
-- Update or remove guidance made inaccurate by a change. Avoid duplicate field catalogs, control-flow narration and appended PR summaries. Keep the codebase map useful when feature entry points move.
+- Engineering guides in `docs` record only what the code does not show: rules and invariants, failure behavior, authority constraints, limits with their reasons, traps and supported procedures. Follow the [writing rules](docs/README.md#writing-guides).
+- Do not add file, function, route or migration catalogs, test lists, dated measurements, ticket IDs or change history to guides. Search finds code; pull requests and Linear hold evidence and history.
+- Extend the existing guide for a feature instead of adding a file per change. The codebase map lists owners and conventions only; update it when ownership changes, not for each feature.
+- Architecture decisions with their alternatives live in `docs/architecture`. Keep local implementation explanations in code comments.
+- Update or remove guidance made inaccurate by a change, in the same change.
 - Comments explain purpose, behavior or non-obvious constraints for maintainers. Avoid narrating the code or describing hypothetical future work.
 
 ## Branches, pull requests and work artifacts

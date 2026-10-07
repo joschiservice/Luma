@@ -1,80 +1,121 @@
 # Durable exception workflows
 
-LUMA-29 uses Temporal for exception process progress and retry scheduling. PostgreSQL remains the authority for incidents, diagnoses, approvals, execution attempts and audit evidence. The workflow coordinates detection, diagnosis, proposal preparation, policy/approval, execution, business verification and recovery.
+Temporal drives exception process progress and retry scheduling: detection, diagnosis,
+proposal preparation, policy and approval, execution, business verification and recovery.
+PostgreSQL remains the authority for incidents, diagnoses, approvals, execution attempts
+and audit evidence. A workflow never resolves an incident on its own; only fresh
+authoritative verification through the exceptions service does. The workflow lives in
+`@luma/workflow-temporal` and is composed in `@luma/application-runtime`.
 
 ## Run the worker
 
-For the managed local environment, run `pnpm dev:workflows`. It starts PostgreSQL,
-the Temporal development server and UI, and watches the API, web and worker.
-See [local development](development.md). The steps below cover manual setup.
+`pnpm dev:workflows` starts PostgreSQL, the Temporal development server and the worker
+locally (see [local development](development.md)). The worker runs separately from the
+HTTP server, drains on SIGINT/SIGTERM and then closes its connections and pools. Use a
+persistent Temporal deployment for durable operation. Settings are documented in
+`apps/api/.env.example`:
 
-Apply the existing database migrations. Configure `apps/api/.env` using `.env.example`:
+- `WORKFLOW_DATABASE_URL` is a restricted login with the worker's
+  [database roles](development.md#database-roles).
+- `TEMPORAL_ADDRESS`, `TEMPORAL_NAMESPACE` and `TEMPORAL_TASK_QUEUE` select the service and
+  queue. Each worker connection belongs to one namespace and task queue.
+- `TEMPORAL_DATA_REGION=EU` declares placement. Operators must provision the server,
+  namespace, backups and workers in the approved EU region; the setting cannot verify
+  physical placement.
+- `TEMPORAL_TLS=true` is required in production and whenever `TEMPORAL_API_KEY` is set.
+  Inject the key as a deployment secret.
 
-- `IDENTITY_DATABASE_URL` and the existing identity settings authenticate membership queries.
-- `WORKFLOW_DATABASE_URL` uses a restricted login granted `luma_exceptions`, `luma_policies`, `luma_execution` and `luma_audit`.
-- `TEMPORAL_ADDRESS`, `TEMPORAL_NAMESPACE` and `TEMPORAL_TASK_QUEUE` select the Temporal service and worker queue.
-- `TEMPORAL_DATA_REGION=EU` declares the deployment placement. Operators must provision the server, namespace, backups and workers in the approved EU region; the setting cannot verify physical placement.
-- `TEMPORAL_TLS=true` is required in production and whenever `TEMPORAL_API_KEY` is supplied. Inject the key as a deployment secret. Custom composition also accepts Temporal TLS certificate options.
+The default worker runs persisted diagnosis for incident references and returns manual
+intervention when no published proposal exists. It resolves no connector effect adapters
+itself and never invents an action from diagnosis prose or resolves an incident without a
+verifier. App-owned writes, such as Shopify corrections, run through
+[case workflows](workflows.md#case-workflows) and their owners' services.
 
-Start a local Temporal development server, then build and run the worker:
+## Starting and identity
 
-```sh
-temporal server start-dev --ip 127.0.0.1
-pnpm exec turbo run build --filter=@luma/worker...
-pnpm --filter @luma/worker start
-```
+Clients start and query workflows with an authenticated `TenantContext` and a source
+reference: an incident, or a detection delivery. A detection source requires a binding
+that loads an immutable, tenant-owned detection request from durable storage; persist the
+source before starting. Detection then runs as a retryable activity with the usual
+evidence deduplication. A producer that needs guaranteed delivery must keep its start
+command in a transactional outbox and retry until acknowledged. The default worker has no
+detection-source store, so use incident references with it.
 
-The development server is for local testing. Use a persistent Temporal deployment for durable operation. The worker drains on SIGINT/SIGTERM and closes its connections and database pools after shutdown. It runs separately from the HTTP server.
+Workflow IDs hash the tenant and source kind and ID. Repeated starts return the same
+workflow, including after completion, without changing its initiating user, and tenants
+cannot address each other's workflows. A new immutable detection delivery can start
+another investigation for the same incident. An identical source never resets a
+completed run within Temporal's history retention; execution receipts still prevent
+repeat effects after retention expires. Set retention to cover the operational review
+period.
 
-The default worker accepts existing incident references, runs persisted diagnosis and returns manual intervention when no executable proposal is available. Current production connectors are read-only. Executable proposals, connector write adapters and authoritative business verification are supplied through the composition bindings for the safe execution loop. The default worker does not invent an action from diagnosis prose or resolve an incident without a verifier.
+## Proposals
 
-## Compose and start
+Proposal preparation must persist once per tenant, incident, diagnosis revision and
+requester, and reads must return that immutable action with its incident and revision
+binding, or null when no supported action exists. A changed action needs a new proposal
+ID. Before dispatch the activity checks the current diagnosis revision and freshness;
+execution then validates the action, binds its hash, checks adapter availability and
+evaluates policy before any write. Composing with the case desk persists the producer's
+action before returning its reference and records the case/workflow association (see
+[case decisions](case-decisions.md#proposals-and-workflow-composition)).
 
-`createExceptionWorkflowRuntime` in `@luma/application-runtime/worker` wires the existing identity, detection and safety services. It returns `createClient()` and `createWorker()` factories. Call `worker.run()`, then `worker.shutdown()` on shutdown; await the run before `worker.close()`. Close the client and owner services separately. Each worker connection belongs to one namespace/task queue.
+## Approval
 
-The client accepts an authenticated `TenantContext` and a source reference:
+Policy evaluation and the initial dispatch share execution's preflight boundary; no
+separate policy result authorizes a later write. While awaiting approval, the command
+layer records the response through policies with the approver's authenticated context and,
+after commit, sends a notification signal. The signal is only a wake-up hint with no
+approval or actor claims. A 30-second durable poll covers lost notifications.
 
-```ts
-await client.start(context, { kind: 'incident', id: exceptionId });
-const progress = await client.progress(context, {
-  kind: 'incident',
-  id: exceptionId,
-});
-```
+Approval waits end at the proposal or evidence expiry, at most 24 hours. When the
+composition installs a proposal refresher (the shipping-method correction), the workflow
+rereads current conditions 30 seconds before that deadline and renews an unexecuted
+proposal. Renewal records a policy evaluation but never approves; a rejection or a
+still-valid approval prevents it, and an expired approval needs a new decision. Rejection,
+expiry and changed membership never authorize execution.
 
-For durable ingestion, pass `{ kind: 'detection', id: deliveryId }` and install `bindings.loadDetection`. That binding must load an immutable, tenant-owned `DetectionRequest` from durable storage. Detection then runs as a retryable activity and retains the existing evidence deduplication semantics. Persist the source before starting the workflow. A producer requiring automatic delivery must retain its start command in a transactional outbox and retry `start` until acknowledged. The default command has no detection-source store; use incident references with it.
+## Authority, retries and recovery
 
-Workflow IDs hash the tenant and source kind/ID. Repeated starts return the same workflow, including after completion, without changing its initiating user. Different tenants cannot address one another through the command API. A new immutable detection delivery can start another investigation for the same incident; an identical source never resets a completed run within Temporal's configured retention. Execution receipts still prevent repeat effects after workflow history retention expires. Configure history retention to cover the required operational review period.
+Every activity rebuilds the initiating user's context through identity and checks current
+membership, role, organization status and EU placement. Serialized contexts, sessions,
+cookies and earlier roles are not trusted. Logout does not stop an explicitly started
+workflow; membership removal, role loss or organization suspension does.
 
-The proposal binding provides `prepare(context, diagnosis)` and `get(context, proposalId)`. Preparation must persist once per tenant, incident, diagnosis revision and requester. Reads must return that immutable action and its incident/revision binding. Return null when no supported action exists. The activity checks current diagnosis revision/freshness before dispatch. A changed action needs a new proposal ID. The execution service validates the action, binds its hash, checks adapter availability and evaluates policy before any write.
+Activities retry up to five attempts within five minutes, with a one-minute attempt
+timeout. Diagnosis retries honor persisted reread backoff, up to five evaluations; a
+backoff beyond 24 hours escalates. Exhausted retries end in a stable escalation reason.
+Timers and approval polling survive worker replacement, and the workflow never loops
+indefinitely over uncertainty.
 
-## Approval and recovery
+Before dispatch, activities check for an existing execution receipt. Prepared or unknown
+attempts go to read-only reconciliation, even if the diagnosis expired or the proposal
+source is gone. A lost activity completion, a restart or a cancellation after dispatch
+never causes a fresh write. Execution activities use `WAIT_CANCELLATION_COMPLETED`:
+cancellation waits for the activity to finish or time out, then reconciles in a
+non-cancellable scope. A completion that arrives after a cancellation request still ends
+in a cancelled workflow, with any unresolved outcome visible in the execution record for
+operator recovery. Failed or inconclusive reconciliation escalates instead of producing a
+retry proposal. Cancellation is not compensation.
 
-Progress exposes the current phase and relevant incident, proposal and decision IDs. Policy evaluation and the initial dispatch share the existing execution service's preflight boundary; no independent policy result authorizes a later write.
-
-When `awaiting_approval`, the command layer calls `policies.respond` with the approver's authenticated context. After that transaction commits, call `client.notifyApproval(context, source)`. The signal is a wake-up hint, contains no approval or actor claims, and cannot grant permission. A 30-second durable poll handles a lost notification. Approval waits end at the earliest proposal/evidence expiry or 24 hours. Rejection, expiry and changed membership cannot authorize execution.
-
-Every activity reconstructs the initiating user's context through identity and checks current membership, role, organization status and EU placement. Serialized contexts, sessions, cookies and previously granted roles are not trusted. This is an explicitly started user workflow: session logout does not revoke its initiating user, but membership removal, role loss or organization suspension does.
-
-Activity failures retry up to five attempts within five minutes, with a one-minute attempt timeout. Diagnosis retries honor persisted reread backoff, up to five evaluations and a 24-hour backoff limit. Exhausted retries expose a stable escalation reason. Approval polling and all timers survive worker replacement. The workflow remains bounded; it never loops indefinitely over uncertainty.
-
-Before dispatch, activities check for an existing execution receipt. Prepared/unknown attempts go to read-only reconciliation even if the original diagnosis has expired or its proposal source is unavailable. A lost activity completion, a restart or cancellation after dispatch cannot cause a fresh write. Execution uses `WAIT_CANCELLATION_COMPLETED`, so cancellation waits for its activity to complete or reach its timeout before attempting reconciliation in a non-cancellable scope. A successful or failed activity completion after a cancellation request still leads to a cancelled workflow; unresolved outcomes stay visible in the execution record for operator recovery. Failed or inconclusive reconciliation escalates instead of manufacturing a retry proposal. Cancellation is not compensation.
-
-Only fresh authoritative business verification through `exceptions.verify` resolves the incident. Successful provider execution alone does not resolve it. Detector `clear` results also go through this verifier. Repeated verification delivery recognizes an already committed verified resolution, while a human disposition is not reported as verified.
+Detector `clear` results and successful executions both go through verification.
+Repeated verification recognizes an already committed verified resolution; a human
+disposition is never reported as verified.
 
 ## Progress and data handling
 
-Temporal history contains source/tenant/user/correlation IDs, diagnosis revision/status, proposal ID/expiry, policy decision ID and finite result codes. It does not contain evidence documents, connector payloads, proposal parameters, credentials, model prompts or arbitrary provider errors. Activity failures are sanitized before persistence. Namespace access must be limited to trusted workers/operators because they can invoke workflows directly.
+Progress is a Temporal projection, not a second incident lifecycle: it exposes the phase
+and relevant incident, proposal and decision IDs. Escalations and interrupted workflows
+report escalation without marking the incident resolved. The canonical incident changes
+only through the exceptions service. [Case decisions and progress](case-decisions.md)
+expose the persisted state to people.
 
-Process progress is a Temporal projection, not a second incident lifecycle table. The canonical incident is changed only through the exceptions service. Escalation results remain inspectable through `client.progress`; they do not falsely mark the incident resolved. Interrupted workflow statuses report an escalation. The [case decision and progress API](case-decisions.md) exposes persisted review, decisions, execution and verification, audit history and authenticated SSE. Workflow source bindings connect both incident-started and detection-started runs to their case.
+Temporal history holds only source, tenant, user and correlation IDs, diagnosis revision
+and status, proposal ID and expiry, policy decision ID and finite result codes. It never
+holds evidence documents, connector payloads, proposal parameters, credentials, model
+prompts or provider errors; activity failures are sanitized. Limit namespace access to
+trusted workers and operators, because they can invoke workflows directly.
 
-## Validation
-
-`pnpm check` includes a local Temporal server integration suite. The SDK downloads/caches the development server binary on first use; CI needs access to Temporal's download service. Tests cover history replay, worker replacement during approval, lost notifications, expiry, diagnosis retry, cancellation, ambiguous effect recovery, verification failure and manual intervention. Activity tests cover tenant scope, revoked access, stale revisions, immutable proposal bindings and verification replay. PostgreSQL execution tests cover durable reservation and single dispatch; `pnpm test:e2e` kills a worker after a provider commit and verifies restart reconciliation.
-
-The lost-notification polling test uses a separate Temporal time-skipping server
-to exercise the polling timer without waiting 30 seconds. Its binary is also
-downloaded on first use. Apple silicon requires Rosetta 2 for that test server.
-The worker-recovery E2E test continues to use the full local Temporal server.
-
-Implementation references: [Temporal TypeScript SDK](https://typescript.temporal.io/), [workflow testing](https://docs.temporal.io/develop/typescript/testing-suite), [execution guarantees](execution.md), [diagnosis revisions](exception-diagnosis.md).
+The Temporal integration tests download the development server binary on first use (CI
+needs access to Temporal's download service). The lost-notification test uses the
+time-skipping test server, which needs Rosetta 2 on Apple silicon.

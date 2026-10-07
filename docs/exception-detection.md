@@ -1,65 +1,122 @@
 # Exception detection
 
-`createDetectionServices(databaseUrl, now?, verifier?)` in `@luma/application-runtime` composes the exception repository and ingestion pipeline. Use the injected clock for reproducible replay. Call `close()` when the worker stops.
-
-The pipeline evaluates the four [V0 taxonomy](exception-taxonomy.md) classes: sync failure, stuck fulfillment, inventory mismatch and workflow failure. It records every accepted evaluation with its rule version, configuration version, decision, evidence references and delivery correlation ID. Inventory evaluations also retain the exact signed difference, left minus right.
+Detection evaluates the four [V0 taxonomy](exception-taxonomy.md) classes against
+normalized evidence and persists the result as tenant-scoped incidents. It records every
+accepted evaluation with its rule and configuration versions, decision, evidence
+references and delivery correlation ID (inventory also keeps the exact signed difference,
+left minus right). Detection opens, updates and verifies incidents; it never repairs,
+redispatches or resolves without independent verification. `@luma/exceptions` owns the
+rules and persistence; `@luma/application-runtime` composes them.
 
 ## Ingestion
 
-All methods require an identity-resolved `TenantContext`. Workers must resolve current organization membership before calling them. These are internal application ports; there is no unauthenticated ingestion route. Scheduled detection (below) is the production caller for sync failures, stock mismatches and stuck fulfillment.
+Every entry point requires an identity-resolved `TenantContext` (workers resolve current
+membership first); there is no unauthenticated ingestion route. Callers must:
 
-- `pipeline.inventory`: two normalized connector observations, explicit SKU/pool mappings, authority, completeness, projection currency and configuration. External IDs include their parent scope. Equal labels never establish a mapping. JTL aggregate stock requires an explicit equivalent Shopify pool mapping.
-- `pipeline.fulfillment`: one normalized operation, explicit order/line mapping and current eligibility evidence. Resolve holds/schedules from trusted evidence; pass `unknown` when eligibility is unavailable. Split operations remain separate. Shipment quantities from mirrored systems are never summed.
-- `pipeline.scan`: a durable scan event, connection/capability, normalized error and retry-window metadata. The ingestion job supplies `firstFailureAt`, resetting it after complete success. A single successful page must not set `scanComplete`. Include retry-after advice, latest failure time and last checkpoint in the event's normalized facts.
-- `pipeline.workflow`: a durable worker event with stable run/step IDs, attempt, status, retry exhaustion and effect certainty. Unknown effects require an execution reference and reconciliation. This pipeline has no connector write port.
+- Pass explicit mappings. Equal labels never establish identity, external IDs include
+  their parent scope, and JTL aggregate stock needs an explicit equivalent Shopify pool.
+- Resolve fulfillment holds and schedules from trusted evidence, passing `unknown` when
+  unavailable. Keep split operations separate and never sum mirrored shipments.
+- Supply `firstFailureAt` for scans and reset it only after a complete success. A single
+  successful page never sets `scanComplete`.
+- Give unknown workflow effects an execution reference for reconciliation. The workflow
+  path has no connector write port.
+- Keep observation and event keys stable on redelivery and use a new key for each new
+  authoritative poll. Keys identify immutable evidence within a tenant; namespace provider
+  event IDs by connection.
+- Store only normalized facts and provenance, never credentials, error text or customer
+  payloads. Raw payload retention stays with the connector.
+- Pass a new configuration version whenever a threshold changes; reusing a version with
+  different values fails atomically. The persisted version is the one the evaluation used.
 
-Keep observation and event keys stable on redelivery. Use a new key for a new authoritative poll. Keys identify immutable evidence within a tenant; namespace provider event IDs by connection. Store only normalized operational facts and provenance, never credentials, error text or customer payloads. Raw payload retention remains connector-owned.
-
-`exceptions.ingest` is the normalized rule boundary for other trusted ingestion callers. It validates the supplied facts, evidence and configuration before persistence. `key` is a delivery correlation ID; changing it does not add an occurrence. Pass a new configuration version whenever a threshold changes. Reusing a version with different values fails atomically. Configuration selection belongs to the caller; the persisted version is the one used for that evaluation.
+The delivery correlation key does not identify evidence; changing it adds no occurrence.
+Inject the clock for reproducible replay.
 
 ## Scheduled detection
 
-The commerce sync process runs `createDetectionWorker` from `@luma/application-runtime` once a minute. For each workspace with an active sync it resolves the person the sync runs as through `detection_worker_scopes()`, then runs `createDetectionMonitor` from `@luma/resolution`. Stored state chooses candidates; fresh provider reads decide:
+The commerce sync process runs the detection worker once a minute. For each workspace
+with an active sync it acts as the person the sync runs as. Stored state selects
+candidates; fresh provider reads decide:
 
-- **Sync failure:** every orders, fulfillment, product and stock stream with failed pages is evaluated with its first failure time (`failing_since`), latest error code and whether five attempts failed. The evidence key changes with each new failure, so repeated passes add no occurrences.
-- **Stock mismatch:** stock positions that at least two connections report, because people linked their SKU and location, are compared when their stored availability differs. Each ERP report is paired with each storefront report; the app category decides which is which, and the ERP is the authority. Both sides are reread and projected before the rule runs, at most 25 positions per pass.
-- **Stuck fulfillment:** open work in `orders_fulfillment_list` without progress for `stuckSeconds` is reread through its order. A start time in the future makes the work exempt. A reported hold exempts it until the work has gone `holdOverdueSeconds` (24 hours by default) without progress; after that the hold is the reason it is stuck, and the eligibility evidence records `holdOverdue`. Work from an adapter that does not read holds stays unknown. At most 25 per pass, oldest progress first.
+- **Sync failure:** every orders, fulfillment, product and stock stream with failed pages
+  is evaluated with its first failure time, latest error code and whether five attempts
+  failed. The evidence key changes only with a new failure, so repeated passes add no
+  occurrences.
+- **Stock mismatch:** positions reported by at least two connections, because people
+  linked their SKU and location, are compared when stored availability differs. Each ERP
+  report is paired with each storefront report; the app category decides the roles and
+  the ERP is the authority. Both sides are reread and projected before the rule runs, at
+  most 25 positions per pass.
+- **Stuck fulfillment:** open work without progress for the stuck threshold is reread
+  through its order, at most 25 per pass, oldest progress first. A future start time
+  exempts the work. A reported hold exempts it until the work has gone 24 hours
+  (`holdOverdueSeconds`) without progress; then the hold is why it is stuck and the
+  eligibility evidence records `holdOverdue`. Work from an adapter that does not read
+  holds stays `unknown`.
 
-Open cases of these classes are always included. Detection only opens and verifies cases; [case workflows](workflows.md#case-workflows) may start runs for them, but closure still needs this verification. When the fresh evaluation is clear, the monitor requests verification. Its verifier rereads stock or fulfillment for the case's exact subject; a sync failure passes once its stream completes a scan after the latest detection without new failures. A case opened by a newly detected subject gets a diagnosis. Each rule runs independently, so an unavailable source does not stop the others, and failures are retried on the next pass.
+Open cases of these classes are always included. When the fresh evaluation is clear, the
+monitor requests verification: stock and fulfillment reread the case's exact subject; a
+sync failure passes once its stream completes a scan after the latest detection without
+new failures. A newly detected subject gets a diagnosis. Rules run independently, so an
+unavailable source does not stop the others; failures retry on the next pass.
+[Case workflows](workflows.md#case-workflows) may start runs for these cases, but closure
+still needs this verification.
 
-A revoked or disconnected connection blocks its streams, so its reads stop failing and would look clear. Lost access is reported as a case instead: when a provider revoked a connection or removed its grants (status `revoked` or `degraded` after it was last `active`, with no disconnect by a person since), the stream query reports `accessLostAt` from the connection's lifecycle events. The monitor opens one high-severity `sync_failure` case for that connection, on its first stream, with reason `access_lost`. Earlier this situation was left to connection health; people missed it because nothing appeared in Issues or Needs you and their data quietly went stale. A connection a person disconnected stays clear. Reconnecting with new credentials keeps the connection ID; verification passes after a complete scan following the latest detection. A connection that someone disconnects after losing access leaves the case for a person to close.
+**Lost access.** A revoked or disconnected connection blocks its streams, so their reads
+stop failing and would look clear. When a provider revoked a connection or removed its
+grants (status `revoked` or `degraded` after it was last `active`, with no disconnect by a
+person since), the stream reports when access was lost and the monitor opens one
+high-severity `sync_failure` case for that connection, on its first stream, with reason
+`access_lost`. A connection a person disconnected stays clear. Reconnecting keeps the
+connection ID, and verification passes after a complete scan following the latest
+detection. If someone disconnects the connection after access was lost, a person must
+close the case.
 
 ## Persistence and lifecycle
 
-Migration `0003_exception_detection.sql` adds the `luma_exceptions` role. Grant it to the detection worker's restricted runtime login after running migrations with the migration owner. Every table has forced tenant RLS; runtime code cannot update or delete source evidence, configurations, inputs, evaluations or audit records.
+All tables use forced tenant RLS. Runtime roles cannot update or delete source evidence,
+configurations, inputs, evaluations or audit records (see
+[database roles](development.md#database-roles)).
 
-A transaction stores source evidence and normalized inputs before creating/updating an incident. One advisory lock per tenant serializes evidence conflicts, fingerprint updates and resolution; unrelated tenants remain independent. A partial unique index guarantees one unresolved incident per fingerprint. This favors correctness for V0; throughput within a busy tenant is serialized.
+One transaction stores source evidence and normalized inputs before creating or updating
+an incident. One advisory lock per tenant serializes evidence conflicts, fingerprint
+updates and resolution; other tenants stay independent, but throughput within a busy
+tenant is serialized. A partial unique index guarantees one unresolved incident per
+fingerprint.
 
-Fingerprints use the taxonomy's SHA-256 material and stable source scope. An evidence set adds at most one occurrence per fingerprint, including concurrent redelivery. New evidence updates the active incident; failed and escalated incidents remain active. Resolved incidents are immutable. New evidence after resolution creates a successor linked to its predecessor; replaying old evidence cannot reopen it.
+An evidence set adds at most one occurrence per fingerprint, including under concurrent
+redelivery. New evidence updates the active incident; failed and escalated incidents stay
+active. Resolved incidents are immutable: new evidence creates a successor linked to its
+predecessor, and replaying old evidence cannot reopen it.
 
-A clear or deferred decision never resolves an incident. Reevaluate deferred subjects after authoritative refreshes and while uncertainty remains. After 30 minutes with the default configuration, the next evaluation escalates an existing incident or records an operator review task in `exception_outbox`. No mismatch is invented. Successful certainty resets the uncertainty window.
+A clear or deferred decision never resolves an incident. Deferred subjects are reevaluated
+after authoritative refreshes; after 30 minutes of uncertainty (default configuration)
+the next evaluation escalates the existing incident or records an operator review task.
+No mismatch is invented, and a certain result resets the window.
 
-State changes and append-only audit events commit together in `exception_outbox`. Audit delivery and worker scheduling are separate consumers; this change does not register a background dispatcher. `exceptions.list` and `exceptions.evidence` provide tenant-scoped reads for downstream diagnosis and inbox work. Detection never deletes or overwrites earlier connector snapshots.
+State changes and append-only audit events commit together in the exception outbox.
+Detection never deletes or overwrites earlier connector snapshots.
 
 ## Resolution
 
-`exceptions.resolve` accepts a context with `issues.manage`, an explicit human disposition, a reason and existing tenant evidence references. The record identifies the actor and is not counted as autonomous verified success. Caller-supplied verification results are rejected.
+There are two ways to resolve an incident:
 
-`exceptions.verify(context, incidentId)` requests verification from the `VerificationEvaluator` installed by the composition root. It fails closed when no evaluator is configured. The evaluator receives the tenant context and persisted incident, reads authoritative state, and checks the business postcondition. Neither evidence nor success flags come from the verification request.
+- **Human disposition** requires `issues.manage`, a reason and existing tenant evidence
+  references. It records the actor and never counts as autonomous verified success.
+  Caller-supplied verification results are rejected.
+- **Verification** asks the evaluator installed by the composition root, and fails closed
+  when none is installed. The evaluator reads authoritative state itself; neither evidence
+  nor success flags come from the request.
 
-Each evaluator evidence item must bind to the incident's class, canonical subject, rule identity and ordered scope. Its connection must match that scope. The required postconditions are `complete_scan_checkpoint_advanced`, `fulfillment_disposition_verified`, `equivalent_inventory_agrees` and `workflow_business_postcondition_verified`, respectively. The evaluator must establish these findings from source data; an accepted write receipt is insufficient.
+Each evaluator evidence item must bind to the incident's class, canonical subject, rule
+identity and ordered scope, and its connection must match that scope. The required
+postconditions are `complete_scan_checkpoint_advanced`, `fulfillment_disposition_verified`,
+`equivalent_inventory_agrees` and `workflow_business_postcondition_verified`. They must be
+established from source data; an accepted write receipt is insufficient.
 
-Passed, complete, authoritative evidence must be independent of detection evidence, observed at or after the latest detection and within the configured freshness window. Failed, partial, stale or inconclusive results leave the incident open and return `false`. Mismatched evidence is rejected. A version check under the tenant lock rejects results if the incident changed while the evaluator was reading; external reads run outside the transaction.
-
-Successful verification returns `true` and atomically persists resolution, evaluator version, evidence bindings and an audit reference. There is no repair or redispatch operation in detection.
-
-## Validation
-
-The production evaluator runs against every case in `docs/fixtures/exceptions-v0.json`. PostgreSQL integration tests exercise concurrent replay, conflicting evidence, tenant isolation, configuration versions, uncertainty, independent verification and recurrence. Real JTL and Shopify adapters normalize synthetic HTTP fixtures before the pipeline persists all four classes.
-
-```sh
-TEST_DATABASE_URL=postgresql://postgres:luma_test_only@127.0.0.1:55432/luma_test pnpm --filter @luma/api test
-pnpm check
-```
-
-Use a disposable PostgreSQL 17 instance and an administrator URL for integration tests. The suite creates its own database and restricted runtime login. Without `TEST_DATABASE_URL`, database tests skip; CI supplies it.
+Passing evidence must be complete, authoritative, independent of the detection evidence,
+observed at or after the latest detection and within the freshness window. Failed,
+partial, stale or inconclusive results leave the incident open. Mismatched evidence is
+rejected. External reads run outside the transaction; a version check under the tenant
+lock rejects the result if the incident changed meanwhile. Success atomically persists the
+resolution, evaluator version, evidence bindings and an audit reference.

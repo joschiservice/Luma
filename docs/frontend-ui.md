@@ -1,112 +1,85 @@
 # Shared frontend components
 
-The product frontend imports visual primitives from `@luma/ui/components/primitives/*`. Page CSS owns positioning, grids and feature-specific data presentation. Shared components own padding, borders, surfaces, text hierarchy and semantic colors. See the [design workflow](design-workflow.md) for tokens and the brand direction.
+`@luma/ui` holds the interface building blocks: primitives in `components/primitives`, and issue and workspace compositions in `components/issues` and `components/workspace` with their stories and fixtures. Shared components own padding, borders, surfaces, text hierarchy and semantic colors; features own positioning, grids and domain presentation. Primitives never import compositions. Brand direction and the token process are in the [design workflow](design-workflow.md).
 
-Feature compositions live separately in `components/issues` and `components/workspace`, with their stories and fixtures colocated. Primitives must not import feature compositions.
+## Choosing a component
 
-## Reusable patterns
+| Need                                      | Use                             | Rule                                                                      |
+| ----------------------------------------- | ------------------------------- | ------------------------------------------------------------------------- |
+| Top-level page title                      | `PageTitle`                     | The page's `h1`, visually hidden; actions move into the workspace bar     |
+| Record title, description and actions     | `PageHeader`                    | The visible `h1` of a page about one record or subject                    |
+| Where a piece of work stands              | `StateDot`, `StatePill`         | Always with a text label                                                  |
+| Domain identity in navigation and records | `DomainIcon`                    | External systems stay neutral                                             |
+| Bordered content and nested surfaces      | `Card` and its parts            | Group content that needs a boundary; prefer rows, toolbars and inspectors |
+| Notices and warnings                      | `Alert`                         | Choose the live-region role deliberately (below)                          |
+| Short labels                              | `Badge`                         | Always text                                                               |
+| Empty collections                         | `Empty`                         | Describe this view, not the whole business                                |
+| Supporting detail                         | `Disclosure`                    | Evidence, audit events, metadata and technical details                    |
+| Record lists and fact tables              | `DataTable`, `DataTableRowLink` | See [tables](#tables)                                                     |
+| Counts over time or by category           | `BarChart`, `ChartLegend`       | Pair with a table of the same values                                      |
 
-| Pattern                              | Component                                                                         | Use it for                                                                                   |
-| ------------------------------------ | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| Page title, description and actions  | `PageHeader` (`components/workspace/page-header`)                                 | The single `h1` of a workspace page, with an optional domain icon                            |
-| Operational state                    | `StateDot`, `StatePill`                                                           | Where a piece of work stands: running, approval, attention, error, verified, waiting, idle   |
-| Domain landmark                      | `DomainIcon`                                                                      | Navigation and record identity for orders, inventory, procurement, workflows and other areas |
-| Brand marks                          | `LumaMark`, `LumaLockup`, `AurenMark`                                             | Entry pages, the favicon and attribution                                                     |
-| Keyboard hints                       | `Kbd`                                                                             | Shortcut hints next to commands that stay accessible elsewhere                               |
-| Bordered content and nested surfaces | `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`, `CardFooter` | Home modules, record sections, app tiles and dialogs                                         |
-| Notices and warnings                 | `Alert`, `AlertTitle`, `AlertDescription`                                         | Issue notices, setup guidance, permissions, offline and recovery messages                    |
-| Short labels                         | `Badge`                                                                           | Severity, activation status, personal settings and counts                                    |
-| Empty collections                    | `Empty`                                                                           | Lists with nothing to show; describe this view, not the whole business                       |
-| Expandable supporting content        | `Disclosure`                                                                      | Evidence, audit events, metadata and technical details                                       |
-| Record lists and fact tables         | `DataTable`, `DataTableRowLink`                                                   | Sortable lists whose rows open a record, and numeric fact tables inside record sections      |
-| Counts over time or by category      | `BarChart`, `ChartLegend`                                                         | Stacked bars whose bars open their records; pair each chart with a table of the same values  |
+Interaction primitives (`Button`, `Field`, `Select`, `SearchableSelect`, `Dialog`, `DropdownMenu`, `Tabs`, `Pagination`, `SectionNavigation` and others) cover forms and navigation. Give link-styled buttons `buttonVariants()` on the link itself so link semantics survive. Coarse pointers get 44px targets automatically; don't shrink them. `Pagination` omits the total when a source does not report one, so never invent a count.
 
-`Button`, `Input`, `Textarea`, `Select`, `SearchableSelect`, `Field`, `Switch`, `Dialog`, `DropdownMenu`, `Tabs`, `Pagination` and `SectionNavigation` remain the interaction primitives. `Pagination` omits the total when a source doesn't report one. `Button` has default (Cobalt), outline, ghost and destructive variants in default, `sm`, `lg` and `icon` sizes; coarse pointers receive 44px targets. Link-styled buttons use `buttonVariants()` on the link itself so link semantics are preserved.
+Map case states through `issueStatus` and `issueKind` in `components/issues/case-presentation` instead of per feature. Verified means the intended outcome was observed; an accepted request is still running. Keep source freshness separate from connection credentials and permissions.
 
-Choose states from `issueStatus` and `issueKind` in `components/issues/case-presentation` rather than mapping case states in each feature. Verified means the intended outcome was observed; an accepted request is still running.
+## Composition rules
+
+- Use `Card` `variant="subtle"` for nested supporting surfaces and `variant="plain"` when the container already supplies one. Keep heading levels correct with `CardTitle as="h3"` or `as="h4"`. Cards have no click behavior.
+- Give an `Alert` `role="status"` or `role="alert"` only when its arrival should be announced; static guidance needs no live region. Descriptions accept block content and controls, so never nest an Alert inside a paragraph.
+- `Disclosure` keeps native details/summary keyboard and open-state behavior; its first child is the summary. Menus and navigation drawers use their own components.
+- Cards trim first and last child margins, and `CardContent` trims its children's outer margins. Add a content wrapper rather than edge resets in a page stylesheet.
 
 ## Tables
 
-`DataTable` takes column definitions and rows. Every table needs a `caption`; it is visually hidden and names the table for assistive technology. The first column labels each row unless `rowHeader` names another. Mark quantities, amounts and counts `numeric` for right alignment and tabular figures, and `hideOnNarrow` for secondary columns. Sortable columns set `sortKey`; the caller owns the sort state through `sort` and `onSortChange`. Put one `DataTableRowLink` in a row to make the whole row open the record; pass a router link through `render`. Use `density="compact"` and `variant="plain"` for tables inside cards. A table wider than its container scrolls horizontally and becomes a focusable region.
+Every `DataTable` needs a `caption`; it is visually hidden and names the table for assistive technology. The first column labels each row unless `rowHeader` names another. Mark quantities, amounts and counts `numeric` for right alignment and tabular figures, and secondary columns `hideOnNarrow`. The caller owns sort state through `sort` and `onSortChange`. One `DataTableRowLink` per row makes the whole row open the record; pass a router link through `render`. Inside cards use `density="compact"` and `variant="plain"`. Wide tables scroll horizontally as a focusable region.
 
 ## Charts
 
-`BarChart` draws stacked bars from one baseline, vertically for calendar buckets and
-horizontally for named categories. Assign series the `chart-1` to `chart-5` slots in order;
-use state colors only when the color means good or bad, and `muted` for unknown values. A
-category with `unknown` set is hatched so it never reads as zero, and `note` marks an
-incomplete period. The chart is one tab stop with arrow-key navigation; every bar has a spoken
-summary. Add `ChartLegend` for two or more series and offer a `DataTable` view of the same
-values. The palette was validated for color-vision deficiencies on the card surface in both
-themes; validate again when changing `--chart-*` tokens.
+`BarChart` stacks bars from one baseline: vertical for calendar buckets, horizontal for named categories. Assign series the `chart-1` to `chart-5` slots in order; use state colors only when the color means good or bad, and `muted` for unknown values. Set `unknown` on a category so it is hatched and never reads as zero, and `note` to mark an incomplete period. The chart is one tab stop with arrow-key navigation, and every bar has a spoken summary. Add `ChartLegend` for two or more series and offer a `DataTable` of the same values. The palette is validated for color-vision deficiencies on the card surface in both themes; validate again when changing `--chart-*` tokens.
 
-## Workspace shell
+## Pages and navigation
 
-`WorkspaceLayout` renders a persistent sidebar on the canvas and an inset page surface. The sidebar holds the workspace switcher, search, core areas (Home, Needs you, Issues, Records, Activity, Insights), pinned pages, operations domains (Orders, Customers, Products, Inventory, Workflows, Procurement), installed apps, and Apps and Settings. It collapses to an icon rail with `[` and moves into a drawer below 900px. The top bar shows breadcrumbs, page controls portaled through `WorkspaceHeaderSlot`, the pin control and contextual help.
+Top-level workspace pages are registered once in `workspaceDestinations` in the web identity feature. That list drives the sidebar, the command menu, the `G` keyboard shortcuts and the no-access explanation for its `permission`, so a page missing from it is unreachable by keyboard and search. Top-level pages are named once, by the breadcrumb; page-level explanations belong in contextual help or empty states, and page actions go into the bar through `WorkspacePageActionsSlot`. Pages about one record keep a visible `PageHeader` under the section breadcrumb. Page controls go into the top bar through `WorkspaceHeaderSlot`. Working views such as the issue inbox use `page-full`; reading pages use a comfortable maximum width.
 
-Search opens a command menu with ⌘K or Ctrl K. It lists pages and actions such as switching appearance. `G` followed by a letter jumps to a destination, for example G then I for Issues.
-
-Pages set their own width. Working views such as the issue inbox use `page-full` and fill the surface; reading pages use a comfortable maximum width.
-
-## Home and personal layouts
-
-Home answers what needs the reader's attention and what Luma is handling. Its attention module and the sidebar's Needs you count read the [Needs you queue](needs-you.md). It is built from modules: attention, handling, connected systems and activity by default, with resolution outcomes, operational pulse, order flow and catalog health available. Each member arranges their own Home per workspace and can pin any page, including its filters, to the sidebar. Layouts are stored through `GET` and `PUT /v1/organizations/:organizationId/settings/layout` with revision checks; see `features/layout/data.ts` and **Settings → Home & sidebar**. Theme and sidebar width are device preferences stored locally.
-
-## Composition
-
-```tsx
-<Card as="section" aria-labelledby="review-title">
-  <CardHeader>
-    <div>
-      <CardTitle id="review-title">Review</CardTitle>
-      <CardDescription>Inspect the proposed correction.</CardDescription>
-    </div>
-    <StatePill state="approval">Needs approval</StatePill>
-  </CardHeader>
-  <CardContent>{content}</CardContent>
-  <CardFooter>{actions}</CardFooter>
-</Card>
-```
-
-Use `variant="subtle"` for nested supporting surfaces and `variant="plain"` when the surrounding container already supplies a surface. Keep document heading levels correct with `CardTitle as="h3"` or `as="h4"`. Cards do not add click behavior.
-
-Use `Alert` for a notice, and explicitly choose `role="status"` or `role="alert"` when its arrival should be announced. Static guidance does not need a live region. Alert descriptions accept block content and controls. Do not nest an Alert inside a paragraph.
-
-Badges and state pills always contain a text label. Keep source freshness separate from connection credentials and permissions.
-
-`Disclosure` retains native details/summary keyboard and open-state behavior. Include a summary as its first child. Menus and navigation drawers continue to use their dedicated components.
+Home and sidebar pins are per-member layouts; see [workspace settings](workspace-settings.md#personal-layouts). Home's attention module and the sidebar count read the [Needs you queue](needs-you.md).
 
 ## Collection pages
 
-List pages share one order: `PageHeader`, then `CollectionToolbar`, then the coverage line, notices, the table and pagination. The toolbar places views and Refresh on the first row, then search, one pill per filter, page display actions and one **Sort** menu. Every offered filter stays visible: unset filters are dashed pills that open their values in one click, and applied filters are chips that edit or remove the value. On small screens unset pills give way to one **Filters** button that lists every filter in a sheet. Pages describe filters as data (`choice`, `date-range` or link-set `applied` filters) and own their URL state; the toolbar owns presentation, focus and the search draft.
+List pages keep one order: `PageTitle`, `CollectionToolbar`, the coverage line, notices, the table and pagination. The toolbar puts views and Refresh first, then search, one pill per filter, display actions and a single **Sort** menu. Every offered filter stays visible: unset filters are dashed pills that open their values in one click, applied filters are chips. On small screens unset pills collapse into one **Filters** button. Pages describe filters as data (`choice`, `date-range` or link-set `applied` filters) and own their URL state; the toolbar owns presentation, focus and the search draft.
 
-Wrap a collection in `CollectionFilterPanel` and pass `panel` to its toolbar only when it has five or more filters that people combine to investigate, and the content is a narrow feed. Activity is the example. On wide screens the panel lists every filter and value beside the feed while the toolbar keeps the applied chips; below that the pills return. Tables and split views keep the pills, because a docked panel costs them columns. Use `CollectionViews` for button views; link-based views can keep `Tabs`.
+Use `CollectionFilterPanel` only for a narrow feed with five or more filters that people combine to investigate, as in Activity. Tables and split views keep the pills, because a docked panel costs them columns. Use `CollectionViews` for button views; link-based views can keep `Tabs`.
 
-`SyncCoverage` (`apps/web/src/features/sync/coverage.tsx`) condenses what each source has imported into one line. It leads with sources that need attention, says the list is incomplete while any import runs, and keeps per-source detail behind a disclosure.
+`SyncCoverage` condenses what each source has imported into one line. It leads with sources that need attention and says the list is incomplete while any import runs.
 
-## Issues
+## Issue views
 
-`IssueSplitView` composes the resizable panels for the inbox, with minimum list and detail widths and a single-pane layout on narrow screens. Both pane trees stay mounted across layout changes to preserve local interaction state. The inbox toolbar spans the page above the split view; filters wrap on small screens.
+`IssueSplitView` keeps both pane trees mounted across layout changes so local interaction state survives resizing; don't conditionally render a pane. `IssuePageLayout` and `IssuePanelLayout` share section content and navigation. Contextual actions expand their target section before moving focus. `IssueListToolbar` adapts issue filters to `CollectionToolbar`; its caller owns URL state and fetching.
 
-`IssuePageLayout` and `IssuePanelLayout` share section content and navigation behavior. The full page moves its identity and actions into the top bar and uses `IssueSectionSelect` on small screens. The inspector keeps Overview visible and uses native disclosures for supporting sections, with Findings initially open. Contextual actions expand their target section before moving focus. `IssueViewTabs` composes the shadcn `Tabs` primitives with URL-backed links. `IssueListToolbar` adapts the issue filters to `CollectionToolbar`; its caller owns URL state and fetching.
+## State and data
 
-## Density and maintenance
+| State                                         | Owner                           |
+| --------------------------------------------- | ------------------------------- |
+| Draft values, touched fields and validation   | TanStack Form                   |
+| Server data, requests and mutation results    | TanStack Query                  |
+| Shareable filters, sorting and view selection | TanStack Router search params   |
+| Ephemeral UI state                            | React `useState` / `useReducer` |
 
-The UI stylesheet owns `--card-padding`, `--content-gap`, `--content-related-gap`, `--content-section-gap` and `--surface-detail`. Cards trim first and last child margins; `CardContent` trims its children's outer margins. Add a content wrapper instead of descendant-specific edge resets in a page stylesheet.
+- There is no global store or custom form framework. Do not mirror search params into another store: define `validateSearch` on the route, read `Route.useSearch()` and update with `navigate({ search })`.
+- Use Zod schemas directly as Standard Schema validators. Form validation does not apply schema transforms, so parse again on submit to get normalized output. Validate unknown responses at the I/O boundary; the server validates requests independently.
+- The router creates one QueryClient per router and request for SSR hydration. Never make a server QueryClient a module singleton. Keep query keys, mutations and invalidation beside their feature.
+- Match domain discriminated unions with `ts-pattern` and `.exhaustive()`.
+- Stories receive state through props and deterministic fixtures. Keep data fetching, auth, mutations and business decisions in the app; add a local decorator only when a component needs a provider, such as an in-memory router.
 
-Use component variants for appearance and `className` for layout. Do not add page selectors that restyle shared card padding, Alert colors or Badge typography. Keep text at 12px or larger and check contrast on tinted surfaces.
+## Styling rules
 
-Storybook's **Foundations/Theme** documents tokens, states and landmarks. Feature stories cover the actual domain compositions in both themes and at narrow viewport widths.
+- Read semantic tokens only. Theme tokens and primitive styling stay in `packages/ui/src/styles`; feature stylesheets, imported by the feature's page component, lay out shared components without restyling them.
+- Use component variants for appearance and `className` for layout. Spacing comes from the shared density variables such as `--card-padding` and `--content-gap`.
+- Keep text at 12px or larger and check contrast on tinted surfaces.
 
-## Automated appearance checks
+Tooling enforces part of this statically:
 
-`pnpm lint` checks literal JSX style colors and appearance overrides on imported
-shared primitives, including aliased imports. `pnpm lint:ui` parses product and
-workspace-app CSS to reject literal hex/function colors and appearance declarations
-targeting shared card, badge, alert and button selectors. Layout remains feature-owned.
+- `pnpm lint` rejects literal colors in JSX styles and appearance overrides on imported shared primitives, including aliased imports.
+- `pnpm lint:ui` parses CSS in `apps/web/src` and workspace apps. It rejects literal hex and color-function values (mask colors excepted) and appearance declarations (color, background, border, shadow, font, line height, letter spacing, padding, fill, stroke) on card, badge, alert and button selectors.
+- Existing violations are listed exactly in `tooling/style/ui-baseline.json`. New violations fail, and fixing one requires removing its baseline entry.
 
-Existing CSS declarations are listed exactly in `tooling/style/ui-baseline.json`;
-new declarations fail, and removed declarations require removing their baseline entry.
-Keep theme token definitions and primitive styling
-in the UI package. The checks cover static syntax; they do not replace visual and
-accessibility review or resolve arbitrary dynamic class names.
+The checks cover static syntax only. They do not resolve dynamic class names or replace visual and accessibility review in both themes and at narrow widths.

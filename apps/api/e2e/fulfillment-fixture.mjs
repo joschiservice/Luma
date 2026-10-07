@@ -217,7 +217,10 @@ export async function fulfillmentFixture(t, f) {
     t.onTestFinished(() => services.close());
     const corpus = JSON.parse(
       await readFile(
-        new URL('../../../docs/fixtures/exceptions-v0.json', import.meta.url),
+        new URL(
+          '../../../packages/exceptions/fixtures/exceptions-v0.json',
+          import.meta.url,
+        ),
         'utf8',
       ),
     );

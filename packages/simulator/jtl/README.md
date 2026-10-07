@@ -2,9 +2,7 @@
 
 Simulates a JTL-Wawi ERP behind the ERP REST API 2.2 that Luma's JTL adapter uses: sales orders, items with warehouse stock, delivery notes, shipping methods, suppliers and purchase orders.
 
-## Responsibilities
-
-The package implements `ProviderSimulator` from simulator-core. The host owns transport, persistence, failure injection, rate-limit buckets and scheduling; this package owns JTL records, the HTTP surface and merchant, warehouse and supplier commands. Records live in the context's `RecordStore`, scoped to one ERP instance; the host table is `sim_jtl_records`. Canonical Luma models and cross-provider scenarios belong outside this package.
+The package implements `ProviderSimulator` from simulator-core. The host owns transport, persistence, failure injection, rate-limit buckets and scheduling; this package owns JTL records, the HTTP surface and merchant, warehouse and supplier commands. Records live in the context's `RecordStore`, scoped to one ERP instance; the host table is `sim_jtl_records`. Canonical Luma models and cross-provider scenarios belong outside this package. Exports point to compiled `dist` output.
 
 ## Model
 
@@ -25,30 +23,11 @@ Lists page by `pageNumber` and `pageSize` (at most 1,000) in creation order. `to
 - `readOrder`, `openOrders`, `readItemStock` and `itemsPage` serve the merchant engine. Open orders carry the store key `open`, so they can be queried without scanning all orders.
 - Refusals throw `JtlError`; its `status` is the HTTP answer for the same condition.
 
-## Public entry points
+## Validation
 
-Import through these package exports. Private source paths are not supported across package boundaries.
-
-- `@luma/simulator-jtl` — [source](./src/index.ts).
-
-## Workspace dependencies
-
-[@luma/simulator-core](../core/README.md).
-
-## Development
-
-Run commands from the repository root after installing workspace dependencies.
-
-```sh
-pnpm exec turbo run build --filter=@luma/simulator-jtl...
-pnpm exec turbo run typecheck --filter=@luma/simulator-jtl
-pnpm exec turbo run test --filter=@luma/simulator-jtl
-node --test tooling/simulator/jtl-contract.test.mjs
-```
-
-The contract test drives the real JTL connector against this package; build `@luma/app-jtl` and its dependencies first.
+`pnpm test:simulator` builds the adapters and runs the contract tests in `tooling/simulator`, which drive the real JTL connector against this package.
 
 ## Further reading
 
-- [Engineering guide](../../../docs/simulator.md)
+- [Simulator](../../../docs/simulator.md)
 - [Package boundaries and runtime composition](../../../docs/architecture/005-domain-packages-and-runtimes.md)

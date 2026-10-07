@@ -1,47 +1,42 @@
 # Architecture decisions
 
-This directory is the source of truth for implementation ADRs. Review and version decisions alongside the code they govern. Linear holds short summaries, related issues and repository links; do not maintain full ADR copies there. Notion remains the source of truth for strategic product and business decisions.
+Implementation decisions are recorded here and versioned with the code they govern. Linear
+holds short summaries and links to these files; Notion holds strategic product and business
+decisions.
 
 ## Register
 
-| ADR                                               | Decision                                               | Status   | Issue                                                |
-| ------------------------------------------------- | ------------------------------------------------------ | -------- | ---------------------------------------------------- |
-| [001](001-module-boundaries.md)                   | Modular monolith boundaries                            | Accepted | [LUMA-4](https://linear.app/auren-labs/issue/LUMA-4) |
-| [002](002-canonical-commerce-model.md)            | Canonical commerce data model v0                       | Accepted | [LUMA-5](https://linear.app/auren-labs/issue/LUMA-5) |
-| [003](003-tenant-isolation-and-data-residency.md) | Tenant isolation and regional data residency           | Proposed | [LUMA-6](https://linear.app/auren-labs/issue/LUMA-6) |
-| [004](004-browser-runtime.md)                     | Browserbase V0 with Playwright/CDP; Anchor alternative | Proposed | [LUMA-2](https://linear.app/auren-labs/issue/LUMA-2) |
-
-[ADR-005](005-domain-packages-and-runtimes.md) defines the accepted domain package layout, API/worker processes, shared composition and persistence ownership. It supersedes ADR-001’s source placement.
-
-[The model processing-path review](003-model-processing-path-review.md) applies ADR-003 to the Bedrock EU route for tenant authoring prompts. It is pending operator sign-off.
+| ADR                                               | Decision                                                   | Status                             |
+| ------------------------------------------------- | ---------------------------------------------------------- | ---------------------------------- |
+| [001](001-module-boundaries.md)                   | Modular monolith boundaries                                | Accepted; layout superseded by 005 |
+| [002](002-canonical-commerce-model.md)            | Canonical commerce data model v0                           | Accepted                           |
+| [003](003-tenant-isolation-and-data-residency.md) | Tenant isolation and regional data residency               | Proposed                           |
+| [003 review](003-model-processing-path-review.md) | ADR-003 applied to the Bedrock EU route for tenant prompts | Pending operator sign-off          |
+| [004](004-browser-runtime.md)                     | Browser runtime and managed provider                       | Proposed                           |
+| [005](005-domain-packages-and-runtimes.md)        | Domain packages and process composition                    | Accepted                           |
+| [006](006-workspace-apps.md)                      | First-party workspace apps                                 | Accepted                           |
+| [007](007-workflow-model.md)                      | First-class Workflow ownership                             | Accepted                           |
+| [008](008-workspace-read-models.md)               | Workspace read models                                      | Accepted                           |
+| [009](009-permissions-and-roles.md)               | Permission catalog and workspace roles                     | Accepted                           |
 
 ## Baseline
 
-Carried forward from the [Linear architecture register](https://linear.app/auren-labs/document/architecture-decision-register-305db9bed1de):
-
-- TypeScript + Node.js; Fastify; contract-first REST/OpenAPI via ts-rest.
-- PostgreSQL + Drizzle; Better Auth; modular monolith first.
-- TanStack Start for the current web app; Vercel primarily for frontend delivery.
-- Canonical commerce model with separate connector payloads.
+- TypeScript and Node.js; Fastify; contract-first REST and OpenAPI through ts-rest.
+- PostgreSQL with Drizzle; Better Auth; modular monolith first.
+- TanStack Start for the web app; Vercel primarily for frontend delivery.
+- A canonical commerce model kept separate from provider payloads.
 - EU data residency by default; regional data planes later.
 - Sentry, Langfuse and PostHog.
-- Execution preference: API, deterministic browser automation, agentic browser/computer use, then human escalation.
+- Execution preference: provider API, deterministic browser automation, agentic browser or
+  computer use, then human escalation.
+- Open: V0 PostgreSQL hosting, Neon Frankfurt or an AWS-managed alternative.
 
-## Pending decisions
+## Writing an ADR
 
-- Restate versus Temporal for durable execution.
-- V0 PostgreSQL hosting: Neon Frankfurt versus an AWS-managed alternative.
+Write one when a decision is material, cross-cutting or expensive to reverse. Give it the
+next number and include status and date, context, the options considered, the decision,
+consequences, reversal cost and evidence. Add it to the register.
 
-## Maintaining ADRs
-
-Create a numbered Markdown file for each material decision. Include status/date, context, options considered, decision, consequences, reversal cost, evidence and related Linear issues. Add it to this register. Preserve decision history; mark replaced decisions as superseded and link their successors.
-
-Update ADRs through pull requests. After pushing, link the repository file from Linear with a short summary. Use a commit permalink for the recorded version; this register provides navigation to current files. A pushed branch can be linked while awaiting review, with that state stated explicitly. Update Linear when a decision's status changes, without copying its full text.
-
-- [ADR-006: First-party workspace apps](006-workspace-apps.md)
-
-- [ADR-007: First-class Workflow ownership](007-workflow-model.md)
-
-- [ADR-008: Workspace read models](008-workspace-read-models.md)
-
-- [ADR-009: Permission catalog and workspace roles](009-permissions-and-roles.md)
+ADRs record a decision at a point in time. Mark a replaced decision as superseded and link
+its successor instead of rewriting it. Day-to-day feature rules belong in the
+[engineering guides](../README.md).

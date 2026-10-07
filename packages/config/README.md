@@ -1,28 +1,12 @@
 # @luma/config
 
-Parses and validates API, identity, connection, model gateway, observability, and workflow configuration.
+Parses and validates server configuration: API, identity, connections, commerce sync, model gateway, observability and workflows.
 
-## Responsibilities
+Readers take an explicit environment map and run at process startup; services receive typed settings. Domain code never reads environment variables. Credentials stay on the server. Document new settings in the relevant `.env.example`.
 
-Readers accept an explicit environment map. Parse configuration at process startup and pass typed settings to services. Keep credentials on the server and avoid reading environment variables inside domain code.
-
-## Public entry points
-
-Import through these package exports. Private source paths are not supported across package boundaries.
-
-- `@luma/config` — [source](./src/index.ts).
-
-## Development
-
-Run commands from the repository root after installing workspace dependencies.
-
-```sh
-pnpm exec turbo run build --filter=@luma/config...
-pnpm exec turbo run typecheck --filter=@luma/config
-pnpm exec turbo run test --filter=@luma/config
-```
+Exports point to compiled `dist` output, so consumers see source changes only after a build or the package's `dev` watch.
 
 ## Further reading
 
-- [Engineering guide](../../docs/development.md)
+- [Local development](../../docs/development.md)
 - [Package boundaries and runtime composition](../../docs/architecture/005-domain-packages-and-runtimes.md)

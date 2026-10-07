@@ -1,34 +1,16 @@
 # Documentation and contextual help
 
-User guides live in `apps/web/content/docs`. Fumadocs MDX compiles them into lazy
-React articles. Fumadocs Core supplies the content source, heading metadata, and
-full-text search. The portal and help drawer render the same articles with Luma's
-shared controls and semantic colors.
+Product guides in `apps/web/content/docs` are compiled by Fumadocs MDX into lazily loaded articles. The public portal at `/docs` and the in-app help drawer render the same articles with Luma's shared components. Opening help never changes the workspace state behind it.
 
-- `/docs` opens the issue guide. `/docs/<slug>` is the canonical article URL.
-- `/docs-search` serves the Fumadocs search API through TanStack Start. It sits
-  outside `/api`, which Vite forwards to the application backend.
-- Both endpoints are public. Only put public product guidance in this collection.
-- Workspace routes opt into help through `staticData.help`. The deepest matched
-  route with a topic wins. Add topic slugs to `HelpTopic` in
-  `apps/web/src/features/help/context.ts`.
-- The inbox opens `issues`; selected issues and full issue pages open
-  `issues/investigate`. The resolution guide is available through links and search.
+## Rules
 
-Write task-focused MDX with a `title` and `description` in frontmatter. Use `##`
-headings and canonical links such as `/docs/issues/resolve#confirm-the-outcome`.
-The drawer prefixes heading IDs and handles navigation locally so opening a
-guide cannot change the selected issue, filters, or browser history. Modified
-clicks and “Open full documentation” retain normal link behavior.
+- The portal and its search endpoint are public. Only put public product guidance in this collection; contributor and implementation notes belong in `docs/`.
+- `/docs/<slug>` is the canonical article URL; `/docs` redirects to the issue guide. Search is served at `/docs-search`, outside `/api`, because Vite forwards `/api` to the backend.
+- Workspace routes opt into help with `staticData.help`. The deepest matched route with a topic wins. Add new topics to the `HelpTopic` type in the web help feature.
+- Write task-focused MDX with `title` and `description` frontmatter and `##` headings. Link with canonical paths such as `/docs/issues/resolve#confirm-the-outcome`; the drawer handles only same-origin `/docs/...` links locally.
 
-Fumadocs' Vite plugin is configured in both the web build and Vitest. Guides are
-loaded on demand. Search indexes the same content on the server. The portal uses
-server rendering; search is enabled when the browser has hydrated.
+## Drawer behavior
 
-## Validation
+The drawer prefixes heading IDs and handles article links locally, so following a link cannot change the selected issue, filters or browser history. Modified clicks and **Open full documentation** keep normal link behavior.
 
-`pnpm --filter @luma/web test` covers topic resolution and route behavior.
-`pnpm --filter @luma/api test:browser docs.browser.mjs` covers the public portal
-without a database. `pnpm test:browser issues-help.browser.mjs` covers contextual help
-on authenticated issue pages, local article navigation, heading focus, opening
-the portal, Escape dismissal, retained issue state, and mobile rendering.
+The portal is server-rendered; search starts working once the browser has hydrated. Search indexes the same content on the server. The Fumadocs Vite plugin is configured in both the web build and Vitest, so article imports also work in tests.
