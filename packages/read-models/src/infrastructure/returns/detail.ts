@@ -29,7 +29,7 @@ export async function readReturnDetail(
   tx: SqlTransaction,
   tenantId: string,
   id: string,
-): Promise<Omit<ReturnDetail, 'asOf'> | null> {
+): Promise<Omit<ReturnDetail, 'asOf' | 'hidden'> | null> {
   id = await resolveOrderEntity(tx, tenantId, id);
   let item = await readItem(tx, tenantId, id);
   if (!item) {

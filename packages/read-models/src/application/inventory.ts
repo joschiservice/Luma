@@ -19,6 +19,9 @@ export interface InventoryList {
   asOf: string;
 }
 
+/** Stock detail sections that need another area's read permission. */
+export type InventoryDetailSection = 'orders' | 'purchaseOrders' | 'issues';
+
 export interface InventoryDetail {
   position: StockPosition;
   history: {
@@ -42,10 +45,15 @@ export interface InventoryDetail {
   }[];
   issues: { id: string; label: string; state: string }[];
   relatedTruncated: boolean;
+  /** Sections left empty because the reader can't read their area. */
+  hidden: InventoryDetailSection[];
   asOf: string;
 }
 
-/** Reads stock by canonical SKU, location and unit while preserving each source's quantities. */
+/**
+ * Reads stock by canonical SKU, location and unit while preserving each source's quantities.
+ * Requires `inventory.read`; detail sections of other areas need their read permission.
+ */
 export interface InventoryWorkspace {
   /** Returns up to 50 positions. A cursor must belong to the same tenant and filters. */
   list(context: TenantContext, query: InventoryQuery): Promise<InventoryList>;

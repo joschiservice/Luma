@@ -22,6 +22,9 @@ export function registerRecoveryRoutes(
   ] as const) {
     server.post(
       `/v1/organizations/:organizationId/apps/shopify/fulfillment-recovery-${command}`,
+      {
+        config: { access: { permission: 'shopify:fulfillment_recovery.run' } },
+      },
       async (request, reply) => {
         reply.header('cache-control', 'no-store');
         if (!request.tenantContext)

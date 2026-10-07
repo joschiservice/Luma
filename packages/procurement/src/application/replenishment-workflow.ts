@@ -6,7 +6,12 @@ import type {
   BoundActionStep,
 } from '@luma/execution';
 import type { IdentityService, TenantContext } from '@luma/identity';
-import { IdentityError, requireRole, requireTenant } from '@luma/identity';
+import {
+  hasPermission,
+  IdentityError,
+  requirePermission,
+  requireTenant,
+} from '@luma/identity';
 import type { PolicyService } from '@luma/policies';
 import type {
   PlaybookDependencies,
@@ -160,10 +165,7 @@ export function createReplenishmentService(deps: {
   async function authorize(context: TenantContext, write = false) {
     const fresh = await deps.identity.refreshContext(context);
     requireTenant(fresh, context.tenantId);
-    requireRole(
-      fresh,
-      write ? ['owner', 'admin'] : ['owner', 'admin', 'member'],
-    );
+    requirePermission(fresh, write ? 'procurement.manage' : 'procurement.read');
     if (fresh.actor.id !== context.actor.id)
       throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
 
@@ -310,8 +312,8 @@ export function createReplenishmentService(deps: {
     return run;
   }
 
-  // Approval needs an owner or admin other than the principal who started the run, while the
-  // rule is active and the proposal's evidence is still valid.
+  // Approval needs someone who can manage procurement other than the principal who started the
+  // run, while the rule is active and the proposal's evidence is still valid.
   const respondable = (
     context: TenantContext,
     run: { actor: { id: string } },
@@ -319,7 +321,7 @@ export function createReplenishmentService(deps: {
     validUntil: string | undefined,
   ) =>
     rule.active &&
-    context.actor.role !== 'member' &&
+    hasPermission(context, 'procurement.manage') &&
     context.actor.id !== run.actor.id &&
     !!validUntil &&
     Date.parse(validUntil) > Date.now();
@@ -636,7 +638,7 @@ export function createReplenishmentService(deps: {
 
       return {
         available,
-        canManage: context.actor.role !== 'member',
+        canManage: hasPermission(context, 'procurement.manage'),
         positions: positions.filter((s) => !s.deleted),
         suppliers: suppliers.items,
         rules: rules.map((rule) => {
@@ -718,13 +720,13 @@ export function createReplenishmentService(deps: {
             context: version.context,
             systems: ['luma'],
             approval:
-              'A different owner or admin reviews each purchase-order proposal. Quantity above the configured limit is high risk. Workspace policy may require approval below that limit too.',
+              'Someone else who can approve changes reviews each purchase-order proposal. Quantity above the configured limit is high risk. Workspace policy may require approval below that limit too.',
           },
         ],
         activations: rules.map(view),
         connections: [],
         principalId: context.actor.id,
-        canManage: context.actor.role !== 'member',
+        canManage: hasPermission(context, 'procurement.manage'),
         policyVersion: await deps.safety.policies.currentVersion(
           context.tenantId,
         ),
@@ -1017,7 +1019,7 @@ export function createReplenishmentService(deps: {
         definitionId,
         name: version.definition.name,
         purpose: version.definition.intent,
-        canManage: context.actor.role !== 'member',
+        canManage: hasPermission(context, 'procurement.manage'),
         readiness: assessReadiness({
           enablement: active ? 'enabled' : rule ? 'paused' : 'not_enabled',
           issues,
@@ -1590,7 +1592,7 @@ export function createReplenishmentService(deps: {
                 targetKind: step.targetKind,
                 minimumRisk: step.minimumRisk,
                 approval:
-                  'Workspace policy decides whether a different owner or admin must approve each order.',
+                  'Workspace policy decides whether someone else who can approve changes must approve each order.',
                 parameters: types(step.parameters),
                 postcondition: types(step.expectedPostcondition),
                 evaluators: version.steps.flatMap((item) =>
@@ -1669,7 +1671,7 @@ export function createReplenishmentService(deps: {
           'Read current stock for the position you choose',
           'Stop when stock is stale or an order is already open',
           'Create a purchase-order draft for your supplier',
-          'Ask a different owner or admin to approve it when policy requires',
+          'Ask someone else who can approve changes to approve it when policy requires',
           'Check the draft independently',
         ],
         success:

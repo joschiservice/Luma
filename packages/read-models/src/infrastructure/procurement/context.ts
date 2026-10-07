@@ -1,8 +1,11 @@
-import { requireTenant } from '@luma/identity';
+import type { TenantContext } from '@luma/identity';
+import { requirePermission } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
 
+import { hiddenSections } from '../../application/access.js';
 import type {
   ProcurementContextReader,
+  ProcurementContextSection,
   ReplenishmentTrace,
   SkuContext,
 } from '../../application/procurement.js';
@@ -266,13 +269,23 @@ async function replenishment(
   };
 }
 
+/** Authorizes a procurement context read and names the sections the reader can't see. */
+function authorize(context: TenantContext) {
+  requirePermission(context, 'procurement.read');
+
+  return hiddenSections<ProcurementContextSection>(context, [
+    ['positions', 'inventory.read'],
+    ['issues', 'issues.read'],
+  ]);
+}
+
 /** Reads purchase-order and supplier context in one repeatable-read snapshot. */
 export function createProcurementContext(
   db: TenantDatabase,
 ): ProcurementContextReader {
   return {
     async order(context, purchaseOrderId) {
-      requireTenant(context, context.tenantId);
+      const hidden = authorize(context);
 
       return db.transaction(
         context.tenantId,
@@ -303,11 +316,13 @@ export function createProcurementContext(
                 sku: found.sku,
                 skuId: found.skuId,
                 title: found.title,
-                positions: found.positions,
+                positions: hidden.includes('positions') ? [] : found.positions,
                 otherOrders: found.otherOrders,
               };
             }),
-            issues: (await issues(tx, context.tenantId, contexts)).slice(0, 50),
+            issues: hidden.includes('issues')
+              ? []
+              : (await issues(tx, context.tenantId, contexts)).slice(0, 50),
             replenishment: order.origin.workflowRunId
               ? await replenishment(
                   tx,
@@ -316,6 +331,7 @@ export function createProcurementContext(
                 )
               : null,
             truncated,
+            hidden,
             asOf: new Date().toISOString(),
           };
         },
@@ -323,7 +339,7 @@ export function createProcurementContext(
       );
     },
     async supplier(context, supplierId) {
-      requireTenant(context, context.tenantId);
+      const hidden = authorize(context);
 
       return db.transaction(
         context.tenantId,
@@ -359,14 +375,18 @@ export function createProcurementContext(
 
               return {
                 ...sku,
+                positions: hidden.includes('positions') ? [] : sku.positions,
                 onOrder: [...onOrder].map(([unit, quantity]) => ({
                   unit,
                   quantity,
                 })),
               };
             }),
-            issues: (await issues(tx, context.tenantId, contexts)).slice(0, 50),
+            issues: hidden.includes('issues')
+              ? []
+              : (await issues(tx, context.tenantId, contexts)).slice(0, 50),
             truncated: truncated || skus.length > 50,
+            hidden,
             asOf: new Date().toISOString(),
           };
         },

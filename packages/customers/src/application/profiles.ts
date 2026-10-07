@@ -17,7 +17,7 @@ export interface StoredCustomerProfile extends CustomerProfile {
 
 export interface CustomerProfiles {
   /**
-   * Stores the profile when it is newer than the stored one; requires an owner or admin.
+   * Stores the profile when it is newer than the stored one; requires `sync.manage`.
    * Returns `suppressed` without storing when the customer's data was erased.
    */
   upsert(
@@ -26,7 +26,7 @@ export interface CustomerProfiles {
   ): Promise<'applied' | 'retained' | 'suppressed'>;
   /**
    * Deletes stored profiles for one connection, or only the listed source customers, and
-   * prevents listed customers from being imported again. Requires an owner or admin.
+   * prevents listed customers from being imported again. Requires `sync.manage`.
    */
   erase(
     context: TenantContext,

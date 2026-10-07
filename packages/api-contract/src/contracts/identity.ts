@@ -2,14 +2,15 @@ import { initContract } from '@ts-rest/core';
 import { z } from 'zod';
 
 import {
+  anyMember,
   apiErrorSchema,
   dataRegionSchema,
   organizationParamsSchema,
+  requires,
 } from '../common.js';
+import { roleReferenceSchema } from '../roles.js';
 
 const c = initContract();
-
-export const roleSchema = z.enum(['owner', 'admin', 'member']);
 
 export const organizationSchema = z.object({
   id: z.string().uuid(),
@@ -25,7 +26,7 @@ export const membershipSchema = z.object({
   id: z.string().uuid(),
   organizationId: z.string().uuid(),
   userId: z.string().uuid(),
-  role: roleSchema,
+  role: roleReferenceSchema,
 });
 
 export const tenantContextSchema = z.object({
@@ -38,9 +39,17 @@ export const tenantContextSchema = z.object({
     initiatingUserId: z.string().uuid(),
     sessionId: z.string().uuid(),
     membershipId: z.string().uuid(),
-    role: roleSchema,
+    role: roleReferenceSchema,
   }),
+  /** Every permission the caller's role grants in this workspace. */
+  permissions: z.array(z.string()),
+  /** True for Owner and Admin, which also hold every installed app's permissions. */
+  allAppPermissions: z.boolean(),
 });
+
+export type Membership = z.infer<typeof membershipSchema>;
+
+export type TenantContextResponse = z.infer<typeof tenantContextSchema>;
 
 export const memberParamsSchema = organizationParamsSchema.extend({
   memberId: z.string().uuid(),
@@ -78,33 +87,44 @@ export const identityContract = c.router(
       path: '/v1/organizations/:organizationId/context',
       pathParams: organizationParamsSchema,
       responses: { 200: tenantContextSchema },
+      metadata: anyMember,
       summary: 'Resolve your organization access',
+      description:
+        'Returns your membership, role and effective permissions. Changes to your role apply on the next request.',
     },
     listMembers: {
       method: 'GET',
       path: '/v1/organizations/:organizationId/members',
       pathParams: organizationParamsSchema,
       responses: { 200: z.object({ items: z.array(membershipSchema) }) },
+      metadata: anyMember,
       summary: 'List organization members',
     },
     addMember: {
+      headers: z.object({ 'x-command-id': z.string().uuid().optional() }),
       method: 'POST',
       path: '/v1/organizations/:organizationId/members',
       pathParams: organizationParamsSchema,
-      body: z.object({ userId: z.string().uuid(), role: roleSchema }).strict(),
+      body: z
+        .object({ userId: z.string().uuid(), roleId: z.string().min(1) })
+        .strict(),
       responses: { 201: membershipSchema },
+      metadata: requires('members.manage'),
       summary: 'Add a registered user to an organization',
       description:
-        'Owners and admins can add users. Only owners can grant ownership.',
+        'Requires `members.manage`. Only owners can grant ownership, and others can only assign roles whose permissions they hold.',
     },
     updateMember: {
       headers: z.object({ 'x-command-id': z.string().uuid().optional() }),
       method: 'PATCH',
       path: '/v1/organizations/:organizationId/members/:memberId',
       pathParams: memberParamsSchema,
-      body: z.object({ role: roleSchema }).strict(),
+      body: z.object({ roleId: z.string().min(1) }).strict(),
       responses: { 200: membershipSchema },
+      metadata: requires('members.manage'),
       summary: 'Change a member role',
+      description:
+        'Requires `members.manage`. Only owners change ownership; others can only assign roles, and change members, whose permissions they hold. The last owner cannot be demoted.',
     },
     removeMember: {
       headers: z.object({ 'x-command-id': z.string().uuid().optional() }),
@@ -113,6 +133,7 @@ export const identityContract = c.router(
       pathParams: memberParamsSchema,
       body: c.noBody(),
       responses: { 204: c.noBody() },
+      metadata: requires('members.manage'),
       summary: 'Remove an organization member',
       description: 'The last owner cannot be removed or demoted.',
     },

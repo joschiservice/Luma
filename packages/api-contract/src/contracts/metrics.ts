@@ -1,7 +1,11 @@
 import { initContract } from '@ts-rest/core';
 import { z } from 'zod';
 
-import { apiErrorSchema, organizationParamsSchema } from '../common.js';
+import {
+  apiErrorSchema,
+  organizationParamsSchema,
+  requires,
+} from '../common.js';
 import {
   metricDefinitionSchema,
   metricRequestSchema,
@@ -18,6 +22,7 @@ const c = initContract();
 export const metricsContract = c.router({
   operationalDefinitions: {
     method: 'GET',
+    metadata: requires('insights.read'),
     path: '/v2/organizations/:organizationId/metrics',
     pathParams: organizationParamsSchema,
     responses: {
@@ -33,6 +38,7 @@ export const metricsContract = c.router({
   },
   operationalQuery: {
     method: 'POST',
+    metadata: requires('insights.read'),
     path: '/v2/organizations/:organizationId/metrics/query',
     pathParams: organizationParamsSchema,
     body: operationalMetricRequestSchema,
@@ -50,6 +56,7 @@ export const metricsContract = c.router({
   },
   definitions: {
     method: 'GET',
+    metadata: requires('insights.read'),
     path: '/v1/organizations/:organizationId/metrics',
     pathParams: organizationParamsSchema,
     responses: {
@@ -64,6 +71,7 @@ export const metricsContract = c.router({
   },
   query: {
     method: 'POST',
+    metadata: requires('insights.read'),
     path: '/v1/organizations/:organizationId/metrics/query',
     pathParams: organizationParamsSchema,
     body: metricRequestSchema,

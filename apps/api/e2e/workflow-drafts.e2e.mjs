@@ -50,7 +50,7 @@ it('saves, validates and publishes tenant drafts without activating them', async
     cookie: owner.cookie,
     method: 'POST',
     status: 201,
-    body: { userId: member.userId, role: 'member' },
+    body: { userId: member.userId, roleId: 'member' },
   });
   const base = `/v1/organizations/${org.id}`;
   const call = (path, options = {}) =>

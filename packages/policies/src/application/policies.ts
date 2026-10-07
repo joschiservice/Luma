@@ -1,5 +1,10 @@
 import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireRole, requireTenant } from '@luma/identity';
+import {
+  IdentityError,
+  isAppPermission,
+  requirePermission,
+  requireTenant,
+} from '@luma/identity';
 import { measure } from '@luma/platform';
 
 import type {
@@ -9,6 +14,7 @@ import type {
   ProposedAction,
 } from '../domain/action.js';
 import { workspacePolicyVersion } from '../domain/action.js';
+import type { PolicyCapability } from '../domain/evaluate.js';
 import { approvalRequirement, evaluatePolicy } from '../domain/evaluate.js';
 
 export interface PolicyRepository {
@@ -60,7 +66,6 @@ export function createPolicyService(deps: PolicyDependencies) {
     async decision(context: TenantContext, id: string) {
       const fresh = await deps.refreshContext(context);
       requireTenant(fresh, context.tenantId);
-      requireRole(fresh, ['owner', 'admin', 'member']);
       if (fresh.actor.id !== context.actor.id)
         throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
 
@@ -95,11 +100,15 @@ export function createPolicyService(deps: PolicyDependencies) {
         workspaceRequired: workspace.required,
       });
     },
+    /**
+     * Records a policy decision for an action against the actor's current permissions. Callers
+     * state the permission the step needs; see `PolicyCapability`.
+     */
     async evaluate(
       context: TenantContext,
       action: ProposedAction,
       actionHash: string,
-      capability: { available: boolean; minimumRisk: ProposedAction['risk'] },
+      capability: PolicyCapability,
     ) {
       return measure('policy.evaluate', async () => {
         requireTenant(context, action.tenantId);
@@ -121,7 +130,7 @@ export function createPolicyService(deps: PolicyDependencies) {
         const { outcome, reason } = evaluatePolicy(
           action,
           capability,
-          fresh.actor.role,
+          fresh.permissions,
           fresh.actor.id,
           now.getTime(),
           approval,
@@ -138,6 +147,7 @@ export function createPolicyService(deps: PolicyDependencies) {
           policyVersion,
           outcome,
           reason,
+          permission: capability.permission,
           ...(approval && reason === 'authorized'
             ? { approvalId: approval.id }
             : {}),
@@ -166,7 +176,7 @@ export function createPolicyService(deps: PolicyDependencies) {
       requireTenant(context, context.tenantId);
       const fresh = await deps.refreshContext(context);
       requireTenant(fresh, context.tenantId);
-      requireRole(fresh, ['owner', 'admin']);
+      requirePermission(fresh, 'decisions.respond');
       const policyVersion = await version(context.tenantId);
       const decision = await deps.repository.findDecision(
         context.tenantId,
@@ -186,6 +196,9 @@ export function createPolicyService(deps: PolicyDependencies) {
         );
       if (fresh.actor.id === decision.actorId)
         throw new Error('A different approver is required');
+      // Capabilities with their own app permission need it to approve, too.
+      if (decision.permission && isAppPermission(decision.permission))
+        requirePermission(fresh, decision.permission);
       const now = deps.now();
       const expiry = Date.parse(expiresAt);
       if (

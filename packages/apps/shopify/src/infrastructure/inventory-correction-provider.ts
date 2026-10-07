@@ -119,6 +119,7 @@ export function createInventoryCorrectionProvider(
     descriptor: {
       version: '0',
       minimumRisk: 'medium',
+      permission: 'shopify:inventory_corrections.apply',
       idempotency: 'provider_key',
       retry: { maxAttempts: 1, initialDelayMs: 0 },
     },

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 
+import { appScopes } from './app-scopes.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
 const gid = (kind, value = 1) => `gid://shopify/${kind}/${value}`;
@@ -89,11 +90,12 @@ export async function recoveryFixture(t, origin = 'http://localhost:3000') {
     f.owner,
     `${f.base}/members`,
     'POST',
-    { userId: admin.id, role: 'admin' },
+    { userId: admin.id, roleId: 'admin' },
     201,
   );
   await f.request(f.owner, `${f.base}/apps/shopify/install`, 'POST', {
     version: null,
+    scopes: appScopes.shopify,
   });
   const installed = await f.request(
     f.owner,

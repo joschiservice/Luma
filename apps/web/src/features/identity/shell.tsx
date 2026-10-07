@@ -25,6 +25,7 @@ import { PinCurrentPage, PinnedNavigation } from '../layout/pins';
 import { settingsOptions } from '../settings/data';
 import { Failure, Pending } from './common';
 import { contextOptions, organizationsOptions, sessionOptions } from './data';
+import { NoAccess, usePermissions } from './permissions';
 import {
   destinationFor,
   type WorkspaceDestination,
@@ -90,8 +91,13 @@ function Navigation({
     ...decisionsOptions(organizationId, {}, 1),
     select: (list) => list.counts.views.all,
   });
+  const { can } = usePermissions(organizationId);
+  // Areas outside the person's role stay out of navigation; opening them explains why.
   const group = (name: WorkspaceDestination['group']) =>
-    workspaceDestinations.filter((item) => item.group === name);
+    workspaceDestinations.filter(
+      (item) =>
+        item.group === name && (!item.permission || can(item.permission)),
+    );
   const link = (destination: WorkspaceDestination) => (
     <li key={destination.path}>
       <NavigationLink
@@ -173,6 +179,7 @@ function TenantShell({ organizationId }: { organizationId: string }) {
   const client = useQueryClient();
   const theme = useThemePreference();
   const access = useQuery(contextOptions(organizationId));
+  const permissions = usePermissions(organizationId);
   const organizations = useQuery(organizationsOptions());
   const settings = useQuery({
     ...settingsOptions(organizationId),
@@ -274,7 +281,15 @@ function TenantShell({ organizationId }: { organizationId: string }) {
               : 'Display timezone unavailable. Dates are shown in UTC.'}
           </Alert>
         ) : null}
-        <Outlet />
+        {page.permission && !permissions.can(page.permission) ? (
+          <NoAccess
+            organizationId={organizationId}
+            area={page.area ?? page.label.toLowerCase()}
+            permission={page.permission}
+          />
+        ) : (
+          <Outlet />
+        )}
       </WorkspaceTimezone>
     </WorkspaceLayout>
   );

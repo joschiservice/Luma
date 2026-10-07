@@ -31,7 +31,8 @@ import {
 import { type ReactNode, useState } from 'react';
 
 import { SignInRedirect } from '../../identity/common';
-import { contextOptions, IdentityError } from '../../identity/data';
+import { IdentityError } from '../../identity/data';
+import { usePermissions } from '../../identity/permissions';
 import { workflowError } from '../data';
 import { OfflineNotice } from '../offline';
 import { createDraft, draftsKey, templatesOptions } from './data';
@@ -91,7 +92,7 @@ export function NewWorkflowPage({
   const navigate = useNavigate();
   const client = useQueryClient();
   const templates = useQuery(templatesOptions(organizationId));
-  const context = useQuery(contextOptions(organizationId));
+  const permissions = usePermissions(organizationId);
   const [request, setRequest] = useState<
     Parameters<typeof createDraft>[1] | null
   >(null);
@@ -132,7 +133,7 @@ export function NewWorkflowPage({
       loading={templates.isPending}
       error={templates.error ? workflowError(templates.error) : undefined}
       retry={() => void templates.refetch()}
-      canManage={!!context.data && context.data.actor.role !== 'member'}
+      canManage={permissions.can('workflows.author')}
       search={search}
       changeSearch={(next) =>
         void navigate({
@@ -234,13 +235,13 @@ export function NewWorkflowView({
       <PageHeader
         icon={<DomainIcon domain="workflows" size="lg" />}
         title="New workflow"
-        description="Start from a template or build your own. Nothing runs until an owner or admin publishes and activates it."
+        description="Start from a template or build your own. Nothing runs until it is published and activated."
       />
       <OfflineNotice />
       {!canManage ? (
         <Alert tone="neutral" className="workflow-notice">
-          You can browse templates. Only workspace owners and admins can set
-          them up or create workflows.
+          You can browse templates. Your role doesn’t include Author workflows,
+          so you can’t set them up or create workflows.
         </Alert>
       ) : null}
       {startError ? (

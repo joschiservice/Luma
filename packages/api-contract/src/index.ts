@@ -24,6 +24,7 @@ import { productsContract } from './contracts/products.js';
 import { connectorProvidersContract } from './contracts/providers.js';
 import { recordsContract } from './contracts/records.js';
 import { returnsContract } from './contracts/returns.js';
+import { rolesContract } from './contracts/roles.js';
 import { settingsContract } from './contracts/settings.js';
 import { shadowContract } from './contracts/shadow.js';
 import { syncContract } from './contracts/sync.js';
@@ -51,6 +52,7 @@ const routes: {
   exceptions: typeof exceptionsContract;
   identity: typeof identityContract;
   settings: typeof settingsContract;
+  roles: typeof rolesContract;
   connections: typeof connectionsContract;
   apps: typeof appsContract;
   system: typeof systemContract;
@@ -82,6 +84,7 @@ const routes: {
   exceptions: exceptionsContract,
   identity: identityContract,
   settings: settingsContract,
+  roles: rolesContract,
   connections: connectionsContract,
   apps: appsContract,
   system: systemContract,
@@ -130,19 +133,27 @@ export { diagnosisSchema } from './diagnosis.js';
 export type { Diagnosis } from './diagnosis.js';
 
 export {
+  anyMember,
   apiErrorSchema,
   dataRegionSchema,
   organizationParamsSchema,
+  requires,
 } from './common.js';
 
-export type { ApiError } from './common.js';
+export type { ApiError, RouteAccess } from './common.js';
 
 export {
   membershipSchema,
   organizationSchema,
-  roleSchema,
   tenantContextSchema,
 } from './contracts/identity.js';
+
+export type {
+  Membership,
+  TenantContextResponse,
+} from './contracts/identity.js';
+
+export * from './roles.js';
 
 export { connectorProviderSchema } from './contracts/providers.js';
 

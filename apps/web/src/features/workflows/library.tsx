@@ -29,7 +29,8 @@ import {
 } from 'lucide-react';
 
 import { SignInRedirect } from '../identity/common';
-import { contextOptions, IdentityError } from '../identity/data';
+import { IdentityError } from '../identity/data';
+import { usePermissions } from '../identity/permissions';
 import { draftsOptions } from './authoring/data';
 import { workflowError, workflowsOptions } from './data';
 import { OfflineNotice } from './offline';
@@ -104,7 +105,7 @@ export function WorkflowsPage() {
   const navigate = useNavigate({ from: '/app/$organizationId/workflows/' });
   const query = useQuery(workflowsOptions(organizationId));
   const drafts = useQuery(draftsOptions(organizationId));
-  const context = useQuery(contextOptions(organizationId));
+  const permissions = usePermissions(organizationId);
   if (query.error instanceof IdentityError && query.error.status === 401)
     return <SignInRedirect />;
 
@@ -112,7 +113,7 @@ export function WorkflowsPage() {
     <WorkflowLibraryView
       organizationId={organizationId}
       drafts={drafts.data}
-      canCreate={!!context.data && context.data.actor.role !== 'member'}
+      canCreate={permissions.can('workflows.author')}
       items={
         query.error instanceof IdentityError &&
         [401, 403, 404].includes(query.error.status)
@@ -264,8 +265,8 @@ export function WorkflowLibraryView({
             <Workflow size={28} aria-hidden="true" />
             <h2>No published workflows</h2>
             <p>
-              Start from a template or build your own. An owner or admin
-              publishes a reviewed version before it can be activated.
+              Start from a template or build your own. A reviewed version must
+              be published before it can be activated.
             </p>
             <Link
               to="/app/$organizationId/workflows/new"

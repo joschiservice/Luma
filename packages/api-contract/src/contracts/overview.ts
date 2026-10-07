@@ -5,6 +5,7 @@ import {
   apiErrorSchema,
   caseParams,
   organizationParamsSchema,
+  requires,
 } from '../common.js';
 import {
   measurementCommandSchema,
@@ -18,6 +19,7 @@ const c = initContract();
 export const operationsContract = c.router({
   recordMeasurement: {
     method: 'POST',
+    metadata: requires('issues.manage'),
     path: '/v1/organizations/:organizationId/exceptions/:exceptionId/measurements',
     pathParams: caseParams,
     body: measurementCommandSchema,
@@ -31,10 +33,11 @@ export const operationsContract = c.router({
     },
     summary: 'Record an evidence-backed measurement fact',
     description:
-      'Owners and admins append versioned eligibility, attribution, environment, incorrect-action or measured partner-baseline assessments. Evidence must belong to the incident. Environment is immutable. Expected revision prevents concurrent lost updates; exact retries return the original fact. These facts grant no execution authority.',
+      'People who can manage issues append versioned eligibility, attribution, environment, incorrect-action or measured partner-baseline assessments. Evidence must belong to the incident. Environment is immutable. Expected revision prevents concurrent lost updates; exact retries return the original fact. These facts grant no execution authority.',
   },
   measurementHistory: {
     method: 'GET',
+    metadata: requires('issues.read'),
     path: '/v1/organizations/:organizationId/exceptions/:exceptionId/measurements',
     pathParams: caseParams,
     query: z
@@ -49,10 +52,11 @@ export const operationsContract = c.router({
     },
     summary: 'Read the measurement evidence ledger',
     description:
-      'Workspace members can read up to 100 immutable measurement facts after a revision. Follow nextRevision for more; revision identifies the current head.',
+      'People who can read issues can read up to 100 immutable measurement facts after a revision. Follow nextRevision for more; revision identifies the current head.',
   },
   overview: {
     method: 'GET',
+    metadata: requires('issues.read'),
     path: '/v1/organizations/:organizationId/operations/overview',
     pathParams: organizationParamsSchema,
     query: overviewQuerySchema,

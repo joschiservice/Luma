@@ -53,6 +53,10 @@ export type WorkspaceDestination = {
   domain?: Domain;
   /** Second key of the `G` navigation shortcut, such as `h` for G then H. */
   shortcut: string;
+  /** The permission needed to open the page; without one, every member can open it. */
+  permission?: string;
+  /** What the page shows, for the no-access explanation. */
+  area?: string;
 };
 
 /** Pages available through workspace navigation, search and `G` shortcuts. */
@@ -81,6 +85,8 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
     description: 'Investigate and resolve issues',
     group: 'core',
     shortcut: 'i',
+    permission: 'issues.read',
+    area: 'issues',
   },
   {
     path: 'records',
@@ -97,6 +103,8 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
     description: 'Follow workspace activity',
     group: 'core',
     shortcut: 'a',
+    permission: 'activity.read',
+    area: 'workspace activity',
   },
   {
     path: 'insights',
@@ -105,6 +113,8 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
     description: 'Live operational metrics and order flow',
     group: 'core',
     shortcut: 'm',
+    permission: 'insights.read',
+    area: 'insights',
   },
   {
     path: 'orders',
@@ -114,6 +124,8 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
     group: 'operations',
     domain: 'orders',
     shortcut: 'o',
+    permission: 'orders.read',
+    area: 'orders',
   },
   {
     path: 'customers',
@@ -122,6 +134,8 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
     description: 'Customer identity, order history and service context',
     group: 'operations',
     shortcut: 'u',
+    permission: 'customers.read',
+    area: 'customers',
   },
   {
     path: 'products',
@@ -132,6 +146,8 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
     group: 'operations',
     domain: 'products',
     shortcut: 'k',
+    permission: 'products.read',
+    area: 'products',
   },
   {
     path: 'returns',
@@ -142,6 +158,8 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
     group: 'operations',
     domain: 'returns',
     shortcut: 't',
+    permission: 'returns.read',
+    area: 'returns',
   },
   {
     path: 'inventory',
@@ -151,6 +169,8 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
     group: 'operations',
     domain: 'inventory',
     shortcut: 'v',
+    permission: 'inventory.read',
+    area: 'inventory',
   },
   {
     path: 'fulfillment',
@@ -161,6 +181,8 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
     group: 'operations',
     domain: 'fulfillment',
     shortcut: 'f',
+    permission: 'fulfillment.read',
+    area: 'fulfillment',
   },
   {
     path: 'workflows',
@@ -170,6 +192,8 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
     group: 'operations',
     domain: 'workflows',
     shortcut: 'w',
+    permission: 'workflows.read',
+    area: 'workflows',
   },
   {
     path: 'procurement',
@@ -179,6 +203,8 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
     group: 'operations',
     domain: 'procurement',
     shortcut: 'p',
+    permission: 'procurement.read',
+    area: 'procurement',
   },
   {
     path: 'apps',

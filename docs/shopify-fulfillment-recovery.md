@@ -8,7 +8,7 @@ requests fulfillment write scopes; existing read-only connections remain usable.
 
 The app composition in `packages/apps/shopify/src/fulfillment-recovery.ts` uses
 the shared policy, execution, audit and Action Admission services. The requester
-and approver must be different owners or admins. A preview stays open for a
+and approver must be different people; both need `shopify:fulfillment_recovery.run`, and the approver also `decisions.respond`. A preview stays open for a
 four-hour decision window. Shopify is read again before dispatch, and membership,
 installation, grants, source revision and eligibility are checked on that read. Only references to persisted previews enter
 the execution endpoint.

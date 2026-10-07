@@ -1,6 +1,9 @@
 import { randomUUID } from 'node:crypto';
 
-import { makeTenantContext } from '@luma/identity/composition';
+import {
+  builtInMembership,
+  makeTenantContext,
+} from '@luma/identity/composition';
 import { createWorkflowCommands } from '@luma/workflow-temporal';
 import { TestWorkflowEnvironment } from '@temporalio/testing';
 import { expect, it } from 'vitest';
@@ -18,12 +21,10 @@ it('reuses exact Shadow starts and rejects conflicting principal, source or Play
         dataRegion: 'EU',
         status: 'active',
       },
-      {
-        id: 'membership',
-        organizationId: tenantId,
-        userId: 'owner',
-        role: 'owner',
-      },
+      builtInMembership(
+        { id: 'membership', organizationId: tenantId, userId: 'owner' },
+        'owner',
+      ),
       'request',
     );
     const commands = createWorkflowCommands(

@@ -5,6 +5,8 @@ export interface WorkspaceApp {
   status: 'installed' | 'uninstalled';
   version: number;
   updatedAt: string;
+  /** Scopes granted to the current installation; empty after uninstall. */
+  grantedScopes: string[];
 }
 
 /** Checks optimistic lifecycle transitions; reinstalls always create a new installation version. */
@@ -13,7 +15,7 @@ export function nextInstallation(
   appId: string,
   version: number | null,
   installed: boolean,
-): WorkspaceApp {
+): Omit<WorkspaceApp, 'grantedScopes'> {
   if ((current?.version ?? null) !== version)
     throw new IdentityError(
       409,

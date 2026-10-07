@@ -51,12 +51,17 @@ export interface ShadowComparison {
   } | null;
 }
 
-/** Simulates the bounded shipping-method model without provider access or execution receipts. */
+/**
+ * Simulates the bounded shipping-method model without provider access or execution receipts.
+ * Policy is evaluated as if the actor were running the action, so `access` must grant
+ * `actions.execute` for an admitted outcome.
+ */
 export function evaluateShadow(input: {
   id: string;
   incidentId: string;
   actorId: string;
-  role: string;
+  /** The actor's current permissions, e.g. `context.permissions`. */
+  access: { has(permission: string): boolean };
   workflow: string;
   now: string;
   diagnosis: Diagnosis | null;
@@ -93,8 +98,9 @@ export function evaluateShadow(input: {
                 candidate.action.capability === 'orders.shipping-method.write'
                   ? 'high'
                   : version.ir.action.minimumRisk,
+              permission: 'actions.execute',
             },
-            input.role,
+            input.access,
             input.actorId,
             Date.parse(input.now),
           ),

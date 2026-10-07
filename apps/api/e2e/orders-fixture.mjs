@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { createCommerceServices } from '@luma/application-runtime';
 import { createCommerceSyncWorker } from '@luma/application-runtime/sync';
-import { makeTenantContext } from '@luma/identity';
+import { builtInMembership, makeTenantContext } from '@luma/identity';
 import { createOrderListRebuilder } from '@luma/orders/composition';
 import { createTenantDatabase } from '@luma/platform/composition';
 
@@ -14,12 +14,10 @@ export async function ordersFixture(t, f) {
   const context = makeTenantContext(
     { userId: f.owner.id, sessionId: 'fixture' },
     { ...f.org, status: 'active', dataRegion: 'EU' },
-    {
-      id: randomUUID(),
-      organizationId: f.org.id,
-      userId: f.owner.id,
-      role: 'owner',
-    },
+    builtInMembership(
+      { id: randomUUID(), organizationId: f.org.id, userId: f.owner.id },
+      'owner',
+    ),
     randomUUID(),
   );
   const store = randomUUID();

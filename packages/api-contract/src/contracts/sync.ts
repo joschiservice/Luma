@@ -1,7 +1,12 @@
 import { initContract } from '@ts-rest/core';
 import { z } from 'zod';
 
-import { apiErrorSchema, organizationParamsSchema } from '../common.js';
+import {
+  anyMember,
+  apiErrorSchema,
+  organizationParamsSchema,
+  requires,
+} from '../common.js';
 import {
   identityDetailSchema,
   identityKindSchema,
@@ -24,6 +29,7 @@ const errors = {
 export const syncContract = c.router({
   overview: {
     method: 'GET',
+    metadata: anyMember,
     path: '/v1/organizations/:organizationId/sync',
     pathParams: organizationParamsSchema,
     responses: { 200: syncOverviewSchema, ...errors },
@@ -33,6 +39,7 @@ export const syncContract = c.router({
   },
   command: {
     method: 'POST',
+    metadata: requires('sync.manage'),
     path: '/v1/organizations/:organizationId/sync/:streamId/commands',
     pathParams: organizationParamsSchema.extend({
       streamId: z.string().uuid(),
@@ -41,10 +48,11 @@ export const syncContract = c.router({
     responses: { 200: syncStreamSchema, 400: apiErrorSchema, ...errors },
     summary: 'Control a sync',
     description:
-      'Owners and admins can pause or resume a sync, retry now, request a full check against the source (`reconcile`) or import the history again (`reimport`). Resuming, retrying and re-importing continue with the caller’s access. Re-importing keeps every imported record; unchanged records are recognized and not duplicated. Commands are idempotent.',
+      'Requires `sync.manage`. Pauses or resumes a sync, retries now, requests a full check against the source (`reconcile`) or imports the history again (`reimport`). Resuming, retrying and re-importing continue with the caller’s access. Re-importing keeps every imported record; unchanged records are recognized and not duplicated. Commands are idempotent.',
   },
   identity: {
     method: 'GET',
+    metadata: anyMember,
     path: '/v1/organizations/:organizationId/identities/:kind/:entityId',
     pathParams: organizationParamsSchema.extend({
       kind: identityKindSchema,
@@ -57,6 +65,7 @@ export const syncContract = c.router({
   },
   requestLink: {
     method: 'POST',
+    metadata: requires('sync.manage'),
     path: '/v1/organizations/:organizationId/identities/links',
     pathParams: organizationParamsSchema,
     body: linkInputSchema,
@@ -68,10 +77,11 @@ export const syncContract = c.router({
     },
     summary: 'Link or unlink source records',
     description:
-      'Owners and admins can confirm that another SKU, location or order is the same record (`link`), or separate one connection’s source from it (`unlink`). Luma applies the change in the background, keeps the previous mapping as history and re-projects affected projections. Order links keep each source’s lines and shipments separate and preserve old references. Poll the returned request for its outcome.',
+      'Requires `sync.manage`. Confirms that another SKU, location or order is the same record (`link`), or separates one connection’s source from it (`unlink`). Luma applies the change in the background, keeps the previous mapping as history and re-projects affected projections. Order links keep each source’s lines and shipments separate and preserve old references. Poll the returned request for its outcome.',
   },
   linkRequest: {
     method: 'GET',
+    metadata: anyMember,
     path: '/v1/organizations/:organizationId/identities/links/:requestId',
     pathParams: organizationParamsSchema.extend({
       requestId: z.string().uuid(),

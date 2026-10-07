@@ -82,9 +82,11 @@ export const member = pgTable('memberships', {
     .notNull()
     .references(() => user.id, { onDelete: 'cascade' }),
   role: text('role').notNull(),
+  customRoleId: uuid('custom_role_id'),
   createdAt: time('created_at').notNull(),
 });
 
+// Required by Better Auth's organization plugin; Luma uses workspace_invitations instead.
 export const invitation = pgTable('invitations', {
   id: uuid('id').primaryKey(),
   organizationId: uuid('tenant_id')

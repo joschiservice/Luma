@@ -38,6 +38,11 @@ export function createShopifyRecovery(
   installations: InstallationService,
   fetch?: typeof globalThis.fetch,
 ) {
+  const operation = {
+    app: 'shopify',
+    permission: 'shopify:fulfillment_recovery.run',
+    scopes: ['fulfillment.read'],
+  } as const;
   const store = createRecoveryStore(context.database);
   const audit = createAuditLog(context.database);
   const provisioning = createAdmissionStore(context.database);
@@ -220,6 +225,10 @@ export function createShopifyRecovery(
     effects,
     read,
     authorize,
+    permission: {
+      require: (tenant) => context.requirePermission(tenant, operation),
+      allowed: (tenant) => context.hasPermission(tenant, operation),
+    },
     refreshContext: context.refreshContext,
     now: () => new Date(),
     hash: (action) => parseAction(action).hash,

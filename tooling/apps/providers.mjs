@@ -48,6 +48,7 @@ export function createInstalledConnections(db, options) {
     ...host.connections,
     apps: host.apps,
     registry: host.registry,
+    decisionSources: host.decisionSources,
     providerCatalog: host.providerCatalog,
   };
 }

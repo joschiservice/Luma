@@ -17,20 +17,11 @@ import type {
   SyncStreamState,
 } from './detection-monitor.js';
 import { createDetectionMonitor } from './detection-monitor.js';
-
-vi.mock('@luma/identity', () => ({
-  requireTenant: (context: TenantContext, tenantId: string) => {
-    if (context.tenantId !== tenantId) throw new Error('Tenant mismatch');
-  },
-  requireRole: () => undefined,
-}));
+import { testContext } from './tenant-context.fixture.js';
 
 const uuid = () => crypto.randomUUID();
 const tenantId = uuid();
-const context = {
-  tenantId,
-  actor: { id: 'owner', role: 'owner' },
-} as TenantContext;
+const context = testContext({ tenantId });
 const now = new Date('2026-10-05T12:00:00Z');
 const ago = (minutes: number) =>
   new Date(+now - minutes * 60_000).toISOString();

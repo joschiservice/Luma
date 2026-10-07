@@ -121,8 +121,11 @@ describe.skipIf(!databaseUrl)('connections through the API CLI', () => {
       for (const migration of [
         '0001_identity.sql',
         '0004_connector_installations.sql',
+        '0023_workspace_settings.sql',
         '0024_workspace_apps.sql',
         '0052_authentication_factors.sql',
+        '0054_workspace_roles.sql',
+        '0055_workspace_app_scopes.sql',
       ]) {
         await owner.query(
           await readFile(
@@ -180,6 +183,16 @@ describe.skipIf(!databaseUrl)('connections through the API CLI', () => {
       (
         await call(`/v1/organizations/${organizationId}/apps/shopify/install`, {
           version: null,
+          scopes: [
+            'orders.read',
+            'fulfillment.read',
+            'inventory.read',
+            'products.read',
+            'customers.read',
+            'returns.read',
+            'actions.propose',
+            'actions.execute',
+          ],
         })
       ).status,
     ).toBe(200);

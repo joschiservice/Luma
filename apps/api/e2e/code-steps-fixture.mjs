@@ -1,4 +1,7 @@
-import { makeTenantContext } from '@luma/identity/composition';
+import {
+  builtInMembership,
+  makeTenantContext,
+} from '@luma/identity/composition';
 import { createTenantDatabase } from '@luma/platform/composition';
 import {
   compileProcessWorkflow,
@@ -21,12 +24,10 @@ export async function seedCodeSteps(db, tenantId) {
   const context = makeTenantContext(
     { userId: member.user_id, sessionId: 'fixture' },
     { ...org, dataRegion: org.data_region, status: 'active' },
-    {
-      id: member.id,
-      organizationId: tenantId,
-      userId: member.user_id,
-      role: 'owner',
-    },
+    builtInMembership(
+      { id: member.id, organizationId: tenantId, userId: member.user_id },
+      'owner',
+    ),
     'fixture',
   );
   const pool = new Pool({ connectionString: db.runtimeUrl });

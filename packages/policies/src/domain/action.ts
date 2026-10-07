@@ -48,6 +48,8 @@ export interface PolicyDecision {
     | 'approval_required'
     | 'approval_rejected';
   approvalId?: string;
+  /** The permission the actor needed; approvers also need it when it belongs to an app. */
+  permission?: string;
   evaluatedAt: string;
   validUntil: string;
 }

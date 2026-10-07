@@ -92,7 +92,7 @@ export function caseRunOutcome(state: string | undefined): string {
     case 'ended':
       return 'The run finished without changing anything.';
     case 'awaiting_decision':
-      return 'A different owner or admin needs to approve the change.';
+      return 'Someone else who can approve changes needs to approve the change.';
     case 'waiting':
       return 'The run is waiting before it checks again.';
     case 'escalated':

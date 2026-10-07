@@ -8,7 +8,11 @@ import {
   caseListSchema,
   caseQuerySchema,
 } from '../cases.js';
-import { apiErrorSchema, organizationParamsSchema } from '../common.js';
+import {
+  apiErrorSchema,
+  organizationParamsSchema,
+  requires,
+} from '../common.js';
 
 const c = initContract();
 
@@ -16,6 +20,7 @@ export const exceptionsContract = c.router(
   {
     list: {
       method: 'GET',
+      metadata: requires('issues.read'),
       path: '/v1/organizations/:organizationId/exceptions',
       pathParams: organizationParamsSchema,
       query: caseQuerySchema,
@@ -26,6 +31,7 @@ export const exceptionsContract = c.router(
     },
     evidence: {
       method: 'GET',
+      metadata: requires('issues.read'),
       path: '/v1/organizations/:organizationId/exceptions/:exceptionId/evidence',
       pathParams: organizationParamsSchema.extend({
         exceptionId: z.string().uuid(),
@@ -38,6 +44,7 @@ export const exceptionsContract = c.router(
     },
     get: {
       method: 'GET',
+      metadata: requires('issues.read'),
       path: '/v1/organizations/:organizationId/exceptions/:exceptionId',
       pathParams: organizationParamsSchema.extend({
         exceptionId: z.string().uuid(),

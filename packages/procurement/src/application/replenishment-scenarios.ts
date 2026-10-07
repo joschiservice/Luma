@@ -56,7 +56,7 @@ const matrix: {
     id: 'approval-pending',
     name: 'Waits for approval',
     description:
-      'Stock is below the minimum and policy asks a different owner or admin to approve the purchase-order draft. The run waits for that decision.',
+      'Stock is below the minimum and policy asks someone else who can approve changes to approve the purchase-order draft. The run waits for that decision.',
     outcome: 'awaiting_decision',
     replies: {
       inventory: stock,

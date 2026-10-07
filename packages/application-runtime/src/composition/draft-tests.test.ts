@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { makeTenantContext } from '@luma/identity';
+import { builtInMembership, makeTenantContext } from '@luma/identity';
 import {
   createReplenishmentScenarios,
   replenishmentSource,
@@ -30,12 +30,10 @@ const owner = makeTenantContext(
     dataRegion: 'EU',
     status: 'active',
   },
-  {
-    id: 'membership',
-    organizationId: 'tenant',
-    userId: 'owner-id',
-    role: 'owner',
-  },
+  builtInMembership(
+    { id: 'membership', organizationId: 'tenant', userId: 'owner-id' },
+    'owner',
+  ),
   'request',
 );
 const version = compileProcessWorkflow(replenishmentSource);

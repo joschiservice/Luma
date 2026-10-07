@@ -262,6 +262,8 @@ export function createSubmissionAdmission(
         {
           available: !!effect && (await effect.checkPreconditions(action)),
           minimumRisk: 'high',
+          // Preparing a submission proposes it; JTL declares its own permission.
+          permission: effect?.permission ?? 'actions.propose',
         },
       );
     },

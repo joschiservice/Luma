@@ -42,6 +42,11 @@ export function createShopifyInventoryCorrection(
   fetch?: typeof globalThis.fetch,
 ) {
   const query = createCorrectionQuery(context.database);
+  const operation = {
+    app: 'shopify',
+    permission: 'shopify:inventory_corrections.apply',
+    scopes: ['inventory.read'],
+  } as const;
   const store = createCorrectionStore(context.database);
   const audit = createAuditLog(context.database);
   const provisioning = createAdmissionStore(context.database);
@@ -273,6 +278,10 @@ export function createShopifyInventoryCorrection(
     effects,
     read,
     authorize,
+    permission: {
+      require: (tenant) => context.requirePermission(tenant, operation),
+      allowed: (tenant) => context.hasPermission(tenant, operation),
+    },
     refreshContext: context.refreshContext,
     now: () => new Date(),
     hash: (action) => parseAction(action).hash,

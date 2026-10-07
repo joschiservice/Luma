@@ -145,7 +145,7 @@ export async function buildRuntimeApp(
       desk: workflowReader ? { workflow: workflowReader.get } : {},
       ...(installedConnections
         ? {
-            decisionSources: installedConnections.registry.decisionSources(),
+            decisionSources: installedConnections.decisionSources(),
             workflowSources: installedConnections.registry.workflowSources(),
             ...(stockRefresh ? { refreshStock } : {}),
           }
@@ -191,6 +191,9 @@ export async function buildRuntimeApp(
         : {}),
       identity: identity.service,
       settings: identity.settings,
+      roles: identity.roles((tenantId) =>
+        installedConnections.apps.permissions(tenantId),
+      ),
       trustedOrigins: settings.trustedOrigins,
       checkReadiness: createReadinessCheck(
         identity.checkReadiness,

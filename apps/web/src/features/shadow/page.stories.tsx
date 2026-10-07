@@ -173,7 +173,7 @@ export const Member: Story = {
     const canvas = within(canvasElement);
     await expect(
       await canvas.findByText(
-        'Workspace owners and admins can evaluate and review Shadow predictions.',
+        'Your role doesn’t include Activate playbooks, so you can’t evaluate or review Shadow predictions.',
       ),
     ).toBeVisible();
     await expect(

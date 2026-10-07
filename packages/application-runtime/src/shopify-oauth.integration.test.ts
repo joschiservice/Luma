@@ -10,7 +10,11 @@ import { createAppRegistry, createAppService } from '@luma/app-host';
 import { createPrivacyIntake, createShopifyOAuth } from '@luma/app-shopify';
 import { ConnectorError } from '@luma/connections';
 import { createSecretCipher } from '@luma/connections/composition';
-import { makeTenantContext } from '@luma/identity/composition';
+import { requirePermission } from '@luma/identity';
+import {
+  builtInMembership,
+  makeTenantContext,
+} from '@luma/identity/composition';
 import { createTenantDatabase } from '@luma/platform/composition';
 import { buildSchema, parse, validate } from 'graphql';
 import { Pool } from 'pg';
@@ -50,14 +54,14 @@ const config = {
 
 const context = (
   id: string = randomUUID(),
-  userId = 'admin',
+  userId = '00000000-0000-4000-8000-0000000000ad',
   sessionId = 'session',
   role: 'admin' | 'member' = 'admin',
 ) =>
   makeTenantContext(
     { userId, sessionId },
     { id, name: 'Store', slug: 'store', dataRegion: 'EU', status: 'active' },
-    { id: 'membership', organizationId: id, userId, role },
+    builtInMembership({ id: 'membership', organizationId: id, userId }, role),
     randomUUID(),
   );
 
@@ -172,6 +176,8 @@ describe.skipIf(!databaseUrl)('Shopify OAuth on PostgreSQL', () => {
       verify,
       fetch: transport,
       refreshContext: async (c: ReturnType<typeof context>) => c,
+      authorize: async (c: ReturnType<typeof context>) =>
+        requirePermission(c, 'connections.manage'),
       now: () => clock,
       requireInstalled: async (c: ReturnType<typeof context>) =>
         db.transaction(c.tenantId, async (tx) => {

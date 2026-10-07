@@ -352,3 +352,36 @@ it('withholds dispatch if adapter risk changes after policy resolution', async (
   ).rejects.toMatchObject({ failure: { code: 'conflict', effect: 'none' } });
   expect(run).not.toHaveBeenCalled();
 });
+
+it('carries a declared app permission to the resolved adapter', async () => {
+  const { connection, runtime } = fixture();
+  const registry = runtime.effects({
+    capability: 'inventory.write',
+    map: async () => input,
+    checkPreconditions: async () => true,
+    verify: async () => ({
+      outcome: 'inconclusive',
+      observationRefs: [],
+      observedAt: '2026-09-17T00:00:00Z',
+      evaluatorVersion: '0',
+    }),
+  });
+  const intent: EffectIntent = {
+    tenantId: context.tenantId,
+    connectionId: write.connectionId,
+    capability: write.capability,
+    capabilityVersion: '0',
+    target: { kind: 'sku', id: 'sku-a' },
+    parameters: {},
+    preconditions: { evidenceRefs: [], validUntil: '2026-09-18T00:00:00Z' },
+    expectedPostcondition: {},
+  };
+  const undeclared = await registry.resolve(context, intent);
+  expect(undeclared).not.toHaveProperty('permission');
+
+  connection.capabilities['inventory.write']!.descriptor.permission =
+    'sample:inventory.adjust';
+  expect((await registry.resolve(context, intent))?.permission).toBe(
+    'sample:inventory.adjust',
+  );
+});

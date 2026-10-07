@@ -6,7 +6,7 @@ import {
   createDetectionServices,
 } from '@luma/application-runtime';
 import { defaultConfiguration } from '@luma/exceptions';
-import { makeTenantContext } from '@luma/identity';
+import { builtInMembership, makeTenantContext } from '@luma/identity';
 
 import { ordersFixture } from './orders-fixture.mjs';
 
@@ -27,12 +27,10 @@ export async function fulfillmentFixture(t, f) {
   const context = makeTenantContext(
     { userId: f.owner.id, sessionId: 'fixture' },
     { ...f.org, status: 'active', dataRegion: 'EU' },
-    {
-      id: randomUUID(),
-      organizationId: f.org.id,
-      userId: f.owner.id,
-      role: 'owner',
-    },
+    builtInMembership(
+      { id: randomUUID(), organizationId: f.org.id, userId: f.owner.id },
+      'owner',
+    ),
     randomUUID(),
   );
   const ago = (hours) => new Date(Date.now() - hours * hour).toISOString();

@@ -100,3 +100,23 @@ export function recordCapability(kind: ShopifyRecordKind) {
 
   return 'orders.read';
 }
+
+/** The core read permission a person and the Shopify app both need to read a record kind. */
+export function recordPermission(kind: ShopifyRecordKind) {
+  switch (kind) {
+    case 'Order':
+      return 'orders.read';
+    case 'FulfillmentOrder':
+      return 'fulfillment.read';
+    case 'Customer':
+      return 'customers.read';
+    case 'Product':
+    case 'ProductVariant':
+      return 'products.read';
+    case 'InventoryItem':
+      return 'inventory.read';
+    case 'Return':
+    case 'Refund':
+      return 'returns.read';
+  }
+}

@@ -541,7 +541,10 @@ export function ProcurementPage() {
                       : 'Add your first supplier'}
                   </Button>
                 ) : (
-                  <p>An owner or admin can create purchase orders.</p>
+                  <p>
+                    Your role doesn’t include Manage procurement, so you can’t
+                    create purchase orders.
+                  </p>
                 )}
               </Empty>
             ) : (

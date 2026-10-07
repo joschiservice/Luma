@@ -7,7 +7,7 @@ description: Find every approval, manual step and outcome check waiting on a per
 
 ## What appears here
 
-- **Approvals**: a proposed change that a second owner or admin must approve, such as an issue fix, a purchase-order draft from replenishment, sending a purchase order to a supplier, a Shopify stock correction or a fulfillment recovery. A supplier's changed quantity or date waits here too, to be accepted or followed up.
+- **Approvals**: a proposed change that needs approval from someone other than the requester, such as an issue fix, a purchase-order draft from replenishment, sending a purchase order to a supplier, a Shopify stock correction or a fulfillment recovery. A supplier's changed quantity or date waits here too, to be accepted or followed up.
 - **Ready to run**: an approved Shopify change that only its requester can run before it expires.
 - **Outcome checks**: a change the source system accepted, or whose outcome is unknown, that no fresh read has confirmed yet. An accepted change is not a verified one.
 - **Manual steps**: work Luma can't do itself, such as a correction in your ERP or chasing a supplier whose confirmation or delivery is overdue. See [Procurement](/docs/procurement). A [follow-up workflow](/docs/workflows#workflows-that-follow-up) also hands you a return still waiting for its refund or a payment that stays pending; it leaves once Luma sees it's done.
@@ -36,13 +36,13 @@ Select a decision to see:
 
 **Review and respond** shows the same controls as the issue, workflow run or record the decision belongs to. Responding here is the one decision; the issue, run and record update without a second one. Before anything changes, the owner checks again that the proposal, its revision and its expiry are unchanged. If someone else already answered, or the proposal changed or expired, your response is refused and the current state is shown.
 
-The person who requested a change can't approve it. Members can follow every decision; owners and admins respond to approvals.
+The person who requested a change can't approve it. Responding to an approval needs **Approve or reject changes**. Some approvals need more, such as **Manage procurement** for purchase orders.
 
 Use J and K to move through the list, and Esc to close a decision.
 
 ## Assign decisions
 
-Take a decision to show your team you're looking after it. Owners and admins can also hand a decision to another member. **Assigned to me** and **Unassigned** list the matching decisions. Assigning a decision doesn't change who may approve it.
+Take a decision to show your team you're looking after it. People whose role includes **Assign decisions** can also hand a decision to another member. **Assigned to me** and **Unassigned** list the matching decisions. Assigning a decision doesn't change who may approve it.
 
 ## When a decision is missing
 

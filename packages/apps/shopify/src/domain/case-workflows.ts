@@ -17,7 +17,7 @@ export const stockCorrectionSource = {
     id: 'shopify-stock-correction',
     name: 'Correct Shopify stock from the ERP',
     intent:
-      'When Shopify shows a different available quantity than the ERP for linked stock, propose setting Shopify to the ERP quantity, wait for a different owner or admin to approve, and confirm the quantity with a fresh Shopify read.',
+      'When Shopify shows a different available quantity than the ERP for linked stock, propose setting Shopify to the ERP quantity, wait for someone else who can approve changes to approve, and confirm the quantity with a fresh Shopify read.',
     category: 'inventory',
   },
   version: '1.0.0',
@@ -102,7 +102,7 @@ export const holdReleaseSource = {
     id: 'shopify-hold-release',
     name: 'Release an overdue fulfillment hold',
     intent:
-      'When a Shopify fulfillment order stays on hold past the stuck window, propose releasing the hold, wait for a different owner or admin to approve, and confirm in Shopify that it was released.',
+      'When a Shopify fulfillment order stays on hold past the stuck window, propose releasing the hold, wait for someone else who can approve changes to approve, and confirm in Shopify that it was released.',
     category: 'fulfillment',
   },
   version: '1.0.0',

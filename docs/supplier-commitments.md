@@ -33,7 +33,7 @@ supplier linked to an active connection granted `purchase-orders.submit` and
 `purchase-orders.read`, and every line SKU mapped to an item on that connection. It stores a
 submission and asks Action Admission to bind the exact `purchase-orders.submit` action
 (capability version `0`, target `purchase_order_submission`, high risk). Workspace policy then
-requires a different owner or admin. Requests expire after 24 hours.
+requires someone else with `decisions.respond` and the purchasing capability's permission, such as `jtl:purchase_orders.submit`. Requests expire after 24 hours.
 
 Approval dispatches immediately as the requester, through a resolved workflow context; the
 approver gains no execution authority. The background follow-up also dispatches approved

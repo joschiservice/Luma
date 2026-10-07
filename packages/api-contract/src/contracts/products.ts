@@ -1,7 +1,11 @@
 import { initContract } from '@ts-rest/core';
 import { z } from 'zod';
 
-import { apiErrorSchema, organizationParamsSchema } from '../common.js';
+import {
+  apiErrorSchema,
+  organizationParamsSchema,
+  requires,
+} from '../common.js';
 import {
   productDetailSchema,
   productListSchema,
@@ -13,6 +17,7 @@ const c = initContract();
 export const productsContract = c.router({
   list: {
     method: 'GET',
+    metadata: requires('products.read'),
     path: '/v1/organizations/:organizationId/products',
     pathParams: organizationParamsSchema,
     query: productQuerySchema,
@@ -29,6 +34,7 @@ export const productsContract = c.router({
   },
   get: {
     method: 'GET',
+    metadata: requires('products.read'),
     path: '/v1/organizations/:organizationId/products/:skuId',
     pathParams: organizationParamsSchema.extend({ skuId: z.string().uuid() }),
     responses: {

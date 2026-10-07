@@ -160,7 +160,7 @@ export function CaseActivationForm({
   );
 }
 
-/** Shows whether a case workflow is on, as whom, and lets owners and admins turn it on or off. */
+/** Shows whether a case workflow is on, as whom, and lets people with permission to enable workflows turn it on or off. */
 export function CaseWorkflowPanel({
   organizationId,
   detail,
@@ -210,7 +210,7 @@ export function CaseWorkflowPanel({
       <CardTitle id="case-title">When it runs</CardTitle>
       <p>
         {detail.summary.readiness.coverage.explanation} Every change waits for
-        approval by a different owner or admin.
+        approval by someone else who can approve changes.
       </p>
       {message ? (
         <Alert tone="success" role="status">
@@ -225,7 +225,7 @@ export function CaseWorkflowPanel({
               Runs as{' '}
               {active.reviewedBy === detail.principalId
                 ? 'you'
-                : 'the owner or admin who turned it on'}
+                : 'the person who turned it on'}
               {active.reviewedAt ? (
                 <>
                   {' '}
@@ -243,7 +243,8 @@ export function CaseWorkflowPanel({
       </div>
       {!detail.canManage ? (
         <p>
-          Only workspace owners and admins can turn this workflow on or off.
+          Your role doesn’t include Publish and enable workflows, so you can’t
+          turn this workflow on or off.
         </p>
       ) : active ? (
         <Button

@@ -1,6 +1,9 @@
 import { randomUUID } from 'node:crypto';
 
-import { makeTenantContext } from '@luma/identity/composition';
+import {
+  builtInMembership,
+  makeTenantContext,
+} from '@luma/identity/composition';
 import { createOrderListRebuilder } from '@luma/orders/composition';
 import { createTenantDatabase } from '@luma/platform/composition';
 import { Pool } from 'pg';
@@ -28,12 +31,10 @@ const context = makeTenantContext(
     status: 'active',
     dataRegion: 'EU',
   },
-  {
-    id: 'operator',
-    organizationId: tenantId,
-    userId: 'orders-list-rebuild',
-    role: 'owner',
-  },
+  builtInMembership(
+    { id: 'operator', organizationId: tenantId, userId: 'orders-list-rebuild' },
+    'owner',
+  ),
   randomUUID(),
 );
 try {

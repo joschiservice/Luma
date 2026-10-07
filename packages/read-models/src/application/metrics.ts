@@ -1,6 +1,6 @@
 import type { CoverageReader } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireTenant } from '@luma/identity';
+import { IdentityError, requirePermission } from '@luma/identity';
 import type { OrderMetricRead, OrderMetricScope } from '@luma/orders';
 import { orderMetricDefinitions } from '@luma/orders';
 
@@ -47,7 +47,10 @@ interface ParsedMetricRequest extends MetricRequest {
   offset: number;
 }
 
-/** Applies authorization, snapshot expiry and shared coverage semantics to registered metrics. */
+/**
+ * Applies authorization, snapshot expiry and shared coverage semantics to registered order
+ * metrics. Readers need `orders.read`; others get a 403 error.
+ */
 export function createMetricService(dependencies: {
   parse(input: MetricRequest): ParsedMetricRequest;
   read(
@@ -62,7 +65,7 @@ export function createMetricService(dependencies: {
   now(): Date;
 }): OperationalMetrics {
   return async (context, input) => {
-    requireTenant(context, context.tenantId);
+    requirePermission(context, 'orders.read');
     const request = dependencies.parse(input);
     const readAt = dependencies.now().toISOString();
     const asOf = request.asOf ?? readAt;

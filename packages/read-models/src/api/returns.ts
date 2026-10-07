@@ -10,7 +10,7 @@ import { initServer } from '@ts-rest/fastify';
 
 import type { ReturnWorkspace } from '../application/returns.js';
 
-/** Exposes the tenant's returns and refunds to workspace members. */
+/** Exposes the tenant's returns and refunds to readers with `returns.read`. */
 export function returnRoutes(service?: ReturnWorkspace) {
   return initServer().router(apiContract.returns, {
     list: async ({ request, query }) => {

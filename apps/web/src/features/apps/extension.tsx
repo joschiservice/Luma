@@ -18,6 +18,7 @@ import {
 } from '../connections/data';
 import { loadCustomerOrderContext } from '../customers/order-context';
 import { IdentityError, sessionOptions } from '../identity/data';
+import { NoAccess, usePermissions } from '../identity/permissions';
 import { appsOptions } from './data';
 
 const modules = import.meta.glob<{ default: ComponentType<AppUiProps> }>(
@@ -47,7 +48,10 @@ class ExtensionBoundary extends Component<
   }
 }
 
-/** Mounts app UI only after current workspace installation and slot availability are confirmed. */
+/**
+ * Mounts app UI only after current workspace installation, slot availability and the slot's
+ * declared permission are confirmed. Slots the person can't use are not mounted.
+ */
 export function AppExtension({
   appId,
   organizationId,
@@ -71,6 +75,7 @@ export function AppExtension({
 }) {
   const state = useQuery(appsOptions(organizationId));
   const session = useQuery(sessionOptions());
+  const { can } = usePermissions(organizationId);
   const services = useMemo<AppUiProps['services']>(
     () => ({
       orderContext: (connectionId, externalId) =>
@@ -119,6 +124,15 @@ export function AppExtension({
   const Extension = components.get(appId);
   if (!installed || !manifest || !manifest.ui.includes(slot) || !Extension)
     return <p>This app is unavailable in this workspace.</p>;
+  const permission = manifest.slotAccess[slot];
+  if (!permission || !can(permission))
+    return slot === 'page' && permission ? (
+      <NoAccess
+        organizationId={organizationId}
+        area={manifest.name}
+        permission={permission}
+      />
+    ) : null;
 
   return (
     <ExtensionBoundary
@@ -135,6 +149,7 @@ export function AppExtension({
           fulfillment,
           done,
           services,
+          can,
         })}
       </Suspense>
     </ExtensionBoundary>

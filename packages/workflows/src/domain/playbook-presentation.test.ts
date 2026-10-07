@@ -14,7 +14,7 @@ describe('playbook presentation', () => {
       'verify-correction',
       'review',
     ]);
-    expect(view.approval).toContain('independent');
+    expect(view.approval).toContain('Someone else');
     expect(view.steps[3]?.description).toContain(
       'Provider acceptance alone is not verified success',
     );

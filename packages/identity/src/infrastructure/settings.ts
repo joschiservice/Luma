@@ -7,9 +7,20 @@ import type {
   SettingsRepository,
   SettingsTransaction,
 } from '../application/settings.js';
-import type { Role } from '../domain/context.js';
 import { IdentityError } from '../domain/context.js';
+import {
+  builtInReference,
+  isBuiltInRole,
+  PermissionSet,
+} from '../domain/roles.js';
 import type { SettingsSnapshot, WorkspaceLayout } from '../domain/settings.js';
+import type { MembershipRow } from './access.js';
+import {
+  membershipFromRow,
+  membershipSelect,
+  roleFromRow,
+  storedRole,
+} from './access.js';
 
 /** Runs a serialized workspace transaction, installing only transaction-local identity context. */
 export async function workspaceTransaction<T>(
@@ -51,27 +62,87 @@ function transaction(
   tenantId: string,
   deliveryAvailable: boolean,
 ): SettingsTransaction {
-  const invitationSelect = `SELECT i.id,i.email,i.role,
+  const invitationSelect = `SELECT i.id,i.email,i.role,i.custom_role_id AS "customRoleId",r.name AS "roleName",
+    r.revision AS "roleRevision",r.archived_at IS NOT NULL AS "roleArchived",
     CASE WHEN i.status='pending' AND i.expires_at<=now() THEN 'expired' ELSE i.status END AS status,
     i.generation,i.token_hash AS "tokenHash",i.accepted_by AS "acceptedBy",i.expires_at AS "expiresAt",i.created_at AS "createdAt",
     COALESCE((SELECT state FROM workspace_mail m WHERE m.tenant_id=i.tenant_id AND m.invitation_id=i.id AND m.generation=i.generation LIMIT 1),'cancelled') AS delivery
-    FROM workspace_invitations i WHERE i.tenant_id=$1`;
-  const invitationDto = (row: InvitationRecord): InvitationRecord => ({
+    FROM workspace_invitations i LEFT JOIN workspace_roles r ON r.tenant_id=i.tenant_id AND r.id=i.custom_role_id
+    WHERE i.tenant_id=$1`;
+
+  type InvitationRow = Omit<InvitationRecord, 'role'> & {
+    role: string;
+    customRoleId: string | null;
+    roleName: string | null;
+    roleRevision: number | null;
+    roleArchived: boolean;
+  };
+
+  const invitationDto = ({
+    role,
+    customRoleId,
+    roleName,
+    roleRevision,
+    roleArchived,
+    ...row
+  }: InvitationRow): InvitationRecord => ({
     ...row,
+    role: {
+      ...roleFromRow({ role, customRoleId, roleName, roleRevision }),
+      archived: roleArchived,
+    },
     expiresAt: new Date(row.expiresAt).toISOString(),
     createdAt: new Date(row.createdAt).toISOString(),
   });
 
   return {
-    async role(userId) {
-      return (
-        (
-          await tx.query<{ role: Role }>(
-            'SELECT role FROM memberships WHERE tenant_id=$1 AND user_id=$2',
-            [tenantId, userId],
-          )
-        ).rows[0]?.role ?? null
-      );
+    async member(userId) {
+      const row = (
+        await tx.query<MembershipRow>(
+          `${membershipSelect} WHERE m.tenant_id=$1 AND m.user_id=$2`,
+          [tenantId, userId],
+        )
+      ).rows[0];
+
+      return row ? membershipFromRow(row) : null;
+    },
+    async role(roleId) {
+      if (isBuiltInRole(roleId)) {
+        const reference = builtInReference(roleId);
+
+        return {
+          reference,
+          permissions: PermissionSet.forRole(reference),
+          archived: false,
+        };
+      }
+      const row = (
+        await tx.query<{
+          name: string;
+          revision: number;
+          archived: boolean;
+          permissions: string[];
+        }>(
+          `SELECT r.name,r.revision,r.archived_at IS NOT NULL AS archived,
+          ARRAY(SELECT p.permission FROM workspace_role_permissions p WHERE p.tenant_id=r.tenant_id AND p.role_id=r.id) AS permissions
+          FROM workspace_roles r WHERE r.tenant_id=$1 AND r.id::text=$2`,
+          [tenantId, roleId],
+        )
+      ).rows[0];
+      if (!row) return null;
+      const reference = {
+        id: roleId,
+        key: 'custom' as const,
+        name: row.name,
+        builtIn: false,
+        revision: row.revision,
+      };
+
+      return {
+        reference,
+        permissions: PermissionSet.forRole(reference, row.permissions),
+        archived: row.archived,
+      };
     },
     async snapshot(userId) {
       const org = (
@@ -207,7 +278,7 @@ function transaction(
     },
     async invitations() {
       return (
-        await tx.query<InvitationRecord>(
+        await tx.query<InvitationRow>(
           `${invitationSelect} ORDER BY (i.status='pending') DESC,i.created_at DESC LIMIT 200`,
           [tenantId],
         )
@@ -215,7 +286,7 @@ function transaction(
     },
     async invitation(id) {
       const row = (
-        await tx.query<InvitationRecord>(`${invitationSelect} AND i.id=$2`, [
+        await tx.query<InvitationRow>(`${invitationSelect} AND i.id=$2`, [
           tenantId,
           id,
         ])
@@ -233,19 +304,20 @@ function transaction(
     },
     async saveInvitation(value, inviterId) {
       await tx.query(
-        `INSERT INTO workspace_invitations(tenant_id,id,email,role,status,generation,token_hash,inviter_id,expires_at,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+        `INSERT INTO workspace_invitations(tenant_id,id,email,role,custom_role_id,status,generation,token_hash,inviter_id,expires_at,created_at) VALUES($1,$2,$3,$4,$11,$5,$6,$7,$8,$9,$10)
         ON CONFLICT(tenant_id,id) DO UPDATE SET status=$5,generation=$6,token_hash=$7,inviter_id=$8,expires_at=$9`,
         [
           tenantId,
           value.id,
           value.email,
-          value.role,
+          storedRole(value.role.id).role,
           value.status,
           value.generation,
           value.tokenHash,
           inviterId,
           value.expiresAt,
           value.createdAt,
+          storedRole(value.role.id).customRoleId,
         ],
       );
       await tx.query(
@@ -283,8 +355,14 @@ function transaction(
     },
     async accept(invitation, userId) {
       await tx.query(
-        'INSERT INTO memberships(id,tenant_id,user_id,role,created_at) VALUES($1,$2,$3,$4,now())',
-        [randomUUID(), tenantId, userId, invitation.role],
+        'INSERT INTO memberships(id,tenant_id,user_id,role,custom_role_id,created_at) VALUES($1,$2,$3,$4,$5,now())',
+        [
+          randomUUID(),
+          tenantId,
+          userId,
+          storedRole(invitation.role.id).role,
+          storedRole(invitation.role.id).customRoleId,
+        ],
       );
       await tx.query(
         "UPDATE workspace_invitations SET status='accepted',accepted_by=$3 WHERE tenant_id=$1 AND id=$2",

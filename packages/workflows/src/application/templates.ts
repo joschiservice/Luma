@@ -1,5 +1,9 @@
-import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireRole, requireTenant } from '@luma/identity';
+import type { Permission, TenantContext } from '@luma/identity';
+import {
+  IdentityError,
+  requirePermission,
+  requireTenant,
+} from '@luma/identity';
 
 import type { WorkflowDraftContent } from '../domain/draft.js';
 import type { WorkflowTemplate } from '../domain/template.js';
@@ -20,13 +24,10 @@ export function createWorkflowTemplates(deps: {
   sources: TemplateSource[];
   refreshContext(context: TenantContext): Promise<TenantContext>;
 }) {
-  async function authorize(context: TenantContext, write = false) {
+  async function authorize(context: TenantContext, permission: Permission) {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
-    requireRole(
-      fresh,
-      write ? ['owner', 'admin'] : ['owner', 'admin', 'member'],
-    );
+    requirePermission(fresh, permission);
     if (fresh.actor.id !== context.actor.id)
       throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
 
@@ -44,7 +45,7 @@ export function createWorkflowTemplates(deps: {
   return {
     /** Lists every template with its requirements, readiness and activation status. */
     async list(context: TenantContext) {
-      context = await authorize(context);
+      context = await authorize(context, 'workflows.read');
 
       return Promise.all(deps.sources.map((item) => item.template(context)));
     },
@@ -53,7 +54,7 @@ export function createWorkflowTemplates(deps: {
      * safe. Installing never activates the workflow.
      */
     async install(context: TenantContext, id: string) {
-      context = await authorize(context, true);
+      context = await authorize(context, 'workflows.publish');
       const found = source(id);
       await found.install(context);
 

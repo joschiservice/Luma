@@ -153,7 +153,7 @@ export function WorkflowTriggers({
             <p>
               {external
                 ? `Accepts ${version.context.kind} evidence.`
-                : 'An owner or administrator starts this workflow.'}
+                : 'Someone who can manage workflow triggers starts this workflow.'}
             </p>
           )}
         </div>
@@ -179,7 +179,8 @@ export function WorkflowTriggers({
         </Alert>
       ) : !detail.canManage ? (
         <Alert tone="neutral">
-          Only workspace owners and admins can submit triggers.
+          Your role doesn’t include Manage workflow triggers, so you can’t
+          submit triggers.
         </Alert>
       ) : expired ? (
         <Alert tone="warning">

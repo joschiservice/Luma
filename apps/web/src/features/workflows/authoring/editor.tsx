@@ -45,6 +45,7 @@ import {
 
 import { SignInRedirect } from '../../identity/common';
 import { contextOptions, IdentityError } from '../../identity/data';
+import { usePermissions } from '../../identity/permissions';
 import { workflowError, workflowsKey } from '../data';
 import { WorkflowLoading } from '../library';
 import { OfflineNotice } from '../offline';
@@ -285,6 +286,7 @@ export function DraftEditorPage({
   const draft = useQuery(draftOptions(organizationId, draftId));
   const vocabulary = useQuery(vocabularyOptions(organizationId));
   const context = useQuery(contextOptions(organizationId));
+  const permissions = usePermissions(organizationId);
   const failure = draft.error ?? vocabulary.error;
   if (failure instanceof IdentityError && failure.status === 401)
     return <SignInRedirect />;
@@ -311,7 +313,7 @@ export function DraftEditorPage({
           organizationId={organizationId}
           draft={draft.data}
           vocabulary={vocabulary.data}
-          canManage={context.data.actor.role !== 'member'}
+          canManage={permissions.can('workflows.author')}
           view={view}
           setView={(next) =>
             void navigate({
@@ -530,8 +532,8 @@ export function DraftEditor({
       </div>
       {!canManage ? (
         <Alert tone="neutral" className="workflow-notice">
-          You can review this draft. Only workspace owners and admins can edit
-          or publish it.
+          Your role doesn’t include Author workflows, so you can only review
+          this draft.
         </Alert>
       ) : null}
       {draft.state === 'published' && draft.published ? (

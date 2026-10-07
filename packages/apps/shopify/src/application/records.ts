@@ -17,6 +17,11 @@ import {
 export function createRecordService(options: {
   installations: Pick<InstallationService, 'credential'>;
   requireInstalled(context: TenantContext): Promise<number>;
+  /**
+   * Requires the person and the app's granted scopes to allow reading this kind of record;
+   * see `recordPermission`.
+   */
+  authorize(context: TenantContext, kind: ShopifyRecordKind): Promise<void>;
   protectedCustomerDataApproved: boolean;
   /** Enable only when Shopify approves name, email and phone access for this deployment. */
   protectedCustomerContactApproved?: boolean;
@@ -47,6 +52,7 @@ export function createRecordService(options: {
         'Choose a valid Shopify record type and ID.',
       );
     const { connectionId, kind, id, cursor, search } = parsed.data;
+    await options.authorize(context, kind);
     const capability = recordCapability(kind);
     const credential = async () => {
       const version = await options.requireInstalled(context);

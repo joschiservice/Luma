@@ -27,6 +27,12 @@ export interface CapabilityDescriptor {
   retry: { maxAttempts: number; initialDelayMs: number };
   /** Optional read filters the handler honors; absent means none. */
   filters?: ('updatedSince' | 'createdSince' | 'historyImport')[];
+  /**
+   * App permission needed to propose, approve and run this write capability, as
+   * `<appId>:<name>`. Without it, proposing needs actions.propose and running needs
+   * actions.execute.
+   */
+  permission?: string;
 }
 
 export interface InvocationContext {
@@ -308,6 +314,9 @@ export function createCapabilityRuntime(deps: CapabilityDependencies) {
             capability: binding.capability,
             version: '0',
             minimumRisk: handler.descriptor.minimumRisk,
+            ...(handler.descriptor.permission
+              ? { permission: handler.descriptor.permission }
+              : {}),
             mechanism: connection.mechanism,
             executor: connection.executor,
             checkPreconditions: (action) =>

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { makeTenantContext } from '@luma/identity';
+import { builtInMembership, makeTenantContext } from '@luma/identity';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -33,7 +33,10 @@ function context(role: 'owner' | 'admin' | 'member', userId = `${role}-id`) {
       dataRegion: 'EU',
       status: 'active',
     },
-    { id: `membership-${userId}`, organizationId: tenantId, userId, role },
+    builtInMembership(
+      { id: `membership-${userId}`, organizationId: tenantId, userId },
+      role,
+    ),
     'request',
   );
 }

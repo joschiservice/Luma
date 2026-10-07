@@ -2,8 +2,12 @@ import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import type { IdentityService, TenantContext } from '@luma/identity';
-import { IdentityError, requireRole } from '@luma/identity';
+import type {
+  IdentityService,
+  Permission,
+  TenantContext,
+} from '@luma/identity';
+import { IdentityError, requirePermission } from '@luma/identity';
 import type { Observability } from '@luma/platform';
 import type {
   ExceptionActivities,
@@ -214,14 +218,15 @@ export function createWorkflowCommands(
   taskQueue: string,
   identity: Pick<IdentityService, 'refreshContext'>,
 ) {
+  /** Checks the permission before and after refreshing; reads pass `null` and need membership only. */
   async function scope(
     context: TenantContext,
     source: WorkflowSource,
-    write = true,
+    permission: Permission | null,
   ) {
-    if (write) requireRole(context, ['owner', 'admin']);
+    if (permission) requirePermission(context, permission);
     const fresh = await identity.refreshContext(context);
-    if (write) requireRole(fresh, ['owner', 'admin']);
+    if (permission) requirePermission(fresh, permission);
     if (
       fresh.tenantId !== context.tenantId ||
       fresh.actor.id !== context.actor.id
@@ -243,7 +248,7 @@ export function createWorkflowCommands(
       source: WorkflowSource,
       shadow: { id: string; workflow: string },
     ) {
-      const scoped = await scope(context, source);
+      const scoped = await scope(context, source, 'playbooks.activate');
       const parsed = z
         .object({ id: z.string().uuid(), workflow: z.string().min(1).max(200) })
         .strict()
@@ -290,7 +295,7 @@ export function createWorkflowCommands(
       source: WorkflowSource,
       resumeExpired = false,
     ) {
-      const scoped = await scope(context, source);
+      const scoped = await scope(context, source, 'actions.propose');
       const input: ExceptionWorkflowInput = {
         tenantId: scoped.fresh.tenantId,
         userId: scoped.fresh.actor.id,
@@ -341,7 +346,7 @@ export function createWorkflowCommands(
       return { workflowId: scoped.id };
     },
     async progress(context: TenantContext, source: WorkflowSource) {
-      const { id } = await scope(context, source, false);
+      const { id } = await scope(context, source, null);
       const handle = client.workflow.getHandle(id);
       const description = await handle.describe();
       if (description.status.name === 'COMPLETED')
@@ -359,7 +364,7 @@ export function createWorkflowCommands(
       return handle.query<WorkflowProgress>('progress');
     },
     async notifyApproval(context: TenantContext, source: WorkflowSource) {
-      const { id } = await scope(context, source);
+      const { id } = await scope(context, source, 'decisions.respond');
       await client.workflow.getHandle(id).signal('approvalChanged');
     },
   };

@@ -33,18 +33,42 @@ export function appsOptions(organizationId: string) {
   });
 }
 
-/** Installs or uninstalls an app using its current workspace version. */
+/**
+ * Installs an app, granting the scopes the installer reviewed, or uninstalls it at its current
+ * workspace version.
+ */
 export async function changeApp(
   organizationId: string,
   appId: string,
   action: 'install' | 'uninstall',
   version: number | null,
+  scopes: readonly string[] = [],
 ) {
   const params = { organizationId, appId };
   const result =
     action === 'install'
-      ? await api.apps.install({ params, body: { version } })
+      ? await api.apps.install({
+          params,
+          body: { version, scopes: [...scopes] },
+        })
       : await api.apps.uninstall({ params, body: { version: version! } });
+  if (result.status !== 200)
+    throw new IdentityError(result.status, result.body);
+
+  return result.body;
+}
+
+/** Grants access an upgraded app requests; earlier grants keep working until then. */
+export async function approveAppScopes(
+  organizationId: string,
+  appId: string,
+  version: number,
+  scopes: readonly string[],
+) {
+  const result = await api.apps.approveScopes({
+    params: { organizationId, appId },
+    body: { version, scopes: [...scopes] },
+  });
   if (result.status !== 200)
     throw new IdentityError(result.status, result.body);
 

@@ -1,7 +1,11 @@
 import { initContract } from '@ts-rest/core';
 import { z } from 'zod';
 
-import { apiErrorSchema, organizationParamsSchema } from '../common.js';
+import {
+  apiErrorSchema,
+  organizationParamsSchema,
+  requires,
+} from '../common.js';
 import {
   authoringVocabularySchema,
   createWorkflowDraftSchema,
@@ -26,6 +30,7 @@ export const workflowDraftsContract = c.router(
   {
     templates: {
       method: 'GET',
+      metadata: requires('workflows.read'),
       path: templates,
       pathParams: organizationParamsSchema,
       responses: {
@@ -37,6 +42,7 @@ export const workflowDraftsContract = c.router(
     },
     installTemplate: {
       method: 'POST',
+      metadata: requires('workflows.publish'),
       path: `${templates}/:templateId/install`,
       pathParams: organizationParamsSchema.extend({
         templateId: z.string().regex(/^[a-z][a-zA-Z0-9_-]{0,79}$/),
@@ -45,10 +51,11 @@ export const workflowDraftsContract = c.router(
       responses: { 200: workflowTemplateSchema },
       summary: 'Add a template to this workspace',
       description:
-        'Owners and admins publish the template’s reviewed version here so it can be configured. Repeating the request is safe. Adding a template never activates it.',
+        'Requires `workflows.publish`. Publishes the template’s reviewed version here so it can be configured. Repeating the request is safe. Adding a template never activates it.',
     },
     vocabulary: {
       method: 'GET',
+      metadata: requires('workflows.read'),
       path: `${authoring}/vocabulary`,
       pathParams: organizationParamsSchema,
       responses: { 200: authoringVocabularySchema },
@@ -58,6 +65,7 @@ export const workflowDraftsContract = c.router(
     },
     validate: {
       method: 'POST',
+      metadata: requires('workflows.read'),
       path: `${authoring}/validate`,
       pathParams: organizationParamsSchema,
       body: validateWorkflowDraftSchema,
@@ -68,25 +76,28 @@ export const workflowDraftsContract = c.router(
     },
     list: {
       method: 'GET',
+      metadata: requires('workflows.read'),
       path: drafts,
       pathParams: organizationParamsSchema,
       responses: { 200: z.object({ items: z.array(workflowDraftSchema) }) },
       summary: 'List open workflow drafts',
       description:
-        'Members can read drafts. Drafts never run and grant no access to connected systems.',
+        'Requires `workflows.read`. People can read drafts. Drafts never run and grant no access to connected systems.',
     },
     create: {
       method: 'POST',
+      metadata: requires('workflows.author'),
       path: drafts,
       pathParams: organizationParamsSchema,
       body: createWorkflowDraftSchema,
       responses: { 200: workflowDraftSchema },
       summary: 'Start a workflow draft',
       description:
-        'Owners and admins start from scratch, from supplied content, or from a published version to edit it. Editing a published workflow never changes that version. Reuse the same ID and body after an uncertain response.',
+        'Requires `workflows.author`. Starts a draft from scratch, from supplied content, or from a published version to edit it. Editing a published workflow never changes that version. Reuse the same ID and body after an uncertain response.',
     },
     get: {
       method: 'GET',
+      metadata: requires('workflows.read'),
       path: `${drafts}/:draftId`,
       pathParams: draftParams,
       responses: { 200: workflowDraftSchema },
@@ -94,33 +105,36 @@ export const workflowDraftsContract = c.router(
     },
     save: {
       method: 'PUT',
+      metadata: requires('workflows.author'),
       path: `${drafts}/:draftId`,
       pathParams: draftParams,
       body: saveWorkflowDraftSchema,
       responses: { 200: workflowDraftSchema },
       summary: 'Save a workflow draft',
       description:
-        'Owners and admins save against the revision they loaded. If someone else saved first, the request returns 409 and nothing is overwritten. Reuse the same save ID and body after an uncertain response.',
+        'Requires `workflows.author`. Saves against the revision you loaded. If someone else saved first, the request returns 409 and nothing is overwritten. Reuse the same save ID and body after an uncertain response.',
     },
     publish: {
       method: 'POST',
+      metadata: requires('workflows.publish'),
       path: `${drafts}/:draftId/publish`,
       pathParams: draftParams,
       body: publishWorkflowDraftSchema,
       responses: { 200: publishedDraftSchema },
       summary: 'Publish a draft as a new version',
       description:
-        'Owners and admins publish the exact revision they reviewed as an immutable version. Publishing does not activate the workflow or grant it access to anything. Retrying the same revision returns the same version.',
+        'Requires `workflows.publish`. Publishes the exact revision you reviewed as an immutable version. Publishing does not activate the workflow or grant it access to anything. Retrying the same revision returns the same version.',
     },
     discard: {
       method: 'POST',
+      metadata: requires('workflows.author'),
       path: `${drafts}/:draftId/discard`,
       pathParams: draftParams,
       body: z.object({ revision: z.number().int().positive() }).strict(),
       responses: { 200: z.object({ discarded: z.literal(true) }) },
       summary: 'Discard an unpublished draft',
       description:
-        'Owners and admins discard a draft they no longer need. Discarding again is safe. Published drafts are kept.',
+        'Requires `workflows.author`. Discards a draft you no longer need. Discarding again is safe. Published drafts are kept.',
     },
   },
   {

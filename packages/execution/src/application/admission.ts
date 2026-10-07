@@ -1,5 +1,5 @@
 import type { TenantContext } from '@luma/identity';
-import { requireRole, requireTenant } from '@luma/identity';
+import { requireTenant } from '@luma/identity';
 import type { ProposedAction } from '@luma/policies';
 import { currentPolicyVersion } from '@luma/policies';
 
@@ -84,9 +84,10 @@ export function createActionAdmission(deps: AdmissionDependencies) {
     reconcile: deps.execution.reconcile,
     async execute(context: TenantContext, input: unknown) {
       const reference = deps.parseReference(input);
+      // Execution checks the capability's permission, or actions.execute, against a fresh
+      // context at policy evaluation and again before dispatch.
       const fresh = await deps.refreshContext(context);
       requireTenant(fresh, context.tenantId);
-      requireRole(fresh, ['owner', 'admin']);
       if (fresh.actor.id !== context.actor.id)
         throw new AdmissionRejected('Admission principal changed');
       const step = await deps.repository.step(
@@ -167,7 +168,6 @@ export function createActionAdmission(deps: AdmissionDependencies) {
       const stillEligible = async () => {
         const current = await deps.refreshContext(fresh);
         requireTenant(current, fresh.tenantId);
-        requireRole(current, ['owner', 'admin']);
         if (current.actor.id !== step.principalId) return false;
         const active = await deps.repository.artifact(
           current,

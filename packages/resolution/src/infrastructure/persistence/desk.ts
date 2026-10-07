@@ -1,6 +1,10 @@
 import { createHash } from 'node:crypto';
 
-import { IdentityError, requireRole, requireTenant } from '@luma/identity';
+import {
+  IdentityError,
+  requirePermission,
+  requireTenant,
+} from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
 import type { PolicyService, ProposedAction } from '@luma/policies';
 import { workspacePolicyVersion } from '@luma/policies';
@@ -88,14 +92,16 @@ export function createDeskStore(
   return {
     withRefresh: (context, id, operation) =>
       db.transaction(context.tenantId, async (tx) => {
-        requireRole(context, ['owner', 'admin']);
+        // The desk service authorizes the purpose of the lock on the refreshed context:
+        // actions.execute for execution admission, actions.propose for proposal renewal.
+        requireTenant(context, context.tenantId);
         await refreshLock(tx, context.tenantId, id);
 
         return operation(await load(tx, context.tenantId, id));
       }),
     bindWorkflow: (context, id, source) =>
       db.transaction(context.tenantId, async (tx) => {
-        requireRole(context, ['owner', 'admin']);
+        requirePermission(context, 'actions.propose');
         await load(tx, context.tenantId, id);
         await tx.query(
           'INSERT INTO case_workflows(tenant_id,exception_id,source_kind,source_id) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING',
@@ -183,7 +189,7 @@ export function createDeskStore(
       }),
     publish: (context, id, revision, input) =>
       db.transaction(context.tenantId, async (tx) => {
-        requireRole(context, ['owner', 'admin']);
+        requirePermission(context, 'actions.propose');
         const { action, hash } = dependencies.parseAction(input);
         requireTenant(context, action.tenantId);
         if (

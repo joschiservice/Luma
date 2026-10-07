@@ -1,10 +1,11 @@
 import { createHash } from 'node:crypto';
 
 import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireTenant } from '@luma/identity';
+import { hasPermission, IdentityError, requireTenant } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
 import { z } from 'zod';
 
+import { canReadRecord } from '../../application/access.js';
 import type {
   DecisionCandidate,
   DecisionItem,
@@ -15,6 +16,7 @@ import type {
 } from '../../application/decisions.js';
 import {
   type CaseDecisionFacts,
+  type DecisionReader,
   evidenceState,
   expiringWindowMinutes,
   presentCase,
@@ -68,7 +70,7 @@ const reasons = [
 // Rank 0: the deadline falls within the expiring window; 1: high impact; 2: the rest. Unknown
 // impact is not ranked below known low impact. Binds: $1 tenant, $2 evaluation time, $3 external rows,
 // $4 expiring window minutes, $5 view, $6 reader, $7 domain, $8 reason, $9-$12 cursor,
-// $13 page size + 1, $14 one item ID.
+// $13 page size + 1, $14 one item ID, $15 whether the reader may read issues.
 function queueSql(cases: string) {
   return `WITH case_rows AS (${cases}),
  cases AS (
@@ -85,7 +87,7 @@ function queueSql(cases: string) {
    CASE WHEN c.subject->>'subjectKind' IN ('order','fulfillment','sku','product') THEN c.subject->>'subjectKind' END AS record_kind,
    NULL::text AS record_id,c.subject->'scope'->>0 AS record_connection,c.subject->>'subjectId' AS record_external,
    to_jsonb(c) AS facts
-  FROM case_rows c),
+  FROM case_rows c WHERE $15::boolean),
  external AS (
   SELECT x.id,x.reason,x.domain,x.impact,x.requested_at,x.deadline,x.record_kind,x.record_id,
    x.record_connection,x.record_external,NULL::jsonb AS facts
@@ -153,7 +155,8 @@ function decode(value: string, context: string): Cursor {
  * Creates the Needs you queue over the exceptions owner's case attention rules and the owners'
  * decision providers. Reads run in one repeatable-read snapshot under tenant row security;
  * providers answer for the refreshed reader before it starts. A failing provider is reported
- * as unavailable instead of failing the whole queue.
+ * as unavailable instead of failing the whole queue. Cases need `issues.read` and providers their
+ * declared permission; otherwise they are skipped before ranking and counting.
  */
 export function createDecisionQueue(
   db: TenantDatabase,
@@ -194,8 +197,18 @@ export function createDecisionQueue(
     // Keep one ranking time across pages so expiring items don't move between them.
     const asOf = cursor?.asOf ?? now().toISOString();
 
+    const reader: DecisionReader = {
+      id: fresh.actor.id,
+      can: (permission) => hasPermission(fresh, permission),
+    };
+    const readsCases = hasPermission(fresh, 'issues.read');
+    // Owners whose area the reader can't read aren't asked, so their items and counts stay hidden.
+    const providers = deps.providers.filter(
+      (provider) =>
+        !provider.permission || hasPermission(fresh, provider.permission),
+    );
     const answers = await Promise.allSettled(
-      deps.providers.map((provider) => provider.pending(fresh)),
+      providers.map((provider) => provider.pending(fresh)),
     );
     const external = new Map<string, DecisionCandidate>();
     answers.forEach((answer) => {
@@ -250,13 +263,13 @@ export function createDecisionQueue(
             cursor?.id ?? null,
             query.limit + 1,
             only,
+            readsCases,
           ])
         ).rows[0]!;
       },
       { readOnlySnapshot: true },
     );
 
-    const reader = { id: fresh.actor.id, role: fresh.actor.role };
     const page = result.items.slice(0, query.limit);
     const items = page.flatMap((row): DecisionItem[] => {
       const candidate = row.facts
@@ -273,7 +286,10 @@ export function createDecisionQueue(
             state: evidenceState(candidate.evidence.validUntil, asOf),
           },
           assignment: row.assignment,
-          record: row.record,
+          record:
+            row.record && canReadRecord(fresh, row.record.kind)
+              ? row.record
+              : null,
         },
       ];
     });
@@ -302,8 +318,10 @@ export function createDecisionQueue(
         reasons: { ...emptyCounts(reasons), ...result.reasons },
       },
       sources: [
-        { id: 'cases', label: 'Issues', state: 'available' },
-        ...deps.providers.map((provider, index) => ({
+        ...(readsCases
+          ? [{ id: 'cases', label: 'Issues', state: 'available' as const }]
+          : []),
+        ...providers.map((provider, index) => ({
           id: provider.id,
           label: provider.label,
           state:

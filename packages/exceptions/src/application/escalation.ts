@@ -1,5 +1,5 @@
 import type { TenantContext } from '@luma/identity';
-import { requireRole } from '@luma/identity';
+import { requirePermission } from '@luma/identity';
 
 /**
  * Creates a tenant-scoped command for requesting manual attention at a specific incident
@@ -13,7 +13,7 @@ export function createEscalationService(
   ) => Promise<number>,
 ) {
   return (context: TenantContext, id: string, revision: number) => {
-    requireRole(context, ['owner', 'admin']);
+    requirePermission(context, 'issues.manage');
 
     return commit(context, id, revision);
   };

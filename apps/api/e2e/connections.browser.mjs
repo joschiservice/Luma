@@ -60,7 +60,13 @@ async function setup(page, provider, label, token = 'valid-test-token') {
     name: 'Install JTL',
     exact: true,
   });
-  if (await install.count()) await install.click();
+  if (await install.count()) {
+    await install.click();
+    // Installing asks for consent to the access the app requests.
+    await page
+      .getByRole('button', { name: 'Install and grant access', exact: true })
+      .click();
+  }
   await page
     .getByRole('button', { name: 'Add connection', exact: true })
     .click();
@@ -260,7 +266,7 @@ test('connects JTL targets, validates, replaces invalid credentials and disconne
   );
   await page.reload();
   await page
-    .getByText('An owner or admin can install and configure apps.', {
+    .getByText('Installing apps requires permission to manage apps', {
       exact: false,
     })
     .waitFor();
@@ -388,6 +394,9 @@ test('starts Shopify authorization without token fields and reports callback out
   );
   await page
     .getByRole('button', { name: 'Install Shopify', exact: true })
+    .click();
+  await page
+    .getByRole('button', { name: 'Install and grant access', exact: true })
     .click();
   await page
     .getByRole('button', { name: 'Add connection', exact: true })

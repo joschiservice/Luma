@@ -103,6 +103,10 @@ export interface OrderSourceFacts extends OrderSource {
   }[];
 }
 
+/** Order detail sections that need another area's read permission. */
+export type OrderDetailSection =
+  'fulfillments' | 'returns' | 'issues' | 'workflows' | 'activity';
+
 export interface OrderDetail {
   /** Retired URL identity, when this read resolved to the current order. */
   redirectedFrom?: string | null;
@@ -160,6 +164,11 @@ export interface OrderDetail {
     entries: OrderActivityEntry[];
     truncated: boolean;
   };
+  /**
+   * Sections left empty because the reader can't read their area. Fulfillment, return and
+   * refund history entries follow their section.
+   */
+  hidden: OrderDetailSection[];
   asOf: string;
 }
 
@@ -190,7 +199,11 @@ export interface OrderActivityReader {
   ): Promise<{ items: OrderActivityEntry[]; nextCursor: string | null }>;
 }
 
-/** Reads current orders for one tenant from canonical projections and linked Luma records. */
+/**
+ * Reads current orders for one tenant from canonical projections and linked Luma records.
+ * Requires `orders.read`. Issue links need `issues.read`; detail sections of other areas need
+ * their read permission and are listed in `hidden` otherwise.
+ */
 export interface OrderWorkspace {
   /** Rejects a cursor produced by different filters or sorting with a 400 error. */
   list(context: TenantContext, query: OrderListQuery): Promise<OrderList>;

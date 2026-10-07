@@ -17,7 +17,7 @@ export const vocabulary: AuthoringVocabulary = {
     {
       kind: 'manual',
       label: 'Started by a person',
-      description: 'An owner or admin starts a run.',
+      description: 'Someone who can manage workflow triggers starts a run.',
       executable: true,
       reason: null,
     },
@@ -76,7 +76,8 @@ export const vocabulary: AuthoringVocabulary = {
     {
       kind: 'approval',
       label: 'Ask for approval',
-      description: 'Wait for an owner or admin to approve the next action.',
+      description:
+        'Wait for someone who can approve changes to decide on the next action.',
       executable: false,
       reason:
         'No installed adapter runs this in custom workflows in this workspace.',
@@ -158,7 +159,7 @@ export const vocabulary: AuthoringVocabulary = {
       targetKind: 'purchase_order',
       minimumRisk: 'medium',
       approval:
-        'Workspace policy decides whether a different owner or admin must approve each order.',
+        'Workspace policy decides whether someone else who can approve changes must approve each order.',
       parameters: { quantity: 'number' },
       postcondition: { status: 'string' },
       evaluators: ['procurement/1'],
@@ -248,7 +249,7 @@ export const templates: WorkflowTemplate[] = [
     steps: [
       'Check that the diagnosis is ready and the method is mapped',
       'Propose the mapped shipping method for the order',
-      'Ask an independent owner or admin to approve the change',
+      'Ask someone else who can approve changes to approve the change',
       'Read the order again to confirm the new method',
     ],
     success:

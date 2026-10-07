@@ -1,5 +1,5 @@
 import type { ActionAdmission } from '@luma/execution';
-import { makeTenantContext } from '@luma/identity';
+import { builtInMembership, makeTenantContext } from '@luma/identity';
 import { expect, it, vi } from 'vitest';
 
 import { processVersion } from '../domain/process.fixture.js';
@@ -8,32 +8,12 @@ import type { WorkflowTriggerRun } from '../domain/workflow.js';
 import { createProcessActivities } from './process-activities.js';
 import { runProcess } from './process-runtime.js';
 
-it('admits each consequential step independently under the exact run and version', async () => {
-  const action = processVersion.steps[3]!;
-  const verification = processVersion.steps[4]!;
-  if (action.kind !== 'capability' || verification.kind !== 'verification')
-    throw new Error('Invalid process fixture');
-  const second: ProcessStep[] = [
-    {
-      id: 'review2',
-      kind: 'approval',
-      forStep: 'reserve2',
-      expiresAfterSeconds: 3600,
-    },
-    { ...action, id: 'reserve2' },
-    { ...verification, id: 'verify2', forStep: 'reserve2' },
-  ];
-  const version: ProcessWorkflowVersion = {
-    ...processVersion,
-    steps: [
-      ...processVersion.steps.slice(0, 5),
-      ...second,
-      processVersion.steps[6]!,
-    ],
-  };
-  const tenantId = 'tenant';
-  const userId = 'operator';
-  const context = makeTenantContext(
+const tenantId = 'tenant';
+const userId = 'operator';
+
+/** Builds the stored principal's refreshed context with a built-in role. */
+function operator(role: 'owner' | 'admin' | 'member') {
+  return makeTenantContext(
     { userId, sessionId: 'session' },
     {
       id: tenantId,
@@ -42,10 +22,17 @@ it('admits each consequential step independently under the exact run and version
       dataRegion: 'EU',
       status: 'active',
     },
-    { id: 'membership', organizationId: tenantId, userId, role: 'owner' },
+    builtInMembership(
+      { id: 'membership', organizationId: tenantId, userId },
+      role,
+    ),
     'request',
   );
-  const run: WorkflowTriggerRun = {
+}
+
+/** Builds a run awaiting admission for the exact version. */
+function triggerRun(version: ProcessWorkflowVersion): WorkflowTriggerRun {
+  return {
     id: 'run',
     tenantId,
     definitionId: version.definition.id,
@@ -78,6 +65,33 @@ it('admits each consequential step independently under the exact run and version
     state: 'awaiting_admission',
     triggeredAt: '2026-09-27T00:00:00Z',
   };
+}
+
+it('admits each consequential step independently under the exact run and version', async () => {
+  const action = processVersion.steps[3]!;
+  const verification = processVersion.steps[4]!;
+  if (action.kind !== 'capability' || verification.kind !== 'verification')
+    throw new Error('Invalid process fixture');
+  const second: ProcessStep[] = [
+    {
+      id: 'review2',
+      kind: 'approval',
+      forStep: 'reserve2',
+      expiresAfterSeconds: 3600,
+    },
+    { ...action, id: 'reserve2' },
+    { ...verification, id: 'verify2', forStep: 'reserve2' },
+  ];
+  const version: ProcessWorkflowVersion = {
+    ...processVersion,
+    steps: [
+      ...processVersion.steps.slice(0, 5),
+      ...second,
+      processVersion.steps[6]!,
+    ],
+  };
+  const context = operator('owner');
+  const run = triggerRun(version);
   const execute = vi.fn(
     async (
       _context: unknown,
@@ -132,4 +146,26 @@ it('admits each consequential step independently under the exact run and version
     { runId: 'run', stepId: 'reserve2' },
   ]);
   expect(outputs).toContain('verify2');
+});
+
+it('stops a run whose stored principal can no longer propose actions', async () => {
+  const read = vi.fn();
+  const activities = createProcessActivities({
+    resolveContext: async () => operator('member'),
+    loadRun: async () => triggerRun(processVersion),
+    loadVersion: async () => processVersion,
+    admission: { get: vi.fn(), execute: vi.fn(), reconcile: vi.fn() },
+    bindAction: vi.fn(),
+    read,
+    decision: vi.fn(),
+    verify: vi.fn(),
+    record: vi.fn(),
+  });
+  const step = processVersion.steps.find((item) => item.kind === 'read');
+  if (step?.kind !== 'read') throw new Error('Invalid process fixture');
+
+  await expect(
+    activities.read(triggerRun(processVersion), step),
+  ).rejects.toMatchObject({ statusCode: 403 });
+  expect(read).not.toHaveBeenCalled();
 });

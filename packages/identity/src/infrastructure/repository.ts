@@ -5,9 +5,16 @@ import { and, eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import type { Pool } from 'pg';
 
-import type { IdentityRepository } from '../application/identity.js';
-import type { Membership, Organization } from '../domain/context.js';
+import type { IdentityRepository, MemberDto } from '../application/identity.js';
+import type { Organization } from '../domain/context.js';
 import { IdentityError } from '../domain/context.js';
+import {
+  builtInReference,
+  isBuiltInRole,
+  PermissionSet,
+} from '../domain/roles.js';
+import type { MembershipRow } from './access.js';
+import { membershipFromRow, membershipSelect, storedRole } from './access.js';
 import type { AuthSettings } from './auth.js';
 import { createAuth } from './auth.js';
 import * as schema from './schema.js';
@@ -31,18 +38,6 @@ const organizationDto = (
     slug: row.slug,
     dataRegion: row.dataRegion as Organization['dataRegion'],
     status: row.status as Organization['status'],
-  };
-};
-
-const memberDto = (row: typeof schema.member.$inferSelect): Membership => {
-  if (!['owner', 'admin', 'member'].includes(row.role))
-    throw new IdentityError(403, 'FORBIDDEN', 'Unknown organization role');
-
-  return {
-    id: row.id,
-    organizationId: row.organizationId,
-    userId: row.userId,
-    role: row.role as Membership['role'],
   };
 };
 
@@ -97,20 +92,28 @@ export function createRepository(pool: Pool, settings: AuthSettings) {
           await tx.execute(
             sql`select set_config('app.user_id', ${userId}, true)`,
           );
+          const readMember = async (
+            organizationId: string,
+            memberId: string,
+          ) => {
+            const result = await tx.execute<MembershipRow>(
+              sql`${sql.raw(membershipSelect)} WHERE m.tenant_id=${organizationId} AND m.id=${memberId}`,
+            );
+            const row = result.rows[0];
+            if (!row)
+              throw new IdentityError(404, 'NOT_FOUND', 'Member not found');
+
+            return membershipFromRow(row);
+          };
 
           return operation({
             async findMembership(organizationId) {
-              const [row] = await tx
-                .select()
-                .from(schema.member)
-                .where(
-                  and(
-                    eq(schema.member.organizationId, organizationId),
-                    eq(schema.member.userId, userId),
-                  ),
-                );
+              const result = await tx.execute<MembershipRow>(
+                sql`${sql.raw(membershipSelect)} WHERE m.tenant_id=${organizationId} AND m.user_id=${userId}`,
+              );
+              const row = result.rows[0];
 
-              return row ? memberDto(row) : null;
+              return row ? membershipFromRow(row) : null;
             },
             async findOrganization(organizationId) {
               const [row] = await tx
@@ -163,24 +166,60 @@ export function createRepository(pool: Pool, settings: AuthSettings) {
                 .for('update');
             },
             async listMembers(organizationId) {
-              const rows = await tx
-                .select({
-                  member: schema.member,
-                  name: schema.user.name,
-                  email: schema.user.email,
-                })
-                .from(schema.member)
-                .innerJoin(
-                  schema.user,
-                  eq(schema.member.userId, schema.user.id),
-                )
-                .where(eq(schema.member.organizationId, organizationId));
+              const result = await tx.execute<
+                MembershipRow & { name: string; email: string }
+              >(
+                sql`SELECT a.*,u.name,u.email FROM (${sql.raw(membershipSelect)} WHERE m.tenant_id=${organizationId}) a JOIN users u ON u.id=a."userId" ORDER BY lower(u.name),u.email`,
+              );
 
-              return rows.map((row) => ({
-                ...memberDto(row.member),
+              return result.rows.map((row) => ({
+                ...membershipFromRow(row),
                 name: row.name,
                 email: row.email,
               }));
+            },
+            async findRole(organizationId, roleId) {
+              if (isBuiltInRole(roleId)) {
+                const reference = builtInReference(roleId);
+
+                return {
+                  reference,
+                  permissions: PermissionSet.forRole(reference),
+                  archived: false,
+                };
+              }
+              if (
+                !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+                  roleId,
+                )
+              )
+                return null;
+              const result = await tx.execute<{
+                id: string;
+                name: string;
+                revision: number;
+                archived: boolean;
+                permissions: string[];
+              }>(
+                sql`SELECT r.id,r.name,r.revision,r.archived_at IS NOT NULL AS archived,
+                  ARRAY(SELECT p.permission FROM workspace_role_permissions p WHERE p.tenant_id=r.tenant_id AND p.role_id=r.id) AS permissions
+                  FROM workspace_roles r WHERE r.tenant_id=${organizationId} AND r.id=${roleId}`,
+              );
+              const row = result.rows[0];
+              if (!row) return null;
+              const reference = {
+                id: row.id,
+                key: 'custom' as const,
+                name: row.name,
+                builtIn: false,
+                revision: row.revision,
+              };
+
+              return {
+                reference,
+                permissions: PermissionSet.forRole(reference, row.permissions),
+                archived: row.archived,
+              };
             },
             async memberCommand(organizationId, id) {
               const result = await tx.execute(
@@ -192,7 +231,7 @@ export function createRepository(pool: Pool, settings: AuthSettings) {
                   | {
                       actorId: string;
                       request: string;
-                      result: Membership | null;
+                      result: MemberDto | null;
                     }
                   | undefined) ?? null
               );
@@ -213,35 +252,38 @@ export function createRepository(pool: Pool, settings: AuthSettings) {
                 sql`INSERT INTO workspace_access_events(id,tenant_id,actor_id,event_type,target_id,before_value,after_value) VALUES(${randomUUID()},${organizationId},${actorId},${`member.${action}`},${after?.id ?? before!.id},${JSON.stringify(before)}::jsonb,${JSON.stringify(after)}::jsonb)`,
               );
             },
-            async addMember(organizationId, newUserId, role) {
+            async addMember(organizationId, newUserId, roleId) {
+              const stored = storedRole(roleId);
               const [row] = await tx
                 .insert(schema.member)
                 .values({
                   id: randomUUID(),
                   organizationId,
                   userId: newUserId,
-                  role,
+                  role: stored.role,
+                  customRoleId: stored.customRoleId,
                   createdAt: new Date(),
                 })
-                .returning();
+                .returning({ id: schema.member.id });
 
-              return memberDto(row!);
+              return readMember(organizationId, row!.id);
             },
-            async updateMember(organizationId, memberId, role) {
+            async updateMember(organizationId, memberId, roleId) {
+              const stored = storedRole(roleId);
               const [row] = await tx
                 .update(schema.member)
-                .set({ role })
+                .set({ role: stored.role, customRoleId: stored.customRoleId })
                 .where(
                   and(
                     eq(schema.member.organizationId, organizationId),
                     eq(schema.member.id, memberId),
                   ),
                 )
-                .returning();
+                .returning({ id: schema.member.id });
               if (!row)
                 throw new IdentityError(404, 'NOT_FOUND', 'Member not found');
 
-              return memberDto(row);
+              return readMember(organizationId, row.id);
             },
             async removeMember(organizationId, memberId) {
               await tx

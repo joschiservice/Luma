@@ -36,7 +36,7 @@ export function presentPlaybook(version: PlaybookVersion) {
       : `${label(value.field)} from ${value.source}`;
   const approval =
     ir.approval.mode === 'required' || ir.action.minimumRisk !== 'low'
-      ? 'An independent owner or administrator must approve each proposed change. Activation does not approve an action.'
+      ? 'Someone else who can approve changes must approve each proposed change. Activation does not approve an action.'
       : 'Current policy decides whether a person must approve each proposed change. Activation does not bypass policy.';
   const blockers = playbookBlockers(version);
 

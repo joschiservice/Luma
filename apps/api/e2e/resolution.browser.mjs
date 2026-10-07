@@ -4,7 +4,10 @@ import { readFile } from 'node:fs/promises';
 
 import { createDetectionServices } from '@luma/application-runtime';
 import { defaultConfiguration } from '@luma/exceptions';
-import { makeTenantContext } from '@luma/identity/composition';
+import {
+  builtInMembership,
+  makeTenantContext,
+} from '@luma/identity/composition';
 
 import { inventoryCase } from '../../../packages/ui/src/components/issues/case-fixtures.ts';
 import {
@@ -70,7 +73,10 @@ test('reviews decisions, recovers ambiguous commands and escalates through the c
       dataRegion: 'EU',
       status: 'active',
     },
-    { id: randomUUID(), organizationId, userId: actorId, role: 'owner' },
+    builtInMembership(
+      { id: randomUUID(), organizationId, userId: actorId },
+      'owner',
+    ),
     randomUUID(),
   );
   const corpus = JSON.parse(

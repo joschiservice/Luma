@@ -25,6 +25,8 @@ export interface EffectAdapter {
   capability: string;
   version: string;
   minimumRisk: 'low' | 'medium' | 'high';
+  /** App permission the capability declares, as `<appId>:<name>`; absent uses the core action permissions. */
+  permission?: string;
   mechanism:
     | 'api'
     | 'deterministic_browser'

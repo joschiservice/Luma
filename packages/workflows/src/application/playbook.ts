@@ -5,8 +5,8 @@ import type {
   ExecutionResult,
 } from '@luma/execution';
 import { AdmissionRejected } from '@luma/execution';
-import type { TenantContext } from '@luma/identity';
-import { requireRole, requireTenant } from '@luma/identity';
+import type { Permission, TenantContext } from '@luma/identity';
+import { requirePermission, requireTenant } from '@luma/identity';
 import type { ProposedAction } from '@luma/policies';
 
 import type {
@@ -119,10 +119,10 @@ const rank = { low: 0, medium: 1, high: 2 };
  * action admission.
  */
 export function createPlaybookService(deps: PlaybookDependencies) {
-  async function authorize(context: TenantContext) {
+  async function authorize(context: TenantContext, permission: Permission) {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
-    requireRole(fresh, ['owner', 'admin']);
+    requirePermission(fresh, permission);
     if (fresh.actor.id !== context.actor.id)
       throw new Error('Playbook principal changed');
 
@@ -153,7 +153,7 @@ export function createPlaybookService(deps: PlaybookDependencies) {
     id: string,
     recovery: boolean,
   ): Promise<PlaybookOutcome> {
-    context = await authorize(context);
+    context = await authorize(context, 'actions.propose');
     const { run, version } = await load(context, id);
     const ir = version.ir;
 
@@ -300,7 +300,7 @@ export function createPlaybookService(deps: PlaybookDependencies) {
       snapshot: PlaybookSnapshot;
     },
   ) {
-    context = await authorize(context);
+    context = await authorize(context, 'actions.propose');
     const activation = await deps.store.activation(context, input.activationId);
     if (
       !activation ||
@@ -364,7 +364,7 @@ export function createPlaybookService(deps: PlaybookDependencies) {
 
   return {
     async publish(context: TenantContext, source: unknown) {
-      context = await authorize(context);
+      context = await authorize(context, 'workflows.publish');
       const version = deps.compile(source);
       await deps.store.publish(context, version);
 
@@ -427,7 +427,7 @@ export function createPlaybookService(deps: PlaybookDependencies) {
     reconcile: (context: TenantContext, id: string) =>
       perform(context, id, true),
     async get(context: TenantContext, id: string) {
-      context = await authorize(context);
+      context = await authorize(context, 'actions.propose');
       const { run, version } = await load(context, id);
 
       return { run, version, outcomes: await deps.store.outcomes(context, id) };

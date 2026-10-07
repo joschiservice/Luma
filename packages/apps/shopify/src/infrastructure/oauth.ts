@@ -19,7 +19,7 @@ import {
   validMac,
 } from '@luma/connector-shopify';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireRole } from '@luma/identity';
+import { IdentityError } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
 import { z } from 'zod';
 
@@ -98,6 +98,8 @@ export function createShopifyOAuth(
     fetch?: typeof globalThis.fetch;
     now?: () => Date;
     requireInstalled?: (context: TenantContext) => Promise<number>;
+    /** Requires permission to connect stores; the host checks it with app installation. */
+    authorize(context: TenantContext): Promise<void>;
   },
 ) {
   const now = deps.now ?? (() => new Date());
@@ -321,7 +323,7 @@ export function createShopifyOAuth(
     },
     async start(context: TenantContext, input: unknown) {
       const fresh = await deps.refreshContext(context);
-      requireRole(fresh, ['owner', 'admin']);
+      await deps.authorize(fresh);
       const installationVersion = await deps.requireInstalled?.(fresh);
       const stateApp = `${app}:${installationVersion ?? 0}`;
       const parsed = oauthStartInput.safeParse(input);
@@ -371,7 +373,7 @@ export function createShopifyOAuth(
     },
     async callback(context: TenantContext, query: string) {
       const fresh = await deps.refreshContext(context);
-      requireRole(fresh, ['owner', 'admin']);
+      await deps.authorize(fresh);
       const installationVersion = await deps.requireInstalled?.(fresh);
       const stateApp = `${app}:${installationVersion ?? 0}`;
       let params: URLSearchParams;
@@ -474,7 +476,7 @@ export function createShopifyOAuth(
         } catch {
           connection.granted = [];
         }
-        requireRole(await deps.refreshContext(context), ['owner', 'admin']);
+        await deps.authorize(await deps.refreshContext(context));
         await persist(
           tx,
           record,

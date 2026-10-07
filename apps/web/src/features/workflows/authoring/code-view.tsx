@@ -166,7 +166,7 @@ export function DraftCodeView({
       {narrow || readOnly ? (
         <Alert tone="neutral" className="workflow-notice">
           {readOnly
-            ? 'You can review the code. Only owners and admins can change drafts.'
+            ? 'You can review the code. Changing drafts requires Author workflows.'
             : 'Code is read-only on small screens. Use a wider screen to edit it.'}
         </Alert>
       ) : (

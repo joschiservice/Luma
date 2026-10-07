@@ -31,6 +31,8 @@ export interface RecordDetail {
     label: string;
     relationship: string;
   }[];
+  /** Kinds of linked records left out because the reader can't read them. */
+  hidden: RecordKind[];
   snapshots: {
     connectionId: string;
     observedAt: string;
@@ -39,9 +41,16 @@ export interface RecordDetail {
   }[];
 }
 
-/** Reads current records and confirmed relationships for one tenant. */
+/**
+ * Reads current records and confirmed relationships for one tenant. Each kind needs its read
+ * permission (see `recordReadPermissions`): searches skip and name kinds the reader can't read,
+ * and details leave out links to them.
+ */
 export interface RecordExplorer {
-  /** Resolves an exact source identity; multiple IDs indicate an ambiguous mapping. */
+  /**
+   * Resolves an exact source identity; multiple IDs indicate an ambiguous mapping. Requires
+   * `orders.read`.
+   */
   resolve(
     context: TenantContext,
     query: { connectionId: string; externalId: string; kind: 'order' },
@@ -63,7 +72,10 @@ export interface RecordExplorer {
     items: RecordSummary[];
     nextCursor: string | null;
     coverage: { customer: 'unavailable'; return: 'unavailable' };
+    /** Kinds left out of the search because the reader can't read them. */
+    hidden: RecordKind[];
   }>;
+  /** Rejects a kind the reader can't read with a 403 error. */
   get(
     context: TenantContext,
     kind: RecordKind,

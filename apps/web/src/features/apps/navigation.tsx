@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 
+import { usePermissions } from '../identity/permissions';
 import { appsOptions } from './data';
 
 /** Adds a sidebar section for installed apps that contribute workspace pages. */
@@ -12,6 +13,7 @@ export function AppNavigation({
   close?: (() => void) | undefined;
 }) {
   const { data } = useQuery(appsOptions(organizationId));
+  const { can } = usePermissions(organizationId);
   const installed = new Set(
     data?.installations
       .filter((app) => app.status === 'installed')
@@ -19,7 +21,11 @@ export function AppNavigation({
   );
   const pages =
     data?.catalog.filter(
-      (app) => installed.has(app.id) && app.ui.includes('page'),
+      (app) =>
+        installed.has(app.id) &&
+        app.ui.includes('page') &&
+        !!app.slotAccess.page &&
+        can(app.slotAccess.page),
     ) ?? [];
   if (!pages.length) return null;
 

@@ -1,6 +1,6 @@
 # Authentication and organization access
 
-Luma stores Better Auth users, credentials and sessions in its PostgreSQL database. Organizations are tenants; membership roles are `owner`, `admin` and `member`. V0 provisions only EU organizations.
+Luma stores Better Auth users, credentials and sessions in its PostgreSQL database. Organizations are tenants. Each membership has one role: built-in Owner, Admin or Member, or a custom workspace role. Roles grant permissions from a typed catalog; see [ADR-009](architecture/009-permissions-and-roles.md) and the [permission reference](permissions.md). V0 provisions only EU organizations.
 
 ## Local setup
 
@@ -44,13 +44,13 @@ The typed contract and OpenAPI document describe organization routes. Send the s
 | `POST /auth/sign-out`                                        | Revoke the current session                                                                        |
 | `GET /v1/organizations`                                      | List only the caller's organizations                                                              |
 | `POST /v1/organizations`                                     | Create an organization and its first owner atomically; accepts name, slug and optional dataRegion |
-| `GET /v1/organizations/:organizationId/context`              | Resolve current membership, state, region and audit identity                                      |
+| `GET /v1/organizations/:organizationId/context`              | Resolve current membership, role, effective permissions, state, region and audit identity         |
 | `GET /v1/organizations/:organizationId/members`              | List members of an authorized organization                                                        |
-| `POST /v1/organizations/:organizationId/members`             | Add an existing user by UUID and role                                                             |
+| `POST /v1/organizations/:organizationId/members`             | Add an existing user by UUID and `roleId`                                                         |
 | `PATCH /v1/organizations/:organizationId/members/:memberId`  | Change a role                                                                                     |
 | `DELETE /v1/organizations/:organizationId/members/:memberId` | Remove a member                                                                                   |
 
-Owners and admins manage members; only owners may grant or revoke ownership. The last owner cannot be removed or demoted. Membership mutations serialize on the organization row and recheck the acting membership after acquiring the lock. Adding users by UUID remains an explicit administrator action. [Workspace Settings](workspace-settings.md) also provides expiring email invitations, audited access changes and email preferences.
+`members.manage` manages members; only owners may grant or revoke ownership, and others can only assign roles, and change members, whose permissions they hold. The last owner cannot be removed or demoted. Membership mutations serialize on the organization row and recheck the acting membership after acquiring the lock. Adding users by UUID remains an explicit administrator action. [Workspace Settings](workspace-settings.md) also provides expiring email invitations, audited access changes and email preferences.
 
 The auth bridge also permits session listing/revocation, password changes, and the two-factor and passkey routes listed under [Sign-in factors](#sign-in-factors). Other Better Auth routes, including direct organization routes, return 404. Organization creation uses Better Auth's organization plugin inside the identity transaction; Luma's API owns membership management and placement rules. Cookie cache and automatic account linking are disabled.
 
@@ -80,13 +80,13 @@ With `NODE_ENV=production`, Better Auth rate-limits `/two-factor/*`, like sign-i
 
 ## Context and isolation
 
-Every new Fastify route is protected by default. Only health, readiness, OpenAPI, the static connector-provider catalog and the restricted auth bridge are public. Organization listing/creation require a session. Tenant routes must use `/v1/organizations/:organizationId/...`; the guard resolves an immutable `request.tenantContext`. Pass it explicitly into application use cases. Public identity exports include `TenantContext`, `requireTenant` and `requireRole`; no database handles or auth instances escape the module.
+Every new Fastify route is protected by default. Only health, readiness, OpenAPI, the static connector-provider catalog and the restricted auth bridge are public. Organization listing/creation require a session. Tenant routes must use `/v1/organizations/:organizationId/...`; the guard resolves an immutable `request.tenantContext`. Pass it explicitly into application use cases. Every tenant route declares who may call it: contract routes through `metadata` (`requires(...)` or `anyMember` from `@luma/api-contract`), other routes through `config.access`. The guard denies routes without a declaration and callers without the declared permission (403). Public identity exports include `TenantContext`, `requireTenant`, `requirePermission` and `hasPermission`; no database handles or auth instances escape the module.
 
 A path ID selects a tenant; it does not grant access. Each request reads the current session and membership. `activeOrganizationId`, tenant headers and client-supplied context are never authorization inputs. Suspended/closed organizations return 404, unsupported placement returns 503, and US/APAC provisioning returns 422. Nonmembers and missing organizations both return 404; insufficient roles within an authorized organization return 403.
 
-Audit identity contains user ID, initiating-user ID, session ID, membership ID, role, tenant, region and server request ID. It excludes passwords and session tokens. This is evidence metadata, not a durable audit log. Each later audit producer must write its own evidence envelope through the audit module.
+Audit identity contains user ID, initiating-user ID, session ID, membership ID, role reference, tenant, region and server request ID. The context also carries the role's effective permissions, resolved in the same membership statement; there is no long-lived permission cache. It excludes passwords and session tokens. This is evidence metadata, not a durable audit log. Each later audit producer must write its own evidence envelope through the audit module.
 
-The identity role has DML grants on auth tables and narrowly scoped grants on organization tables. It owns no tables and has no commerce grants. Organizations, memberships and invitations force RLS. Bootstrap reads expose only the verified user's memberships and organizations. Provisioning uses a server-generated organization UUID; tenant operations install context only after membership, state and placement checks. All context uses transaction-local `set_config`, including rollback and pooled reuse. Runtime grants prohibit changing tenant ownership, placement or organization status.
+The identity role has DML grants on auth tables and narrowly scoped grants on organization tables. It owns no tables and has no commerce grants. Organizations, memberships, invitations, workspace roles and role permissions force RLS. A member can read their own role before a tenant is selected, so context resolution needs no extra round trip. The legacy Better Auth `invitations` table remains because its organization plugin requires it; Luma uses `workspace_invitations`. Bootstrap reads expose only the verified user's memberships and organizations. Provisioning uses a server-generated organization UUID; tenant operations install context only after membership, state and placement checks. All context uses transaction-local `set_config`, including rollback and pooled reuse. Runtime grants prohibit changing tenant ownership, placement or organization status.
 
 RLS prevents omitted filters; it does not protect against a compromised backend that sets arbitrary context. Credential/session tables are the ADR-003 regional bootstrap exception. Commerce modules must add their own scoped repositories, composite foreign keys, runtime roles and forced RLS policies when persistence is introduced.
 

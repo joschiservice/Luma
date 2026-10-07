@@ -713,7 +713,7 @@ function nextAction(input: {
       owner: 'approver',
       title: 'Approve sending the order',
       detail:
-        'A different owner or admin must approve before Luma places it in the purchasing system.',
+        'Someone else who can approve changes must approve before Luma places it in the purchasing system.',
     };
   if (first?.kind === 'submission_uncertain')
     return {

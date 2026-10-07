@@ -1,5 +1,5 @@
 import type { TenantContext } from '@luma/identity';
-import { requireRole } from '@luma/identity';
+import { requirePermission } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
 
 import type {
@@ -7,7 +7,7 @@ import type {
   ReadCapability,
 } from '../domain/capabilities.js';
 
-/** Stores validated runtime read outcomes, including empty pages, for connection coverage. Requires an owner or admin. */
+/** Stores validated runtime read outcomes, including empty pages, for connection coverage. Requires `sync.manage`. */
 export function createReadChecks(db: TenantDatabase) {
   return async (
     context: TenantContext,
@@ -15,7 +15,7 @@ export function createReadChecks(db: TenantDatabase) {
     capability: ReadCapability,
     result: CapabilityResult<ReadCapability>,
   ) => {
-    requireRole(context, ['owner', 'admin']);
+    requirePermission(context, 'sync.manage');
     if (
       result.ok &&
       result.value.items.some(

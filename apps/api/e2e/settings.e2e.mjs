@@ -72,7 +72,7 @@ it('persists settings, reconciles commands, enforces tenant roles and serializes
     403,
   );
   await request(owner, `${base}/members/${f.membership.id}`, 'PATCH', {
-    role: 'owner',
+    roleId: 'owner',
   });
   const members = (await request(owner, `${base}/members`)).items;
   const ownerMembership = members.find((m) => m.userId === owner.id);
@@ -82,7 +82,7 @@ it('persists settings, reconciles commands, enforces tenant roles and serializes
         method: 'PATCH',
         url: `${base}/members/${memberId}`,
         headers: { origin: 'http://localhost:3000', cookie: owner.cookie },
-        payload: { role: 'member' },
+        payload: { roleId: 'member' },
       }),
     ),
   );
@@ -119,18 +119,18 @@ it('delivers expiring invitations and rejects wrong-email, wrong-workspace, old,
     member,
     `${base}/settings/invitations`,
     'POST',
-    command({ email: outsider.email, role: 'admin' }),
+    command({ email: outsider.email, roleId: 'admin' }),
     403,
   );
   await request(
     owner,
     `${base}/settings/invitations`,
     'POST',
-    command({ email: member.email, role: 'member' }),
+    command({ email: member.email, roleId: 'member' }),
     409,
   );
   f.setFail(true);
-  const input = command({ email: outsider.email, role: 'admin' });
+  const input = command({ email: outsider.email, roleId: 'admin' });
   const invite = await request(
     owner,
     `${base}/settings/invitations`,
@@ -144,7 +144,7 @@ it('delivers expiring invitations and rejects wrong-email, wrong-workspace, old,
     owner,
     `${base}/settings/invitations`,
     'POST',
-    command({ email: outsider.email, role: 'member' }),
+    command({ email: outsider.email, roleId: 'member' }),
     409,
   );
   for (let i = 0; i < 5; i++) {
@@ -190,7 +190,10 @@ it('delivers expiring invitations and rejects wrong-email, wrong-workspace, old,
   await request(outsider, '/v1/invitations/accept', 'POST', old, 404);
   expect(
     await request(outsider, '/v1/invitations/preview', 'POST', proof),
-  ).toMatchObject({ role: 'admin', email: outsider.email });
+  ).toMatchObject({
+    role: { id: 'admin', name: 'Admin' },
+    email: outsider.email,
+  });
   const accepted = await Promise.all(
     [1, 2].map(() =>
       f.app.inject({
@@ -205,7 +208,7 @@ it('delivers expiring invitations and rejects wrong-email, wrong-workspace, old,
   const target = (await request(owner, `${base}/members`)).items.find(
     (m) => m.userId === outsider.id,
   );
-  expect(target.role).toBe('admin');
+  expect(target.role.id).toBe('admin');
   await request(
     owner,
     `${base}/members/${target.id}`,
@@ -218,7 +221,7 @@ it('delivers expiring invitations and rejects wrong-email, wrong-workspace, old,
     owner,
     `${base}/settings/invitations`,
     'POST',
-    command({ email: outsider.email, role: 'member' }),
+    command({ email: outsider.email, roleId: 'member' }),
   );
   await f.drain();
   const revoked = invitationProof([...f.messages.values()].at(-1));
@@ -332,7 +335,7 @@ it('strengthens platform policy, versions decisions and rejects stale independen
   const f = await settingsFixture(t);
   const { request, owner, member, base, command } = f;
   await request(owner, `${base}/members/${f.membership.id}`, 'PATCH', {
-    role: 'admin',
+    roleId: 'admin',
   });
   const pool = new Pool({ connectionString: f.db.runtimeUrl });
   t.onTestFinished(() => pool.end());
@@ -369,7 +372,11 @@ it('strengthens platform policy, versions decisions and rejects stale independen
     proposedBy: { kind: 'user', id: owner.id },
     expiresAt: new Date(Date.now() + 600000).toISOString(),
   };
-  const capability = { available: true, minimumRisk: 'low' };
+  const capability = {
+    available: true,
+    minimumRisk: 'low',
+    permission: 'actions.execute',
+  };
   const evaluate = () =>
     policies.evaluate(context, action, 'a'.repeat(64), capability);
   expect((await evaluate()).outcome).toBe('allowed');
@@ -428,7 +435,7 @@ it('replays membership commands without overwriting later role changes', async (
         cookie: f.owner.cookie,
         'x-command-id': id,
       },
-      payload: { role },
+      payload: { roleId: role },
     });
   expect((await change(commandId, 'admin')).statusCode).toBe(200);
   expect((await change(randomUUID(), 'owner')).statusCode).toBe(200);
@@ -436,7 +443,7 @@ it('replays membership commands without overwriting later role changes', async (
   expect(
     (await f.request(f.owner, `${f.base}/members`)).items.find(
       (m) => m.id === f.membership.id,
-    ).role,
+    ).role.id,
   ).toBe('owner');
   expect((await change(commandId, 'member')).statusCode).toBe(409);
 });

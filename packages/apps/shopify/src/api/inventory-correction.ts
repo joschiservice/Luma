@@ -23,6 +23,11 @@ export function registerInventoryCorrectionRoutes(
   ] as const) {
     server.post(
       `/v1/organizations/:organizationId/apps/shopify/inventory-correction-${command}`,
+      {
+        config: {
+          access: { permission: 'shopify:inventory_corrections.apply' },
+        },
+      },
       async (request, reply) => {
         reply.header('cache-control', 'no-store');
         if (!request.tenantContext)

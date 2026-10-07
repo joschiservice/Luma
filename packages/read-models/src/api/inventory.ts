@@ -10,7 +10,7 @@ import { initServer } from '@ts-rest/fastify';
 
 import type { InventoryWorkspace } from '../application/inventory.js';
 
-/** Exposes the tenant's stock position list and stock position details to workspace members. */
+/** Exposes the tenant's stock position list and stock position details to readers with `inventory.read`. */
 export function inventoryRoutes(service?: InventoryWorkspace) {
   return initServer().router(apiContract.inventory, {
     list: async ({ request, query }) => {

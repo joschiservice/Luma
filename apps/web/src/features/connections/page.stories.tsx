@@ -72,6 +72,12 @@ export const ShopifySetup: Story = {
         name: 'Install Shopify',
       }),
     );
+    // Installing asks for consent to the access the app requests.
+    await userEvent.click(
+      await within(document.body).findByRole('button', {
+        name: 'Install and grant access',
+      }),
+    );
     await userEvent.click(
       await within(canvasElement).findByRole('button', {
         name: 'Add connection',
@@ -94,6 +100,12 @@ export const JtlCloudSetup: Story = {
         name: 'Install JTL',
       }),
     );
+    // Installing asks for consent to the access the app requests.
+    await userEvent.click(
+      await within(document.body).findByRole('button', {
+        name: 'Install and grant access',
+      }),
+    );
     await userEvent.click(
       await within(canvasElement).findByRole('button', {
         name: 'Add connection',
@@ -114,6 +126,12 @@ export const JtlOnPremiseSetup: Story = {
     await userEvent.click(
       await within(canvasElement).findByRole('button', {
         name: 'Install JTL',
+      }),
+    );
+    // Installing asks for consent to the access the app requests.
+    await userEvent.click(
+      await within(document.body).findByRole('button', {
+        name: 'Install and grant access',
       }),
     );
     await userEvent.click(

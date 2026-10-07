@@ -1,14 +1,11 @@
-import type { TenantContext } from '@luma/identity';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createExceptionActivities } from './runtime.js';
 import type { ShadowStore } from './shadow.js';
 import { createShadowService } from './shadow.js';
+import { testContext } from './tenant-context.fixture.js';
 
-const context = {
-  tenantId: 'tenant',
-  actor: { id: 'owner', role: 'owner' },
-} as TenantContext;
+const context = testContext({ tenantId: 'tenant' });
 
 describe('Shadow safety boundaries', () => {
   it.each(['execute', 'reconcile', 'verify', 'propose', 'refresh'] as const)(
@@ -61,15 +58,11 @@ describe('Shadow safety boundaries', () => {
         list: vi.fn(),
         review: vi.fn(),
       } satisfies ShadowStore;
-      const fresh = {
-        ...context,
-        tenantId: change === 'tenant' ? 'other' : context.tenantId,
-        actor: {
-          ...context.actor,
-          role: change === 'member' ? ('member' as const) : context.actor.role,
-          id: change === 'actor' ? 'other' : context.actor.id,
-        },
-      };
+      const fresh = testContext({
+        tenantId: change === 'tenant' ? 'other' : 'tenant',
+        role: change === 'member' ? 'member' : 'owner',
+        userId: change === 'actor' ? 'other' : 'owner',
+      });
       const service = createShadowService({
         store,
         refreshContext: async () => fresh,

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import type { TenantContext } from '@luma/identity';
-import { requireRole, requireTenant } from '@luma/identity';
+import { requirePermission, requireTenant } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
 import { z } from 'zod';
 
@@ -26,7 +26,7 @@ export function createSourceRecords(
   ) => Promise<string[]>,
 ): SourceRecords {
   const recordMany: SourceRecords['recordMany'] = async (context, items) => {
-    requireRole(context, ['owner', 'admin']);
+    requirePermission(context, 'sync.manage');
     const values = items.map((item) => {
       z.string().min(1).max(1024).parse(item.ingestKey);
       const value = commerceSchema.parse(item.input);
@@ -128,7 +128,7 @@ export function createSourceRecords(
   };
 
   const bindMany: SourceRecords['bindMany'] = async (context, entries) => {
-    requireRole(context, ['owner', 'admin']);
+    requirePermission(context, 'sync.manage');
     const values = entries.map((entry) => {
       const source = sourceSchema.parse(entry.source);
       requireTenant(context, source.tenantId);
@@ -392,7 +392,7 @@ export function createSourceRecords(
       });
     },
     async remap(context, input, from, to, method, reason) {
-      requireRole(context, ['owner', 'admin']);
+      requirePermission(context, 'sync.manage');
       const source = sourceSchema.parse(input);
       requireTenant(context, source.tenantId);
       z.string().uuid().parse(from);

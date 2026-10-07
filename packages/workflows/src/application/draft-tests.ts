@@ -1,5 +1,9 @@
-import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireRole, requireTenant } from '@luma/identity';
+import type { Permission, TenantContext } from '@luma/identity';
+import {
+  IdentityError,
+  requirePermission,
+  requireTenant,
+} from '@luma/identity';
 
 import {
   type CodeActivityResult,
@@ -369,13 +373,10 @@ export function createDraftTests(deps: {
   const clockStart = deps.clockStart ?? '2026-01-01T00:00:00.000Z';
   let active = 0;
 
-  async function authorize(context: TenantContext, write = false) {
+  async function authorize(context: TenantContext, permission: Permission) {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
-    requireRole(
-      fresh,
-      write ? ['owner', 'admin'] : ['owner', 'admin', 'member'],
-    );
+    requirePermission(fresh, permission);
     if (fresh.actor.id !== context.actor.id)
       throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
 
@@ -680,7 +681,7 @@ export function createDraftTests(deps: {
   return {
     /** Lists saved cases and whether each passes on the current draft revision. Members can read. */
     async cases(context: TenantContext, draftId: string) {
-      context = await authorize(context);
+      context = await authorize(context, 'workflows.read');
 
       return summary(context, await open(context, draftId));
     },
@@ -693,7 +694,7 @@ export function createDraftTests(deps: {
       draftId: string,
       input: { revision: number; cases: DraftTestCase[] },
     ) {
-      context = await authorize(context, true);
+      context = await authorize(context, 'workflows.author');
       const draft = await open(context, draftId);
       if (input.cases.length > maxCases)
         conflict(`Save at most ${maxCases} test cases.`);
@@ -731,7 +732,7 @@ export function createDraftTests(deps: {
       draftId: string,
       input: { revision: number },
     ) {
-      context = await authorize(context, true);
+      context = await authorize(context, 'workflows.author');
       const draft = await open(context, draftId);
       if (draft.revision !== input.revision) conflict(reload);
       const saved = await deps.store.cases(context, draftId);
@@ -802,7 +803,7 @@ export function createDraftTests(deps: {
      * workflow this draft edits, and scenarios from installed adapters. Members can read.
      */
     async examples(context: TenantContext, draftId: string) {
-      context = await authorize(context);
+      context = await authorize(context, 'workflows.read');
       const draft = await open(context, draftId);
       const content = draft.content;
       const fields = defaultCase(content, deps.id());
@@ -851,7 +852,7 @@ export function createDraftTests(deps: {
       draftId: string,
       input: StartDraftTest,
     ) {
-      context = await authorize(context, true);
+      context = await authorize(context, 'workflows.author');
       if (!input.caseId === !input.case)
         conflict('Choose a saved test case or supply one.');
       const requestDigest = deps.hash({
@@ -913,11 +914,11 @@ export function createDraftTests(deps: {
     },
     /** Reads a run you started. Runs left running past their deadline read as failed. */
     async get(context: TenantContext, draftId: string, id: string) {
-      return get(await authorize(context), draftId, id);
+      return get(await authorize(context, 'workflows.read'), draftId, id);
     },
     /** Cancels a run you started. Cancelling a finished run returns it unchanged. */
     async cancel(context: TenantContext, draftId: string, id: string) {
-      context = await authorize(context, true);
+      context = await authorize(context, 'workflows.author');
       await get(context, draftId, id);
       await deps.store.cancel(context, draftId, id);
 

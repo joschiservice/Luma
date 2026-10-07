@@ -63,7 +63,7 @@ References: [orders and historical access](https://shopify.dev/docs/api/admin-gr
 
 ## Connect Shopify
 
-Owners and admins choose **Connect Shopify**, name the connection, and enter the
+People with `connections.manage` choose **Connect Shopify**, name the connection, and enter the
 store's permanent `*.myshopify.com` hostname. Shopify asks them to approve read
 access. On return, Luma verifies access and enables the connection. No merchant
 app creation or token entry is required. **Reconnect Shopify** reauthorizes the
@@ -143,7 +143,7 @@ Before public launch:
 
 ### Authorization and recovery guarantees
 
-The start route requires a current owner/admin and trusted request origin. State
+The start route requires current `connections.manage`, the installed app and a trusted request origin. State
 is random, stored as a hash, expires after ten minutes, and is consumed once. It
 binds the current login session, operator, tenant, shop and app environment.
 Callbacks require Shopify's HMAC over the complete decoded, sorted query;

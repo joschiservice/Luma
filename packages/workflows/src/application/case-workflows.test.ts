@@ -1,4 +1,8 @@
-import { IdentityError, makeTenantContext } from '@luma/identity';
+import {
+  builtInMembership,
+  IdentityError,
+  makeTenantContext,
+} from '@luma/identity';
 import { describe, expect, it, vi } from 'vitest';
 
 import type {
@@ -28,7 +32,10 @@ const context = (id: string, role: 'owner' | 'admin' | 'member' = 'admin') =>
       dataRegion: 'EU',
       status: 'active',
     },
-    { id: `membership-${id}`, organizationId: tenantId, userId: id, role },
+    builtInMembership(
+      { id: `membership-${id}`, organizationId: tenantId, userId: id },
+      role,
+    ),
     'request',
   );
 

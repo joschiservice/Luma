@@ -2,7 +2,7 @@ import { initContract } from '@ts-rest/core';
 import { z } from 'zod';
 
 import { caseEvidenceQuerySchema } from '../cases.js';
-import { apiErrorSchema, caseParams } from '../common.js';
+import { apiErrorSchema, caseParams, requires } from '../common.js';
 import {
   caseDecisionSchema,
   caseProgressSchema,
@@ -17,6 +17,7 @@ export const caseDeskContract = c.router(
   {
     review: {
       method: 'GET',
+      metadata: requires('issues.read'),
       path: '/v1/organizations/:organizationId/exceptions/:exceptionId/review',
       pathParams: caseParams,
       responses: { 200: caseReviewSchema },
@@ -26,6 +27,7 @@ export const caseDeskContract = c.router(
     },
     refresh: {
       method: 'POST',
+      metadata: requires('actions.propose'),
       path: '/v1/organizations/:organizationId/exceptions/:exceptionId/review/refresh',
       pathParams: caseParams,
       body: z.object({}).strict(),
@@ -36,6 +38,7 @@ export const caseDeskContract = c.router(
     },
     decide: {
       method: 'POST',
+      metadata: requires(['decisions.respond', 'issues.manage']),
       path: '/v1/organizations/:organizationId/exceptions/:exceptionId/decisions',
       pathParams: caseParams,
       body: caseDecisionSchema,
@@ -46,6 +49,7 @@ export const caseDeskContract = c.router(
     },
     receipt: {
       method: 'GET',
+      metadata: requires('issues.read'),
       path: '/v1/organizations/:organizationId/exceptions/:exceptionId/decisions/:commandId',
       pathParams: caseParams.extend({ commandId: z.string().uuid() }),
       responses: { 200: decisionReceiptSchema },
@@ -55,6 +59,7 @@ export const caseDeskContract = c.router(
     },
     progress: {
       method: 'GET',
+      metadata: requires('issues.read'),
       path: '/v1/organizations/:organizationId/exceptions/:exceptionId/progress',
       pathParams: caseParams,
       responses: { 200: caseProgressSchema },
@@ -64,6 +69,7 @@ export const caseDeskContract = c.router(
     },
     timeline: {
       method: 'GET',
+      metadata: requires('issues.read'),
       path: '/v1/organizations/:organizationId/exceptions/:exceptionId/timeline',
       pathParams: caseParams,
       query: caseEvidenceQuerySchema,

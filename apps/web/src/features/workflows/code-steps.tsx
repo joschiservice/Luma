@@ -27,6 +27,7 @@ import { Braces, Check, Copy, Play, ShieldCheck, Square } from 'lucide-react';
 import { useId, useState } from 'react';
 
 import { IdentityError } from '../identity/data';
+import { useCan } from '../identity/permissions';
 import {
   cancelCodeEvaluation,
   codeEvaluationOptions,
@@ -69,15 +70,15 @@ export function WorkflowCodeSteps({
   version,
   organizationId,
   definitionId,
-  canManage,
   accessLost,
 }: {
   version: WorkflowVersionView;
   organizationId: string;
   definitionId: string;
-  canManage: boolean;
   accessLost: () => Promise<void>;
 }) {
+  // Evaluations are draft authoring work, whatever controls the workflow itself.
+  const canManage = useCan(organizationId, 'workflows.author');
   if (version.format !== 'workflow/2' || !version.codeSteps?.length)
     return null;
 
@@ -323,7 +324,10 @@ function CodeStepPanel({
             result. Connected systems are never called.
           </p>
           {!canManage ? (
-            <Alert>Only workspace owners and admins can run evaluations.</Alert>
+            <Alert>
+              Running evaluations requires Author workflows, which your role
+              doesn’t include.
+            </Alert>
           ) : lost ? (
             <Alert tone="danger">
               Access changed. Refresh the workflow to continue.

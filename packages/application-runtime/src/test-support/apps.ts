@@ -12,6 +12,7 @@ import {
   createInstalledShippingMethodEffects as effects,
   createSecretCipher,
 } from '@luma/connections/composition';
+import { requirePermission } from '@luma/identity';
 
 /** Composes real provider contributions against injected fixture transports. */
 export function providers(options: Parameters<typeof createJtlProvider>[0]) {
@@ -78,6 +79,8 @@ export function createInstalledConnections(
         cipher: createSecretCipher(options.activeKeyId, options.keys),
         refreshContext: options.refreshContext,
         verify: options.verify,
+        authorize: async (context) =>
+          requirePermission(context, 'connections.manage'),
       })
     : undefined;
 

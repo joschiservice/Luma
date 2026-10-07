@@ -1,6 +1,9 @@
 import { randomUUID } from 'node:crypto';
 
-import { makeTenantContext } from '@luma/identity/composition';
+import {
+  builtInMembership,
+  makeTenantContext,
+} from '@luma/identity/composition';
 import { createTenantDatabase } from '@luma/platform/composition';
 import { shippingMethodPlaybook } from '@luma/resolution';
 import { resolutionWorkflow } from '@luma/workflows';
@@ -43,12 +46,10 @@ it('publishes native workflows without cases, retains immutable versions and exp
   const context = makeTenantContext(
     { userId: user.userId, sessionId: 'test' },
     { ...org, status: 'active' },
-    {
-      id: membership.id,
-      organizationId: tenantId,
-      userId: user.userId,
-      role: 'owner',
-    },
+    builtInMembership(
+      { id: membership.id, organizationId: tenantId, userId: user.userId },
+      'owner',
+    ),
     'publication',
   );
   const pool = new Pool({ connectionString: db.runtimeUrl });

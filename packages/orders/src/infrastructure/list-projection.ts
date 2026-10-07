@@ -1,5 +1,5 @@
 import type { TenantContext } from '@luma/identity';
-import { requireRole } from '@luma/identity';
+import { requirePermission } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
 
 import { refreshFulfillmentList } from './fulfillment-list.js';
@@ -123,7 +123,7 @@ export function createOrderListRebuilder(db: TenantDatabase) {
     after?: string,
     limit = 500,
   ): Promise<string | null> => {
-    requireRole(context, ['owner', 'admin']);
+    requirePermission(context, 'sync.manage');
     if (!Number.isInteger(limit) || limit < 1 || limit > 2000)
       throw new Error('Batch size must be between 1 and 2000');
 

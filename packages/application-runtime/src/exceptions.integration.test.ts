@@ -26,7 +26,10 @@ import { defaultConfiguration } from '@luma/exceptions';
 import { createCases, parseInput } from '@luma/exceptions/composition';
 import type { IdentityService } from '@luma/identity';
 import { IdentityError } from '@luma/identity';
-import { makeTenantContext } from '@luma/identity/composition';
+import {
+  builtInMembership,
+  makeTenantContext,
+} from '@luma/identity/composition';
 import type { ModelGateway } from '@luma/platform';
 import { createTenantDatabase } from '@luma/platform/composition';
 import { shippingMethodPlaybook } from '@luma/resolution';
@@ -75,12 +78,10 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
         dataRegion: 'EU',
         status: 'active',
       },
-      {
-        id: 'membership',
-        organizationId: id,
-        userId: 'operator',
-        role: 'owner',
-      },
+      builtInMembership(
+        { id: 'membership', organizationId: id, userId: 'operator' },
+        'owner',
+      ),
       randomUUID(),
     );
   }
@@ -372,7 +373,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
         context(),
         action,
         candidate.actionHash,
-        { available: true, minimumRisk: 'high' },
+        { available: true, minimumRisk: 'high', permission: 'actions.execute' },
       );
       await owner.query(
         `INSERT INTO executed_actions(id,tenant_id,proposal_id,idempotency_key,action_hash,state,document) VALUES($1,$2,$3,$4,$5,'unknown',$6)`,
@@ -1616,7 +1617,10 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
         dataRegion: 'EU',
         status: 'active',
       },
-      { id: 'membership', organizationId: tenant, userId: user, role },
+      builtInMembership(
+        { id: 'membership', organizationId: tenant, userId: user },
+        role,
+      ),
       randomUUID(),
     );
   }

@@ -69,7 +69,7 @@ test('reviews replenishment scope, recovers a lost response, approves and opens 
   await dialog.getByText('Will activate', { exact: true }).waitFor();
   await dialog
     .getByText(
-      'A different owner or admin approves every purchase-order draft before Luma acts.',
+      'Someone else who can approve changes approves every purchase-order draft before Luma acts.',
     )
     .waitFor();
   await page.screenshot({

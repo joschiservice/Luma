@@ -1,7 +1,11 @@
 import { initContract } from '@ts-rest/core';
 import { z } from 'zod';
 
-import { apiErrorSchema, organizationParamsSchema } from '../common.js';
+import {
+  apiErrorSchema,
+  organizationParamsSchema,
+  requires,
+} from '../common.js';
 import {
   returnDetailSchema,
   returnListSchema,
@@ -13,6 +17,7 @@ const c = initContract();
 export const returnsContract = c.router({
   list: {
     method: 'GET',
+    metadata: requires('returns.read'),
     path: '/v1/organizations/:organizationId/returns',
     pathParams: organizationParamsSchema,
     query: returnQuerySchema,
@@ -29,6 +34,7 @@ export const returnsContract = c.router({
   },
   get: {
     method: 'GET',
+    metadata: requires('returns.read'),
     path: '/v1/organizations/:organizationId/returns/:returnId',
     pathParams: organizationParamsSchema.extend({
       returnId: z.string().uuid(),

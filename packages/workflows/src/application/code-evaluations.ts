@@ -1,5 +1,9 @@
 import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireRole, requireTenant } from '@luma/identity';
+import {
+  IdentityError,
+  requirePermission,
+  requireTenant,
+} from '@luma/identity';
 
 import type {
   CodeEvaluation,
@@ -51,7 +55,7 @@ export function createCodeEvaluations(deps: {
   async function authorize(context: TenantContext) {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
-    requireRole(fresh, ['owner', 'admin']);
+    requirePermission(fresh, 'workflows.author');
     if (fresh.actor.id !== context.actor.id)
       throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
 

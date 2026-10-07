@@ -32,7 +32,7 @@ const readiness = (
   approval: {
     mode: 'every_action',
     summary:
-      'A different owner or admin approves every change before Luma sends it.',
+      'Someone else who can approve changes approves every change before Luma sends it.',
     details: [
       'Changes are medium risk or higher, so workspace policy always requires approval.',
     ],
@@ -41,7 +41,7 @@ const readiness = (
   outcomes: null,
   nextAction: {
     label: 'Turn on',
-    description: 'Nothing runs until an owner or admin turns it on.',
+    description: 'Nothing runs until someone whose role allows it turns it on.',
     repair: { label: 'Turn on', destination: 'workflow_rules' },
   },
   ...overrides,
@@ -130,7 +130,7 @@ const detail = (
       finalOutcome: 'Shopify shows the ERP quantity, confirmed by a fresh read',
       systems: [],
       approval:
-        'Each change waits for policy approval by a different owner or admin.',
+        'Each change waits for policy approval by someone else who can approve changes.',
       permissions: ['inventory.available.reconcile'],
       provenance: {
         kind: 'native',
@@ -232,7 +232,7 @@ export const Member: Story = {
     const canvas = within(canvasElement);
     await expect(
       await canvas.findByText(
-        'Only workspace owners and admins can turn this workflow on or off.',
+        'Your role doesn’t include Publish and enable workflows, so you can’t turn this workflow on or off.',
       ),
     ).toBeVisible();
   },

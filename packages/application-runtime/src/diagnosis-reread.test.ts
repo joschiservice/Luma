@@ -5,7 +5,10 @@ import type {
 } from '@luma/connections';
 import type { DiagnosisInput } from '@luma/exceptions';
 import { defaultConfiguration } from '@luma/exceptions';
-import { makeTenantContext } from '@luma/identity/composition';
+import {
+  builtInMembership,
+  makeTenantContext,
+} from '@luma/identity/composition';
 import { createDiagnosisRereader } from '@luma/resolution';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -18,7 +21,10 @@ const context = makeTenantContext(
     dataRegion: 'EU',
     status: 'active',
   },
-  { id: 'member', organizationId: 'tenant', userId: 'operator', role: 'owner' },
+  builtInMembership(
+    { id: 'member', organizationId: 'tenant', userId: 'operator' },
+    'owner',
+  ),
   'request',
 );
 

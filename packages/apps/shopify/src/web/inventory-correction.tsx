@@ -229,7 +229,7 @@ export function ShopifyInventoryCorrection({
       <CardContent className="shopify-stock-content">
         <p className="field-help">
           ERP → Shopify · Available stock only · ERP stock stays authoritative.
-          A different administrator must approve each correction.
+          Someone else who can approve changes must approve each correction.
         </p>
         {error ? (
           <Alert tone="danger" role="alert">

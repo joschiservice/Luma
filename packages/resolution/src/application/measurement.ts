@@ -1,5 +1,9 @@
 import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireRole, requireTenant } from '@luma/identity';
+import {
+  IdentityError,
+  requirePermission,
+  requireTenant,
+} from '@luma/identity';
 import type { OperationalMetricRead } from '@luma/platform';
 
 import type {
@@ -37,13 +41,13 @@ export interface MeasurementStore {
 }
 
 export interface MeasurementService {
-  /** Records an assessment with fresh owner/admin authorization; conflicting revisions return 409. */
+  /** Records an assessment after a fresh `issues.manage` check; conflicting revisions return 409. */
   append(
     context: TenantContext,
     incidentId: string,
     input: unknown,
   ): Promise<MeasurementEvent>;
-  /** Reads the evidence ledger for authorized workspace members. */
+  /** Reads the evidence ledger; requires `issues.read`. */
   history(
     context: TenantContext,
     incidentId: string,
@@ -70,7 +74,7 @@ export function createMeasurementService(deps: {
     requireTenant(fresh, context.tenantId);
     if (fresh.actor.id !== context.actor.id)
       throw new IdentityError(403, 'FORBIDDEN', 'Actor changed');
-    if (write) requireRole(fresh, ['owner', 'admin']);
+    requirePermission(fresh, write ? 'issues.manage' : 'issues.read');
 
     return fresh;
   }

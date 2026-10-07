@@ -22,7 +22,7 @@ const connectionId = '33333333-3333-4333-8333-333333333333';
 const approval: WorkflowReadiness['approval'] = {
   mode: 'every_action',
   summary:
-    'A different owner or admin approves every shipping-method correction before Luma acts.',
+    'Someone else who can approve changes approves every shipping-method correction before Luma acts.',
   details: [
     'This action is medium risk or higher, so workspace policy always requires approval.',
     'The person who started a run can’t approve it. Approval doesn’t extend expired evidence.',
@@ -56,7 +56,7 @@ const readiness = (
   nextAction: {
     label: 'Review activation',
     description:
-      'Nothing runs until an owner or admin reviews the exact scope and turns it on.',
+      'Nothing runs until someone reviews the exact scope and turns it on.',
     repair: { label: 'Review activation', destination: 'workflow_rules' },
   },
   ...overrides,
@@ -158,7 +158,8 @@ const detail: WorkflowDetail = {
         onUnverified: 'escalate',
       },
       systems: summary.systems,
-      approval: 'An independent administrator must approve each change.',
+      approval:
+        'Someone else who can approve changes must approve each change.',
       permissions: ['orders.read', 'orders.shipping-method.write'],
       provenance: {
         kind: 'pilot',
@@ -188,7 +189,7 @@ const detail: WorkflowDetail = {
           id: 'approval',
           title: 'Obtain approval',
           description:
-            'An independent owner or administrator must approve each change.',
+            'Someone else who can approve changes must approve each change.',
           details: [],
         },
         {

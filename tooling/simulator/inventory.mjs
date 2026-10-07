@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 
 import { defaultConfiguration } from '@luma/exceptions';
-import { requireRole, requireTenant } from '@luma/identity';
+import { requirePermission, requireTenant } from '@luma/identity';
 import { createInventoryMonitor } from '@luma/resolution';
 
 const ref = (externalId, scopeKey = '') => ({ externalId, scopeKey });
@@ -145,7 +145,7 @@ export async function createInventoryScenario({
 
   function check(context, detection) {
     requireTenant(context, manifest.organizationId);
-    requireRole(context, ['owner', 'admin']);
+    requirePermission(context, 'issues.manage');
     // Every manual request gets a fresh pass after earlier background work finishes.
     const work = queue.then(async () => {
       try {

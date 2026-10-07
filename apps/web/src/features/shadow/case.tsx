@@ -10,6 +10,7 @@ import { Link } from '@tanstack/react-router';
 import { useId, useRef, useState } from 'react';
 
 import { contextOptions, IdentityError } from '../identity/data';
+import { useCan } from '../identity/permissions';
 import { resolutionWorkflowsOptions } from '../workflows/data';
 import {
   evaluateShadow,
@@ -36,9 +37,7 @@ export function CaseShadow({
   embedded?: boolean;
 }) {
   const context = useQuery(contextOptions(organizationId));
-  const canManage =
-    !context.error &&
-    ['owner', 'admin'].includes(context.data?.actor.role ?? '');
+  const canManage = useCan(organizationId, 'playbooks.activate');
 
   return (
     <Card
@@ -59,7 +58,7 @@ export function CaseShadow({
         <p>
           {context.error
             ? shadowError(context.error)
-            : 'Workspace owners and admins can evaluate and review Shadow predictions.'}
+            : 'Your role doesn’t include Activate playbooks, so you can’t evaluate or review Shadow predictions.'}
         </p>
       ) : (
         <ShadowCaseControls

@@ -4,7 +4,7 @@ import type { ConnectionMetricItem, CoverageReader } from '@luma/connections';
 import { summarizeConnectionMetrics } from '@luma/connections';
 import type { CaseMetricItem } from '@luma/exceptions';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireTenant } from '@luma/identity';
+import { hasPermission, IdentityError, requireTenant } from '@luma/identity';
 import type { OperationalMetricRead, TenantDatabase } from '@luma/platform';
 import type {
   PurchaseOrderMetricItem,
@@ -12,10 +12,12 @@ import type {
 } from '@luma/procurement';
 import type { ResolutionMetricReader } from '@luma/resolution';
 
-import type {
-  OperationalCohortItem,
-  OperationalSummary,
-  OperationalSummaryRequest,
+import {
+  metricFamilyPermissions,
+  type OperationalCohortItem,
+  operationalMetricDefinitions,
+  type OperationalSummary,
+  type OperationalSummaryRequest,
 } from '../application/operational-summary.js';
 import { operationalMetricRequestSchema } from './operational-metric-validation.js';
 
@@ -39,6 +41,31 @@ interface Readers {
     | OperationalMetricRead<StockMetricItem>[]
   >;
   coverage(db: TenantDatabase): CoverageReader;
+}
+
+/** Presents a metric the reader may not read: unavailable, without value or records. */
+function withheldMetric(
+  id: string,
+): OperationalMetricRead<OperationalCohortItem> {
+  const definition = operationalMetricDefinitions.find((d) => d.id === id)!;
+
+  return {
+    definition,
+    value: null,
+    total: null,
+    observedCount: 0,
+    unknownCount: 0,
+    population: 0,
+    coverage: 'unavailable',
+    coverageExplanation:
+      'Your role doesn’t include access to this area. Ask a workspace admin for access.',
+    freshness: 'unobserved',
+    observedAt: null,
+    dataThrough: null,
+    nextRefreshAt: null,
+    breakdown: [],
+    items: [],
+  };
 }
 
 /** Composes only requested domain families in a repeatable-read transaction with revision-checked pagination. */
@@ -73,8 +100,17 @@ export function createOperationalSummary(
             return operation(tx);
           },
         };
-        const results: OperationalMetricRead<OperationalCohortItem>[] = [];
-        const families = new Set(request.metrics.map((id) => id.split('.')[0]));
+        const hidden = request.metrics.filter((id) => {
+          const permission = metricFamilyPermissions[id.split('.')[0]!];
+
+          return !!permission && !hasPermission(context, permission);
+        });
+        const results = hidden.map(withheldMetric);
+        const families = new Set(
+          request.metrics
+            .filter((id) => !hidden.includes(id))
+            .map((id) => id.split('.')[0]),
+        );
         if (families.has('resolution')) {
           if (!readers.resolution)
             throw new IdentityError(
@@ -161,6 +197,7 @@ export function createOperationalSummary(
           nextRefreshAt: boundaries[0] ?? null,
           limit: request.limit,
           offset: request.offset,
+          hidden,
           metrics: metrics.map((metric) => ({
             ...metric,
             items: metric.items

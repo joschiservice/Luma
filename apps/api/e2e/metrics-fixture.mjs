@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { createCommerceServices } from '@luma/application-runtime';
-import { makeTenantContext } from '@luma/identity';
+import { builtInMembership, makeTenantContext } from '@luma/identity';
 
 /** Seeds mapped order observations through the commerce services for metric browser coverage. */
 export async function seedMetricOrders(t, f) {
@@ -9,12 +9,10 @@ export async function seedMetricOrders(t, f) {
   const context = makeTenantContext(
     { userId: f.owner.id, sessionId: 'fixture' },
     { ...f.org, status: 'active', dataRegion: 'EU' },
-    {
-      id: randomUUID(),
-      organizationId: f.org.id,
-      userId: f.owner.id,
-      role: 'owner',
-    },
+    builtInMembership(
+      { id: randomUUID(), organizationId: f.org.id, userId: f.owner.id },
+      'owner',
+    ),
     randomUUID(),
   );
   await f.db.owner.query(
