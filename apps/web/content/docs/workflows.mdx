@@ -25,7 +25,7 @@ A workflow has four parts:
 
 - **Overview** shows when it starts, what success means and its readiness: the next action, anything blocking it, what it covers, who approves its actions, what waits for a person and what recent runs verified. **How it works** lists the steps in plain language.
 - **Activity** shows every run with its decisions, actions and result checks. An accepted action isn't success on its own; only a passed result check confirms it.
-- **Rules** is where you turn the workflow on, if your role allows it: stock rules for replenishment (**Manage procurement**), or an activation that names the exact orders a correction may change (**Activate playbooks**).
+- **Rules** is where you turn the workflow on, if your role allows it: stock rules for replenishment (**Manage procurement**), an activation that names the exact orders a correction may change (**Activate playbooks**), or **Turn on** for a workflow that starts from detected issues (**Publish and enable workflows**).
 - **Technical details** keeps capability identifiers, permissions, inputs, version history and digests for inspection.
 
 Coverage that Luma can't establish shows as **Unknown**, never as zero.
@@ -43,6 +43,20 @@ Open **Replenish low stock** and choose **Add stock rules**, or start from **Pro
 3. Activate. Each position gets its own rule and its own result. A rule that couldn't be confirmed can be retried; retrying never creates a second rule.
 
 A stock position's page shows the same readiness as the workflow, including a waiting decision and the latest purchase order.
+
+## Workflows that start from issues
+
+Some workflows start on their own when Luma detects an issue:
+
+- **Correct Shopify stock from the ERP** starts when Shopify and your ERP disagree on linked stock. It proposes setting Shopify to the ERP quantity and confirms it with a fresh Shopify read. It never changes ERP stock.
+- **Release an overdue fulfillment hold** starts when a Shopify order stays on a fraud-review or manual hold for too long. It proposes releasing that hold and confirms in Shopify that it's gone. Payment, address and stock holds go to a person, because their cause has to be fixed first.
+- **Check a failing connection** starts when a connection's reads keep failing. Lost access goes to a person straight away. Otherwise it waits 15 minutes, checks again, and hands the issue over only if reads still fail. It changes nothing.
+
+Someone whose role includes **Publish and enable workflows** turns each one on under **Rules**. Runs act as that person, but every change still waits in [Needs you](/docs/needs-you) for someone else who can approve changes to approve. A proposal stays open for four hours. Right before acting, Luma reads stock again: if the change is still the same, it runs; if it would differ, Luma prepares one new proposal in the same Needs you item. A rejected change, a change Luma can't make safely, or an unclear result hands the issue to a person; nothing is retried behind your back.
+
+A workflow never closes an issue. Luma closes it only after its own check confirms the problem is gone. Releasing a hold, for example, doesn't ship the order, so the issue stays open until the warehouse makes progress.
+
+Turning a workflow off stops new runs. A change that's waiting for approval is then never sent.
 
 ## Start something new
 

@@ -634,7 +634,8 @@ li.workflow-row {
   background: var(--surface-sunken);
 }
 
-.workflow-process-status {
+.workflow-process-status,
+.workflow-case-status {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -901,4 +902,11 @@ li.workflow-row {
   display: inline-block;
   margin-top: 2px;
   color: var(--foreground-subtle);
+}
+
+.workflow-case-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 4px 0;
 }

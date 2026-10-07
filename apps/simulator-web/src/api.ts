@@ -10,6 +10,7 @@ import type {
   RecordKindCount,
   RecordPage,
   RunDetail,
+  RunScenario,
   RunSummary,
   Scorecard,
   SkuComparison,
@@ -171,6 +172,8 @@ export function createSimulatorApi(
     incidents: (id: string) => request<IncidentView[]>(`${run(id)}/incidents`),
     injectIncident: (id: string, body: InjectIncident) =>
       request<IncidentView>(`${run(id)}/incidents`, { body }),
+    runScenario: (id: string, body: RunScenario) =>
+      request<IncidentView[]>(`${run(id)}/scenarios`, { body }),
     recoverIncident: (id: string, incident: string) =>
       request<IncidentView>(
         `${run(id)}/incidents/${segment(incident)}/recover`,

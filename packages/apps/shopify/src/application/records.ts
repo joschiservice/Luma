@@ -1,4 +1,7 @@
-import type { InstallationService } from '@luma/connections';
+import type {
+  InstallationService,
+  InstalledConnection,
+} from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
 import { IdentityError } from '@luma/identity';
 
@@ -26,6 +29,8 @@ export function createRecordService(options: {
   reader(options: {
     tenantId: string;
     connectionId: string;
+    /** The authorized connection, so composition can route simulated ones to the simulator. */
+    connection: InstalledConnection;
     shop: string;
     protectedCustomerDataApproved: boolean;
     /** Enable only when Shopify approves name, email and phone access for this deployment. */
@@ -76,6 +81,7 @@ export function createRecordService(options: {
     const reader = options.reader({
       tenantId: context.tenantId,
       connectionId,
+      connection: current.connection,
       shop,
       protectedCustomerDataApproved: options.protectedCustomerDataApproved,
       protectedCustomerContactApproved:

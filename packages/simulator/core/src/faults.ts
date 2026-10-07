@@ -31,6 +31,8 @@ export interface FaultRule {
   /** Simulation time after which the rule no longer applies. */
   expiresAt?: number | undefined;
   status: 'armed' | 'triggered' | 'expired' | 'disabled';
+  /** The scenario request that armed the rule, so repeating the request arms it once. */
+  origin?: string | undefined;
 }
 
 /** Response loss happens after a write commits; every other manual fault replaces the response. */

@@ -75,6 +75,8 @@ export interface RecoveryDependencies {
   bind(context: TenantContext, run: RecoveryRun): Promise<void>;
   hash(action: ProposedAction): string;
   now(): Date;
+  /** How long a person has to decide on a preview. Defaults to four hours. */
+  decisionWindowMs?: number;
 }
 
 /** Offers source-bound previews and reference-only execution, preserving the shared approval and reconciliation controls. */
@@ -183,6 +185,18 @@ export function createFulfillmentRecovery(deps: RecoveryDependencies) {
       decisionId: run.decisionId,
       state,
       approved: decision?.approval?.outcome === 'approved',
+      denial:
+        state !== 'denied'
+          ? null
+          : withheld
+            ? 'withheld'
+            : rejected
+              ? 'rejected'
+              : policyChanged || decision?.outcome === 'denied'
+                ? 'policy'
+                : changed
+                  ? 'changed'
+                  : 'expired',
       acceptance: accepted
         ? 'accepted'
         : record && !withheld
@@ -211,6 +225,19 @@ export function createFulfillmentRecovery(deps: RecoveryDependencies) {
   }
 
   return {
+    /**
+     * Reads a saved preview's current state, rereading Shopify while it can still run. Returns
+     * null when the tenant has no preview with this ID. Changes nothing except releasing a
+     * settled target lock.
+     */
+    async status(context: TenantContext, id: string) {
+      context = await authorize(context);
+      const run = await deps.store.get(context, id);
+      if (!run) return null;
+      await deps.authorize(context, run.target.connectionId);
+
+      return view(context, run);
+    },
     async inspect(context: TenantContext, input: unknown) {
       context = await authorize(context);
       const target = recoveryTarget.parse(input);
@@ -264,8 +291,9 @@ export function createFulfillmentRecovery(deps: RecoveryDependencies) {
       const before = await deps.read(context, target);
       const blocker = recoveryBlocker(before, choice, granted);
       if (blocker) throw new IdentityError(409, 'CONFLICT', blocker);
+      // People get a decision window; Shopify is reread and the revision checked before sending.
       const expiresAt = new Date(
-        deps.now().getTime() + 10 * 60_000,
+        deps.now().getTime() + (deps.decisionWindowMs ?? 4 * 60 * 60_000),
       ).toISOString();
       const action: ProposedAction = {
         schemaVersion: 1,

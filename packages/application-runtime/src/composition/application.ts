@@ -17,7 +17,7 @@ import {
   orderAttentionForOrders,
   orderAttentionQuery,
 } from '@luma/exceptions/composition';
-import type { IdentityService } from '@luma/identity';
+import type { IdentityService, TenantContext } from '@luma/identity';
 import {
   createOrderMetricReader,
   orderStateQueries,
@@ -66,6 +66,7 @@ import {
   createShadowEvaluations,
   createWorkspaceActivity,
 } from '@luma/resolution/composition';
+import type { CaseWorkflowAdapter } from '@luma/workflows';
 import {
   compilePlaybook,
   createCodeProcesses,
@@ -77,6 +78,7 @@ import {
 } from '@luma/workflows/composition';
 
 import { createAdmissionEligibility } from './admission.js';
+import { createCaseWorkflowServices } from './case-workflows.js';
 import { createPersistentPlaybookLibrary } from './playbook-library.js';
 import { createProcurementEffects } from './procurement-effects.js';
 import {
@@ -118,6 +120,7 @@ export interface ApplicationServices {
   generation: ReturnType<typeof createDraftGenerations>;
   templates: ReturnType<typeof createWorkflowTemplates>;
   replenishment: ReturnType<typeof createReplenishmentRuntime>;
+  caseWorkflows: ReturnType<typeof createCaseWorkflowServices>;
   codeProcesses: ReturnType<typeof createCodeProcesses>;
   procurement: ReturnType<typeof createProcurement>;
   commitments: SupplierCommitments;
@@ -167,6 +170,13 @@ export interface ApplicationOptions {
   authoring?: { available: boolean; reason: string | null };
   /** Installed-app decision sources, such as `registry.decisionSources()`, for Needs you. */
   decisionSources?: Parameters<typeof appDecisionProvider>[0][];
+  /** Installed-app case workflows, such as `registry.workflowSources()`. */
+  workflowSources?: CaseWorkflowAdapter[];
+  /**
+   * Rereads a stock position's stale sources through installed capabilities, so owners act on
+   * current stock. See `createStockRefreshService`.
+   */
+  refreshStock?: (context: TenantContext, positionId: string) => Promise<void>;
   /** Installed purchasing-system connections. Without them, orders cannot be sent from Luma. */
   purchasing?: {
     runtime: InstalledPurchaseOrderRuntime;
@@ -286,12 +296,24 @@ export function createApplicationServices(
     ...(options.replenishmentTransport
       ? { transport: options.replenishmentTransport }
       : {}),
+    ...(options.refreshStock ? { refreshStock: options.refreshStock } : {}),
   });
   const codeProcesses = createCodeProcesses(
     database,
     identity,
     options.replenishmentTransport,
   );
+  const caseWorkflows = createCaseWorkflowServices({
+    database,
+    identity,
+    exceptions: detection.exceptions,
+    policies: safety.policies,
+    ...(options.workflowSources ? { sources: options.workflowSources } : {}),
+    ...(options.replenishmentTransport
+      ? { transport: options.replenishmentTransport }
+      : {}),
+    enabled: options.execution.kind === 'enabled',
+  });
 
   const playbooks = createResolutionPlaybooks(database, identity, safety);
   const templateSources = [
@@ -304,6 +326,7 @@ export function createApplicationServices(
         await playbooks.publish(context, shippingMethodPlaybook);
       },
     }),
+    ...caseWorkflows.templates,
   ];
   const templates = createWorkflowTemplates({
     sources: templateSources,
@@ -320,6 +343,7 @@ export function createApplicationServices(
     builtIn: [
       replenishment.version.definition.id,
       shippingMethodPlaybook.definition.id,
+      ...caseWorkflows.templates.map((item) => item.id),
     ],
     templates: templateSources,
   });
@@ -345,6 +369,7 @@ export function createApplicationServices(
     replenishment.api,
     codeProcesses,
     drafts.blockers,
+    caseWorkflows,
   );
   const decisions = createDecisionQueue(database, {
     cases: caseDecisionQuery,
@@ -439,6 +464,7 @@ export function createApplicationServices(
   return {
     codeProcesses,
     replenishment,
+    caseWorkflows,
     workflows,
     drafts,
     draftTests,

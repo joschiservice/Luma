@@ -18,6 +18,7 @@
   "dependencies": {
     "@luma/connections": "workspace:*",
     "@luma/identity": "workspace:*",
+    "@luma/workflows": "workspace:*",
     "@luma/platform": "workspace:*",
     "zod": "catalog:zod3",
     "@luma/connector-shopify": "workspace:*",

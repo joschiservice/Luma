@@ -106,6 +106,17 @@ const groupLabels: Record<
   },
 };
 
+/**
+ * A decision about a target keeps one ID while it waits for approval or a run, so a refreshed
+ * proposal updates the same item. Checks of sent changes stay separate per attempt.
+ */
+const decisionId = (
+  kind: AppDecision['kind'],
+  reason: AppDecision['reason'],
+  target: string,
+  attempt: string,
+) => `shopify:${kind}:${reason === 'recovery' ? attempt : target}`;
+
 const group = (kind: AppDecision['kind'], reason: AppDecision['reason']) => ({
   key: `shopify:${kind}:${reason}`,
   label: groupLabels[kind][reason],
@@ -140,7 +151,12 @@ export function recoveryDecision(
         : `Reopen fulfillment at ${before.locationName}`;
 
   return {
-    id: `shopify:fulfillment_recovery:${view.id}`,
+    id: decisionId(
+      'fulfillment_recovery',
+      state.reason,
+      `${target.connectionId}:${tail(target.fulfillmentOrderId)}`,
+      view.id,
+    ),
     kind: 'fulfillment_recovery',
     domain: 'fulfillment',
     title,
@@ -209,7 +225,12 @@ export function correctionDecision(
   const observed = [before.observedAt, before.source.observedAt].sort()[0]!;
 
   return {
-    id: `shopify:inventory_correction:${view.id}`,
+    id: decisionId(
+      'inventory_correction',
+      state.reason,
+      `${target.positionId}:${target.connectionId}`,
+      view.id,
+    ),
     kind: 'inventory_correction',
     domain: 'inventory',
     title: `Correct Shopify stock at ${before.locationName}`,

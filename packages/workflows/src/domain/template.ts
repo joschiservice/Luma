@@ -18,7 +18,8 @@ export interface WorkflowTemplate {
   id: string;
   name: string;
   purpose: string;
-  category: 'procurement' | 'resolution' | 'inventory';
+  category:
+    'procurement' | 'resolution' | 'inventory' | 'fulfillment' | 'connections';
   trigger: string;
   steps: string[];
   success: string;
@@ -28,7 +29,7 @@ export interface WorkflowTemplate {
   /** Current activation status of the published definition in this workspace. */
   status: 'active' | 'inactive' | 'revoked' | 'unavailable';
   /** The guided configure flow that activates this template. */
-  configure: 'replenishment' | 'resolution';
+  configure: 'replenishment' | 'resolution' | 'case';
   installed: boolean;
   version: string;
   digest: string;

@@ -37,6 +37,7 @@ import { createPrivacyIntake } from './infrastructure/privacy.js';
 import { createShopifyRecordReader } from './infrastructure/records.js';
 import { createInstallationVerifier } from './infrastructure/verifier.js';
 import { createShopifyInventoryCorrection } from './inventory-correction.js';
+import { createShopifyWorkflows } from './workflows.js';
 
 export {
   createShopifyConnector,
@@ -150,7 +151,15 @@ export function createApp(context: AppFactoryContext): AppDefinition {
   });
   const records = createRecordService({
     installations,
-    reader: createShopifyRecordReader,
+    reader: ({ connection, ...reader }) => {
+      // Simulated connections must reach the simulator, never a live shop.
+      const fetch = simulationTransport(connection, context.simulation);
+
+      return createShopifyRecordReader({
+        ...reader,
+        ...(fetch ? { fetch } : {}),
+      });
+    },
     requireInstalled: (ctx) => context.requireInstalled(ctx, 'shopify'),
     authorize: async (ctx, kind) =>
       context.requirePermission(await context.refreshContext(ctx), {
@@ -165,6 +174,11 @@ export function createApp(context: AppFactoryContext): AppDefinition {
 
   const recovery = createShopifyRecovery(context, installations);
   const corrections = createShopifyInventoryCorrection(context, installations);
+  const workflows = createShopifyWorkflows(context, {
+    installations,
+    recovery,
+    corrections,
+  });
 
   return {
     manifest: {
@@ -248,11 +262,18 @@ export function createApp(context: AppFactoryContext): AppDefinition {
         corrections.pending(tenant),
       ]);
 
-      return [
+      const items = [
         ...recoveries.map((view) => recoveryDecision(view, tenant.actor.id)),
         ...stock.map((view) => correctionDecision(view, tenant.actor.id)),
       ];
+
+      // Owners list newest first, so the current proposal for a target wins its item.
+      return items.filter(
+        (item, index) =>
+          items.findIndex((other) => other.id === item.id) === index,
+      );
     },
+    workflows,
     async uninstalled({ tenantId, transaction }) {
       if (config)
         await transaction.query(

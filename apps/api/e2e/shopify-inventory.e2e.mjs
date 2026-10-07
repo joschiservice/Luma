@@ -51,14 +51,18 @@ test('ERP authority, separate approval, one dispatch, reconciliation and tenant 
   assert.equal(recovered.id, preview.id);
   assert.equal(recovered.state, 'approval_required');
   // Needs you projects the same app-owned decision for each reader.
+  // Waiting decisions keep one ID per target; checks of a sent change use the attempt's ID.
   const decision = async (user) =>
     (await f.request(user, `${f.base}/decisions?domain=inventory`)).items.find(
-      (item) => item.id === `shopify:inventory_correction:${preview.id}`,
+      (item) =>
+        item.id ===
+          `shopify:inventory_correction:${target.positionId}:${target.connectionId}` ||
+        item.id === `shopify:inventory_correction:${preview.id}`,
     );
   const pending = await decision(admin);
   assert.equal(pending.reason, 'approval');
   assert.equal(pending.response, 'decide');
-  assert.equal(pending.urgency, 'expiring');
+  assert.equal(pending.urgency, 'normal');
   assert.deepEqual(pending.owner, {
     kind: 'app_inventory',
     appId: 'shopify',
@@ -158,6 +162,30 @@ test('ERP authority, separate approval, one dispatch, reconciliation and tenant 
   } finally {
     await pool.end();
   }
+});
+
+test('a newer ERP read of the same quantity keeps an approved correction valid', async (t) => {
+  const { f, admin, call, target, mutations, stock } =
+    await correctionFixture(t);
+  const preview = await call(f.owner, 'preview', {
+    ...target,
+    requestId: randomUUID(),
+  });
+  await call(admin, 'approve', { id: preview.id, outcome: 'approved' });
+  // Detection rereads linked stock often; the same authoritative quantity is not a change.
+  await stock.stock({
+    connectionId: stock.erp,
+    external: '77',
+    location: stockLocation,
+    amount: '9',
+  });
+  const executed = await call(f.owner, 'execute', { id: preview.id });
+  assert.equal(executed.acceptance, 'accepted');
+  assert.equal(mutations.length, 1);
+  assert.equal(
+    (await call(f.owner, 'check', { id: preview.id })).state,
+    'verified',
+  );
 });
 
 test('source freshness, ambiguous mappings, source changes and provider CAS stop writes', async (t) => {

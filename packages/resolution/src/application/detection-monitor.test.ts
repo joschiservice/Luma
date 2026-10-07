@@ -153,6 +153,7 @@ function fixture(
     fulfillment: overrides.fulfillment ?? {},
   };
   const sources: DetectionSources = {
+    positionSources: vi.fn(async () => []),
     streams: vi.fn(async () => structuredClone(state.streams)),
     stockPositions: vi.fn<DetectionSources['stockPositions']>(
       async (_context, { include, limit }) =>
@@ -513,6 +514,23 @@ describe('detection monitor', () => {
       eligibility: 'exempt',
     });
     expect(f.exceptions.incidents).toHaveLength(0);
+  });
+
+  it('counts a hold as the cause once the work has not progressed for a day', async () => {
+    const f = fixture({
+      work: [work()],
+      fulfillment: {
+        holds: [{ reason: 'high_risk_of_fraud' }],
+        lastProgressAt: ago(25 * 60),
+      },
+    });
+
+    await f.monitor.tick(context);
+
+    expect(f.exceptions.incidents).toHaveLength(1);
+    expect(f.exceptions.incidents[0]).toMatchObject({
+      exceptionClass: 'stuck_fulfillment',
+    });
   });
 
   it('runs every rule even when one source is unavailable', async () => {

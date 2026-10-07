@@ -249,6 +249,22 @@ export const workflowActivationSchema = playbookActivationSchema;
 
 export { activatePlaybookSchema as activateWorkflowSchema } from './playbooks.js';
 
+/**
+ * Turns on a workflow that starts for new cases, acting as the caller. The caller reviews the
+ * exact version and the approval policy that applies to its changes.
+ */
+export const activateCaseWorkflowSchema = z
+  .object({
+    id: z.string().uuid(),
+    version: text,
+    reviewedDigest: z.string().regex(/^[a-f0-9]{64}$/),
+    policyVersion: text,
+    scopeReviewed: z.literal(true),
+  })
+  .strict();
+
+export type ActivateCaseWorkflow = z.infer<typeof activateCaseWorkflowSchema>;
+
 export type WorkflowSummary = z.infer<typeof workflowSummarySchema>;
 
 export type WorkflowReadiness = z.infer<typeof workflowReadinessSchema>;

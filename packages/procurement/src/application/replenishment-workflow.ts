@@ -145,9 +145,20 @@ export function createReplenishmentService(deps: {
   };
   transport?: ReplenishmentTransport;
   enabled: boolean;
+  /**
+   * Rereads a stock position's stale sources and stores them as current. Without it, proposals
+   * follow the source's sync schedule.
+   */
+  refreshStock?(context: TenantContext, positionId: string): Promise<void>;
+  /** How long a person has to decide on a proposal. Defaults to four hours. */
+  decisionWindowMs?: number;
 }) {
   const { version, store, steps, catalog, runs, effects, audit, triggers } =
     deps;
+  const decisionWindowMs = deps.decisionWindowMs ?? 4 * 60 * 60_000;
+  // When each rule's stock was last reread, so waiting rules stay current without rereading on
+  // every pass.
+  const refreshedAt = new Map<string, number>();
   const definitionId = version.definition.id;
   const available = deps.enabled && !!deps.transport;
 
@@ -172,6 +183,30 @@ export function createReplenishmentService(deps: {
         'SERVICE_UNAVAILABLE',
         'Replenishment execution is unavailable. Check the workflow worker connection.',
       );
+  }
+
+  /**
+   * Rereads a rule's stock when its stored report is older than `maxAgeMs`, at most once per
+   * minute per rule. Failures leave the stored report; freshness checks then decide.
+   */
+  async function refresh(
+    context: TenantContext,
+    rule: ReplenishmentActivation,
+    maxAgeMs: number,
+  ) {
+    if (!deps.refreshStock) return;
+    const current = (await store.stocks(context)).find(
+      (s) =>
+        s.positionId === rule.positionId &&
+        s.connectionId === rule.connectionId,
+    );
+    const age = current
+      ? Date.now() - Date.parse(current.observedAt)
+      : Infinity;
+    const last = refreshedAt.get(rule.id) ?? 0;
+    if (age < maxAgeMs || (maxAgeMs > 0 && Date.now() - last < 60_000)) return;
+    refreshedAt.set(rule.id, Date.now());
+    await deps.refreshStock(context, rule.positionId).catch(() => undefined);
   }
 
   const resolveContext = (run: ProcessRun) =>
@@ -1221,11 +1256,22 @@ export function createReplenishmentService(deps: {
         conflict(
           'This proposal changed, expired, or needs a different approver. Refresh its review.',
         );
+      const binding = await deps.safety.provisioning.step(
+        context,
+        id,
+        'create-order',
+      );
+      // The approval lasts as long as the proposal it answers, never beyond a day.
       await deps.safety.policies.respond(
         context,
         input.decisionId,
         input.outcome,
-        new Date(Date.now() + 300_000).toISOString(),
+        new Date(
+          Math.min(
+            Date.parse(binding!.action.preconditions.validUntil),
+            Date.now() + 86_000_000,
+          ),
+        ).toISOString(),
       );
 
       // Durable process polling observes the committed policy decision even if the API disconnects.
@@ -1258,6 +1304,8 @@ export function createReplenishmentService(deps: {
       rule.positionId !== run.subject.id
     )
       return false;
+    // The approval may be hours old; decide on stock read now.
+    await refresh(context, rule, 0);
     const inventory = await stock(context, rule);
     const current = await plan(context, rule, inventory, step.action.target.id);
     const line = JSON.parse(String(step.action.parameters.lines))[0];
@@ -1351,9 +1399,8 @@ export function createReplenishmentService(deps: {
           'Another replenishment run is already handling this stock position.',
         );
       const id = deps.id(`${run.id}:order`);
-      const validUntil = new Date(
-        Date.parse(run.context.evidence.observations[0]!.observedAt) + 300_000,
-      ).toISOString();
+      // People get a decision window; stock is reread and checked again before the order is created.
+      const validUntil = new Date(Date.now() + decisionWindowMs).toISOString();
       await deps.safety.provisioning.bind(context, {
         runId: run.id,
         stepId: step.id,
@@ -1680,8 +1727,15 @@ export function createReplenishmentService(deps: {
         )
           await deps.transport!.start(context, run, version);
       }
+      const waiting = new Set(
+        existing.map((run) => String(run.context.inputs.activationId)),
+      );
       for (const rule of await store.list(context)) {
         if (!rule.active || rule.principalId !== context.actor.id) continue;
+        // A rule with a run in progress gets no second run; that run rechecks stock itself.
+        if (waiting.has(rule.id)) continue;
+        // Keep watched stock current, so a proposal follows soon after stock falls.
+        await refresh(context, rule, 240_000);
         const inventory = await stock(context, rule);
         const current = await plan(context, rule, inventory);
         if (current.fresh && current.belowMinimum)

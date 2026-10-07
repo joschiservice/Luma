@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import type {
   DetectionSources,
+  PositionSource,
   StockSource,
 } from '../../application/detection-monitor.js';
 
@@ -77,7 +78,57 @@ const readable = (capability: string) => `c.document->>'status'='active'
 
 /** Creates tenant-scoped reads of the stored state that scheduled detection starts from. */
 export function createDetectionSources(db: TenantDatabase): DetectionSources {
+  /** Keeps a source only when it has exactly one SKU and one location mapping. */
+  function exactSource(row: z.infer<typeof positionRow>): StockSource | null {
+    const sku = row.mappings.filter((m) => m.resource === 'sku');
+    const location = row.mappings.filter((m) => m.resource === 'location');
+    if (sku.length !== 1 || location.length !== 1) return null;
+
+    return {
+      connectionId: row.connectionId,
+      provider: row.provider,
+      sku: { externalId: sku[0]!.externalId, scopeKey: sku[0]!.scopeKey },
+      location: {
+        externalId: location[0]!.externalId,
+        scopeKey: location[0]!.scopeKey,
+      },
+      mappedAt: [sku[0]!.createdAt, location[0]!.createdAt].sort().at(-1)!,
+      mappingIds: [sku[0]!.id, location[0]!.id],
+    };
+  }
+
   return {
+    async positionSources(context, positionId) {
+      const rows = await db.transaction(context.tenantId, async (tx) => {
+        const result = await tx.query(
+          `SELECT p.entity_id AS "positionId",p.connection_id AS "connectionId",c.document->>'provider' AS provider,
+            s.document->'data'->>'skuId' AS "skuId",s.document->'data'->>'locationId' AS "locationId",
+            s.observed_at AS "observedAt",
+            COALESCE((SELECT jsonb_agg(jsonb_build_object('id',m.id,'resource',m.resource,'externalId',m.external_id,
+              'scopeKey',m.scope_key,'createdAt',m.created_at) ORDER BY m.id)
+             FROM connector_source_mappings m WHERE m.tenant_id=$1 AND m.connection_id=p.connection_id
+              AND ((m.resource='sku' AND m.canonical_id=(s.document->'data'->>'skuId')::uuid)
+               OR (m.resource='location' AND m.canonical_id=(s.document->'data'->>'locationId')::uuid))),'[]'::jsonb) AS mappings
+          FROM inventory_projections p
+          JOIN inventory_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id
+          JOIN connector_installations c ON c.tenant_id=p.tenant_id AND c.id=p.connection_id
+          WHERE p.tenant_id=$1 AND p.entity_id=$2 AND s.kind='position'
+           AND NOT (s.document->>'deleted')::boolean AND ${readable('inventory.read')}
+          ORDER BY p.connection_id`,
+          [context.tenantId, positionId],
+        );
+
+        return z
+          .array(positionRow.extend({ observedAt: time }))
+          .parse(result.rows);
+      });
+
+      return rows.flatMap((row): PositionSource[] => {
+        const source = exactSource(row);
+
+        return source ? [{ ...source, observedAt: row.observedAt }] : [];
+      });
+    },
     async streams(context) {
       return db.transaction(context.tenantId, async (tx) => {
         const result = await tx.query(
@@ -140,21 +191,9 @@ export function createDetectionSources(db: TenantDatabase): DetectionSources {
         Awaited<ReturnType<DetectionSources['stockPositions']>>[number]
       >();
       for (const row of rows) {
-        const sku = row.mappings.filter((m) => m.resource === 'sku');
-        const location = row.mappings.filter((m) => m.resource === 'location');
         // Only one exact mapping per side identifies the provider record to read.
-        if (sku.length !== 1 || location.length !== 1) continue;
-        const source: StockSource = {
-          connectionId: row.connectionId,
-          provider: row.provider,
-          sku: { externalId: sku[0]!.externalId, scopeKey: sku[0]!.scopeKey },
-          location: {
-            externalId: location[0]!.externalId,
-            scopeKey: location[0]!.scopeKey,
-          },
-          mappedAt: [sku[0]!.createdAt, location[0]!.createdAt].sort().at(-1)!,
-          mappingIds: [sku[0]!.id, location[0]!.id],
-        };
+        const source = exactSource(row);
+        if (!source) continue;
         const position = positions.get(row.positionId) ?? {
           positionId: row.positionId,
           skuId: row.skuId,

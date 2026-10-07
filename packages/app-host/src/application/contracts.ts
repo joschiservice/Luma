@@ -5,6 +5,7 @@ import type {
 } from '@luma/connections';
 import type { IdentityService, TenantContext } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
+import type { CaseWorkflowAdapter } from '@luma/workflows';
 import type { FastifyInstance } from 'fastify';
 
 export type AppSlot =
@@ -61,7 +62,10 @@ export type { WorkspaceApp } from '../domain/installation.js';
  * responses still go through the app's own review, which checks the exact proposal again.
  */
 export interface AppDecision {
-  /** Stable and app-prefixed, such as `shopify:inventory_correction:<id>`. */
+  /**
+   * Stable and app-prefixed, such as `shopify:inventory_correction:<target>`. Keep it while the
+   * same problem waits on a person, so a refreshed proposal updates the item in place.
+   */
   id: string;
   kind: 'fulfillment_recovery' | 'inventory_correction';
   reason: 'approval' | 'run' | 'recovery';
@@ -112,6 +116,11 @@ export interface AppDefinition {
    */
   decisions?(context: TenantContext): Promise<AppDecision[]>;
   /**
+   * Built-in workflows that start for new cases. Each must send changes through the app's
+   * governed proposal, approval, admission and verification path.
+   */
+  workflows?: CaseWorkflowAdapter[];
+  /**
    * Registers app-owned HTTP handlers. Each tenant route declares `config.access`; the host
    * checks installation and that permission before the handler runs.
    */
@@ -160,6 +169,11 @@ export interface AppFactoryContext {
   /** Routes synthetic connections through their trusted simulator binding. */
   simulation?: (connection: InstalledConnection) => typeof fetch | undefined;
   env: Readonly<Record<string, string | undefined>>;
+  /**
+   * Rereads a stock position's stale sources through installed capabilities and stores them as
+   * current, so an app can act on fresh stock. Absent where the host has no capability runtime.
+   */
+  refreshStock?(context: TenantContext, positionId: string): Promise<void>;
 }
 
 /** Builds deployment contributions using explicit host services and environment configuration. */

@@ -12,6 +12,8 @@ export * from './random.js';
 
 export * from './rate-limit.js';
 
+export * from './scenarios.js';
+
 export * from './store.js';
 
 /** One ordered entry in a run's activity journal. */

@@ -198,7 +198,9 @@ The adapter queues when all five query slots are occupied.
 
 Completed exports are streamed as grouped JSONL in chunks of 500 root records.
 Children are joined through `__parentId` before normalizing a complete observation.
-The file is never saved. The ledger and cursor commit together, so replay after a
+Each observation's `observedAt` is the export's `createdAt`, because the file shows
+the shop when the export started, not when Luma reads it; freshness checks then
+treat old exports as old. The file is never saved. The ledger and cursor commit together, so replay after a
 crash recognizes unchanged records. The final root count must match the completed
 export's count. Failed, canceled, expired, malformed or truncated exports never
 complete coverage. Retry transient download failures; use **Re-import history** to

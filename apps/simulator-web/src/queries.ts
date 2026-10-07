@@ -3,6 +3,7 @@ import type {
   CreateRun,
   InjectIncident,
   RunDetail,
+  RunScenario,
 } from '@luma/simulator-contract';
 import {
   keepPreviousData,
@@ -281,6 +282,21 @@ export function useInjectIncident(id: string) {
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: keys.incidents(id) });
       void client.invalidateQueries({ queryKey: keys.scorecard(id) });
+    },
+  });
+}
+
+/** Starts a workflow scenario; the same request ID never starts it twice. */
+export function useRunScenario(id: string) {
+  const api = useApi();
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: (body: RunScenario) => api.runScenario(id, body),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: keys.incidents(id) });
+      void client.invalidateQueries({ queryKey: keys.scorecard(id) });
+      void client.invalidateQueries({ queryKey: keys.run(id) });
     },
   });
 }

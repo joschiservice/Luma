@@ -14,6 +14,7 @@ import { useState } from 'react';
 
 import { contextOptions } from '../../identity/data';
 import { ActivationForm } from '../activation';
+import { CaseActivationForm } from '../case';
 import {
   replenishmentOptions,
   workflowError,
@@ -108,7 +109,14 @@ export function UseTemplateDialog({
             </div>
           </>
         ) : stage === 'configure' ? (
-          template.configure === 'replenishment' ? (
+          template.configure === 'case' ? (
+            <CaseStep
+              organizationId={organizationId}
+              template={template}
+              cancel={close}
+              done={() => setStage('done')}
+            />
+          ) : template.configure === 'replenishment' ? (
             <ReplenishmentStep
               organizationId={organizationId}
               template={template}
@@ -199,6 +207,40 @@ function ReplenishmentStep({
         });
         done();
       }}
+    />
+  );
+}
+
+function CaseStep({
+  organizationId,
+  template,
+  cancel,
+  done,
+}: {
+  organizationId: string;
+  template: WorkflowTemplate;
+  cancel(): void;
+  done(): void;
+}) {
+  const detail = useQuery(workflowOptions(organizationId, template.id));
+
+  if (detail.error)
+    return (
+      <Alert tone="danger" role="alert">
+        <span>{workflowError(detail.error)}</span>
+        <Button variant="outline" onClick={() => void detail.refetch()}>
+          Retry
+        </Button>
+      </Alert>
+    );
+  if (!detail.data) return <p role="status">Loading the workflow…</p>;
+
+  return (
+    <CaseActivationForm
+      organizationId={organizationId}
+      detail={detail.data}
+      cancel={cancel}
+      done={async () => done()}
     />
   );
 }

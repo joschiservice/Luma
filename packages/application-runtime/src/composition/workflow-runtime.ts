@@ -1,6 +1,8 @@
 import { setTimeout as delay } from 'node:timers/promises';
 
-import type { WorkflowConfig } from '@luma/config';
+import { createAppHost } from '@luma/app-catalog';
+import type { ConnectionsConfig, WorkflowConfig } from '@luma/config';
+import { createInstalledRuntime } from '@luma/connections/composition';
 import type { Diagnosis } from '@luma/exceptions';
 import type { IdentityService, TenantContext } from '@luma/identity';
 import { createIdentity } from '@luma/identity/composition';
@@ -23,6 +25,7 @@ import {
 import { Pool } from 'pg';
 
 import { createApplicationServices } from './application.js';
+import { createStockRefreshService } from './detection-worker.js';
 import { createReplenishmentWorker } from './replenishment-worker.js';
 import { createResourceScope } from './resources.js';
 import { createDetectionServices, createSafetyServices } from './services.js';
@@ -183,10 +186,15 @@ export function createExceptionWorkflowRuntime(
   };
 }
 
-/** Start a worker for persisted incidents and diagnoses. */
+/**
+ * Start a worker for persisted incidents, diagnoses and process workflows. With `connections`,
+ * installed apps contribute their case workflows; without it, only Luma's own run.
+ */
 export async function createDefaultExceptionWorker(
   identitySettings: Parameters<typeof createIdentity>[0],
   settings: WorkflowConfig & { temporal: TemporalSettings },
+  connections?: ConnectionsConfig,
+  env?: Readonly<Record<string, string | undefined>>,
 ) {
   const resources = createResourceScope();
   try {
@@ -202,13 +210,49 @@ export async function createDefaultExceptionWorker(
       identity.service,
     );
     resources.add(processClient.close);
-    const { detection, safety, desk, http, replenishment, codeProcesses } =
-      createApplicationServices({
-        database: createTenantDatabase(pool),
-        identity: identity.service,
-        execution: { kind: 'enabled', effects: { resolve: async () => null } },
-        replenishmentTransport: processClient,
+    const database = createTenantDatabase(pool);
+    // Owners reread stale stock right before they act; the reread needs the host's providers.
+    let stockRefresh: ReturnType<typeof createStockRefreshService> | undefined;
+    const refreshStock = async (context: TenantContext, positionId: string) =>
+      stockRefresh?.refresh(context, positionId);
+    const host = connections
+      ? createAppHost(database, {
+          ...connections,
+          refreshContext: identity.service.refreshContext,
+          refreshStock,
+          ...(env ? { env } : {}),
+        })
+      : undefined;
+    if (host) {
+      stockRefresh = createStockRefreshService({
+        database,
+        capabilities: createInstalledRuntime({
+          installations: host.connections,
+          providers: host.registry.providers(),
+          // Owners record the reads they use as evidence; telemetry has no sink here.
+          record: async () => undefined,
+          recordObservations: async () => undefined,
+        }),
       });
+      resources.add(stockRefresh.close);
+    }
+    const {
+      detection,
+      safety,
+      desk,
+      http,
+      replenishment,
+      codeProcesses,
+      caseWorkflows,
+    } = createApplicationServices({
+      database,
+      identity: identity.service,
+      execution: { kind: 'enabled', effects: { resolve: async () => null } },
+      replenishmentTransport: processClient,
+      ...(host
+        ? { workflowSources: host.registry.workflowSources(), refreshStock }
+        : {}),
+    });
     const runtime = createExceptionWorkflowRuntime(
       settings.temporal,
       identity.service,
@@ -242,6 +286,7 @@ export async function createDefaultExceptionWorker(
       pool,
       identity.service,
       codeProcesses,
+      caseWorkflows,
     );
     resources.add(procurementWorker.close);
 

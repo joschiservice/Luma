@@ -8,8 +8,9 @@ import type { ConnectionManagement } from '@luma/connections';
 import {
   createInstallationRepository,
   createInstalledPurchaseOrderRuntime,
+  createInstalledRuntime,
 } from '@luma/connections/composition';
-import type { IdentityService } from '@luma/identity';
+import type { IdentityService, TenantContext } from '@luma/identity';
 import { createIdentity } from '@luma/identity/composition';
 import { registerIdentityHttp } from '@luma/identity/http';
 import type { Observability } from '@luma/platform';
@@ -32,6 +33,7 @@ import {
   supplierExtractionAvailability,
 } from './authoring.js';
 import { createCommerceSyncService } from './commerce-sync.js';
+import { createStockRefreshService } from './detection-worker.js';
 import { buildApp } from './http-app.js';
 import { createReadinessCheck } from './readiness.js';
 import { createResourceScope } from './resources.js';
@@ -72,6 +74,10 @@ export async function buildRuntimeApp(
       typeof connections === 'function'
         ? connections(identity.service)
         : undefined;
+    // Owners reread stale stock right before they act; the reread needs the host's providers.
+    let stockRefresh: ReturnType<typeof createStockRefreshService> | undefined;
+    const refreshStock = async (context: TenantContext, positionId: string) =>
+      stockRefresh?.refresh(context, positionId);
     const installedConnections =
       configured && 'registry' in configured
         ? configured
@@ -80,7 +86,21 @@ export async function buildRuntimeApp(
               ? connections
               : {}),
             refreshContext: identity.service.refreshContext,
+            refreshStock,
           });
+    if (connections && typeof connections !== 'function') {
+      stockRefresh = createStockRefreshService({
+        database: createTenantDatabase(casePool),
+        capabilities: createInstalledRuntime({
+          installations: installedConnections.connections,
+          providers: installedConnections.registry.providers(),
+          // Owners record the reads they use as evidence; telemetry has no sink here.
+          record: async () => undefined,
+          recordObservations: async () => undefined,
+        }),
+      });
+      resources.add(stockRefresh.close);
+    }
     const connectionService =
       configured && !('registry' in configured)
         ? configured
@@ -124,7 +144,11 @@ export async function buildRuntimeApp(
       ...(processClient ? { replenishmentTransport: processClient } : {}),
       desk: workflowReader ? { workflow: workflowReader.get } : {},
       ...(installedConnections
-        ? { decisionSources: installedConnections.decisionSources() }
+        ? {
+            decisionSources: installedConnections.decisionSources(),
+            workflowSources: installedConnections.registry.workflowSources(),
+            ...(stockRefresh ? { refreshStock } : {}),
+          }
         : {}),
       ...(modelGateway ? { modelGateway } : {}),
       authoring: authoringAvailability(modelSettings, !!modelGateway),

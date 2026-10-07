@@ -13,6 +13,7 @@ import {
   createReplenishmentWorker,
   createResourceScope,
   createScheduledDetection,
+  createStockRefreshService,
 } from '@luma/application-runtime';
 import { createCommerceSyncService } from '@luma/application-runtime/sync';
 import { createSyncRunner } from '@luma/commerce-sync';
@@ -25,6 +26,7 @@ import {
   createSimulationTransport,
 } from '@luma/connections/composition';
 import { createCustomerProfiles } from '@luma/customers/composition';
+import { defaultConfiguration } from '@luma/exceptions';
 import { parseAction } from '@luma/execution/composition';
 import { IdentityError } from '@luma/identity';
 import { createIdentity } from '@luma/identity/composition';
@@ -50,6 +52,7 @@ import {
   createInstalledShippingMethodEffects,
 } from '../apps/providers.mjs';
 import { lumaCases } from '../simulator/cases.mjs';
+import { createWorkflowDemo, demoDetection } from '../simulator/demo.mjs';
 import { createInventoryScenario } from '../simulator/inventory.mjs';
 import { createStockLinks } from '../simulator/links.mjs';
 import { simulatorShopifyEnv } from '../simulator/shopify-app.mjs';
@@ -71,6 +74,11 @@ export async function createPilot(
     proposalFreshnessMs = 300_000,
     observability,
     role = 'api',
+    // Detection timing for scheduled detection: `configuration` and `holdOverdueSeconds`.
+    // Simulator workspaces provisioned for the workflow demo default to faster windows.
+    detection: detectionTiming = manifest.simulator?.demo?.detection === 'demo'
+      ? demoDetection(defaultConfiguration)
+      : {},
   } = {},
 ) {
   if (process.env.NODE_ENV === 'production' || !manifest.synthetic)
@@ -101,7 +109,12 @@ export async function createPilot(
     const simulation = manifest.simulator
       ? createSimulationTransport(manifest.simulator)
       : undefined;
+    // Owners reread stale stock right before they act; created once capabilities exist.
+    let stockRefresh = null;
+    const refreshStock = async (actor, positionId) =>
+      stockRefresh?.refresh(actor, positionId);
     const installations = createInstalledConnections(db, {
+      refreshStock,
       ...(simulation
         ? {
             simulation,
@@ -272,6 +285,14 @@ export async function createPilot(
             // The synthetic pilot does not export capability telemetry.
           },
         });
+    if (simulation) {
+      stockRefresh = createStockRefreshService({
+        database: db,
+        capabilities,
+        log: failureLog,
+      });
+      resources.add(stockRefresh.close);
+    }
     const inventory = simulation
       ? await createInventoryScenario({
           commerce,
@@ -284,6 +305,7 @@ export async function createPilot(
     const detectionErrors = [];
     const scheduled = simulation
       ? createScheduledDetection({
+          ...detectionTiming,
           database: db,
           capabilities,
           category: (provider) =>
@@ -411,6 +433,8 @@ export async function createPilot(
       execution: { kind: 'enabled', effects },
       verifier,
       decisionSources: installations.decisionSources(),
+      workflowSources: installations.registry.workflowSources(),
+      ...(simulation ? { refreshStock } : {}),
       ...(simulation
         ? {
             purchasing: {
@@ -543,6 +567,7 @@ export async function createPilot(
           (request) =>
             lumaCases(request.tenantContext, {
               detection,
+              workflows: application.caseWorkflows,
               manifest,
               webOrigin: settings.baseURL,
             }),
@@ -716,6 +741,12 @@ export async function createPilot(
       })(await context(), exceptionId);
     }
 
+    // The merchant's workflow setup for the simulator demo, run in the API process.
+    const demo =
+      simulation && role === 'api'
+        ? createWorkflowDemo({ application, manifest, owner: context })
+        : null;
+
     const replenishmentWorker =
       temporal && role === 'worker'
         ? await createReplenishmentWorker(
@@ -724,6 +755,7 @@ export async function createPilot(
             pool,
             identity.service,
             application.codeProcesses,
+            application.caseWorkflows,
           )
         : undefined;
     if (replenishmentWorker) resources.add(replenishmentWorker.close);
@@ -771,6 +803,7 @@ export async function createPilot(
       app,
       runtime,
       replenishment: application.replenishment,
+      caseWorkflows: application.caseWorkflows,
       procurement: application.procurement,
       commitments: application.commitments,
       procurementContext: application.http.procurementContext,
@@ -799,13 +832,28 @@ export async function createPilot(
             );
         for (let pass = 0; pass < passes; pass++) {
           const scopes = await syncRunner.scopes();
-          if (!scopes.includes(manifest.organizationId)) break;
+          if (!scopes.includes(manifest.organizationId)) {
+            // Bulk exports finish asynchronously; wait for them instead of stopping.
+            const waiting = (await syncStore.streams(manifest.organizationId))
+              .filter(
+                (item) =>
+                  item.scan?.waitingForExport && !item.paused && !item.blocked,
+              )
+              .map((item) => Date.parse(item.dueAt));
+            if (!waiting.length) break;
+            await delay(
+              Math.min(5000, Math.max(100, Math.min(...waiting) - Date.now())),
+            );
+            continue;
+          }
           await syncRunner.tick(manifest.organizationId);
         }
         if (check) await inventory.check(await operator(), detection);
       },
       /** Links the next batch of the merchant's reviewed SKUs and shop locations. */
       link: async () => links?.pass(),
+      /** Turns on demo workflows, suppliers and stock rules once their records are imported. */
+      demo: async () => demo?.pass(),
       /** Runs one scheduled detection and verification pass, as the sync worker does. */
       detect: async () => {
         if (scheduled) await scheduled.tick(await operator());

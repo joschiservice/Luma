@@ -106,7 +106,7 @@ test('signed Shopify webhooks reach the real change route and schedule early rea
   const hints = async () =>
     (
       await f.db.owner.query(
-        'SELECT capabilities FROM connector_refresh_hints WHERE connection_id=$1',
+        'SELECT capabilities FROM connector_refresh_hints WHERE connection_id=$1 ORDER BY received_at',
         [f.manifest.connections.shopify],
       )
     ).rows;
@@ -115,13 +115,14 @@ test('signed Shopify webhooks reach the real change route and schedule early rea
     action: 'order',
     lines: [{ sku: 'LUMA-001', quantity: 1 }],
   });
+  // The order and its stock change arrive as separate webhooks, in either order.
   await until(
-    async () => (await hints()).length > already,
-    'webhook stored a refresh hint',
+    async () =>
+      (await hints())
+        .slice(already)
+        .some((row) => row.capabilities.includes('orders.read')),
+    'order webhook stored a refresh hint',
     20_000,
-  );
-  expect((await hints()).flatMap((row) => row.capabilities)).toContain(
-    'orders.read',
   );
 });
 

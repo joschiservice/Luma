@@ -36,6 +36,7 @@ export function createAppHost(
     env?: Readonly<Record<string, string | undefined>>;
     factories?: readonly AppFactory[];
     simulation?: AppFactoryContext['simulation'];
+    refreshStock?: AppFactoryContext['refreshStock'];
   },
 ): {
   registry: AppRegistry;
@@ -62,6 +63,7 @@ export function createAppHost(
         database,
         cipher,
         ...(options.simulation ? { simulation: options.simulation } : {}),
+        ...(options.refreshStock ? { refreshStock: options.refreshStock } : {}),
         refreshContext: options.refreshContext,
         env: options.env ?? process.env,
         requireInstalled: (context, appId) =>

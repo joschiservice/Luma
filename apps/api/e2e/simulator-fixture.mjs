@@ -14,6 +14,8 @@ export async function setupSimulator(
     origin = 'http://127.0.0.1:3000',
     profile = 'test',
     chaos = 'calm',
+    detection,
+    demo,
   } = {},
 ) {
   const db = await database(t);
@@ -31,6 +33,8 @@ export async function setupSimulator(
     temporal,
     profile,
     chaos,
+    detection,
+    demo,
     env: {
       IDENTITY_DATABASE_URL: db.runtimeUrl,
       WORKFLOW_DATABASE_URL: db.runtimeUrl,

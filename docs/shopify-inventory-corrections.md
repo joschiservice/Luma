@@ -12,9 +12,13 @@ Both sources must be active, installed, readable, and mapped to the same canonic
 SKU, location and `each` unit. Every source must have exactly one unscoped SKU and
 location mapping. Shopify requires real InventoryItem and Location IDs, tracked
 inventory and an active location. The ERP quantity must be a known, nonnegative
-integer. Evidence expires after five minutes; the preview's expiry cannot extend
-its ERP observation's authority. Refreshing Inventory reloads saved observations.
-Run Data sync to refresh stale ERP evidence.
+integer, and evidence must be less than five minutes old when Luma judges it. A
+preview stays open for a four-hour decision window. Each read of the target,
+including the check right before the write, first rereads stale stock sources
+through the host's `refreshStock` (`createStockRefreshService`), so a late
+approval acts on current stock. When the reread changes the correction, the
+preview no longer runs and a new one needs a new approval. A source that can't
+be reread keeps its stored report, and stale evidence still stops the write.
 
 The app-owned service in `packages/apps/shopify/src/application/inventory-correction.ts`
 uses shared policy, audit, Action Admission and execution. Membership, installation,
@@ -37,8 +41,10 @@ resends a mutation. Shopify simulator receipts persist with the provider state.
 
 A successful receipt is acceptance, not resolution. Reconciliation independently
 reads Shopify and requires the approved quantity at the same item and location,
-complete tracked inventory and unchanged ERP authority. A changed ERP observation
-or mapping leaves reconciliation unverified. Luma records verification evidence and
+complete tracked inventory and unchanged ERP authority. A changed ERP quantity,
+availability or mapping leaves reconciliation unverified. A newer ERP read that
+reports the same values is not a change, so detection's frequent rereads don't
+invalidate a reviewed correction; its expiry still follows the reviewed read. Luma records verification evidence and
 shows **Quantity verified**; it does not optimistically rewrite canonical snapshots
 or close related operational issues. Data sync and the independent issue monitor
 retain ownership of those updates.

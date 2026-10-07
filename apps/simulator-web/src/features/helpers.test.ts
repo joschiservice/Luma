@@ -2,7 +2,7 @@ import type { IncidentView } from '@luma/simulator-contract';
 import { describe, expect, it } from 'vitest';
 
 import { incidentStatusText } from '../lib/labels';
-import { detectionText } from './incidents/incidents-view';
+import { detectionText, workflowStateText } from './incidents/incidents-view';
 import { mergeJournal } from './journal/journal-view';
 import { windowLength } from './overview/overview-view';
 import { parseCommand } from './providers/merchant-actions';
@@ -46,6 +46,7 @@ describe('incidents', () => {
       detectedAt: 301_000,
       resolved: false,
       verified: false,
+      workflow: null,
     },
   };
 
@@ -54,6 +55,12 @@ describe('incidents', () => {
     expect(detectionText({ ...incident, detection: null })).toBe(
       'Not evaluated',
     );
+  });
+
+  it('names a workflow run state in plain words', () => {
+    expect(workflowStateText('awaiting_decision')).toBe('waiting for approval');
+    expect(workflowStateText('escalated')).toBe('handed to a person');
+    expect(workflowStateText('running')).toBe('in progress');
   });
 
   it('says what a planned incident waits for', () => {

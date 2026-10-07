@@ -16,13 +16,21 @@ function identifiers(value, found = new Set(), depth = 0) {
 
 /**
  * Lists the workspace's cases with the simulator instances and provider IDs in their evidence,
- * for the simulator scorecard. Reads through the authorized detection services.
+ * and the latest workflow run each case started, for the simulator scorecard. Reads through the
+ * authorized detection and workflow services.
  */
-export async function lumaCases(context, { detection, manifest, webOrigin }) {
+export async function lumaCases(
+  context,
+  { detection, workflows, manifest, webOrigin },
+) {
   const instances = new Map(
     Object.entries(manifest.connections).map(([name, id]) => [id, name]),
   );
   const incidents = (await detection.exceptions.list(context)).slice(-maxCases);
+  // The newest run per case; runs come newest first.
+  const runs = new Map();
+  for (const run of (await workflows?.caseRuns(context)) ?? [])
+    if (!runs.has(run.caseId)) runs.set(run.caseId, run);
 
   return Promise.all(
     incidents.map(async (incident) => {
@@ -62,6 +70,13 @@ export async function lumaCases(context, { detection, manifest, webOrigin }) {
         ),
         identifiers: [...found],
         url: `${webOrigin}/app/${manifest.organizationId}/exceptions/${incident.id}`,
+        workflow: runs.has(incident.id)
+          ? {
+              name: runs.get(incident.id).name,
+              state: runs.get(incident.id).state ?? 'starting',
+              url: `${webOrigin}/app/${manifest.organizationId}/workflows/${runs.get(incident.id).definitionId}#run-${runs.get(incident.id).runId}`,
+            }
+          : null,
       };
     }),
   );

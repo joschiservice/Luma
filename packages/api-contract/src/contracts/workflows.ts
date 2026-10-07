@@ -18,6 +18,7 @@ import {
   workflowCoverageSchema,
 } from '../replenishment.js';
 import {
+  activateCaseWorkflowSchema,
   activateWorkflowSchema,
   fireWorkflowSchema,
   workflowActivationSchema,
@@ -231,9 +232,25 @@ export const workflowsContract = c.router(
       description:
         'Requires `playbooks.activate`. Activates supported Resolution versions for your own principal and explicit orders on one connection. Other definitions remain available for review. Review the exact digest, scope and approval behavior. Reuse the same ID and body after an uncertain response. Conflicting, overlapping or stale grants return 409; revoked records cannot be restored.',
     },
+    activateCase: {
+      method: 'POST',
+      metadata: requires('workflows.publish'),
+      path: `${path}/:definitionId/case-activations`,
+      pathParams: params,
+      body: activateCaseWorkflowSchema,
+      responses: { 200: workflowActivationSchema },
+      summary: 'Turn on a case workflow',
+      description:
+        'Requires `workflows.publish`. Lets a built-in workflow start a run for each new case of its issue type. Runs act as the caller; every change still needs policy approval by someone else who can approve changes. Review the exact version digest and policy version. Reuse the same ID and body after an uncertain response. A second active activation returns 409.',
+    },
     revoke: {
       method: 'POST',
-      metadata: requires(['playbooks.activate', 'procurement.manage']),
+      // Replenishment, case-workflow and playbook revokes each check their own permission.
+      metadata: requires([
+        'playbooks.activate',
+        'procurement.manage',
+        'workflows.publish',
+      ]),
       path: `${path}/:definitionId/activations/:activationId/revoke`,
       pathParams: params.extend({ activationId: z.string().uuid() }),
       body: z

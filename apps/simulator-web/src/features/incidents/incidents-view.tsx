@@ -3,6 +3,9 @@ import {
   type IncidentKindName,
   incidentKindNames,
   incidentKinds,
+  type WorkflowScenarioName,
+  workflowScenarioNames,
+  workflowScenarios,
 } from '@luma/simulator-core';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -43,6 +46,7 @@ import {
   useIncidents,
   useInjectIncident,
   useRecoverIncident,
+  useRunScenario,
 } from '../../queries';
 import { InventoryCheck } from './inventory-check';
 
@@ -73,6 +77,29 @@ export function detectionText(incident: IncidentView) {
   }
 }
 
+/** Describes a workflow run's state as people read it in Luma. */
+export function workflowStateText(state: string) {
+  switch (state) {
+    case 'awaiting_decision':
+      return 'waiting for approval';
+    case 'verified':
+      return 'change verified';
+    case 'ended':
+      return 'finished without a change';
+    case 'escalated':
+      return 'handed to a person';
+    case 'denied':
+      return 'not allowed';
+    case 'failed_verification':
+    case 'inconclusive_verification':
+      return 'result not confirmed';
+    case 'waiting':
+      return 'waiting to check again';
+    default:
+      return 'in progress';
+  }
+}
+
 const statusState: Record<IncidentView['status'], OperationalState> = {
   planned: 'waiting',
   active: 'attention',
@@ -98,10 +125,87 @@ const shownLimit = 200;
 export function IncidentsView({ run }: { run: RunDetail }) {
   return (
     <div className="sim-stack">
+      <WorkflowScenarios run={run} />
       <InjectIncident run={run} />
       <IncidentList run={run} />
       <InventoryCheck run={run} />
     </div>
+  );
+}
+
+/**
+ * Starts reproducible situations for Luma's case workflows, each with what Luma should do. A
+ * scenario keeps its request ID until it succeeds, so retrying never starts it twice.
+ */
+function WorkflowScenarios({ run }: { run: RunDetail }) {
+  const start = useRunScenario(run.id);
+  const id = useId();
+  const pending = useRef<{ scenario: WorkflowScenarioName; id: string } | null>(
+    null,
+  );
+  const [started, setStarted] = useState<WorkflowScenarioName | null>(null);
+
+  function begin(scenario: WorkflowScenarioName) {
+    if (pending.current?.scenario !== scenario)
+      pending.current = { scenario, id: randomId() };
+    start.mutate(
+      { id: pending.current.id, scenario },
+      {
+        onSuccess: () => {
+          pending.current = null;
+          setStarted(scenario);
+        },
+      },
+    );
+  }
+
+  return (
+    <Card as="section" aria-labelledby={`${id}-title`}>
+      <CardHeader>
+        <div>
+          <CardTitle id={`${id}-title`}>Workflow scenarios</CardTitle>
+          <CardDescription>
+            Each one causes a situation that a workflow handles in Luma. Sign in
+            as the admin to approve its changes in Needs you.
+          </CardDescription>
+        </div>
+      </CardHeader>
+      <ul className="sim-scenarios">
+        {workflowScenarioNames.map((name) => {
+          const scenario = workflowScenarios[name];
+
+          return (
+            <li key={name}>
+              <div className="sim-cell-stack">
+                <strong>{scenario.label}</strong>
+                <span>{scenario.description}</span>
+                <span className="sim-muted">Expected: {scenario.expected}</span>
+              </div>
+              <Button
+                variant="outline"
+                disabled={start.isPending}
+                onClick={() => begin(name)}
+              >
+                Start
+              </Button>
+            </li>
+          );
+        })}
+      </ul>
+      <div aria-live="polite">
+        {start.isError ? (
+          <p className="sim-error-text" role="alert">
+            Not started: {errorMessage(start.error)} Retrying sends the same
+            request ID, so it cannot start twice.
+          </p>
+        ) : started ? (
+          <p>
+            {workflowScenarios[started].label} started. Follow it in the
+            incident list below and in Luma.
+          </p>
+        ) : null}
+      </div>
+    </Card>
   );
 }
 
@@ -316,6 +420,17 @@ function IncidentList({ run }: { run: RunDetail }) {
               rel="noreferrer"
             >
               Open case in Luma<span className="sr-only"> (new tab)</span>
+            </a>
+          ) : null}
+          {incident.detection?.workflow ? (
+            <a
+              href={incident.detection.workflow.url}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {incident.detection.workflow.name}:{' '}
+              {workflowStateText(incident.detection.workflow.state)}
+              <span className="sr-only"> (new tab)</span>
             </a>
           ) : null}
         </span>

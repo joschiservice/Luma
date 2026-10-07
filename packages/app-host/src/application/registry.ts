@@ -112,6 +112,8 @@ export function createAppRegistry(
             ]
           : [],
       ),
+    /** Lists the case workflows installed apps contribute. */
+    workflowSources: () => [...apps.values()].flatMap((a) => a.workflows ?? []),
     /**
      * Registers app-owned routes after host identity guards are attached. Tenant routes must
      * declare `config.access`; the host checks installation and that permission before the

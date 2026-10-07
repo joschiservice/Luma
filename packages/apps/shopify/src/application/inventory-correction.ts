@@ -84,7 +84,12 @@ export interface CorrectionDependencies {
   bind(context: TenantContext, run: CorrectionRun): Promise<void>;
   hash(action: ProposedAction): string;
   now(): Date;
+  /** How long a person has to decide on a preview. Defaults to four hours. */
+  decisionWindowMs?: number;
 }
+
+/** How long a person has to decide on a stock correction by default. */
+const decisionWindowMs = 4 * 60 * 60_000;
 
 /** Offers source-bound previews and reference-only execution, preserving the shared approval and reconciliation controls. */
 export function createInventoryCorrection(deps: CorrectionDependencies) {
@@ -194,6 +199,18 @@ export function createInventoryCorrection(deps: CorrectionDependencies) {
       decisionId: run.decisionId,
       state,
       approved: decision?.approval?.outcome === 'approved',
+      denial:
+        state !== 'denied'
+          ? null
+          : withheld
+            ? 'withheld'
+            : rejected
+              ? 'rejected'
+              : policyChanged || decision?.outcome === 'denied'
+                ? 'policy'
+                : changed
+                  ? 'changed'
+                  : 'expired',
       acceptance: accepted
         ? 'accepted'
         : record && !withheld
@@ -241,6 +258,19 @@ export function createInventoryCorrection(deps: CorrectionDependencies) {
   }
 
   return {
+    /**
+     * Reads a saved preview's current state, rereading Shopify while it can still run. Returns
+     * null when the tenant has no preview with this ID. Changes nothing except releasing a
+     * settled target lock.
+     */
+    async status(context: TenantContext, id: string) {
+      context = await authorize(context);
+      const run = await deps.store.get(context, id);
+      if (!run) return null;
+      await deps.authorize(context, run.target.connectionId);
+
+      return view(context, run);
+    },
     async candidates(context: TenantContext, input: unknown) {
       context = await authorize(context);
       const { positionId } = z
@@ -317,11 +347,10 @@ export function createInventoryCorrection(deps: CorrectionDependencies) {
       const before = await deps.read(context, target);
       const blocker = correctionBlocker(before, choice, granted, deps.now());
       if (blocker) throw new IdentityError(409, 'CONFLICT', blocker);
+      // People get a decision window; evidence freshness is checked again on a fresh read before
+      // the write, so the approval binds this exact change, not this read.
       const expiresAt = new Date(
-        Math.min(
-          deps.now().getTime() + 5 * 60_000,
-          Date.parse(before.source.observedAt) + 5 * 60_000,
-        ),
+        deps.now().getTime() + (deps.decisionWindowMs ?? decisionWindowMs),
       ).toISOString();
       const action: ProposedAction = {
         schemaVersion: 1,

@@ -5,7 +5,10 @@ import type {
   InstallationCapability,
   InstallationService,
 } from '@luma/connections';
-import { createCapabilityRuntime } from '@luma/connections/adapters';
+import {
+  createCapabilityRuntime,
+  simulationTransport,
+} from '@luma/connections/adapters';
 import {
   createAdmission,
   createAdmissionStore,
@@ -103,12 +106,15 @@ export function createShopifyRecovery(
   ) {
     const current = await credential(tenant, connectionId, capability);
     const shop = current.connection.target.shop!;
+    // Simulated connections must reach the simulator, never a live shop.
+    const transport =
+      simulationTransport(current.connection, context.simulation) ?? fetch;
 
     return createFulfillmentProvider({
       tenantId: tenant.tenantId,
       connectionId,
       shop,
-      ...(fetch ? { fetch } : {}),
+      ...(transport ? { fetch: transport } : {}),
       accessToken: async () => {
         const fresh = await credential(tenant, connectionId, capability);
         if (fresh.connection.target.shop !== shop)

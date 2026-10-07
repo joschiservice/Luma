@@ -74,7 +74,7 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
     .getByRole('button', { name: 'Remove System filter: JTL Cloud' })
     .click();
   await page.getByRole('link', { name }).waitFor();
-  await page.getByRole('button', { name: /^Enabled 0$/ }).click();
+  await page.getByRole('tab', { name: /^Enabled 0$/ }).click();
   await page.getByRole('heading', { name: 'No matching workflows' }).waitFor();
   await page.getByRole('tab', { name: /^All workflows 1$/ }).click();
   await page.getByRole('link', { name }).waitFor();

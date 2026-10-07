@@ -969,15 +969,19 @@ const normalized = (items) =>
     data,
   }));
 
-/** Makes a synthetic asynchronous export ready without waiting on wall-clock time. */
-async function completeExports(shop, status = 'RUNNING') {
+/**
+ * Makes a synthetic asynchronous export ready without waiting on wall-clock time. `createdAt`
+ * backdates when the export started.
+ */
+async function completeExports(shop, status = 'RUNNING', createdAt) {
   const records = await shop.store.page({ kind: 'BulkOperation', limit: 100 });
   for (const record of records.items)
-    await shop.store.put('BulkOperation', record.id, {
-      ...record.data,
-      readyAt: 0,
-      status,
-    });
+    await shop.store.put(
+      'BulkOperation',
+      record.id,
+      { ...record.data, readyAt: 0, status },
+      createdAt === undefined ? undefined : { createdAt },
+    );
 }
 
 test('bulk history resumes export and JSONL chunks after restart with identical observations', async () => {
@@ -998,7 +1002,8 @@ test('bulk history resumes export and JSONL chunks after restart with identical 
     assert.equal(result.ok, true, JSON.stringify(result));
     assert.equal(result.value.deferred, true);
     assert.ok(result.value.nextCursor);
-    await completeExports(shop);
+    const exportedAt = Date.now() - 3_600_000;
+    await completeExports(shop, 'RUNNING', exportedAt);
     const imported = [];
     let cursor = result.value.nextCursor;
     const initialCursor = cursor;
@@ -1015,6 +1020,12 @@ test('bulk history resumes export and JSONL chunks after restart with identical 
       cursor = result.value.nextCursor;
     } while (cursor);
     assert.deepEqual(normalized(imported), normalized(paged.items));
+    // Records carry the export's start time, however late Luma reads the file.
+    assert.ok(
+      imported.every(
+        (item) => item.observedAt === new Date(exportedAt).toISOString(),
+      ),
+    );
     const replay = await pages(shop)(capability, {
       limit: 1,
       cursor: initialCursor,

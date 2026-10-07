@@ -65,7 +65,7 @@ Content-Type: application/json
 }
 ```
 
-Use `operatorAction: null` when the intervention is unknown. Feedback accepts `trust`, `distrust`, `unsure`, or null. Evidence must belong to the incident. Reviews are attributed to the current owner or admin and retained immutably. Conflicting retries fail.
+Use `operatorAction: null` when the intervention is unknown. Feedback accepts `trust`, `distrust`, `unsure`, or null. Evidence must belong to the incident. Reviews are attributed to the current reviewer and retained immutably. Conflicting retries fail.
 
 Read `/v1/organizations/{organizationId}/shadow` with `workflow`, `since` and `until` query parameters. The window includes evaluation timestamps from `since` through, but excluding, `until`. Reports retain the latest evaluation per incident and accept at most 500 incidents; narrow the window if it is larger. Authoritative outcomes are read from subsequent completed incident or execution verification evidence with the same evaluator version. Execution observations must concern the same case, connection, capability, target and expected postcondition. Passing incident verification must have been accepted. Execution observations must fall within the pinned Playbook verification deadline measured from the execution attempt. Unknown, incomplete, unrelated and failed verification attempts without a result do not count as outcomes.
 

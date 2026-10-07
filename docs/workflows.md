@@ -108,8 +108,9 @@ check to explain why a published custom version is unavailable.
 readiness and activation status. Templates are not a separate store:
 `POST /workflow-templates/:templateId/install` publishes the template's reviewed
 version in the workspace (safe to repeat, never activates). **Use template** then
-configures and activates through the existing path — replenishment rules or
-Resolution activation — so the same server authorization and overlap checks apply.
+configures and activates through the existing path — replenishment rules,
+Resolution activation or a [case workflow](#case-workflows) activation — so the
+same server authorization and overlap checks apply.
 **Customize** creates a draft copy with a new ID; the published template never
 changes. The Resolution shipping-method correction is copied as its `workflow/2`
 equivalent (`processDraftFromPlaybook`).
@@ -297,6 +298,57 @@ custom versions from adapter blockers (`catalog.ts`).
 same readiness scoped to one record, so stock and purchase-order pages show what
 the workflow overview shows. It returns 404 for records outside the workspace.
 Record links carry `from` so their Back link returns to the original context.
+
+## Case workflows
+
+Case workflows are built-in `workflow/2` versions with an `exception` trigger.
+They start a run for each open case of their issue type and run on the process
+runtime, so runs, step evidence, Activity and readiness work as for replenishment.
+`createCaseWorkflows` (`application/case-workflows.ts`) owns activation, starts,
+readiness and the activities; each `CaseWorkflowAdapter` owns its reads, action
+and result check.
+
+| Workflow                   | Owner              | Trigger              | Action                          | Result check                          |
+| -------------------------- | ------------------ | -------------------- | ------------------------------- | ------------------------------------- |
+| `shopify-stock-correction` | Shopify app        | `inventory_mismatch` | `inventory.available.reconcile` | `shopify-inventory-reconciliation/1`  |
+| `shopify-hold-release`     | Shopify app        | `stuck_fulfillment`  | `fulfillment.hold.release`      | `shopify-hold-released/1` (hold gone) |
+| `connection-sync-check`    | `@luma/resolution` | `sync_failure`       | none; waits and rereads         | none                                  |
+
+Apps contribute adapters through `AppDefinition.workflows`; the app registry
+lists them with `workflowSources()`.
+
+- **Activation:** `POST /workflows/:definitionId/case-activations` turns a
+  workflow on for the workspace as the caller, after they reviewed the version
+  digest and policy version. One activation can be active per workflow
+  (`workflow_case_activations`, migration `0053`). Revoking uses the normal
+  activation revoke route. Activation grants no approval.
+- **Starts:** the workflow worker calls `tick` for each principal returned by
+  `case_workflow_worker_scopes()`. It recovers committed runs, then records at
+  most one run per case and version for open cases whose `lastDetectedAt` is
+  within the version's `maxAgeSeconds`. Older open cases wait until detection
+  confirms them again. At most 20 runs per workflow are unfinished at once. The
+  run is persisted before Temporal starts it under its stable ID. Manual starts
+  of case workflows return 409.
+- **Actions:** the Shopify adapters call the app's existing correction and
+  recovery services as the run's principal: persisted preview, policy approval
+  by someone else with `decisions.respond` in Needs you, execution by the requester,
+  claims, compare-and-set or hold identity, and reconciliation. Previews stay
+  open for a four-hour decision window. A preview whose change differs on a
+  fresh read is replaced with one new proposal, up to 12 times, and Needs you
+  keeps one item for the target while it waits. A rejection, policy denial, withheld write or uncertain write ends
+  the attempt. Turning the workflow off, or the case closing, stops any change
+  that wasn't sent; sent changes still reconcile.
+- **Closure:** runs never close cases. Detection verifies them independently.
+
+Readiness reports enablement, worker availability, adapter requirements (such as
+Shopify write access), open cases of the type, waiting approvals and recent
+outcomes. The web domain view is `apps/web/src/features/workflows/case.tsx`.
+
+Validation: `application/case-workflows.test.ts`,
+`packages/resolution/src/application/connection-check.test.ts` and
+`apps/api/e2e/case-workflows.e2e.mjs`, which runs stock correction, rejection,
+turning off, hold release and the connection check against the simulator and
+Temporal.
 
 ## Domain views
 
