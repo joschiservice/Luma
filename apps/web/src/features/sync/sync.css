@@ -5,10 +5,6 @@
   margin: 0 auto;
 }
 
-.sync-page > .page-header {
-  margin-bottom: 0;
-}
-
 .sync-page a {
   color: var(--signal-text);
 }

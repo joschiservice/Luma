@@ -36,7 +36,11 @@ it('fans out committed changes, coalesces bursts and recovers listeners, subscri
   const coverage = await f.db.owner.query(
     "SELECT event_object_table, array_agg(event_manipulation::text ORDER BY event_manipulation) AS operations FROM information_schema.triggers WHERE trigger_name='metric_change' GROUP BY event_object_table",
   );
-  expect(coverage.rows).toHaveLength(28);
+  // pg_trigger is not filtered by the reader's table privileges.
+  const triggers = await f.db.owner.query(
+    "SELECT count(*)::int AS total, count(*) FILTER (WHERE tgnargs=0)::int AS untagged FROM pg_trigger WHERE tgname='metric_change'",
+  );
+  expect(triggers.rows[0]).toEqual({ total: 42, untagged: 0 });
   expect(coverage.rows.map((row) => row.event_object_table)).toEqual(
     expect.arrayContaining([
       'resolution_measurement_facts',
@@ -75,6 +79,15 @@ it('fans out committed changes, coalesces bursts and recovers listeners, subscri
       status,
     );
     expect((await count()).metrics[0].observedCount).toBe(expected);
+    // An order change names its area and does not wake views of other areas such as Needs you.
+    const latest = streams.map((s, i) => s.events.slice(before[i]));
+    expect(
+      latest.every((events) =>
+        events.some(
+          (e) => e.topics.includes('orders') && !e.topics.includes('decisions'),
+        ),
+      ),
+    ).toBe(true);
   }
   await wait(120);
   const before = streams.map((s) => s.events.length);

@@ -1,11 +1,15 @@
 import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-import { subscribeToWorkspaceMetrics } from '../overview/metric-subscription';
+import {
+  liveRefreshMs,
+  subscribeToWorkspaceMetrics,
+} from '../overview/metric-subscription';
 import { insightsKey } from './data';
 import { subscribeToInsightChanges } from './live';
 
-vi.mock('../overview/metric-subscription', () => ({
+vi.mock('../overview/metric-subscription', async (original) => ({
+  ...(await original<typeof import('../overview/metric-subscription')>()),
   subscribeToWorkspaceMetrics: vi.fn(() => vi.fn()),
 }));
 
@@ -25,13 +29,14 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function change() {
+function change(topics = ['orders']) {
   stream.mock.calls[0]![1].onResync({
     schemaVersion: 1,
     organizationId: 'workspace',
     scope: 'order-metrics',
     connected: true,
     refetch: true,
+    topics,
     sentAt: new Date().toISOString(),
   });
 }
@@ -96,6 +101,35 @@ it('keeps a failed chart stable through repeated events, allows manual retry and
   await vi.advanceTimersByTimeAsync(1000);
   expect(read).toHaveBeenCalledTimes(3);
   expect(observer.getCurrentResult().data).toBe(4);
+});
+
+it('reads at once after a quiet period and at most once per interval during a burst', async () => {
+  const read = vi.fn<() => Promise<number>>().mockResolvedValue(1);
+  observe(read);
+  await vi.advanceTimersByTimeAsync(0);
+  cleanup.push(subscribeToInsightChanges('workspace', client));
+  change();
+  await vi.advanceTimersByTimeAsync(0);
+  expect(read).toHaveBeenCalledTimes(2);
+  for (let index = 0; index < 15; index++) {
+    change();
+    await vi.advanceTimersByTimeAsync(liveRefreshMs / 10);
+  }
+  expect(read).toHaveBeenCalledTimes(3);
+  await vi.advanceTimersByTimeAsync(liveRefreshMs);
+  expect(read).toHaveBeenCalledTimes(4);
+  await vi.advanceTimersByTimeAsync(5000);
+  expect(read).toHaveBeenCalledTimes(4);
+});
+
+it('ignores changes to areas no chart reads', async () => {
+  const read = vi.fn<() => Promise<number>>().mockResolvedValue(1);
+  observe(read);
+  await vi.advanceTimersByTimeAsync(0);
+  cleanup.push(subscribeToInsightChanges('workspace', client));
+  for (let index = 0; index < 10; index++) change(['decisions', 'resolution']);
+  await vi.advanceTimersByTimeAsync(5000);
+  expect(read).toHaveBeenCalledOnce();
 });
 
 it('drops queued refreshes when the charts leave the page', async () => {

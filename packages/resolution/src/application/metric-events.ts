@@ -2,6 +2,8 @@
 export interface MetricWakeup {
   tenantId?: string;
   connected: boolean;
+  /** Areas that changed. Absent after a reconnection or an untagged change: reconcile all. */
+  topics?: readonly string[];
 }
 
 /** Shares a process listener. Subscribers must reauthorize before delivering an event. */

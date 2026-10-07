@@ -6,7 +6,6 @@ import type { TenantContext } from '@luma/identity';
 import { IdentityError } from '@luma/identity';
 
 import {
-  type CustomerSearch,
   recordCapability,
   recordInput,
   type ShopifyRecordDetail,
@@ -40,7 +39,6 @@ export function createRecordService(options: {
     kind: ShopifyRecordKind,
     id?: string,
     cursor?: string,
-    search?: CustomerSearch,
   ) => Promise<ShopifyRecordDetail>;
 }) {
   return async (context: TenantContext, input: unknown) => {
@@ -51,7 +49,7 @@ export function createRecordService(options: {
         'CONFLICT',
         'Choose a valid Shopify record type and ID.',
       );
-    const { connectionId, kind, id, cursor, search } = parsed.data;
+    const { connectionId, kind, id, cursor } = parsed.data;
     await options.authorize(context, kind);
     const capability = recordCapability(kind);
     const credential = async () => {
@@ -99,6 +97,6 @@ export function createRecordService(options: {
       },
     });
 
-    return reader(kind, id, cursor, search);
+    return reader(kind, id, cursor);
   };
 }

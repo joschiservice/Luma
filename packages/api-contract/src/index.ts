@@ -6,6 +6,7 @@ import { appsContract } from './contracts/apps.js';
 import { assistantContract } from './contracts/assistant.js';
 import { exceptionsContract } from './contracts/cases.js';
 import { connectionsContract } from './contracts/connections.js';
+import { customersContract } from './contracts/customers.js';
 import { decisionsContract } from './contracts/decisions.js';
 import { caseDeskContract } from './contracts/desk.js';
 import { draftTestsContract } from './contracts/draft-tests.js';
@@ -63,6 +64,7 @@ const routes: {
   products: typeof productsContract;
   orders: typeof ordersContract;
   returns: typeof returnsContract;
+  customers: typeof customersContract;
   sync: typeof syncContract;
   decisions: typeof decisionsContract;
   insights: typeof insightsContract;
@@ -95,6 +97,7 @@ const routes: {
   products: productsContract,
   orders: ordersContract,
   returns: returnsContract,
+  customers: customersContract,
   sync: syncContract,
   decisions: decisionsContract,
   insights: insightsContract,
@@ -163,7 +166,11 @@ export {
   caseEventsContract,
   metricEventsContract,
   metricStreamEventSchema,
+  workspaceTopics,
+  workspaceTopicSchema,
 } from './contracts/events.js';
+
+export type { WorkspaceTopic } from './contracts/events.js';
 
 export * from './playbooks.js';
 
@@ -189,6 +196,8 @@ export * from './procurement.js';
 
 export * from './replenishment.js';
 
+export * from './metric-summary.js';
+
 export * from './metrics.js';
 
 export * from './operational-metrics.js';
@@ -204,6 +213,8 @@ export * from './fulfillment.js';
 export * from './products.js';
 
 export * from './returns.js';
+
+export * from './customers.js';
 
 export * from './sync.js';
 

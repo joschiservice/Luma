@@ -1,13 +1,47 @@
 import '@luma/identity/http';
 
-import { metricEventsContract } from '@luma/api-contract';
-import type { IdentityService } from '@luma/identity';
+import {
+  anyMember,
+  metricEventsContract,
+  type WorkspaceTopic,
+  workspaceTopics,
+} from '@luma/api-contract';
+import type {
+  IdentityService,
+  Permission,
+  TenantContext,
+} from '@luma/identity';
 import { hasPermission, IdentityError } from '@luma/identity';
 import type { FastifyInstance } from 'fastify';
 
 import type { MetricEvents } from '../application/metric-events.js';
 
-/** Delivers bounded, tenant-scoped invalidations after rechecking the original session. */
+/** The read permission an area needs. Needs you filters its own sources, so every member hears it. */
+const topicPermissions: Record<WorkspaceTopic, Permission | null> = {
+  orders: 'orders.read',
+  connections: null,
+  issues: 'issues.read',
+  inventory: 'inventory.read',
+  workflows: 'workflows.read',
+  procurement: 'procurement.read',
+  resolution: 'insights.read',
+  decisions: null,
+};
+
+/** Lists the areas a member may hear about. */
+function readableTopics(context: TenantContext) {
+  return workspaceTopics.filter((topic) => {
+    const permission = topicPermissions[topic];
+
+    return !permission || hasPermission(context, permission);
+  });
+}
+
+/**
+ * Tells workspace members which areas changed, limited to areas they can read. Bursts coalesce
+ * per stream. Access is rechecked on the five-second heartbeat and whenever the last check is
+ * older than that, so revoked members stop receiving events within about five seconds.
+ */
 export function registerMetricEvents(
   app: FastifyInstance,
   events?: MetricEvents,
@@ -43,7 +77,7 @@ export function registerMetricEvents(
   });
   app.get(
     metricEventsContract.events.path,
-    { config: { access: { permission: 'insights.read' } } },
+    { config: { access: anyMember } },
     async (request, reply) => {
       if (!events || !identity || draining)
         throw new IdentityError(
@@ -74,7 +108,12 @@ export function registerMetricEvents(
       }
       let closed = false;
       let busy = false;
-      let dirty = true;
+      // The first event and every listener reconnection reconcile all readable areas.
+      let everything = true;
+      const changed = new Set<string>();
+      let recheck = true;
+      let checkedAt = 0;
+      let readable: WorkspaceTopic[] = [];
       let timer: ReturnType<typeof setTimeout> | undefined;
       let unsubscribe = () => {
         /* Subscription is installed before the first read. */
@@ -98,30 +137,45 @@ export function registerMetricEvents(
       actors.set(key, (actors.get(key) ?? 0) + 1);
       reply.raw.on('close', close);
       reply.hijack();
+      const pending = () => everything || changed.size > 0;
       const send = async () => {
         timer = undefined;
         if (closed || busy) return;
         busy = true;
-        const refetch = dirty || Date.now() - reconciledAt >= 30000;
-        dirty = false;
+        const heartbeat = recheck;
+        const reconcile = everything || Date.now() - reconciledAt >= 30000;
+        const areas = [...changed];
+        everything = false;
+        changed.clear();
         try {
-          const fresh = await authorize(async () => {
-            if (closed) return null;
+          if (heartbeat || Date.now() - checkedAt >= 5000) {
+            recheck = false;
+            const fresh = await authorize(async () => {
+              if (closed) return null;
 
-            return identity.resolveTenant(
-              request.headers.cookie ? { cookie: request.headers.cookie } : {},
-              organizationId,
-              request.id,
-            );
-          });
-          if (closed) return;
-          if (
-            !fresh ||
-            fresh.actor.id !== context.actor.id ||
-            fresh.tenantId !== organizationId ||
-            !hasPermission(fresh, 'insights.read')
-          )
-            throw new Error('Access changed');
+              return identity.resolveTenant(
+                request.headers.cookie
+                  ? { cookie: request.headers.cookie }
+                  : {},
+                organizationId,
+                request.id,
+              );
+            });
+            if (closed) return;
+            if (
+              !fresh ||
+              fresh.actor.id !== context.actor.id ||
+              fresh.tenantId !== organizationId
+            )
+              throw new Error('Access changed');
+            readable = readableTopics(fresh);
+            checkedAt = Date.now();
+          }
+          const topics = reconcile
+            ? readable
+            : readable.filter((topic) => areas.includes(topic));
+          // Changes only in areas this member cannot read wait silently for the next heartbeat.
+          if (!heartbeat && !reconcile && !topics.length) return;
           if (!reply.raw.headersSent) {
             reply.raw.writeHead(200, {
               'content-type': 'text/event-stream',
@@ -129,13 +183,14 @@ export function registerMetricEvents(
               'x-accel-buffering': 'no',
             });
           }
-          if (refetch) reconciledAt = Date.now();
+          if (reconcile) reconciledAt = Date.now();
           const event = {
             schemaVersion: 1,
             organizationId,
             scope: 'order-metrics',
             connected: events.connected,
-            refetch,
+            refetch: topics.length > 0,
+            topics,
             sentAt: new Date().toISOString(),
           };
           if (
@@ -169,16 +224,19 @@ export function registerMetricEvents(
           close();
         } finally {
           busy = false;
-          if (dirty && !closed && !timer)
+          if ((pending() || recheck) && !closed && !timer)
             timer = setTimeout(() => void send(), 75);
         }
       };
-      unsubscribe = events.subscribe(organizationId, () => {
-        dirty = true;
-        if (!busy && !closed && !timer)
+      unsubscribe = events.subscribe(organizationId, (wakeup) => {
+        if (wakeup.topics)
+          for (const topic of wakeup.topics) changed.add(topic);
+        else everything = true;
+        if (pending() && !busy && !closed && !timer)
           timer = setTimeout(() => void send(), 75);
       });
       const heartbeat = setInterval(() => {
+        recheck = true;
         if (!busy && !timer) void send();
       }, 5000);
       heartbeat.unref();

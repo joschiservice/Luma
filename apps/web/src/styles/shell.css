@@ -579,7 +579,7 @@
   background: var(--surface-hover);
 }
 
-.breadcrumb-root svg {
+.breadcrumb-root > svg {
   flex-shrink: 0;
   color: var(--foreground-subtle);
 }
@@ -596,7 +596,7 @@
   min-width: 0;
 }
 
-.workspace-route-breadcrumb svg {
+.workspace-route-breadcrumb svg:not(.lu-domain-icon > svg) {
   flex-shrink: 0;
   color: var(--foreground-subtle);
 }
@@ -636,6 +636,17 @@
 
 .workspace-page-header:not(:empty) {
   flex: 1;
+}
+
+.workspace-page-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.workspace-page-actions:empty {
+  display: none;
 }
 
 .desk-header-tools {
@@ -909,6 +920,23 @@
 
   .command-footer-hint {
     display: none;
+  }
+}
+
+/* Page actions take their own row when the bar is too narrow to keep their labels. */
+@media (max-width: 560px) {
+  .desk-header:has(.workspace-page-actions:not(:empty)) {
+    flex-wrap: wrap;
+    row-gap: 6px;
+    height: auto;
+    min-height: var(--topbar-height);
+    padding-block: 6px;
+  }
+
+  .workspace-page-actions {
+    order: 1;
+    flex-basis: 100%;
+    justify-content: flex-end;
   }
 }
 

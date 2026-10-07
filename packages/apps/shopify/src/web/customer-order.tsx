@@ -57,7 +57,11 @@ export function CustomerOrder({
   const base = `/app/${encodeURIComponent(organizationId)}`;
 
   return (
-    <Card as="section" aria-label="Selected order service context">
+    <Card
+      as="section"
+      variant="subtle"
+      aria-label="Selected order service context"
+    >
       <CardHeader>
         <CardTitle as="h3">
           {String(
@@ -81,7 +85,7 @@ export function CustomerOrder({
             </Button>
           </Alert>
         ) : read.data ? (
-          <div className="customer-workspace">
+          <div className="customer-order-body">
             <ShopifyRecordSections
               detail={{
                 ...read.data,

@@ -1,11 +1,25 @@
+import type { WorkspaceTopic } from '@luma/api-contract';
 import type { QueryClient } from '@tanstack/react-query';
 
-import { subscribeToWorkspaceMetrics } from '../overview/metric-subscription';
+import {
+  changesAny,
+  liveRefreshDelay,
+  subscribeToWorkspaceMetrics,
+} from '../overview/metric-subscription';
 import { insightsKey } from './data';
 
+const chartTopics: readonly WorkspaceTopic[] = [
+  'orders',
+  'issues',
+  'inventory',
+  'procurement',
+  'workflows',
+  'connections',
+];
+
 /**
- * Coalesces live chart invalidations, finishes active reads and limits failed reads to one
- * attempt per 30 seconds. Explicit refresh and filter changes remain immediate.
+ * Refreshes charts at most once per `liveRefreshMs`, finishes active reads and limits failed
+ * reads to one attempt per 30 seconds. Explicit refresh and filter changes remain immediate.
  */
 export function subscribeToInsightChanges(
   organizationId: string,
@@ -15,16 +29,18 @@ export function subscribeToInsightChanges(
   let busy = false;
   let dirty = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let lastReadAt = -Infinity;
 
   const schedule = () => {
     dirty = true;
     if (!active || busy || timer) return;
-    timer = setTimeout(() => void refresh(), 1000);
+    timer = setTimeout(() => void refresh(), liveRefreshDelay(lastReadAt));
   };
   const refresh = async () => {
     timer = undefined;
     dirty = false;
     busy = true;
+    lastReadAt = Date.now();
     try {
       await client.invalidateQueries(
         {
@@ -42,7 +58,7 @@ export function subscribeToInsightChanges(
   };
   const stop = subscribeToWorkspaceMetrics(organizationId, {
     onResync: (event) => {
-      if (event.refetch) schedule();
+      if (changesAny(event, chartTopics)) schedule();
     },
     onError: () => undefined,
   });

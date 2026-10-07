@@ -133,6 +133,7 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
     Icon: Users,
     description: 'Customer identity, order history and service context',
     group: 'operations',
+    domain: 'customers',
     shortcut: 'u',
     permission: 'customers.read',
     area: 'customers',

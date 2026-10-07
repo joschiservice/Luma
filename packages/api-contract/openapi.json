@@ -70644,6 +70644,1429 @@
         }
       }
     },
+    "/v2/organizations/{organizationId}/metrics/summary": {
+      "post": {
+        "description": "Reads up to four parts, each an order (v1) or operational (v2) metric query, with the same rules as those endpoints, and returns them in request order. A part that fails carries its own status and error; the other parts are unaffected. Each part has its own snapshot and asOf; page a part through its own query endpoint. nextRefreshAt is the earliest boundary across the parts that were read.",
+        "summary": "Read several metric views in one request",
+        "tags": ["metrics"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "operationId": "metrics.summary",
+        "requestBody": {
+          "description": "Body",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "parts": {
+                    "type": "array",
+                    "items": {
+                      "discriminator": {
+                        "propertyName": "kind"
+                      },
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["orders"]
+                            },
+                            "request": {
+                              "type": "object",
+                              "properties": {
+                                "definitionVersion": {
+                                  "default": 1,
+                                  "type": "number",
+                                  "enum": [1]
+                                },
+                                "scope": {
+                                  "default": {},
+                                  "type": "object",
+                                  "properties": {
+                                    "connectionId": {
+                                      "type": "string",
+                                      "format": "uuid"
+                                    },
+                                    "updatedFrom": {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    "updatedBefore": {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                },
+                                "limit": {
+                                  "default": 20,
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 100
+                                },
+                                "offset": {
+                                  "default": 0,
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 10000
+                                },
+                                "asOf": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "snapshot": {
+                                  "type": "string",
+                                  "pattern": "^[a-f0-9]{64}$"
+                                }
+                              },
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": ["kind", "request"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["operational"]
+                            },
+                            "request": {
+                              "type": "object",
+                              "properties": {
+                                "definitionVersion": {
+                                  "type": "number",
+                                  "enum": [2]
+                                },
+                                "metrics": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "enum": [
+                                      "cases.active",
+                                      "cases.attention",
+                                      "cases.oldest_unresolved_age",
+                                      "inventory.below_minimum",
+                                      "inventory.replenishment_unknown",
+                                      "procurement.purchase_orders.draft",
+                                      "procurement.purchase_orders.open",
+                                      "connections.needing_attention",
+                                      "resolution.unknown_eligibility",
+                                      "resolution.eligible",
+                                      "resolution.verified",
+                                      "resolution.autonomous",
+                                      "resolution.human",
+                                      "resolution.unknown",
+                                      "resolution.pending",
+                                      "resolution.recurrent",
+                                      "resolution.incorrect_actions",
+                                      "resolution.time_to_outcome",
+                                      "resolution.unresolved_age"
+                                    ]
+                                  },
+                                  "minItems": 1,
+                                  "maxItems": 19
+                                },
+                                "scope": {
+                                  "default": {},
+                                  "type": "object",
+                                  "properties": {
+                                    "connectionId": {
+                                      "type": "string",
+                                      "format": "uuid"
+                                    },
+                                    "supplierId": {
+                                      "type": "string",
+                                      "format": "uuid"
+                                    },
+                                    "authority": {
+                                      "type": "string",
+                                      "enum": ["luma", "external"]
+                                    },
+                                    "environment": {
+                                      "type": "string",
+                                      "enum": [
+                                        "live",
+                                        "pilot",
+                                        "synthetic",
+                                        "shadow",
+                                        "unknown"
+                                      ]
+                                    },
+                                    "window": {
+                                      "type": "string",
+                                      "enum": ["24h", "7d"]
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                },
+                                "limit": {
+                                  "default": 20,
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 100
+                                },
+                                "offset": {
+                                  "default": 0,
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 10000
+                                },
+                                "asOf": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "snapshot": {
+                                  "type": "string",
+                                  "pattern": "^[a-f0-9]{64}$"
+                                }
+                              },
+                              "required": ["definitionVersion", "metrics"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": ["kind", "request"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "minItems": 1,
+                    "maxItems": 4
+                  }
+                },
+                "required": ["parts"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "readAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "nextRefreshAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "Earliest refresh boundary across the parts that were read.",
+                      "nullable": true
+                    },
+                    "parts": {
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": ["orders"]
+                              },
+                              "status": {
+                                "type": "number",
+                                "enum": [200]
+                              },
+                              "body": {
+                                "type": "object",
+                                "properties": {
+                                  "nextRefreshAt": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "nullable": true,
+                                    "description": "Next deadline or freshness boundary. Refresh current metrics at this time, even if no change event arrives."
+                                  },
+                                  "definitionVersion": {
+                                    "type": "number",
+                                    "enum": [1]
+                                  },
+                                  "scope": {
+                                    "type": "object",
+                                    "properties": {
+                                      "connectionId": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                      },
+                                      "updatedFrom": {
+                                        "type": "string",
+                                        "format": "date-time"
+                                      },
+                                      "updatedBefore": {
+                                        "type": "string",
+                                        "format": "date-time"
+                                      }
+                                    },
+                                    "additionalProperties": false
+                                  },
+                                  "asOf": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "readAt": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "snapshot": {
+                                    "type": "string"
+                                  },
+                                  "timezone": {
+                                    "type": "string",
+                                    "enum": ["UTC"]
+                                  },
+                                  "observedAt": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "nullable": true
+                                  },
+                                  "dataThrough": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "nullable": true
+                                  },
+                                  "freshness": {
+                                    "type": "string",
+                                    "enum": ["fresh", "stale", "unobserved"]
+                                  },
+                                  "coverage": {
+                                    "type": "string",
+                                    "enum": ["partial", "unavailable"]
+                                  },
+                                  "coverageExplanation": {
+                                    "type": "string"
+                                  },
+                                  "limit": {
+                                    "type": "number"
+                                  },
+                                  "offset": {
+                                    "type": "number"
+                                  },
+                                  "metrics": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "definition": {
+                                          "type": "object",
+                                          "properties": {
+                                            "id": {
+                                              "type": "string",
+                                              "enum": [
+                                                "orders.open",
+                                                "orders.overdue",
+                                                "orders.attention"
+                                              ]
+                                            },
+                                            "title": {
+                                              "type": "string"
+                                            },
+                                            "description": {
+                                              "type": "string"
+                                            },
+                                            "predicate": {
+                                              "type": "string"
+                                            },
+                                            "timeSemantics": {
+                                              "type": "string"
+                                            },
+                                            "version": {
+                                              "type": "number",
+                                              "enum": [1]
+                                            },
+                                            "unit": {
+                                              "type": "string",
+                                              "enum": ["canonical_order"]
+                                            },
+                                            "dimensions": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "string",
+                                                "enum": ["connectionId"]
+                                              }
+                                            },
+                                            "filters": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "string",
+                                                "enum": [
+                                                  "connectionId",
+                                                  "updatedFrom",
+                                                  "updatedBefore"
+                                                ]
+                                              }
+                                            },
+                                            "permissions": {
+                                              "type": "string",
+                                              "enum": ["workspace_member"]
+                                            },
+                                            "drillDown": {
+                                              "type": "string",
+                                              "enum": ["orders.cohort"]
+                                            }
+                                          },
+                                          "required": [
+                                            "id",
+                                            "title",
+                                            "description",
+                                            "predicate",
+                                            "timeSemantics",
+                                            "version",
+                                            "unit",
+                                            "dimensions",
+                                            "filters",
+                                            "permissions",
+                                            "drillDown"
+                                          ]
+                                        },
+                                        "total": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "nullable": true
+                                        },
+                                        "observedCount": {
+                                          "type": "integer",
+                                          "minimum": 0
+                                        },
+                                        "unknownCount": {
+                                          "type": "integer",
+                                          "minimum": 0
+                                        },
+                                        "items": {
+                                          "type": "array",
+                                          "items": {
+                                            "type": "object",
+                                            "properties": {
+                                              "id": {
+                                                "type": "string",
+                                                "format": "uuid"
+                                              },
+                                              "displayNumber": {
+                                                "type": "string",
+                                                "nullable": true
+                                              },
+                                              "connectionId": {
+                                                "type": "string",
+                                                "format": "uuid"
+                                              },
+                                              "dueAt": {
+                                                "type": "string",
+                                                "format": "date-time",
+                                                "nullable": true
+                                              },
+                                              "observedAt": {
+                                                "type": "string",
+                                                "format": "date-time"
+                                              },
+                                              "sourceUpdatedAt": {
+                                                "type": "string",
+                                                "format": "date-time",
+                                                "nullable": true
+                                              },
+                                              "open": {
+                                                "type": "boolean",
+                                                "nullable": true
+                                              },
+                                              "overdue": {
+                                                "type": "boolean",
+                                                "nullable": true
+                                              },
+                                              "attention": {
+                                                "type": "boolean"
+                                              },
+                                              "issueIds": {
+                                                "type": "array",
+                                                "items": {
+                                                  "type": "string",
+                                                  "format": "uuid"
+                                                }
+                                              }
+                                            },
+                                            "required": [
+                                              "id",
+                                              "displayNumber",
+                                              "connectionId",
+                                              "dueAt",
+                                              "observedAt",
+                                              "sourceUpdatedAt",
+                                              "open",
+                                              "overdue",
+                                              "attention",
+                                              "issueIds"
+                                            ]
+                                          }
+                                        }
+                                      },
+                                      "required": [
+                                        "definition",
+                                        "total",
+                                        "observedCount",
+                                        "unknownCount",
+                                        "items"
+                                      ]
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "definitionVersion",
+                                  "scope",
+                                  "asOf",
+                                  "readAt",
+                                  "snapshot",
+                                  "timezone",
+                                  "observedAt",
+                                  "dataThrough",
+                                  "freshness",
+                                  "coverage",
+                                  "coverageExplanation",
+                                  "limit",
+                                  "offset",
+                                  "metrics"
+                                ]
+                              }
+                            },
+                            "required": ["kind", "status", "body"]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": ["operational"]
+                              },
+                              "status": {
+                                "type": "number",
+                                "enum": [200]
+                              },
+                              "body": {
+                                "type": "object",
+                                "properties": {
+                                  "definitionVersion": {
+                                    "type": "number",
+                                    "enum": [2]
+                                  },
+                                  "scope": {
+                                    "type": "object",
+                                    "properties": {
+                                      "connectionId": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                      },
+                                      "supplierId": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                      },
+                                      "authority": {
+                                        "type": "string",
+                                        "enum": ["luma", "external"]
+                                      },
+                                      "environment": {
+                                        "type": "string",
+                                        "enum": [
+                                          "live",
+                                          "pilot",
+                                          "synthetic",
+                                          "shadow",
+                                          "unknown"
+                                        ]
+                                      },
+                                      "window": {
+                                        "type": "string",
+                                        "enum": ["24h", "7d"]
+                                      }
+                                    },
+                                    "additionalProperties": false
+                                  },
+                                  "asOf": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "readAt": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "snapshot": {
+                                    "type": "string"
+                                  },
+                                  "timezone": {
+                                    "type": "string",
+                                    "enum": ["UTC"]
+                                  },
+                                  "nextRefreshAt": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "nullable": true
+                                  },
+                                  "limit": {
+                                    "type": "number"
+                                  },
+                                  "offset": {
+                                    "type": "number"
+                                  },
+                                  "metrics": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "definition": {
+                                          "type": "object",
+                                          "properties": {
+                                            "id": {
+                                              "type": "string",
+                                              "enum": [
+                                                "cases.active",
+                                                "cases.attention",
+                                                "cases.oldest_unresolved_age",
+                                                "inventory.below_minimum",
+                                                "inventory.replenishment_unknown",
+                                                "procurement.purchase_orders.draft",
+                                                "procurement.purchase_orders.open",
+                                                "connections.needing_attention",
+                                                "resolution.unknown_eligibility",
+                                                "resolution.eligible",
+                                                "resolution.verified",
+                                                "resolution.autonomous",
+                                                "resolution.human",
+                                                "resolution.unknown",
+                                                "resolution.pending",
+                                                "resolution.recurrent",
+                                                "resolution.incorrect_actions",
+                                                "resolution.time_to_outcome",
+                                                "resolution.unresolved_age"
+                                              ]
+                                            },
+                                            "title": {
+                                              "type": "string"
+                                            },
+                                            "description": {
+                                              "type": "string"
+                                            },
+                                            "version": {
+                                              "type": "number",
+                                              "enum": [2]
+                                            },
+                                            "family": {
+                                              "type": "string",
+                                              "enum": [
+                                                "cases",
+                                                "inventory",
+                                                "procurement",
+                                                "connections",
+                                                "resolution"
+                                              ]
+                                            },
+                                            "unit": {
+                                              "type": "string",
+                                              "enum": [
+                                                "case",
+                                                "second",
+                                                "stock_position",
+                                                "purchase_order",
+                                                "connection"
+                                              ]
+                                            },
+                                            "filters": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "string",
+                                                "enum": [
+                                                  "connectionId",
+                                                  "supplierId",
+                                                  "authority",
+                                                  "environment",
+                                                  "window"
+                                                ]
+                                              }
+                                            },
+                                            "timeSemantics": {
+                                              "type": "string"
+                                            },
+                                            "permissions": {
+                                              "type": "string",
+                                              "enum": ["workspace_member"]
+                                            }
+                                          },
+                                          "required": [
+                                            "id",
+                                            "title",
+                                            "description",
+                                            "version",
+                                            "family",
+                                            "unit",
+                                            "filters",
+                                            "timeSemantics",
+                                            "permissions"
+                                          ]
+                                        },
+                                        "value": {
+                                          "type": "number",
+                                          "minimum": 0,
+                                          "nullable": true
+                                        },
+                                        "total": {
+                                          "type": "number",
+                                          "minimum": 0,
+                                          "nullable": true
+                                        },
+                                        "observedCount": {
+                                          "type": "integer",
+                                          "minimum": 0
+                                        },
+                                        "unknownCount": {
+                                          "type": "integer",
+                                          "minimum": 0
+                                        },
+                                        "population": {
+                                          "type": "integer",
+                                          "minimum": 0
+                                        },
+                                        "coverage": {
+                                          "type": "string",
+                                          "enum": [
+                                            "complete",
+                                            "partial",
+                                            "unavailable"
+                                          ]
+                                        },
+                                        "coverageExplanation": {
+                                          "type": "string"
+                                        },
+                                        "freshness": {
+                                          "type": "string",
+                                          "enum": [
+                                            "fresh",
+                                            "stale",
+                                            "unobserved"
+                                          ]
+                                        },
+                                        "observedAt": {
+                                          "type": "string",
+                                          "nullable": true
+                                        },
+                                        "dataThrough": {
+                                          "type": "string",
+                                          "format": "date-time",
+                                          "nullable": true
+                                        },
+                                        "nextRefreshAt": {
+                                          "type": "string",
+                                          "format": "date-time",
+                                          "nullable": true
+                                        },
+                                        "breakdown": {
+                                          "type": "array",
+                                          "items": {
+                                            "type": "object",
+                                            "properties": {
+                                              "reason": {
+                                                "type": "string"
+                                              },
+                                              "count": {
+                                                "type": "integer",
+                                                "minimum": 0
+                                              }
+                                            },
+                                            "required": ["reason", "count"]
+                                          }
+                                        },
+                                        "items": {
+                                          "type": "array",
+                                          "items": {
+                                            "discriminator": {
+                                              "propertyName": "kind"
+                                            },
+                                            "oneOf": [
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "kind": {
+                                                    "type": "string",
+                                                    "enum": ["resolution"]
+                                                  },
+                                                  "id": {
+                                                    "type": "string",
+                                                    "format": "uuid"
+                                                  },
+                                                  "title": {
+                                                    "type": "string"
+                                                  },
+                                                  "state": {
+                                                    "type": "string"
+                                                  },
+                                                  "environment": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "live",
+                                                      "pilot",
+                                                      "synthetic",
+                                                      "shadow",
+                                                      "unknown"
+                                                    ]
+                                                  },
+                                                  "detectedAt": {
+                                                    "type": "string",
+                                                    "format": "date-time"
+                                                  },
+                                                  "verifiedAt": {
+                                                    "type": "string",
+                                                    "format": "date-time",
+                                                    "nullable": true
+                                                  },
+                                                  "eligibility": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "eligible",
+                                                      "ineligible",
+                                                      "unknown"
+                                                    ]
+                                                  },
+                                                  "involvement": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "none",
+                                                      "human",
+                                                      "unknown"
+                                                    ]
+                                                  },
+                                                  "outcome": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "verified",
+                                                      "pending",
+                                                      "human_disposition"
+                                                    ]
+                                                  },
+                                                  "timeToOutcomeSeconds": {
+                                                    "type": "number",
+                                                    "minimum": 0,
+                                                    "nullable": true
+                                                  },
+                                                  "unresolvedAgeSeconds": {
+                                                    "type": "number",
+                                                    "minimum": 0,
+                                                    "nullable": true
+                                                  },
+                                                  "previousIncidentId": {
+                                                    "type": "string",
+                                                    "format": "uuid",
+                                                    "nullable": true
+                                                  },
+                                                  "incorrectActionIds": {
+                                                    "type": "array",
+                                                    "items": {
+                                                      "type": "string",
+                                                      "format": "uuid"
+                                                    }
+                                                  },
+                                                  "evidenceRefCount": {
+                                                    "type": "integer",
+                                                    "minimum": 0
+                                                  },
+                                                  "factCount": {
+                                                    "type": "integer",
+                                                    "minimum": 0
+                                                  },
+                                                  "evidenceRefs": {
+                                                    "type": "array",
+                                                    "items": {
+                                                      "type": "string"
+                                                    },
+                                                    "maxItems": 50
+                                                  },
+                                                  "factIds": {
+                                                    "type": "array",
+                                                    "items": {
+                                                      "type": "string",
+                                                      "format": "uuid"
+                                                    },
+                                                    "maxItems": 50
+                                                  },
+                                                  "revision": {
+                                                    "type": "integer",
+                                                    "minimum": 0
+                                                  }
+                                                },
+                                                "required": [
+                                                  "kind",
+                                                  "id",
+                                                  "title",
+                                                  "state",
+                                                  "environment",
+                                                  "detectedAt",
+                                                  "verifiedAt",
+                                                  "eligibility",
+                                                  "involvement",
+                                                  "outcome",
+                                                  "timeToOutcomeSeconds",
+                                                  "unresolvedAgeSeconds",
+                                                  "previousIncidentId",
+                                                  "incorrectActionIds",
+                                                  "evidenceRefs",
+                                                  "factIds",
+                                                  "revision"
+                                                ]
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "kind": {
+                                                    "type": "string",
+                                                    "enum": ["case"]
+                                                  },
+                                                  "id": {
+                                                    "type": "string",
+                                                    "format": "uuid"
+                                                  },
+                                                  "subjectKind": {
+                                                    "type": "string"
+                                                  },
+                                                  "subjectId": {
+                                                    "type": "string"
+                                                  },
+                                                  "state": {
+                                                    "type": "string"
+                                                  },
+                                                  "title": {
+                                                    "type": "string"
+                                                  },
+                                                  "detectedAt": {
+                                                    "type": "string",
+                                                    "nullable": true
+                                                  },
+                                                  "ageSeconds": {
+                                                    "type": "number",
+                                                    "minimum": 0,
+                                                    "nullable": true
+                                                  },
+                                                  "reason": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "approval",
+                                                      "manual_intervention",
+                                                      "uncertainty"
+                                                    ],
+                                                    "nullable": true
+                                                  }
+                                                },
+                                                "required": [
+                                                  "kind",
+                                                  "id",
+                                                  "subjectKind",
+                                                  "subjectId",
+                                                  "state",
+                                                  "title",
+                                                  "detectedAt",
+                                                  "ageSeconds",
+                                                  "reason"
+                                                ]
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "kind": {
+                                                    "type": "string",
+                                                    "enum": ["stock_position"]
+                                                  },
+                                                  "id": {
+                                                    "type": "string",
+                                                    "format": "uuid"
+                                                  },
+                                                  "ruleId": {
+                                                    "type": "string",
+                                                    "format": "uuid"
+                                                  },
+                                                  "connectionId": {
+                                                    "type": "string",
+                                                    "format": "uuid"
+                                                  },
+                                                  "sku": {
+                                                    "type": "string"
+                                                  },
+                                                  "minimum": {
+                                                    "type": "number"
+                                                  },
+                                                  "available": {
+                                                    "type": "number",
+                                                    "nullable": true
+                                                  },
+                                                  "unit": {
+                                                    "type": "string",
+                                                    "nullable": true
+                                                  },
+                                                  "observedAt": {
+                                                    "type": "string",
+                                                    "nullable": true
+                                                  },
+                                                  "reason": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "missing",
+                                                      "deleted",
+                                                      "nonnumeric",
+                                                      "future",
+                                                      "expired",
+                                                      "invalid_time"
+                                                    ],
+                                                    "nullable": true
+                                                  },
+                                                  "commitmentIds": {
+                                                    "type": "array",
+                                                    "items": {
+                                                      "type": "string",
+                                                      "format": "uuid"
+                                                    }
+                                                  }
+                                                },
+                                                "required": [
+                                                  "kind",
+                                                  "id",
+                                                  "ruleId",
+                                                  "connectionId",
+                                                  "sku",
+                                                  "minimum",
+                                                  "available",
+                                                  "unit",
+                                                  "observedAt",
+                                                  "reason",
+                                                  "commitmentIds"
+                                                ]
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "kind": {
+                                                    "type": "string",
+                                                    "enum": ["purchase_order"]
+                                                  },
+                                                  "id": {
+                                                    "type": "string",
+                                                    "format": "uuid"
+                                                  },
+                                                  "reference": {
+                                                    "type": "string"
+                                                  },
+                                                  "supplierId": {
+                                                    "type": "string",
+                                                    "format": "uuid"
+                                                  },
+                                                  "supplierName": {
+                                                    "type": "string"
+                                                  },
+                                                  "authority": {
+                                                    "type": "string",
+                                                    "enum": ["luma", "external"]
+                                                  },
+                                                  "status": {
+                                                    "type": "string",
+                                                    "enum": ["draft", "open"]
+                                                  },
+                                                  "createdAt": {
+                                                    "type": "string",
+                                                    "format": "date-time"
+                                                  },
+                                                  "ageSeconds": {
+                                                    "type": "number",
+                                                    "nullable": true
+                                                  }
+                                                },
+                                                "required": [
+                                                  "kind",
+                                                  "id",
+                                                  "reference",
+                                                  "supplierId",
+                                                  "supplierName",
+                                                  "authority",
+                                                  "status",
+                                                  "createdAt",
+                                                  "ageSeconds"
+                                                ]
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "kind": {
+                                                    "type": "string",
+                                                    "enum": ["connection"]
+                                                  },
+                                                  "id": {
+                                                    "type": "string",
+                                                    "format": "uuid"
+                                                  },
+                                                  "label": {
+                                                    "type": "string"
+                                                  },
+                                                  "status": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "pending",
+                                                      "active",
+                                                      "degraded",
+                                                      "revoked",
+                                                      "disconnected"
+                                                    ]
+                                                  },
+                                                  "lastObservedAt": {
+                                                    "type": "string",
+                                                    "format": "date-time",
+                                                    "nullable": true
+                                                  },
+                                                  "freshness": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "fresh",
+                                                      "stale",
+                                                      "unobserved"
+                                                    ]
+                                                  },
+                                                  "nextRefreshAt": {
+                                                    "type": "string",
+                                                    "format": "date-time",
+                                                    "nullable": true
+                                                  },
+                                                  "reasons": {
+                                                    "type": "array",
+                                                    "items": {
+                                                      "type": "string"
+                                                    }
+                                                  }
+                                                },
+                                                "required": [
+                                                  "kind",
+                                                  "id",
+                                                  "label",
+                                                  "status",
+                                                  "lastObservedAt",
+                                                  "freshness",
+                                                  "reasons"
+                                                ]
+                                              }
+                                            ]
+                                          }
+                                        }
+                                      },
+                                      "required": [
+                                        "definition",
+                                        "value",
+                                        "total",
+                                        "observedCount",
+                                        "unknownCount",
+                                        "population",
+                                        "coverage",
+                                        "coverageExplanation",
+                                        "freshness",
+                                        "observedAt",
+                                        "dataThrough",
+                                        "nextRefreshAt",
+                                        "breakdown",
+                                        "items"
+                                      ]
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "definitionVersion",
+                                  "scope",
+                                  "asOf",
+                                  "readAt",
+                                  "snapshot",
+                                  "timezone",
+                                  "nextRefreshAt",
+                                  "limit",
+                                  "offset",
+                                  "metrics"
+                                ]
+                              }
+                            },
+                            "required": ["kind", "status", "body"]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": ["orders", "operational"]
+                              },
+                              "status": {
+                                "type": "integer",
+                                "minimum": 400,
+                                "maximum": 599
+                              },
+                              "error": {
+                                "type": "object",
+                                "properties": {
+                                  "code": {
+                                    "type": "string",
+                                    "enum": [
+                                      "VALIDATION_ERROR",
+                                      "UNAUTHENTICATED",
+                                      "FORBIDDEN",
+                                      "NOT_FOUND",
+                                      "CONFLICT",
+                                      "REGION_UNAVAILABLE",
+                                      "SERVICE_UNAVAILABLE",
+                                      "NOT_READY",
+                                      "INTERNAL_ERROR",
+                                      "PAYLOAD_TOO_LARGE",
+                                      "TOO_MANY_REQUESTS",
+                                      "UNSUPPORTED_MEDIA_TYPE"
+                                    ]
+                                  },
+                                  "message": {
+                                    "type": "string"
+                                  },
+                                  "requestId": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": ["code", "message", "requestId"]
+                              }
+                            },
+                            "required": ["kind", "status", "error"]
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "required": ["readAt", "nextRefreshAt", "parts"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/organizations/{organizationId}/metrics": {
       "get": {
         "description": "Lists versioned counting rules, supported filters, permissions and drill-down semantics for canonical order metrics.",
@@ -99263,6 +100686,1053 @@
         }
       }
     },
+    "/v1/organizations/{organizationId}/customers": {
+      "get": {
+        "description": "List customer profiles imported from connected stores. Each profile belongs to one connection and source customer; profiles are never merged across stores, and names or email addresses do not establish identity. Name, email and phone are null unless the source shares contact details (`shared.contact`). `orderCount` and `amountSpent` are what the source reports. Search matches the name, email address, phone number and source customer ID. `externalId` with `connectionId` finds one source customer. `sources` lists each commerce connection and whether it shares customers with Luma. Results contain up to `limit` profiles (at most 50) with `totalCount` matches; nextCursor continues the same filters and sorting.",
+        "summary": "Browse customers",
+        "tags": ["customers"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "default": "",
+              "type": "string",
+              "maxLength": 120
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["enabled", "disabled", "invited", "declined", "unknown"]
+            }
+          },
+          {
+            "name": "connectionId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "externalId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "default": "created",
+              "type": "string",
+              "enum": ["created", "orders", "name"]
+            }
+          },
+          {
+            "name": "direction",
+            "in": "query",
+            "schema": {
+              "default": "desc",
+              "type": "string",
+              "enum": ["asc", "desc"]
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          }
+        ],
+        "operationId": "customers.list",
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "connectionId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "externalId": {
+                            "type": "string"
+                          },
+                          "displayName": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "email": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "phone": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "enabled",
+                              "disabled",
+                              "invited",
+                              "declined",
+                              "unknown"
+                            ]
+                          },
+                          "sourceCreatedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "orderCount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "nullable": true
+                          },
+                          "amountSpent": {
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "string"
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "nullable": true
+                          },
+                          "tags": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "shared": {
+                            "type": "object",
+                            "properties": {
+                              "contact": {
+                                "type": "boolean"
+                              },
+                              "address": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": ["contact", "address"]
+                          },
+                          "sourceUpdatedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "observedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "connectionId",
+                          "externalId",
+                          "displayName",
+                          "email",
+                          "phone",
+                          "state",
+                          "sourceCreatedAt",
+                          "orderCount",
+                          "amountSpent",
+                          "tags",
+                          "shared",
+                          "sourceUpdatedAt",
+                          "observedAt"
+                        ]
+                      }
+                    },
+                    "sources": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "connectionId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "system": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "appId": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "access": {
+                            "type": "string",
+                            "enum": ["granted", "not_granted", "not_requested"]
+                          },
+                          "records": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "importing": {
+                            "type": "boolean"
+                          },
+                          "fullReadAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "lastReadAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "failing": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "connectionId",
+                          "label",
+                          "system",
+                          "appId",
+                          "status",
+                          "access",
+                          "records",
+                          "importing",
+                          "fullReadAt",
+                          "lastReadAt",
+                          "failing"
+                        ]
+                      }
+                    },
+                    "totalCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "nextCursor": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "asOf": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "sources",
+                    "totalCount",
+                    "nextCursor",
+                    "asOf"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/customers/{customerId}": {
+      "get": {
+        "description": "Read one imported customer profile with its address, when the source shares addresses, and the connection it came from. Order history is read live through the connected app.",
+        "summary": "Inspect a customer",
+        "tags": ["customers"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "customerId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "operationId": "customers.get",
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "item": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "connectionId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "externalId": {
+                          "type": "string"
+                        },
+                        "displayName": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "email": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "phone": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "enabled",
+                            "disabled",
+                            "invited",
+                            "declined",
+                            "unknown"
+                          ]
+                        },
+                        "sourceCreatedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        },
+                        "orderCount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "nullable": true
+                        },
+                        "amountSpent": {
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "string"
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "nullable": true
+                        },
+                        "tags": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "shared": {
+                          "type": "object",
+                          "properties": {
+                            "contact": {
+                              "type": "boolean"
+                            },
+                            "address": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": ["contact", "address"]
+                        },
+                        "sourceUpdatedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        },
+                        "observedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "connectionId",
+                        "externalId",
+                        "displayName",
+                        "email",
+                        "phone",
+                        "state",
+                        "sourceCreatedAt",
+                        "orderCount",
+                        "amountSpent",
+                        "tags",
+                        "shared",
+                        "sourceUpdatedAt",
+                        "observedAt"
+                      ]
+                    },
+                    "address": {
+                      "type": "object",
+                      "properties": {
+                        "line1": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "line2": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "city": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "region": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "postalCode": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "country": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "line1",
+                        "line2",
+                        "city",
+                        "region",
+                        "postalCode",
+                        "country"
+                      ],
+                      "nullable": true
+                    },
+                    "source": {
+                      "type": "object",
+                      "properties": {
+                        "connectionId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "system": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "appId": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "status": {
+                          "type": "string"
+                        },
+                        "access": {
+                          "type": "string",
+                          "enum": ["granted", "not_granted", "not_requested"]
+                        },
+                        "records": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "importing": {
+                          "type": "boolean"
+                        },
+                        "fullReadAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        },
+                        "lastReadAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        },
+                        "failing": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "connectionId",
+                        "label",
+                        "system",
+                        "appId",
+                        "status",
+                        "access",
+                        "records",
+                        "importing",
+                        "fullReadAt",
+                        "lastReadAt",
+                        "failing"
+                      ],
+                      "nullable": true
+                    },
+                    "asOf": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": ["item", "address", "source", "asOf"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/organizations/{organizationId}/sync": {
       "get": {
         "description": "Shows, for each connection and record type, whether Luma is importing history, keeping records in sync, retrying or waiting for someone. Includes imported record counts, the creation-date range Luma holds, any source history limit, the last successful sync and recent runs. A record type is `not_requested` when the connection does not include it and `not_granted` when the source did not grant it.",
@@ -105961,8 +108431,8 @@
     },
     "/v1/organizations/{organizationId}/metrics/events": {
       "get": {
-        "description": "Authenticated SSE invalidates order metrics and their matching records. Subscribe before the first query. Refetch on resync events with refetch: true and on reconnect. Events contain no totals or replay history. Last-Event-ID requests current state. Access is rechecked before delivery and every five seconds. Slow consumers disconnect and must resynchronize. Reconciliation runs every 30 seconds.",
-        "summary": "Follow operational metric changes",
+        "description": "Authenticated SSE tells workspace members which areas of data changed. Subscribe before the first query. On resync events with refetch: true, read again the views that depend on a listed topic; on reconnect, read all of them. Topics are limited to areas the member can read; decisions is available to every member. Events contain no records, totals or replay history. Last-Event-ID requests current state. Access is rechecked at least every five seconds and the stream closes when it is lost. Slow consumers disconnect and must resynchronize. Reconciliation lists every readable topic every 30 seconds.",
+        "summary": "Follow workspace changes",
         "tags": ["metricEvents"],
         "parameters": [
           {

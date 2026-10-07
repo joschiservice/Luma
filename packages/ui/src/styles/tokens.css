@@ -68,6 +68,7 @@
 
   /* Domain wayfinding. Never used for full surfaces or states. */
   --domain-orders: #316bff;
+  --domain-customers: #e8622c;
   --domain-inventory: #0ea5a0;
   --domain-products: #c2418f;
   --domain-returns: #5b9a2f;
@@ -174,6 +175,7 @@
   --chart-axis: #ffffff2e;
 
   --domain-orders: #4a80ff;
+  --domain-customers: #f07a3e;
   --domain-inventory: #14b8b2;
   --domain-products: #dc5aa6;
   --domain-returns: #74b545;

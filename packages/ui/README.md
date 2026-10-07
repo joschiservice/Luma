@@ -10,7 +10,7 @@ Components, stories and fixtures are grouped by responsibility under `src/compon
 
 - `primitives/`: general components such as Card, Alert, Button and Field. They never import feature components.
 - `issues/`: issue investigation, evidence, execution, resolution and timeline compositions.
-- `workspace/`: workspace header, switcher and account menu.
+- `workspace/`: page titles and headers, workspace switcher and account menu.
 
 Import from the matching public path, such as `@luma/ui/components/primitives/card`. Keep stories and fixtures beside their components.
 

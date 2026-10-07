@@ -232,13 +232,7 @@ export function NeedsYouView({
       className={`inbox page-full decisions ${search.item ? 'inbox-selected' : ''}`}
     >
       <header className="inbox-heading">
-        <div className="decisions-heading-copy">
-          <h1>Needs you</h1>
-          <p>
-            Approvals, manual steps and outcome checks from issues, workflows
-            and apps, most urgent first.
-          </p>
-        </div>
+        <h1 className="sr-only">Needs you</h1>
         <div className="issue-summary" aria-live="polite">
           {list ? (
             <>

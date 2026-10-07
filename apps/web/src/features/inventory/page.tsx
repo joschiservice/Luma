@@ -8,9 +8,8 @@ import {
   CollectionViews,
 } from '@luma/ui/components/primitives/collection-toolbar';
 import { DataTable } from '@luma/ui/components/primitives/data-table';
-import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { Empty } from '@luma/ui/components/primitives/empty';
-import { PageHeader } from '@luma/ui/components/workspace/page-header';
+import { PageTitle } from '@luma/ui/components/workspace/page-header';
 import { useQuery } from '@tanstack/react-query';
 import {
   Link,
@@ -199,11 +198,7 @@ export function InventoryView({
   return (
     <main className="inventory-page">
       {from ? <Link to={from}>← Back to context</Link> : null}
-      <PageHeader
-        title="Inventory"
-        icon={<DomainIcon domain="inventory" size="md" />}
-        description="Know what is available, where it is, and why your sources disagree."
-      />
+      <PageTitle title="Inventory" />
       <CollectionToolbar
         refreshLabel="Refresh inventory"
         refreshing={refreshing}

@@ -18,11 +18,10 @@ import {
   type DataTableColumn,
   DataTableRowLink,
 } from '@luma/ui/components/primitives/data-table';
-import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { Empty } from '@luma/ui/components/primitives/empty';
 import { StatePill } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
-import { PageHeader } from '@luma/ui/components/workspace/page-header';
+import { PageTitle } from '@luma/ui/components/workspace/page-header';
 import { onlineManager, useQuery } from '@tanstack/react-query';
 import {
   Link,
@@ -365,11 +364,7 @@ export function FulfillmentView({
   return (
     <main className="fulfillment-page">
       {from ? <Link to={from}>← Back to context</Link> : null}
-      <PageHeader
-        title="Fulfillment"
-        icon={<DomainIcon domain="fulfillment" size="md" />}
-        description="See where each order is in fulfillment, what stops it from moving, and the next safe step."
-      />
+      <PageTitle title="Fulfillment" />
       <CollectionToolbar
         refreshLabel="Refresh fulfillment"
         refreshing={refreshing}

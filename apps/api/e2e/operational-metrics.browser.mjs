@@ -95,7 +95,7 @@ test('keeps cross-domain cohorts live, recovers races and measures committed cha
     release = resolve;
   });
   await page.route(
-    '**/v2/organizations/*/metrics/query',
+    '**/v2/organizations/*/metrics/summary',
     async (route) => {
       const response = await route.fetch();
       held = true;
