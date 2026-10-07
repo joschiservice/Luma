@@ -236,20 +236,10 @@
 .workflow-drafts {
   display: grid;
   gap: 8px;
-  padding: 12px;
-  border-radius: var(--radius-panel);
-  background: var(--surface-raised);
-  box-shadow: var(--shadow-panel);
 }
 
 .workflow-drafts h2 {
-  margin: 0 4px;
-}
-
-.workflow-drafts ul {
   margin: 0;
-  padding: 0;
-  list-style: none;
 }
 
 .workflow-drafts .workflow-row h3 {

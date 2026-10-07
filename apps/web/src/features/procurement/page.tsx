@@ -355,66 +355,68 @@ export function ProcurementPage() {
           ) : null
         }
       />
-      <section
-        className="procurement-overview"
-        aria-label="Supplier commitments"
-      >
-        <div className="procurement-overview-heading">
-          <PackageCheck size={17} aria-hidden="true" />
-          <div>
-            <h2>Supplier commitments</h2>
-            <p>
-              What’s drafted, sent, confirmed and received, and what needs a
-              response.
-            </p>
+      <div className="procurement-summary">
+        <section
+          className="procurement-overview"
+          aria-label="Supplier commitments"
+        >
+          <div className="procurement-overview-heading">
+            <PackageCheck size={17} aria-hidden="true" />
+            <div>
+              <h2>Supplier commitments</h2>
+              <p>
+                What’s drafted, sent, confirmed and received, and what needs a
+                response.
+              </p>
+            </div>
           </div>
-        </div>
-        <div className="procurement-overview-actions">
-          {(
-            [
+          <div className="procurement-overview-actions">
+            {(
               [
-                'attention',
-                attentionCount,
-                'Need a response',
-                'Show orders that need a response',
-              ],
-              [
-                'awaiting_confirmation',
-                waitingCount,
-                'Waiting on supplier',
-                'Show orders waiting for supplier confirmation',
-              ],
-              [
-                'draft',
-                draftCount,
-                'Drafts not sent',
-                'Show draft purchase orders',
-              ],
-            ] as const
-          ).map(([stage, count, label, aria]) => (
-            <Button
-              key={stage}
-              variant="ghost"
-              aria-label={aria}
-              aria-pressed={
-                filters.view === 'orders' && filters.stage === stage
-              }
-              onClick={() =>
-                change(
-                  filters.stage === stage
-                    ? { view: 'orders', stage: undefined }
-                    : { view: 'orders', q: '', status: '', stage },
-                )
-              }
-            >
-              <strong>{count ?? '—'}</strong>
-              <span>{label}</span>
-              <ArrowUpRight size={14} aria-hidden="true" />
-            </Button>
-          ))}
-        </div>
-      </section>
-      <ReplenishmentOverview organizationId={organizationId} />
+                [
+                  'attention',
+                  attentionCount,
+                  'Need a response',
+                  'Show orders that need a response',
+                ],
+                [
+                  'awaiting_confirmation',
+                  waitingCount,
+                  'Waiting on supplier',
+                  'Show orders waiting for supplier confirmation',
+                ],
+                [
+                  'draft',
+                  draftCount,
+                  'Drafts not sent',
+                  'Show draft purchase orders',
+                ],
+              ] as const
+            ).map(([stage, count, label, aria]) => (
+              <Button
+                key={stage}
+                variant="ghost"
+                aria-label={aria}
+                aria-pressed={
+                  filters.view === 'orders' && filters.stage === stage
+                }
+                onClick={() =>
+                  change(
+                    filters.stage === stage
+                      ? { view: 'orders', stage: undefined }
+                      : { view: 'orders', q: '', status: '', stage },
+                  )
+                }
+              >
+                <strong>{count ?? '—'}</strong>
+                <span>{label}</span>
+                <ArrowUpRight size={14} aria-hidden="true" />
+              </Button>
+            ))}
+          </div>
+        </section>
+        <ReplenishmentOverview organizationId={organizationId} />
+      </div>
       <div className="procurement-collection">
         <CollectionToolbar
           views={
@@ -491,14 +493,12 @@ export function ProcurementPage() {
             Loading procurement records…
           </div>
         ) : selected.error ? (
-          <div className="procurement-notice">
-            <Alert role="alert" tone="danger">
-              {procurementError(selected.error)}
-              <Button variant="outline" onClick={() => void selected.refetch()}>
-                Retry
-              </Button>
-            </Alert>
-          </div>
+          <Alert role="alert" tone="danger">
+            {procurementError(selected.error)}
+            <Button variant="outline" onClick={() => void selected.refetch()}>
+              Retry
+            </Button>
+          </Alert>
         ) : filters.view === 'orders' ? (
           <>
             {!visibleOrders?.length ? (
@@ -547,7 +547,6 @@ export function ProcurementPage() {
             ) : (
               <DataTable
                 caption="Purchase orders"
-                variant="plain"
                 columns={orderColumns(organizationId, summaries)}
                 rows={visibleOrders}
                 rowKey={(order) => order.id}
@@ -582,7 +581,6 @@ export function ProcurementPage() {
         ) : (
           <DataTable
             caption="Suppliers"
-            variant="plain"
             columns={supplierColumns({
               organizationId,
               orderCount: (supplier) =>

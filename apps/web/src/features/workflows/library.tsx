@@ -394,7 +394,7 @@ export function DraftList({
       aria-labelledby="workflow-drafts-title"
     >
       <h2 id="workflow-drafts-title">Drafts</h2>
-      <ul>
+      <ul className="workflow-rows">
         {drafts.map((draft) => (
           <li key={draft.id}>
             <Link
