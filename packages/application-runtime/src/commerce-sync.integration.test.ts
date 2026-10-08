@@ -2,8 +2,15 @@ import { createHash, randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 
 import { createCommerceServices } from '@luma/application-runtime';
-import { createSyncRunner, createSyncService } from '@luma/commerce-sync';
+import { createAutomaticLinkStore } from '@luma/application-runtime/sync';
 import {
+  createAutoLinkRunner,
+  createAutoLinkService,
+  createSyncRunner,
+  createSyncService,
+} from '@luma/commerce-sync';
+import {
+  createAutoLinkStore,
   createIdentityReader,
   createSyncStore,
 } from '@luma/commerce-sync/composition';
@@ -509,6 +516,11 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
       for (const capability of reads) source.set(connectionId, capability, []);
     runner = createSyncRunner({
       store: createSyncStore(db),
+      automaticLinks: createAutoLinkRunner({
+        store: createAutomaticLinkStore(db),
+        resolveContext: async (principal) => context(principal),
+        log: () => undefined,
+      }),
       reader: source.reader,
       ingestion: services.ingestion,
       customers: createCustomerProfiles(db),
@@ -518,6 +530,10 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
       pageSize: 2,
     });
     service = createSyncService({
+      automaticLinks: createAutoLinkService({
+        store: createAutomaticLinkStore(db),
+        refreshContext: async (value) => context(value.actor.id),
+      }),
       store: createSyncStore(db),
       connections: {
         list: async () =>
@@ -1191,6 +1207,432 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
       )
     ).rows[0]!.canonical_id;
   }
+
+  async function autoDue() {
+    await owner.query(
+      'UPDATE commerce_auto_link_rules SET due_at=now() WHERE tenant_id=$1',
+      [tenant],
+    );
+  }
+
+  const autoPair = (kind: 'sku' | 'order') => ({
+    kind,
+    targetConnectionId: shop,
+    sourceConnectionId: erp,
+  });
+
+  it('automatically links unique SKUs and explicit order references, replays related records and respects manual separation', async () => {
+    source.set(shop, 'products.read', [product(shop, 'p1', 'item-1', 'ABC-1')]);
+    source.set(erp, 'products.read', [product(erp, 'p9', 'item-9', ' abc-1 ')]);
+    source.set(shop, 'orders.read', [order(shop, '1')]);
+    source.set(erp, 'orders.read', [
+      order(erp, '9', { sku: 'item-9', number: 'SO-9', externalNumber: '#1' }),
+    ]);
+    source.set(erp, 'fulfillment.read', [shipment(erp, 'f9', '9')]);
+    source.set(shop, 'inventory.read', [stock(shop, 'item-1', '3')]);
+    source.set(erp, 'inventory.read', [stock(erp, 'item-9', '8')]);
+    await drain();
+    const shopSku = await canonical(shop, 'sku', 'item-1');
+    const erpSku = await canonical(erp, 'sku', 'item-9');
+    const shopOrder = await canonical(shop, 'order', '1');
+    const erpOrder = await canonical(erp, 'order', '9');
+    expect(shopSku).not.toBe(erpSku);
+    expect(shopOrder).not.toBe(erpOrder);
+    for (const kind of ['sku', 'order'] as const) {
+      expect(
+        await service.previewAutoLinks(context(), autoPair(kind)),
+      ).toMatchObject({ ready: true, counts: { eligible: 1 } });
+      await service.saveAutoLinkRule(context(), {
+        ...autoPair(kind),
+        id: randomUUID(),
+        revision: 0,
+        enabled: true,
+      });
+    }
+    expect(await runner.scopes()).toContain(tenant);
+    await Promise.all([runner.tick(tenant, 0), runner.tick(tenant, 0)]);
+    expect(await canonical(erp, 'sku', 'item-9')).toBe(shopSku);
+    expect(await canonical(erp, 'order', '9')).toBe(shopOrder);
+    const detail = await workspace().get(context(), shopOrder);
+    expect(detail?.sources).toHaveLength(2);
+    expect(
+      (await services.orders.current(context(), shopOrder)).every(
+        (item) =>
+          item.snapshot.data.type === 'order' &&
+          item.snapshot.data.lines.every((line) => line.skuId === shopSku),
+      ),
+    ).toBe(true);
+    const evidence = await owner.query<{ method: string; reason: string }>(
+      "SELECT method,reason FROM connector_mapping_revisions WHERE tenant_id=$1 AND resource IN ('sku','order')",
+      [tenant],
+    );
+    expect(evidence.rows).toHaveLength(2);
+    expect(
+      evidence.rows.every(
+        (item) =>
+          item.method.startsWith('Automatically linked by rule') &&
+          item.reason.includes('revision 1'),
+      ),
+    ).toBe(true);
+    expect(
+      (await service.autoLinkRules(context())).map((rule) => rule.linked),
+    ).toEqual([1, 1]);
+    await autoDue();
+    await runner.tick(tenant, 0);
+    expect(
+      (await service.autoLinkRules(context())).map((rule) => rule.linked),
+    ).toEqual([1, 1]);
+    await service.requestLink(context(), {
+      kind: 'sku',
+      operation: 'unlink',
+      entityId: shopSku,
+      connectionId: erp,
+      reason: 'Different item',
+    });
+    await service.requestLink(context(), {
+      kind: 'order',
+      operation: 'unlink',
+      entityId: shopOrder,
+      connectionId: erp,
+      reason: 'Different order',
+    });
+    await autoDue();
+    await runner.tick(tenant, 0);
+    expect(await canonical(erp, 'sku', 'item-9')).toBe(erpSku);
+    expect(await canonical(erp, 'order', '9')).toBe(erpOrder);
+    for (const kind of ['sku', 'order'] as const)
+      expect(
+        await service.previewAutoLinks(context(), autoPair(kind)),
+      ).toMatchObject({ counts: { eligible: 0, excluded: 1 } });
+  });
+
+  it('previews ambiguities and missing evidence without choosing an arbitrary SKU or order', async () => {
+    source.set(shop, 'products.read', [
+      product(shop, 'p1', 'item-1', 'DUP'),
+      product(shop, 'p2', 'item-2', 'DUP'),
+    ]);
+    source.set(erp, 'products.read', [product(erp, 'p9', 'item-9', 'dup')]);
+    source.set(shop, 'orders.read', [
+      order(shop, '1'),
+      order(shop, '2', { number: '#1' }),
+    ]);
+    source.set(erp, 'orders.read', [
+      order(erp, '9', { externalNumber: '#1' }),
+      order(erp, '10', { number: '#2' }),
+    ]);
+    await drain();
+    for (const kind of ['sku', 'order'] as const) {
+      expect(
+        await service.previewAutoLinks(context(), autoPair(kind)),
+      ).toMatchObject({ ready: true, counts: { eligible: 0, ambiguous: 1 } });
+      await service.saveAutoLinkRule(context(), {
+        ...autoPair(kind),
+        id: randomUUID(),
+        revision: 0,
+        enabled: true,
+      });
+    }
+    await runner.tick(tenant, 0);
+    expect(
+      (await service.autoLinkRules(context())).every(
+        (rule) => rule.linked === 0,
+      ),
+    ).toBe(true);
+    await owner.query(
+      "UPDATE commerce_sync_streams SET last_full_scan_at=NULL WHERE tenant_id=$1 AND connection_id=$2 AND record_type='products'",
+      [tenant, erp],
+    );
+    expect(
+      await service.previewAutoLinks(context(), autoPair('sku')),
+    ).toMatchObject({ ready: false, candidates: [] });
+    await owner.query(
+      "UPDATE commerce_sync_streams SET last_full_scan_at=now(),last_success_at=now()-interval '2 days' WHERE tenant_id=$1 AND connection_id=$2 AND record_type='products'",
+      [tenant, erp],
+    );
+    expect(
+      await service.previewAutoLinks(context(), autoPair('sku')),
+    ).toMatchObject({ ready: false });
+  });
+
+  it('revalidates candidates after preview and skips stale ledger evidence and incompatible units', async () => {
+    source.set(shop, 'products.read', [product(shop, 'p1', 'item-1', 'ABC-1')]);
+    source.set(erp, 'products.read', [product(erp, 'p9', 'item-9', 'abc-1')]);
+    await drain();
+    expect(
+      (await service.previewAutoLinks(context(), autoPair('sku'))).counts
+        .eligible,
+    ).toBe(1);
+    const rule = await service.saveAutoLinkRule(context(), {
+      ...autoPair('sku'),
+      id: randomUUID(),
+      revision: 0,
+      enabled: true,
+    });
+    // A second SKU arrives after preview, before the rule runs.
+    source.set(erp, 'products.read', [
+      product(erp, 'p9', 'item-9', 'abc-1'),
+      product(erp, 'p10', 'item-10', 'ABC-1'),
+    ]);
+    await due();
+    await drain();
+    expect((await service.autoLinkRules(context()))[0]).toMatchObject({
+      id: rule.id,
+      linked: 0,
+    });
+    expect(
+      (await service.previewAutoLinks(context(), autoPair('sku'))).counts
+        .ambiguous,
+    ).toBe(1);
+    await owner.query(
+      "UPDATE inventory_product_skus SET code='OTHER' WHERE tenant_id=$1 AND product_id=(SELECT canonical_id FROM connector_source_mappings WHERE tenant_id=$1 AND connection_id=$2 AND resource='product' AND external_id='p10')",
+      [tenant, erp],
+    );
+    await owner.query(
+      "UPDATE inventory_product_skus SET unit='case' WHERE tenant_id=$1 AND connection_id=$2",
+      [tenant, erp],
+    );
+    expect(
+      (await service.previewAutoLinks(context(), autoPair('sku'))).counts
+        .conflict,
+    ).toBe(1);
+    await owner.query(
+      "UPDATE inventory_product_skus SET unit='each' WHERE tenant_id=$1 AND connection_id=$2",
+      [tenant, erp],
+    );
+    // A recent read of an older provider version cannot refresh the retained projection's identity evidence.
+    await owner.query(
+      "UPDATE commerce_sync_items SET source_updated_at=source_updated_at-interval '1 day' WHERE tenant_id=$1 AND connection_id=$2 AND record_type='products'",
+      [tenant, erp],
+    );
+    expect(
+      (await service.previewAutoLinks(context(), autoPair('sku'))).counts.stale,
+    ).toBe(1);
+    await owner.query(
+      "UPDATE commerce_sync_items SET source_updated_at=source_updated_at+interval '1 day' WHERE tenant_id=$1 AND connection_id=$2 AND record_type='products'",
+      [tenant, erp],
+    );
+    await owner.query(
+      "UPDATE commerce_sync_items SET missing_since=now() WHERE tenant_id=$1 AND connection_id=$2 AND record_type='products'",
+      [tenant, erp],
+    );
+    expect(
+      (await service.previewAutoLinks(context(), autoPair('sku'))).counts.stale,
+    ).toBe(1);
+    await autoDue();
+    await runner.tick(tenant, 0);
+    expect((await service.autoLinkRules(context()))[0]!.linked).toBe(0);
+  });
+
+  it('audits revision-checked configuration, disables future linking and blocks revoked authority', async () => {
+    source.set(shop, 'products.read', [product(shop, 'p1', 'item-1', 'ABC-1')]);
+    source.set(erp, 'products.read', [product(erp, 'p9', 'item-9', 'abc-1')]);
+    await drain();
+    const input = {
+      ...autoPair('sku'),
+      id: randomUUID(),
+      revision: 0,
+      enabled: true,
+    };
+    await expect(
+      service.saveAutoLinkRule(context('viewer'), input),
+    ).rejects.toThrow();
+    await expect(
+      service.previewAutoLinks(context('viewer'), autoPair('sku')),
+    ).rejects.toThrow();
+    await expect(
+      service.saveAutoLinkRule(context(), {
+        ...input,
+        sourceConnectionId: randomUUID(),
+      }),
+    ).rejects.toThrow('Connection not found');
+    let rule = await service.saveAutoLinkRule(context(), input);
+    await expect(service.saveAutoLinkRule(context(), input)).rejects.toThrow(
+      'This rule changed',
+    );
+    await expect(
+      service.saveAutoLinkRule(context(), {
+        ...input,
+        id: randomUUID(),
+        targetConnectionId: erp,
+        sourceConnectionId: shop,
+      }),
+    ).rejects.toThrow('A rule already exists');
+    rule = await service.saveAutoLinkRule(context(), {
+      ...input,
+      revision: rule.revision,
+      enabled: false,
+    });
+    await runner.tick(tenant, 0);
+    expect((await service.autoLinkRules(context()))[0]).toMatchObject({
+      state: 'disabled',
+      linked: 0,
+    });
+    rule = await service.saveAutoLinkRule(context(), {
+      ...input,
+      revision: rule.revision,
+    });
+    members.set('operator', 'member');
+    try {
+      await runner.tick(tenant, 0);
+      expect(
+        (await createAutomaticLinkStore(db).list(tenant))[0],
+      ).toMatchObject({ state: 'blocked', linked: 0 });
+    } finally {
+      members.set('operator', 'owner');
+    }
+    await service.saveAutoLinkRule(context(), {
+      ...input,
+      revision: rule.revision,
+    });
+    await runner.tick(tenant, 0);
+    expect((await service.autoLinkRules(context()))[0]).toMatchObject({
+      state: 'active',
+      linked: 1,
+    });
+    expect(
+      (
+        await owner.query(
+          'SELECT count(*) FROM commerce_auto_link_rule_revisions WHERE tenant_id=$1',
+          [tenant],
+        )
+      ).rows[0].count,
+    ).toBe('4');
+    expect(await createAutomaticLinkStore(db).list(randomUUID())).toEqual([]);
+    await db.transaction(randomUUID(), async (tx) => {
+      expect(
+        (await tx.query('SELECT * FROM commerce_auto_link_rules')).rows,
+      ).toEqual([]);
+      expect(
+        (await tx.query('SELECT * FROM commerce_auto_link_rule_revisions'))
+          .rows,
+      ).toEqual([]);
+    });
+  });
+
+  it('keeps equal order numbers in different Shopify stores separate', async () => {
+    source.set(shop, 'orders.read', [order(shop, '1')]);
+    source.set(erp, 'orders.read', [order(erp, '9', { externalNumber: '#1' })]);
+    await drain();
+    await service.saveAutoLinkRule(context(), {
+      ...autoPair('order'),
+      id: randomUUID(),
+      revision: 0,
+      enabled: true,
+    });
+    await runner.tick(tenant, 0);
+    const otherShop = randomUUID();
+    await owner.query(
+      `INSERT INTO connector_installations(tenant_id,id,version,document,secret)
+      SELECT tenant_id,$2::uuid,version,jsonb_set(jsonb_set(document,'{id}',to_jsonb(($2::uuid)::text)),'{label}','"Other store"'),secret
+      FROM connector_installations WHERE tenant_id=$1 AND id=$3`,
+      [tenant, otherShop, shop],
+    );
+    await owner.query(
+      `INSERT INTO connector_lifecycle_events(tenant_id,connection_id,version,event,actor_id,status,credential_version)
+      VALUES($1,$2,1,'installed','operator','active',1)`,
+      [tenant, otherShop],
+    );
+    for (const capability of reads) source.set(otherShop, capability, []);
+    source.set(otherShop, 'orders.read', [order(otherShop, '1')]);
+    await drain();
+    const pair = {
+      kind: 'order' as const,
+      targetConnectionId: otherShop,
+      sourceConnectionId: erp,
+    };
+    expect(await service.previewAutoLinks(context(), pair)).toMatchObject({
+      ready: true,
+      counts: { eligible: 0, conflict: 1 },
+    });
+    await service.saveAutoLinkRule(context(), {
+      ...pair,
+      id: randomUUID(),
+      revision: 0,
+      enabled: true,
+    });
+    await runner.tick(tenant, 0);
+    expect(await canonical(erp, 'order', '9')).toBe(
+      await canonical(shop, 'order', '1'),
+    );
+    expect(await canonical(otherShop, 'order', '1')).not.toBe(
+      await canonical(shop, 'order', '1'),
+    );
+  });
+
+  it('rolls back mapping changes and replay after interruption, then resumes without duplicating links', async () => {
+    source.set(shop, 'products.read', [product(shop, 'p1', 'item-1', 'ABC-1')]);
+    source.set(erp, 'products.read', [product(erp, 'p9', 'item-9', 'abc-1')]);
+    await drain();
+    const shopSku = await canonical(shop, 'sku', 'item-1');
+    const erpSku = await canonical(erp, 'sku', 'item-9');
+    const rule = await service.saveAutoLinkRule(context(), {
+      ...autoPair('sku'),
+      id: randomUUID(),
+      revision: 0,
+      enabled: true,
+    });
+    const interrupted = createAutoLinkStore(
+      db,
+      async (scoped, actor, value, candidate) => {
+        await createCommerceServices(scoped).ingestion.link(
+          actor,
+          value.kind,
+          candidate.targetId,
+          candidate.sourceId,
+          'Interrupted automatic match',
+        );
+        throw new Error('Interrupted after remap');
+      },
+    );
+    await expect(interrupted.apply(context(), rule.id)).rejects.toThrow(
+      'Interrupted after remap',
+    );
+    expect(await canonical(erp, 'sku', 'item-9')).toBe(erpSku);
+    expect((await service.autoLinkRules(context()))[0]!.linked).toBe(0);
+    expect(
+      (
+        await owner.query(
+          'SELECT count(*) FROM connector_mapping_revisions WHERE tenant_id=$1',
+          [tenant],
+        )
+      ).rows[0].count,
+    ).toBe('0');
+    await runner.tick(tenant, 0);
+    expect(await canonical(erp, 'sku', 'item-9')).toBe(shopSku);
+    expect((await service.autoLinkRules(context()))[0]!.linked).toBe(1);
+  });
+
+  it('applies large candidate sets in bounded restartable batches', async () => {
+    for (const connectionId of [shop, erp])
+      source.set(
+        connectionId,
+        'products.read',
+        Array.from({ length: 21 }, (_, index) =>
+          product(connectionId, `p${index}`, `s${index}`, `BATCH-${index}`),
+        ),
+      );
+    await drain();
+    const rule = await service.saveAutoLinkRule(context(), {
+      ...autoPair('sku'),
+      id: randomUUID(),
+      revision: 0,
+      enabled: true,
+    });
+    const store = createAutomaticLinkStore(db);
+    expect(
+      (await service.previewAutoLinks(context(), autoPair('sku'))).counts
+        .eligible,
+    ).toBe(21);
+    await store.apply(context(), rule.id);
+    expect((await service.autoLinkRules(context()))[0]!.linked).toBe(20);
+    expect(await store.scopes()).toContain(tenant);
+    await createAutomaticLinkStore(db).apply(context(), rule.id);
+    expect((await service.autoLinkRules(context()))[0]!.linked).toBe(21);
+    expect(
+      (await service.previewAutoLinks(context(), autoPair('sku'))).counts
+        .eligible,
+    ).toBe(0);
+  });
 
   const queries = {
     state: orderStateQueries,

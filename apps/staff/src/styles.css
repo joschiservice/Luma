@@ -1,0 +1,143 @@
+@import '@luma/ui/styles.css';
+@source './';
+
+.staff-shell {
+  min-height: 100dvh;
+}
+
+.staff-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 0.875rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.staff-brand,
+.staff-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.staff-content {
+  display: grid;
+  gap: var(--content-gap, 1.5rem);
+  max-width: 72rem;
+  margin-inline: auto;
+  padding: 2rem 1.5rem;
+}
+
+.staff-entry {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+}
+
+.staff-login {
+  width: 100%;
+  max-width: 27rem;
+}
+
+.staff-entry-heading {
+  display: grid;
+  gap: 1.5rem;
+  justify-content: start;
+}
+
+.staff-content > a,
+.staff-content > [data-slot='button'] {
+  justify-self: start;
+}
+
+.staff-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.staff-directory {
+  display: grid;
+  gap: 2rem;
+}
+
+.staff-search {
+  display: flex;
+  align-items: end;
+  gap: 0.75rem;
+  max-width: 38rem;
+}
+
+.staff-search > [data-slot='field'] {
+  flex: 1;
+}
+
+.staff-section {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.staff-section h2 {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.staff-metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  color: var(--foreground-muted);
+}
+
+.staff-muted {
+  color: var(--foreground-muted);
+}
+
+.staff-check {
+  display: flex;
+  align-items: start;
+  gap: 0.75rem;
+}
+
+.staff-check input {
+  margin-top: 0.25rem;
+}
+
+.staff-skip {
+  position: absolute;
+  inset-inline-start: 1rem;
+  top: -6rem;
+}
+
+.staff-skip:focus {
+  top: 1rem;
+  z-index: 100;
+}
+
+@media (width < 640px) {
+  .staff-bar {
+    padding-inline: 1rem;
+  }
+
+  .staff-content {
+    padding: 1.5rem 1rem;
+  }
+
+  .staff-search {
+    flex-wrap: wrap;
+  }
+}
+
+.staff-member-role-narrow {
+  display: none;
+}
+
+@media (width <= 760px) {
+  .staff-member-role-narrow {
+    display: block;
+  }
+}

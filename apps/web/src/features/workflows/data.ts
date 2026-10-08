@@ -3,9 +3,11 @@ import {
   type ActivateWorkflow,
   playbookSummarySchema,
   replenishmentBatchResultSchema,
+  type ReplenishmentPositionQuery,
   type ReplenishmentPreviewRequest,
   replenishmentPreviewSchema,
   type ReplenishmentRuleInput,
+  replenishmentSetupSchema,
   workflowActivationSchema,
   workflowCoverageSchema,
   workflowDetailSchema,
@@ -206,23 +208,28 @@ export async function cancelWorkflowStart(
   return workflowRunViewSchema.parse(result.body);
 }
 
-/** Loads replenishment stock choices and activation rules in one request. */
-export const replenishmentOptions = (organizationId: string) =>
+/** Loads one stock choices page and readiness for the configured replenishment rules. */
+export const replenishmentOptions = (
+  organizationId: string,
+  query: ReplenishmentPositionQuery = {},
+) =>
   queryOptions({
     queryKey: [
       ...workflowsKey(organizationId),
       'inventory-replenishment',
       'setup',
+      query,
     ],
     ...privateQueryDefaults,
     queryFn: async ({ signal }) => {
       const result = await api.workflows.replenishmentSetup({
         params: { organizationId, definitionId: 'inventory-replenishment' },
+        query,
         fetchOptions: { signal, cache: 'no-store' },
       });
       if (result.status !== 200) return failure(result);
 
-      return result.body;
+      return replenishmentSetupSchema.parse(result.body);
     },
   });
 

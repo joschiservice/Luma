@@ -41,6 +41,14 @@ export interface ReplenishmentRuleInput {
   reviewedDigest: string;
 }
 
+/** Filters one bounded page of stock choices; cursors continue the same filters. */
+export interface ReplenishmentPositionQuery {
+  q?: string | undefined;
+  cursor?: string | undefined;
+  positionId?: string | undefined;
+  connectionId?: string | undefined;
+}
+
 export interface ReplenishmentSetup {
   available: boolean;
   canManage: boolean;
@@ -52,12 +60,16 @@ export interface ReplenishmentSetup {
     available: number | null;
     observedAt: string;
   }[];
+  /** Continues the stock choices, independently of configured rule readiness. */
+  nextCursor: string | null;
   suppliers: { id: string; name: string }[];
   rules: (Omit<ReplenishmentRuleInput, 'reviewedDigest'> & {
     active: boolean;
     principalId: string;
     sku: string;
     supplier: string;
+    /** Current stock from the rule's exact source, even when it is outside the choices page. */
+    stock: ReplenishmentSetup['positions'][number] | null;
     /** Whether this rule's stock can support a decision now. */
     status: {
       state: 'ready' | 'blocked' | 'revoked';
@@ -151,7 +163,11 @@ export interface ReplenishmentSubjectCoverage {
 export interface ReplenishmentWorkflow {
   definitionId: string;
   detail(context: TenantContext): Promise<WorkflowDetail>;
-  setup(context: TenantContext): Promise<ReplenishmentSetup>;
+  /** Reads a page of stock choices and readiness for every configured rule. */
+  setup(
+    context: TenantContext,
+    query?: ReplenishmentPositionQuery,
+  ): Promise<ReplenishmentSetup>;
   configure(
     context: TenantContext,
     input: ReplenishmentRuleInput,

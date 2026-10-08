@@ -2,8 +2,15 @@ import { createHash } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 
 import { createAppHost } from '@luma/app-catalog';
-import { createSyncRunner, createSyncService } from '@luma/commerce-sync';
 import {
+  autoLinkEvidence,
+  createAutoLinkRunner,
+  createAutoLinkService,
+  createSyncRunner,
+  createSyncService,
+} from '@luma/commerce-sync';
+import {
+  createAutoLinkStore,
   createIdentityReader,
   createSyncStore,
 } from '@luma/commerce-sync/composition';
@@ -63,6 +70,11 @@ export function createCommerceSyncWorker(options: {
   });
   const log = options.log ?? createFailureLog();
   const runner = createSyncRunner({
+    automaticLinks: createAutoLinkRunner({
+      store: createAutomaticLinkStore(options.database),
+      resolveContext: options.identity.resolveWorkflowContext,
+      log,
+    }),
     store: createSyncStore(options.database),
     reader,
     ingestion: commerce.ingestion,
@@ -124,6 +136,10 @@ export function createCommerceSyncService(
   connections: Pick<ConnectionManagement, 'list'>,
 ) {
   return createSyncService({
+    automaticLinks: createAutoLinkService({
+      store: createAutomaticLinkStore(database),
+      refreshContext: identity.refreshContext,
+    }),
     store: createSyncStore(database),
     connections,
     identities: createIdentityReader(database),
@@ -198,4 +214,20 @@ export async function createDefaultCommerceSyncWorker(
     await resources.close();
     throw error;
   }
+}
+
+/** Wires automatic remapping to the commerce owner in the candidate transaction. */
+export function createAutomaticLinkStore(database: TenantDatabase) {
+  return createAutoLinkStore(database, (scoped, context, rule, candidate) => {
+    const evidence = autoLinkEvidence(rule, candidate.key);
+
+    return createCommerceServices(scoped).ingestion.link(
+      context,
+      rule.kind,
+      candidate.targetId,
+      candidate.sourceId,
+      evidence.reason,
+      evidence.method,
+    );
+  });
 }

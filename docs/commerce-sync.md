@@ -101,7 +101,35 @@ with the requester's current permissions, because only the worker login may writ
 projections. Suggestions come from equal normalized SKU codes in other connections. Order
 suggestions require a JTL external marketplace order number matching a Shopify order
 number; dates and totals support review but never establish identity. Multiple candidates
-stay visible and are never applied automatically.
+stay visible and require review.
+
+Automatic linking is opt-in for a selected connection pair and record type. SKU rules
+match a nonempty code after lowercasing and trimming surrounding spaces; each connection
+must identify exactly one SKU with that code, with equal known units. Order rules match a
+JTL external marketplace reference to the order number in one selected Shopify store.
+Order references preserve case and ignore surrounding spaces and `#`. Automatic
+order rules skip records already linked outside their selected connection pair. Dates, totals and
+customer details never establish identity. Source products and fulfillment operations
+remain separate.
+
+Both streams need a completed full read and a successful read within the last day. Full
+reads cover the history the provider grants, including any reported history limit.
+Paused, blocked, failing or incomplete scans, and pending or failed imports, stop matching.
+Each candidate must still have current, recently seen ledger evidence. A read of an older
+provider version cannot refresh a newer retained projection's identity evidence. Duplicate keys,
+multiple source identities, conflicting units or overlapping connection mappings are
+skipped. Any source identity with a recorded manual unlink stays excluded from automatic
+rules; a person can link it again explicitly. Pending manual requests take precedence.
+
+Rule saves require current `sync.manage`, check the expected revision and append the
+configuring actor and enabled state to immutable history. Rules run with that person's
+current access. Lost access blocks a rule until a manager previews and enables it again.
+Disabling stops future links and preserves existing ones. The worker checks enabled rules
+once a minute, in batches of at most 20 non-overlapping matches. Preview uses the same
+rules but writes nothing; each application rechecks current evidence under the exclusive
+ingestion lock and commits mapping revisions, replay and progress together. A failed
+attempt rolls back and retries. Every automatic mapping revision names its rule and
+configuration revision.
 
 Link and unlink wait for running imports and block new ones (see
 [commerce projections](commerce-projections.md#imports-products-and-links)). Redirects

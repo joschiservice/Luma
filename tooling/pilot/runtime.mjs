@@ -15,8 +15,11 @@ import {
   createScheduledDetection,
   createStockRefreshService,
 } from '@luma/application-runtime';
-import { createCommerceSyncService } from '@luma/application-runtime/sync';
-import { createSyncRunner } from '@luma/commerce-sync';
+import {
+  createAutomaticLinkStore,
+  createCommerceSyncService,
+} from '@luma/application-runtime/sync';
+import { createAutoLinkRunner, createSyncRunner } from '@luma/commerce-sync';
 import { createSyncStore } from '@luma/commerce-sync/composition';
 import { ConnectorError } from '@luma/connections';
 import { createCapabilityRuntime } from '@luma/connections/adapters';
@@ -263,6 +266,11 @@ export async function createPilot(
     const syncStore = simulation ? createSyncStore(db) : undefined;
     const syncRunner = simulation
       ? createSyncRunner({
+          automaticLinks: createAutoLinkRunner({
+            store: createAutomaticLinkStore(db),
+            resolveContext: identity.service.resolveWorkflowContext,
+            log: failureLog,
+          }),
           store: syncStore,
           reader: createInstalledRuntime({
             ...installedOptions,

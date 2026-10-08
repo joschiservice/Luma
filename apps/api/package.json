@@ -22,7 +22,8 @@
     "playwright": "catalog:",
     "tsx": "catalog:",
     "graphql": "catalog:",
-    "@luma/simulator-shopify": "workspace:*"
+    "@luma/simulator-shopify": "workspace:*",
+    "@luma/staff": "workspace:*"
   },
   "dependencies": {
     "@luma/application-runtime": "workspace:*",

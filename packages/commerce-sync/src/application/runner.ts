@@ -23,6 +23,7 @@ import {
   syncPolicy,
   type SyncStream,
 } from '../domain/streams.js';
+import type { AutoLinkRunner } from './automatic-links.js';
 import type {
   ItemKey,
   LedgerEntry,
@@ -34,6 +35,7 @@ import { itemKey } from './ports.js';
 
 export interface SyncRunnerDependencies {
   store: SyncStore;
+  automaticLinks?: AutoLinkRunner;
   reader: CapabilityReader;
   ingestion: {
     import(
@@ -547,7 +549,14 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
 
   return {
     /** Tenants that currently have sync work. */
-    scopes: () => deps.store.scopes(),
+    scopes: async () => {
+      const [sync, automatic] = await Promise.all([
+        deps.store.scopes(),
+        deps.automaticLinks?.scopes() ?? [],
+      ]);
+
+      return [...new Set([...sync, ...automatic])];
+    },
     /** Advances one tenant for up to `budgetMs` of page work. */
     async tick(tenantId: string, budgetMs = 20_000) {
       const deadline = Date.now() + budgetMs;
@@ -559,6 +568,7 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
           while (Date.now() < deadline && (await runPage(tenantId)));
         }),
       );
+      await deps.automaticLinks?.tick(tenantId);
     },
   };
 }

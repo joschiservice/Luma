@@ -38,7 +38,8 @@ bodies.
 unknown. Fully paid maps to paid and unpaid to pending; partial payment stays unknown
 because the canonical enum has no partial state. Original quantities and units are kept;
 custom lines with item ID zero have no SKU reference. `externalSalesOrderNumber` is kept
-as a marketplace reference for operator-reviewed order link suggestions. Malformed
+as a marketplace reference for order link suggestions and configured automatic
+linking to one selected Shopify store. Malformed
 descriptive fields become null without rejecting the order.
 
 **Products.** Each JTL item is a product with its own item-ID SKU reference; SKU text

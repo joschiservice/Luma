@@ -28,7 +28,10 @@ import type { CaseWorkflows } from './case-workflows.js';
 import type { createCodeEvaluations } from './code-evaluations.js';
 import type { PlaybookOutcome, PlaybookRun } from './playbook.js';
 import type { PlaybookLibrary } from './playbook-library.js';
-import type { ReplenishmentWorkflow } from './replenishment-port.js';
+import type {
+  ReplenishmentPositionQuery,
+  ReplenishmentWorkflow,
+} from './replenishment-port.js';
 import {
   presentResolutionRun,
   presentResolutionStory,
@@ -419,8 +422,11 @@ export function createWorkflowCatalog(deps: {
       return { cancelled: true as const };
     },
     /** Reads available stock and replenishment rules. */
-    replenishmentSetup: (context: TenantContext, id: string) =>
-      replenishment(id).setup(context),
+    replenishmentSetup: (
+      context: TenantContext,
+      id: string,
+      query: ReplenishmentPositionQuery,
+    ) => replenishment(id).setup(context, query),
     /** Activates an exact replenishment scope. */
     configureReplenishment: (
       context: TenantContext,

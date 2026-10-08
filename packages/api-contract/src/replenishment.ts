@@ -34,19 +34,33 @@ export const replenishmentRunSummarySchema = z.object({
   purchaseOrderId: z.string().uuid().nullable(),
 });
 
+/** Reads one page of stock choices. Keep the same filters when continuing a cursor. */
+export const replenishmentPositionQuerySchema = z
+  .object({
+    q: z.string().trim().max(200).optional(),
+    cursor: z
+      .string()
+      .regex(/^[a-f0-9-]{36}:[a-f0-9-]{36}$/i)
+      .optional(),
+    positionId: z.string().uuid().optional(),
+    connectionId: z.string().uuid().optional(),
+  })
+  .strict();
+
+const replenishmentStockSchema = z.object({
+  positionId: z.string().uuid(),
+  connectionId: z.string().uuid(),
+  sku: z.string(),
+  unit: z.string(),
+  available: z.number().nullable(),
+  observedAt: z.string(),
+});
+
 export const replenishmentSetupSchema = z.object({
   available: z.boolean(),
   canManage: z.boolean(),
-  positions: z.array(
-    z.object({
-      positionId: z.string().uuid(),
-      connectionId: z.string().uuid(),
-      sku: z.string(),
-      unit: z.string(),
-      available: z.number().nullable(),
-      observedAt: z.string(),
-    }),
-  ),
+  positions: z.array(replenishmentStockSchema).max(50),
+  nextCursor: z.string().nullable(),
   suppliers: z.array(z.object({ id: z.string().uuid(), name: z.string() })),
   rules: z.array(
     z.object({
@@ -61,6 +75,7 @@ export const replenishmentSetupSchema = z.object({
       principalId: z.string(),
       sku: z.string(),
       supplier: z.string(),
+      stock: replenishmentStockSchema.nullable(),
       /** Whether this rule's stock can support a decision now. */
       status: z.object({
         state: z.enum(['ready', 'blocked', 'revoked']),
@@ -241,3 +256,7 @@ export type ReplenishmentBatchResult = z.infer<
 >;
 
 export type WorkflowCoverage = z.infer<typeof workflowCoverageSchema>;
+
+export type ReplenishmentPositionQuery = z.infer<
+  typeof replenishmentPositionQuerySchema
+>;

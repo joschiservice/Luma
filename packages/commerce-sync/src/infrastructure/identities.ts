@@ -86,8 +86,8 @@ function label(
 }
 
 /**
- * Reads sources and explicit match signals across connections. SKU codes and marketplace
- * order references suggest records for review; they never establish identity automatically.
+ * Reads sources and match signals for manual review across connections.
+ * Automatic linking evaluates these signals separately under configured rules.
  */
 export function createIdentityReader(db: TenantDatabase): IdentityReader {
   return (tenantId, kind, entityId) =>

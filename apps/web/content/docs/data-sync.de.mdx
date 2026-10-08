@@ -64,6 +64,22 @@ Enthält Ihre Rolle **Importe verwalten**, hat jeder Datensatztyp ein Aktionsmen
 
 Ohne **Importe verwalten** können Sie jeden Abgleich verfolgen, aber nicht ändern.
 
+## Automatisches Verknüpfen [#automatic-linking]
+
+Luma hält Datensätze aus verschiedenen Quellen getrennt, bis jemand sie verknüpft. Wenn Ihr Shop und Ihr ERP dieselben SKU-Codes verwenden oder JTL-Wawi bei jeder Bestellung die Shopify-Bestellnummer speichert, kann eine Verknüpfungsregel das für Sie übernehmen.
+
+Wenn Ihre Rolle **Importe verwalten** enthält:
+
+1. Gehen Sie in **Datenabgleich** zu **Automatisches Verknüpfen** und wählen Sie **Verknüpfungsregel hinzufügen**.
+2. Wählen Sie unter **Datensatztyp** entweder **SKUs: eindeutiger Code** oder **Bestellungen: JTL-Referenz zu Shopify**.
+3. Wählen Sie die beiden Verbindungen. Wählen Sie bei Bestellungen den Shopify-Shop, dessen Bestellnummern JTL-Wawi speichert.
+4. Wählen Sie **Treffer anzeigen**. Luma zeigt, wie viele Treffer es verknüpfen kann und warum es andere überspringt. Öffnen Sie bei einem Beispiel **Erster Datensatz** und **Anderer Datensatz**, um beide zu vergleichen.
+5. Wählen Sie **Automatisches Verknüpfen aktivieren**. Die Regel verknüpft die aktuellen Treffer und künftig auch neue.
+
+Luma verknüpft nur eindeutige Treffer. SKU-Codes werden unabhängig von Groß- und Kleinschreibung und Leerzeichen am Anfang oder Ende abgeglichen. Jeder Code muss in jeder Verbindung zu genau einer SKU gehören, mit derselben Einheit. Eine Bestellung passt nur, wenn ihre externe Bestellreferenz in JTL-Wawi genau einer Bestellnummer im Shopify-Shop entspricht. Ähnliche Daten, Beträge, Namen oder E-Mail-Adressen reichen nie aus. Mehrdeutige und widersprüchliche Treffer sowie von Hand getrennte Datensätze überspringt Luma; verknüpfen Sie diese selbst, wenn Sie Ihre Entscheidung ändern. Verknüpfte Datensätze behalten ihre eigenen Mengen, Preise und Bestellstatus.
+
+Eine Regel zeigt **Wartet auf Daten**, bis Luma beide Verbindungen vollständig und innerhalb des letzten Tages erfolgreich gelesen hat. Jede Regel zeigt, wie viele Verknüpfungen sie angewendet hat und wann Luma zuletzt geprüft hat. Eine Regel läuft mit dem Zugriff der Person, die sie aktiviert hat. Verliert diese Person **Importe verwalten**, zeigt die Regel **Zugriff erforderlich**, bis jemand mit dieser Berechtigung **Vorschau und aktivieren** wählt. **Deaktivieren** stoppt neue Verknüpfungen und behält die bestehenden. Um einen einzelnen Datensatz zu trennen, wählen Sie im Bereich **Verknüpfte Quellen** die Option **Trennen**.
+
 ## Wenn ein Abgleich Sie braucht [#when-a-sync-needs-you]
 
 - **Neuer Versuch läuft**: Ein Lesevorgang ist fehlgeschlagen, und Luma versucht es automatisch erneut, mit jeweils etwas längerer Pause.

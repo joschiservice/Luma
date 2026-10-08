@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "sourceMap": true,
+    "customConditions": ["luma-source"]
+  },
+  "exclude": ["src/**/*.test.ts", "src/test-support/**"]
+}

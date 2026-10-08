@@ -10,6 +10,7 @@ import {
 import {
   replenishmentBatchRequestSchema,
   replenishmentBatchResultSchema,
+  replenishmentPositionQuerySchema,
   replenishmentPreviewRequestSchema,
   replenishmentPreviewSchema,
   replenishmentReviewSchema,
@@ -82,8 +83,11 @@ export const workflowsContract = c.router(
       metadata: requires('procurement.read'),
       path: `${path}/:definitionId/replenishment`,
       pathParams: params,
+      query: replenishmentPositionQuerySchema,
       responses: { 200: replenishmentSetupSchema },
-      summary: 'Read replenishment scopes and current stock',
+      summary: 'Read replenishment rules and a page of stock choices',
+      description:
+        'Returns up to 50 stock choices. Search by SKU or filter to a position or connection. Continue with nextCursor and the same filters. Rule readiness includes the current stock for every configured rule, independently of this page.',
     },
     configureReplenishment: {
       method: 'POST',

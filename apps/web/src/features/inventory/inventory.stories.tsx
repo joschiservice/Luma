@@ -109,8 +109,7 @@ const identity = (
           provider: 'shopify',
           externalId: 'gid://shopify/InventoryItem/4410',
           scopeKey: '',
-          method:
-            'Imported source record; linked only to itself until a person links it to another source',
+          method: 'Imported source record with its own canonical identity',
           linkedAt: '2026-09-28T09:00:00Z',
           revisedAt: null,
           codes: ['LINEN-SHIRT-M'],

@@ -64,6 +64,22 @@ If your role includes **Manage imports**, each record type has an actions menu:
 
 Without **Manage imports**, you can follow every sync but not change it.
 
+## Automatic linking
+
+Luma keeps records from different sources separate until someone links them. If your store and your ERP use the same SKU codes, or JTL-Wawi records the Shopify order number on each order, a linking rule can link them for you.
+
+If your role includes **Manage imports**:
+
+1. In **Data sync**, go to **Automatic linking** and choose **Add linking rule**.
+2. Under **Record type**, choose **SKUs: unique code** or **Orders: JTL reference to Shopify**.
+3. Choose the two connections. For orders, choose the Shopify store whose order numbers JTL-Wawi records.
+4. Choose **Preview matches**. Luma shows how many matches it can link and why it skips others. Open **First record** and **Other record** on an example to compare them.
+5. Choose **Enable automatic linking**. The rule links the current matches and keeps linking new ones.
+
+Luma links only clear matches. SKU codes match regardless of letter case and spaces at the start or end. Each code must belong to exactly one SKU in each connection, with the same unit. An order matches only when its external order reference in JTL-Wawi matches exactly one order number in the Shopify store. Similar dates, totals, names or email addresses are never enough. Luma skips ambiguous and conflicting matches and records someone unlinked by hand; link those yourself if you change your mind. Linked records keep their own quantities, prices and order states.
+
+A rule shows **Waiting for data** until Luma has read both connections completely and successfully within the last day. Each rule shows how many links it applied and when Luma last checked. A rule runs with the access of the person who enabled it. If that person loses **Manage imports**, the rule shows **Needs access** until someone who has it chooses **Preview and enable**. **Disable** stops new links and keeps the existing ones. To separate a single record, choose **Unlink** under its **Linked sources**.
+
 ## When a sync needs you
 
 - **Retrying**: a read failed and Luma tries again automatically, waiting a little longer each time.

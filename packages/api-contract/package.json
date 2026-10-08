@@ -30,6 +30,10 @@
     "./openapi": {
       "types": "./dist/openapi.d.ts",
       "import": "./dist/openapi.js"
+    },
+    "./staff": {
+      "types": "./dist/staff.d.ts",
+      "import": "./dist/staff.js"
     }
   }
 }

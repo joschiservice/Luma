@@ -7,7 +7,7 @@ import { cssFindings } from './ui-policy.mjs';
 const baseline = JSON.parse(
   await readFile(new URL('./ui-baseline.json', import.meta.url), 'utf8'),
 );
-const roots = ['apps/web/src', 'packages/apps'];
+const roots = ['apps/web/src', 'apps/staff/src', 'packages/apps'];
 let failures = 0;
 const remaining = new Set(Object.keys(baseline));
 for (const directory of roots) {

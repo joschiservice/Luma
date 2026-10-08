@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
-import { expect, it } from 'vitest';
+import { Client } from 'pg';
+import { expect, it, vi } from 'vitest';
 
 import { replenishmentFixture } from './replenishment-fixture.mjs';
 
@@ -570,4 +571,125 @@ it('keeps a proposal open for hours and rereads stock before creating the order'
     }),
   ]);
   expect(rule.active).toBe(true);
+}, 120000);
+
+it('keeps rule readiness independent of stock choice search and pages', async (t) => {
+  const f = await replenishmentFixture(t);
+  const rule = await f.configure();
+  const searched = await f.request('/replenishment?q=no-such-sku');
+  expect(searched.positions).toEqual([]);
+  expect(searched.nextCursor).toBeNull();
+  expect(searched.rules).toMatchObject([
+    {
+      id: rule.id,
+      stock: {
+        positionId: f.position.positionId,
+        connectionId: f.position.connectionId,
+        available: f.position.available,
+      },
+      status: { state: 'ready' },
+    },
+  ]);
+  const exact = await f.request(
+    `/replenishment?positionId=${f.position.positionId}&connectionId=${f.position.connectionId}`,
+  );
+  expect(exact.positions).toEqual([f.position]);
+  expect(exact.nextCursor).toBeNull();
+  const missing = await f.request('/replenishment/previews', {
+    supplierId: f.supplier.id,
+    items: [
+      {
+        positionId: f.position.positionId,
+        connectionId: randomUUID(),
+        minimum: 1,
+        target: 50,
+        approvalQuantity: 20,
+      },
+    ],
+  });
+  expect(missing.items[0]).toMatchObject({
+    outcome: 'covered',
+    available: null,
+  });
+  await f.request('/replenishment?cursor=not-a-cursor', undefined, {
+    status: 400,
+  });
+}, 120000);
+
+it('reads watched stock once per monitor pass and rereads only a refreshed position', async (t) => {
+  const f = await replenishmentFixture(t);
+  const setup = await f.request('/replenishment');
+  const chosen = setup.positions
+    .filter(
+      (p, index, all) =>
+        all.findIndex((other) => other.positionId === p.positionId) === index,
+    )
+    .slice(0, 2);
+  expect(chosen).toHaveLength(2);
+  const detail = await f.request('');
+  for (const position of chosen)
+    await f.request('/replenishment/activations', {
+      id: randomUUID(),
+      positionId: position.positionId,
+      connectionId: position.connectionId,
+      supplierId: f.supplier.id,
+      minimum: 0,
+      target: 100,
+      approvalQuantity: 20,
+      reviewedDigest: detail.versions[0].digest,
+    });
+  const reads = [];
+  const original = Client.prototype.query;
+  const spy = vi.spyOn(Client.prototype, 'query').mockImplementation(function (
+    ...args
+  ) {
+    const result = original.apply(this, args);
+    if (
+      typeof args[0] !== 'string' ||
+      !args[0].includes('COALESCE((SELECT k.code FROM inventory_product_skus')
+    )
+      return result;
+
+    return result.then((result) => {
+      reads.push(
+        result.rows.map((row) => ({
+          positionId: row.position_id,
+          connectionId: row.connection_id,
+        })),
+      );
+
+      return result;
+    });
+  });
+  t.onTestFinished(() => spy.mockRestore());
+  await f.pilot.replenishment.tick(f.actor);
+  expect(reads).toHaveLength(1);
+  expect(reads[0]).toHaveLength(2);
+  expect(reads[0]).toEqual(
+    expect.arrayContaining(
+      chosen.map(({ positionId, connectionId }) => ({
+        positionId,
+        connectionId,
+      })),
+    ),
+  );
+  reads.length = 0;
+  await f.pilot.replenishment.tick(f.actor);
+  expect(reads).toHaveLength(1);
+  expect(reads[0]).toHaveLength(2);
+  const old = new Date(Date.now() - 6 * 60_000).toISOString();
+  await f.db.owner.query(
+    `UPDATE inventory_snapshots SET observed_at=$3::timestamptz,document=jsonb_set(document,'{observedAt}',to_jsonb($3::text))
+     WHERE tenant_id=$1 AND entity_id=$2`,
+    [f.actor.tenantId, chosen[0].positionId, old],
+  );
+  reads.length = 0;
+  await f.pilot.replenishment.tick(f.actor);
+  expect(reads).toHaveLength(2);
+  expect(reads[0]).toHaveLength(2);
+  expect(reads[1]).toEqual([
+    { positionId: chosen[0].positionId, connectionId: chosen[0].connectionId },
+  ]);
+  spy.mockRestore();
+  expect((await f.request('/runs')).items).toEqual([]);
 }, 120000);

@@ -30,9 +30,11 @@ methods require a resolved tenant context; ingestion and mapping require `sync.m
   keeping each connection's quantities.
 
 External IDs are case-preserved strings, including leading zeros and parent scope.
-Display numbers and SKU text never establish equivalence. A conflicting binding is
+Display numbers and SKU text alone never establish equivalence. Configured
+[automatic linking rules](commerce-sync.md#links) may establish identity from unambiguous,
+current evidence between selected connections. A conflicting binding is
 rejected; mappings keep the confirming actor, method and observation as immutable audit
-evidence. Corrections go through a reviewed remapping (link/unlink), never by overwriting
+evidence. Corrections go through an evidenced remapping (link/unlink), never by overwriting
 history.
 
 ## Imports, products and links
@@ -40,7 +42,7 @@ history.
 History imports (`import`, `importMany`) record observations, bind every unmapped
 identity to its own source-local canonical entity and project the records in input order,
 all in one transaction. Any failure rolls back the whole batch. Existing mappings,
-including operator mappings made before the import, are reused. Imports never merge
+including operator and automatic mappings made before the import, are reused. Imports never merge
 records across connections.
 
 Owners create entities and mappings with sorted multi-row writes and lock affected order

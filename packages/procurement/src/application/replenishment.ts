@@ -1,4 +1,5 @@
 import type { TenantContext } from '@luma/identity';
+import type { ReplenishmentPositionQuery } from '@luma/workflows';
 
 import type { ReplenishmentRule } from '../domain/replenishment.js';
 
@@ -28,7 +29,18 @@ export interface ReplenishmentStock {
 
 /** Stores immutable grants and serializes overlapping replenishment actions. */
 export interface ReplenishmentStore {
-  stocks(context: TenantContext): Promise<ReplenishmentStock[]>;
+  /** Checks whether any non-deleted stock has been projected without loading stock records. */
+  hasStock(context: TenantContext): Promise<boolean>;
+  /** Reads only the named positions. Omit a connection to read every source of that position. Empty scopes read nothing. */
+  stocksFor(
+    context: TenantContext,
+    positions: readonly { positionId: string; connectionId?: string }[],
+  ): Promise<ReplenishmentStock[]>;
+  /** Browses at most 50 non-deleted stock choices, with server-side SKU search and a continuation cursor. */
+  browseStocks(
+    context: TenantContext,
+    query: ReplenishmentPositionQuery,
+  ): Promise<{ positions: ReplenishmentStock[]; nextCursor: string | null }>;
   list(context: TenantContext): Promise<ReplenishmentActivation[]>;
   save(
     context: TenantContext,

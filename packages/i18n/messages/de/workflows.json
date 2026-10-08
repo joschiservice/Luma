@@ -509,7 +509,7 @@
   "workflows_setup_filter_placeholder": "Nach SKU filtern",
   "workflows_setup_selected": "{selected, number} von {limit, number} ausgewählt",
   "workflows_setup_selected_full": "{selected, number} von {limit, number} ausgewählt. Richten Sie weitere Positionen in einem weiteren Durchgang ein.",
-  "workflows_setup_no_positions": "Noch keine Bestandspositionen. Verbinden Sie ein System mit Bestandsdaten, damit Luma sie lesen kann.",
+  "workflows_setup_no_positions": "Keine Bestandspositionen vorhanden. Falls noch keine importiert wurden, verbinden Sie ein System mit Bestandsdaten.",
   "workflows_setup_no_match": "Keine SKU passt zu „{filter}“.",
   "workflows_setup_quantities": "Mengen",
   "workflows_setup_minimum_stock": "Mindestbestand",
@@ -531,5 +531,9 @@
   "workflows_setup_result_covered": "Bereits abgedeckt",
   "workflows_setup_result_failed": "Nicht aktiviert",
   "workflows_setup_retrying": "Wird wiederholt…",
-  "workflows_setup_retry_unconfirmed": "{count, number} unbestätigte wiederholen"
+  "workflows_setup_retry_unconfirmed": "{count, number} unbestätigte wiederholen",
+  "workflows_setup_loading_positions": "Bestandspositionen werden geladen…",
+  "workflows_setup_loading_position": "Bestandsposition wird geladen…",
+  "workflows_setup_pagination_label": "Seiten der Bestandspositionen",
+  "workflows_setup_pagination_empty": "Keine Bestandspositionen"
 }

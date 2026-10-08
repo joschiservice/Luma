@@ -130,11 +130,7 @@ export function ReplenishmentPanel({
       organizationId={organizationId}
       definitionId={detail.summary.id}
       rule={rule}
-      stock={data?.positions.find(
-        (p) =>
-          p.positionId === rule.positionId &&
-          p.connectionId === rule.connectionId,
-      )}
+      stock={rule.stock ?? undefined}
       canStart={
         rule.active &&
         rule.principalId === detail.principalId &&

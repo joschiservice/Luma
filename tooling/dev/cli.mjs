@@ -34,6 +34,7 @@ try {
     ![
       'setup',
       'dev',
+      'staff',
       'workflows',
       'observe',
       'seed',
@@ -47,7 +48,7 @@ try {
     capture: true,
   });
   const saved = await state(
-    ['setup', 'dev', 'workflows', 'observe'].includes(command),
+    ['setup', 'dev', 'staff', 'workflows', 'observe'].includes(command),
   );
   if (command === 'down') {
     await compose(saved, [
@@ -70,7 +71,11 @@ try {
     ]);
     const { env, generated, webOrigin } = await environment(saved);
     const { Pool } = await import('pg');
-    for (const key of ['IDENTITY_DATABASE_URL', 'WORKFLOW_DATABASE_URL']) {
+    for (const key of [
+      'IDENTITY_DATABASE_URL',
+      'WORKFLOW_DATABASE_URL',
+      'STAFF_DATABASE_URL',
+    ]) {
       const pool = new Pool({
         connectionString: env[key],
         connectionTimeoutMillis: 5000,
@@ -152,12 +157,34 @@ try {
         'run',
         'build',
         '--filter=@luma/api...',
+        '--filter=@luma/staff-api...',
       ]);
       const { seed } = await import('./seed.mjs');
       await seed(saved, generated);
     }
+    if (
+      [
+        'setup',
+        'seed',
+        'reset',
+        'staff',
+        'dev',
+        'workflows',
+        'observe',
+      ].includes(command)
+    ) {
+      await run('pnpm', [
+        'exec',
+        'turbo',
+        'run',
+        'build',
+        '--filter=@luma/staff-api...',
+      ]);
+      const { seedStaff } = await import('./staff-seed.mjs');
+      await seedStaff(saved, generated, migrationUrl);
+    }
     console.log(
-      `Web: ${webOrigin}\nAPI: ${generated.API_PROXY_TARGET}\nLocal configuration: ${join(stateDirectory, 'env')}`,
+      `Web: ${webOrigin}\nAPI: ${generated.API_PROXY_TARGET}\nStaff: ${generated.STAFF_PUBLIC_ORIGIN}\nStaff login: staff@example.test (password in .luma/staff.json)\nLocal configuration: ${join(stateDirectory, 'env')}`,
     );
     if (workflows)
       console.log(
@@ -167,7 +194,7 @@ try {
       console.log(
         `Grafana: http://${await compose(saved, ['port', 'grafana', '3000'], true)} (admin / admin)`,
       );
-    if (['dev', 'workflows', 'observe'].includes(command)) {
+    if (['dev', 'staff', 'workflows', 'observe'].includes(command)) {
       try {
         await access(join(root, 'apps/api/.env'));
         console.log(
@@ -184,6 +211,9 @@ try {
           'run',
           'dev',
           '--concurrency=20',
+          ...(command === 'staff'
+            ? ['--filter=@luma/staff-web', '--filter=@luma/staff-api']
+            : []),
           ...(workflows ? ['dev:worker'] : []),
         ],
         { env },

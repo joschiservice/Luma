@@ -47,6 +47,7 @@ export default tseslint.config(
       'apps/web/**/*.{ts,tsx}',
       'packages/ui/**/*.{ts,tsx}',
       'apps/simulator-web/**/*.{ts,tsx}',
+      'apps/staff/**/*.{ts,tsx}',
     ],
     languageOptions: { globals: globals.browser },
     plugins: { 'react-hooks': reactHooks },
@@ -60,6 +61,7 @@ export default tseslint.config(
   {
     files: [
       'apps/web/src/**/*.{ts,tsx}',
+      'apps/staff/src/**/*.{ts,tsx}',
       'packages/apps/*/src/web/**/*.{ts,tsx}',
     ],
     plugins: { ui },

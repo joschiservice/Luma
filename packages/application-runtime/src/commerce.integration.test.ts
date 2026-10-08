@@ -16,6 +16,7 @@ import {
 } from '@luma/identity/composition';
 import { createOrderMetricReader } from '@luma/orders/composition';
 import { createTenantDatabase } from '@luma/platform/composition';
+import { createReplenishmentStore } from '@luma/procurement/composition';
 import {
   createOperationalMetrics,
   createRecordExplorer,
@@ -97,13 +98,17 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
     };
   }
 
-  async function mapStock(input: ReturnType<typeof stock>, key: string) {
+  async function mapStock(
+    input: ReturnType<typeof stock>,
+    key: string,
+    skuKey = 'shared-sku',
+  ) {
     const o = input.observation;
     await services.ingestion.ingest(context(), key, input);
     await services.ingestion.bind(
       context(),
       { ...o.source, ...o.data.sku },
-      'shared-sku',
+      skuKey,
       o.id,
       'operator-confirmed',
     );
@@ -192,6 +197,111 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
     await owner.query(
       'TRUNCATE connector_observations,connector_source_mappings,orders_entities,inventory_entities CASCADE',
     );
+  });
+  it('reads only requested replenishment positions and connections under tenant RLS', async () => {
+    const first = await mapStock(stock({ amount: '3' }), 'watched-first');
+    await mapStock(
+      stock({ connectionId: secondConnection, amount: '5' }),
+      'watched-second',
+    );
+    await mapStock(
+      stock({ external: 'unwatched', amount: '99' }),
+      'unwatched',
+      'OTHER-SKU',
+    );
+    if (first.status === 'pending')
+      throw new Error('Stock projection did not complete');
+    const store = createReplenishmentStore(createTenantDatabase(runtime));
+    expect(await store.stocksFor(context(), [])).toEqual([]);
+    expect(
+      await store.stocksFor(context(), [
+        { positionId: first.entityId, connectionId: connection },
+      ]),
+    ).toMatchObject([
+      { positionId: first.entityId, connectionId: connection, available: 3 },
+    ]);
+    expect(
+      await store.stocksFor(context(), [
+        { positionId: first.entityId, connectionId: secondConnection },
+      ]),
+    ).toMatchObject([
+      {
+        positionId: first.entityId,
+        connectionId: secondConnection,
+        available: 5,
+      },
+    ]);
+    expect(
+      await store.stocksFor(context(), [{ positionId: first.entityId }]),
+    ).toHaveLength(2);
+    expect(
+      await store.stocksFor(context(), [
+        { positionId: first.entityId, connectionId: randomUUID() },
+      ]),
+    ).toEqual([]);
+    expect(
+      await store.stocksFor(context(otherTenant), [
+        { positionId: first.entityId },
+      ]),
+    ).toEqual([]);
+  });
+
+  it('bounds stock choices, pages without duplicates and searches literal SKU text', async () => {
+    const ids = [];
+    for (let i = 0; i < 55; i++) {
+      const key = `CHOICE_%_${String(i).padStart(3, '0')}`;
+      const result = await mapStock(stock({ external: key }), key, key);
+      if (result.status === 'pending')
+        throw new Error('Stock projection did not complete');
+      ids.push(result.entityId);
+    }
+    const store = createReplenishmentStore(createTenantDatabase(runtime));
+    const first = await store.browseStocks(context(), {});
+    expect(first.positions).toHaveLength(50);
+    expect(first.nextCursor).toEqual(expect.any(String));
+    const second = await store.browseStocks(context(), {
+      cursor: first.nextCursor!,
+    });
+    expect(second.positions).toHaveLength(5);
+    expect(second.nextCursor).toBeNull();
+    expect(
+      new Set(
+        [...first.positions, ...second.positions].map((p) => p.positionId),
+      ),
+    ).toEqual(new Set(ids));
+    const chosen = second.positions[0]!;
+    expect(
+      await store.browseStocks(context(), {
+        positionId: chosen.positionId,
+        connectionId: connection,
+      }),
+    ).toMatchObject({
+      positions: [{ positionId: chosen.positionId, sku: chosen.sku }],
+      nextCursor: null,
+    });
+    expect(
+      (await store.browseStocks(context(), { q: '_%_054' })).positions,
+    ).toHaveLength(1);
+    expect(
+      (await store.browseStocks(context(), { q: '_%_missing' })).positions,
+    ).toEqual([]);
+    expect(
+      (await store.browseStocks(context(otherTenant), {})).positions,
+    ).toEqual([]);
+    await owner.query(
+      "UPDATE inventory_snapshots SET document=jsonb_set(document,'{deleted}','true') WHERE tenant_id=$1 AND entity_id=$2",
+      [tenant, chosen.positionId],
+    );
+    expect(
+      (await store.browseStocks(context(), { positionId: chosen.positionId }))
+        .positions,
+    ).toEqual([]);
+    expect(await store.stocksFor(context(), [chosen])).toMatchObject([
+      { deleted: true },
+    ]);
+    await expect(
+      store.browseStocks(context(), { cursor: 'bad' }),
+    ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
   });
   it('searches mapped records within one tenant and keeps differing source facts separate', async () => {
     const first = await mapStock(stock({ amount: '3' }), 'explorer-left');

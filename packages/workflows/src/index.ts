@@ -24,6 +24,7 @@ export type {
   ReplenishmentBatchResult,
   ReplenishmentPreview,
   ReplenishmentPreviewItem,
+  ReplenishmentPositionQuery,
   ReplenishmentRunSummary,
   ReplenishmentSubjectCoverage,
   ReplenishmentWorkflow,

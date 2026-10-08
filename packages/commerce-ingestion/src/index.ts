@@ -35,7 +35,7 @@ const normalizers = {
 
 /** Mapping method recorded for identities created by a history import or sync. */
 export const sourceLocalMethod =
-  'Imported source record; linked only to itself until a person links it to another source';
+  'Imported source record with its own canonical identity';
 
 /** Coordinates idempotent owner transactions; replay resumes after a partial failure. */
 export function createCommerceIngestion(
@@ -505,12 +505,14 @@ export function createCommerceIngestion(
       return (await importMany(context, [{ ingestKey, input }]))[0]!;
     },
     importMany,
+    /** Confirms shared identity and replays affected records. Supply an audited method for automatic rules; manual callers use the default. */
     async link(
       context: TenantContext,
       kind: LinkableKind,
       targetId: string,
       otherId: string,
       reason: string,
+      method: string = linkedMethod,
     ) {
       requirePermission(context, 'sync.manage');
       if (targetId === otherId)
@@ -537,7 +539,7 @@ export function createCommerceIngestion(
           item.source,
           otherId,
           targetId,
-          linkedMethod,
+          method,
           reason,
         );
       if (kind === 'order') {

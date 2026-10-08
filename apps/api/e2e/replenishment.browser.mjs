@@ -49,15 +49,12 @@ test('reviews replenishment scope, recovers a lost response, approves and opens 
   await page.getByRole('option', { name: 'Northstar Supply' }).click();
   await dialog.getByLabel('Filter stock positions').fill(f.position.sku);
   // A SKU can come from several sources; pick the configured connection's position.
-  const sku = new RegExp(f.position.sku.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-  const choices = dialog.getByRole('checkbox', { name: sku });
-  await (
-    (await choices.count()) > 1
-      ? dialog.getByRole('checkbox', {
-          name: new RegExp(f.position.connectionId.slice(0, 8)),
-        })
-      : choices
-  ).check();
+  const sku = f.position.sku.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  await dialog
+    .getByRole('checkbox', {
+      name: new RegExp(`${sku}.*source ${f.position.connectionId.slice(0, 8)}`),
+    })
+    .check();
   await dialog
     .getByLabel('Minimum stock', { exact: true })
     .fill(String(f.position.available + 10));
@@ -189,3 +186,92 @@ test('reviews replenishment scope, recovers a lost response, approves and opens 
   ).toBe(true);
   expect(errors).toEqual([]);
 }, 120000);
+
+test('keeps selections across stock pages and server search in narrow and dark layouts', async ({
+  resources: t,
+}) => {
+  const port = await availablePort();
+  const origin = `http://127.0.0.1:${port}`;
+  const f = await replenishmentFixture(t, origin);
+  const setup = await f.request('/replenishment');
+  const first = setup.positions[0];
+  const second = setup.positions.find(
+    (p) => p.positionId !== first.positionId && p.sku !== first.sku,
+  );
+  expect(second).toBeTruthy();
+  const web = startProcess(
+    t,
+    'e2e/web-server.mjs',
+    { TEST_API_ORIGIN: f.apiOrigin, TEST_WEB_PORT: String(port) },
+    true,
+  );
+  await web.message('listening');
+  const context = await t.newContext({
+    baseURL: origin,
+    viewport: { width: 390, height: 844 },
+  });
+  await context.addCookies(
+    f.ownerCookie.split('; ').map((value) => {
+      const [name, ...rest] = value.split('=');
+
+      return { name, value: rest.join('='), url: origin };
+    }),
+  );
+  const page = await context.newPage();
+  page.setDefaultTimeout(20000);
+  // A short first page makes continuation and retained selection observable with the fixed merchant fixture.
+  await page.route('**/replenishment{,?*}', async (route) => {
+    const url = new URL(route.request().url());
+    const response = await route.fetch();
+    const body = await response.json();
+    if (
+      !url.searchParams.get('q') &&
+      !url.searchParams.has('cursor') &&
+      !url.searchParams.has('positionId')
+    ) {
+      body.positions = body.positions.slice(0, 1);
+      body.nextCursor = `${first.positionId}:${first.connectionId}`;
+    }
+    await route.fulfill({ response, json: body });
+  });
+  await page.goto(`/app/${f.actor.tenantId}/workflows/inventory-replenishment`);
+  await page
+    .getByRole('button', { name: 'Add stock rules', exact: true })
+    .click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('checkbox').first().check();
+  await dialog
+    .getByRole('navigation', { name: 'Stock position pages' })
+    .getByRole('button', { name: 'Next', exact: true })
+    .click();
+  const escaped = second.sku.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  await dialog
+    .getByRole('checkbox', {
+      name: new RegExp(`${escaped}.*source ${second.connectionId.slice(0, 8)}`),
+    })
+    .check();
+  await expect(dialog.getByText('2 of 25 selected')).toBeVisible();
+  await dialog.getByLabel('Filter stock positions').fill('no-such-sku');
+  await expect(dialog.getByText('No SKU matches “no-such-sku”.')).toBeVisible();
+  await expect(dialog.getByRole('checkbox', { checked: true })).toHaveCount(2);
+  await expect(
+    dialog.getByRole('button', { name: 'Next', exact: true }),
+  ).toBeDisabled();
+  await expect(
+    dialog.getByRole('button', { name: 'Previous', exact: true }),
+  ).toBeDisabled();
+  await page.screenshot({ path: '/tmp/luma-replenishment-paging-narrow.png' });
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.screenshot({ path: '/tmp/luma-replenishment-paging-dark.png' });
+  await dialog.getByRole('combobox', { name: 'Supplier', exact: true }).click();
+  await page.getByRole('option', { name: 'Northstar Supply' }).click();
+  await dialog.getByRole('button', { name: 'Preview 2 rules' }).click();
+  await expect(dialog.getByText('Will activate', { exact: true })).toHaveCount(
+    2,
+  );
+  await expect(
+    dialog
+      .getByRole('list', { name: 'Rules to activate' })
+      .getByRole('listitem'),
+  ).toHaveCount(2);
+});

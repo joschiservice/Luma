@@ -231,3 +231,65 @@ export type IdentityDetail = z.infer<typeof identityDetailSchema>;
 export type LinkRequestView = z.infer<typeof linkRequestSchema>;
 
 export type LinkInput = z.infer<typeof linkInputSchema>;
+
+export const autoLinkPairSchema = z
+  .object({
+    kind: z.enum(['sku', 'order']),
+    targetConnectionId: z.string().uuid(),
+    sourceConnectionId: z.string().uuid(),
+  })
+  .strict();
+
+export const autoLinkInputSchema = autoLinkPairSchema
+  .extend({
+    id: z.string().uuid(),
+    revision: z.number().int().nonnegative(),
+    enabled: z.boolean(),
+  })
+  .strict();
+
+export const autoLinkRuleSchema = autoLinkInputSchema.extend({
+  principalId: z.string(),
+  state: z.enum(['disabled', 'waiting', 'active', 'blocked', 'failed']),
+  message: z.string().nullable(),
+  lastCheckedAt: timestamp.nullable(),
+  linked: z.number().int().nonnegative(),
+});
+
+export const autoLinkRulesSchema = z.array(autoLinkRuleSchema);
+
+export const autoLinkPreviewSchema = z.object({
+  ready: z.boolean(),
+  message: z.string().nullable(),
+  counts: z.object({
+    eligible: z.number().int().nonnegative(),
+    ambiguous: z.number().int().nonnegative(),
+    conflict: z.number().int().nonnegative(),
+    excluded: z.number().int().nonnegative(),
+    stale: z.number().int().nonnegative(),
+  }),
+  candidates: z
+    .array(
+      z.object({
+        key: z.string(),
+        targetId: z.string().uuid(),
+        sourceId: z.string().uuid(),
+        disposition: z.enum([
+          'eligible',
+          'ambiguous',
+          'conflict',
+          'excluded',
+          'stale',
+        ]),
+      }),
+    )
+    .max(20),
+});
+
+export type AutoLinkPair = z.infer<typeof autoLinkPairSchema>;
+
+export type AutoLinkInput = z.infer<typeof autoLinkInputSchema>;
+
+export type AutoLinkRule = z.infer<typeof autoLinkRuleSchema>;
+
+export type AutoLinkPreview = z.infer<typeof autoLinkPreviewSchema>;

@@ -509,7 +509,7 @@
   "workflows_setup_filter_placeholder": "Filter by SKU",
   "workflows_setup_selected": "{selected, number} of {limit, number} selected",
   "workflows_setup_selected_full": "{selected, number} of {limit, number} selected. Set up more positions in another batch.",
-  "workflows_setup_no_positions": "No stock positions yet. Connect a system that tracks stock so Luma can read it.",
+  "workflows_setup_no_positions": "No stock positions to show. If none have been imported yet, connect a system that tracks stock.",
   "workflows_setup_no_match": "No SKU matches “{filter}”.",
   "workflows_setup_quantities": "Quantities",
   "workflows_setup_minimum_stock": "Minimum stock",
@@ -531,5 +531,9 @@
   "workflows_setup_result_covered": "Already covered",
   "workflows_setup_result_failed": "Not activated",
   "workflows_setup_retrying": "Retrying…",
-  "workflows_setup_retry_unconfirmed": "Retry {count, number} unconfirmed"
+  "workflows_setup_retry_unconfirmed": "Retry {count, number} unconfirmed",
+  "workflows_setup_loading_positions": "Loading stock positions…",
+  "workflows_setup_loading_position": "Loading the stock position…",
+  "workflows_setup_pagination_label": "Stock position pages",
+  "workflows_setup_pagination_empty": "No stock positions"
 }
