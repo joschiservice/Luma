@@ -120,6 +120,7 @@ test('opens a return from its order, tells pending work from money returned and 
   await page.getByRole('link', { name: '#1002-R1', exact: true }).waitFor();
   expect(new URL(page.url()).searchParams.get('stage')).toBe('refund_pending');
   await page.getByRole('link', { name: '#1002-R1', exact: true }).click();
+  await page.getByRole('heading', { name: '#1002-R1', level: 1 }).waitFor();
   await page
     .getByRole('navigation', { name: 'Breadcrumb' })
     .getByRole('link', { name: 'Returns' })

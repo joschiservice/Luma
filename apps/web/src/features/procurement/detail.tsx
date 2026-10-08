@@ -18,6 +18,7 @@ import { Card } from '@luma/ui/components/primitives/card';
 import { DataTable } from '@luma/ui/components/primitives/data-table';
 import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import { Empty } from '@luma/ui/components/primitives/empty';
+import { RefreshButton } from '@luma/ui/components/primitives/refresh-button';
 import { StateDot, StatePill } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { RecordHeader } from '@luma/ui/components/workspace/record-header';
@@ -237,10 +238,13 @@ export function PurchaseOrderRecordView({
                   : m.procurement_detail_check_updates()}
               </Button>
             ) : null}
-            <Button variant="ghost" disabled={refreshing} onClick={reload}>
-              <RefreshCw size={14} aria-hidden="true" />
+            <RefreshButton
+              variant="ghost"
+              refreshing={refreshing}
+              onClick={reload}
+            >
               {m.common_refresh()}
-            </Button>
+            </RefreshButton>
           </>
         }
         status={

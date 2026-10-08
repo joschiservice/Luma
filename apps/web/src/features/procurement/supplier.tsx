@@ -13,13 +13,14 @@ import {
   DataTableRowLink,
 } from '@luma/ui/components/primitives/data-table';
 import { Empty } from '@luma/ui/components/primitives/empty';
+import { RefreshButton } from '@luma/ui/components/primitives/refresh-button';
 import { StatePill } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { RecordHeader } from '@luma/ui/components/workspace/record-header';
 import { quantityWithUnit } from '@luma/ui/lib/units';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from '@tanstack/react-router';
-import { Building2, Plus, RefreshCw } from 'lucide-react';
+import { Building2, Plus } from 'lucide-react';
 import { useState } from 'react';
 
 import { SignInRedirect } from '../identity/common';
@@ -131,10 +132,13 @@ export function SupplierRecordView({
         title={supplier?.name ?? m.procurement_supplier_title_fallback()}
         actions={
           <>
-            <Button variant="ghost" disabled={refreshing} onClick={reload}>
-              <RefreshCw size={14} aria-hidden="true" />
+            <RefreshButton
+              variant="ghost"
+              refreshing={refreshing}
+              onClick={reload}
+            >
               {m.common_refresh()}
-            </Button>
+            </RefreshButton>
             {record?.canManage ? (
               <>
                 <Button variant="outline" onClick={() => setDialog('link')}>

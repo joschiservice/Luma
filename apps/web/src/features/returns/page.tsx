@@ -535,11 +535,7 @@ export function ReturnsView({
               </span>
               <div>
                 {previous ? (
-                  <Button
-                    variant="outline"
-                    disabled={refreshing}
-                    onClick={previous}
-                  >
+                  <Button variant="outline" onClick={previous}>
                     {m.returns_previous_page()}
                   </Button>
                 ) : null}
@@ -548,11 +544,7 @@ export function ReturnsView({
                     {m.returns_first_page()}
                   </Button>
                 ) : null}
-                <Button
-                  variant="outline"
-                  disabled={!next || refreshing}
-                  onClick={next}
-                >
+                <Button variant="outline" disabled={!next} onClick={next}>
                   {m.returns_next_page()}
                 </Button>
               </div>

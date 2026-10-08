@@ -14,11 +14,12 @@ import {
   CardTitle,
 } from '@luma/ui/components/primitives/card';
 import { Empty } from '@luma/ui/components/primitives/empty';
+import { RefreshButton } from '@luma/ui/components/primitives/refresh-button';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { RecordHeader } from '@luma/ui/components/workspace/record-header';
 import { onlineManager, useQuery } from '@tanstack/react-query';
 import { Link, useParams } from '@tanstack/react-router';
-import { RefreshCw, UsersRound } from 'lucide-react';
+import { UsersRound } from 'lucide-react';
 import { type ReactNode, useSyncExternalStore } from 'react';
 
 import { appsOptions } from '../apps/data';
@@ -197,10 +198,9 @@ export function CustomerDetailView({
             : undefined
         }
         actions={
-          <Button variant="outline" disabled={refreshing} onClick={refresh}>
-            <RefreshCw size={14} aria-hidden="true" />
+          <RefreshButton refreshing={refreshing} onClick={refresh}>
             {m.customers_detail_refresh()}
-          </Button>
+          </RefreshButton>
         }
       />
       {offline ? (

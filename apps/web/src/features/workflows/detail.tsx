@@ -277,7 +277,6 @@ export function WorkflowDetailView({
         <Button
           variant="ghost"
           aria-label={m.workflows_detail_refresh_label()}
-          disabled={refreshing}
           onClick={() => void refresh()}
         >
           <RefreshCw size={14} aria-hidden="true" /> {m.common_refresh()}

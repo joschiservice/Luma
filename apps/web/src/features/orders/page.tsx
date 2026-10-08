@@ -242,7 +242,6 @@ export function OrdersView({
               hasNext={!!next}
               onPrevious={previous}
               onNext={() => next?.()}
-              disabled={refreshing}
               formatTotal={(count) => m.orders_list_pagination_total({ count })}
               label={m.orders_list_pagination_label()}
             />

@@ -10,12 +10,13 @@ import { Button, buttonVariants } from '@luma/ui/components/primitives/button';
 import { Card } from '@luma/ui/components/primitives/card';
 import { DataTable } from '@luma/ui/components/primitives/data-table';
 import { Empty } from '@luma/ui/components/primitives/empty';
+import { RefreshButton } from '@luma/ui/components/primitives/refresh-button';
 import { StateDot, StatePill } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { RecordHeader } from '@luma/ui/components/workspace/record-header';
 import { onlineManager, useQuery } from '@tanstack/react-query';
 import { Link, useParams, useSearch } from '@tanstack/react-router';
-import { ExternalLink, PackageX, RefreshCw } from 'lucide-react';
+import { ExternalLink, PackageX } from 'lucide-react';
 import { type ReactNode, useSyncExternalStore } from 'react';
 
 import { activityLabel, activityState } from '../activity/presentation';
@@ -481,10 +482,9 @@ export function FulfillmentDetailView({
         title={item ? orderLabel(item) : m.fulfillment_detail_title_fallback()}
         back={from ? <Link to={from} /> : undefined}
         actions={
-          <Button variant="outline" disabled={refreshing} onClick={refresh}>
-            <RefreshCw size={14} aria-hidden="true" />
+          <RefreshButton refreshing={refreshing} onClick={refresh}>
             {m.fulfillment_detail_refresh()}
-          </Button>
+          </RefreshButton>
         }
         status={
           <>

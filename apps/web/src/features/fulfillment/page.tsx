@@ -520,11 +520,7 @@ export function FulfillmentView({
               </span>
               <div>
                 {previous ? (
-                  <Button
-                    variant="outline"
-                    disabled={refreshing}
-                    onClick={previous}
-                  >
+                  <Button variant="outline" onClick={previous}>
                     {m.fulfillment_previous_page()}
                   </Button>
                 ) : null}
@@ -533,11 +529,7 @@ export function FulfillmentView({
                     {m.fulfillment_first_page()}
                   </Button>
                 ) : null}
-                <Button
-                  variant="outline"
-                  disabled={!next || refreshing}
-                  onClick={next}
-                >
+                <Button variant="outline" disabled={!next} onClick={next}>
                   {m.fulfillment_next_page()}
                 </Button>
               </div>

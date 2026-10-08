@@ -10,6 +10,7 @@
 | Page about one record                     | `RecordHeader`                  | Names the record in the breadcrumb; shows its status and key facts        |
 | Subject title, description and actions    | `PageHeader`                    | The visible `h1` of a page outside a section, such as an app's settings   |
 | Where a piece of work stands              | `StateDot`, `StatePill`         | Always with a text label                                                  |
+| Reloading a record or view                | `RefreshButton`                 | Never disabled by background reads; spins only after a slow read          |
 | Domain identity in navigation and records | `DomainIcon`                    | External systems stay neutral                                             |
 | Bordered content and nested surfaces      | `Card` and its parts            | Group content that needs a boundary; prefer rows, toolbars and inspectors |
 | Notices and warnings                      | `Alert`                         | Choose the live-region role deliberately (below)                          |

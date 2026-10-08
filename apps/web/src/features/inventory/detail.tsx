@@ -8,12 +8,12 @@ import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Card } from '@luma/ui/components/primitives/card';
 import { DataTable } from '@luma/ui/components/primitives/data-table';
+import { RefreshButton } from '@luma/ui/components/primitives/refresh-button';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { RecordHeader } from '@luma/ui/components/workspace/record-header';
 import { quantityUnit, unitOfMeasure } from '@luma/ui/lib/units';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams, useSearch } from '@tanstack/react-router';
-import { RefreshCw } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { appsOptions } from '../apps/data';
@@ -150,10 +150,9 @@ export function StockDetailView({
         title={position?.sku ?? m.inventory_detail_title_fallback()}
         back={back ? <Link to={back} /> : undefined}
         actions={
-          <Button variant="outline" disabled={refreshing} onClick={refresh}>
-            <RefreshCw size={14} aria-hidden="true" />
+          <RefreshButton refreshing={refreshing} onClick={refresh}>
             {m.inventory_detail_refresh()}
-          </Button>
+          </RefreshButton>
         }
         status={position ? <StockState position={position} /> : null}
         description={

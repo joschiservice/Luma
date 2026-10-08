@@ -423,11 +423,7 @@ export function ProductsView({
             </span>
             <div>
               {previous ? (
-                <Button
-                  variant="outline"
-                  disabled={refreshing}
-                  onClick={previous}
-                >
+                <Button variant="outline" onClick={previous}>
                   {m.products_list_previous()}
                 </Button>
               ) : null}
@@ -436,11 +432,7 @@ export function ProductsView({
                   {m.products_list_first_page()}
                 </Button>
               ) : null}
-              <Button
-                variant="outline"
-                disabled={!next || refreshing}
-                onClick={next}
-              >
+              <Button variant="outline" disabled={!next} onClick={next}>
                 {m.products_list_next()}
               </Button>
             </div>

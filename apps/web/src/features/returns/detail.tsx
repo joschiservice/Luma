@@ -16,12 +16,13 @@ import {
 } from '@luma/ui/components/primitives/card';
 import { DataTable } from '@luma/ui/components/primitives/data-table';
 import { Empty } from '@luma/ui/components/primitives/empty';
+import { RefreshButton } from '@luma/ui/components/primitives/refresh-button';
 import { StatePill } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { RecordHeader } from '@luma/ui/components/workspace/record-header';
 import { onlineManager, useQuery } from '@tanstack/react-query';
 import { Link, useParams, useSearch } from '@tanstack/react-router';
-import { ArrowRight, Check, Minus, RefreshCw, Undo2, X } from 'lucide-react';
+import { ArrowRight, Check, Minus, Undo2, X } from 'lucide-react';
 import { type ReactNode, useSyncExternalStore } from 'react';
 
 import { appsOptions } from '../apps/data';
@@ -517,10 +518,9 @@ export function ReturnDetailView({
         title={item ? returnLabel(item) : m.returns_detail_title_fallback()}
         back={from ? <Link to={from} /> : undefined}
         actions={
-          <Button variant="outline" disabled={refreshing} onClick={refresh}>
-            <RefreshCw size={14} aria-hidden="true" />
+          <RefreshButton refreshing={refreshing} onClick={refresh}>
             {m.returns_detail_refresh()}
-          </Button>
+          </RefreshButton>
         }
         status={
           item ? (

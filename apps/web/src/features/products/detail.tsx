@@ -15,13 +15,14 @@ import { Button } from '@luma/ui/components/primitives/button';
 import { Card } from '@luma/ui/components/primitives/card';
 import { DataTable } from '@luma/ui/components/primitives/data-table';
 import { Empty } from '@luma/ui/components/primitives/empty';
+import { RefreshButton } from '@luma/ui/components/primitives/refresh-button';
 import { StatePill } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { RecordHeader } from '@luma/ui/components/workspace/record-header';
 import { quantityUnit } from '@luma/ui/lib/units';
 import { onlineManager, useQuery } from '@tanstack/react-query';
 import { Link, useParams, useSearch } from '@tanstack/react-router';
-import { PackageX, RefreshCw } from 'lucide-react';
+import { PackageX } from 'lucide-react';
 import { type ReactNode, useSyncExternalStore } from 'react';
 
 import { SignInRedirect } from '../identity/common';
@@ -354,10 +355,9 @@ export function ProductDetailView({
         title={item?.sku.trim() ?? m.products_detail_title_fallback()}
         back={from ? <Link to={from} /> : undefined}
         actions={
-          <Button variant="outline" disabled={refreshing} onClick={refresh}>
-            <RefreshCw size={14} aria-hidden="true" />
+          <RefreshButton refreshing={refreshing} onClick={refresh}>
             {m.products_detail_refresh()}
-          </Button>
+          </RefreshButton>
         }
         status={
           <>
