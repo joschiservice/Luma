@@ -9,6 +9,7 @@ import {
 } from '@luma/ui/components/primitives/data-table';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { Link } from '@tanstack/react-router';
+import { GitCompareArrows, ListOrdered } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { OrderSection } from './order-section';
@@ -104,10 +105,7 @@ export function OrderLines({
   from: string;
 }) {
   return (
-    <OrderSection
-      title={m.orders_lines_title()}
-      description={m.orders_lines_description()}
-    >
+    <OrderSection title={m.orders_lines_title()} icon={ListOrdered}>
       {detail.sources.length > 1 ? (
         <div
           className="order-source-switch"
@@ -253,10 +251,7 @@ export function SourceComparison({ detail }: { detail: OrderDetail }) {
   ];
 
   return (
-    <OrderSection
-      title={m.orders_comparison_title()}
-      description={m.orders_comparison_description()}
-    >
+    <OrderSection title={m.orders_comparison_title()} icon={GitCompareArrows}>
       <DataTable
         caption={m.orders_comparison_caption()}
         columns={columns}

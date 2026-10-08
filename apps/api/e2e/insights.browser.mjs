@@ -100,7 +100,7 @@ test('opens the exact records behind a chart point and returns to them', async (
   const drill = page.url();
   expect(new URL(drill).searchParams.get('chart')).toBe('orders');
   await sheet.getByRole('link', { name: /^#\d+/ }).first().click();
-  await page.getByRole('link', { name: 'Back to context' }).click();
+  await page.getByRole('link', { name: 'Back to previous page' }).click();
   await page.waitForURL(drill);
   await sheet.getByRole('heading', { name: /^Orders · / }).waitFor();
 

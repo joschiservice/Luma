@@ -291,20 +291,6 @@ li.workflow-row {
   border-bottom: 1px solid var(--line);
 }
 
-.workflow-back {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--foreground-subtle);
-  font-size: 13px;
-  font-weight: 500;
-  text-decoration: none;
-}
-
-.workflow-back:hover {
-  color: var(--foreground);
-}
-
 .workflow-version-controls {
   display: flex;
   align-items: center;
@@ -444,14 +430,6 @@ li.workflow-row {
   height: 6px;
   border-radius: 1.5px;
   background: var(--domain-workflows);
-}
-
-.workflow-intent h2 {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-  line-height: 30px;
-  letter-spacing: -0.028em;
 }
 
 .workflow-intent > p:last-child {

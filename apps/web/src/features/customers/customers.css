@@ -30,14 +30,6 @@
 .customers-loading .lu-skeleton {
   height: 56px;
 }
-.customers-back {
-  display: inline-flex;
-  gap: 6px;
-  align-items: center;
-  width: fit-content;
-  font-size: 13px;
-  color: var(--signal-text);
-}
 .customers-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);

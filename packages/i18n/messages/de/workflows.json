@@ -92,7 +92,6 @@
   "workflows_readiness_latest": "Zuletzt: {summary} {date}",
   "workflows_readiness_verified_help": "Ein Ergebnis gilt erst als bestätigt, wenn Luma es unabhängig geprüft hat.",
   "workflows_readiness_approval_details": "So gilt die Genehmigung",
-  "workflows_detail_back": "Alle Workflows",
   "workflows_detail_activated": "Workflow aktiviert. Diese Version darf jetzt die ausgewählten Bestellungen ändern.",
   "workflows_detail_revoked": "Aktivierung widerrufen. Es starten keine neuen Ausführungen. Bereits gesendete Änderungen können noch abgeschlossen werden.",
   "workflows_detail_review_activation": "Aktivierung prüfen",

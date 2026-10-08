@@ -88,7 +88,10 @@ test('searches scoped records and returns from a metric to the same cohort', asy
     path: '/tmp/luma97-record-mobile.png',
     fullPage: true,
   });
-  await page.getByRole('link', { name: 'Back to records' }).click();
+  await page
+    .getByRole('navigation', { name: 'Breadcrumb' })
+    .getByRole('link', { name: 'Records' })
+    .click();
   await page.getByRole('heading', { name: 'Records', exact: true }).waitFor();
   const search = page.getByRole('searchbox', { name: 'Search records' });
   await search.fill('#1000');
@@ -109,7 +112,7 @@ test('searches scoped records and returns from a metric to the same cohort', asy
   const dialog = page.getByRole('dialog');
   await dialog.getByRole('link', { name: 'Open order' }).click();
   await page.getByRole('heading', { name: '#1000' }).waitFor();
-  await page.getByRole('link', { name: 'Back to context' }).click();
+  await page.getByRole('link', { name: 'Back to previous page' }).click();
   await dialog.getByRole('heading', { name: 'Open orders' }).waitFor();
   expect(errors).toEqual([]);
 });

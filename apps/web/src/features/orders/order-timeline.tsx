@@ -6,7 +6,7 @@ import { Badge } from '@luma/ui/components/primitives/badge';
 import { StateDot } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { Link } from '@tanstack/react-router';
-import { ArrowRight } from 'lucide-react';
+import { Activity, ArrowRight, History, Truck } from 'lucide-react';
 
 import { activityLabel, activityState } from '../activity/presentation';
 import { OrderSection } from './order-section';
@@ -61,10 +61,7 @@ export function OrderFulfillments({
   from: string;
 }) {
   return (
-    <OrderSection
-      title={m.orders_fulfillments_title()}
-      description={m.orders_fulfillments_description()}
-    >
+    <OrderSection title={m.orders_fulfillments_title()} icon={Truck}>
       {detail.fulfillments.length ? (
         <ul className="order-list">
           {detail.fulfillments.map((item) => {
@@ -131,10 +128,7 @@ export function OrderFulfillments({
 /** Lists the order, fulfillment, return and refund states Luma read from each source, newest first. */
 export function ObservedHistory({ detail }: { detail: OrderDetail }) {
   return (
-    <OrderSection
-      title={m.orders_history_title()}
-      description={m.orders_history_description()}
-    >
+    <OrderSection title={m.orders_history_title()} icon={History}>
       <ol className="order-history">
         {detail.history.entries.map((entry) => (
           <li key={entry.snapshotId}>
@@ -179,10 +173,7 @@ export function LumaActivity({
   organizationId: string;
 }) {
   return (
-    <OrderSection
-      title={m.orders_activity_title()}
-      description={m.orders_activity_description()}
-    >
+    <OrderSection title={m.orders_activity_title()} icon={Activity}>
       {detail.activity.entries.length ? (
         <ol className="order-activity">
           {detail.activity.entries.map((entry) => (

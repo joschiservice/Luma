@@ -223,7 +223,10 @@ test('opens an imported customer from an order, reads live history and keeps oth
 
   // The list keeps same-name customers apart and search text out of the URL.
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.getByRole('link', { name: 'Back to customers' }).click();
+  await page
+    .getByRole('navigation', { name: 'Breadcrumb' })
+    .getByRole('link', { name: 'Customers' })
+    .click();
   await page.getByRole('link', { name: 'Avery Tan' }).first().waitFor();
   await page.getByRole('searchbox', { name: 'Search customers' }).fill('72@');
   await page.keyboard.press('Enter');

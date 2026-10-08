@@ -17,11 +17,10 @@ import { Button } from '@luma/ui/components/primitives/button';
 import { Card } from '@luma/ui/components/primitives/card';
 import { DataTable } from '@luma/ui/components/primitives/data-table';
 import { Disclosure } from '@luma/ui/components/primitives/disclosure';
-import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { Empty } from '@luma/ui/components/primitives/empty';
 import { StateDot, StatePill } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
-import { PageHeader } from '@luma/ui/components/workspace/page-header';
+import { RecordHeader } from '@luma/ui/components/workspace/record-header';
 import { quantityWithUnit } from '@luma/ui/lib/units';
 import {
   onlineManager,
@@ -31,7 +30,6 @@ import {
 } from '@tanstack/react-query';
 import { Link, useLocation, useParams } from '@tanstack/react-router';
 import {
-  ArrowLeft,
   ArrowRight,
   FileX,
   MessageSquarePlus,
@@ -204,19 +202,64 @@ export function PurchaseOrderRecordView({
   const order = record?.order;
 
   return (
-    <main className="procurement-page procurement-record">
-      <Link
-        className="procurement-back"
-        to="/app/$organizationId/procurement"
-        params={{ organizationId }}
-        search={{ view: 'orders', q: '', status: '' }}
-      >
-        <ArrowLeft size={14} aria-hidden="true" />
-        {m.procurement_detail_back()}
-      </Link>
-      <PageHeader
+    <div className="procurement-page procurement-record">
+      <RecordHeader
+        section={{
+          label: m.procurement_title(),
+          domain: 'procurement',
+          link: (
+            <Link
+              to="/app/$organizationId/procurement"
+              params={{ organizationId }}
+              search={{ view: 'orders', q: '', status: '' }}
+            />
+          ),
+        }}
         title={order?.reference ?? m.procurement_detail_title_fallback()}
-        icon={<DomainIcon domain="procurement" size="md" />}
+        actions={
+          <>
+            {record?.submission?.state === 'submitted' ? (
+              <Button
+                variant="outline"
+                disabled={sync.isPending || offline}
+                title={
+                  record.readiness.connection?.label
+                    ? m.procurement_detail_check_updates_title({
+                        system: record.readiness.connection.label,
+                      })
+                    : m.procurement_detail_check_updates_title_generic()
+                }
+                onClick={() => sync.mutate()}
+              >
+                <RefreshCw size={14} aria-hidden="true" />
+                {sync.isPending
+                  ? m.procurement_detail_checking()
+                  : m.procurement_detail_check_updates()}
+              </Button>
+            ) : null}
+            <Button variant="ghost" disabled={refreshing} onClick={reload}>
+              <RefreshCw size={14} aria-hidden="true" />
+              {m.common_refresh()}
+            </Button>
+          </>
+        }
+        status={
+          <>
+            {record ? <StagePill stage={record.stage} /> : null}
+            {order ? (
+              <Badge>
+                {order.authority === 'luma'
+                  ? m.procurement_detail_managed_luma()
+                  : m.procurement_detail_managed_external()}
+              </Badge>
+            ) : null}
+            {record?.draftVerified ? (
+              <Badge tone="success">
+                {m.procurement_detail_draft_verified()}
+              </Badge>
+            ) : null}
+          </>
+        }
         description={
           record && order ? (
             <>
@@ -240,53 +283,9 @@ export function PurchaseOrderRecordView({
                   }`
                 : ''}
             </>
-          ) : (
-            m.procurement_detail_description_fallback()
-          )
+          ) : null
         }
       />
-      <div className="procurement-record-toolbar">
-        <span className="procurement-flags">
-          {record ? <StagePill stage={record.stage} /> : null}
-          {order ? (
-            <Badge>
-              {order.authority === 'luma'
-                ? m.procurement_detail_managed_luma()
-                : m.procurement_detail_managed_external()}
-            </Badge>
-          ) : null}
-          {record?.draftVerified ? (
-            <Badge tone="success">
-              {m.procurement_detail_draft_verified()}
-            </Badge>
-          ) : null}
-        </span>
-        <span className="procurement-flags">
-          {record?.submission?.state === 'submitted' ? (
-            <Button
-              variant="outline"
-              disabled={sync.isPending || offline}
-              title={
-                record.readiness.connection?.label
-                  ? m.procurement_detail_check_updates_title({
-                      system: record.readiness.connection.label,
-                    })
-                  : m.procurement_detail_check_updates_title_generic()
-              }
-              onClick={() => sync.mutate()}
-            >
-              <RefreshCw size={14} aria-hidden="true" />
-              {sync.isPending
-                ? m.procurement_detail_checking()
-                : m.procurement_detail_check_updates()}
-            </Button>
-          ) : null}
-          <Button variant="ghost" disabled={refreshing} onClick={reload}>
-            <RefreshCw size={14} aria-hidden="true" />
-            {m.common_refresh()}
-          </Button>
-        </span>
-      </div>
       {offline ? (
         <Alert role="status">{m.procurement_detail_offline()}</Alert>
       ) : null}
@@ -407,7 +406,7 @@ export function PurchaseOrderRecordView({
           close={() => setDialog(null)}
         />
       ) : null}
-    </main>
+    </div>
   );
 }
 

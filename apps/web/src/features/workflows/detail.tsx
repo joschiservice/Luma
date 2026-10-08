@@ -14,8 +14,8 @@ import {
   DialogTitle,
 } from '@luma/ui/components/primitives/dialog';
 import { Select } from '@luma/ui/components/primitives/select';
+import { RecordHeader } from '@luma/ui/components/workspace/record-header';
 import { SectionWorkspace } from '@luma/ui/components/workspace/section-workspace';
-import { WorkspaceBreadcrumb } from '@luma/ui/components/workspace/workspace-breadcrumb';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Link,
@@ -23,7 +23,7 @@ import {
   useParams,
   useSearch,
 } from '@tanstack/react-router';
-import { ArrowLeft, ChevronRight, RefreshCw, Workflow } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 
 import { SignInRedirect } from '../identity/common';
@@ -125,16 +125,6 @@ export function WorkflowDetailPage({
   return (
     <div className="workflows-page">
       <OfflineNotice />
-      {!query.data || accessError ? (
-        <Link
-          className="workflow-back"
-          to="/app/$organizationId/workflows"
-          params={{ organizationId }}
-          search={filters}
-        >
-          <ArrowLeft size={15} aria-hidden="true" /> {m.workflows_detail_back()}
-        </Link>
-      ) : null}
       {query.error || accessError ? (
         <Alert tone="danger" role="alert" className="workflow-notice">
           {workflowError(query.error ?? accessError)}{' '}
@@ -268,30 +258,21 @@ export function WorkflowDetailView({
 
   return (
     <>
-      <WorkspaceBreadcrumb>
-        <Workflow size={16} aria-hidden="true" />
-        <Link
-          to="/app/$organizationId/workflows"
-          params={{ organizationId }}
-          search={filters}
-        >
-          {m.workflows_title()}
-        </Link>
-        <ChevronRight size={14} aria-hidden="true" />
-        <span aria-current="page" title={detail.summary.name}>
-          {detail.summary.name}
-        </span>
-      </WorkspaceBreadcrumb>
-      <h1 className="sr-only">{detail.summary.name}</h1>
+      <RecordHeader
+        section={{
+          label: m.workflows_title(),
+          domain: 'workflows',
+          link: (
+            <Link
+              to="/app/$organizationId/workflows"
+              params={{ organizationId }}
+              search={filters}
+            />
+          ),
+        }}
+        title={detail.summary.name}
+      />
       <div className="workflow-action-bar">
-        <Link
-          className="workflow-back"
-          to="/app/$organizationId/workflows"
-          params={{ organizationId }}
-          search={filters}
-        >
-          <ArrowLeft size={15} aria-hidden="true" /> {m.workflows_detail_back()}
-        </Link>
         <ReadinessPills readiness={detail.summary.readiness} />
         <Button
           variant="ghost"

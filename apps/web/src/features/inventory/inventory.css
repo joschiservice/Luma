@@ -4,13 +4,9 @@
   max-width: 1440px;
   margin: 0 auto;
 }
-.inventory-page > .page-header {
-  margin-bottom: 0;
-}
 .inventory-page a {
   color: var(--signal-text);
 }
-.inventory-detail-toolbar,
 .inventory-pagination,
 .inventory-pagination > div {
   display: flex;
@@ -58,8 +54,7 @@
   margin: 0;
   line-height: 1.6;
 }
-.inventory-pagination,
-.inventory-detail-toolbar {
+.inventory-pagination {
   justify-content: space-between;
 }
 .inventory-loading {
@@ -68,13 +63,6 @@
 }
 .inventory-loading .lu-skeleton {
   height: 74px;
-}
-.inventory-back {
-  display: inline-flex;
-  gap: 6px;
-  align-items: center;
-  width: fit-content;
-  font-size: 13px;
 }
 .inventory-explanation {
   border-left: 3px solid var(--primary);
