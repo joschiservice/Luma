@@ -60,7 +60,6 @@ export function WorkflowOverview({
         <p className="workflow-eyebrow">
           {workflowCategoryLabel(version.category)}
         </p>
-        <h2>{detail.summary.name}</h2>
         <p>{detail.summary.purpose}</p>
       </div>
       <div className="workflow-contract-flow">

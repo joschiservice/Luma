@@ -67,6 +67,103 @@
   }
 }
 
+/* Record pages name themselves in the breadcrumb and open with their state and key facts. */
+.record-crumb-back,
+.record-crumb-section {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 4px 6px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.record-crumb-back {
+  margin-left: -6px;
+  padding-inline: 4px;
+}
+
+.record-crumb-section:first-child {
+  margin-left: -6px;
+}
+
+.record-crumb-back:hover,
+.record-crumb-section:hover {
+  background: var(--surface-hover);
+}
+
+.record-header {
+  display: grid;
+  gap: 12px;
+}
+
+.record-header-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.record-header-status:empty {
+  display: none;
+}
+
+.record-header-description {
+  margin: 0;
+  color: var(--foreground-subtle);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+/* Facts wrap into rows; each cell draws its left and top rule, which the container clips at its edges. */
+.record-facts {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0;
+  overflow: hidden;
+  border-radius: var(--radius-panel);
+  background: var(--card);
+  box-shadow: var(--shadow-panel);
+}
+
+.record-facts > div {
+  display: grid;
+  flex: 1 1 148px;
+  align-content: start;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px 16px;
+  box-shadow:
+    -1px 0 0 var(--line),
+    0 -1px 0 var(--line);
+}
+
+.record-facts dt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--foreground-subtle);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.record-facts dt > svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+
+.record-facts dd {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
 /* Record page headers share their appearance across application shells. */
 .page-header {
   display: grid;

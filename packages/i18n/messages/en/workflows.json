@@ -92,7 +92,6 @@
   "workflows_readiness_latest": "Latest: {summary} {date}",
   "workflows_readiness_verified_help": "A result counts as verified only after Luma checks it independently.",
   "workflows_readiness_approval_details": "How approval applies",
-  "workflows_detail_back": "All workflows",
   "workflows_detail_activated": "Workflow activated. This version can now change the selected orders.",
   "workflows_detail_revoked": "Activation revoked. No new runs start. Changes already sent may still finish.",
   "workflows_detail_review_activation": "Review activation",

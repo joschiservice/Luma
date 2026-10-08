@@ -12,6 +12,11 @@ export function WorkspaceBreadcrumb({ children }: { children: ReactNode }) {
   return target ? (
     createPortal(children, target)
   ) : (
-    <nav aria-label={m.ui_breadcrumb_label()}>{children}</nav>
+    <nav
+      aria-label={m.ui_breadcrumb_label()}
+      className="workspace-route-breadcrumb"
+    >
+      {children}
+    </nav>
   );
 }

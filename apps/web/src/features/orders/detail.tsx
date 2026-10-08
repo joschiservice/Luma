@@ -7,13 +7,21 @@ import { Button } from '@luma/ui/components/primitives/button';
 import { WorkspaceTimezone } from '@luma/ui/components/primitives/workspace-date';
 import { workspaceDateValue } from '@luma/ui/lib/timezone';
 import { onlineManager, useQuery } from '@tanstack/react-query';
+import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import {
-  Link,
-  useNavigate,
-  useParams,
-  useSearch,
-} from '@tanstack/react-router';
-import { ArrowLeft } from 'lucide-react';
+  CircleCheck,
+  CircleHelp,
+  ClipboardList,
+  Clock,
+  GitCompareArrows,
+  Inbox,
+  Info,
+  type LucideIcon,
+  PackageOpen,
+  Radio,
+  Trash2,
+  TriangleAlert,
+} from 'lucide-react';
 import {
   type ReactNode,
   useContext,
@@ -38,8 +46,35 @@ import {
   ObservedHistory,
   OrderFulfillments,
 } from './order-timeline';
-import { orderSummary } from './presentation';
+import { orderSummary, type SummaryKind } from './presentation';
 import { OrderLines, SourceComparison } from './source-facts';
+
+const summaryIcons: Record<SummaryKind, LucideIcon> = {
+  state: Info,
+  removed: Trash2,
+  closed: CircleCheck,
+  remaining: PackageOpen,
+  unknown: CircleHelp,
+  overdue: Clock,
+  failed: TriangleAlert,
+  issues: Inbox,
+  differs: GitCompareArrows,
+};
+
+const summaryTones: Record<
+  SummaryKind,
+  'neutral' | 'warning' | 'danger' | 'success'
+> = {
+  state: 'neutral',
+  removed: 'warning',
+  closed: 'success',
+  remaining: 'neutral',
+  unknown: 'warning',
+  overdue: 'danger',
+  failed: 'danger',
+  issues: 'warning',
+  differs: 'warning',
+};
 
 const subscribe = (changed: () => void) => onlineManager.subscribe(changed);
 const onlineSnapshot = () => onlineManager.isOnline();
@@ -176,22 +211,7 @@ export function OrderDetailView({
       : [];
 
   return (
-    <main className="order-page">
-      {returnPath ? (
-        <a className="order-back" href={returnPath}>
-          <ArrowLeft size={16} aria-hidden="true" />{' '}
-          {m.orders_detail_back_context()}
-        </a>
-      ) : (
-        <Link
-          className="order-back"
-          to="/app/$organizationId/orders"
-          params={{ organizationId }}
-          search={listSearch}
-        >
-          <ArrowLeft size={16} aria-hidden="true" /> {m.orders_detail_back()}
-        </Link>
-      )}
+    <div className="order-page">
       {offline ? (
         <Alert role="status">{m.orders_detail_offline()}</Alert>
       ) : null}
@@ -209,6 +229,16 @@ export function OrderDetailView({
           </Button>
         </Alert>
       ) : null}
+      {detail && (detail.redirectedFrom || search.linkedFrom) ? (
+        <Alert role="status">{m.orders_detail_linked_notice()}</Alert>
+      ) : null}
+      <OrderHeader
+        organizationId={organizationId}
+        search={listSearch}
+        returnPath={returnPath}
+        detail={detail}
+        here={here}
+      />
       {!detail ? (
         loading && !error ? (
           <p role="status" className="order-note">
@@ -216,72 +246,70 @@ export function OrderDetailView({
           </p>
         ) : null
       ) : (
-        <>
-          {detail.redirectedFrom || search.linkedFrom ? (
-            <Alert role="status">{m.orders_detail_linked_notice()}</Alert>
-          ) : null}
-          <OrderHeader order={detail.order} />
-          <div className="order-layout">
-            <div className="order-main">
-              <OrderSection
-                title={m.orders_detail_state_title()}
-                description={
-                  shown
-                    ? m.orders_detail_state_description({ source: shown.label })
-                    : m.orders_detail_state_description_generic()
-                }
-              >
-                <ul className="order-summary">
-                  {orderSummary(detail, (value) =>
-                    workspaceDateValue(new Date(value), timeZone),
-                  ).map((line) => (
-                    <li key={line}>{line}</li>
-                  ))}
-                </ul>
-              </OrderSection>
-              <OrderLines
-                detail={detail}
-                shown={shown}
-                choose={setChosen}
-                organizationId={organizationId}
-                from={here}
-              />
-              {linkedSources}
-              {detail.sources.length > 1 ? (
-                <SourceComparison detail={detail} />
-              ) : null}
-              <OrderFulfillments
-                detail={detail}
-                organizationId={organizationId}
-                from={here}
-              />
-              <OrderReturns
-                detail={detail}
-                organizationId={organizationId}
-                from={here}
-              />
-              {contexts.map(({ source, content }) => (
-                <OrderSection
-                  key={source.connectionId}
-                  title={m.orders_detail_live_title({ source: source.label })}
-                  description={m.orders_detail_live_description({
-                    source: source.label,
-                  })}
-                >
-                  {content}
-                </OrderSection>
-              ))}
-              <ObservedHistory detail={detail} />
-              <LumaActivity detail={detail} organizationId={organizationId} />
-            </div>
-            <OrderInspector
+        <div className="order-layout">
+          <div className="order-main">
+            <OrderSection
+              title={m.orders_detail_state_title()}
+              icon={ClipboardList}
+            >
+              <ul className="order-summary">
+                {orderSummary(detail, (value) =>
+                  workspaceDateValue(new Date(value), timeZone),
+                ).map(({ kind, text }) => {
+                  const Icon = summaryIcons[kind];
+
+                  return (
+                    <li key={text} data-tone={summaryTones[kind]}>
+                      <Icon aria-hidden="true" />
+                      <span>{text}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </OrderSection>
+            <OrderLines
+              detail={detail}
+              shown={shown}
+              choose={setChosen}
+              organizationId={organizationId}
+              from={here}
+            />
+            {linkedSources}
+            {detail.sources.length > 1 ? (
+              <SourceComparison detail={detail} />
+            ) : null}
+            <OrderFulfillments
               detail={detail}
               organizationId={organizationId}
-              here={here}
+              from={here}
             />
+            <OrderReturns
+              detail={detail}
+              organizationId={organizationId}
+              from={here}
+            />
+            {contexts.map(({ source, content }) => (
+              <OrderSection
+                key={source.connectionId}
+                title={m.orders_detail_live_title({ source: source.label })}
+                icon={Radio}
+                description={m.orders_detail_live_description({
+                  source: source.label,
+                })}
+              >
+                {content}
+              </OrderSection>
+            ))}
+            <LumaActivity detail={detail} organizationId={organizationId} />
+            <ObservedHistory detail={detail} />
           </div>
-        </>
+          <OrderInspector
+            detail={detail}
+            organizationId={organizationId}
+            here={here}
+          />
+        </div>
       )}
-    </main>
+    </div>
   );
 }

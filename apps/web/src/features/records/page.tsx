@@ -23,6 +23,7 @@ import {
 import { Pagination } from '@luma/ui/components/primitives/pagination';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { PageTitle } from '@luma/ui/components/workspace/page-header';
+import { RecordHeader } from '@luma/ui/components/workspace/record-header';
 import { quantityUnit } from '@luma/ui/lib/units';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -31,7 +32,7 @@ import {
   useParams,
   useSearch,
 } from '@tanstack/react-router';
-import { ArrowLeft, ArrowRight, Plug } from 'lucide-react';
+import { ArrowRight, Database, Plug } from 'lucide-react';
 import { useState } from 'react';
 
 import { connectionsOptions } from '../connections/data';
@@ -451,20 +452,41 @@ export function RecordDetailPage() {
       (entry): entry is [string, string] => typeof entry[1] === 'string',
     ),
   );
-  const back =
-    returnPath ??
-    `/app/${encodeURIComponent(organizationId)}/records${listParams.size ? `?${listParams}` : ''}`;
+  const listHref = `/app/${encodeURIComponent(organizationId)}/records${listParams.size ? `?${listParams}` : ''}`;
   const record = query.data?.record;
   const denied =
     query.error instanceof IdentityError &&
     [401, 403].includes(query.error.status);
 
   return (
-    <main className="records-page record-detail-page">
-      <a className="record-back" href={back}>
-        <ArrowLeft size={16} />{' '}
-        {returnPath ? m.records_back_context() : m.records_back_list()}
-      </a>
+    <div className="records-page record-detail-page">
+      <RecordHeader
+        section={{
+          label: m.records_title(),
+          icon: Database,
+          link: <a href={listHref} />,
+        }}
+        title={record?.label ?? m.records_detail_title_fallback()}
+        back={returnPath ? <a href={returnPath} /> : undefined}
+        status={
+          record ? (
+            <Badge
+              tone={record.coverage === 'projected' ? 'neutral' : 'warning'}
+            >
+              {record.coverage === 'projected'
+                ? record.status
+                : record.sources.length === 1 && record.sources[0]
+                  ? m.records_detail_id_only_source({
+                      source: record.sources[0].label,
+                    })
+                  : m.records_detail_id_only()}
+            </Badge>
+          ) : null
+        }
+        description={
+          record ? `${kindLabels[record.kind]()} · ${record.description}` : null
+        }
+      />
       {!parsed.success ? (
         <p className="record-notice">{m.records_detail_kind_unknown()}</p>
       ) : query.isPending ? (
@@ -483,26 +505,6 @@ export function RecordDetailPage() {
         </p>
       ) : record ? (
         <>
-          <header className="record-detail-head">
-            <div>
-              <p className="record-eyebrow">
-                {kindLabels[record.kind]()} / {record.id}
-              </p>
-              <h1>{record.label}</h1>
-              <p>{record.description}</p>
-            </div>
-            <Badge
-              tone={record.coverage === 'projected' ? 'neutral' : 'warning'}
-            >
-              {record.coverage === 'projected'
-                ? record.status
-                : record.sources.length === 1 && record.sources[0]
-                  ? m.records_detail_id_only_source({
-                      source: record.sources[0].label,
-                    })
-                  : m.records_detail_id_only()}
-            </Badge>
-          </header>
           <div className="record-detail-grid">
             <section className="record-card">
               <h2>{m.records_detail_data_title()}</h2>
@@ -704,6 +706,6 @@ export function RecordDetailPage() {
           </div>
         </>
       ) : null}
-    </main>
+    </div>
   );
 }

@@ -113,7 +113,7 @@ test('finds a held fulfillment, explains the next safe step and follows its orde
   await page
     .getByRole('heading', { name: 'On hold: Incorrect address' })
     .waitFor();
-  await page.getByRole('link', { name: 'Back to context' }).click();
+  await page.getByRole('link', { name: 'Back to previous page' }).click();
   await page.waitForURL(`**/orders/*`);
   expect(errors).toEqual([]);
 });

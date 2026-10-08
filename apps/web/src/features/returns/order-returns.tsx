@@ -4,7 +4,7 @@ import type { OrderDetail } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
 import { StatePill } from '@luma/ui/components/primitives/state';
 import { Link } from '@tanstack/react-router';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Undo2 } from 'lucide-react';
 
 import { OrderSection } from '../orders/order-section';
 import {
@@ -29,10 +29,7 @@ export function OrderReturns({
       ?.label ?? m.returns_source_fallback();
 
   return (
-    <OrderSection
-      title={m.returns_order_section_title()}
-      description={m.returns_order_section_description()}
-    >
+    <OrderSection title={m.returns_order_section_title()} icon={Undo2}>
       {detail.returns.length ? (
         <ul className="order-list order-returns">
           {detail.returns.map((item) => (

@@ -10,6 +10,7 @@ import { type ReactNode, useState } from 'react';
 import { expect, userEvent, within } from 'storybook/test';
 
 import appStyles from '../../styles.css?inline';
+import { StoryShell } from '../identity/storybook-shell';
 import { returnItem } from '../returns/returns-fixtures';
 import type { OrdersError, OrdersSearch } from './data';
 import { OrderDetailView, type OrderError } from './detail';
@@ -356,9 +357,11 @@ function Preview({
         page === 'list' ? (
           <ListPreview state={state as ListState} />
         ) : (
-          <DetailPreview
-            state={state as Parameters<typeof DetailPreview>[0]['state']}
-          />
+          <StoryShell page="orders">
+            <DetailPreview
+              state={state as Parameters<typeof DetailPreview>[0]['state']}
+            />
+          </StoryShell>
         )
       }
     </Routed>
@@ -488,6 +491,14 @@ export const OrderRecord: Story = {
     await expect(
       canvas.getByRole('link', { name: /Review issue/ }),
     ).toBeVisible();
+    await expect(
+      canvas.getByRole('button', { name: 'Copy link' }),
+    ).toBeVisible();
+    // The breadcrumb names the order once; Luma's internal ID stays out of the page.
+    await expect(
+      canvas.getByText('SO-10', { selector: '[aria-current]' }),
+    ).toBeVisible();
+    await expect(canvas.queryByText(/66666666-/)).toBeNull();
   },
 };
 

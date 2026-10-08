@@ -4,16 +4,11 @@
   max-width: 1440px;
   margin: 0 auto;
 }
-.returns-page > .page-header {
-  margin-bottom: 0;
-}
 .returns-page a {
   color: var(--signal-text);
 }
-.returns-detail-toolbar,
 .returns-pagination,
-.returns-pagination > div,
-.returns-flags {
+.returns-pagination > div {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -46,8 +41,7 @@
   font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
-.returns-pagination,
-.returns-detail-toolbar {
+.returns-pagination {
   justify-content: space-between;
 }
 .returns-loading {
@@ -56,13 +50,6 @@
 }
 .returns-loading .lu-skeleton {
   height: 74px;
-}
-.returns-back {
-  display: inline-flex;
-  gap: 6px;
-  align-items: center;
-  width: fit-content;
-  font-size: 13px;
 }
 .returns-list-table table {
   min-width: 760px;

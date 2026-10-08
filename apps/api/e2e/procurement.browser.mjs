@@ -104,7 +104,8 @@ test('creates and reviews procurement records with safe retries on desktop and m
   await page.reload();
   await page.getByText('Draft → Open', { exact: true }).waitFor();
   await page
-    .getByRole('link', { name: 'Purchase orders', exact: true })
+    .getByRole('navigation', { name: 'Breadcrumb' })
+    .getByRole('link', { name: 'Procurement' })
     .click();
   await page.getByRole('link', { name: /PO-2026-001/ }).waitFor();
   await page.screenshot({

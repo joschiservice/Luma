@@ -85,7 +85,7 @@ test('investigates stock differences, follows affected orders and preserves filt
     ),
   ).toBe(true);
   // Opened from an issue, the detail page links back to that issue; history returns to the list.
-  await page.getByRole('link', { name: 'Back to context' }).waitFor();
+  await page.getByRole('link', { name: 'Back to previous page' }).waitFor();
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goBack();
   await page.getByRole('link', { name: 'SKU-100', exact: true }).waitFor();

@@ -269,6 +269,20 @@ const differenceSentences: Record<
   total: m.orders_summary_differs_total,
 };
 
+/** What a summary sentence is about, so it can be shown with a matching icon and tone. */
+export type SummaryKind =
+  | 'state'
+  | 'removed'
+  | 'closed'
+  | 'remaining'
+  | 'unknown'
+  | 'overdue'
+  | 'failed'
+  | 'issues'
+  | 'differs';
+
+export type SummaryLine = { kind: SummaryKind; text: string };
+
 /**
  * Explains an order's current state and outstanding work in short sentences, using the source
  * shown in the list and naming disagreements between sources.
@@ -279,17 +293,19 @@ export function orderSummary(
     'order' | 'sources' | 'differences' | 'fulfillments' | 'issues'
   >,
   date: (value: string) => string,
-): string[] {
+): SummaryLine[] {
   const source =
     detail.sources.find((item) => item.selected) ?? detail.sources[0];
   if (!source) return [];
   const label = (connectionId: string) =>
     detail.sources.find((item) => item.connectionId === connectionId)?.label ??
     m.orders_source_fallback();
-  const lines: string[] = [];
+  const lines: SummaryLine[] = [];
+  const say = (kind: SummaryKind, text: string) => lines.push({ kind, text });
   if (source.deleted)
-    lines.push(m.orders_summary_removed({ source: source.label }));
-  lines.push(
+    say('removed', m.orders_summary_removed({ source: source.label }));
+  say(
+    'state',
     `${(statusSentences[source.status] ?? m.orders_summary_status_unknown)({ source: source.label })} ${(paymentSentences[source.paymentStatus] ?? m.orders_summary_payment_unknown)()}`,
   );
   const remaining = source.lines.flatMap((line) =>
@@ -299,9 +315,10 @@ export function orderSummary(
     (line) => line.remainingQuantity === null,
   );
   const open = add(remaining.filter((value) => Number(value) > 0));
-  if (detail.order.open === false) lines.push(m.orders_summary_closed());
+  if (detail.order.open === false) say('closed', m.orders_summary_closed());
   else if (open > 0)
-    lines.push(
+    say(
+      'remaining',
       m.orders_summary_remaining({
         units: open,
         lines: source.lines.filter((line) => Number(line.remainingQuantity) > 0)
@@ -309,7 +326,8 @@ export function orderSummary(
       }),
     );
   if (unknown.length && detail.order.open !== false)
-    lines.push(
+    say(
+      'unknown',
       m.orders_summary_remaining_unknown({
         lines: unknown.length,
         source: source.label,
@@ -318,10 +336,14 @@ export function orderSummary(
       }),
     );
   if (detail.order.overdue && detail.order.dueAt)
-    lines.push(m.orders_summary_overdue({ date: date(detail.order.dueAt) }));
+    say(
+      'overdue',
+      m.orders_summary_overdue({ date: date(detail.order.dueAt) }),
+    );
   for (const fulfillment of detail.fulfillments)
     if (!fulfillment.deleted && fulfillment.status === 'failed')
-      lines.push(
+      say(
+        'failed',
         fulfillment.failureCode
           ? m.orders_summary_fulfillment_failed_code({
               source: label(fulfillment.connectionId),
@@ -335,9 +357,9 @@ export function orderSummary(
   const openIssues = detail.issues.filter(
     (issue) => issue.state !== 'resolved',
   ).length;
-  if (needsYou) lines.push(m.orders_summary_needs_you({ count: needsYou }));
+  if (needsYou) say('issues', m.orders_summary_needs_you({ count: needsYou }));
   else if (openIssues)
-    lines.push(m.orders_summary_open_issues({ count: openIssues }));
+    say('issues', m.orders_summary_open_issues({ count: openIssues }));
   for (const difference of detail.differences) {
     const values = [...difference.values].sort(
       (left, right) =>
@@ -345,7 +367,8 @@ export function orderSummary(
         Number(left.connectionId === source.connectionId),
     );
     if (difference.field === 'lines') {
-      lines.push(
+      say(
+        'differs',
         m.orders_summary_differs_lines({
           sources: formatList(values.map((entry) => label(entry.connectionId))),
         }),
@@ -360,7 +383,8 @@ export function orderSummary(
           ? entry
           : ((field === 'status' ? statusLabels : paymentLabels)[entry] ??
             m.common_unknown());
-    lines.push(
+    say(
+      'differs',
       differenceSentences[field]({
         values: formatList(
           values.map((entry) =>

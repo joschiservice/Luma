@@ -13,13 +13,12 @@ import {
   CardHeader,
   CardTitle,
 } from '@luma/ui/components/primitives/card';
-import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { Empty } from '@luma/ui/components/primitives/empty';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
-import { PageHeader } from '@luma/ui/components/workspace/page-header';
+import { RecordHeader } from '@luma/ui/components/workspace/record-header';
 import { onlineManager, useQuery } from '@tanstack/react-query';
 import { Link, useParams } from '@tanstack/react-router';
-import { ArrowLeft, RefreshCw, UsersRound } from 'lucide-react';
+import { RefreshCw, UsersRound } from 'lucide-react';
 import { type ReactNode, useSyncExternalStore } from 'react';
 
 import { appsOptions } from '../apps/data';
@@ -176,25 +175,26 @@ export function CustomerDetailView({
   const address = addressLines(detail?.address ?? null);
 
   return (
-    <main className="customers-page">
-      <Link
-        className="customers-back"
-        to="/app/$organizationId/customers"
-        params={{ organizationId }}
-      >
-        <ArrowLeft size={14} aria-hidden="true" />
-        {m.customers_detail_back()}
-      </Link>
-      <PageHeader
+    <div className="customers-page">
+      <RecordHeader
+        section={{
+          label: m.customers_page_title(),
+          domain: 'customers',
+          link: (
+            <Link
+              to="/app/$organizationId/customers"
+              params={{ organizationId }}
+            />
+          ),
+        }}
         title={item ? customerName(item) : m.customers_detail_title_fallback()}
-        icon={<DomainIcon domain="customers" size="md" />}
         description={
           item
             ? m.customers_detail_description({
                 source: detail?.source?.label ?? m.customers_source_fallback(),
                 id: sourceId(item.externalId),
               })
-            : m.customers_detail_description_fallback()
+            : undefined
         }
         actions={
           <Button variant="outline" disabled={refreshing} onClick={refresh}>
@@ -355,6 +355,6 @@ export function CustomerDetailView({
           </aside>
         </div>
       ) : null}
-    </main>
+    </div>
   );
 }

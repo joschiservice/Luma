@@ -4,13 +4,9 @@
   max-width: 1440px;
   margin: 0 auto;
 }
-.fulfillment-page > .page-header {
-  margin-bottom: 0;
-}
 .fulfillment-page a {
   color: var(--signal-text);
 }
-.fulfillment-detail-toolbar,
 .fulfillment-pagination,
 .fulfillment-pagination > div,
 .fulfillment-flags {
@@ -47,8 +43,7 @@
   margin: 0;
   line-height: 1.6;
 }
-.fulfillment-pagination,
-.fulfillment-detail-toolbar {
+.fulfillment-pagination {
   justify-content: space-between;
 }
 .fulfillment-loading {
@@ -57,13 +52,6 @@
 }
 .fulfillment-loading .lu-skeleton {
   height: 74px;
-}
-.fulfillment-back {
-  display: inline-flex;
-  gap: 6px;
-  align-items: center;
-  width: fit-content;
-  font-size: 13px;
 }
 @media (min-width: 761px) {
   .fulfillment-list-table table {
