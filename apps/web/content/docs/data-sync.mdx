@@ -65,9 +65,24 @@ If your role includes **Manage imports**, you can also choose **Sync now**, **Ch
 
 ## Link the same SKU across sources
 
-Luma keeps each source's records separate until a person confirms they are the same. On a stock position, **Linked sources** lists the source records behind the SKU and suggests possible matches that share a SKU code.
+Luma keeps each source's records separate until you confirm they are the same or enable an automatic linking rule. On a stock position, **Linked sources** lists the source records behind the SKU and suggests possible matches that share a SKU code.
 
 Choose **Link**, say why the records match and confirm. Luma then groups stock, products and order lines from both sources under one SKU, while each source keeps its own quantities. **Unlink** separates a source again. Every link and unlink is recorded with who made it and why.
+
+## Automatic linking
+
+If your role includes **Manage imports**, open **Data sync → Automatic linking** and choose **Add linking rule**.
+
+1. Choose **SKUs: unique code** or **Orders: JTL reference to Shopify**.
+2. Choose the two connections. For orders, select the Shopify store whose orders the JTL references identify.
+3. Choose **Preview matches**. Review the counts and open example records to compare them.
+4. Choose **Enable automatic linking** to keep applying the rule to existing and future matches.
+
+SKU codes match regardless of letter case or surrounding spaces. Each code must identify one SKU in each connection, and their units must agree. Orders match only when JTL's external order reference uniquely identifies an order number in the selected Shopify store. Similar dates, amounts, names or email addresses are not enough.
+
+Luma waits until both sources have completed successful full reads within the last day. Missing, stale, ambiguous or conflicting evidence is skipped. Records you previously unlinked stay separate; link those manually if you change your decision. Each source keeps its own prices, quantities and order states after linking.
+
+Rules show how many links were applied, their last check and any reason they are waiting. If a rule shows **Needs access**, someone who manages imports can preview and enable it with their access. **Disable** stops future links and keeps existing links. Use **Unlink** on the record to separate a source.
 
 ## Correct a Shopify stock discrepancy
 

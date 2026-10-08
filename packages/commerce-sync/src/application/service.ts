@@ -14,6 +14,7 @@ import {
   streamStatus,
   type SyncStream,
 } from '../domain/streams.js';
+import type { AutoLinkService } from './automatic-links.js';
 import type {
   LinkRequest,
   StreamCommand,
@@ -38,6 +39,7 @@ export type IdentityReader = (
 
 export interface SyncServiceDependencies {
   store: SyncStore;
+  automaticLinks?: AutoLinkService;
   connections: Pick<ConnectionManagement, 'list'>;
   identities: IdentityReader;
   refreshContext(context: TenantContext): Promise<TenantContext>;
@@ -139,6 +141,17 @@ export function createSyncService(deps: SyncServiceDependencies) {
     return fresh;
   }
 
+  function automaticLinks() {
+    if (!deps.automaticLinks)
+      throw new IdentityError(
+        503,
+        'SERVICE_UNAVAILABLE',
+        'Automatic linking is unavailable.',
+      );
+
+    return deps.automaticLinks;
+  }
+
   async function overview(context: TenantContext): Promise<SyncOverview> {
     const fresh = await deps.refreshContext(context);
     const [connections, data] = await Promise.all([
@@ -223,6 +236,17 @@ export function createSyncService(deps: SyncServiceDependencies) {
 
   return {
     overview,
+    /** Reads automatic link rules with their current outcomes. */
+    autoLinkRules: (context: TenantContext) =>
+      automaticLinks().autoLinkRules(context),
+    /** Previews a connection-pair rule without changing records. */
+    previewAutoLinks: (
+      ...args: Parameters<AutoLinkService['previewAutoLinks']>
+    ) => automaticLinks().previewAutoLinks(...args),
+    /** Saves a rule with revision checks and the caller's current access. */
+    saveAutoLinkRule: (
+      ...args: Parameters<AutoLinkService['saveAutoLinkRule']>
+    ) => automaticLinks().saveAutoLinkRule(...args),
     /** Applies an operator command and returns the updated stream. */
     async command(
       context: TenantContext,

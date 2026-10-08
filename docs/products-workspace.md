@@ -19,8 +19,9 @@ A **catalog source** is a connection with at least one current product. A **gap*
 catalog source that currently lists none of the SKU. Absence is only established after a
 full catalog read; the read model reports each source's last completed full products scan
 and the UI says when it is missing. A gap's **match** is another SKU in that source with the
-same normalized SKU code. Matches are suggestions for the reviewed link flow; they are never
-merged automatically.
+same normalized SKU code. Matches are suggestions for the reviewed link flow. Configured
+[automatic linking rules](commerce-sync.md#links) can link unique codes with current,
+complete evidence; ambiguous matches still require review.
 
 | Rule              | Definition                                                                                                                        |
 | ----------------- | --------------------------------------------------------------------------------------------------------------------------------- |

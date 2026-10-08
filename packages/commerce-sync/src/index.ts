@@ -58,3 +58,19 @@ export type {
   SyncRun,
   SyncStore,
 } from './application/ports.js';
+
+export {
+  createAutoLinkService,
+  createAutoLinkRunner,
+} from './application/automatic-links.js';
+
+export type { AutoLinkStore } from './application/automatic-links.js';
+
+export type {
+  AutoLinkRule,
+  AutoLinkPair,
+  AutoLinkInput,
+  AutoLinkPreview,
+} from './domain/automatic-links.js';
+
+export { autoLinkEvidence } from './domain/automatic-links.js';

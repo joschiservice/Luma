@@ -52,13 +52,14 @@ import {
   RotateCcw,
   ScanSearch,
 } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { type ReactNode, useRef, useState } from 'react';
 
 import { statuses } from '../connections/presentation';
 import { ProviderIcon } from '../connections/provider-icon';
 import { SignInRedirect } from '../identity/common';
 import { IdentityError } from '../identity/data';
 import { usePermissions } from '../identity/permissions';
+import { AutomaticLinks } from './automatic-links';
 import { sendSyncCommand, syncKey, syncOptions } from './data';
 import {
   ago,
@@ -128,6 +129,15 @@ export function SyncPage() {
       pending={pending}
       message={message}
       command={(stream, action) => void command(stream, action)}
+      automaticLinks={
+        query.data ? (
+          <AutomaticLinks
+            organizationId={organizationId}
+            connections={query.data.connections}
+            canManage={can('sync.manage') && query.data.canManage}
+          />
+        ) : null
+      }
       refresh={() => void query.refetch()}
     />
   );
@@ -155,9 +165,11 @@ export function SyncView({
   message = null,
   command,
   refresh,
+  automaticLinks,
 }: {
   organizationId: string;
   overview?: SyncOverview | undefined;
+  automaticLinks?: ReactNode;
   loading?: boolean;
   error?: string | undefined;
   offline?: boolean;
@@ -244,6 +256,7 @@ export function SyncView({
               </Link>
             </Empty>
           )}
+          {automaticLinks}
           <RecentRuns overview={overview} />
           <p className="sync-footnote">
             Luma never changes records in your systems while syncing. Change

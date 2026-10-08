@@ -8,6 +8,11 @@ import {
   requires,
 } from '../common.js';
 import {
+  autoLinkInputSchema,
+  autoLinkPairSchema,
+  autoLinkPreviewSchema,
+  autoLinkRuleSchema,
+  autoLinkRulesSchema,
   identityDetailSchema,
   identityKindSchema,
   linkInputSchema,
@@ -27,6 +32,49 @@ const errors = {
 };
 
 export const syncContract = c.router({
+  autoLinkRules: {
+    method: 'GET',
+    metadata: anyMember,
+    path: '/v1/organizations/:organizationId/sync/automatic-links',
+    pathParams: organizationParamsSchema,
+    responses: { 200: autoLinkRulesSchema, ...errors },
+    summary: 'Review automatic linking rules',
+    description:
+      'Lists connection-pair rules for SKU codes and JTL references to Shopify orders, with their last check, total links and any reason they are waiting or blocked.',
+  },
+  previewAutoLinks: {
+    method: 'POST',
+    metadata: requires('sync.manage'),
+    path: '/v1/organizations/:organizationId/sync/automatic-links/preview',
+    pathParams: organizationParamsSchema,
+    body: autoLinkPairSchema,
+    responses: {
+      200: autoLinkPreviewSchema,
+      400: apiErrorSchema,
+      422: apiErrorSchema,
+      ...errors,
+    },
+    summary: 'Preview automatic links',
+    description:
+      'Requires Manage imports. Shows counts and up to 20 examples for the selected record type and connections. Does not link records. Duplicate codes or references, conflicting mappings or units, manually separated records and stale or missing evidence are skipped.',
+  },
+  saveAutoLinkRule: {
+    method: 'PUT',
+    metadata: requires('sync.manage'),
+    path: '/v1/organizations/:organizationId/sync/automatic-links',
+    pathParams: organizationParamsSchema,
+    body: autoLinkInputSchema,
+    responses: {
+      200: autoLinkRuleSchema,
+      400: apiErrorSchema,
+      409: apiErrorSchema,
+      422: apiErrorSchema,
+      ...errors,
+    },
+    summary: 'Configure automatic linking',
+    description:
+      'Requires Manage imports. Creates a rule with revision zero, or enables or disables an existing rule using its current revision. Each save is audited and enabled rules run with the caller’s current access. Disabling stops future links and keeps existing links. SKU rules require unique normalized codes and compatible units; order rules match an explicit JTL external order number to one selected Shopify store. Every application rechecks current evidence and preserves mapping history.',
+  },
   overview: {
     method: 'GET',
     metadata: anyMember,
@@ -61,7 +109,7 @@ export const syncContract = c.router({
     responses: { 200: identityDetailSchema, ...errors },
     summary: 'Inspect linked source records',
     description:
-      'Lists the source records that represent one SKU, location or order, how each was linked, and possible matches in other sources. Suggestions share a SKU code or a JTL marketplace order reference; they are never linked automatically.',
+      'Lists the source records that represent one SKU, location or order, how each was linked, and possible matches in other sources. Suggestions share a SKU code or a JTL marketplace order reference. Configured automatic linking rules may apply unambiguous matches; other suggestions require review.',
   },
   requestLink: {
     method: 'POST',

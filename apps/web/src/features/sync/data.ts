@@ -1,4 +1,9 @@
 import {
+  type AutoLinkInput,
+  type AutoLinkPair,
+  autoLinkPreviewSchema,
+  autoLinkRuleSchema,
+  autoLinkRulesSchema,
   type IdentityDetail,
   identityDetailSchema,
   type LinkInput,
@@ -129,4 +134,52 @@ export async function requestLink(organizationId: string, body: LinkInput) {
     throw new IdentityError(result.status, result.body);
 
   return linkRequestSchema.parse(result.body);
+}
+
+/** Loads automatic link rules and their latest outcomes. */
+export const autoLinkOptions = (organizationId: string) =>
+  queryOptions({
+    ...privateQueryDefaults,
+    queryKey: [...syncKey(organizationId), 'automatic-links'],
+    refetchInterval: 15000,
+    queryFn: async ({ signal }) => {
+      const result = await api.sync.autoLinkRules({
+        params: { organizationId },
+        fetchOptions: { signal, cache: 'no-store' },
+      });
+      if (result.status !== 200)
+        throw new IdentityError(result.status, result.body);
+
+      return autoLinkRulesSchema.parse(result.body);
+    },
+  });
+
+/** Reads current matching evidence without linking records. */
+export async function previewAutoLinks(
+  organizationId: string,
+  body: AutoLinkPair,
+) {
+  const result = await api.sync.previewAutoLinks({
+    params: { organizationId },
+    body,
+  });
+  if (result.status !== 200)
+    throw new IdentityError(result.status, result.body);
+
+  return autoLinkPreviewSchema.parse(result.body);
+}
+
+/** Saves a revision-checked rule; enabling continues with the caller's access. */
+export async function saveAutoLinkRule(
+  organizationId: string,
+  body: AutoLinkInput,
+) {
+  const result = await api.sync.saveAutoLinkRule({
+    params: { organizationId },
+    body,
+  });
+  if (result.status !== 200)
+    throw new IdentityError(result.status, result.body);
+
+  return autoLinkRuleSchema.parse(result.body);
 }

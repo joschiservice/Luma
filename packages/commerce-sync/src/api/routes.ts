@@ -2,6 +2,9 @@ import '@luma/identity/http';
 
 import {
   apiContract,
+  autoLinkPreviewSchema,
+  autoLinkRuleSchema,
+  autoLinkRulesSchema,
   identityDetailSchema,
   linkRequestSchema,
   syncOverviewSchema,
@@ -29,6 +32,36 @@ export function syncRoutes(service?: SyncService) {
   }
 
   return initServer().router(apiContract.sync, {
+    autoLinkRules: async ({ request }) => {
+      const s = use(request);
+
+      return {
+        status: 200,
+        body: autoLinkRulesSchema.parse(
+          await s.service.autoLinkRules(s.context),
+        ),
+      };
+    },
+    previewAutoLinks: async ({ request, body }) => {
+      const s = use(request);
+
+      return {
+        status: 200,
+        body: autoLinkPreviewSchema.parse(
+          await s.service.previewAutoLinks(s.context, body),
+        ),
+      };
+    },
+    saveAutoLinkRule: async ({ request, body }) => {
+      const s = use(request);
+
+      return {
+        status: 200,
+        body: autoLinkRuleSchema.parse(
+          await s.service.saveAutoLinkRule(s.context, body),
+        ),
+      };
+    },
     overview: async ({ request }) => {
       const s = use(request);
 

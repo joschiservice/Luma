@@ -450,3 +450,46 @@
   color: var(--state-success-text);
   font-weight: 550;
 }
+
+.auto-link-rules {
+  display: grid;
+  gap: var(--content-gap);
+  list-style: none;
+  padding: 0;
+}
+.auto-link-rules > li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--content-gap);
+  flex-wrap: wrap;
+}
+.auto-link-rules > li > div:first-child {
+  flex: 1;
+  min-width: 12rem;
+}
+.auto-link-actions,
+.auto-link-fields {
+  display: flex;
+  gap: var(--content-gap);
+  flex-wrap: wrap;
+}
+.auto-link-fields > * {
+  flex: 1;
+  min-width: 10rem;
+}
+.auto-link-examples {
+  max-height: 15rem;
+  overflow: auto;
+}
+
+.auto-link-editor {
+  grid-template-columns: minmax(0, 1fr);
+}
+.auto-link-editor .sync-dialog-actions {
+  flex-wrap: wrap;
+}
+.auto-link-examples {
+  display: grid;
+  gap: 0.5rem;
+  overflow-wrap: anywhere;
+}
