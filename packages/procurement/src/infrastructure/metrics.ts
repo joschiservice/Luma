@@ -34,10 +34,11 @@ async function readStock(
 ) {
   const store = createReplenishmentStore(db);
   const rules = (await store.list(context)).filter(
-    (rule) => !connectionId || rule.connectionId === connectionId,
+    (rule) =>
+      rule.active && (!connectionId || rule.connectionId === connectionId),
   );
 
-  return { rules, stocks: await store.stocks(context) };
+  return { rules, stocks: await store.stocksFor(context, rules) };
 }
 
 /** Reads selected procurement families inside the caller's authorized snapshot. */

@@ -185,28 +185,25 @@ export function createReplenishmentService(deps: {
       );
   }
 
-  /**
-   * Rereads a rule's stock when its stored report is older than `maxAgeMs`, at most once per
-   * minute per rule. Failures leave the stored report; freshness checks then decide.
-   */
+  /** Refreshes stale stock at most once per minute; a forced admission read always refreshes. */
   async function refresh(
     context: TenantContext,
     rule: ReplenishmentActivation,
     maxAgeMs: number,
+    current?: ReplenishmentStock,
   ) {
-    if (!deps.refreshStock) return;
-    const current = (await store.stocks(context)).find(
-      (s) =>
-        s.positionId === rule.positionId &&
-        s.connectionId === rule.connectionId,
-    );
-    const age = current
-      ? Date.now() - Date.parse(current.observedAt)
-      : Infinity;
+    if (!deps.refreshStock) return false;
     const last = refreshedAt.get(rule.id) ?? 0;
-    if (age < maxAgeMs || (maxAgeMs > 0 && Date.now() - last < 60_000)) return;
+    if (
+      maxAgeMs > 0 &&
+      (Date.now() - last < 60_000 ||
+        (current && Date.now() - Date.parse(current.observedAt) < maxAgeMs))
+    )
+      return false;
     refreshedAt.set(rule.id, Date.now());
     await deps.refreshStock(context, rule.positionId).catch(() => undefined);
+
+    return true;
   }
 
   const resolveContext = (run: ProcessRun) =>
@@ -224,18 +221,17 @@ export function createReplenishmentService(deps: {
     return item;
   }
 
-  async function stock(context: TenantContext, rule: ReplenishmentActivation) {
-    const result = (await store.stocks(context)).find(
-      (s) =>
-        s.positionId === rule.positionId &&
-        s.connectionId === rule.connectionId,
-    );
+  function requireStock(result: ReplenishmentStock | undefined) {
     if (!result)
       conflict(
         'The configured stock position is unavailable. Refresh inventory before retrying.',
       );
 
     return result;
+  }
+
+  async function stock(context: TenantContext, rule: ReplenishmentActivation) {
+    return requireStock((await store.stocksFor(context, [rule]))[0]);
   }
 
   async function plan(
@@ -560,6 +556,7 @@ export function createReplenishmentService(deps: {
       suppliers: number;
       waiting: ReplenishmentDecision[];
       recent: RecentRun[];
+      hasStock: boolean;
     },
   ) {
     const now = Date.now();
@@ -570,7 +567,7 @@ export function createReplenishmentService(deps: {
     const issues: ReadinessIssue[] = available ? [] : [workerIssue];
     if (!active.length) {
       if (!facts.suppliers) issues.push(supplierIssue);
-      if (!facts.stocks.some((stock) => !stock.deleted))
+      if (!facts.hasStock)
         issues.push({
           code: 'no_stock',
           severity: 'blocking',
@@ -625,21 +622,25 @@ export function createReplenishmentService(deps: {
 
   const api: ReplenishmentWorkflow = {
     definitionId,
-    async setup(context) {
+    async setup(context, query = {}) {
       context = await authorize(context);
-      const [positions, suppliers, rules, waiting, recent] = await Promise.all([
-        store.stocks(context),
-        deps.procurement.suppliers(context),
-        store.list(context),
-        listPending(context),
-        recentRuns(context),
-      ]);
+      const rulesPromise = store.list(context);
+      const [page, suppliers, rules, waiting, recent, ruleStocks] =
+        await Promise.all([
+          store.browseStocks(context, query),
+          deps.procurement.suppliers(context),
+          rulesPromise,
+          listPending(context),
+          recentRuns(context),
+          rulesPromise.then((rules) => store.stocksFor(context, rules)),
+        ]);
       const now = Date.now();
 
       return {
         available,
         canManage: hasPermission(context, 'procurement.manage'),
-        positions: positions.filter((s) => !s.deleted),
+        positions: page.positions,
+        nextCursor: page.nextCursor,
         suppliers: suppliers.items,
         rules: rules.map((rule) => {
           const latest = recent.find(
@@ -648,9 +649,10 @@ export function createReplenishmentService(deps: {
 
           return {
             ...rule,
+            stock: findStock(ruleStocks, rule) ?? null,
             status: ruleState(
               rule.active,
-              stockUnusableReason(findStock(positions, rule), now),
+              stockUnusableReason(findStock(ruleStocks, rule), now),
             ),
             waitingRunId:
               waiting.find((item) => item.positionId === rule.positionId)
@@ -662,13 +664,16 @@ export function createReplenishmentService(deps: {
     },
     async detail(context): ReturnType<ReplenishmentWorkflow['detail']> {
       context = await authorize(context);
-      const [rules, stocks, suppliers, waiting, recent] = await Promise.all([
-        store.list(context),
-        store.stocks(context),
-        deps.procurement.suppliers(context),
-        listPending(context),
-        recentRuns(context),
-      ]);
+      const rulesPromise = store.list(context);
+      const [rules, stocks, suppliers, waiting, recent, hasStock] =
+        await Promise.all([
+          rulesPromise,
+          rulesPromise.then((rules) => store.stocksFor(context, rules)),
+          deps.procurement.suppliers(context),
+          listPending(context),
+          recentRuns(context),
+          store.hasStock(context),
+        ]);
       const active = rules.filter((r) => r.active);
       const presented = presentProcessVersion(version);
       const blockers = available
@@ -702,6 +707,7 @@ export function createReplenishmentService(deps: {
             suppliers: suppliers.items.length,
             waiting,
             recent,
+            hasStock,
           }),
         },
         versions: [
@@ -758,11 +764,8 @@ export function createReplenishmentService(deps: {
 
         return view(prior);
       }
-      const inventory = (await store.stocks(context)).find(
-        (s) =>
-          s.positionId === request.positionId &&
-          s.connectionId === request.connectionId &&
-          !s.deleted,
+      const inventory = (await store.stocksFor(context, [request])).find(
+        (s) => !s.deleted,
       );
       const supplier = await deps.procurement.supplier(
         context,
@@ -819,7 +822,7 @@ export function createReplenishmentService(deps: {
     async preview(context, input) {
       context = await authorize(context, true);
       const [stocks, rules, supplier, orders] = await Promise.all([
-        store.stocks(context),
+        store.stocksFor(context, input.items),
         store.list(context),
         deps.procurement.supplier(context, input.supplierId),
         deps.procurement.orders(context),
@@ -971,7 +974,7 @@ export function createReplenishmentService(deps: {
       context = await authorize(context);
       const [rules, stocks, suppliers, waiting, recent] = await Promise.all([
         store.list(context),
-        store.stocks(context),
+        store.stocksFor(context, [{ positionId }]),
         deps.procurement.suppliers(context),
         listPending(context),
         recentRuns(context),
@@ -1653,7 +1656,7 @@ export function createReplenishmentService(deps: {
           label: 'Mapped stock positions',
           met: setup.positions.length > 0,
           detail: setup.positions.length
-            ? `${setup.positions.length} stock position(s) with current stock.`
+            ? 'Mapped stock positions are available to choose.'
             : 'Connect an inventory source and let Luma read its stock.',
           fix: setup.positions.length
             ? null
@@ -1730,13 +1733,19 @@ export function createReplenishmentService(deps: {
       const waiting = new Set(
         existing.map((run) => String(run.context.inputs.activationId)),
       );
-      for (const rule of await store.list(context)) {
-        if (!rule.active || rule.principalId !== context.actor.id) continue;
-        // A rule with a run in progress gets no second run; that run rechecks stock itself.
-        if (waiting.has(rule.id)) continue;
-        // Keep watched stock current, so a proposal follows soon after stock falls.
-        await refresh(context, rule, 240_000);
-        const inventory = await stock(context, rule);
+      const rules = (await store.list(context)).filter(
+        (rule) =>
+          rule.active &&
+          rule.principalId === context.actor.id &&
+          !waiting.has(rule.id),
+      );
+      const stocks = await store.stocksFor(context, rules);
+      for (const rule of rules) {
+        let inventory = findStock(stocks, rule);
+        // Reuse this pass's scoped stock unless a provider refresh may have changed it.
+        if (await refresh(context, rule, 240_000, inventory))
+          inventory = (await store.stocksFor(context, [rule]))[0];
+        inventory = requireStock(inventory);
         const current = await plan(context, rule, inventory);
         if (current.fresh && current.belowMinimum)
           await api.start(context, {

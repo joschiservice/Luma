@@ -9,49 +9,144 @@ import type {
   ReplenishmentStore,
 } from '../application/replenishment.js';
 
-/** Persists immutable replenishment grants and reads tenant inventory projections. */
+type StockRow = {
+  position_id: string;
+  connection_id: string;
+  sku: string;
+  document: {
+    observedAt: string;
+    observationId: string;
+    deleted: boolean;
+    data: { available: string | null; unit: string };
+  };
+};
+
+function stockRow(row: StockRow): ReplenishmentStock {
+  const quantity = row.document.data.available;
+
+  return {
+    positionId: row.position_id,
+    connectionId: row.connection_id,
+    sku: row.sku,
+    unit: row.document.data.unit,
+    available:
+      typeof quantity === 'string' &&
+      quantity.trim() !== '' &&
+      Number.isFinite(Number(quantity))
+        ? Number(quantity)
+        : null,
+    observedAt: row.document.observedAt,
+    observationId: row.document.observationId,
+    deleted: row.document.deleted,
+  };
+}
+
+// The generated sku_id column lets a scoped position read use the entity primary key.
+const stockColumns = `p.entity_id AS position_id,p.connection_id,s.document,
+  COALESCE((SELECT k.code FROM inventory_product_skus k WHERE k.tenant_id=p.tenant_id AND k.sku_id=e.id
+    AND k.code_key IS NOT NULL ORDER BY k.connection_id,k.product_id LIMIT 1),e.reconciliation_key) AS sku`;
+const stockJoins = `JOIN inventory_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id
+  JOIN inventory_entities e ON e.tenant_id=p.tenant_id AND e.id=s.sku_id`;
+
+/** Persists immutable replenishment grants and reads explicitly scoped tenant inventory. */
 export function createReplenishmentStore(
   db: TenantDatabase,
 ): ReplenishmentStore {
   return {
-    async stocks(context: TenantContext): Promise<ReplenishmentStock[]> {
+    async hasStock(context) {
       return db.transaction(context.tenantId, async (tx) => {
-        const rows = await tx.query<{
-          position_id: string;
-          connection_id: string;
-          sku: string;
-          document: {
-            observedAt: string;
-            observationId: string;
-            deleted: boolean;
-            data: { available: string | null; unit: string };
-          };
-        }>(
-          // Imported SKUs have identity tuples as reconciliation keys; people know them by code.
-          `SELECT p.entity_id AS position_id,p.connection_id,s.document,
-             COALESCE((SELECT k.code FROM inventory_product_skus k WHERE k.tenant_id=p.tenant_id AND k.sku_id=e.id
-               AND k.code_key IS NOT NULL ORDER BY k.connection_id LIMIT 1),e.reconciliation_key) AS sku
-           FROM inventory_projections p JOIN inventory_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id
-           JOIN inventory_entities e ON e.tenant_id=p.tenant_id AND e.id=(s.document->'data'->>'skuId')::uuid
-           WHERE p.tenant_id=$1 AND s.kind='position' ORDER BY e.reconciliation_key,p.entity_id,p.connection_id`,
+        const result = await tx.query<{ present: boolean }>(
+          `SELECT EXISTS(SELECT 1 FROM inventory_projections p
+            JOIN inventory_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id
+            WHERE p.tenant_id=$1 AND s.kind='position' AND NOT (s.document->>'deleted')::boolean) AS present`,
           [context.tenantId],
         );
 
-        return rows.rows.map((r) => ({
-          positionId: r.position_id,
-          connectionId: r.connection_id,
-          sku: r.sku,
-          unit: r.document.data.unit,
-          available:
-            typeof r.document.data.available === 'string' &&
-            r.document.data.available.trim() !== '' &&
-            Number.isFinite(Number(r.document.data.available))
-              ? Number(r.document.data.available)
+        return result.rows[0]!.present;
+      });
+    },
+    async stocksFor(context, positions) {
+      if (!positions.length) return [];
+
+      return db.transaction(context.tenantId, async (tx) => {
+        const rows = await tx.query<StockRow>(
+          `SELECT ${stockColumns} FROM inventory_projections p ${stockJoins}
+           WHERE p.tenant_id=$1 AND s.kind='position' AND p.entity_id=ANY($2::uuid[])
+           AND EXISTS (SELECT 1 FROM unnest($2::uuid[],$3::uuid[]) scope(position_id,connection_id)
+             WHERE scope.position_id=p.entity_id AND (scope.connection_id IS NULL OR scope.connection_id=p.connection_id))
+           ORDER BY p.entity_id,p.connection_id`,
+          [
+            context.tenantId,
+            positions.map((p) => p.positionId),
+            positions.map((p) => p.connectionId ?? null),
+          ],
+        );
+
+        return rows.rows.map(stockRow);
+      });
+    },
+    async browseStocks(context, query) {
+      const cursor = query.cursor?.split(':');
+      if (
+        cursor &&
+        (cursor.length !== 2 ||
+          !cursor.every((part) =>
+            /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(
+              part,
+            ),
+          ))
+      )
+        throw new IdentityError(
+          422,
+          'VALIDATION_ERROR',
+          'Invalid stock choices cursor.',
+        );
+      const search = query.q?.trim() ?? '';
+      const pattern = `%${search.replace(/[\\%_]/g, '\\$&')}%`;
+
+      return db.transaction(context.tenantId, async (tx) => {
+        const rows = await tx.query<StockRow>(
+          // Search scalar SKU labels once; documents and display lookups are read only for the page.
+          `WITH ${
+            search
+              ? `matching_skus AS MATERIALIZED (
+            SELECT sku_id FROM (
+              SELECT DISTINCT ON (sku_id) sku_id,code FROM inventory_product_skus
+              WHERE tenant_id=$1 AND code_key IS NOT NULL ORDER BY sku_id,connection_id,product_id
+            ) codes WHERE code ILIKE $6
+            UNION SELECT id FROM inventory_entities e WHERE e.tenant_id=$1 AND e.reconciliation_key ILIKE $6
+              AND NOT EXISTS (SELECT 1 FROM inventory_product_skus k WHERE k.tenant_id=$1 AND k.sku_id=e.id AND k.code_key IS NOT NULL)
+          ),`
+              : ''
+          } page AS MATERIALIZED (
+            SELECT p.* FROM inventory_projections p
+            JOIN inventory_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id
+            WHERE p.tenant_id=$1 AND s.kind='position' AND NOT (s.document->>'deleted')::boolean
+              AND ($2::uuid IS NULL OR p.entity_id=$2) AND ($3::uuid IS NULL OR p.connection_id=$3)
+              AND ($4::uuid IS NULL OR (p.entity_id,p.connection_id)>($4::uuid,$5::uuid))
+              ${search ? 'AND s.sku_id IN (SELECT sku_id FROM matching_skus)' : ''}
+            ORDER BY p.entity_id,p.connection_id LIMIT 51
+          ) SELECT ${stockColumns} FROM page p ${stockJoins}
+            ORDER BY p.entity_id,p.connection_id`,
+          [
+            context.tenantId,
+            query.positionId ?? null,
+            query.connectionId ?? null,
+            cursor?.[0] ?? null,
+            cursor?.[1] ?? null,
+            ...(search ? [pattern] : []),
+          ],
+        );
+        const positions = rows.rows.slice(0, 50).map(stockRow);
+        const last = positions.at(-1);
+
+        return {
+          positions,
+          nextCursor:
+            rows.rows.length > 50 && last
+              ? `${last.positionId}:${last.connectionId}`
               : null,
-          observedAt: r.document.observedAt,
-          observationId: r.document.observationId,
-          deleted: r.document.deleted,
-        }));
+        };
       });
     },
     async list(context: TenantContext): Promise<ReplenishmentActivation[]> {

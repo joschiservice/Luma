@@ -14,6 +14,10 @@ risk threshold, the principal, the workflow digest and the admission artifact. O
 active rule may cover a position; revoke it before changing the scope. The worker acts as
 the activating principal and refreshes membership at every activity and admission check.
 
+Setup browses stock in pages of 50 and searches SKU labels on the server. Selected positions
+stay selected across pages and searches. Rule readiness uses its exact configured source,
+independently of the choices page.
+
 Bulk setup previews and activates up to 25 positions per request, each through the
 single-rule path and for exactly one position. Previews change nothing. Items succeed or
 fail on their own: a position covered by another active rule fails as `covered`, and
@@ -31,7 +35,9 @@ suppliers and inventory sources.
 
 While a rule waits, the monitor rereads its stock when the stored report is older than four
 minutes, at most once a minute per rule, so proposals follow soon after stock falls instead
-of waiting for the next sync. A rule with a run in progress gets no second run.
+of waiting for the next sync. A rule with a run in progress gets no second run. Each pass
+reads only the eligible watched positions and reuses those reports; after a provider refresh it reads the changed position
+again. Stock reads for admission remain independent and fresh.
 
 ## Approval and admission
 

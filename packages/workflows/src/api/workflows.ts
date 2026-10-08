@@ -72,7 +72,7 @@ export function workflowRoutes(service?: WorkflowCatalog) {
         ),
       };
     },
-    replenishmentSetup: async ({ request, params }) => {
+    replenishmentSetup: async ({ request, params, query }) => {
       const s = use(request);
 
       return {
@@ -80,6 +80,7 @@ export function workflowRoutes(service?: WorkflowCatalog) {
         body: await s.service.replenishmentSetup(
           s.context,
           params.definitionId,
+          query,
         ),
       };
     },

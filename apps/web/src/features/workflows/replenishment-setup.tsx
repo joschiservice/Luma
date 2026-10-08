@@ -9,18 +9,20 @@ import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Input } from '@luma/ui/components/primitives/input';
+import { Pagination } from '@luma/ui/components/primitives/pagination';
 import { Select } from '@luma/ui/components/primitives/select';
 import { StatePill } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { ArrowRight, Search, ShieldCheck } from 'lucide-react';
-import { useState } from 'react';
+import { useDeferredValue, useState } from 'react';
 
 import { IdentityError } from '../identity/data';
 import {
   configureReplenishmentBatch,
   previewReplenishment,
+  replenishmentOptions,
   workflowError,
 } from './data';
 
@@ -60,41 +62,81 @@ function validQuantities(q: Quantities) {
 const uncertainError = (error: unknown) =>
   !(error instanceof IdentityError) || error.status >= 500;
 
-/**
- * Sets up stock rules for up to 25 positions in three steps: choose positions and a supplier,
- * review what each rule would do, then see each result. Each rule covers exactly one position, an
- * existing rule is never replaced, and a retry resends the same request IDs.
- */
-export function ReplenishmentSetupFlow({
+type SetupFlowProps = {
+  organizationId: string;
+  detail: WorkflowDetail;
+  setup: ReplenishmentSetup;
+  /** A stock position to preselect, including one outside the first choices page. */
+  initial?: string | undefined;
+  onLock(locked: boolean): void;
+  done(changed: boolean): void;
+};
+
+/** Loads a contextual stock choice before opening the reviewed setup form. */
+export function ReplenishmentSetupFlow(props: SetupFlowProps) {
+  const initial = useQuery({
+    ...replenishmentOptions(props.organizationId, {
+      positionId: props.initial,
+    }),
+    enabled: !!props.initial,
+  });
+  if (props.initial && initial.error)
+    return (
+      <Alert tone="danger" role="alert">
+        {workflowError(initial.error)}
+        <Button variant="outline" onClick={() => void initial.refetch()}>
+          Retry
+        </Button>
+      </Alert>
+    );
+  if (props.initial && !initial.data)
+    return <p role="status">Loading the stock position…</p>;
+
+  return (
+    <ReplenishmentSetupForm
+      {...props}
+      initialPositions={initial.data?.positions}
+    />
+  );
+}
+
+/** Reviews up to 25 positions; selections and retry IDs survive browsing and search. */
+function ReplenishmentSetupForm({
   organizationId,
   detail,
   setup,
   initial,
+  initialPositions,
   onLock,
   done,
-}: {
-  organizationId: string;
-  detail: WorkflowDetail;
-  setup: ReplenishmentSetup;
-  /** A stock position to preselect. */
-  initial?: string | undefined;
-  onLock(locked: boolean): void;
-  done(changed: boolean): void;
-}) {
+}: SetupFlowProps & { initialPositions?: Position[] | undefined }) {
   const covered = new Set(
     setup.rules.filter((rule) => rule.active).map((rule) => rule.positionId),
   );
-  const preselected = setup.positions.find(
+  const preselected = (initialPositions ?? setup.positions).find(
     (p) => p.positionId === initial && !covered.has(p.positionId),
   );
   const [step, setStep] = useState<'choose' | 'review' | 'results'>('choose');
   const [supplierId, setSupplierId] = useState(
     setup.suppliers.length === 1 ? setup.suppliers[0]!.id : '',
   );
-  const [selected, setSelected] = useState<string[]>(
-    preselected ? [keyOf(preselected)] : [],
+  const [selected, setSelected] = useState<Position[]>(
+    preselected ? [preselected] : [],
   );
+  const selectedKeys = selected.map(keyOf);
   const [filter, setFilter] = useState('');
+  const search = useDeferredValue(filter.trim());
+  const [cursors, setCursors] = useState<string[]>([]);
+  const choices = useQuery({
+    ...replenishmentOptions(organizationId, {
+      q: search,
+      cursor: cursors.at(-1),
+    }),
+    ...(!search && !cursors.length ? { initialData: setup } : {}),
+  });
+  const browsing = choices.isFetching || search !== filter.trim();
+  const page = choices.data?.positions ?? [];
+
   const [defaults, setDefaults] = useState<Quantities>({
     minimum: '10',
     target: '50',
@@ -107,17 +149,13 @@ export function ReplenishmentSetupFlow({
   const [results, setResults] = useState<ReplenishmentBatchResult['results']>(
     [],
   );
-  const positions = new Map(setup.positions.map((p) => [keyOf(p), p]));
+  const positions = new Map([...page, ...selected].map((p) => [keyOf(p), p]));
   const quantities = (key: string) => overrides[key] ?? defaults;
-  const skuCounts = new Map<string, number>();
-  for (const p of setup.positions)
-    skuCounts.set(p.sku, (skuCounts.get(p.sku) ?? 0) + 1);
-
   const previewing = useMutation({
     mutationFn: () =>
       previewReplenishment(organizationId, {
         supplierId,
-        items: selected.map((key) => {
+        items: selectedKeys.map((key) => {
           const position = positions.get(key)!;
           const q = quantities(key);
 
@@ -350,7 +388,7 @@ export function ReplenishmentSetupFlow({
             <Button
               disabled={
                 previewing.isPending ||
-                !selected.every((key) => validQuantities(quantities(key)))
+                !selectedKeys.every((key) => validQuantities(quantities(key)))
               }
               onClick={() => previewing.mutate()}
             >
@@ -377,13 +415,14 @@ export function ReplenishmentSetupFlow({
       </div>
     );
 
-  const visible = setup.positions.filter((p) =>
-    p.sku.toLowerCase().includes(filter.trim().toLowerCase()),
-  );
+  const visible = [
+    ...selected,
+    ...page.filter((p) => !selectedKeys.includes(keyOf(p))),
+  ];
   const canPreview =
     !!supplierId &&
     selected.length > 0 &&
-    selected.every((key) => validQuantities(quantities(key)));
+    selectedKeys.every((key) => validQuantities(quantities(key)));
 
   return (
     <form
@@ -428,7 +467,10 @@ export function ReplenishmentSetupFlow({
             aria-label="Filter stock positions"
             placeholder="Filter by SKU"
             value={filter}
-            onChange={(e) => setFilter(e.target.value)}
+            onChange={(e) => {
+              setFilter(e.target.value);
+              setCursors([]);
+            }}
           />
         </div>
         <p className="replenishment-setup-note" aria-live="polite">
@@ -437,38 +479,69 @@ export function ReplenishmentSetupFlow({
             ? '. Set up more positions in another batch.'
             : ''}
         </p>
-        {!setup.positions.length ? (
+        {browsing ? (
+          <p role="status">Loading stock positions…</p>
+        ) : choices.error ? (
+          <Alert tone="danger" role="alert">
+            {workflowError(choices.error)}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void choices.refetch()}
+            >
+              Retry
+            </Button>
+          </Alert>
+        ) : !page.length ? (
           <p className="replenishment-setup-note">
-            No stock positions yet. Connect an inventory source and let Luma
-            read its stock.
+            {search
+              ? `No SKU matches “${search}”.`
+              : 'No stock positions on this page. Connect an inventory source if none have been imported.'}
           </p>
-        ) : !visible.length ? (
-          <p className="replenishment-setup-note">No SKU matches “{filter}”.</p>
         ) : null}
         <div className="replenishment-position-list">
           {visible.map((position) => (
             <PositionOption
               key={keyOf(position)}
               position={position}
-              checked={selected.includes(keyOf(position))}
+              checked={selectedKeys.includes(keyOf(position))}
               covered={covered.has(position.positionId)}
-              otherSource={selected.some(
+              otherSource={selectedKeys.some(
                 (key) =>
                   key !== keyOf(position) &&
                   positions.get(key)?.positionId === position.positionId,
               )}
               full={selected.length >= setupLimit}
-              showSource={(skuCounts.get(position.sku) ?? 0) > 1}
+              loading={browsing && !selectedKeys.includes(keyOf(position))}
+              showSource
               toggle={(checked) =>
                 setSelected((keys) =>
                   checked
-                    ? [...keys, keyOf(position)]
-                    : keys.filter((key) => key !== keyOf(position)),
+                    ? [...keys, position]
+                    : keys.filter((p) => keyOf(p) !== keyOf(position)),
                 )
               }
             />
           ))}
         </div>
+        <Pagination
+          count={page.length}
+          page={cursors.length + 1}
+          pageSize={50}
+          itemLabel="stock choices"
+          label="Stock position pages"
+          hasNext={!!choices.data?.nextCursor}
+          disabled={browsing || !!choices.error}
+          onPrevious={
+            cursors.length
+              ? () => setCursors((all) => all.slice(0, -1))
+              : undefined
+          }
+          onNext={() => {
+            const next = choices.data?.nextCursor;
+            if (next) setCursors((all) => [...all, next]);
+          }}
+        />
       </fieldset>
       <fieldset className="replenishment-setup-defaults">
         <legend>Quantities</legend>
@@ -552,6 +625,7 @@ function PositionOption({
   covered,
   otherSource,
   full,
+  loading,
   showSource,
   toggle,
 }: {
@@ -561,6 +635,7 @@ function PositionOption({
   /** Another source of the same position is selected; a rule covers a position once. */
   otherSource: boolean;
   full: boolean;
+  loading: boolean;
   showSource: boolean;
   toggle(checked: boolean): void;
 }) {
@@ -569,7 +644,7 @@ function PositionOption({
       <input
         type="checkbox"
         checked={checked}
-        disabled={covered || otherSource || (full && !checked)}
+        disabled={loading || covered || otherSource || (full && !checked)}
         onChange={(e) => toggle(e.target.checked)}
       />
       <span>

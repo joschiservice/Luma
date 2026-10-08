@@ -139,11 +139,14 @@ export function createWorkflowDemo({ application, manifest, owner }) {
   }
 
   async function rules(context) {
-    const setup = await application.replenishment.api.setup(context);
     const detail = await application.replenishment.api.detail(context);
     for (const [index, variant] of plan.variants.entries()) {
       if (done.rules.has(variant.id)) continue;
       const supplierId = done.suppliers.get(variant.supplierId);
+      const setup = await application.replenishment.api.setup(context, {
+        q: variant.sku,
+        connectionId: jtl,
+      });
       const position = setup.positions.find(
         (item) => item.connectionId === jtl && item.sku === variant.sku,
       );

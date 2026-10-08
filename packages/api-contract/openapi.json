@@ -7828,7 +7828,8 @@
     },
     "/v1/organizations/{organizationId}/workflows/{definitionId}/replenishment": {
       "get": {
-        "summary": "Read replenishment scopes and current stock",
+        "description": "Returns up to 50 stock choices. Search by SKU or filter to a position or connection. Continue with nextCursor and the same filters. Rule readiness includes the current stock for every configured rule, independently of this page.",
+        "summary": "Read replenishment rules and a page of stock choices",
         "tags": ["workflows"],
         "parameters": [
           {
@@ -7847,6 +7848,38 @@
             "schema": {
               "type": "string",
               "pattern": "^[a-z][a-zA-Z0-9_-]{0,79}$"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9-]{36}:[a-f0-9-]{36}$"
+            }
+          },
+          {
+            "name": "positionId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "connectionId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
             }
           }
         ],
@@ -7900,7 +7933,12 @@
                           "available",
                           "observedAt"
                         ]
-                      }
+                      },
+                      "maxItems": 50
+                    },
+                    "nextCursor": {
+                      "type": "string",
+                      "nullable": true
                     },
                     "suppliers": {
                       "type": "array",
@@ -7959,6 +7997,41 @@
                           },
                           "supplier": {
                             "type": "string"
+                          },
+                          "stock": {
+                            "type": "object",
+                            "properties": {
+                              "positionId": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "connectionId": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "sku": {
+                                "type": "string"
+                              },
+                              "unit": {
+                                "type": "string"
+                              },
+                              "available": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "observedAt": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "positionId",
+                              "connectionId",
+                              "sku",
+                              "unit",
+                              "available",
+                              "observedAt"
+                            ],
+                            "nullable": true
                           },
                           "status": {
                             "type": "object",
@@ -8027,6 +8100,7 @@
                           "principalId",
                           "sku",
                           "supplier",
+                          "stock",
                           "status",
                           "waitingRunId",
                           "latestRun"
@@ -8038,6 +8112,7 @@
                     "available",
                     "canManage",
                     "positions",
+                    "nextCursor",
                     "suppliers",
                     "rules"
                   ]
