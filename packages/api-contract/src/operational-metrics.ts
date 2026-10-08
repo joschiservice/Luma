@@ -76,22 +76,19 @@ export const operationalMetricRequestSchema = z
     metrics: z.array(operationalMetricIdSchema).min(1).max(19),
     scope: operationalMetricScopeSchema.default({}),
     limit: z.number().int().min(1).max(100).default(20),
-    offset: z.number().int().min(0).max(10000).default(0),
-    asOf: timestamp.optional(),
-    snapshot: z
+    cursor: z
       .string()
-      .regex(/^[a-f0-9]{64}$/)
-      .optional(),
+      .min(1)
+      .max(2048)
+      .optional()
+      .describe(
+        'A metric’s nextCursor. That metric lists the records after the previous page, read from current data; the other metrics return their first page.',
+      ),
   })
   .strict()
   .refine(
     (v) => new Set(v.metrics).size === v.metrics.length,
     'Choose each metric once.',
-  )
-  .refine(
-    (v) =>
-      (!v.snapshot && !v.asOf && v.offset === 0) || (!!v.snapshot && !!v.asOf),
-    'Pagination requires the snapshot and evaluation time.',
   )
   .refine(
     (v) =>
@@ -178,11 +175,9 @@ export const operationalMetricResponseSchema = z.object({
   scope: operationalMetricScopeSchema,
   asOf: timestamp,
   readAt: timestamp,
-  snapshot: z.string(),
   timezone: z.literal('UTC'),
   nextRefreshAt: timestamp.nullable(),
   limit: z.number(),
-  offset: z.number(),
   metrics: z.array(
     z.object({
       definition: operationalMetricDefinitionSchema,
@@ -200,6 +195,19 @@ export const operationalMetricResponseSchema = z.object({
       breakdown: z.array(
         z.object({ reason: z.string(), count: z.number().int().nonnegative() }),
       ),
+      offset: z
+        .number()
+        .int()
+        .nonnegative()
+        .describe(
+          'Records paged past before this page. It labels the page; records may have changed since earlier pages.',
+        ),
+      nextCursor: z
+        .string()
+        .nullable()
+        .describe(
+          'Pass as cursor to read the records after this page. Null when no more records match.',
+        ),
       items: z.array(operationalMetricItemSchema),
     }),
   ),

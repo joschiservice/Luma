@@ -34,7 +34,6 @@ import {
 } from 'lucide-react';
 import { useRef, useState } from 'react';
 
-import { IdentityError } from '../identity/data';
 import {
   metricDescription,
   metricTimeSemantics,
@@ -164,7 +163,7 @@ export function OperationalMetrics({
   metricGroups?: MetricGroup[];
 }) {
   const initial = initialRequest ?? operationalMetricRequest;
-  const { query, request, setRequest, connection } = usePagedMetric(
+  const { records, page, next, previous, first, connection } = usePagedMetric(
     live,
     initial,
     (paged: OperationalMetricRequest) =>
@@ -172,18 +171,22 @@ export function OperationalMetrics({
   );
   const [selected, setSelected] = useState<string | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
-  const unavailable =
-    query.isError ||
-    query.isPaused ||
-    connection === 'denied' ||
-    connection === 'offline';
-  const data = unavailable ? undefined : query.data;
-  const metric = data?.metrics.find((m) => m.definition.id === selected);
-  const conflict =
-    query.error instanceof IdentityError && query.error.status === 409;
+  const offline = connection === 'denied' || connection === 'offline';
+  const unavailable = live.isError || live.isPaused || offline;
+  const data = unavailable ? undefined : live.data;
+  // The dialog lists the page the person is reading; the cards keep showing live counts.
+  const shown =
+    records.isError || records.isPaused || offline ? undefined : records.data;
+  const metric = shown?.metrics.find((m) => m.definition.id === selected);
+  const latest = data?.metrics.find((m) => m.definition.id === selected);
+  const changed =
+    page > 1 &&
+    !!metric &&
+    !!latest &&
+    latest.observedCount !== metric.observedCount;
   const refresh = () => {
-    if (request.snapshot) setRequest(initial);
-    else void query.refetch();
+    first();
+    void live.refetch();
   };
 
   return (
@@ -204,7 +207,7 @@ export function OperationalMetrics({
               ? m.overview_live_access_changed()
               : connection === 'offline'
                 ? m.overview_live_offline()
-                : query.isError
+                : live.isError
                   ? m.overview_live_unavailable()
                   : connection === 'live'
                     ? m.overview_live_on()
@@ -217,8 +220,7 @@ export function OperationalMetrics({
             size="sm"
             onClick={refresh}
             disabled={
-              query.isFetching ||
-              query.isPaused ||
+              live.isPaused ||
               connection === 'denied' ||
               connection === 'offline'
             }
@@ -234,9 +236,7 @@ export function OperationalMetrics({
           title={
             connection === 'denied'
               ? m.overview_notice_access_title()
-              : conflict
-                ? m.overview_notice_conflict_title()
-                : m.overview_notice_unavailable_title()
+              : m.overview_notice_unavailable_title()
           }
         >
           {connection === 'denied'
@@ -245,7 +245,7 @@ export function OperationalMetrics({
               ? m.overview_notice_offline_body()
               : m.overview_notice_unavailable_body()}
         </CaseNotice>
-      ) : query.isPending ? (
+      ) : live.isPending ? (
         <CaseLoading />
       ) : data ? (
         <>
@@ -278,7 +278,7 @@ export function OperationalMetrics({
                           onClick={(event) => {
                             trigger.current = event.currentTarget;
                             setSelected(m.definition.id);
-                            if (request.snapshot) setRequest(initial);
+                            first();
                           }}
                         >
                           <span className="operational-label">
@@ -308,7 +308,7 @@ export function OperationalMetrics({
         onOpenChange={(open) => {
           if (!open) {
             setSelected(null);
-            if (request.snapshot) setRequest(initial);
+            first();
           }
         }}
       >
@@ -323,7 +323,7 @@ export function OperationalMetrics({
               {m.overview_dialog_description()}
             </DialogDescription>
           </DialogHeader>
-          {metric && data ? (
+          {metric && shown ? (
             <>
               <div className="order-cohort-definition">
                 <Badge tone="neutral">
@@ -384,6 +384,14 @@ export function OperationalMetrics({
                     : m.overview_data_through_unknown()}
                 </p>
               ) : null}
+              {changed ? (
+                <CaseNotice title={m.overview_records_changed_title()}>
+                  {m.overview_records_changed_body()}{' '}
+                  <Button variant="outline" size="sm" onClick={first}>
+                    {m.overview_records_show_latest()}
+                  </Button>
+                </CaseNotice>
+              ) : null}
               {metric.items.length ? (
                 <ul
                   className="operational-cohort"
@@ -422,65 +430,42 @@ export function OperationalMetrics({
                 <span>
                   {metric.observedCount
                     ? m.overview_records_range({
-                        from: Math.min(data.offset + 1, metric.observedCount),
+                        from: Math.min(metric.offset + 1, metric.observedCount),
                         to: Math.min(
-                          data.offset + metric.items.length,
+                          metric.offset + metric.items.length,
                           metric.observedCount,
                         ),
                         total: metric.observedCount,
                       })
                     : m.overview_records_none()}{' '}
-                  · <WorkspaceDate value={data.asOf} />
+                  · <WorkspaceDate value={shown.asOf} />
                 </span>
                 <div>
                   <Button
                     variant="outline"
                     size="sm"
-                    disabled={!data.offset || query.isFetching}
-                    onClick={() =>
-                      setRequest({
-                        ...initial,
-                        asOf: data.asOf,
-                        snapshot: data.snapshot,
-                        offset: Math.max(0, data.offset - data.limit),
-                      })
-                    }
+                    disabled={page === 1}
+                    onClick={previous}
                   >
                     {m.common_previous()}
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
-                    disabled={
-                      data.offset + data.limit >= metric.observedCount ||
-                      data.offset + data.limit > 10000 ||
-                      query.isFetching
-                    }
-                    onClick={() =>
-                      setRequest({
-                        ...initial,
-                        asOf: data.asOf,
-                        snapshot: data.snapshot,
-                        offset: data.offset + data.limit,
-                      })
-                    }
+                    disabled={!metric.nextCursor}
+                    onClick={() => {
+                      if (metric.nextCursor) next(metric.nextCursor);
+                    }}
                   >
                     {m.common_next()}
                   </Button>
                 </div>
               </div>
             </>
-          ) : query.isPending ? (
+          ) : records.isPending ? (
             <CaseLoading />
           ) : (
-            <CaseNotice
-              error
-              title={
-                conflict
-                  ? m.overview_notice_conflict_title()
-                  : m.overview_records_error_title()
-              }
-            >
+            <CaseNotice error title={m.overview_records_error_title()}>
               {m.overview_records_error_body()}{' '}
               <Button variant="outline" onClick={refresh}>
                 {m.overview_refresh_summary()}

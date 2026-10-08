@@ -22,6 +22,7 @@ import {
   TabsList,
   TabsTrigger,
 } from '@luma/ui/components/primitives/tabs';
+import { useSlowRequest } from '@luma/ui/lib/use-slow-request';
 import { Link } from '@tanstack/react-router';
 import { RefreshCw } from 'lucide-react';
 import { useId, useState } from 'react';
@@ -79,6 +80,7 @@ export function ChartCard({
   data,
   loading,
   refreshing,
+  previous,
   error,
   selected,
   onSelect,
@@ -90,7 +92,10 @@ export function ChartCard({
   timeZone: string;
   data: InsightChartResponse | undefined;
   loading: boolean;
+  /** A read is running. Only a slow one dims the chart. */
   refreshing: boolean;
+  /** `data` was read for an earlier range or source and stays dimmed until the new read lands. */
+  previous: boolean;
   error: InsightsError | undefined;
   selected: Selection | null;
   onSelect: (selection: Selection) => void;
@@ -102,6 +107,7 @@ export function ChartCard({
   const [view, setView] = useState<'chart' | 'table'>('chart');
   const badge = data && !error ? coverageBadge(data) : null;
   const title = definition.title();
+  const slow = useSlowRequest(refreshing);
 
   return (
     <Card
@@ -159,7 +165,7 @@ export function ChartCard({
             data={data}
             timeZone={timeZone}
             view={view}
-            refreshing={refreshing}
+            refreshing={previous || slow}
             selected={selected}
             onSelect={onSelect}
           />

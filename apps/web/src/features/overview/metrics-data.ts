@@ -7,7 +7,7 @@ import { IdentityError } from '../identity/data';
 
 const api = createWebApiClient();
 
-/** Reads totals and matching orders together; snapshot conflicts require an explicit refresh. */
+/** Reads totals and a page of matching orders for each metric, from current data. */
 export function metricsOptions(
   organizationId: string,
   request: MetricRequest = {},
@@ -22,7 +22,7 @@ export function metricsOptions(
     ],
     ...privateQueryDefaults,
     retry: false,
-    refetchOnWindowFocus: !request.snapshot,
+    refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     queryFn: async ({ signal }) => {
       const result = await api.metrics.query({

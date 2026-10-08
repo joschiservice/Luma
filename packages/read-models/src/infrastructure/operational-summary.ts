@@ -1,5 +1,3 @@
-import { createHash } from 'node:crypto';
-
 import type { ConnectionMetricItem, CoverageReader } from '@luma/connections';
 import { summarizeConnectionMetrics } from '@luma/connections';
 import type { CaseMetricItem } from '@luma/exceptions';
@@ -12,6 +10,7 @@ import type {
 } from '@luma/procurement';
 import type { ResolutionMetricReader } from '@luma/resolution';
 
+import { pageCohort, readMetricCursor } from '../application/metric-pages.js';
 import {
   metricFamilyPermissions,
   type OperationalCohortItem,
@@ -68,7 +67,23 @@ function withheldMetric(
   };
 }
 
-/** Composes only requested domain families in a repeatable-read transaction with revision-checked pagination. */
+// Each record type pages in a fixed order, so records joining or leaving a cohort don't shift later pages.
+function cohortKey(item: OperationalCohortItem): string[] {
+  switch (item.kind) {
+    case 'case':
+      return [item.id];
+    case 'resolution':
+      return [new Date(item.detectedAt).toISOString(), item.id];
+    case 'purchase_order':
+      return [new Date(item.createdAt).toISOString(), item.id];
+    case 'stock_position':
+      return [item.sku, item.id];
+    case 'connection':
+      return [item.label, item.id];
+  }
+}
+
+/** Composes only requested domain families in one repeatable-read transaction and pages each cohort from current data. */
 export function createOperationalSummary(
   db: TenantDatabase,
   readers: Readers,
@@ -77,17 +92,8 @@ export function createOperationalSummary(
   return async (context, input) => {
     requireTenant(context, context.tenantId);
     const request = operationalMetricRequestSchema.parse(input);
-    const readAt = now().toISOString();
-    const asOf = request.asOf ?? readAt;
-    if (
-      Date.parse(asOf) > Date.parse(readAt) ||
-      Date.parse(readAt) - Date.parse(asOf) > 900_000
-    )
-      throw new IdentityError(
-        409,
-        'CONFLICT',
-        'This snapshot expired. Refresh the metrics.',
-      );
+    const cursor = readMetricCursor(request.cursor, request.metrics);
+    const asOf = now().toISOString();
 
     return db.transaction(
       context.tenantId,
@@ -163,24 +169,6 @@ export function createOperationalSummary(
         const metrics = request.metrics.map((id) =>
           results.find((result) => result.definition.id === id)!,
         );
-        const snapshot = createHash('sha256')
-          .update(
-            JSON.stringify([
-              context.tenantId,
-              request.definitionVersion,
-              request.metrics,
-              request.scope,
-              asOf,
-              metrics,
-            ]),
-          )
-          .digest('hex');
-        if (request.snapshot && request.snapshot !== snapshot)
-          throw new IdentityError(
-            409,
-            'CONFLICT',
-            'The matching records changed. Refresh the metrics.',
-          );
         const boundaries = metrics
           .flatMap((metric) =>
             metric.nextRefreshAt ? [metric.nextRefreshAt] : [],
@@ -191,18 +179,25 @@ export function createOperationalSummary(
           definitionVersion: 2,
           scope: request.scope,
           asOf,
-          readAt,
-          snapshot,
+          readAt: asOf,
           timezone: 'UTC',
           nextRefreshAt: boundaries[0] ?? null,
           limit: request.limit,
-          offset: request.offset,
           hidden,
-          metrics: metrics.map((metric) => ({
-            ...metric,
-            items: metric.items
-              .slice(request.offset, request.offset + request.limit)
-              .map((item) =>
+          metrics: metrics.map((metric) => {
+            const page = pageCohort(
+              metric.items,
+              cohortKey,
+              metric.definition.id,
+              request.limit,
+              cursor?.metric === metric.definition.id ? cursor : undefined,
+            );
+
+            return {
+              ...metric,
+              offset: page.offset,
+              nextCursor: page.nextCursor,
+              items: page.items.map((item) =>
                 item.kind === 'resolution'
                   ? {
                       ...item,
@@ -213,7 +208,8 @@ export function createOperationalSummary(
                     }
                   : item,
               ),
-          })),
+            };
+          }),
         };
       },
       { readOnlySnapshot: true },

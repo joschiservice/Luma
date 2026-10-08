@@ -9,7 +9,7 @@ import {
 } from './operational-metrics-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
-it('reconciles all domain cohorts, stock expiry, lifecycle transitions, scopes and snapshot conflicts', async (t) => {
+it('reconciles all domain cohorts, stock expiry, lifecycle transitions, scopes and paging', async (t) => {
   const f = await settingsFixture(t);
   const endpoint = operationalEndpoint(f);
   const query = (body = {}) =>
@@ -51,12 +51,8 @@ it('reconciles all domain cohorts, stock expiry, lifecycle transitions, scopes a
     reason: 'uncertainty',
     count: 2,
   });
-  const second = await query({
-    limit: 1,
-    offset: 1,
-    asOf: first.asOf,
-    snapshot: first.snapshot,
-  });
+  const second = await query({ limit: 1, cursor: first.metrics[0].nextCursor });
+  expect(second.metrics[0]).toMatchObject({ offset: 1, nextCursor: null });
   expect(
     new Set([first.metrics[0].items[0].id, second.metrics[0].items[0].id]).size,
   ).toBe(2);
@@ -69,17 +65,16 @@ it('reconciles all domain cohorts, stock expiry, lifecycle transitions, scopes a
     'POST',
     created.input,
   );
+  // A later page reads current data instead of failing after a change.
+  const after = await query({ limit: 1, cursor: first.metrics[0].nextCursor });
+  expect(after.metrics[0].items[0].id).toBe(second.metrics[0].items[0].id);
+  expect(after.metrics[5].value).toBe(1);
   await f.request(
     f.owner,
     endpoint,
     'POST',
-    {
-      ...operationalRequest,
-      asOf: first.asOf,
-      snapshot: first.snapshot,
-      offset: 1,
-    },
-    409,
+    { ...operationalRequest, cursor: 'not-a-cursor' },
+    422,
   );
   let current = await query();
   expect(current.metrics[5].value).toBe(1);
@@ -247,25 +242,21 @@ it('reads several metric views in one summary and keeps a failed part to itself'
     boundaries.length ? Math.min(...boundaries) : null,
   );
 
-  // A changed order snapshot fails only its part.
-  const stale = await f.request(f.owner, summary, 'POST', {
+  // A part that can't be read fails only its own part.
+  const missing = await f.request(f.owner, summary, 'POST', {
     parts: [
       parts[0],
       {
         kind: 'orders',
-        request: {
-          asOf: new Date().toISOString(),
-          snapshot: '0'.repeat(64),
-          offset: 20,
-        },
+        request: { scope: { connectionId: randomUUID() } },
       },
     ],
   });
-  expect(stale.parts[0].status).toBe(200);
-  expect(stale.parts[1]).toMatchObject({
+  expect(missing.parts[0].status).toBe(200);
+  expect(missing.parts[1]).toMatchObject({
     kind: 'orders',
-    status: 409,
-    error: { code: 'CONFLICT' },
+    status: 404,
+    error: { code: 'NOT_FOUND' },
   });
 
   await f.request(f.owner, summary, 'POST', { parts: [] }, 400);

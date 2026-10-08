@@ -1,5 +1,3 @@
-import { createHash } from 'node:crypto';
-
 import type { CoverageReader } from '@luma/connections';
 import { IdentityError, requireTenant } from '@luma/identity';
 import type { OrderMetricReader } from '@luma/orders';
@@ -19,7 +17,7 @@ interface Readers {
   coverage: (db: TenantDatabase) => CoverageReader;
 }
 
-/** Shares one repeatable-read transaction across domain readers and rejects changed cohorts. */
+/** Shares one repeatable-read transaction across the order and connection coverage readers. */
 export function createOperationalMetrics(
   db: TenantDatabase,
   readers: Readers,
@@ -28,7 +26,7 @@ export function createOperationalMetrics(
   return createMetricService({
     parse: (input) => metricRequestSchema.parse(input),
     now,
-    read: async (context, request, asOf) => {
+    read: async (context, request, asOf, limit, after) => {
       return db.transaction(
         context.tenantId,
         async (tx) => {
@@ -49,8 +47,10 @@ export function createOperationalMetrics(
           )
             throw new IdentityError(404, 'NOT_FOUND', 'Connection not found');
           const result = await readers.orders(scoped)(context, {
-            ...request,
+            scope: request.scope,
             asOf,
+            limit,
+            after,
           });
           const boundary = await readers.attentionBoundary?.(scoped)(
             context.tenantId,
@@ -62,20 +62,8 @@ export function createOperationalMetrics(
               Date.parse(boundary) < Date.parse(result.nextRefreshAt))
           )
             result.nextRefreshAt = boundary;
-          const snapshot = createHash('sha256')
-            .update(
-              JSON.stringify([
-                context.tenantId,
-                request.definitionVersion,
-                request.scope,
-                asOf,
-                result.revision,
-                connections,
-              ]),
-            )
-            .digest('hex');
 
-          return { result, connections, snapshot };
+          return { result, connections };
         },
         { readOnlySnapshot: true },
       );
