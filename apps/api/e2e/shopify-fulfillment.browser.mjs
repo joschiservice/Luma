@@ -78,7 +78,7 @@ test('reviews a held fulfillment, obtains separate approval and verifies progres
     page.getByText('Release hold 1 only', { exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole('button', { name: 'Run approved action' }),
+    page.getByRole('button', { name: 'Send to Shopify' }),
   ).toHaveCount(0);
   const base = `${f.base}/apps/shopify/fulfillment-recovery`;
   const inspection = await f.request(admin, `${base}-inspect`, 'POST', {
@@ -91,7 +91,7 @@ test('reviews a held fulfillment, obtains separate approval and verifies progres
     outcome: 'approved',
   });
   await page.getByRole('button', { name: 'Check approval' }).click();
-  await page.getByRole('button', { name: 'Run approved action' }).click();
+  await page.getByRole('button', { name: 'Send to Shopify' }).click();
   await expect(
     page.getByText('Shopify accepted', { exact: true }),
   ).toBeVisible();
@@ -124,6 +124,6 @@ test('reviews a held fulfillment, obtains separate approval and verifies progres
   ).toBeVisible();
   expect(mutations).toHaveLength(1);
   await page.getByRole('button', { name: 'Review another action' }).click();
-  await expect(page.getByLabel('Hold to release')).toContainText('other · 2');
+  await expect(page.getByLabel('Hold to release')).toContainText('Other · 2');
   expect(errors).toEqual([]);
 });

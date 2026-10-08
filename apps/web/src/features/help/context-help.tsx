@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import { Button } from '@luma/ui/components/primitives/button';
 import {
   Dialog,
@@ -32,8 +33,8 @@ function HelpButton({ topic }: { topic: HelpTopic }) {
             variant="ghost"
             size="icon"
             className="workspace-help"
-            aria-label="Help for this page"
-            title="Help for this page"
+            aria-label={m.help_button_label()}
+            title={m.help_button_label()}
           />
         }
       >
@@ -42,9 +43,9 @@ function HelpButton({ topic }: { topic: HelpTopic }) {
       <DialogContent className="help-drawer translate-x-0 translate-y-0">
         <div className="help-drawer-heading">
           <CircleHelp size={18} aria-hidden="true" />
-          <DialogTitle>Help</DialogTitle>
+          <DialogTitle>{m.common_help()}</DialogTitle>
           <DialogDescription className="sr-only">
-            Guides for the page you are working on.
+            {m.help_drawer_description()}
           </DialogDescription>
         </div>
         {open ? (
@@ -52,18 +53,17 @@ function HelpButton({ topic }: { topic: HelpTopic }) {
             getResetKey={() => topic}
             errorComponent={() => (
               <div className="help-load-state" role="alert">
-                We couldn’t load this guide.{' '}
+                {m.help_load_failed()}{' '}
                 <a href={`/docs/${topic}`} target="_blank" rel="noreferrer">
-                  Open documentation in a new tab
+                  {m.help_load_failed_link()}
                 </a>
-                .
               </div>
             )}
           >
             <Suspense
               fallback={
                 <div className="help-load-state" role="status">
-                  Loading your guide…
+                  {m.docs_article_loading()}
                 </div>
               }
             >

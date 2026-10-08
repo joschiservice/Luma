@@ -1,4 +1,6 @@
 import type { DecisionOwner } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import { caseLabel } from '@luma/ui/components/issues/case-investigation';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
@@ -40,16 +42,17 @@ export function OwnerReview({
     case 'workflow_run':
       return handover ? (
         <p className="decision-note">
-          The workflow did what it can and handed this to a person. Act on the
-          record; this item leaves Needs you once Luma no longer sees the
-          follow-up.{' '}
-          <Link
-            to="/app/$organizationId/workflows/$definitionId"
-            params={{ organizationId, definitionId: owner.definitionId }}
-            hash={`run-${owner.runId}`}
-          >
-            Open the workflow run
-          </Link>
+          {rich(m.decisions_handover_text, {
+            link: (
+              <Link
+                to="/app/$organizationId/workflows/$definitionId"
+                params={{ organizationId, definitionId: owner.definitionId }}
+                hash={`run-${owner.runId}`}
+              >
+                {m.decisions_handover_link()}
+              </Link>
+            ),
+          })}
         </p>
       ) : (
         <RunReview
@@ -104,9 +107,7 @@ function CaseReview({
   const connections = useQuery(connectionsOptions(organizationId));
 
   if (observation.denied)
-    return (
-      <p role="alert">This issue is missing or you no longer have access.</p>
-    );
+    return <p role="alert">{m.decisions_case_denied()}</p>;
 
   return (
     <CaseResolution
@@ -116,7 +117,10 @@ function CaseReview({
       connectionLabels={Object.fromEntries(
         (connections.data ?? []).map((connection) => [
           connection.id,
-          `${connection.label} · ${caseLabel(connection.target.kind)}`,
+          m.decisions_connection_label({
+            connection: connection.label,
+            system: caseLabel(connection.target.kind),
+          }),
         ]),
       )}
     />
@@ -138,19 +142,20 @@ function RunReview({
   });
   const run = runs.data?.find((item) => item.id === runId);
 
-  if (runs.isPending) return <p role="status">Loading the workflow run…</p>;
+  if (runs.isPending) return <p role="status">{m.decisions_run_loading()}</p>;
   if (!run)
     return (
       <p role={runs.isError ? 'alert' : 'status'}>
-        {runs.isError
-          ? 'The workflow run could not be loaded. '
-          : 'This run is no longer among the recent runs. '}
-        <Link
-          to="/app/$organizationId/workflows/$definitionId"
-          params={{ organizationId, definitionId }}
-        >
-          Open the workflow
-        </Link>
+        {rich(runs.isError ? m.decisions_run_failed : m.decisions_run_gone, {
+          link: (
+            <Link
+              to="/app/$organizationId/workflows/$definitionId"
+              params={{ organizationId, definitionId }}
+            >
+              {m.decisions_open_workflow()}
+            </Link>
+          ),
+        })}
       </p>
     );
 

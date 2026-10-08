@@ -1,28 +1,46 @@
 ---
-title: Understand a customer
-description: Find the right customer and inspect their orders, service history and Luma activity.
+title: Find and understand a customer
+description: Find a customer from a connected store, read their profile and order history, and see the issues and actions on their orders.
 ---
 
-Open **Customers** or press **G**, then **U**. The list shows customers that your connected stores share with Luma. From an order’s Shopify details, choose **Open customer workspace** to go straight to that order’s customer.
+Customers shows the customer profiles your connected stores share with Luma. Use it to check who a customer is, what they ordered and what Luma did on their orders. Open **Customers** in the sidebar or press **G**, then **U**. From an order’s live Shopify details, **Open customer in Luma →** opens that order’s customer directly.
 
-## Find the right customer
+## Find a customer
 
-Search by name, email address, phone number or the store’s customer ID. Filter by **Account** or **Source**, and sort by **Customer since**, **Orders** or **Name**. Each store keeps its own customers: the same person who bought in two stores appears twice, once per store. Compare the source and contact details before choosing one.
+Search by name, email address, phone number or the customer’s ID in the store. Narrow the list with **Account** and **Source**, and sort by **Customer since**, **Orders** or **Name**. **Account** shows whether the customer has a store account: **Has account**, **No account** (for example after a guest checkout), **Invited** or **Declined invite**.
 
-Search text is not saved in the page link, so links you share or pin never contain a customer’s name or email address. Filters and sorting are saved.
+Each store keeps its own customers, and Luma never combines customers from different stores by name or email address. Someone who bought in two stores appears twice, once for each store. Compare the source and contact details before you choose.
 
-A customer appears after data sync imports them. **Coverage** above the list shows which stores have been read and when. If a link points to a customer Luma hasn’t imported yet, the page says so.
+Your search text isn’t saved in the page address, so links you share or pin never contain a customer’s name or email address. Filters and sorting are saved.
+
+**Coverage** above the list shows which stores have been imported and when. If a link points to a customer Luma hasn’t imported yet, the page says so; choose **Show all customers** to return to the list.
 
 ## Read a customer
 
-The customer page shows the contact details and address the store shares, the order count and amount spent the store reports, the account state and tags. **Not shared** means the store withholds that field. **Not reported** means the store returned no value.
+The customer page shows the store and the customer’s ID in it, then:
 
-**Order history** is read live from the store, with payment, fulfillment and totals. Use **Next** and **Previous** to page through it. Shopify usually limits order history to 60 days unless older-order access is granted.
+- **Contact**: email, phone and address, as far as the store shares them.
+- A section named after the store, such as **In Main Store**: the order count and amount spent the store reports, when the customer was created, their account state and tags.
+- **Source and evidence**: the store, the customer’s ID, when the store last updated the profile and when Luma last read it.
 
-Select an order to inspect fulfillment, returns and refunds. When Luma has a confirmed mapping for that order, its open issues and recent Luma actions appear below. **Open in Luma** opens the full order, evidence and workflow history. A missing or ambiguous mapping is shown explicitly.
+**Not shared** means the store withholds that field from Luma. **Not reported** means the store sent no value. Choose **Refresh customer** to load the profile again.
 
-## When information is unavailable
+## Follow the order history
 
-A permission notice is different from an empty history. Ask someone whose role includes **Manage apps**, such as an Admin, to check the store connection and approved customer access in **Apps**. Order history, returns and fulfillment can have different permissions from customer profiles.
+**Order history** is read live from the store each time you open it, with the connection’s permissions. It lists each order with its payment, fulfillment and total. Use the page controls to move through it, and choose **Refresh orders** to read it again. Shopify shares orders from the last 60 days unless access to older orders is on for the store.
 
-Choose **Refresh orders** to read the order history again, or **Refresh customer** to reload the profile.
+Select an order to see its service history: fulfillment, returns and refunds from the store. If the order is linked to an order in Luma, you also see its **Open issues** and **Luma actions**. The **Open … in Luma →** link opens the full order with its evidence and workflow runs. When the Shopify order isn’t linked to an order in Luma yet, or is linked to more than one, the page says so and shows only the store’s history.
+
+## When customer data is missing
+
+- **Customers aren’t shared yet** means no connected store shares customers with Luma. Shopify shares customers only after Shopify approves Luma’s access to customer data and your store grants it.
+- **Not shared** on contact details or the address means that part isn’t approved for sharing. The rest of the profile is still shown.
+- A store connected before Luma could read customers must be reconnected to share them. The page names each store that needs it, including stores that haven’t granted access to customers.
+- If the order history says the store’s app isn’t installed or authorized, someone with **Manage apps** can set it up in **Apps**. A permission notice in the history is different from an empty history.
+- **Customer not found** means the customer isn’t in this workspace, or the store asked Luma to erase their data.
+
+Someone whose role includes **Manage connections** can reconnect a store in **Apps**. See [Apps and connections](/docs/apps-and-connections#change-or-reconnect-a-connection).
+
+## Who can see customers
+
+Customer profiles include names, email addresses and postal addresses, so they need **View customers**. The built-in roles include it; a custom role might not. Without it, Customers is hidden from the sidebar and search, and a link to a customer says you don’t have access to customers in this workspace. Ask a workspace admin for access. See [Roles and permissions](/docs/roles-and-permissions).

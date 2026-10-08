@@ -4,6 +4,7 @@ import type {
   WorkflowActivationView,
   WorkflowDetail,
 } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import {
@@ -131,14 +132,14 @@ export function WorkflowDetailPage({
           params={{ organizationId }}
           search={filters}
         >
-          <ArrowLeft size={15} aria-hidden="true" /> All workflows
+          <ArrowLeft size={15} aria-hidden="true" /> {m.workflows_detail_back()}
         </Link>
       ) : null}
       {query.error || accessError ? (
         <Alert tone="danger" role="alert" className="workflow-notice">
           {workflowError(query.error ?? accessError)}{' '}
           <Button onClick={() => void refresh()} variant="outline">
-            Retry
+            {m.common_retry()}
           </Button>
         </Alert>
       ) : null}
@@ -227,9 +228,7 @@ export function WorkflowDetailView({
     detail.connections.some((c) => !c.blockers.length);
   const done = async () => {
     setActivate(false);
-    setMessage(
-      'Activation saved. This exact version and scope are now permitted.',
-    );
+    setMessage(m.workflows_detail_activated());
     await refresh();
   };
   const revokeSelected = async () => {
@@ -244,9 +243,7 @@ export function WorkflowDetailView({
         revoke.artifactDigest,
       );
       setRevoke(null);
-      setMessage(
-        'Activation revoked. Future runs are blocked; work already dispatched may still complete.',
-      );
+      setMessage(m.workflows_detail_revoked());
       await refresh();
     } catch (error) {
       setError(workflowError(error));
@@ -265,7 +262,7 @@ export function WorkflowDetailView({
         }
         onClick={() => setActivate(true)}
       >
-        Review activation
+        {m.workflows_detail_review_activation()}
       </Button>
     ) : null;
 
@@ -278,7 +275,7 @@ export function WorkflowDetailView({
           params={{ organizationId }}
           search={filters}
         >
-          Workflows
+          {m.workflows_title()}
         </Link>
         <ChevronRight size={14} aria-hidden="true" />
         <span aria-current="page" title={detail.summary.name}>
@@ -293,16 +290,16 @@ export function WorkflowDetailView({
           params={{ organizationId }}
           search={filters}
         >
-          <ArrowLeft size={15} aria-hidden="true" /> All workflows
+          <ArrowLeft size={15} aria-hidden="true" /> {m.workflows_detail_back()}
         </Link>
         <ReadinessPills readiness={detail.summary.readiness} />
         <Button
           variant="ghost"
-          aria-label="Refresh workflow"
+          aria-label={m.workflows_detail_refresh_label()}
           disabled={refreshing}
           onClick={() => void refresh()}
         >
-          <RefreshCw size={14} aria-hidden="true" /> Refresh
+          <RefreshCw size={14} aria-hidden="true" /> {m.common_refresh()}
         </Button>
         <div className="workflow-version-controls">
           {detail.canManage &&
@@ -315,7 +312,7 @@ export function WorkflowDetailView({
             />
           ) : null}
           <Select
-            aria-label="Version"
+            aria-label={m.workflows_detail_version_label()}
             value={version.version}
             onValueChange={(value) => {
               if (value === null) return;
@@ -324,7 +321,10 @@ export function WorkflowDetailView({
             }}
             options={detail.versions.map((v) => ({
               value: v.version,
-              label: `v${v.version}${v.version === detail.summary.availableVersion ? ' · Latest' : ''}`,
+              label:
+                v.version === detail.summary.availableVersion
+                  ? m.workflows_version_latest({ version: v.version })
+                  : m.workflows_version_short({ version: v.version }),
             }))}
           />
         </div>
@@ -335,11 +335,11 @@ export function WorkflowDetailView({
         </Alert>
       ) : null}
       <SectionWorkspace
-        label="Workflow sections"
+        label={m.workflows_detail_sections_label()}
         sections={[
           {
             value: 'overview',
-            label: 'Overview',
+            label: m.workflows_detail_tab_overview(),
             content: (
               <div id="overview" tabIndex={-1}>
                 <WorkflowOverview
@@ -352,7 +352,7 @@ export function WorkflowDetailView({
           },
           {
             value: 'activity',
-            label: 'Activity',
+            label: m.workflows_detail_tab_activity(),
             content: (
               <div id="activity" tabIndex={-1} className="workflow-stack">
                 {runs}
@@ -362,7 +362,7 @@ export function WorkflowDetailView({
           },
           {
             value: 'rules',
-            label: 'Rules',
+            label: m.workflows_detail_tab_rules(),
             content: (
               <div id="rules" tabIndex={-1} className="workflow-stack">
                 {DomainControls ? (
@@ -380,10 +380,10 @@ export function WorkflowDetailView({
                         className="workflow-notice"
                       >
                         {!detail.canManage
-                          ? 'You can inspect workflows. Your role doesn’t include Activate playbooks, so you can’t activate or revoke them.'
+                          ? m.workflows_detail_cannot_manage()
                           : !version.compatible
-                            ? 'This version can’t be activated. Technical details list the requirements.'
-                            : 'No connection can run this workflow yet. Repair access in Connections, then review the activation.'}
+                            ? m.workflows_detail_incompatible()
+                            : m.workflows_detail_no_connection()}
                       </Alert>
                     ) : null}
                     {!computation ? (
@@ -412,7 +412,7 @@ export function WorkflowDetailView({
           },
           {
             value: 'technical',
-            label: 'Technical details',
+            label: m.workflows_detail_tab_technical(),
             content: (
               <div id="technical" tabIndex={-1}>
                 <WorkflowTechnical
@@ -439,10 +439,9 @@ export function WorkflowDetailView({
       />
       <Dialog open={activate && detail.canManage} onOpenChange={setActivate}>
         <DialogContent className="workflow-dialog">
-          <DialogTitle>Review activation</DialogTitle>
+          <DialogTitle>{m.workflows_detail_review_activation()}</DialogTitle>
           <DialogDescription>
-            Confirm the exact version, connection, orders and approval behavior
-            before granting access.
+            {m.workflows_detail_activation_description()}
           </DialogDescription>
           <ActivationForm
             key={`${selected}:${activate}`}
@@ -462,15 +461,18 @@ export function WorkflowDetailView({
         }}
       >
         <DialogContent className="workflow-dialog">
-          <DialogTitle>Revoke activation?</DialogTitle>
+          <DialogTitle>{m.workflows_detail_revoke_title()}</DialogTitle>
           <DialogDescription>
-            This stops future runs under this activation. Work already
-            dispatched may still complete. Existing changes are not undone.
+            {m.workflows_detail_revoke_description()}
           </DialogDescription>
-          <p>
-            Version {revoke?.version} · {revoke?.grants.targetIds.length} scoped
-            targets
-          </p>
+          {revoke ? (
+            <p>
+              {m.workflows_detail_revoke_scope({
+                version: revoke.version,
+                count: revoke.grants.targetIds.length,
+              })}
+            </p>
+          ) : null}
           {error ? <p role="alert">{error}</p> : null}
           <div className="workflow-dialog-actions">
             <Button
@@ -478,14 +480,16 @@ export function WorkflowDetailView({
               disabled={pending}
               onClick={() => setRevoke(null)}
             >
-              Cancel
+              {m.common_cancel()}
             </Button>
             <Button
               variant="destructive"
               disabled={pending}
               onClick={() => void revokeSelected()}
             >
-              {pending ? 'Confirming revocation…' : 'Confirm revocation'}
+              {pending
+                ? m.workflows_detail_revoking()
+                : m.workflows_detail_revoke_confirm()}
             </Button>
           </div>
         </DialogContent>

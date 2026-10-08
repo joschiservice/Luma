@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import { LumaMark } from '@luma/ui/components/primitives/brand';
 import { Button } from '@luma/ui/components/primitives/button';
 import { useEffect, useSyncExternalStore } from 'react';
@@ -10,7 +11,8 @@ import {
 import { usesCommandKey } from '../../lib/keyboard';
 
 const subscribePlatform = () => () => undefined;
-const platformModifier = () => (usesCommandKey() ? '⌘' : 'Ctrl');
+const platformModifier = () =>
+  usesCommandKey() ? '⌘' : m.assistant_key_control();
 
 /** Opens and closes the Ask Luma panel with ⌘J or Ctrl J, including from text fields. */
 export function useAssistantShortcut() {
@@ -38,7 +40,7 @@ export function AssistantToggle() {
   const modifier = useSyncExternalStore(
     subscribePlatform,
     platformModifier,
-    () => 'Ctrl',
+    m.assistant_key_control,
   );
 
   return (
@@ -48,14 +50,18 @@ export function AssistantToggle() {
       className="assistant-toggle"
       aria-pressed={open}
       aria-controls="assistant-panel"
-      title={`${open ? 'Close' : 'Ask'} Luma (${modifier} J)`}
+      title={
+        open
+          ? m.assistant_toggle_close_title({ shortcut: `${modifier} J` })
+          : m.assistant_toggle_open_title({ shortcut: `${modifier} J` })
+      }
       onClick={() => setAssistantOpen(!open)}
     >
       <LumaMark
         tone={open ? 'color' : 'mono'}
         className="assistant-toggle-mark"
       />
-      <span className="assistant-toggle-label">Ask Luma</span>
+      <span className="assistant-toggle-label">{m.assistant_title()}</span>
     </Button>
   );
 }

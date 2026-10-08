@@ -1,6 +1,8 @@
 import './fulfillment-recovery.css';
 
 import type { AppUiProps } from '@luma/app-host/web';
+import { formatTime } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Select } from '@luma/ui/components/primitives/select';
 import { StatePill } from '@luma/ui/components/primitives/state';
@@ -8,18 +10,63 @@ import { useEffect, useRef, useState } from 'react';
 import { z } from 'zod/v3';
 
 import {
-  recoveryBlocker,
+  type RecoveryBlockerReason,
+  recoveryBlockerReason,
   type RecoveryChoice,
   recoverySnapshot,
   type RecoveryView,
   recoveryView,
 } from '../domain/fulfillment-recovery.js';
 
+const recoveryBlockerText: Record<RecoveryBlockerReason, () => string> = {
+  write_access: m.shopify_blocker_recovery_write_access,
+  incomplete: m.shopify_blocker_recovery_incomplete,
+  closed: m.shopify_blocker_recovery_closed,
+  not_allowed: m.shopify_blocker_recovery_not_allowed,
+  hold_gone: m.shopify_blocker_recovery_hold_gone,
+  cancellation_pending: m.shopify_blocker_recovery_cancellation_pending,
+  same_location: m.shopify_blocker_recovery_same_location,
+  location_unavailable: m.shopify_blocker_recovery_location_unavailable,
+};
+
 const inspection = z.object({
   snapshot: recoverySnapshot,
   granted: z.array(z.string()),
   runs: z.array(recoveryView),
 });
+
+const actionLabels = {
+  'fulfillment.hold.release': m.shopify_recovery_action_release,
+  'fulfillment.open': m.shopify_recovery_action_open,
+  'fulfillment.move': m.shopify_recovery_action_move,
+} satisfies Record<RecoveryChoice['capability'], () => string>;
+
+const statusLabels: Record<string, () => string> = {
+  OPEN: m.shopify_fulfillment_status_open,
+  ON_HOLD: m.shopify_fulfillment_status_on_hold,
+  IN_PROGRESS: m.shopify_fulfillment_status_in_progress,
+  SCHEDULED: m.shopify_fulfillment_status_scheduled,
+  INCOMPLETE: m.shopify_fulfillment_status_incomplete,
+  CLOSED: m.shopify_fulfillment_status_closed,
+  CANCELLED: m.shopify_fulfillment_status_cancelled,
+};
+
+const holdReasons: Record<string, () => string> = {
+  AWAITING_PAYMENT: m.shopify_hold_reason_awaiting_payment,
+  AWAITING_RETURN_ITEMS: m.shopify_hold_reason_awaiting_return_items,
+  HIGH_RISK_OF_FRAUD: m.shopify_hold_reason_high_risk_of_fraud,
+  INCORRECT_ADDRESS: m.shopify_hold_reason_incorrect_address,
+  INVENTORY_OUT_OF_STOCK: m.shopify_hold_reason_inventory_out_of_stock,
+  ONLINE_STORE_POST_PURCHASE_CROSS_SELL:
+    m.shopify_hold_reason_online_store_post_purchase_cross_sell,
+  UNKNOWN_DELIVERY_DATE: m.shopify_hold_reason_unknown_delivery_date,
+  OTHER: m.shopify_hold_reason_other,
+};
+
+/** Names a Shopify enum value in the reader's language, falling back to Shopify's own wording. */
+function shopifyLabel(labels: Record<string, () => string>, value: string) {
+  return labels[value]?.() ?? value.replaceAll('_', ' ').toLowerCase();
+}
 
 /** Shows a live recovery review with exact targets, separate approval and independent progress checks. */
 export function ShopifyFulfillmentRecovery({
@@ -98,8 +145,7 @@ export function ShopifyFulfillmentRecovery({
                 state: 'denied',
                 canExecute: false,
                 canApprove: false,
-                message:
-                  'This preview expired. Refresh fulfillment details and review a new action.',
+                message: m.shopify_recovery_expired(),
               }
             : current,
         );
@@ -142,7 +188,7 @@ export function ShopifyFulfillmentRecovery({
       if (current === generation.current)
         setError(
           services.uncertain(reason)
-            ? 'The response was interrupted. Refresh to check the saved recovery before trying again.'
+            ? m.shopify_recovery_interrupted()
             : services.error(reason),
         );
     } finally {
@@ -151,21 +197,22 @@ export function ShopifyFulfillmentRecovery({
   }
 
   const snapshot = data?.snapshot;
-  const blocker =
-    snapshot && data ? recoveryBlocker(snapshot, choice, data.granted) : null;
+  const blockerReason =
+    snapshot && data
+      ? recoveryBlockerReason(snapshot, choice, data.granted)
+      : null;
+  const blocker = blockerReason ? recoveryBlockerText[blockerReason]() : null;
 
   return (
     <section
       className="shopify-recovery"
-      aria-label="Fulfillment recovery"
+      aria-label={m.shopify_recovery_title()}
       aria-busy={pending}
     >
       <div className="shopify-recovery-heading">
         <div>
-          <Heading>Fulfillment recovery</Heading>
-          <p className="field-help">
-            Review a precise change, then verify what happened.
-          </p>
+          <Heading>{m.shopify_recovery_title()}</Heading>
+          <p className="field-help">{m.shopify_recovery_help()}</p>
         </div>
         <Button
           variant="ghost"
@@ -173,34 +220,39 @@ export function ShopifyFulfillmentRecovery({
           disabled={pending}
           onClick={() => setRefresh((value) => value + 1)}
         >
-          Refresh recovery
+          {m.shopify_recovery_refresh()}
         </Button>
       </div>
       {error ? <p role="alert">{error}</p> : null}
-      {pending ? <p role="status">Checking recovery…</p> : null}
+      {pending ? <p role="status">{m.shopify_recovery_checking()}</p> : null}
       {snapshot ? (
         <>
           <div className="shopify-recovery-facts">
             <StatePill
               state={snapshot.status === 'ON_HOLD' ? 'attention' : 'idle'}
             >
-              {snapshot.status.replaceAll('_', ' ').toLowerCase()}
+              {shopifyLabel(statusLabels, snapshot.status)}
             </StatePill>
             <span>{snapshot.locationName}</span>
             <span className="field-help">
-              Read {new Date(snapshot.observedAt).toLocaleTimeString()}
+              {m.shopify_recovery_read_at({
+                time: formatTime(snapshot.observedAt),
+              })}
             </span>
           </div>
           <p className="shopify-source-id">{fulfillmentOrderId}</p>
           {data && data.runs.length > 1 ? (
             <label>
-              Saved recoveries
+              {m.shopify_recovery_saved_label()}
               <Select
-                aria-label="Saved recoveries"
+                aria-label={m.shopify_recovery_saved_label()}
                 value={review?.id ?? null}
                 options={data.runs.map((run) => ({
                   value: run.id,
-                  label: `${run.choice.capability === 'fulfillment.hold.release' ? 'Release hold' : run.choice.capability === 'fulfillment.move' ? 'Move fulfillment' : 'Reopen fulfillment'} · ${new Date(run.before.observedAt).toLocaleTimeString()}`,
+                  label: m.shopify_recovery_saved_option({
+                    action: actionLabels[run.choice.capability](),
+                    time: formatTime(run.before.observedAt),
+                  }),
                 }))}
                 onValueChange={(id) =>
                   setReview(data.runs.find((run) => run.id === id) ?? null)
@@ -218,21 +270,17 @@ export function ShopifyFulfillmentRecovery({
           ) : (
             <>
               <label>
-                Recovery action
+                {m.shopify_recovery_action_label()}
                 <Select
-                  aria-label="Recovery action"
+                  aria-label={m.shopify_recovery_action_label()}
                   value={choice.capability}
-                  options={[
-                    {
-                      value: 'fulfillment.hold.release',
-                      label: 'Release one hold',
-                    },
-                    { value: 'fulfillment.open', label: 'Reopen fulfillment' },
-                    {
-                      value: 'fulfillment.move',
-                      label: 'Move remaining items',
-                    },
-                  ]}
+                  options={(
+                    [
+                      'fulfillment.hold.release',
+                      'fulfillment.open',
+                      'fulfillment.move',
+                    ] as const
+                  ).map((value) => ({ value, label: actionLabels[value]() }))}
                   onValueChange={(value) => {
                     requestId.current = null;
                     if (value === 'fulfillment.hold.release')
@@ -256,14 +304,17 @@ export function ShopifyFulfillmentRecovery({
               </label>
               {choice.capability === 'fulfillment.hold.release' ? (
                 <label>
-                  Hold to release
+                  {m.shopify_recovery_hold_label()}
                   <Select
-                    aria-label="Hold to release"
+                    aria-label={m.shopify_recovery_hold_label()}
                     value={choice.holdId || null}
-                    placeholder="No holds available"
+                    placeholder={m.shopify_recovery_hold_none()}
                     options={snapshot.holds.map((hold) => ({
                       value: hold.id,
-                      label: `${hold.reason.replaceAll('_', ' ').toLowerCase()} · ${hold.id.split('/').at(-1)}`,
+                      label: m.shopify_recovery_hold_option({
+                        reason: shopifyLabel(holdReasons, hold.reason),
+                        hold: hold.id.split('/').at(-1) ?? hold.id,
+                      }),
                     }))}
                     onValueChange={(holdId) => {
                       if (holdId) {
@@ -277,17 +328,17 @@ export function ShopifyFulfillmentRecovery({
                     disabled={pending}
                   />
                   <span className="field-help">
-                    Only this hold will be released. Other holds stay in place.
+                    {m.shopify_recovery_hold_help()}
                   </span>
                 </label>
               ) : null}
               {choice.capability === 'fulfillment.move' ? (
                 <label>
-                  Destination
+                  {m.shopify_recovery_destination_label()}
                   <Select
-                    aria-label="Destination"
+                    aria-label={m.shopify_recovery_destination_label()}
                     value={choice.locationId || null}
-                    placeholder="No eligible locations"
+                    placeholder={m.shopify_recovery_destination_none()}
                     options={snapshot.locations.map((location) => ({
                       value: location.id,
                       label: location.name,
@@ -307,8 +358,7 @@ export function ShopifyFulfillmentRecovery({
                     disabled={pending}
                   />
                   <span className="field-help">
-                    Move all remaining items. Already fulfilled items stay at
-                    their original location.
+                    {m.shopify_recovery_destination_help()}
                   </span>
                 </label>
               ) : null}
@@ -322,7 +372,7 @@ export function ShopifyFulfillmentRecovery({
                 disabled={pending || !!blocker}
                 onClick={() => void command('preview')}
               >
-                Preview recovery
+                {m.shopify_recovery_preview()}
               </Button>
             </>
           )}
@@ -337,7 +387,7 @@ export function ShopifyFulfillmentRecovery({
                 setRefresh((value) => value + 1);
               }}
             >
-              Review another action
+              {m.shopify_recovery_review_another()}
             </Button>
           ) : null}
         </>
@@ -361,10 +411,17 @@ function RecoveryReview({
   const choice = review.choice;
   const description =
     choice.capability === 'fulfillment.hold.release'
-      ? `Release hold ${choice.holdId.split('/').at(-1)} only`
+      ? m.shopify_recovery_describe_release({
+          hold: choice.holdId.split('/').at(-1) ?? choice.holdId,
+        })
       : choice.capability === 'fulfillment.move'
-        ? `Move remaining items to ${review.before.locations.find((location) => location.id === choice.locationId)?.name ?? choice.locationId}`
-        : 'Mark this fulfillment order as open';
+        ? m.shopify_recovery_describe_move({
+            location:
+              review.before.locations.find(
+                (location) => location.id === choice.locationId,
+              )?.name ?? choice.locationId,
+          })
+        : m.shopify_recovery_describe_open();
 
   return (
     <div className="shopify-recovery-review" aria-live="polite">
@@ -374,7 +431,7 @@ function RecoveryReview({
           <StatePill
             state={review.state === 'approval_required' ? 'approval' : 'idle'}
           >
-            Review & approval
+            {m.shopify_recovery_stage_review()}
           </StatePill>
         </li>
         <li>
@@ -388,10 +445,10 @@ function RecoveryReview({
             }
           >
             {review.acceptance === 'accepted'
-              ? 'Shopify accepted'
+              ? m.shopify_recovery_stage_accepted()
               : review.acceptance === 'unknown'
-                ? 'Acceptance uncertain'
-                : 'Not sent to Shopify'}
+                ? m.shopify_recovery_stage_unclear()
+                : m.shopify_recovery_stage_not_sent()}
           </StatePill>
         </li>
         <li>
@@ -399,16 +456,15 @@ function RecoveryReview({
             state={review.state === 'verified' ? 'verified' : 'waiting'}
           >
             {review.state === 'verified'
-              ? 'Progress verified'
-              : 'Progress not verified'}
+              ? m.shopify_recovery_stage_verified()
+              : m.shopify_recovery_stage_not_verified()}
           </StatePill>
         </li>
       </ol>
       <p>{review.message}</p>
       {review.acceptance === 'not_sent' ? (
         <p className="field-help">
-          Preview expires {new Date(review.expiresAt).toLocaleTimeString()}.
-          Changes in Shopify require a fresh review.
+          {m.shopify_recovery_expires({ time: formatTime(review.expiresAt) })}
         </p>
       ) : null}
       <div className="shopify-recovery-controls">
@@ -418,20 +474,20 @@ function RecoveryReview({
               disabled={pending}
               onClick={() => void command('approve', 'approved')}
             >
-              Approve action
+              {m.shopify_recovery_approve()}
             </Button>
             <Button
               variant="outline"
               disabled={pending}
               onClick={() => void command('approve', 'rejected')}
             >
-              Reject
+              {m.shopify_recovery_reject()}
             </Button>
           </>
         ) : null}
         {review.canExecute ? (
           <Button disabled={pending} onClick={() => void command('execute')}>
-            Run approved action
+            {m.shopify_recovery_send()}
           </Button>
         ) : null}
         <Button
@@ -440,8 +496,8 @@ function RecoveryReview({
           onClick={() => void command('check')}
         >
           {review.acceptance === 'not_sent'
-            ? 'Check approval'
-            : 'Check fulfillment progress'}
+            ? m.shopify_recovery_check_approval()
+            : m.shopify_recovery_check_progress()}
         </Button>
       </div>
     </div>

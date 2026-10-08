@@ -34,7 +34,7 @@ describe('coverageSummary', () => {
       ),
     ).toEqual({
       state: 'running',
-      text: 'Importing from 2 of 3 sources (0–8%) · list is incomplete · synced 30s ago',
+      text: 'Importing from 2 of 3 sources (0–8%) · list is incomplete · synced 30 seconds ago',
     });
   });
 
@@ -48,7 +48,7 @@ describe('coverageSummary', () => {
         now,
       ).text,
     ).toBe(
-      'Importing from 1 of 2 sources (40%) · older history importing from 1 of 2 sources · list is incomplete · synced 30s ago',
+      'Importing from 1 of 2 sources (40%) · older history importing from 1 of 2 sources · list is incomplete · synced 30 seconds ago',
     );
   });
 
@@ -63,7 +63,7 @@ describe('coverageSummary', () => {
       ),
     ).toEqual({
       state: 'error',
-      text: 'JTL-Wawi: failing · importing from 1 of 2 sources · list is incomplete · synced 30s ago',
+      text: 'JTL-Wawi: Failing · importing from 1 of 2 sources · list is incomplete · synced 30 seconds ago',
     });
   });
 
@@ -81,7 +81,7 @@ describe('coverageSummary', () => {
       ),
     ).toEqual({
       state: 'verified',
-      text: 'All 2 sources imported · history since Jul 31, 2026 · synced 1h ago',
+      text: 'All 2 sources imported · history since 31 Jul 2026 · synced 1 hour ago',
     });
     expect(
       coverageSummary(
@@ -89,7 +89,7 @@ describe('coverageSummary', () => {
         now,
       ).text,
     ).toBe(
-      'All 2 sources imported · history limited on 1 source · synced 30s ago',
+      'All 2 sources imported · history limited on 1 source · synced 30 seconds ago',
     );
   });
 });

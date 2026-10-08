@@ -4,6 +4,7 @@ import {
   type InstalledConnection,
   installedConnectionSchema,
 } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import { queryOptions } from '@tanstack/react-query';
 
 import { createWebApiClient } from '../../lib/api-client';
@@ -84,17 +85,12 @@ export async function changeConnection(
 /** Returns actionable connection feedback without exposing provider responses or credentials. */
 export function connectionError(error: unknown) {
   const status = error instanceof IdentityError ? error.status : 0;
-  if (status === 401) return 'Your session expired. Sign in again.';
-  if (status === 403)
-    return 'Permission denied. Your role doesn’t include Manage connections.';
-  if (status === 404)
-    return 'This connection is no longer available. Refresh the list.';
-  if (status === 409)
-    return 'This connection changed. Refresh the list before trying again.';
-  if (status === 400 || status === 422)
-    return 'Check the connection details and enter the credentials again.';
-  if (status === 503)
-    return 'Connection service unavailable. Ask your administrator to check the provider setup, then refresh.';
+  if (status === 401) return m.connections_error_session();
+  if (status === 403) return m.connections_error_forbidden();
+  if (status === 404) return m.connections_error_missing();
+  if (status === 409) return m.connections_error_conflict();
+  if (status === 400 || status === 422) return m.connections_error_invalid();
+  if (status === 503) return m.connections_error_unavailable();
 
-  return 'The result could not be confirmed. Refresh the list before trying again.';
+  return m.connections_error_unknown();
 }

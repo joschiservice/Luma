@@ -1,0 +1,83 @@
+---
+title: Workspace-Einstellungen verwalten
+description: Ändern Sie Name und Zeitzone des Workspace, laden Sie Ihr Team ein und verwalten Sie es, legen Sie Genehmigungsregeln fest und wählen Sie Benachrichtigungen, Sprache und Anordnung.
+---
+
+**Einstellungen** hat zwei Gruppen. **Workspace**-Einstellungen gelten für alle im Workspace: **Workspace**, **Team**, **Rollen** und **Genehmigungen**. **Persönlich**-Einstellungen gelten nur für Sie: **Sicherheit**, **Benachrichtigungen**, **Sprache & Darstellung** und **Start & Seitenleiste**. Mit **G**, dann **S** öffnen Sie die Einstellungen.
+
+Alle können die Workspace-Bereiche ansehen. Kann Ihre Rolle einen Bereich nicht ändern, steht dort, welche Berechtigung Sie brauchen.
+
+## Workspace [#workspace]
+
+Ändern Sie **Name des Workspace** und **Zeitzone** und wählen Sie dann **Änderungen speichern**. Dafür brauchen Sie **Workspace-Einstellungen bearbeiten**. Der Name erscheint in der Navigation und beim Wechseln des Workspace. Luma zeigt Datum und Uhrzeit in diesem Workspace für alle in seiner Zeitzone.
+
+**Workspace-Kennung** und **Datenregion** können nicht geändert werden. Die Daten des Workspace werden in der Europäischen Union gespeichert.
+
+Konnte Luma nicht bestätigen, ob eine Änderung gespeichert wurde, wählen Sie **Status prüfen und erneut versuchen**, bevor Sie etwas anderes ändern.
+
+## Team [#team]
+
+**Team** listet alle mit Zugriff auf diesen Workspace und ihre Rolle. Um Personen einzuladen oder ihren Zugriff zu ändern, brauchen Sie **Mitglieder verwalten**.
+
+### Person einladen [#invite-someone]
+
+1. Wählen Sie **Person einladen**.
+2. Geben Sie die E-Mail-Adresse ein und wählen Sie eine Rolle.
+3. Wählen Sie **Einladung senden**.
+
+Luma sendet einen persönlichen Link per E-Mail. Der Zugriff beginnt, wenn die Person annimmt, angemeldet mit dieser E-Mail-Adresse. Mit einer Einladung kann niemand Inhaber werden; ein Inhaber kann die Rolle nach dem Beitritt ändern.
+
+Offene Einladungen stehen unter **Einladungen** mit ihrem Status, etwa **E-Mail gesendet. Annahme ausstehend.** oder **E-Mail nicht zugestellt. Senden Sie die Einladung erneut.** Einladungen laufen nach 7 Tagen ab.
+
+- **Erneut senden** sendet einen neuen Link. Der frühere Link funktioniert dann nicht mehr.
+- **Widerrufen** storniert die Einladung. Der Link funktioniert sofort nicht mehr.
+- **Erneut einladen** sendet eine neue Einladung, nachdem eine abgelaufen ist.
+
+Ist dieser Luma-Server nicht für den E-Mail-Versand eingerichtet, können Sie niemanden einladen. Bitten Sie die Person, die Luma für Sie betreibt, den E-Mail-Versand einzurichten.
+
+### Rolle ändern oder Zugriff entfernen [#change-someones-role-or-remove-access]
+
+Wählen Sie **⋯** neben der Person, um **Zugriff verwalten** zu öffnen. Wählen Sie eine Rolle und dann **Rolle speichern**, oder wählen Sie **Zugriff entfernen**.
+
+- Eine neue Rolle gilt ab der nächsten Aktion der Person in Luma.
+- Sie können nur Rollen zuweisen, deren Berechtigungen Ihre eigene Rolle enthält.
+- Nur Inhaber können jemanden zum Inhaber machen oder einen anderen Inhaber ändern.
+- Jeder Workspace braucht einen Inhaber. Machen Sie zuerst jemand anderen zum Inhaber, bevor Sie den einzigen ändern oder entfernen.
+
+## Rollen [#roles]
+
+**Rollen** zeigt, was jede Rolle erlaubt, und hier erstellen Sie eigene Rollen. Siehe [Rollen und Berechtigungen](/docs/roles-and-permissions).
+
+## Genehmigungen [#approvals]
+
+**Genehmigungen** legt fest, wann eine Änderung eine zweite Person braucht, bevor Luma sie vornimmt. Zum Ändern brauchen Sie **Genehmigungsregeln verwalten**.
+
+- **Standard-Genehmigungsregeln**: Erlaubte Änderungen mit geringem Risiko werden direkt ausgeführt. Änderungen mit höherem Risiko brauchen die Genehmigung einer anderen Person.
+- **Immer Genehmigung verlangen**: Jede Änderung, die sonst erlaubt wäre, braucht die Genehmigung einer anderen Person, auch bei geringem Risiko.
+
+In beiden Fällen listet **Gilt immer**, was sich nie ändert: Genehmigungen, die Luma immer verlangt, und Aktionen, die Luma nie zulässt; die aktuellen Berechtigungen jeder Person, erneut geprüft, bevor eine Änderung ausgeführt wird; und die Genehmigung durch eine andere Person als die anfragende mit anschließender erneuter Prüfung des Ergebnisses. Diese Einstellung kann die Regeln nur strenger machen.
+
+Genehmigen können Personen, deren Rolle **Änderungen genehmigen oder ablehnen** enthält. Ändern Sie diese Einstellung, müssen bereits offene Prüfungen aktualisiert werden, bevor ihre Änderungen ausgeführt werden können.
+
+## Sicherheit [#security]
+
+**Sicherheit** enthält Ihre Anmeldeeinstellungen: Zwei-Faktor-Authentifizierung, Backup-Codes und Passkeys. Sie gelten für Ihr Konto in jedem Workspace. Siehe [Anmeldung absichern](/docs/account-security).
+
+## Benachrichtigungen [#notifications]
+
+Wählen Sie, welche E-Mails Luma Ihnen zu diesem Workspace sendet:
+
+- **Probleme, die auf Sie warten**: Ein Problem braucht Ihre Genehmigung, einen manuellen Schritt oder einen Blick auf Nachweise, die Luma nicht bestätigen konnte.
+- **Verbindungsprobleme**: Ein verbundenes System antwortet nicht zuverlässig oder sein Zugriff wurde widerrufen.
+
+Wenn Sie eine Benachrichtigung einschalten, sendet Luma keine E-Mails zu früheren Ereignissen. „Wartet auf Sie“ und Start zeigen Arbeit, die Ihre Aufmerksamkeit braucht, unabhängig von dieser Auswahl.
+
+Unter **E-Mail-Versand testen** wählen Sie **Test-E-Mail senden**, um zu prüfen, ob E-Mails Sie erreichen. **Test-E-Mail zum Versand angenommen** heißt, dass der Mailserver die E-Mail übernommen hat, nicht dass sie angekommen ist; bis sie in Ihrem Posteingang ist, kann es einige Minuten dauern. Sehen Sie **E-Mail-Versand ist nicht eingerichtet**, kann dieser Luma-Server noch keine E-Mails senden. Ihre Auswahl wird gespeichert und gilt, sobald der Versand eingerichtet ist.
+
+## Sprache & Darstellung [#language--appearance]
+
+Wählen Sie **Sprache** und **Design** (**System**, **Hell** oder **Dunkel**) und ob Sie die **Seitenleiste einklappen** möchten. Diese Auswahl gilt für dieses Gerät. Zum Umstellen der Sprache lädt Luma die Seite neu. Siehe [Sprache ändern](/docs/navigation#change-the-language).
+
+## Start & Seitenleiste [#home--sidebar]
+
+Wählen Sie, welche **Module auf Start** erscheinen, in welcher Reihenfolge und in welcher Breite, oder wählen Sie **Auf Standard zurücksetzen**. Unter **Angeheftete Seiten** benennen Sie die Seiten in Ihrer Seitenleiste um, ordnen sie neu oder lösen sie; Sie können bis zu 12 anheften. Nur Sie sehen diese Auswahl, und sie gehört zu diesem Workspace. Siehe [Startseite anpassen](/docs/home#customize-home) und [Seite anheften](/docs/navigation#pin-a-page).

@@ -1,9 +1,10 @@
 import type { CaseSummary } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 
 /** Renders the inspector title, retaining the complete text for truncated headings. */
 export function IssuePanelHeading({
   item,
-  fallback = 'Loading issue…',
+  fallback = m.issues_loading_issue(),
 }: {
   item?: CaseSummary | undefined;
   fallback?: string;

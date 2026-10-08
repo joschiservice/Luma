@@ -124,9 +124,7 @@ test('starts a scoped native workflow, preserves uncertain retries and cancels a
   expect(await form.getByLabel('order ID').isDisabled()).toBe(true);
   await form.getByRole('button', { name: 'Retry same request' }).click();
   await form
-    .getByText(
-      'Run started. Review its evidence and admission status in Recent runs.',
-    )
+    .getByText('Run started. Follow its progress and approvals in Recent runs.')
     .waitFor();
   expect(
     (

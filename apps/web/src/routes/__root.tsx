@@ -1,3 +1,4 @@
+import { getLocale } from '@luma/i18n/runtime';
 import type { QueryClient } from '@tanstack/react-query';
 import {
   createRootRouteWithContext,
@@ -32,7 +33,7 @@ function Root() {
   useEffect(() => watchTheme(), []);
 
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang={getLocale()} suppressHydrationWarning>
       <head>
         <HeadContent />
         <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />

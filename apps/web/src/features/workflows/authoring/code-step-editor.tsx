@@ -4,6 +4,7 @@ import type {
   WorkflowDiagnostic,
   WorkflowDraftContent,
 } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import type { CodeEditorCompletion } from '@luma/ui/components/primitives/code-editor';
@@ -22,32 +23,20 @@ import { Field, FieldListEditor, FieldProblems } from './step-forms';
 
 type CodeStep = Extract<DraftStep, { kind: 'code' }>;
 
-const unsupported: [RegExp, string][] = [
-  [
-    /^\s*import\b|\bimport\s*\(/m,
-    'Imports aren’t supported. Code Steps can’t load packages.',
-  ],
-  [
-    /^\s*export\b/m,
-    'Remove export. Declare function main(input, luma) instead.',
-  ],
-  [
-    /\basync\b|\bawait\b/,
-    'Async code isn’t supported. Code Steps run synchronously.',
-  ],
-  [
-    /\brequire\s*\(/,
-    'require() isn’t supported. Code Steps can’t load packages.',
-  ],
+const unsupported: [RegExp, () => string][] = [
+  [/^\s*import\b|\bimport\s*\(/m, m.authoring_code_step_no_imports],
+  [/^\s*export\b/m, m.authoring_code_step_no_export],
+  [/\basync\b|\bawait\b/, m.authoring_code_step_no_async],
+  [/\brequire\s*\(/, m.authoring_code_step_no_require],
 ];
 
 /** Flags features Code Steps never support, before the source is saved. */
 export function unsupportedFeatures(source: string) {
   const found = unsupported
     .filter(([pattern]) => pattern.test(source))
-    .map(([, message]) => message);
+    .map(([, message]) => message());
   if (!/\bfunction\s+main\s*\(/.test(source))
-    found.push('Declare a function named main(input, luma).');
+    found.push(m.authoring_code_step_needs_main());
 
   return found;
 }
@@ -68,10 +57,14 @@ export function codeStepCompletions(
     })),
     ...grants.map((grant) => ({
       label: `luma.request('${grant}')`,
-      detail: 'granted step',
+      detail: m.authoring_code_step_completion_grant(),
       type: 'function' as const,
     })),
-    { label: 'luma.now', detail: 'run start time', type: 'property' as const },
+    {
+      label: 'luma.now',
+      detail: m.authoring_code_step_completion_now(),
+      type: 'property' as const,
+    },
   ];
 }
 
@@ -127,13 +120,14 @@ export function CodeStepEditor({
   return (
     <Dialog open onOpenChange={(open) => !open && close()}>
       <DialogContent className="workflow-dialog authoring-code-dialog">
-        <DialogTitle>Code Step “{step.id}”</DialogTitle>
+        <DialogTitle>
+          {m.authoring_code_step_title({ step: step.id })}
+        </DialogTitle>
         <DialogDescription>
-          Write a synchronous main(input, luma) function that returns the
-          declared fields. It runs in a sandbox with no network or packages.
+          {m.authoring_code_step_description()}
         </DialogDescription>
         <LazyCodeEditor
-          label="TypeScript source"
+          label={m.authoring_code_step_source_label()}
           value={draft.source}
           readOnly={readOnly}
           onChange={(source) => setDraft((current) => ({ ...current, source }))}
@@ -162,7 +156,7 @@ export function CodeStepEditor({
         />
         <div className="authoring-code-columns">
           <div>
-            <h3>Available as input</h3>
+            <h3>{m.authoring_code_step_inputs_title()}</h3>
             {scope.length ? (
               <ul className="authoring-code-inputs">
                 {scope.map((item) => (
@@ -178,12 +172,12 @@ export function CodeStepEditor({
               </ul>
             ) : (
               <p className="authoring-hint">
-                No inputs or earlier outputs yet.
+                {m.authoring_code_step_inputs_empty()}
               </p>
             )}
           </div>
           <FieldListEditor
-            label="Returned fields"
+            label={m.authoring_code_step_returns_label()}
             fields={draft.fields as Record<string, FieldType>}
             disabled={readOnly}
             onChange={(fields) =>
@@ -192,11 +186,10 @@ export function CodeStepEditor({
           />
         </div>
         <fieldset className="authoring-choices">
-          <legend>Steps this code may request</legend>
+          <legend>{m.authoring_code_step_grants_legend()}</legend>
           {available.length ? null : (
             <p className="authoring-hint">
-              Put a read or action right after this Code Step to let it request
-              one.
+              {m.authoring_code_step_grants_empty()}
             </p>
           )}
           {available.map((grant) => (
@@ -221,7 +214,7 @@ export function CodeStepEditor({
             </label>
           ))}
         </fieldset>
-        <Field label="Time limit in milliseconds">
+        <Field label={m.authoring_code_step_time_limit()}>
           {(props) => (
             <Input
               {...props}
@@ -248,7 +241,7 @@ export function CodeStepEditor({
         })}
         <div className="workflow-dialog-actions">
           <Button variant="outline" onClick={close}>
-            {readOnly ? 'Close' : 'Cancel'}
+            {readOnly ? m.common_close() : m.common_cancel()}
           </Button>
           {!readOnly ? (
             <Button
@@ -266,7 +259,7 @@ export function CodeStepEditor({
                 })
               }
             >
-              Apply to draft
+              {m.authoring_code_step_apply()}
             </Button>
           ) : null}
         </div>

@@ -5,6 +5,7 @@ import {
   caseReviewSchema,
   decisionReceiptSchema,
 } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 
 import { createWebApiClient } from '../../lib/api-client';
 import { IdentityError } from '../identity/data';
@@ -22,7 +23,7 @@ export function decisionCommand(
   commandId = crypto.randomUUID(),
 ): CaseDecision {
   if (!review.permittedDecisions.includes(kind))
-    throw new Error('This decision is no longer permitted.');
+    throw new Error(m.exceptions_decision_not_permitted());
   const common = {
     commandId,
     kind,
@@ -33,7 +34,7 @@ export function decisionCommand(
   if (kind === 'escalate') return caseDecisionSchema.parse(common);
   const proposal = review.proposal;
   if (!proposal?.policy)
-    throw new Error('A current proposal and policy result are required.');
+    throw new Error(m.exceptions_decision_needs_proposal());
 
   return caseDecisionSchema.parse({
     ...common,
@@ -82,19 +83,14 @@ export async function recoverDecision(
  */
 export function decisionError(error: unknown) {
   if (error instanceof IdentityError) {
-    if (error.status === 401)
-      return 'Your session expired. Sign in again to review this case.';
-    if (error.status === 403)
-      return 'You no longer have permission to make this decision.';
-    if (error.status === 404)
-      return 'This case or decision is no longer available.';
-    if (error.status === 409)
-      return 'The proposal or case changed. Review the current state before deciding again.';
-    if (error.status === 400)
-      return 'The decision could not be accepted. Review the reason and current proposal.';
+    if (error.status === 401) return m.exceptions_decision_error_session();
+    if (error.status === 403) return m.exceptions_decision_error_permission();
+    if (error.status === 404) return m.exceptions_decision_error_missing();
+    if (error.status === 409) return m.exceptions_decision_error_conflict();
+    if (error.status === 400) return m.exceptions_decision_error_invalid();
   }
 
-  return 'The decision result is uncertain. Current state is being refreshed. Check the recorded decision before taking another action.';
+  return m.exceptions_decision_error_unclear();
 }
 
 /** Checks current source facts without recording a decision or executing the proposal. */
@@ -102,8 +98,7 @@ export async function refreshResolution(
   organizationId: string,
   exceptionId: string,
 ) {
-  const unavailable =
-    'We couldn’t check the latest conditions. Nothing was approved. Try again shortly.';
+  const unavailable = m.exceptions_refresh_unavailable();
   const result = await api.caseDesk
     .refresh({ params: { organizationId, exceptionId }, body: {} })
     .catch(() => {

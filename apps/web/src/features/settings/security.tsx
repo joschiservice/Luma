@@ -1,3 +1,5 @@
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -40,7 +42,7 @@ export const passkeysOptions = () =>
 
       return result.data.map((passkey) => ({
         id: passkey.id,
-        name: passkey.name?.trim() || 'Passkey',
+        name: passkey.name?.trim() || m.settings_security_passkey_fallback(),
         createdAt: passkey.createdAt
           ? new Date(passkey.createdAt).toISOString()
           : undefined,
@@ -61,34 +63,33 @@ export function SecuritySettings({ disabled }: { disabled: boolean }) {
   return (
     <section>
       <SectionHeading
-        title="Security"
-        description="How you sign in. These settings apply to your account in every workspace."
-        badge="Your account"
+        title={m.settings_security_title()}
+        description={m.settings_security_description()}
+        badge={m.settings_security_badge()}
       />
       <div className="settings-panel">
         <div className="settings-panel-heading">
           <div>
-            <h3>Authenticator app</h3>
-            <p>
-              After your password, Luma asks for a 6-digit code from an app such
-              as 1Password, Google Authenticator or Microsoft Authenticator.
-            </p>
+            <h3>{m.settings_security_totp_title()}</h3>
+            <p>{m.settings_security_totp_description()}</p>
           </div>
           {session.data ? (
             <Badge tone={enabled ? 'success' : 'neutral'}>
-              {enabled ? 'On' : 'Off'}
+              {enabled ? m.settings_security_on() : m.settings_security_off()}
             </Badge>
           ) : null}
         </div>
         <div className="settings-preference">
           <span>
             <strong>
-              {enabled ? 'Two-factor authentication is on' : 'Not set up'}
+              {enabled
+                ? m.settings_security_totp_enabled()
+                : m.settings_security_totp_not_set_up()}
             </strong>
             <span>
               {enabled
-                ? 'Keep your backup codes safe. You can use each one once if your device isn’t available.'
-                : 'Add a second step so a password alone can’t open your account.'}
+                ? m.settings_security_totp_enabled_help()
+                : m.settings_security_totp_disabled_help()}
             </span>
           </span>
           <div className="settings-security-actions">
@@ -99,14 +100,14 @@ export function SecuritySettings({ disabled }: { disabled: boolean }) {
                   disabled={disabled}
                   onClick={() => setFlow('regenerate')}
                 >
-                  New backup codes
+                  {m.settings_security_new_codes()}
                 </Button>
                 <Button
                   variant="outline"
                   disabled={disabled}
                   onClick={() => setFlow('disable')}
                 >
-                  Turn off
+                  {m.settings_security_turn_off()}
                 </Button>
               </>
             ) : (
@@ -114,7 +115,7 @@ export function SecuritySettings({ disabled }: { disabled: boolean }) {
                 disabled={disabled || !session.data}
                 onClick={() => setFlow('enable')}
               >
-                Set up
+                {m.settings_security_set_up()}
               </Button>
             )}
           </div>
@@ -167,22 +168,25 @@ function PasskeySettings({ disabled }: { disabled: boolean }) {
           tone: 'danger',
           text:
             code === 'SESSION_NOT_FRESH'
-              ? 'For your security, sign out and sign in again before adding a passkey.'
+              ? m.settings_security_passkey_not_fresh()
               : code === 'ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED'
-                ? 'This device or password manager already has a passkey for your account.'
+                ? m.settings_security_passkey_duplicate()
                 : result.error.status >= 500
-                  ? 'The passkey couldn’t be saved. Try again.'
-                  : 'Passkey setup was cancelled or timed out.',
+                  ? m.settings_security_passkey_save_failed()
+                  : m.settings_security_passkey_canceled(),
         });
 
         return;
       }
       setName('');
-      setMessage({ tone: 'success', text: 'Passkey added.' });
+      setMessage({
+        tone: 'success',
+        text: m.settings_security_passkey_added(),
+      });
     } catch {
       setMessage({
         tone: 'danger',
-        text: 'We couldn’t reach the service. Check your connection and try again.',
+        text: m.settings_security_unreachable(),
       });
     } finally {
       setPending(false);
@@ -194,18 +198,16 @@ function PasskeySettings({ disabled }: { disabled: boolean }) {
     <div className="settings-panel">
       <div className="settings-panel-heading">
         <div>
-          <h3>Passkeys</h3>
-          <p>
-            Sign in with your fingerprint, face, device PIN or a security key
-            instead of your password. Signing in with a passkey skips the code
-            step.
-          </p>
+          <h3>{m.settings_security_passkeys_title()}</h3>
+          <p>{m.settings_security_passkeys_description()}</p>
         </div>
         {passkeys.data ? (
           <Badge tone={passkeys.data.length ? 'success' : 'neutral'}>
             {passkeys.data.length
-              ? `${passkeys.data.length} added`
-              : 'None added'}
+              ? m.settings_security_passkeys_count({
+                  count: passkeys.data.length,
+                })
+              : m.settings_security_passkeys_none()}
           </Badge>
         ) : null}
       </div>
@@ -213,20 +215,23 @@ function PasskeySettings({ disabled }: { disabled: boolean }) {
         <div className="settings-security-row">
           <Alert tone="danger" role="alert">
             {passkeys.data
-              ? 'Passkeys could not be refreshed. This list may be out of date.'
-              : 'Passkeys could not be loaded.'}{' '}
+              ? m.settings_security_passkeys_stale()
+              : m.settings_security_passkeys_failed()}{' '}
             <Button variant="outline" onClick={() => void passkeys.refetch()}>
-              Retry
+              {m.common_retry()}
             </Button>
           </Alert>
         </div>
       ) : null}
       {passkeys.isPending ? (
         <p className="settings-note settings-security-row" role="status">
-          Loading passkeys…
+          {m.settings_security_passkeys_loading()}
         </p>
       ) : !passkeys.data ? null : passkeys.data.length ? (
-        <ul className="settings-passkeys" aria-label="Your passkeys">
+        <ul
+          className="settings-passkeys"
+          aria-label={m.settings_security_passkeys_list()}
+        >
           {passkeys.data.map((passkey) => (
             <li key={passkey.id} className="settings-member">
               <span className="settings-avatar" aria-hidden="true">
@@ -235,32 +240,37 @@ function PasskeySettings({ disabled }: { disabled: boolean }) {
               <span className="settings-member-identity">
                 <strong>{passkey.name}</strong>
                 <span>
-                  {passkey.synced ? 'Synced passkey' : 'Device-bound passkey'}
-                  {passkey.createdAt ? (
-                    <>
-                      {' · Added '}
-                      <WorkspaceDate value={passkey.createdAt} />
-                    </>
-                  ) : null}
+                  {passkey.createdAt
+                    ? rich(
+                        passkey.synced
+                          ? m.settings_security_passkey_synced_added
+                          : m.settings_security_passkey_device_added,
+                        { date: <WorkspaceDate value={passkey.createdAt} /> },
+                      )
+                    : passkey.synced
+                      ? m.settings_security_passkey_synced()
+                      : m.settings_security_passkey_device()}
                 </span>
               </span>
               <Button
                 variant="ghost"
                 size="sm"
                 disabled={disabled}
-                aria-label={`Remove ${passkey.name}`}
+                aria-label={m.settings_security_passkey_remove_label({
+                  name: passkey.name,
+                })}
                 onClick={() =>
                   setRemoving({ id: passkey.id, name: passkey.name })
                 }
               >
-                Remove
+                {m.common_remove()}
               </Button>
             </li>
           ))}
         </ul>
       ) : (
         <p className="settings-note settings-security-row">
-          No passkeys yet. Add one on each device you sign in from.
+          {m.settings_security_passkeys_empty()}
         </p>
       )}
       {supported ? (
@@ -271,8 +281,10 @@ function PasskeySettings({ disabled }: { disabled: boolean }) {
             void add();
           }}
         >
-          <label htmlFor={nameId}>Name (optional)</label>
-          <p>Helps you recognize it later, for example “Work laptop”.</p>
+          <label htmlFor={nameId}>
+            {m.settings_security_passkey_name_label()}
+          </label>
+          <p>{m.settings_security_passkey_name_help()}</p>
           <div className="settings-passkey-add">
             <Input
               id={nameId}
@@ -283,7 +295,9 @@ function PasskeySettings({ disabled }: { disabled: boolean }) {
               onChange={(event) => setName(event.target.value)}
             />
             <Button type="submit" disabled={disabled || pending}>
-              {pending ? 'Waiting for your device…' : 'Add passkey'}
+              {pending
+                ? m.settings_security_passkey_waiting()
+                : m.settings_security_passkey_add()}
             </Button>
           </div>
           {message ? (
@@ -298,8 +312,7 @@ function PasskeySettings({ disabled }: { disabled: boolean }) {
       ) : (
         <div className="settings-security-row">
           <Alert tone="neutral">
-            This browser can’t create passkeys. Use a current version of Chrome,
-            Edge, Firefox or Safari.
+            {m.settings_security_passkey_unsupported()}
           </Alert>
         </div>
       )}
@@ -307,7 +320,10 @@ function PasskeySettings({ disabled }: { disabled: boolean }) {
         passkey={removing}
         onClose={() => setRemoving(null)}
         onRemoved={(removed) =>
-          setMessage({ tone: 'success', text: `${removed} removed.` })
+          setMessage({
+            tone: 'success',
+            text: m.settings_security_passkey_removed({ name: removed }),
+          })
         }
       />
     </div>
@@ -334,16 +350,14 @@ function RemovePasskeyDialog({
     try {
       const result = await auth.passkey.deletePasskey({ id: passkey.id });
       if (result.error) {
-        setError('The passkey couldn’t be removed. Try again.');
+        setError(m.settings_security_passkey_remove_failed());
 
         return;
       }
       onRemoved(passkey.name);
       onClose();
     } catch {
-      setError(
-        'We couldn’t confirm the removal. Check your connection; the list shows the current state.',
-      );
+      setError(m.settings_security_passkey_remove_uncertain());
     } finally {
       setPending(false);
       await client.invalidateQueries({ queryKey: passkeysKey });
@@ -361,10 +375,11 @@ function RemovePasskeyDialog({
       }}
     >
       <DialogContent>
-        <DialogTitle>Remove passkey?</DialogTitle>
+        <DialogTitle>{m.settings_security_passkey_remove_title()}</DialogTitle>
         <DialogDescription>
-          You won’t be able to sign in with “{passkey?.name}” anymore. Also
-          delete it from your device or password manager.
+          {m.settings_security_passkey_remove_description({
+            name: passkey?.name ?? '',
+          })}
         </DialogDescription>
         {error ? (
           <Alert tone="danger" role="alert">
@@ -373,14 +388,16 @@ function RemovePasskeyDialog({
         ) : null}
         <div className="settings-dialog-actions">
           <Button variant="outline" disabled={pending} onClick={onClose}>
-            Keep passkey
+            {m.settings_security_passkey_keep()}
           </Button>
           <Button
             variant="destructive"
             disabled={pending}
             onClick={() => void remove()}
           >
-            {pending ? 'Removing…' : 'Remove passkey'}
+            {pending
+              ? m.settings_security_passkey_removing()
+              : m.settings_security_passkey_remove()}
           </Button>
         </div>
       </DialogContent>
@@ -395,23 +412,22 @@ type FactorStep =
 
 const flowCopy: Record<
   FactorFlow,
-  { title: string; description: string; submit: string }
+  { title: () => string; description: () => string; submit: () => string }
 > = {
   enable: {
-    title: 'Set up an authenticator app',
-    description: 'Confirm your password to start.',
-    submit: 'Continue',
+    title: m.settings_security_enable_title,
+    description: m.settings_security_enable_description,
+    submit: m.common_continue,
   },
   regenerate: {
-    title: 'Create new backup codes',
-    description: 'Your current backup codes stop working.',
-    submit: 'Create codes',
+    title: m.settings_security_regenerate_title,
+    description: m.settings_security_regenerate_description,
+    submit: m.settings_security_regenerate_submit,
   },
   disable: {
-    title: 'Turn off two-factor authentication?',
-    description:
-      'Signing in will only need your password. Your backup codes stop working.',
-    submit: 'Turn off',
+    title: m.settings_security_disable_title,
+    description: m.settings_security_disable_description,
+    submit: m.settings_security_turn_off,
   },
 };
 
@@ -442,8 +458,8 @@ function FactorDialog({
     if (!entered) {
       setError(
         state.step === 'scan'
-          ? 'Enter the 6-digit code.'
-          : 'Enter your password.',
+          ? m.settings_security_enter_code()
+          : m.settings_security_enter_password(),
       );
       input.current?.focus();
 
@@ -457,14 +473,14 @@ function FactorDialog({
         if (result.error) {
           setError(
             result.error.status === 429
-              ? 'Too many attempts. Wait a moment and try again.'
-              : 'That code didn’t work. Check that your device’s time is set automatically, then enter the current code.',
+              ? m.settings_security_too_many_attempts()
+              : m.settings_security_code_rejected(),
           );
           setValue('');
 
           return;
         }
-        await finish('Two-factor authentication is on.');
+        await finish(m.settings_security_totp_on_notice());
 
         return;
       }
@@ -477,10 +493,10 @@ function FactorDialog({
       if (result.error) {
         setError(
           result.error.status === 400
-            ? 'That password isn’t correct.'
+            ? m.settings_security_wrong_password()
             : result.error.status === 429
-              ? 'Too many attempts. Wait a moment and try again.'
-              : 'The change couldn’t be confirmed. Close this dialog to see the current state, then try again.',
+              ? m.settings_security_too_many_attempts()
+              : m.settings_security_unconfirmed(),
         );
 
         return;
@@ -492,15 +508,10 @@ function FactorDialog({
       else if ('backupCodes' in data && data.backupCodes)
         setState({ step: 'codes', codes: data.backupCodes });
       else if (flow === 'disable')
-        await finish('Two-factor authentication is off.');
-      else
-        setError(
-          'The response was incomplete. Close this dialog to see the current state, then try again.',
-        );
+        await finish(m.settings_security_totp_off_notice());
+      else setError(m.settings_security_incomplete());
     } catch {
-      setError(
-        'We couldn’t reach the service. Close this dialog to see the current state, then try again.',
-      );
+      setError(m.settings_security_unreachable_dialog());
     } finally {
       setPending(false);
     }
@@ -508,10 +519,10 @@ function FactorDialog({
 
   const title =
     state.step === 'codes'
-      ? 'Save your backup codes'
+      ? m.settings_security_codes_title()
       : state.step === 'scan'
-        ? 'Scan with your authenticator app'
-        : copy.title;
+        ? m.settings_security_scan_title()
+        : copy.title();
 
   return (
     <Dialog
@@ -519,7 +530,7 @@ function FactorDialog({
       onOpenChange={(open) => {
         if (!open && !pending) {
           if (flow === 'regenerate' && state.step === 'codes')
-            onClose('New backup codes created.');
+            onClose(m.settings_security_codes_created());
           else onClose();
         }
       }}
@@ -529,9 +540,7 @@ function FactorDialog({
         {state.step === 'codes' ? (
           <>
             <DialogDescription>
-              Store these somewhere safe, like your password manager. Each code
-              works once if your authenticator app isn’t available. You won’t
-              see them again.
+              {m.settings_security_codes_description()}
             </DialogDescription>
             <BackupCodes codes={state.codes} />
             <div className="settings-save">
@@ -539,11 +548,13 @@ function FactorDialog({
                 <Button
                   onClick={() => setState({ step: 'scan', uri: state.uri! })}
                 >
-                  I’ve saved my codes
+                  {m.settings_security_codes_saved()}
                 </Button>
               ) : (
-                <Button onClick={() => onClose('New backup codes created.')}>
-                  Done
+                <Button
+                  onClick={() => onClose(m.settings_security_codes_created())}
+                >
+                  {m.common_done()}
                 </Button>
               )}
             </div>
@@ -560,17 +571,17 @@ function FactorDialog({
             {state.step === 'scan' ? (
               <>
                 <DialogDescription>
-                  Scan the code, or enter the setup key, then enter the 6-digit
-                  code the app shows. Two-factor authentication starts once the
-                  code is confirmed.
+                  {m.settings_security_scan_description()}
                 </DialogDescription>
                 <TotpSetup uri={state.uri} />
               </>
             ) : (
-              <DialogDescription>{copy.description}</DialogDescription>
+              <DialogDescription>{copy.description()}</DialogDescription>
             )}
             <label htmlFor={inputId}>
-              {state.step === 'scan' ? 'Authentication code' : 'Password'}
+              {state.step === 'scan'
+                ? m.settings_security_code_label()
+                : m.settings_security_password_label()}
             </label>
             <Input
               ref={input}
@@ -598,7 +609,7 @@ function FactorDialog({
                 disabled={pending}
                 onClick={() => onClose()}
               >
-                Cancel
+                {m.common_cancel()}
               </Button>
               <Button
                 type="submit"
@@ -610,10 +621,10 @@ function FactorDialog({
                 disabled={pending}
               >
                 {pending
-                  ? 'Checking…'
+                  ? m.settings_security_checking()
                   : state.step === 'scan'
-                    ? 'Turn on'
-                    : copy.submit}
+                    ? m.settings_security_turn_on()
+                    : copy.submit()}
               </Button>
             </div>
           </form>
@@ -628,7 +639,7 @@ function BackupCodes({ codes }: { codes: string[] }) {
 
   return (
     <div className="settings-backup-codes">
-      <ol aria-label="Backup codes">
+      <ol aria-label={m.settings_security_codes_list()}>
         {codes.map((code) => (
           <li key={code}>
             <code>{code}</code>
@@ -645,7 +656,7 @@ function BackupCodes({ codes }: { codes: string[] }) {
         }}
       >
         {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
-        {copied ? 'Copied' : 'Copy codes'}
+        {copied ? m.common_copied() : m.settings_security_copy_codes()}
       </Button>
     </div>
   );
@@ -666,7 +677,7 @@ function TotpSetup({ uri }: { uri: string }) {
         className="settings-totp-qr"
         viewBox={`0 0 ${qr.size} ${qr.size}`}
         role="img"
-        aria-label="QR code for your authenticator app"
+        aria-label={m.settings_security_qr_label()}
         shapeRendering="crispEdges"
       >
         <rect width={qr.size} height={qr.size} />
@@ -674,10 +685,13 @@ function TotpSetup({ uri }: { uri: string }) {
       </svg>
       <div>
         <span>
-          <Smartphone size={14} aria-hidden="true" /> Setup key
+          <Smartphone size={14} aria-hidden="true" />{' '}
+          {m.settings_security_setup_key()}
         </span>
-        <code aria-label="Setup key">{secret.match(/.{1,4}/g)?.join(' ')}</code>
-        <small>Time-based, 6 digits.</small>
+        <code aria-label={m.settings_security_setup_key()}>
+          {secret.match(/.{1,4}/g)?.join(' ')}
+        </code>
+        <small>{m.settings_security_setup_key_hint()}</small>
       </div>
     </div>
   );

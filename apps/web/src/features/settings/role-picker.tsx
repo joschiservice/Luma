@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { useId } from 'react';
 
@@ -54,10 +55,13 @@ export function RolePicker({
             <span className="role-choice-copy">
               <strong>
                 {role.name}
-                {role.builtIn ? null : <Badge>Custom</Badge>}
+                {role.builtIn ? null : (
+                  <Badge>{m.settings_role_custom()}</Badge>
+                )}
               </strong>
               <span id={`${id}-description`}>
-                {unavailable ?? (role.description || 'No description')}
+                {unavailable ??
+                  (role.description || m.settings_role_no_description())}
               </span>
             </span>
           </label>

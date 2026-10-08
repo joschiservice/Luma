@@ -1,4 +1,7 @@
 import type { Membership } from '@luma/api-contract';
+import { formatNumber } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -17,6 +20,7 @@ import { useState } from 'react';
 
 import { Failure } from '../identity/common';
 import { IdentityError } from '../identity/data';
+import { roleName } from '../identity/permission-text';
 import { isOwnerRole, usePermissions } from '../identity/permissions';
 import {
   CommandFeedback,
@@ -67,7 +71,7 @@ export function TeamSettings({
     return <Failure error={error} retry={() => void members.refetch()} />;
   const active = roles.data?.roles.filter((role) => !role.archived) ?? [];
   const visible = members.data?.filter((member) =>
-    `${member.name ?? ''} ${member.email ?? ''} ${member.role.name}`
+    `${member.name ?? ''} ${member.email ?? ''} ${roleName(member.role)}`
       .toLowerCase()
       .includes(search.toLowerCase()),
   );
@@ -99,10 +103,10 @@ export function TeamSettings({
     role,
     unavailable:
       isOwnerRole(role) && !access.owner
-        ? 'Only owners can make someone an owner.'
+        ? m.settings_team_only_owners()
         : access.covers(role)
           ? undefined
-          : 'Includes permissions your role doesn’t have.',
+          : m.settings_team_role_out_of_reach(),
   });
 
   async function changeMember(remove: boolean) {
@@ -125,8 +129,8 @@ export function TeamSettings({
         setSelected(null);
       },
       remove
-        ? 'Workspace access removed.'
-        : 'Role updated. It applies on their next request.',
+        ? m.settings_team_access_removed()
+        : m.settings_team_role_changed(),
     );
   }
 
@@ -134,16 +138,17 @@ export function TeamSettings({
     invitation: NonNullable<typeof outstanding>[number],
   ) {
     if (invitation.status === 'revoked')
-      return 'Revoked because its role was archived · Invite again with another role';
-    if (invitation.status === 'expired') return 'Expired';
+      return m.settings_invitation_status_revoked();
+    if (invitation.status === 'expired')
+      return m.settings_invitation_status_expired();
     if (invitation.delivery === 'sent')
-      return 'Email sent · Pending acceptance';
+      return m.settings_invitation_status_sent();
     if (invitation.delivery === 'failed')
-      return 'Delivery failed · Resend to retry';
+      return m.settings_invitation_status_failed();
     if (invitation.delivery === 'cancelled')
-      return 'Delivery cancelled · Resend to retry';
+      return m.settings_invitation_status_canceled();
 
-    return 'Email queued';
+    return m.settings_invitation_status_queued();
   }
 
   const inviteChoice = fullRole(inviteRole);
@@ -153,9 +158,14 @@ export function TeamSettings({
       <header className="settings-section-heading">
         <div>
           <h2>
-            Team <Badge>{members.data?.length ?? '—'}</Badge>
+            {m.settings_team_title()}{' '}
+            <Badge>
+              {members.data
+                ? formatNumber(members.data.length)
+                : m.common_empty_value()}
+            </Badge>
           </h2>
-          <p>The people who keep your operations moving.</p>
+          <p>{m.settings_team_description()}</p>
         </div>
         {manage ? (
           <Button
@@ -165,19 +175,16 @@ export function TeamSettings({
               setInviteOpen(true);
             }}
           >
-            <UserPlus size={15} /> Invite teammate
+            <UserPlus size={15} aria-hidden="true" /> {m.settings_team_invite()}
           </Button>
         ) : null}
       </header>
       {!deliveryAvailable && manage ? (
-        <Alert tone="warning">
-          Email delivery is unavailable. Configure email before inviting
-          teammates.
-        </Alert>
+        <Alert tone="warning">{m.settings_team_delivery_unavailable()}</Alert>
       ) : null}
       {error ? (
         <Alert tone="danger">
-          Team information could not be refreshed.{' '}
+          {m.settings_team_load_failed()}{' '}
           <Button
             variant="outline"
             onClick={() => {
@@ -185,20 +192,22 @@ export function TeamSettings({
               if (manage) void invitations.refetch();
             }}
           >
-            Retry
+            {m.common_retry()}
           </Button>
         </Alert>
       ) : null}
       <div className="settings-search">
-        <Search size={15} />
+        <Search size={15} aria-hidden="true" />
         <Input
-          aria-label="Search team"
-          placeholder="Search by name, email, or role…"
+          aria-label={m.settings_team_search_label()}
+          placeholder={m.settings_team_search_placeholder()}
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
       </div>
-      {members.isPending ? <p role="status">Loading team…</p> : null}
+      {members.isPending ? (
+        <p role="status">{m.settings_team_loading()}</p>
+      ) : null}
       <div className="settings-members">
         {visible?.map((member) => (
           <div className="settings-member" key={member.id}>
@@ -207,8 +216,12 @@ export function TeamSettings({
             </div>
             <div className="settings-member-identity">
               <strong>
-                {member.name ?? member.email ?? 'Workspace member'}{' '}
-                {member.userId === actorId ? <small>You</small> : null}
+                {member.name ??
+                  member.email ??
+                  m.settings_team_member_fallback()}{' '}
+                {member.userId === actorId ? (
+                  <small>{m.settings_team_you()}</small>
+                ) : null}
               </strong>
               <span>{member.email ?? member.userId}</span>
             </div>
@@ -217,10 +230,12 @@ export function TeamSettings({
               to="/app/$organizationId/settings/$section"
               params={{ organizationId, section: 'roles' }}
               search={{ role: member.role.id }}
-              aria-label={`${member.role.name} role: see what it allows`}
+              aria-label={m.settings_team_role_link({
+                role: roleName(member.role),
+              })}
             >
               <Badge tone={member.role.builtIn ? 'neutral' : 'info'}>
-                {member.role.name}
+                {roleName(member.role)}
               </Badge>
             </Link>
             {changeable(member) ? (
@@ -228,7 +243,13 @@ export function TeamSettings({
                 variant="ghost"
                 size="icon"
                 disabled={blocked}
-                aria-label={`Manage ${member.name ?? member.email ?? 'member'}`}
+                aria-label={
+                  (member.name ?? member.email)
+                    ? m.settings_team_manage_member({
+                        name: member.name ?? member.email ?? '',
+                      })
+                    : m.settings_team_manage_unnamed()
+                }
                 onClick={() => {
                   setSelected(member);
                   setNextRole(member.role.id);
@@ -241,13 +262,15 @@ export function TeamSettings({
         ))}
         {visible?.length === 0 ? (
           <div className="settings-empty">
-            <Users size={23} />
+            <Users size={23} aria-hidden="true" />
             <strong>
-              {search ? 'No teammates match your search' : 'No members to show'}
+              {search
+                ? m.settings_team_search_empty()
+                : m.settings_team_empty()}
             </strong>
             {search ? (
               <Button variant="ghost" onClick={() => setSearch('')}>
-                Clear search
+                {m.settings_team_clear_search()}
               </Button>
             ) : null}
           </div>
@@ -256,15 +279,20 @@ export function TeamSettings({
       {manage ? (
         <div className="settings-invitations">
           <h3>
-            Invitations <span>{pendingCount ?? '—'}</span>
+            {m.settings_invitations_title()}{' '}
+            <span>
+              {pendingCount === undefined
+                ? m.common_empty_value()
+                : formatNumber(pendingCount)}
+            </span>
           </h3>
-          <p>Access starts only after the recipient accepts.</p>
+          <p>{m.settings_invitations_description()}</p>
           {invitations.isPending ? (
-            <p role="status">Loading invitations…</p>
+            <p role="status">{m.settings_invitations_loading()}</p>
           ) : outstanding?.length === 0 ? (
             <div className="settings-invitation-empty">
-              <Mail size={18} />
-              <span>No outstanding invitations. Your team is up to date.</span>
+              <Mail size={18} aria-hidden="true" />
+              <span>{m.settings_invitations_empty()}</span>
             </div>
           ) : (
             outstanding?.map((invitation) => (
@@ -273,15 +301,20 @@ export function TeamSettings({
                 key={invitation.id}
                 data-revoked={invitation.status === 'revoked' || undefined}
               >
-                <Mail size={17} />
+                <Mail size={17} aria-hidden="true" />
                 <div>
                   <strong>{invitation.email}</strong>
                   <span>
-                    {invitation.role.name} · {invitationState(invitation)}
+                    {m.settings_invitation_meta({
+                      role: roleName(invitation.role),
+                      status: invitationState(invitation),
+                    })}
                   </span>
                   {invitation.status !== 'revoked' ? (
                     <small>
-                      Expires <WorkspaceDate value={invitation.expiresAt} />
+                      {rich(m.settings_invitation_expires, {
+                        date: <WorkspaceDate value={invitation.expiresAt} />,
+                      })}
                     </small>
                   ) : null}
                 </div>
@@ -296,7 +329,7 @@ export function TeamSettings({
                         setInviteOpen(true);
                       }}
                     >
-                      Invite again
+                      {m.settings_invitation_invite_again()}
                     </Button>
                   ) : (
                     <>
@@ -319,11 +352,11 @@ export function TeamSettings({
                                   },
                                 }),
                               ),
-                            'New invitation queued. The previous link no longer works.',
+                            m.settings_invitation_resent(),
                           )
                         }
                       >
-                        Resend
+                        {m.settings_invitation_resend()}
                       </Button>
                       <Button
                         variant="ghost"
@@ -344,11 +377,11 @@ export function TeamSettings({
                                   },
                                 }),
                               ),
-                            'Invitation revoked.',
+                            m.settings_invitation_revoked(),
                           )
                         }
                       >
-                        Revoke
+                        {m.settings_invitation_revoke()}
                       </Button>
                     </>
                   )}
@@ -366,10 +399,9 @@ export function TeamSettings({
         }}
       >
         <DialogContent className="team-dialog">
-          <DialogTitle>Invite a teammate</DialogTitle>
+          <DialogTitle>{m.settings_invite_title()}</DialogTitle>
           <DialogDescription>
-            Send a personal invitation. They’ll sign in with this email address
-            to join your workspace with the role you choose.
+            {m.settings_invite_description()}
           </DialogDescription>
           <form
             className="settings-dialog-form"
@@ -388,10 +420,12 @@ export function TeamSettings({
                 );
                 setInviteOpen(false);
                 setEmail('');
-              }, 'Invitation queued. Access starts when it is accepted.');
+              }, m.settings_invite_queued());
             }}
           >
-            <label htmlFor="invite-email">Email address</label>
+            <label htmlFor="invite-email">
+              {m.settings_invite_email_label()}
+            </label>
             <Input
               id="invite-email"
               type="email"
@@ -403,10 +437,10 @@ export function TeamSettings({
               onChange={(event) => setEmail(event.target.value)}
             />
             {roles.isError ? (
-              <Alert tone="danger">Roles could not be loaded.</Alert>
+              <Alert tone="danger">{m.settings_invite_roles_failed()}</Alert>
             ) : (
               <RolePicker
-                label="Role"
+                label={m.settings_role_label()}
                 choices={active
                   .filter((role) => !isOwnerRole(role))
                   .map(choice)}
@@ -415,10 +449,7 @@ export function TeamSettings({
                 onChange={setInviteRole}
               />
             )}
-            <p className="settings-note">
-              Invitations can’t grant ownership. Make someone an owner after
-              they join.
-            </p>
+            <p className="settings-note">{m.settings_invite_no_owner()}</p>
             {inviteOpen ? <CommandFeedback command={command} /> : null}
             <Button
               type="submit"
@@ -429,7 +460,9 @@ export function TeamSettings({
                 !!choice(inviteChoice).unavailable
               }
             >
-              {command.pending ? 'Queuing invitation…' : 'Send invitation'}
+              {command.pending
+                ? m.settings_invite_sending()
+                : m.settings_invite_send()}
             </Button>
           </form>
         </DialogContent>
@@ -441,24 +474,21 @@ export function TeamSettings({
         }}
       >
         <DialogContent className="team-dialog">
-          <DialogTitle>Manage access</DialogTitle>
+          <DialogTitle>{m.settings_member_dialog_title()}</DialogTitle>
           <DialogDescription>
             {selected?.name ?? selected?.email} · {selected?.email}
             <br />
-            Role changes apply on their next request.
+            {m.settings_member_dialog_role_timing()}
           </DialogDescription>
           <RolePicker
-            label="Role"
+            label={m.settings_role_label()}
             choices={active.map(choice)}
             value={nextRole}
             disabled={blocked || lastOwner}
             onChange={setNextRole}
           />
           {lastOwner ? (
-            <Alert tone="neutral">
-              This is the last owner. Make another teammate an owner before
-              changing or removing this access.
-            </Alert>
+            <Alert tone="neutral">{m.settings_member_last_owner()}</Alert>
           ) : null}
           {selected ? <CommandFeedback command={command} /> : null}
           <div className="settings-dialog-actions">
@@ -467,7 +497,7 @@ export function TeamSettings({
               disabled={blocked || lastOwner}
               onClick={() => void changeMember(true)}
             >
-              Remove access
+              {m.settings_member_remove()}
             </Button>
             <Button
               disabled={
@@ -478,7 +508,7 @@ export function TeamSettings({
               }
               onClick={() => void changeMember(false)}
             >
-              Save role
+              {m.settings_member_save_role()}
             </Button>
           </div>
         </DialogContent>

@@ -458,7 +458,7 @@ export const StalePage: Story = {
       await canvas.findByText(/This page link no longer matches/),
     ).toBeVisible();
     await expect(
-      canvas.getByRole('button', { name: 'Go to the first page' }),
+      canvas.getByRole('button', { name: 'Go to first page' }),
     ).toBeVisible();
   },
 };
@@ -480,7 +480,7 @@ export const OrderRecord: Story = {
     ).toBeVisible();
     await expect(
       canvas.getByText(
-        'Payment differs: JTL-Wawi payment pending; Tokyo store paid.',
+        'Payment differs between sources: “Payment pending” in JTL-Wawi and “Paid” in Tokyo store.',
       ),
     ).toBeVisible();
     await userEvent.click(canvas.getByRole('button', { name: 'Tokyo store' }));

@@ -1,0 +1,80 @@
+---
+title: Entscheiden, was auf Sie wartet
+description: Finden Sie jede Genehmigung, jeden manuellen Schritt und jede Ergebnisprüfung, die auf eine Person wartet, übernehmen Sie sie und antworten Sie einmal.
+---
+
+**Wartet auf Sie** sammelt die Entscheidungen, die Luma nicht selbst treffen kann, aus Problemen, Workflows, der Beschaffung und Apps in einer Liste. Sie müssen nicht wissen, welcher Workflow oder welche App eine Entscheidung ausgelöst hat, um sie zu finden. Öffnen Sie die Liste in der Seitenleiste oder drücken Sie **G** und dann **N**. Die Seitenleiste zeigt, wie viele Entscheidungen warten.
+
+## Was hier erscheint [#what-appears-here]
+
+- **Genehmigungen**: eine vorgeschlagene Änderung, die eine andere Person als die anfragende genehmigen muss, etwa eine Problemlösung, eine vom Nachschub erstellte Lieferantenbestellung, das Senden einer Lieferantenbestellung, eine Shopify-Bestandskorrektur oder eine Fulfillment-Wiederherstellung. Auch eine geänderte Menge oder ein geänderter Termin eines Lieferanten wartet hier darauf, angenommen oder nachgefasst zu werden.
+- **Bereit zur Ausführung**: eine genehmigte Shopify-Änderung, die nur die anfragende Person senden kann, bevor sie abläuft.
+- **Ergebnisprüfungen**: eine Änderung, die das verbundene System angenommen hat oder deren Ergebnis unklar ist und die noch keine separate Prüfung bestätigt hat. Angenommen heißt nicht bestätigt.
+- **Manuelle Schritte**: Arbeit, die Luma nicht selbst erledigen kann, etwa eine Korrektur in Ihrem ERP, das Nachfassen bei einem Lieferanten mit überfälliger Bestätigung oder Lieferung, oder eine Nacharbeit, die ein [Workflow](/docs/workflows) an eine Person übergeben hat, etwa eine Retoure, deren Erstattung noch aussteht.
+- **Unklare Nachweise**: unvollständige oder widersprüchliche Nachweise, ein eskaliertes Problem oder eine Angabe, die Luma aus einer Lieferantennachricht gelesen hat und die geprüft werden muss.
+
+Entscheidungen verschwinden aus der Liste, sobald sie beantwortet sind, ablaufen oder nicht mehr zutreffen. Eine leere Liste heißt, dass keine Entscheidung auf eine Person wartet. Sie heißt nicht, dass jede Verbindung in Ordnung ist; den Zustand der Verbindungen zeigt **Start**.
+
+## Eine Ansicht wählen [#choose-a-view]
+
+- **Alle**: alle Entscheidungen, die Sie sehen können.
+- **Mir zugewiesen**: Entscheidungen, die Sie übernommen haben oder die Ihnen zugewiesen wurden.
+- **Nicht zugewiesen**: Entscheidungen, um die sich noch niemand kümmert.
+
+Filtern Sie nach **Bereich** (Bestellungen, Fulfillment, Bestand, Beschaffung oder Sonstige Abläufe) oder nach **Grund**. Jede Option zeigt, wie viele Entscheidungen passen. Ansicht, Filter und gewählte Entscheidung sind Teil der Adresse, sodass Sie einen Link teilen oder die Ansicht anheften können.
+
+## Wie die Liste sortiert ist [#how-the-queue-is-ordered]
+
+1. Entscheidungen, die innerhalb von 30 Minuten ablaufen. Eine Genehmigung verlängert keine Frist.
+2. Entscheidungen mit **Hohe Auswirkung**.
+3. Alles andere, früheste Frist zuerst, dann älteste Anfrage.
+
+Eine Auswirkung, die Luma nicht bewertet hat, ist als **Auswirkung nicht bewertet** gekennzeichnet, statt als gering eingestuft zu werden.
+
+**Nach Ursache gruppieren** fasst Entscheidungen mit derselben Ursache zusammen, etwa alle Bestandskorrekturen, die auf Genehmigung warten. Gruppen gelten nur für die aktuelle Seite. Jede Entscheidung braucht weiterhin ihre eigene Antwort; nichts wird gesammelt genehmigt.
+
+## Was jeder Status bedeutet [#what-each-status-means]
+
+| Status                                    | Bedeutung                                                                                                                              |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| **Wartet auf Ihre Genehmigung**           | Sie können diese Änderung genehmigen oder ablehnen.                                                                                    |
+| **Bereit für Ihre Ausführung**            | Sie haben diese Änderung angefragt, und sie ist genehmigt. Senden Sie sie, bevor sie abläuft.                                          |
+| **Ergebnis prüfen**                       | Die Änderung wurde gesendet, aber keine Prüfung hat ihr Ergebnis bestätigt.                                                            |
+| **Manueller Schritt nötig**               | Jemand muss außerhalb von Luma oder am Datensatz handeln.                                                                              |
+| **Prüfung nötig**                         | Die Nachweise sind unklar, oder jemand hat das Problem eskaliert.                                                                      |
+| **Vorschlag abgelaufen**                  | Die Genehmigungsfrist ist abgelaufen, bevor jemand geantwortet hat. Öffnen Sie das Problem oder den Datensatz, um es erneut zu prüfen. |
+| **Wartet auf andere genehmigende Person** | Sie haben diese Änderung angefragt, daher muss eine andere Person sie genehmigen. Sie können sie hier verfolgen.                       |
+| **Wartet auf anfragende Person**          | Die Änderung ist genehmigt, und nur die anfragende Person kann sie ausführen.                                                          |
+| **Wartet auf Genehmigung**                | Mit Ihrer Rolle können Sie diese Entscheidung sehen, aber nicht beantworten.                                                           |
+| **Ergebnis nicht bestätigt**              | Das Ergebnis ist noch nicht bestätigt, und Ihre Rolle kann nicht darauf reagieren.                                                     |
+
+## Auf eine Entscheidung antworten [#respond-to-a-decision]
+
+Wählen Sie eine Entscheidung, um Folgendes zu sehen:
+
+- **Warum Sie gebraucht werden** und, falls Sie nicht selbst antworten können, warum nicht.
+- **Vorgeschlagene Änderung**: genaues System, Datensatz, Lagerort und Mengen.
+- **Was Ihre Antwort bewirkt** für jede Antwort, die Sie geben können.
+- **Nachweise und Zuständigkeit**: wann die Nachweise zuletzt gelesen wurden und ob sie noch aktuell sind, die Frist, wer angefragt hat und wer sich kümmert. Bei **Veraltete Nachweise** oder **Alter der Nachweise unbekannt** prüfen Sie den Datensatz, bevor Sie sich darauf verlassen.
+
+**Prüfen und antworten** zeigt dieselben Bedienelemente wie das Problem, die Workflow-Ausführung oder der Datensatz, zu dem die Entscheidung gehört. Ihre Antwort hier ist die Entscheidung; Problem, Ausführung oder Datensatz werden ohne zweite Antwort aktualisiert. Bevor sich etwas ändert, prüft Luma erneut, dass Vorschlag und Frist unverändert sind. Hat schon jemand anderes geantwortet oder hat sich der Vorschlag geändert oder ist er abgelaufen, wird Ihre Antwort abgelehnt, und **Diese Entscheidung ist nicht mehr in der Liste** zeigt den aktuellen Stand.
+
+Um auf eine Genehmigung zu antworten, brauchen Sie **Änderungen genehmigen oder ablehnen**, und wer eine Änderung angefragt hat, kann sie nicht genehmigen. Manche Genehmigungen brauchen mehr: Lieferantenbestellungen zusätzlich **Beschaffung verwalten** und **Lieferantenbestellungen an JTL senden**, Shopify-Änderungen **Shopify-Fulfillments wiederherstellen** oder **Shopify-Bestand korrigieren**.
+
+## Entscheidung übernehmen oder zuweisen [#take-or-assign-a-decision]
+
+Wählen Sie **Übernehmen**, um Ihrem Team zu zeigen, dass Sie sich um eine Entscheidung kümmern, oder **Zuweisung aufheben**, um sie zurückzugeben. Personen mit **Entscheidungen zuweisen** können außerdem mit **Selbst übernehmen** eine Entscheidung übernehmen, die jemand anderes hat, oder sie einem anderen Mitglied zuweisen. Wer für eine Entscheidung zuständig ist, ändert nichts daran, wer sie genehmigen darf.
+
+Mitglieder können Entscheidungen übernehmen und verfolgen, ihre Rolle enthält aber nicht **Änderungen genehmigen oder ablehnen**. Sie sehen Genehmigungen als **Wartet auf Genehmigung**, mit dem Hinweis, dass ihre Rolle nicht antworten kann.
+
+## Durch die Liste navigieren [#move-through-the-queue]
+
+Mit **J** und **K** wechseln Sie zur nächsten und vorherigen Entscheidung, mit **Esc** schließen Sie die gewählte Entscheidung.
+
+## Wenn die Liste unvollständig oder offline ist [#when-the-queue-is-incomplete-or-offline]
+
+- **Einige Entscheidungen konnten nicht geladen werden** nennt den Bereich, der nicht geantwortet hat. Seine Entscheidungen fehlen in der Liste, sie sind nicht erledigt. Wählen Sie **„Wartet auf Sie“ aktualisieren**, um es erneut zu versuchen.
+- **„Wartet auf Sie“ konnte nicht aktualisiert werden** heißt, die Liste unten ist möglicherweise veraltet.
+- **Sie sind offline**: Die Liste zeigt die zuletzt geladenen Entscheidungen, und Antworten sind pausiert, bis Sie wieder verbunden sind.
+
+Die Liste aktualisiert sich live. Sind Live-Aktualisierungen unterbrochen, zeigt sie **Prüfung alle 30 Sekunden**.

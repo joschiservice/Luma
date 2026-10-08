@@ -1,9 +1,11 @@
+import type { AppManifest } from '@luma/api-contract';
 import { queryOptions } from '@tanstack/react-query';
 import { z } from 'zod';
 
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
 import { IdentityError } from '../identity/data';
+import { localizeManifest } from './catalog-text';
 
 const api = createWebApiClient();
 
@@ -15,7 +17,15 @@ export const appResultSearch = z.object({
     .catch(undefined),
 });
 
-/** Loads current app availability and installations for one workspace. */
+/** Outcome of an app's authorization flow, as reported on return. */
+export type AppResult = NonNullable<
+  z.infer<typeof appResultSearch>['appResult']
+>;
+
+/**
+ * Loads current app availability and installations for one workspace, with known manifest text
+ * in the interface language.
+ */
 export function appsOptions(organizationId: string) {
   return queryOptions({
     queryKey: ['private', 'organization', organizationId, 'apps'],
@@ -30,7 +40,13 @@ export function appsOptions(organizationId: string) {
 
       return result.body;
     },
+    select: localizeCatalog,
   });
+}
+
+// Keeps cached data as delivered and shows known manifest text in the interface language.
+function localizeCatalog<T extends { catalog: AppManifest[] }>(data: T): T {
+  return { ...data, catalog: data.catalog.map(localizeManifest) };
 }
 
 /**

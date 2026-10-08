@@ -1,4 +1,5 @@
 import type { DraftValidation, WorkflowDraft } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import {
@@ -81,28 +82,32 @@ export function PublishDialog({
         className="workflow-dialog authoring-publish"
         showCloseButton={!pending}
       >
-        <DialogTitle>Publish version {draft.content.version}</DialogTitle>
+        <DialogTitle>
+          {m.authoring_publish_title({ version: draft.content.version })}
+        </DialogTitle>
         <DialogDescription>
-          Publishing creates an unchangeable version. It doesn’t activate the
-          workflow or give it access to anything. Activate it afterwards from
-          the workflow page.
+          {m.authoring_publish_description()}
         </DialogDescription>
         {validation?.summary ? (
           <p className="authoring-summary">{validation.summary}</p>
         ) : null}
         {!current ? (
           <Alert tone="neutral" role="status">
-            Checking the saved draft…
+            {m.authoring_publish_checking()}
           </Alert>
         ) : null}
         {errors.length ? (
           <Alert tone="danger">
-            <strong>Fix these before publishing:</strong>
+            <strong>{m.authoring_publish_fix_first()}</strong>
             <ul>
               {errors.map((item) => (
                 <li key={`${item.stepIndex}:${item.field}:${item.code}`}>
-                  {item.stepId ? `${item.stepId}: ` : ''}
-                  {item.message}
+                  {item.stepId
+                    ? m.authoring_publish_step_problem({
+                        step: item.stepId,
+                        problem: item.message,
+                      })
+                    : item.message}
                 </li>
               ))}
             </ul>
@@ -110,8 +115,8 @@ export function PublishDialog({
         ) : null}
         {limits.length ? (
           <Alert tone="warning">
-            <strong>Can’t run in this workspace yet.</strong> You can publish
-            it; it shows as unavailable until an installed adapter supports:
+            <strong>{m.authoring_publish_limits_title()}</strong>{' '}
+            {m.authoring_publish_limits_body()}
             <ul>
               {limits.map((message) => (
                 <li key={message}>{message}</li>
@@ -121,14 +126,14 @@ export function PublishDialog({
         ) : null}
         {tests}
         <label className="authoring-field">
-          Version notes
+          {m.authoring_publish_notes_label()}
           <Textarea
             rows={3}
             required
             maxLength={2000}
             disabled={pending || uncertain}
             value={notes}
-            placeholder="What changed and why"
+            placeholder={m.authoring_publish_notes_placeholder()}
             onChange={(event) => setNotes(event.target.value)}
           />
         </label>
@@ -139,14 +144,16 @@ export function PublishDialog({
         ) : null}
         <div className="workflow-dialog-actions">
           <Button variant="outline" disabled={pending} onClick={close}>
-            Cancel
+            {m.common_cancel()}
           </Button>
           <Button disabled={blocked || pending} onClick={() => void publish()}>
             {pending
-              ? 'Publishing…'
+              ? m.authoring_publish_pending()
               : uncertain
-                ? 'Retry publishing'
-                : `Publish version ${draft.content.version}`}
+                ? m.authoring_publish_retry()
+                : m.authoring_publish_button({
+                    version: draft.content.version,
+                  })}
           </Button>
         </div>
       </DialogContent>

@@ -1,3 +1,5 @@
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import {
   caseLabel,
   CaseLoading,
@@ -146,7 +148,7 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
   return (
     <div className={`inbox page-full ${exceptionId ? 'inbox-selected' : ''}`}>
       <header className="inbox-heading">
-        <h1 className="sr-only">Issues</h1>
+        <h1 className="sr-only">{m.exceptions_page_title()}</h1>
         <IssueSummary
           review={
             overview.isError || overview.isPaused
@@ -185,9 +187,8 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
         }
       />
       {overview.isError && (
-        <CaseNotice title="Summary unavailable">
-          Refresh to check the latest totals. Your issue list is still
-          available.
+        <CaseNotice title={m.exceptions_summary_unavailable_title()}>
+          {m.exceptions_summary_unavailable_text()}
         </CaseNotice>
       )}
       <IssueSplitView
@@ -197,32 +198,35 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
             className="inbox-list"
             ref={listPane}
             tabIndex={-1}
-            aria-label="Issue inbox"
+            aria-label={m.exceptions_list_label()}
           >
             {connections.isError ? (
-              <CaseNotice title="Connection coverage unavailable">
-                Your issues may still be available. Refresh to check
-                connections.
+              <CaseNotice title={m.exceptions_connections_unavailable_title()}>
+                {m.exceptions_connections_unavailable_text()}
               </CaseNotice>
             ) : connections.data &&
               !connections.data.some((c) => c.status === 'active') ? (
-              <CaseNotice title="No active connections">
-                Connect a commerce system to start monitoring operations.{' '}
-                <Link
-                  to="/app/$organizationId/apps"
-                  params={{ organizationId }}
-                >
-                  Open connections
-                </Link>
+              <CaseNotice title={m.exceptions_no_connections_title()}>
+                {rich(m.exceptions_no_connections_text, {
+                  link: (
+                    <Link
+                      to="/app/$organizationId/apps"
+                      params={{ organizationId }}
+                    >
+                      {m.exceptions_no_connections_link()}
+                    </Link>
+                  ),
+                })}
               </CaseNotice>
             ) : null}
             {list.isError ? (
-              <CaseNotice error title="Inbox could not be refreshed">
-                {listData ? 'The list below may be out of date. ' : ''}Try
-                Refresh.
+              <CaseNotice error title={m.exceptions_list_error_title()}>
+                {listData
+                  ? m.exceptions_list_error_stale()
+                  : m.exceptions_list_error_text()}
                 {search.cursor ? (
                   <Button variant="outline" onClick={() => update({})}>
-                    Return to first page
+                    {m.exceptions_first_page()}
                   </Button>
                 ) : null}
               </CaseNotice>
@@ -232,8 +236,8 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
             ) : listData ? (
               <>
                 {listData.coverage === 'unobserved' ? (
-                  <CaseNotice title="No data received yet">
-                    Connect a system to start monitoring your operations.
+                  <CaseNotice title={m.exceptions_no_data_title()}>
+                    {m.exceptions_no_data_text()}
                   </CaseNotice>
                 ) : null}
                 {!listData.items.length ? (
@@ -243,21 +247,21 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
                       {[search.class, search.state, search.severity].some(
                         Boolean,
                       )
-                        ? 'No matching issues'
+                        ? m.exceptions_empty_filtered_title()
                         : search.view === 'needs_you'
-                          ? 'Nothing needs review'
+                          ? m.exceptions_empty_needs_you_title()
                           : search.view === 'history'
-                            ? 'No issue history yet'
-                            : 'No open issues in this view'}
+                            ? m.exceptions_empty_history_title()
+                            : m.exceptions_empty_view_title()}
                     </h2>
                     <p>
                       {[search.class, search.state, search.severity].some(
                         Boolean,
                       )
-                        ? 'Adjust or clear the filters to see more issues.'
+                        ? m.exceptions_empty_filtered_text()
                         : search.view === 'needs_you'
-                          ? 'No issues currently need your review. Check All open for ongoing work.'
-                          : 'Try another view or adjust the filters.'}
+                          ? m.exceptions_empty_needs_you_text()
+                          : m.exceptions_empty_view_text()}
                     </p>
                   </Empty>
                 ) : (
@@ -297,12 +301,14 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
                   onPrevious={goPrevious}
                   onNext={goNext}
                   disabled={list.isFetching}
-                  itemLabel="issues"
-                  label="Issue pages"
+                  formatTotal={(count) =>
+                    m.exceptions_pagination_total({ count })
+                  }
+                  label={m.exceptions_pagination_label()}
                 />
                 {search.cursor && pageIndex < 0 && (
                   <Button variant="ghost" onClick={() => update({})}>
-                    Return to first page
+                    {m.exceptions_first_page()}
                   </Button>
                 )}
               </>
@@ -314,7 +320,7 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
             className="inbox-detail"
             ref={pane}
             tabIndex={-1}
-            aria-label="Selected issue"
+            aria-label={m.exceptions_selected_label()}
             onKeyDown={(event) => {
               if (
                 event.key !== 'Escape' ||
@@ -354,7 +360,10 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
                       connectionLabels={Object.fromEntries(
                         (connections.data ?? []).map((connection) => [
                           connection.id,
-                          `${connection.label} · ${caseLabel(connection.target.kind)}`,
+                          m.exceptions_connection_label({
+                            connection: connection.label,
+                            system: caseLabel(connection.target.kind),
+                          }),
                         ]),
                       )}
                     />
@@ -365,8 +374,8 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
                     refresh={
                       <Button
                         variant="ghost"
-                        aria-label="Refresh issue"
-                        title="Refresh issue"
+                        aria-label={m.exceptions_refresh_issue()}
+                        title={m.exceptions_refresh_issue()}
                         onClick={observation.restart}
                         disabled={detail.isFetching}
                       >
@@ -377,8 +386,8 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
                     item={item}
                     fallback={
                       detail.isError || denied
-                        ? 'Issue unavailable'
-                        : 'Loading issue…'
+                        ? m.exceptions_issue_unavailable()
+                        : m.exceptions_issue_loading()
                     }
                     onClose={() =>
                       void navigate({
@@ -395,8 +404,8 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
                           params={{ organizationId, exceptionId }}
                           search={search}
                           className="issue-panel-open-page"
-                          aria-label="Open full page"
-                          title="Open full page"
+                          aria-label={m.exceptions_open_full_page()}
+                          title={m.exceptions_open_full_page()}
                         >
                           <Maximize2 size={16} aria-hidden="true" />
                         </Link>
@@ -408,8 +417,8 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
                           to="/app/$organizationId/exceptions/$exceptionId"
                           params={{ organizationId, exceptionId: next.id }}
                           className="issue-panel-next"
-                          aria-label="Next issue"
-                          title="Next issue"
+                          aria-label={m.exceptions_next_issue()}
+                          title={m.exceptions_next_issue()}
                           search={search}
                           resetScroll={false}
                         >
@@ -426,19 +435,18 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
                     error
                     title={
                       denied
-                        ? 'Issue unavailable'
-                        : 'Issue could not be refreshed'
+                        ? m.exceptions_issue_unavailable()
+                        : m.exceptions_detail_error_title()
                     }
                   >
                     {denied
-                      ? 'This issue is missing or you no longer have access.'
-                      : 'The current investigation could not be confirmed. Refresh before relying on these findings.'}
+                      ? m.exceptions_detail_denied_text()
+                      : m.exceptions_detail_error_text()}
                   </CaseNotice>
                 ) : null}
                 {moved ? (
-                  <CaseNotice title="This issue has left the current view">
-                    Its state or attention requirement changed. It stays open
-                    here while you finish reading.
+                  <CaseNotice title={m.exceptions_moved_title()}>
+                    {m.exceptions_moved_text()}
                   </CaseNotice>
                 ) : null}
                 {item ? (
@@ -453,8 +461,8 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
               </IssuePanelLayout>
             ) : (
               <div className="inbox-placeholder">
-                <h2>Select an issue</h2>
-                <p>Review the details and choose your next step.</p>
+                <h2>{m.exceptions_placeholder_title()}</h2>
+                <p>{m.exceptions_placeholder_text()}</p>
               </div>
             )}
           </section>

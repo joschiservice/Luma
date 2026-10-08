@@ -1,6 +1,8 @@
 import './customers.css';
 
 import type { CustomerDetail } from '@luma/api-contract';
+import { formatNumber } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -138,9 +140,13 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-const withheld = <span className="customers-muted">Not shared</span>;
+function Withheld() {
+  return <span className="customers-muted">{m.customers_not_shared()}</span>;
+}
 
-const missing = <span className="customers-muted">Not reported</span>;
+function Missing() {
+  return <span className="customers-muted">{m.common_not_reported()}</span>;
+}
 
 /** Shows one customer: imported profile facts beside live order history from the source. */
 export function CustomerDetailView({
@@ -164,9 +170,9 @@ export function CustomerDetailView({
   history?: ReactNode;
 }) {
   const item = detail?.item;
-  const store = detail?.source
-    ? systemName(detail.source.system)
-    : 'the source';
+  const store = detail?.source ? systemName(detail.source.system) : null;
+  const withheld = <Withheld />;
+  const missing = <Missing />;
   const address = addressLines(detail?.address ?? null);
 
   return (
@@ -177,57 +183,55 @@ export function CustomerDetailView({
         params={{ organizationId }}
       >
         <ArrowLeft size={14} aria-hidden="true" />
-        Back to customers
+        {m.customers_detail_back()}
       </Link>
       <PageHeader
-        title={item ? customerName(item) : 'Customer'}
+        title={item ? customerName(item) : m.customers_detail_title_fallback()}
         icon={<DomainIcon domain="customers" size="md" />}
         description={
           item
-            ? `${detail?.source?.label ?? 'Connected source'} · Source ID ${sourceId(item.externalId)}`
-            : 'A customer’s profile and order history in one connected store.'
+            ? m.customers_detail_description({
+                source: detail?.source?.label ?? m.customers_source_fallback(),
+                id: sourceId(item.externalId),
+              })
+            : m.customers_detail_description_fallback()
         }
         actions={
           <Button variant="outline" disabled={refreshing} onClick={refresh}>
             <RefreshCw size={14} aria-hidden="true" />
-            Refresh customer
+            {m.customers_detail_refresh()}
           </Button>
         }
       />
       {offline ? (
-        <Alert role="status">
-          You are offline. The customer below may be out of date.
-        </Alert>
+        <Alert role="status">{m.customers_detail_offline()}</Alert>
       ) : null}
       {error === 'missing' ? (
         <Empty>
           <UsersRound size={30} aria-hidden="true" />
-          <h2>Customer not found</h2>
-          <p>
-            This customer is not in this workspace, or the store asked Luma to
-            erase their data.
-          </p>
+          <h2>{m.customers_detail_missing_title()}</h2>
+          <p>{m.customers_detail_missing_body()}</p>
           <Link to="/app/$organizationId/customers" params={{ organizationId }}>
-            Browse customers
+            {m.customers_detail_browse()}
           </Link>
         </Empty>
       ) : error === 'access' ? (
         <Alert tone="danger" role="alert">
-          You no longer have access to customers in this workspace.
+          {m.customers_access_lost()}
         </Alert>
       ) : error ? (
         <Alert tone="danger" role="alert">
           {detail
-            ? 'This customer could not be refreshed. The details below may be out of date.'
-            : 'This customer could not be loaded.'}{' '}
+            ? m.customers_detail_refresh_failed()
+            : m.customers_detail_load_failed()}{' '}
           <Button variant="outline" onClick={refresh}>
-            Retry
+            {m.common_retry()}
           </Button>
         </Alert>
       ) : null}
       {loading && !error ? (
         <div className="customers-loading" role="status">
-          <span className="sr-only">Loading customer…</span>
+          <span className="sr-only">{m.customers_detail_loading()}</span>
           {Array.from({ length: 3 }, (_, i) => (
             <span className="lu-skeleton" key={i} />
           ))}
@@ -237,27 +241,35 @@ export function CustomerDetailView({
         <div className="customers-layout">
           <div className="customers-main">
             <Section
-              title="Order history"
-              description={`Orders, fulfillment, returns and refunds read live from ${store} with the connection’s permissions. Select an order to see its open issues and Luma actions.`}
+              title={m.customers_history_title()}
+              description={
+                store
+                  ? m.customers_history_description({ store })
+                  : m.customers_history_description_generic()
+              }
             >
               {history ?? (
                 <p className="customers-muted">
-                  Order history is read live through the {store} app. Install
-                  and authorize it in Apps to see this customer’s orders.
+                  {store
+                    ? m.customers_history_unavailable({ store })
+                    : m.customers_history_unavailable_generic()}
                 </p>
               )}
             </Section>
           </div>
-          <aside className="customers-inspector" aria-label="Customer profile">
-            <Section title="Contact">
+          <aside
+            className="customers-inspector"
+            aria-label={m.customers_profile_label()}
+          >
+            <Section title={m.customers_contact_title()}>
               <dl className="customers-facts">
-                <Fact label="Email">
+                <Fact label={m.customers_fact_email()}>
                   {!item.shared.contact ? withheld : (item.email ?? missing)}
                 </Fact>
-                <Fact label="Phone">
+                <Fact label={m.customers_fact_phone()}>
                   {!item.shared.contact ? withheld : (item.phone ?? missing)}
                 </Fact>
-                <Fact label="Address">
+                <Fact label={m.customers_fact_address()}>
                   {!item.shared.address
                     ? withheld
                     : address
@@ -271,20 +283,29 @@ export function CustomerDetailView({
               </dl>
               {!item.shared.contact || !item.shared.address ? (
                 <p className="customers-note">
-                  {store} shares contact details and addresses only when the
-                  deployment is approved for them.
+                  {store
+                    ? m.customers_contact_note({ store })
+                    : m.customers_contact_note_generic()}
                 </p>
               ) : null}
             </Section>
-            <Section title={`In ${store}`}>
+            <Section
+              title={
+                store
+                  ? m.customers_store_title({ store })
+                  : m.customers_store_title_generic()
+              }
+            >
               <dl className="customers-facts">
-                <Fact label="Orders">
-                  {item.orderCount?.toLocaleString() ?? missing}
+                <Fact label={m.customers_fact_orders()}>
+                  {item.orderCount === null
+                    ? missing
+                    : formatNumber(item.orderCount)}
                 </Fact>
-                <Fact label="Amount spent">
+                <Fact label={m.customers_fact_spent()}>
                   {formatMoney(item.amountSpent) ?? missing}
                 </Fact>
-                <Fact label="Customer since">
+                <Fact label={m.customers_fact_since()}>
                   {item.sourceCreatedAt ? (
                     <WorkspaceDate
                       value={item.sourceCreatedAt}
@@ -294,13 +315,13 @@ export function CustomerDetailView({
                     missing
                   )}
                 </Fact>
-                <Fact label="Account">
+                <Fact label={m.customers_fact_account()}>
                   <span title={stateDescriptions[item.state]}>
                     {stateLabels[item.state]}
                   </span>
                 </Fact>
                 {item.tags.length ? (
-                  <Fact label="Tags">
+                  <Fact label={m.customers_fact_tags()}>
                     <span className="customers-tags">
                       {item.tags.map((tag) => (
                         <Badge key={tag}>{tag}</Badge>
@@ -310,29 +331,26 @@ export function CustomerDetailView({
                 ) : null}
               </dl>
             </Section>
-            <Section title="Source and evidence">
+            <Section title={m.customers_source_title()}>
               <dl className="customers-facts">
-                <Fact label="Source">
-                  {detail.source?.label ?? 'Connected source'}
+                <Fact label={m.customers_fact_source()}>
+                  {detail.source?.label ?? m.customers_source_fallback()}
                 </Fact>
-                <Fact label="Source ID">
+                <Fact label={m.customers_fact_source_id()}>
                   <code>{item.externalId}</code>
                 </Fact>
-                <Fact label="Updated in source">
+                <Fact label={m.customers_fact_updated()}>
                   {item.sourceUpdatedAt ? (
                     <WorkspaceDate value={item.sourceUpdatedAt} />
                   ) : (
                     missing
                   )}
                 </Fact>
-                <Fact label="Read by Luma">
+                <Fact label={m.customers_fact_read()}>
                   <WorkspaceDate value={item.observedAt} />
                 </Fact>
               </dl>
-              <p className="customers-note">
-                Each store keeps its own customers. Luma never merges customers
-                across stores by name or email address.
-              </p>
+              <p className="customers-note">{m.customers_source_note()}</p>
             </Section>
           </aside>
         </div>

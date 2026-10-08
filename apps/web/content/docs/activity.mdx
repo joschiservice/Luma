@@ -1,0 +1,54 @@
+---
+title: Review what people and Luma did
+description: Look up decisions, changes, checks and resolutions in the Activity log, filter them, and tell an approval from a confirmed result.
+---
+
+**Activity** is the workspace’s record of what people and Luma did: decisions, changes sent to your systems, checks of their results, issue resolutions and procurement steps. Use it to answer “who approved this?”, “did the change go through?” or “what happened to this order?”. Open it from the sidebar, or press **G** then **A**. You need **View activity**.
+
+Activity is read-only. To approve, retry or check something, open the issue, purchase order or Workflow the entry links to.
+
+## Read an entry
+
+Entries are listed newest first, by when Luma recorded them. Each one shows:
+
+- When it was recorded, and what happened, such as **Change approved**, **Change sent** or **Issue resolved**.
+- Who acted and in which system. An actor is a person, Luma itself or a service.
+- What it concerns: a record, an issue or a connection, or **Workspace** for workspace-wide changes.
+- Its outcome, such as **Approved**, **Accepted by Shopify**, **Verified**, **Outcome unclear** or **Closed manually**. Entries from a simulation, pilot or [workflow test](/docs/shadow-mode) are labeled so you don’t mistake them for live work.
+
+Select an entry to see its details: the reason, the proposed change, when it occurred and was recorded, the request status, the check result and the evidence Luma kept. Links take you to the issue and its evidence, the Workflow, the purchase order or Apps. Entries that belong to the same change attempt or purchase order are grouped, so you can follow one change from approval to check.
+
+An entry can occur earlier than it was recorded, for example when a system confirms a change late. It then appears at the top when it’s recorded, with both times in its details.
+
+## Tell approved, done and verified apart
+
+Each step is its own entry, and none implies the next:
+
+- **Approved** records a decision. Nothing has changed in your systems yet.
+- **Change sent** and **Accepted by Shopify** (or another system) mean the system took the request. That doesn’t prove the result.
+- **Verified** and **Result confirmed** mean a separate read confirmed the expected result.
+- **Outcome unclear** means Luma couldn’t tell whether the change happened. Check the record in the connected system before you try again.
+- **Closed manually** means a person closed the issue. Luma didn’t verify a fix.
+
+## Filter and search
+
+Use the filters above the list:
+
+- **Recorded**: the date range, **Last 30 days** by default. A range can cover up to 366 days. Dates use the workspace time zone.
+- **Event type**: Issue, Decision, Change, Check, Resolution, Connection, Procurement, or Team and settings.
+- **Outcome**, **System** and **Connection**.
+
+Search matches issue IDs, record references, action codes, user IDs and Workflow run IDs. Filters and search are part of the address, so you can share a link to the same view.
+
+Use **Older events** and **Latest events** to page through the results. When new entries arrive while you read, **New events available. Show latest** brings you back to the top.
+
+## Restricted activity
+
+People with **View restricted activity** also see changes to access and connections: members added or removed, role changes, invitations, approval rule changes, app permissions removed from roles, workspace settings, and systems connected, disconnected or revoked. These entries name what changed without showing email addresses, permission lists or credentials. Without this permission, these entries aren’t listed.
+
+## When the list is empty or can’t load
+
+- **No activity in the last 30 days**: nothing was recorded in that period. Choose an earlier date range to see older activity.
+- **No activity matches these filters**: try another date range or clear the filters. Changes Luma didn’t record, such as edits made directly in Shopify, never appear here.
+- **Activity couldn’t be updated. The events shown may be out of date.**: choose **Refresh activity**. If Luma can’t read part of the log, the page reports an error instead of showing a list with entries missing.
+- **Your access to this workspace changed**: your role or membership changed. Ask a workspace owner for access.

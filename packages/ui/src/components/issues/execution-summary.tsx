@@ -1,39 +1,50 @@
 import type { CaseProgress } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 
 import { Badge } from '../primitives/badge';
 import { caseLabel, CaseTime } from './case-investigation';
+import {
+  caseStateLabel,
+  executionStateLabel,
+  verificationLabel,
+  workflowStatusLabel,
+} from './case-presentation';
 
-/** Describes the recorded execution outcome without implying unverified resolution. */
+/**
+ * Describes where the change stands without implying unverified resolution: sent, accepted and
+ * confirmed stay distinct.
+ */
 export function executionStatus(progress: CaseProgress) {
   const execution = progress.execution;
   const verification = execution?.verification;
 
   return progress.resolution
     ? progress.resolution.kind === 'verification'
-      ? 'Resolution verified'
-      : 'Closed by human disposition'
+      ? m.issues_resolution_verified_title()
+      : m.issues_execution_status_closed_unconfirmed()
     : execution
       ? execution.state === 'unknown'
-        ? 'Action outcome unknown'
+        ? m.issues_execution_status_unclear()
         : execution.state === 'failed'
-          ? 'Action failed'
+          ? m.issues_state_failed()
           : verification?.outcome === 'passed'
-            ? 'Outcome verified'
+            ? m.issues_execution_status_confirmed()
             : verification?.outcome === 'failed'
-              ? 'Verification failed'
+              ? m.issues_execution_status_not_confirmed()
               : progress.state === 'verifying'
-                ? 'Verifying outcome'
+                ? m.issues_state_verifying()
                 : execution.state === 'succeeded'
-                  ? 'Action succeeded'
+                  ? m.issues_execution_status_accepted()
                   : progress.state === 'executing'
-                    ? 'Action running'
-                    : 'Action reserved'
+                    ? m.issues_state_executing()
+                    : m.issues_execution_status_queued()
       : progress.state === 'awaiting_approval'
-        ? 'Awaiting approval'
-        : 'No execution recorded';
+        ? m.issues_execution_status_awaiting_approval()
+        : m.issues_execution_status_none();
 }
 
-/** Shows recorded action and verification outcomes without implying that a successful action resolved the issue. */
+/** Shows the sent change and its outcome check without implying that an accepted change resolved the issue. */
 export function ExecutionSummary({
   progress,
   confirmed,
@@ -65,48 +76,47 @@ export function ExecutionSummary({
   return (
     <div className="execution-summary">
       {!confirmed ? (
-        <p className="case-caption">Last confirmed status</p>
+        <p className="case-caption">{m.issues_execution_last_confirmed()}</p>
       ) : null}
       <h3>{tone ? <Badge tone={tone}>{status}</Badge> : status}</h3>
       {!execution ? (
         <p>
           {progress.state === 'awaiting_approval' && !progress.resolution
-            ? 'Approval is required before an action can proceed. No execution attempt has been recorded.'
-            : 'No execution attempt has been recorded for this issue.'}
+            ? m.issues_execution_none_awaiting_approval()
+            : m.issues_execution_none()}
         </p>
       ) : (
         <>
           <dl className="execution-result-rows">
             <div>
-              <dt>Action</dt>
+              <dt>{m.issues_execution_change_label()}</dt>
               <dd>
-                <strong>
-                  {
-                    {
-                      prepared: 'Result pending',
-                      unknown: 'Outcome unknown',
-                      succeeded: 'Succeeded',
-                      failed: 'Failed',
-                    }[execution.state]
-                  }
-                </strong>
+                <strong>{executionStateLabel(execution.state)}</strong>
                 <span className="case-caption">
-                  {execution.finishedAt ? 'Finished ' : 'Started '}
-                  <CaseTime
-                    value={execution.finishedAt ?? execution.startedAt}
-                  />
+                  {rich(
+                    execution.finishedAt
+                      ? m.issues_execution_finished_at
+                      : m.issues_execution_started_at,
+                    {
+                      time: (
+                        <CaseTime
+                          value={execution.finishedAt ?? execution.startedAt}
+                        />
+                      ),
+                    },
+                  )}
                 </span>
               </dd>
             </div>
             <div>
-              <dt>Outcome verification</dt>
+              <dt>{m.issues_check_label()}</dt>
               <dd>
                 <strong>
                   {verification
-                    ? caseLabel(verification.outcome)
+                    ? verificationLabel(verification.outcome)
                     : progress.state === 'verifying'
-                      ? 'Pending'
-                      : 'Not recorded'}
+                      ? m.issues_check_running()
+                      : m.issues_check_none()}
                 </strong>
                 {verification ? (
                   <span className="case-caption">
@@ -117,31 +127,19 @@ export function ExecutionSummary({
             </div>
           </dl>
           {execution.state === 'unknown' ? (
-            <p role="status">
-              The action may have taken effect. Inspect fresh observations
-              before taking further action.
-            </p>
+            <p role="status">{m.issues_execution_unclear_help()}</p>
           ) : execution.state === 'failed' ? (
-            <p>
-              Inspect the attempt details and current findings before deciding
-              what to do next.
-            </p>
+            <p>{m.issues_execution_failed_help()}</p>
           ) : verification?.outcome === 'failed' ? (
-            <p>
-              The expected outcome was not confirmed. Review the verification
-              evidence and current findings.
-            </p>
+            <p>{m.issues_check_failed_help()}</p>
           ) : !verification ? (
             <p className="case-caption">
               {progress.state === 'verifying'
-                ? 'Waiting for observations to confirm the expected outcome.'
-                : 'No verification result is recorded. A successful action alone does not establish resolution.'}
+                ? m.issues_check_running_help()
+                : m.issues_check_none_help()}
             </p>
           ) : verification.outcome !== 'passed' ? (
-            <p className="case-caption">
-              The intended outcome remains uncertain. Review the verification
-              evidence.
-            </p>
+            <p className="case-caption">{m.issues_check_unclear_help()}</p>
           ) : null}
         </>
       )}
@@ -149,29 +147,21 @@ export function ExecutionSummary({
   );
 }
 
-/** Keeps workflow state and revision identifiers available as secondary execution metadata. */
+/** Keeps workflow state and version identifiers available as secondary change metadata. */
 export function ExecutionMetadata({ progress }: { progress: CaseProgress }) {
   return (
     <dl>
-      <dt>Case state</dt>
-      <dd>{caseLabel(progress.state)}</dd>
-      <dt>Case revision</dt>
+      <dt>{m.issues_meta_issue_state()}</dt>
+      <dd>{caseStateLabel(progress.state)}</dd>
+      <dt>{m.issues_meta_issue_version()}</dt>
       <dd>{progress.caseRevision}</dd>
-      <dt>Investigation revision</dt>
+      <dt>{m.issues_meta_investigation_version()}</dt>
       <dd>{progress.diagnosisRevision}</dd>
-      <dt>Workflow</dt>
-      <dd>
-        {progress.workflow.availability === 'unavailable'
-          ? 'Unavailable. Current activity is unknown.'
-          : progress.workflow.availability === 'not_started'
-            ? 'Not started'
-            : progress.workflow.progress
-              ? caseLabel(progress.workflow.progress.phase)
-              : 'Current phase unknown'}
-      </dd>
+      <dt>{m.issues_meta_workflow()}</dt>
+      <dd>{workflowStatusLabel(progress.workflow)}</dd>
       {progress.workflow.progress?.reason ? (
         <>
-          <dt>Workflow reason</dt>
+          <dt>{m.issues_meta_workflow_reason()}</dt>
           <dd>{caseLabel(progress.workflow.progress.reason)}</dd>
         </>
       ) : null}

@@ -6,6 +6,7 @@ import type {
   CatalogView,
   ProductList,
 } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -126,7 +127,7 @@ function sourceOptions(
   }));
 
   return selected && !options.some((option) => option.value === selected)
-    ? [...options, { value: selected, label: 'Selected source' }]
+    ? [...options, { value: selected, label: m.products_source_selected() }]
     : options;
 }
 
@@ -157,20 +158,20 @@ function ListingCell({
 
     return (
       <div className="products-listing products-listing-gap">
-        <span>Not in catalog</span>
+        <span>{m.products_listing_not_in_catalog()}</span>
         {gap?.match ? (
           <Link
             to="/app/$organizationId/products/$skuId"
             params={{ organizationId, skuId: gap.match.skuId }}
             search={search}
           >
-            Same code, not linked: {gap.match.sku.trim()}
+            {m.products_listing_same_code({ sku: gap.match.sku.trim() })}
           </Link>
         ) : (
           <small>
             {source.fullReadAt
-              ? 'Full catalog read'
-              : 'Full catalog not read yet'}
+              ? m.products_listing_full_read()
+              : m.products_listing_full_unread()}
           </small>
         )}
       </div>
@@ -184,14 +185,16 @@ function ListingCell({
       ) : null}
       <span className={differs('status')}>{statusLabels[listing.status]}</span>
       <span className={differs('price')}>
-        {formatPrice(listing.price) ?? 'No price reported'}
+        {formatPrice(listing.price) ?? m.products_listing_no_price()}
       </span>
       <small className={differs('published')}>
         {listingLabel(listing.published, source.system)}
       </small>
       <small>
         {readAge(listing.observedAt, asOf)}
-        {listings.length > 1 ? ` · in ${listings.length} products` : ''}
+        {listings.length > 1
+          ? ` · ${m.products_listing_in_products({ count: listings.length })}`
+          : ''}
       </small>
     </div>
   );
@@ -205,7 +208,7 @@ function catalogColumns(
   return [
     {
       key: 'sku',
-      header: 'SKU / product',
+      header: m.products_column_sku(),
       cell: (item) => {
         const state = catalogState(item, list.sources);
 
@@ -222,7 +225,7 @@ function catalogColumns(
             >
               {item.sku.trim()}
             </DataTableRowLink>
-            <small>{item.title ?? 'No title reported'}</small>
+            <small>{item.title ?? m.products_no_title()}</small>
             <span className="products-flags">
               <StatePill state={state.state}>{state.label}</StatePill>
               {item.differences.map((field) => (
@@ -300,15 +303,15 @@ export function ProductsView({
 
   return (
     <main className="products-page">
-      {from ? <Link to={from}>← Back to context</Link> : null}
-      <PageTitle title="Products" />
+      {from ? <Link to={from}>← {m.products_back_context()}</Link> : null}
+      <PageTitle title={m.products_page_title()} />
       <CollectionToolbar
-        refreshLabel="Refresh products"
+        refreshLabel={m.products_list_refresh()}
         refreshing={refreshing}
         onRefresh={refresh}
         views={
           <CollectionViews
-            label="Product views"
+            label={m.products_list_views_label()}
             value={view}
             views={views.map((option) => ({
               value: option,
@@ -323,14 +326,14 @@ export function ProductsView({
         search={{
           value: search.q,
           onChange: (q) => update({ q }),
-          label: 'Search products',
-          placeholder: 'SKU, title, barcode, vendor or source ID…',
+          label: m.products_list_search_label(),
+          placeholder: m.products_list_search_placeholder(),
         }}
         filters={[
           {
             kind: 'choice',
             key: 'connectionId',
-            label: 'Listed in',
+            label: m.products_filter_listed_in(),
             icon: PackageCheck,
             value: search.connectionId,
             options: sourceOptions(sources, search.connectionId),
@@ -339,7 +342,7 @@ export function ProductsView({
           {
             kind: 'choice',
             key: 'missingFrom',
-            label: 'Missing from',
+            label: m.products_filter_missing_from(),
             icon: PackageX,
             value: search.missingFrom,
             options:
@@ -352,26 +355,21 @@ export function ProductsView({
         onClear={() => change({ from: search.from, view: search.view })}
       />
       {coverage}
-      <p className="products-note">
-        No source is treated as the authority. Prices are compared only within
-        the same currency.
-      </p>
+      <p className="products-note">{m.products_list_note()}</p>
       {offline ? (
-        <Alert role="status">
-          You are offline. Reconnect to refresh products.
-        </Alert>
+        <Alert role="status">{m.products_list_offline()}</Alert>
       ) : null}
       {error ? (
         <Alert tone="danger" role="alert">
           {stale
-            ? 'Products could not be refreshed. The list below may be out of date.'
-            : error}{' '}
+            ? m.products_list_refresh_failed()
+            : `${m.products_list_load_failed()} ${error}`}{' '}
           <Button variant="outline" onClick={refresh}>
-            Retry
+            {m.common_retry()}
           </Button>
           {search.cursor ? (
             <Button variant="ghost" onClick={() => update({})}>
-              Go to first page
+              {m.products_list_first_page_button()}
             </Button>
           ) : null}
         </Alert>
@@ -380,7 +378,7 @@ export function ProductsView({
         <>
           <DataTable
             className="products-list-table"
-            caption={`${viewLabels[view]}, with each source’s listing side by side`}
+            caption={m.products_list_caption({ view: viewLabels[view] })}
             columns={catalogColumns(organizationId, search, shownList)}
             rows={shownList.items}
             rowKey={(item) => item.skuId}
@@ -388,25 +386,27 @@ export function ProductsView({
               <Empty>
                 <Package size={30} aria-hidden="true" />
                 <h2>
-                  {filtered ? 'No products match' : 'No products imported yet'}
+                  {filtered
+                    ? m.products_list_unmatched_title()
+                    : m.products_list_empty_title()}
                 </h2>
                 <p>
                   {filtered
                     ? view !== 'all' && !search.q
-                      ? `No SKUs in “${viewLabels[view]}”. Your catalogs agree on this view.`
-                      : 'Try another SKU, title or source.'
-                    : 'Products appear here once a connected store or ERP shares its catalog. Check Data sync for progress.'}
+                      ? m.products_list_view_empty({ view: viewLabels[view] })
+                      : m.products_list_unmatched_body()
+                    : m.products_list_empty_body()}
                 </p>
                 {filtered ? (
                   <Button onClick={clear} variant="outline">
-                    Clear filters
+                    {m.common_clear_filters()}
                   </Button>
                 ) : (
                   <Link
                     to="/app/$organizationId/sync"
                     params={{ organizationId }}
                   >
-                    Open Data sync
+                    {m.products_open_data_sync()}
                   </Link>
                 )}
               </Empty>
@@ -414,9 +414,12 @@ export function ProductsView({
           />
           <div className="products-pagination">
             <span>
-              {shownList.items.length} of {shownList.counts[view]}{' '}
-              {shownList.counts[view] === 1 ? 'SKU' : 'SKUs'}
-              {search.cursor ? ' on this page' : ''}
+              {(search.cursor
+                ? m.products_list_count_page
+                : m.products_list_count)({
+                shown: shownList.items.length,
+                total: shownList.counts[view] ?? shownList.items.length,
+              })}
             </span>
             <div>
               {previous ? (
@@ -425,12 +428,12 @@ export function ProductsView({
                   disabled={refreshing}
                   onClick={previous}
                 >
-                  Previous page
+                  {m.products_list_previous()}
                 </Button>
               ) : null}
               {search.cursor ? (
                 <Button variant="ghost" onClick={() => update({})}>
-                  First page
+                  {m.products_list_first_page()}
                 </Button>
               ) : null}
               <Button
@@ -438,14 +441,14 @@ export function ProductsView({
                 disabled={!next || refreshing}
                 onClick={next}
               >
-                Next page
+                {m.products_list_next()}
               </Button>
             </div>
           </div>
         </>
       ) : loading && !error ? (
         <div className="products-loading" role="status">
-          <span className="sr-only">Loading products…</span>
+          <span className="sr-only">{m.products_list_loading()}</span>
           {Array.from({ length: 5 }, (_, i) => (
             <span className="lu-skeleton" key={i} />
           ))}

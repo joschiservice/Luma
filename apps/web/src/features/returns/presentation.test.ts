@@ -56,17 +56,17 @@ describe('refund wording', () => {
 describe('next steps', () => {
   it('names the owner of the next step in the source’s terms', () => {
     expect(nextStep(returnItem({ stage: 'requested' }), 'shopify')).toBe(
-      'Review the request and approve or decline it in Shopify.',
+      'Review the request, then approve or decline it in Shopify.',
     );
     expect(nextStep(returnItem(), 'shopify')).toBe(
-      'Waiting for 1 unit to arrive back (1 of 2 received).',
+      'Waiting for 1 unit to arrive back. 1 of 2 received.',
     );
     expect(
       nextStep(
         returnItem({ stage: 'awaiting_refund', refundedUnits: '1' }),
         null,
       ),
-    ).toBe('Refund the remaining 1 unit in the source.');
+    ).toBe('Refund the remaining 1 unit in the connected system.');
     expect(
       nextStep(
         returnItem({
@@ -75,19 +75,19 @@ describe('next steps', () => {
         }),
         'shopify',
       ),
-    ).toMatch(/^€48.00 is processing.*has not received it yet\.$/);
+    ).toMatch(/^€48.00 is processing.*hasn’t received it yet\.$/);
   });
 
   it('explains missing access by connection kind', () => {
     expect(accessMessage(sources[0]!)).toBeNull();
     expect(accessMessage(sources[1]!)).toMatch(
-      /JTL-Wawi does not share returns with Luma/,
+      /JTL-Wawi doesn’t share returns with Luma/,
     );
     expect(accessMessage({ ...sources[0]!, access: 'not_requested' })).toMatch(
       /Reconnect it to share returns/,
     );
     expect(accessMessage({ ...sources[0]!, access: 'not_granted' })).toMatch(
-      /has not granted access/,
+      /hasn’t granted access/,
     );
   });
 });
@@ -109,7 +109,7 @@ describe('return progress', () => {
     });
     expect(unreported[2]).toMatchObject({
       state: 'unreported',
-      detail: 'The source does not report returned items',
+      detail: 'The source doesn’t report returned items',
     });
   });
 

@@ -45,7 +45,7 @@ function Routed({ children }: { children: ReactNode }) {
       routeTree: createRootRoute({
         component: () => (
           <QueryClientProvider client={client}>
-            <StoryShell page="Workflows">{children}</StoryShell>
+            <StoryShell page="workflows">{children}</StoryShell>
           </QueryClientProvider>
         ),
       }),
@@ -321,9 +321,9 @@ export const StepBuilder: Story = {
     // tick, and may scroll the list before the step moves, as with a real keyboard.
     canvas.getByRole('button', { name: 'Reorder step 1' }).focus();
     await userEvent.keyboard('{Enter}');
-    await body.findByText(/Code Step is now at position 1 of 3/);
+    await body.findByText(/Code step is now at position 1 of 3/);
     await userEvent.keyboard('{ArrowDown}');
-    await body.findByText(/Code Step is now at position 2 of 3/);
+    await body.findByText(/Code step is now at position 2 of 3/);
     await userEvent.keyboard('{Enter}');
     await waitFor(() =>
       expect(order).toHaveTextContent('needs-order,compute,finish'),

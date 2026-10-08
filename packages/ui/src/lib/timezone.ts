@@ -1,3 +1,5 @@
+import { m } from '@luma/i18n/messages';
+
 /** Returns an ISO calendar date or local date-time in an IANA timezone. */
 export function workspaceDateValue(
   value: Date,
@@ -23,13 +25,15 @@ export function workspaceDateValue(
     : day;
 }
 
-/** Converts a workspace calendar date or local date-time to UTC, rejecting skipped clock times. */
+/**
+ * Converts a workspace calendar date or local date-time to UTC. Throws an error with a message
+ * in the interface language for an invalid value or a local time skipped by a clock change.
+ */
 export function workspaceInstant(value: string, timeZone: string): string {
   const calendarDay = value.length === 10;
   const local = calendarDay ? `${value}T00:00:00` : value;
   const target = Date.parse(`${local}Z`);
-  if (!Number.isFinite(target))
-    throw new Error('Choose a valid date and time.');
+  if (!Number.isFinite(target)) throw new Error(m.ui_time_error_invalid());
   const milliseconds = ((target % 1000) + 1000) % 1000;
   let guess = target;
   const candidates: number[] = [];
@@ -60,9 +64,7 @@ export function workspaceInstant(value: string, timeZone: string): string {
       return new Date(end).toISOString();
     }
   }
-  throw new Error(
-    'This local time does not exist because the clocks change. Choose another time.',
-  );
+  throw new Error(m.ui_time_error_skipped());
 }
 
 /** Advances a calendar date without applying a browser-local offset. */

@@ -1,4 +1,5 @@
 import type { CaseDetail } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import {
   caseFixture,
   inventoryCase,
@@ -81,7 +82,7 @@ function IssuePagePreview({
 
   return (
     <>
-      <StoryShell page="Issues">
+      <StoryShell page="exceptions">
         {full ? (
           <IssuePageLayout
             item={unavailable ? undefined : item}
@@ -124,8 +125,8 @@ function IssuePagePreview({
             }
           >
             {unavailable ? (
-              <CaseNotice error title="Case unavailable">
-                This case is missing or you no longer have access.
+              <CaseNotice error title={m.exceptions_issue_unavailable()}>
+                {m.exceptions_detail_denied_text()}
               </CaseNotice>
             ) : (
               content
@@ -198,10 +199,10 @@ export const FullPage: Story = {
     for (const title of [
       'Overview',
       'Findings',
-      'Execution',
-      'Audit history',
+      'Change and outcome check',
+      'History',
       'Evidence',
-      'Resolution',
+      'Proposed change',
       'Issue details',
     ]) {
       const card = canvas.getByRole('region', { name: title });
@@ -219,20 +220,18 @@ export const FullPage: Story = {
         .closest('.issue-page-main'),
     ).not.toBeNull();
 
-    await userEvent.click(
-      canvas.getByRole('button', { name: 'Audit history' }),
-    );
+    await userEvent.click(canvas.getByRole('button', { name: 'History' }));
     await expect(
       canvasElement.querySelector('[data-issue-section="history"]'),
     ).toHaveFocus();
     await expect(
-      canvas.getByRole('button', { name: 'Audit history' }),
+      canvas.getByRole('button', { name: 'History' }),
     ).toHaveAttribute('aria-current', 'location');
     await userEvent.click(
       canvas.getByRole('button', { name: 'View full history (32)' }),
     );
     await expect(
-      canvas.getByRole('heading', { name: 'Audit history' }),
+      canvas.getByRole('heading', { name: 'History' }),
     ).toHaveFocus();
     await expect(
       canvas.queryByRole('navigation', { name: 'Issue sections' }),
@@ -241,10 +240,10 @@ export const FullPage: Story = {
       canvas.getByRole('button', { name: 'Back to issue' }),
     );
     await userEvent.click(
-      canvas.getByRole('button', { name: 'Review resolution' }),
+      canvas.getByRole('button', { name: 'Review change' }),
     );
     await expect(
-      canvas.getByRole('region', { name: 'Resolution' }),
+      canvas.getByRole('region', { name: 'Proposed change' }),
     ).toHaveFocus();
     await userEvent.click(
       canvas.getByRole('button', { name: 'Back to issues' }),
@@ -409,7 +408,7 @@ export const OverviewChecks: Story = {
     await expect(overview.getByText('10 units')).toBeVisible();
     await expect(
       overview.getByText(
-        'Selling availability is 10 units above the configured stock authority.',
+        'Available to sell is 10 units above the stock in the leading system.',
       ),
     ).toBeVisible();
     await expect(
@@ -418,14 +417,12 @@ export const OverviewChecks: Story = {
       }),
     ).toBeVisible();
     await expect(
-      overview.getAllByText(
-        'Automatic correction and retries are not available for this issue.',
-      ),
+      overview.getAllByText('Luma can’t fix or retry this automatically.'),
     ).toHaveLength(1);
     await expect(
       overview.getByText('Obtain current observations before correcting.'),
     ).not.toBeVisible();
-    await userEvent.click(overview.getByText('Checks and verification'));
+    await userEvent.click(overview.getByText('Steps and checks'));
     await expect(
       overview.getByText('Obtain current observations before correcting.'),
     ).toBeVisible();
@@ -435,7 +432,7 @@ export const OverviewChecks: Story = {
       ),
     ).toBeVisible();
     await expect(
-      overview.queryByText(/Investigation revision/),
+      overview.queryByText(/Investigation version/),
     ).not.toBeInTheDocument();
   },
 };
@@ -447,13 +444,13 @@ export const HistoricalOverview: Story = {
       within(canvasElement).getByRole('region', { name: 'Overview' }),
     );
     await expect(
-      overview.getByText('Recorded potential exposure'),
+      overview.getByText('Potential exposure when last recorded'),
     ).toBeVisible();
     await expect(
-      overview.queryByText('Checks and verification'),
+      overview.queryByText('Steps and checks'),
     ).not.toBeInTheDocument();
     await expect(
-      overview.queryByText('Manual review required'),
+      overview.queryByText('Manual review needed'),
     ).not.toBeInTheDocument();
   },
 };

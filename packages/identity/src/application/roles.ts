@@ -2,6 +2,7 @@ import type { Membership, TenantContext } from '../domain/context.js';
 import { IdentityError } from '../domain/context.js';
 import type { PermissionDefinition } from '../domain/permissions.js';
 import {
+  appPermissionGroupDescription,
   appPermissionOwner,
   isPermission,
   permissionCatalog,
@@ -278,9 +279,10 @@ export function createRolesService(deps: {
             ...apps.map((group) => ({
               id: `app:${group.app.id}`,
               label: group.app.name,
-              description: group.app.available
-                ? `Permissions ${group.app.name} declares for its own features.`
-                : `${group.app.name} is unavailable in this deployment, so its permissions grant nothing.`,
+              description: appPermissionGroupDescription(
+                group.app.name,
+                group.app.available,
+              ),
               app: group.app,
             })),
           ],

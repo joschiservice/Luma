@@ -21,7 +21,7 @@ export const permissionGroups = [
   {
     id: 'workspace',
     label: 'Workspace',
-    description: 'Shared workspace details and approval policy.',
+    description: 'Workspace details and approval rules.',
   },
   {
     id: 'access',
@@ -31,13 +31,13 @@ export const permissionGroups = [
   {
     id: 'records',
     label: 'Commerce records',
-    description: 'Imported orders, stock, products, customers and returns.',
+    description: 'Imported orders, stock, products, customers, and returns.',
   },
   {
     id: 'issues',
     label: 'Issues and decisions',
     description:
-      'Operational issues, their evidence and the decisions they need.',
+      'Operational issues, their evidence, and the decisions they need.',
   },
   {
     id: 'actions',
@@ -47,21 +47,21 @@ export const permissionGroups = [
   {
     id: 'workflows',
     label: 'Workflows',
-    description: 'Automated processes, their drafts, versions and triggers.',
+    description: 'Workflows, their drafts, versions, and triggers.',
   },
   {
     id: 'procurement',
     label: 'Procurement',
-    description: 'Suppliers, purchase orders and replenishment.',
+    description: 'Suppliers, purchase orders, and replenishment.',
   },
   {
     id: 'connections',
     label: 'Connections and apps',
-    description: 'Connected systems, imports and installed apps.',
+    description: 'Connected systems, imports, and installed apps.',
   },
   {
     id: 'assistant',
-    label: 'Assistant',
+    label: 'Ask Luma',
     description: 'Ask Luma questions about workspace data.',
   },
   {
@@ -70,6 +70,16 @@ export const permissionGroups = [
     description: 'The record of what people and Luma did.',
   },
 ] as const satisfies readonly PermissionGroup[];
+
+/**
+ * Describes the permission group of an installed app. Apps whose package is missing from the
+ * deployment keep their group, but its permissions have no effect.
+ */
+export function appPermissionGroupDescription(app: string, available: boolean) {
+  return available
+    ? `Permissions for ${app}’s own features.`
+    : `${app} isn’t available on this Luma server, so its permissions have no effect.`;
+}
 
 const introduced = '2026-10-06';
 
@@ -82,16 +92,16 @@ export const permissionCatalog = [
     key: 'workspace.settings.manage',
     group: 'workspace',
     label: 'Edit workspace settings',
-    description: 'Change the workspace name and display timezone.',
+    description: 'Change the workspace name and display time zone.',
     consequential: false,
     introduced,
   },
   {
     key: 'workspace.approval_policy.manage',
     group: 'workspace',
-    label: 'Manage approval policy',
+    label: 'Manage approval rules',
     description:
-      'Decide whether every permitted change needs independent approval.',
+      'Decide whether every allowed change needs approval from a second person.',
     consequential: true,
     introduced,
   },
@@ -100,7 +110,7 @@ export const permissionCatalog = [
     group: 'access',
     label: 'Manage team members',
     description:
-      'Invite people, change their role and remove their access. People can only assign roles whose permissions they hold.',
+      'Invite people, change their role, and remove their access. People can only assign roles whose permissions they hold.',
     consequential: true,
     introduced,
   },
@@ -109,7 +119,7 @@ export const permissionCatalog = [
     group: 'access',
     label: 'Manage roles',
     description:
-      'Create, edit and archive custom roles, and read their change history. People can only grant permissions they hold.',
+      'Create, edit, and archive custom roles, and see their change history. People can only grant permissions they hold.',
     consequential: true,
     introduced,
   },
@@ -117,7 +127,8 @@ export const permissionCatalog = [
     key: 'orders.read',
     group: 'records',
     label: 'View orders',
-    description: 'See orders, their lines, payments and provider links.',
+    description:
+      'See orders, their lines, payments, and links to the source systems.',
     consequential: false,
     introduced,
   },
@@ -125,7 +136,7 @@ export const permissionCatalog = [
     key: 'fulfillment.read',
     group: 'records',
     label: 'View fulfillment',
-    description: 'See shipments, carriers and fulfillment progress.',
+    description: 'See shipments, carriers, and fulfillment progress.',
     consequential: false,
     introduced,
   },
@@ -133,7 +144,7 @@ export const permissionCatalog = [
     key: 'inventory.read',
     group: 'records',
     label: 'View inventory',
-    description: 'See stock positions, locations and stock history.',
+    description: 'See stock positions, locations, and stock history.',
     consequential: false,
     introduced,
   },
@@ -150,7 +161,7 @@ export const permissionCatalog = [
     group: 'records',
     label: 'View customers',
     description:
-      'See customer profiles, including names, email addresses and postal addresses.',
+      'See customer profiles, including names, email addresses, and postal addresses.',
     consequential: true,
     introduced,
   },
@@ -158,7 +169,7 @@ export const permissionCatalog = [
     key: 'returns.read',
     group: 'records',
     label: 'View returns',
-    description: 'See returns, refunds and money returned.',
+    description: 'See returns, refunds, and money returned.',
     consequential: false,
     introduced,
   },
@@ -166,7 +177,7 @@ export const permissionCatalog = [
     key: 'insights.read',
     group: 'records',
     label: 'View insights',
-    description: 'See operational metrics, rule charts and import coverage.',
+    description: 'See operational metrics, rule charts, and import coverage.',
     consequential: false,
     introduced,
   },
@@ -174,7 +185,7 @@ export const permissionCatalog = [
     key: 'issues.read',
     group: 'issues',
     label: 'View issues',
-    description: 'See issues, their evidence, diagnoses and proposed actions.',
+    description: 'See issues, their evidence, diagnoses, and proposed changes.',
     consequential: false,
     introduced,
   },
@@ -183,7 +194,7 @@ export const permissionCatalog = [
     group: 'issues',
     label: 'Work on issues',
     description:
-      'Verify, escalate and resolve issues, refresh their evidence and record what was learned.',
+      'Check, escalate, and resolve issues, refresh their evidence, and record what was learned.',
     consequential: false,
     introduced,
   },
@@ -208,25 +219,25 @@ export const permissionCatalog = [
     group: 'issues',
     label: 'Approve or reject changes',
     description:
-      'Respond to approval requests. The approver must differ from the person who proposed the change.',
+      'Respond to approval requests. The approver must be someone other than the person who proposed the change.',
     consequential: true,
     introduced,
   },
   {
     key: 'actions.propose',
     group: 'actions',
-    label: 'Propose actions',
+    label: 'Propose changes',
     description:
-      'Ask Luma to prepare changes in connected systems, subject to policy and approval.',
+      'Ask Luma to prepare changes in connected systems. Approval rules decide whether someone must approve them.',
     consequential: true,
     introduced,
   },
   {
     key: 'actions.execute',
     group: 'actions',
-    label: 'Run actions',
+    label: 'Apply changes',
     description:
-      'Run permitted or approved changes in connected systems. Some actions need their own app permission instead.',
+      'Apply allowed or approved changes in connected systems. Some changes need their own app permission instead.',
     consequential: true,
     introduced,
   },
@@ -234,16 +245,16 @@ export const permissionCatalog = [
     key: 'workflows.read',
     group: 'workflows',
     label: 'View workflows',
-    description: 'See workflows, versions, runs and their evidence.',
+    description: 'See workflows, their versions, runs, and evidence.',
     consequential: false,
     introduced,
   },
   {
     key: 'workflows.author',
     group: 'workflows',
-    label: 'Author workflows',
+    label: 'Edit workflows',
     description:
-      'Create and edit drafts, generate drafts with Luma and run draft tests.',
+      'Create and edit drafts, generate drafts with Luma, and test drafts.',
     consequential: false,
     introduced,
   },
@@ -259,16 +270,16 @@ export const permissionCatalog = [
     key: 'workflows.triggers.manage',
     group: 'workflows',
     label: 'Manage workflow triggers',
-    description: 'Create, change and pause schedules and event triggers.',
+    description: 'Create, change, and pause schedules and event triggers.',
     consequential: true,
     introduced,
   },
   {
     key: 'playbooks.activate',
     group: 'workflows',
-    label: 'Activate playbooks',
+    label: 'Test and turn on issue workflows',
     description:
-      'Activate resolution playbooks and review their shadow-mode results.',
+      'Run Workflow tests on issues, review their results, and turn on issue workflows for selected records.',
     consequential: true,
     introduced,
   },
@@ -277,7 +288,7 @@ export const permissionCatalog = [
     group: 'procurement',
     label: 'View procurement',
     description:
-      'See suppliers, purchase orders, commitments and replenishment.',
+      'See suppliers, purchase orders, supplier commitments, and replenishment.',
     consequential: false,
     introduced,
   },
@@ -286,7 +297,7 @@ export const permissionCatalog = [
     group: 'procurement',
     label: 'Manage procurement',
     description:
-      'Edit suppliers and purchase orders, review commitments and configure replenishment.',
+      'Edit suppliers and purchase orders, review supplier commitments, and set up replenishment.',
     consequential: true,
     introduced,
   },
@@ -294,7 +305,7 @@ export const permissionCatalog = [
     key: 'connections.manage',
     group: 'connections',
     label: 'Manage connections',
-    description: 'Connect, reauthorize and disconnect systems.',
+    description: 'Connect, reconnect, and disconnect systems.',
     consequential: true,
     introduced,
   },
@@ -303,7 +314,7 @@ export const permissionCatalog = [
     group: 'connections',
     label: 'Manage imports',
     description:
-      'Start, pause and repair imports, and review links between imported records.',
+      'Start, pause, and fix imports, and review links between imported records.',
     consequential: false,
     introduced,
   },
@@ -312,7 +323,7 @@ export const permissionCatalog = [
     group: 'connections',
     label: 'Manage apps',
     description:
-      'Install, upgrade and uninstall apps, and grant the access they request.',
+      'Install, update, and uninstall apps, and grant the access they request.',
     consequential: true,
     introduced,
   },
@@ -338,7 +349,7 @@ export const permissionCatalog = [
     group: 'activity',
     label: 'View restricted activity',
     description:
-      'See access changes, actor details and restricted activity entries.',
+      'See access changes, who made each change, and other restricted activity.',
     consequential: true,
     introduced,
   },

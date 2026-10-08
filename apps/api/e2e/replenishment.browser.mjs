@@ -132,7 +132,7 @@ test('reviews replenishment scope, recovers a lost response, approves and opens 
     .getByText('The expected result was verified.', { exact: true })
     .waitFor();
   await review.getByText('Draft verified', { exact: true }).waitFor();
-  await review.getByText('approved', { exact: true }).waitFor();
+  await review.getByText('Approved', { exact: true }).waitFor();
   await review.getByLabel('Recorded stock context').waitFor();
   await review.screenshot({
     path: '/tmp/luma74-run-desktop.png',
@@ -159,7 +159,7 @@ test('reviews replenishment scope, recovers a lost response, approves and opens 
     .first()
     .waitFor();
   await review.goBack();
-  await review.getByRole('link', { name: 'Inspect purchase order' }).click();
+  await review.getByRole('link', { name: 'Open purchase order' }).click();
   await review.getByText('Northstar Supply', { exact: true }).first().waitFor();
   // The stock record shows the same readiness and returns to the original context.
   await page.getByRole('link', { name: 'Stock record' }).first().click();

@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import {
   BadgeCheck,
   Braces,
@@ -14,25 +15,28 @@ import {
 import type { PaletteGroup, StepKind } from './draft-model';
 
 /** Icon and short name for each step type. Colours come from `data-kind` in authoring.css. */
-export const stepKinds: Record<StepKind, { icon: LucideIcon; name: string }> = {
-  read: { icon: Database, name: 'Read data' },
-  condition: { icon: Split, name: 'Condition' },
-  capability: { icon: Zap, name: 'Action' },
-  approval: { icon: UserCheck, name: 'Approval' },
-  wait: { icon: Hourglass, name: 'Wait' },
-  verification: { icon: BadgeCheck, name: 'Result check' },
-  escalation: { icon: Siren, name: 'Escalate' },
-  end: { icon: Flag, name: 'Finish' },
-  code: { icon: Braces, name: 'Code Step' },
+export const stepKinds: Record<
+  StepKind,
+  { icon: LucideIcon; name: () => string }
+> = {
+  read: { icon: Database, name: m.authoring_step_kind_read },
+  condition: { icon: Split, name: m.authoring_step_kind_condition },
+  capability: { icon: Zap, name: m.authoring_step_kind_action },
+  approval: { icon: UserCheck, name: m.authoring_step_kind_approval },
+  wait: { icon: Hourglass, name: m.authoring_step_kind_wait },
+  verification: { icon: BadgeCheck, name: m.authoring_step_kind_check },
+  escalation: { icon: Siren, name: m.authoring_step_kind_escalation },
+  end: { icon: Flag, name: m.authoring_step_kind_finish },
+  code: { icon: Braces, name: m.authoring_step_kind_code },
 };
 
 /** Palette sections in the order a workflow usually reads. */
-export const paletteGroups: { group: PaletteGroup; label: string }[] = [
-  { group: 'data', label: 'Get data' },
-  { group: 'decide', label: 'Decide and wait' },
-  { group: 'act', label: 'Take action' },
-  { group: 'compute', label: 'Compute' },
-  { group: 'finish', label: 'Finish' },
+export const paletteGroups: { group: PaletteGroup; label: () => string }[] = [
+  { group: 'data', label: m.authoring_palette_group_data },
+  { group: 'decide', label: m.authoring_palette_group_decide },
+  { group: 'act', label: m.authoring_palette_group_act },
+  { group: 'compute', label: m.authoring_palette_group_compute },
+  { group: 'finish', label: m.authoring_palette_group_finish },
 ];
 
 /** The coloured icon badge for a step type. */

@@ -1,3 +1,5 @@
+import { m } from '@luma/i18n/messages';
+
 /** Displays provider names while preserving unknown installed system identifiers. */
 export function workflowSystemLabel(system: string): string {
   return (
@@ -18,24 +20,29 @@ export function workflowTriggerLabel(
 ): string {
   switch (trigger.kind) {
     case 'manual':
-      return 'Manual request';
+      return m.workflows_trigger_manual();
     case 'exception':
-      return `${trigger.issueType.replaceAll('_', ' ')} detected`;
+      return m.workflows_trigger_issue_detected({
+        issue: trigger.issueType.replaceAll('_', ' '),
+      });
     case 'event':
       return trigger.eventType;
     case 'schedule':
-      return 'Scheduled start';
+      return m.workflows_trigger_schedule();
     case 'condition':
       return trigger.field === 'belowMinimum' && trigger.equals === true
-        ? 'Stock falls below the configured minimum'
-        : `${trigger.field} is ${String(trigger.equals)}`;
+        ? m.workflows_trigger_below_minimum()
+        : m.workflows_trigger_condition({
+            field: trigger.field,
+            value: String(trigger.equals),
+          });
   }
 }
 
 /** Names a workflow's operational area; resolution workflows fix detected issues. */
 export function workflowCategoryLabel(category: string): string {
-  if (category === 'resolution') return 'Issue resolution';
-  if (category === 'procurement') return 'Procurement';
+  if (category === 'resolution') return m.workflows_category_resolution();
+  if (category === 'procurement') return m.workflows_category_procurement();
 
   return category.charAt(0).toUpperCase() + category.slice(1);
 }

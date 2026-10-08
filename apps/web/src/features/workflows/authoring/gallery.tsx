@@ -1,6 +1,7 @@
 import './authoring.css';
 
 import type { WorkflowTemplate } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -40,14 +41,14 @@ import { DescribeDialog } from './describe';
 import { UseTemplateDialog } from './use-template';
 
 const categories = {
-  procurement: 'Procurement',
-  resolution: 'Resolution',
-  inventory: 'Inventory',
-  fulfillment: 'Fulfillment',
-  orders: 'Orders',
-  returns: 'Returns',
-  connections: 'Connections',
-} as const;
+  procurement: m.authoring_category_procurement,
+  resolution: m.authoring_category_resolution,
+  inventory: m.authoring_category_inventory,
+  fulfillment: m.authoring_category_fulfillment,
+  orders: m.authoring_category_orders,
+  returns: m.authoring_category_returns,
+  connections: m.authoring_category_connections,
+} satisfies Record<WorkflowTemplate['category'], () => string>;
 
 const categoryKeys = [
   'procurement',
@@ -227,21 +228,20 @@ export function NewWorkflowView({
       <WorkspaceBreadcrumb>
         <Workflow size={16} aria-hidden="true" />
         <Link to="/app/$organizationId/workflows" params={{ organizationId }}>
-          Workflows
+          {m.authoring_breadcrumb_workflows()}
         </Link>
         <ChevronRight size={14} aria-hidden="true" />
-        <span aria-current="page">New workflow</span>
+        <span aria-current="page">{m.authoring_gallery_title()}</span>
       </WorkspaceBreadcrumb>
       <PageHeader
         icon={<DomainIcon domain="workflows" size="lg" />}
-        title="New workflow"
-        description="Start from a template or build your own. Nothing runs until it is published and activated."
+        title={m.authoring_gallery_title()}
+        description={m.authoring_gallery_description()}
       />
       <OfflineNotice />
       {!canManage ? (
         <Alert tone="neutral" className="workflow-notice">
-          You can browse templates. Your role doesn’t include Author workflows,
-          so you can’t set them up or create workflows.
+          {m.authoring_gallery_view_only()}
         </Alert>
       ) : null}
       {startError ? (
@@ -249,7 +249,7 @@ export function NewWorkflowView({
           <span>{startError}</span>
           {retryStart ? (
             <Button variant="outline" disabled={pending} onClick={retryStart}>
-              Retry
+              {m.common_retry()}
             </Button>
           ) : null}
         </Alert>
@@ -257,22 +257,19 @@ export function NewWorkflowView({
       <section className="authoring-section" aria-labelledby="templates-title">
         <div className="authoring-section-heading">
           <div>
-            <h2 id="templates-title">Templates</h2>
-            <p>
-              Reviewed workflows you configure and activate. Each one lists what
-              it needs first.
-            </p>
+            <h2 id="templates-title">{m.authoring_templates_title()}</h2>
+            <p>{m.authoring_templates_description()}</p>
           </div>
         </div>
         <div className="authoring-filters">
           <CollectionViews
-            label="Template category"
+            label={m.authoring_templates_category_label()}
             value={search.category ?? 'all'}
             views={[
-              { value: 'all', label: 'All', count: matching?.length },
+              { value: 'all', label: m.common_all(), count: matching?.length },
               ...categoryKeys.map((value) => ({
                 value,
-                label: categories[value],
+                label: categories[value](),
                 count: matching?.filter((item) => item.category === value)
                   .length,
               })),
@@ -288,8 +285,8 @@ export function NewWorkflowView({
             <Search size={16} aria-hidden="true" />
             <Input
               type="search"
-              aria-label="Search templates"
-              placeholder="Search by name or what it does…"
+              aria-label={m.authoring_templates_search_label()}
+              placeholder={m.authoring_templates_search_placeholder()}
               value={search.q ?? ''}
               onChange={(event) =>
                 changeSearch({ ...search, q: event.target.value })
@@ -299,14 +296,14 @@ export function NewWorkflowView({
         </div>
         {error ? (
           <Alert tone="danger" role="alert">
-            <span>Templates are unavailable. {error}</span>
+            <span>{m.authoring_templates_failed({ error })}</span>
             <Button variant="outline" onClick={retry}>
-              Retry
+              {m.common_retry()}
             </Button>
           </Alert>
         ) : loading ? (
           <div className="authoring-template-grid" aria-busy="true">
-            <p role="status">Loading templates…</p>
+            <p role="status">{m.authoring_templates_loading()}</p>
             {[0, 1].map((item) => (
               <div key={item} className="authoring-skeleton" />
             ))}
@@ -314,22 +311,23 @@ export function NewWorkflowView({
         ) : !templates?.length ? (
           <Empty>
             <Workflow size={26} aria-hidden="true" />
-            <h3>No templates installed</h3>
-            <p>
-              Start from scratch below, or install an app that adds templates.
-            </p>
+            <h3>{m.authoring_templates_empty_title()}</h3>
+            <p>{m.authoring_templates_empty_description()}</p>
           </Empty>
         ) : !shown?.length ? (
           <Empty>
             <Search size={24} aria-hidden="true" />
-            <h3>No matching templates</h3>
-            <p>Try another category or search, or start from scratch.</p>
+            <h3>{m.authoring_templates_no_match_title()}</h3>
+            <p>{m.authoring_templates_no_match_description()}</p>
             <Button variant="outline" onClick={() => changeSearch({})}>
-              Clear filters
+              {m.common_clear_filters()}
             </Button>
           </Empty>
         ) : (
-          <ul className="authoring-template-grid" aria-label="Templates">
+          <ul
+            className="authoring-template-grid"
+            aria-label={m.authoring_templates_title()}
+          >
             {shown.map((template) => (
               <li key={template.id}>
                 <TemplateCard
@@ -348,21 +346,21 @@ export function NewWorkflowView({
       <section className="authoring-section" aria-labelledby="scratch-title">
         <div className="authoring-section-heading">
           <div>
-            <h2 id="scratch-title">Start from scratch</h2>
-            <p>
-              Every way of building produces the same workflow. Switch between
-              them at any time.
-            </p>
+            <h2 id="scratch-title">{m.authoring_scratch_title()}</h2>
+            <p>{m.authoring_scratch_description()}</p>
           </div>
         </div>
-        <ul className="authoring-scratch" aria-label="Ways to start">
+        <ul
+          className="authoring-scratch"
+          aria-label={m.authoring_scratch_list_label()}
+        >
           {describe ? (
             <li>
               <ScratchCard
                 icon={<MessageSquareText size={20} aria-hidden="true" />}
-                title="Describe it"
-                description="Say what should happen in your own words. Luma drafts the steps and lists its assumptions for you to review."
-                action="Describe a workflow"
+                title={m.authoring_scratch_describe_title()}
+                description={m.authoring_scratch_describe_description()}
+                action={m.authoring_describe_title()}
                 disabled={!canManage || pending}
                 onSelect={() => setDescribing(true)}
               />
@@ -371,9 +369,9 @@ export function NewWorkflowView({
           <li>
             <ScratchCard
               icon={<LayoutList size={20} aria-hidden="true" />}
-              title="Build visually"
-              description="Add steps one by one: read data, check conditions, take actions, ask for approval and check results."
-              action="Build a workflow"
+              title={m.authoring_scratch_visual_title()}
+              description={m.authoring_scratch_visual_description()}
+              action={m.authoring_scratch_visual_action()}
               disabled={!canManage || pending}
               onSelect={() => scratch('visual')}
             />
@@ -381,9 +379,9 @@ export function NewWorkflowView({
           <li>
             <ScratchCard
               icon={<Code2 size={20} aria-hidden="true" />}
-              title="Write code"
-              description="Edit the whole workflow as TypeScript and write sandboxed Code Steps for calculations."
-              action="Write a workflow"
+              title={m.authoring_scratch_code_title()}
+              description={m.authoring_scratch_code_description()}
+              action={m.authoring_scratch_code_action()}
               disabled={!canManage || pending}
               onSelect={() => scratch('code')}
             />
@@ -464,26 +462,28 @@ export function TemplateCard({
           size="md"
         />
         <div>
-          <p className="workflow-eyebrow">{categories[template.category]}</p>
+          <p className="workflow-eyebrow">{categories[template.category]()}</p>
           <h3 id={titleId}>{template.name}</h3>
         </div>
         <div className="authoring-template-badges">
           {template.status === 'active' ? (
-            <Badge tone="success">Active</Badge>
+            <Badge tone="success">{m.authoring_template_active()}</Badge>
           ) : null}
           <Badge tone={template.readiness === 'ready' ? 'success' : 'warning'}>
-            {template.readiness === 'ready' ? 'Ready' : 'Needs setup'}
+            {template.readiness === 'ready'
+              ? m.authoring_template_ready()
+              : m.authoring_template_needs_setup()}
           </Badge>
         </div>
       </header>
       <p>{template.purpose}</p>
       <dl className="authoring-template-facts">
         <div>
-          <dt>Starts</dt>
+          <dt>{m.authoring_template_starts()}</dt>
           <dd>{template.trigger}</dd>
         </div>
         <div>
-          <dt>What it does</dt>
+          <dt>{m.authoring_template_steps()}</dt>
           <dd>
             <ol>
               {template.steps.map((step) => (
@@ -493,19 +493,22 @@ export function TemplateCard({
           </dd>
         </div>
         <div>
-          <dt>Success means</dt>
+          <dt>{m.authoring_template_success()}</dt>
           <dd>{template.success}</dd>
         </div>
       </dl>
       <div className="authoring-requirements">
-        <h4>What it needs</h4>
+        <h4>{m.authoring_template_requirements()}</h4>
         <ul>
           {template.requirements.map((item) => (
             <li key={item.label} data-met={item.met}>
               {item.met ? (
-                <Check size={15} aria-label="Done" />
+                <Check size={15} aria-label={m.authoring_requirement_met()} />
               ) : (
-                <TriangleAlert size={15} aria-label="Missing" />
+                <TriangleAlert
+                  size={15}
+                  aria-label={m.authoring_requirement_missing()}
+                />
               )}
               <div>
                 <strong>{item.label}</strong>
@@ -524,18 +527,18 @@ export function TemplateCard({
           aria-describedby={missing.length ? `${titleId}-blocked` : undefined}
           onClick={use}
         >
-          Use template
+          {m.authoring_template_use()}
         </Button>
         <Button
           variant="outline"
           disabled={!canManage || pending}
           onClick={customize}
         >
-          Customize
+          {m.authoring_template_customize()}
         </Button>
         {missing.length ? (
           <span id={`${titleId}-blocked`} className="sr-only">
-            {missing.length} requirement(s) still missing.
+            {m.authoring_template_missing({ count: missing.length })}
           </span>
         ) : null}
       </footer>

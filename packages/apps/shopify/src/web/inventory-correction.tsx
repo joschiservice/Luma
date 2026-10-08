@@ -1,6 +1,9 @@
 import './inventory-correction.css';
 
 import type { AppUiProps } from '@luma/app-host/web';
+import { formatDateTime, formatNumber } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import {
@@ -19,7 +22,8 @@ import { useEffect, useRef, useState } from 'react';
 import { z } from 'zod/v3';
 
 import {
-  correctionBlocker,
+  type CorrectionBlockerReason,
+  correctionBlockerReason,
   type CorrectionCandidate,
   correctionCandidate,
   correctionSnapshot,
@@ -27,11 +31,23 @@ import {
   correctionView,
 } from '../domain/inventory-correction.js';
 
+const correctionBlockerText: Record<CorrectionBlockerReason, () => string> = {
+  write_access: m.shopify_blocker_correction_write_access,
+  untracked: m.shopify_blocker_correction_untracked,
+  stale: m.shopify_blocker_correction_stale,
+  already_matches: m.shopify_blocker_correction_already_matches,
+};
+
 const inspection = z.object({
   snapshot: correctionSnapshot,
   granted: z.array(z.string()),
   runs: z.array(correctionView),
 });
+
+/** Shows a stock quantity in the reader's language, or Unknown when the system didn't report one. */
+function quantity(value: number | null | undefined) {
+  return value == null ? m.common_unknown() : formatNumber(value);
+}
 
 /** Reviews an ERP-backed Shopify correction and separates approval, acceptance and verified stock. */
 export function ShopifyInventoryCorrection({
@@ -140,8 +156,7 @@ export function ShopifyInventoryCorrection({
                 state: 'denied',
                 canApprove: false,
                 canExecute: false,
-                message:
-                  'This review expired. Sync the ERP and refresh before reviewing again.',
+                message: m.shopify_stock_expired(),
               }
             : value,
         ),
@@ -179,9 +194,7 @@ export function ShopifyInventoryCorrection({
     } catch (reason) {
       if (current === generation.current) {
         if (services.uncertain(reason)) {
-          setError(
-            'The response was interrupted. Refresh to recover the saved correction before continuing.',
-          );
+          setError(m.shopify_stock_interrupted());
           setReview((value) =>
             value ? { ...value, canExecute: false, canApprove: false } : value,
           );
@@ -195,13 +208,14 @@ export function ShopifyInventoryCorrection({
 
   const shops = candidates?.filter((v) => v.provider === 'shopify') ?? [],
     erps = candidates?.filter((v) => v.provider === 'jtl') ?? [];
-  const blocker = data
-    ? correctionBlocker(
+  const blockerReason = data
+    ? correctionBlockerReason(
         data.snapshot,
         { capability: 'inventory.available.reconcile' },
         data.granted,
       )
     : null;
+  const blocker = blockerReason ? correctionBlockerText[blockerReason]() : null;
   const snapshot = review?.before ?? data?.snapshot;
   const reload = () => {
     setPending(false);
@@ -212,48 +226,40 @@ export function ShopifyInventoryCorrection({
     <Card
       as="section"
       className="shopify-stock-correction"
-      aria-label="Shopify stock correction"
+      aria-label={m.shopify_stock_label()}
       aria-busy={pending}
     >
       <CardHeader>
         <div>
-          <CardTitle>Reconcile Shopify stock</CardTitle>
-          <CardDescription>
-            Use a confirmed ERP quantity. Review, approve, then verify.
-          </CardDescription>
+          <CardTitle>{m.shopify_stock_title()}</CardTitle>
+          <CardDescription>{m.shopify_stock_description()}</CardDescription>
         </div>
         <Button variant="ghost" size="sm" disabled={pending} onClick={reload}>
-          Refresh correction
+          {m.shopify_stock_refresh()}
         </Button>
       </CardHeader>
       <CardContent className="shopify-stock-content">
-        <p className="field-help">
-          ERP → Shopify · Available stock only · ERP stock stays authoritative.
-          Someone else who can approve changes must approve each correction.
-        </p>
+        <p className="field-help">{m.shopify_stock_rules()}</p>
         {error ? (
           <Alert tone="danger" role="alert">
             {error}
           </Alert>
         ) : null}
         {!candidates && !error ? (
-          <p role="status">Checking stock sources…</p>
+          <p role="status">{m.shopify_stock_checking_sources()}</p>
         ) : null}
         {candidates && (!shops.length || !erps.length) ? (
-          <Alert>
-            This position needs an active Shopify connection and a matching ERP
-            source. Confirm SKU and location mappings, then sync both sources.
-          </Alert>
+          <Alert>{m.shopify_stock_missing_sources()}</Alert>
         ) : null}
         {shops.length && erps.length ? (
           <>
             <div className="shopify-stock-sources">
               <label>
-                Shopify destination
+                {m.shopify_stock_store_label()}
                 <Select
-                  aria-label="Shopify destination"
+                  aria-label={m.shopify_stock_store_label()}
                   value={connectionId || null}
-                  placeholder="Choose a store"
+                  placeholder={m.shopify_stock_store_placeholder()}
                   disabled={pending}
                   options={shops.map((v) => ({
                     value: v.connectionId,
@@ -263,19 +269,27 @@ export function ShopifyInventoryCorrection({
                 />
               </label>
               <label>
-                Authoritative ERP source
+                {m.shopify_stock_source_label()}
                 <Select
-                  aria-label="Authoritative ERP source"
+                  aria-label={m.shopify_stock_source_label()}
                   value={
                     review?.target.sourceConnectionId ||
                     sourceConnectionId ||
                     null
                   }
-                  placeholder="Choose the source to trust"
+                  placeholder={m.shopify_stock_source_placeholder()}
                   disabled={pending}
                   options={erps.map((v) => ({
                     value: v.connectionId,
-                    label: `${v.label} · ${v.available ?? 'Unknown'} available`,
+                    label:
+                      v.available == null
+                        ? m.shopify_stock_source_option_unknown({
+                            source: v.label,
+                          })
+                        : m.shopify_stock_source_option({
+                            source: v.label,
+                            count: v.available,
+                          }),
                   }))}
                   onValueChange={(value) => {
                     setReview(null);
@@ -285,18 +299,21 @@ export function ShopifyInventoryCorrection({
                 />
               </label>
             </div>
-            {pending ? <p role="status">Checking correction…</p> : null}
+            {pending ? <p role="status">{m.shopify_stock_checking()}</p> : null}
             {snapshot ? (
               <>
                 <div className="shopify-stock-location">
                   <strong>{snapshot.locationName}</strong>
                   <span className="field-help">
-                    {snapshot.inventoryItemId.split('/').at(-1)} · Available
-                    units
+                    {m.shopify_stock_item({
+                      item:
+                        snapshot.inventoryItemId.split('/').at(-1) ??
+                        snapshot.inventoryItemId,
+                    })}
                   </span>
                 </div>
                 <DataTable
-                  caption="Reviewed stock correction"
+                  caption={m.shopify_stock_table_caption()}
                   density="compact"
                   variant="plain"
                   rows={[
@@ -319,39 +336,44 @@ export function ShopifyInventoryCorrection({
                   columns={[
                     {
                       key: 'source',
-                      header: 'Source',
+                      header: m.common_source(),
                       cell: (row) => (
                         <span>
-                          {row.source}
-                          {row.id === 'erp' ? ' · Authority' : ' · Destination'}
+                          {row.id === 'erp'
+                            ? m.shopify_stock_role_source({
+                                source: row.source,
+                              })
+                            : m.shopify_stock_role_destination({
+                                source: row.source,
+                              })}
                         </span>
                       ),
                     },
                     {
                       key: 'available',
-                      header: 'Available',
+                      header: m.shopify_stock_column_available(),
                       numeric: true,
-                      cell: (row) => row.quantity ?? 'Unknown',
+                      cell: (row) => quantity(row.quantity),
                     },
                     {
                       key: 'observed',
-                      header: 'Evidence read',
+                      header: m.shopify_stock_column_read(),
                       cell: (row) => <WorkspaceDate value={row.time} />,
                     },
                   ]}
                 />
                 <Disclosure>
-                  <summary>Evidence & exact target</summary>
+                  <summary>{m.shopify_stock_details()}</summary>
                   <dl>
-                    <dt>Shopify inventory item</dt>
+                    <dt>{m.shopify_stock_detail_item()}</dt>
                     <dd>{snapshot.inventoryItemId}</dd>
-                    <dt>Shopify location</dt>
+                    <dt>{m.shopify_stock_detail_location()}</dt>
                     <dd>{snapshot.locationId}</dd>
-                    <dt>ERP observation</dt>
+                    <dt>{m.shopify_stock_detail_reading()}</dt>
                     <dd>{snapshot.source.observationId}</dd>
                     {review ? (
                       <>
-                        <dt>Correction</dt>
+                        <dt>{m.shopify_stock_detail_correction()}</dt>
                         <dd>{review.id}</dd>
                       </>
                     ) : null}
@@ -359,13 +381,27 @@ export function ShopifyInventoryCorrection({
                 </Disclosure>
                 <p className="shopify-stock-change">
                   <strong>
-                    {snapshot.available ?? 'Unknown'} →{' '}
-                    {snapshot.source.available} available
+                    {snapshot.available === null
+                      ? m.shopify_stock_change_unknown({
+                          to: snapshot.source.available,
+                        })
+                      : m.shopify_stock_change({
+                          from: snapshot.available,
+                          to: snapshot.source.available,
+                        })}
                   </strong>
                   <span className="field-help">
                     {snapshot.available !== null
-                      ? `${snapshot.source.available - snapshot.available > 0 ? '+' : ''}${snapshot.source.available - snapshot.available} units in Shopify`
-                      : 'Quantity unavailable'}
+                      ? m.shopify_stock_delta({
+                          count: Math.abs(
+                            snapshot.source.available - snapshot.available,
+                          ),
+                          delta: formatNumber(
+                            snapshot.source.available - snapshot.available,
+                            { signDisplay: 'exceptZero' },
+                          ),
+                        })
+                      : m.shopify_stock_delta_unknown()}
                   </span>
                 </p>
               </>
@@ -384,8 +420,8 @@ export function ShopifyInventoryCorrection({
                       }
                     >
                       {review.state === 'denied'
-                        ? 'Correction blocked'
-                        : 'Review & approval'}
+                        ? m.shopify_stock_stage_blocked()
+                        : m.shopify_stock_stage_review()}
                     </StatePill>
                   </li>
                   <li>
@@ -395,10 +431,10 @@ export function ShopifyInventoryCorrection({
                       }
                     >
                       {review.acceptance === 'accepted'
-                        ? 'Shopify accepted'
+                        ? m.shopify_stock_stage_accepted()
                         : review.acceptance === 'unknown'
-                          ? 'Write uncertain'
-                          : 'Not sent'}
+                          ? m.shopify_stock_stage_unclear()
+                          : m.shopify_stock_stage_not_sent()}
                     </StatePill>
                   </li>
                   <li>
@@ -408,16 +444,17 @@ export function ShopifyInventoryCorrection({
                       }
                     >
                       {review.state === 'verified'
-                        ? 'Quantity verified'
-                        : 'Not verified'}
+                        ? m.shopify_stock_stage_verified()
+                        : m.shopify_stock_stage_not_verified()}
                     </StatePill>
                   </li>
                 </ol>
                 <p>{review.message}</p>
                 {review.acceptance === 'not_sent' ? (
                   <p className="field-help">
-                    Review expires <WorkspaceDate value={review.expiresAt} />.
-                    Changes to either source require a new review.
+                    {rich(m.shopify_stock_expires, {
+                      time: <WorkspaceDate value={review.expiresAt} />,
+                    })}
                   </p>
                 ) : null}
                 <div className="shopify-stock-controls">
@@ -427,14 +464,14 @@ export function ShopifyInventoryCorrection({
                         disabled={pending}
                         onClick={() => void command('approve', 'approved')}
                       >
-                        Approve correction
+                        {m.shopify_stock_approve()}
                       </Button>
                       <Button
                         variant="outline"
                         disabled={pending}
                         onClick={() => void command('approve', 'rejected')}
                       >
-                        Reject
+                        {m.shopify_stock_reject()}
                       </Button>
                     </>
                   ) : null}
@@ -443,7 +480,7 @@ export function ShopifyInventoryCorrection({
                       disabled={pending}
                       onClick={() => void command('execute')}
                     >
-                      Apply to Shopify
+                      {m.shopify_stock_send()}
                     </Button>
                   ) : null}
                   <Button
@@ -452,8 +489,8 @@ export function ShopifyInventoryCorrection({
                     onClick={() => void command('check')}
                   >
                     {review.acceptance === 'not_sent'
-                      ? 'Check approval'
-                      : 'Verify stock'}
+                      ? m.shopify_stock_check_approval()
+                      : m.shopify_stock_check()}
                   </Button>
                   {['denied', 'verified', 'recovery_required'].includes(
                     review.state,
@@ -466,20 +503,24 @@ export function ShopifyInventoryCorrection({
                         reload();
                       }}
                     >
-                      Review a new correction
+                      {m.shopify_stock_review_new()}
                     </Button>
                   ) : null}
                 </div>
                 {data && data.runs.length > 1 ? (
                   <label>
-                    Saved corrections
+                    {m.shopify_stock_saved_label()}
                     <Select
-                      aria-label="Saved corrections"
+                      aria-label={m.shopify_stock_saved_label()}
                       value={review.id}
                       disabled={pending}
                       options={data.runs.map((v) => ({
                         value: v.id,
-                        label: `${v.before.available} → ${v.before.source.available} · ${new Date(v.before.observedAt).toLocaleString()}`,
+                        label: m.shopify_stock_saved_option({
+                          from: quantity(v.before.available),
+                          to: quantity(v.before.source.available),
+                          time: formatDateTime(v.before.observedAt),
+                        }),
                       }))}
                       onValueChange={(id) =>
                         setReview(data.runs.find((v) => v.id === id) ?? null)
@@ -497,7 +538,7 @@ export function ShopifyInventoryCorrection({
                     disabled={pending || !!blocker}
                     onClick={() => void command('preview')}
                   >
-                    Review correction
+                    {m.shopify_stock_review()}
                   </Button>
                 </div>
               </>

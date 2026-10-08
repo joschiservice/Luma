@@ -5,6 +5,12 @@ import type {
   SyncRunView,
   SyncStreamView,
 } from '@luma/api-contract';
+import {
+  formatDate,
+  formatNumber,
+  formatRelativeTime,
+} from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
 import type { OperationalState } from '@luma/ui/components/primitives/state';
 import {
   Boxes,
@@ -16,41 +22,86 @@ import {
   Users,
 } from 'lucide-react';
 
+type Message = () => string;
+
+type CountMessage = (inputs: { count: number }) => string;
+
+const recordType = (
+  title: Message,
+  noun: Message,
+  one: Message,
+  counted: CountMessage,
+  Icon: LucideIcon,
+) => ({
+  /** The record type as a heading, such as "Orders". */
+  get title() {
+    return title();
+  },
+  /** The plural noun for use inside a sentence, such as "orders". */
+  get noun() {
+    return noun();
+  },
+  /** The singular noun, such as "order". */
+  get one() {
+    return one();
+  },
+  counted,
+  Icon,
+});
+
+/** Display names, nouns and icons of each record type Luma syncs, in the active language. */
 export const recordTypes: Record<
   SyncRecordType,
-  { title: string; noun: string; one: string; Icon: LucideIcon }
+  {
+    readonly title: string;
+    readonly noun: string;
+    readonly one: string;
+    counted: CountMessage;
+    Icon: LucideIcon;
+  }
 > = {
-  orders: { title: 'Orders', noun: 'orders', one: 'order', Icon: Receipt },
-  fulfillments: {
-    title: 'Fulfillments',
-    noun: 'fulfillments',
-    one: 'fulfillment',
-    Icon: Truck,
-  },
-  products: {
-    title: 'Products',
-    noun: 'products',
-    one: 'product',
-    Icon: Package,
-  },
-  inventory: {
-    title: 'Stock levels',
-    noun: 'stock levels',
-    one: 'stock level',
-    Icon: Boxes,
-  },
-  customers: {
-    title: 'Customers',
-    noun: 'customers',
-    one: 'customer',
-    Icon: Users,
-  },
-  returns: {
-    title: 'Returns and refunds',
-    noun: 'returns and refunds',
-    one: 'return or refund',
-    Icon: Undo2,
-  },
+  orders: recordType(
+    m.sync_type_orders_title,
+    m.sync_type_orders_noun,
+    m.sync_type_orders_one,
+    m.sync_type_orders_count,
+    Receipt,
+  ),
+  fulfillments: recordType(
+    m.sync_type_fulfillments_title,
+    m.sync_type_fulfillments_noun,
+    m.sync_type_fulfillments_one,
+    m.sync_type_fulfillments_count,
+    Truck,
+  ),
+  products: recordType(
+    m.sync_type_products_title,
+    m.sync_type_products_noun,
+    m.sync_type_products_one,
+    m.sync_type_products_count,
+    Package,
+  ),
+  inventory: recordType(
+    m.sync_type_inventory_title,
+    m.sync_type_inventory_noun,
+    m.sync_type_inventory_one,
+    m.sync_type_inventory_count,
+    Boxes,
+  ),
+  customers: recordType(
+    m.sync_type_customers_title,
+    m.sync_type_customers_noun,
+    m.sync_type_customers_one,
+    m.sync_type_customers_count,
+    Users,
+  ),
+  returns: recordType(
+    m.sync_type_returns_title,
+    m.sync_type_returns_noun,
+    m.sync_type_returns_one,
+    m.sync_type_returns_count,
+    Undo2,
+  ),
 };
 
 const providers: Record<string, string> = { shopify: 'Shopify', jtl: 'JTL' };
@@ -65,46 +116,30 @@ export const sourceId = (externalId: string) =>
     ? (externalId.split('/').at(-1) ?? externalId)
     : externalId;
 
-const numbers = new Intl.NumberFormat('en-US');
+/** Formats a count with the active language's grouping, such as 12,480. */
+export const count = (value: number) => formatNumber(value);
 
-/** Formats a count with grouping, such as 12,480. */
-export const count = (value: number) => numbers.format(value);
-
-/** Pluralizes a record noun for a count, such as "1 order" or "3 orders". */
+/** Counts records of one type with the right plural, such as "1 order" or "3 orders". */
 export function records(type: SyncRecordType, value: number) {
-  return `${count(value)} ${value === 1 ? recordTypes[type].one : recordTypes[type].noun}`;
+  return recordTypes[type].counted({ count: value });
 }
 
-const days = new Intl.DateTimeFormat('en-US', {
-  month: 'short',
-  day: 'numeric',
-  year: 'numeric',
-  timeZone: 'UTC',
-});
+/** Formats a calendar date for coverage statements, such as "31 Jul 2026". */
+export const day = (value: string) =>
+  formatDate(value, { dateStyle: 'medium', timeZone: 'UTC' });
 
-/** Formats a calendar date for coverage statements, such as "Jul 31, 2026". */
-export const day = (value: string) => days.format(new Date(value));
-
-/** Describes a past time relative to now, such as "just now" or "12m ago". */
+/** Describes a past time relative to now, such as "just now" or "12 minutes ago". */
 export function ago(value: string, now = Date.now()) {
-  const seconds = Math.round((now - Date.parse(value)) / 1000);
-  if (seconds < 10) return 'just now';
-  if (seconds < 60) return `${seconds}s ago`;
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  if (now - Date.parse(value) < 10_000) return m.sync_time_just_now();
 
-  return `${Math.floor(seconds / 86400)}d ago`;
+  return formatRelativeTime(value, now);
 }
 
-/** Describes a future time relative to now, such as "now" or "in 4m". */
+/** Describes a future time relative to now, such as "now" or "in 4 minutes". */
 export function soon(value: string, now = Date.now()) {
-  const seconds = Math.round((Date.parse(value) - now) / 1000);
-  if (seconds < 10) return 'now';
-  if (seconds < 60) return `in ${seconds}s`;
-  if (seconds < 3600) return `in ${Math.ceil(seconds / 60)}m`;
-  if (seconds < 86400) return `in ${Math.round(seconds / 3600)}h`;
+  if (Date.parse(value) - now < 10_000) return m.sync_time_now();
 
-  return `in ${Math.round(seconds / 86400)}d`;
+  return formatRelativeTime(value, now);
 }
 
 /** The state dot and short label for a sync. */
@@ -114,44 +149,44 @@ export function streamState(stream: SyncStreamView): {
 } {
   switch (stream.status) {
     case 'paused':
-      return { state: 'idle', label: 'Paused' };
+      return { state: 'idle', label: m.sync_state_paused() };
     case 'blocked':
       return {
         state: 'attention',
         label:
           stream.blocked === 'principal_unavailable'
-            ? 'Needs someone to resume'
+            ? m.sync_state_needs_resume()
             : stream.blocked === 'capability_removed'
-              ? 'Access removed'
-              : 'Connection unavailable',
+              ? m.sync_state_access_removed()
+              : m.sync_state_connection_unavailable(),
       };
     case 'failing':
-      return { state: 'error', label: 'Failing' };
+      return { state: 'error', label: m.sync_state_failing() };
     case 'retrying':
-      return { state: 'attention', label: 'Retrying' };
+      return { state: 'attention', label: m.sync_state_retrying() };
     case 'waiting':
-      return { state: 'waiting', label: 'Waiting for orders' };
+      return { state: 'waiting', label: m.sync_state_waiting_for_orders() };
     case 'importing':
       return {
         state: 'running',
         label: stream.scan?.waitingForExport
-          ? 'Preparing history'
+          ? m.sync_state_preparing_history()
           : stream.scan?.createdSince
-            ? 'Importing recent history'
+            ? m.sync_state_importing_recent()
             : stream.coverage.recentCompletedAt && stream.coverage.recentFrom
-              ? 'Importing older history'
-              : 'Importing history',
+              ? m.sync_state_importing_older()
+              : m.sync_state_importing(),
       };
     case 'syncing':
       return {
         state: 'running',
         label:
           stream.scan?.kind === 'reconcile' || stream.scan?.since === null
-            ? 'Checking all records'
-            : 'Reading changes',
+            ? m.sync_state_checking_all()
+            : m.sync_state_reading_changes(),
       };
     default:
-      return { state: 'verified', label: 'Up to date' };
+      return { state: 'verified', label: m.sync_state_up_to_date() };
   }
 }
 
@@ -164,21 +199,42 @@ export function scanProgress(type: SyncRecordType, stream: SyncStreamView) {
   if (!scan) return null;
   const total = scan.total;
   if (scan.waitingForExport)
-    return { value: null, text: 'The source is preparing an export' };
+    return { value: null, text: m.sync_progress_preparing_export() };
 
   return {
     value: total
       ? Math.min(100, (scan.records / Math.max(total, 1)) * 100)
       : null,
     text: total
-      ? `${count(Math.min(scan.records, total))} of ${records(type, total)}`
-      : `${records(type, scan.records)} read`,
+      ? m.sync_progress_of_total({
+          done: count(Math.min(scan.records, total)),
+          total: records(type, total),
+        })
+      : m.sync_progress_read({ records: records(type, scan.records) }),
   };
 }
 
-const dated: Partial<Record<SyncRecordType, string>> = {
-  orders: 'placed',
-  customers: 'created',
+/** Sentences describing the dated range of records Luma holds, for types that have one. */
+const ranges: Partial<
+  Record<
+    SyncRecordType,
+    {
+      held: (inputs: { records: string; from: string; to: string }) => string;
+      all: (inputs: { records: string; from: string; to: string }) => string;
+      limit: (inputs: { records: string; date: string }) => string;
+    }
+  >
+> = {
+  orders: {
+    held: m.sync_coverage_range_placed,
+    all: m.sync_coverage_all_range_placed,
+    limit: m.sync_coverage_limit_placed,
+  },
+  customers: {
+    held: m.sync_coverage_range_created,
+    all: m.sync_coverage_all_range_created,
+    limit: m.sync_coverage_limit_created,
+  },
 };
 
 /**
@@ -189,8 +245,9 @@ export function coverageStatement(
   type: SyncRecordType,
   stream: SyncStreamView,
 ): { text: string; limited: boolean } {
-  const noun = recordTypes[type].noun;
-  const verb = dated[type];
+  const info = recordTypes[type];
+  const noun = info.noun;
+  const range = ranges[type];
   if (
     stream.phase === 'backfill' &&
     stream.coverage.recentCompletedAt &&
@@ -201,33 +258,66 @@ export function coverageStatement(
       stream.coverage.historyFrom > stream.coverage.recentFrom
         ? stream.coverage.historyFrom
         : stream.coverage.recentFrom;
+    const recent = { records: info.title, date: day(from) };
+    const imported =
+      stream.records.failed || stream.records.pending
+        ? m.sync_coverage_recent_read(recent)
+        : m.sync_coverage_recent_imported(recent);
+    const older = stream.paused
+      ? m.sync_coverage_older_paused()
+      : stream.error || stream.blocked
+        ? m.sync_coverage_older_incomplete()
+        : m.sync_coverage_older_continuing();
 
     return {
-      text: `${noun[0]!.toUpperCase()}${noun.slice(1)} since ${day(from)} ${stream.records.failed || stream.records.pending ? 'read; some records need attention' : 'imported'}. Older history ${stream.paused ? 'paused' : stream.error || stream.blocked ? 'is incomplete' : 'continues in the background'}.`,
+      text: m.sync_coverage_two_sentences({ first: imported, second: older }),
       limited: !!stream.coverage.historyFrom,
     };
   }
   if (stream.phase === 'backfill')
     return {
       text: stream.records.total
-        ? `${records(type, stream.records.total)} so far. Coverage is complete when the history import finishes.`
-        : 'Nothing imported yet. Coverage is complete when the history import finishes.',
+        ? m.sync_coverage_so_far({
+            records: records(type, stream.records.total),
+          })
+        : m.sync_coverage_nothing_yet(),
       limited: false,
     };
-  const range =
-    verb && stream.coverage.oldest && stream.coverage.newest
-      ? ` ${verb} ${day(stream.coverage.oldest)} – ${day(stream.coverage.newest)}`
-      : '';
-  if (stream.coverage.historyFrom)
+  const dated =
+    range && stream.coverage.oldest && stream.coverage.newest
+      ? {
+          from: day(stream.coverage.oldest),
+          to: day(stream.coverage.newest),
+        }
+      : null;
+  const total = stream.records.total;
+  if (stream.coverage.historyFrom) {
+    const held = !total
+      ? m.sync_coverage_none_held({ records: noun })
+      : dated && range
+        ? range.held({ records: records(type, total), ...dated })
+        : m.sync_coverage_held({ records: records(type, total) });
+    const date = day(stream.coverage.historyFrom);
+    const limit = range
+      ? range.limit({ records: noun, date })
+      : m.sync_coverage_limit_created_generic({ records: noun, date });
+
     return {
-      text: `${stream.records.total ? `${records(type, stream.records.total)}${range}` : `No ${noun}`}. The source didn’t share ${noun} ${verb ?? 'created'} before ${day(stream.coverage.historyFrom)}.`,
+      text: m.sync_coverage_two_sentences({ first: held, second: limit }),
       limited: true,
     };
-  if (!stream.records.total)
-    return { text: `The source has no ${noun} to share.`, limited: false };
+  }
+  if (!total)
+    return {
+      text: m.sync_coverage_source_has_none({ records: noun }),
+      limited: false,
+    };
 
   return {
-    text: `All ${records(type, stream.records.total)} the source shares${range}.`,
+    text:
+      dated && range
+        ? range.all({ records: records(type, total), ...dated })
+        : m.sync_coverage_all({ records: records(type, total) }),
     limited: false,
   };
 }
@@ -238,11 +328,12 @@ export function unavailableReason(
   connection: SyncConnectionView,
 ) {
   if (connection.status !== 'active')
-    return 'Starts when the connection is active';
-  if (availability === 'not_requested') return 'Not part of this connection';
-  if (availability === 'not_granted') return 'The source did not grant access';
+    return m.sync_unavailable_connection_inactive();
+  if (availability === 'not_requested')
+    return m.sync_unavailable_not_requested();
+  if (availability === 'not_granted') return m.sync_unavailable_not_granted();
 
-  return 'Starting shortly';
+  return m.sync_unavailable_starting();
 }
 
 /** One sentence summarizing every sync in the workspace, with its operational state. */
@@ -257,10 +348,10 @@ export function overallState(overview: SyncOverview): {
   if (!overview.connections.length || !streams.length)
     return {
       state: 'idle',
-      title: 'Nothing to sync yet',
+      title: m.sync_overall_nothing_title(),
       detail: overview.connections.length
-        ? 'Imports start as soon as a connection is active.'
-        : 'Connect a store or ERP and Luma imports its history automatically.',
+        ? m.sync_overall_nothing_waiting()
+        : m.sync_overall_nothing_connect(),
     };
   const needs = streams.filter((stream) =>
     ['failing', 'blocked'].includes(stream.status),
@@ -268,34 +359,36 @@ export function overallState(overview: SyncOverview): {
   if (needs)
     return {
       state: 'error',
-      title: `${needs === 1 ? '1 sync needs' : `${needs} syncs need`} attention`,
-      detail: 'Records that already arrived stay available while Luma waits.',
+      title: m.sync_overall_attention_title({ count: needs }),
+      detail: m.sync_overall_attention_detail(),
     };
   const importing = streams.filter((stream) => stream.phase === 'backfill');
   if (importing.length && importing.every((stream) => stream.paused))
     return {
       state: 'idle',
-      title: 'History import paused',
-      detail:
-        'Records already imported stay available. Resume a sync to continue importing history.',
+      title: m.sync_overall_paused_title(),
+      detail: m.sync_overall_paused_detail(),
     };
   if (importing.length)
     return {
       state: 'running',
-      title: 'Importing history',
+      title: m.sync_overall_importing_title(),
       detail: importing.some(
         (stream) =>
           stream.coverage.recentCompletedAt && stream.coverage.recentFrom,
       )
-        ? 'Recent records are available. Older history continues in the background while Luma reads new changes.'
-        : `${streams.length - importing.length} of ${streams.length} ${streams.length === 1 ? 'record type' : 'record types'} imported. You can use Luma while this runs.`,
+        ? m.sync_overall_importing_recent_detail()
+        : m.sync_overall_importing_detail({
+            done: streams.length - importing.length,
+            total: streams.length,
+          }),
     };
   const retrying = streams.filter((s) => s.status === 'retrying').length;
   if (retrying)
     return {
       state: 'attention',
-      title: 'Up to date, with retries',
-      detail: `${retrying === 1 ? '1 sync is' : `${retrying} syncs are`} retrying a failed read automatically.`,
+      title: m.sync_overall_retrying_title(),
+      detail: m.sync_overall_retrying_detail({ count: retrying }),
     };
   const latest = streams
     .map((stream) => stream.lastSuccessAt)
@@ -305,41 +398,45 @@ export function overallState(overview: SyncOverview): {
 
   return {
     state: 'verified',
-    title: 'Up to date',
+    title: m.sync_overall_current_title(),
     detail: latest
-      ? `Changes last read ${ago(latest, Date.parse(overview.asOf))}.`
-      : 'Every connected record type is imported.',
+      ? m.sync_overall_current_detail({
+          time: ago(latest, Date.parse(overview.asOf)),
+        })
+      : m.sync_overall_current_all(),
   };
 }
 
-export const scanKinds: Record<SyncRunView['kind'], string> = {
-  backfill: 'History import',
-  incremental: 'Change sync',
-  reconcile: 'Full check',
+/** Names of each kind of sync run, called during render. */
+export const scanKinds: Record<SyncRunView['kind'], Message> = {
+  backfill: m.sync_run_kind_backfill,
+  incremental: m.sync_run_kind_incremental,
+  reconcile: m.sync_run_kind_reconcile,
 };
 
-export const triggers: Record<SyncRunView['trigger'], string> = {
-  connection: 'Connection',
-  operator: 'Requested',
-  schedule: 'Scheduled',
-  webhook: 'Source notification',
+/** Names of what started a sync run, called during render. */
+export const triggers: Record<SyncRunView['trigger'], Message> = {
+  connection: m.sync_run_trigger_connection,
+  operator: m.sync_run_trigger_operator,
+  schedule: m.sync_run_trigger_schedule,
+  webhook: m.sync_run_trigger_webhook,
 };
 
-/** Summarizes what a run changed, such as "12 updated · 480 unchanged". */
+/** Summarizes what a run changed, such as "12 imported or updated · 480 unchanged". */
 export function runSummary(run: SyncRunView) {
   const parts = [
-    run.changed ? `${count(run.changed)} imported or updated` : '',
-    run.unchanged ? `${count(run.unchanged)} unchanged` : '',
-    run.pending ? `${count(run.pending)} waiting` : '',
-    run.failed ? `${count(run.failed)} not imported` : '',
-    run.missing ? `${count(run.missing)} no longer found` : '',
+    run.changed ? m.sync_run_changed({ count: run.changed }) : '',
+    run.unchanged ? m.sync_run_unchanged({ count: run.unchanged }) : '',
+    run.pending ? m.sync_run_pending({ count: run.pending }) : '',
+    run.failed ? m.sync_run_failed({ count: run.failed }) : '',
+    run.missing ? m.sync_run_missing({ count: run.missing }) : '',
   ].filter(Boolean);
 
   return parts.length
     ? parts.join(' · ')
     : run.outcome === 'running'
-      ? 'Reading…'
-      : 'No records';
+      ? m.sync_run_reading()
+      : m.sync_run_no_records();
 }
 
 /** A one-line sync summary for one connection, or null before any sync exists. */
@@ -356,5 +453,11 @@ export function connectionSummary(
 
   return summary.state === 'idle'
     ? null
-    : { state: summary.state, text: `${summary.title}. ${summary.detail}` };
+    : {
+        state: summary.state,
+        text: m.sync_connection_summary({
+          title: summary.title,
+          detail: summary.detail,
+        }),
+      };
 }

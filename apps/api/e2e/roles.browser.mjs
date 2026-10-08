@@ -67,7 +67,7 @@ test('creates a custom role, invites with it, restricts views and applies edits 
     .getByRole('button', { name: 'Send invitation', exact: true })
     .click();
   await page
-    .getByText('Invitation queued. Access starts when it is accepted.')
+    .getByText('Invitation queued. Access starts when they accept.')
     .waitFor();
   await f.drain();
   const proof = invitationProof(
@@ -123,7 +123,9 @@ test('creates a custom role, invites with it, restricts views and applies edits 
   await changes.getByText('These changes apply to 1 person').waitFor();
   await changes.getByRole('button', { name: 'Save changes' }).click();
   await page
-    .getByText('Role saved. It applies on each person’s next request.')
+    .getByText(
+      'Role saved. Changes apply from each person’s next action in Luma.',
+    )
     .waitFor();
   await page.getByRole('tab', { name: /History/ }).click();
   await page.getByText(/joined with this role/).waitFor();

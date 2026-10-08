@@ -2,7 +2,7 @@
 import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, startProcess } from './helpers.mjs';
 
-test('serves searchable issue guides without a session on desktop and mobile', async ({
+test('serves searchable, sectioned guides without a session on desktop and mobile', async ({
   resources: t,
 }) => {
   const port = await availablePort();
@@ -23,6 +23,17 @@ test('serves searchable issue guides without a session on desktop and mobile', a
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/docs');
   await page
+    .getByRole('heading', { name: 'Luma documentation', exact: true })
+    .waitFor();
+  expect(await page.title()).toBe('Documentation · Luma');
+  await page
+    .getByRole('heading', { name: 'Daily work', exact: true })
+    .waitFor();
+  await page
+    .getByRole('main')
+    .getByRole('link', { name: 'Find and prioritize issues', exact: true })
+    .click();
+  await page
     .getByRole('heading', { name: 'Find and prioritize issues', exact: true })
     .waitFor();
   expect(await page.title()).toBe('Find and prioritize issues · Luma');
@@ -34,17 +45,17 @@ test('serves searchable issue guides without a session on desktop and mobile', a
   });
   await page
     .getByRole('searchbox', { name: 'Search documentation' })
-    .fill('preconditions');
+    .fill('reverse');
   const result = page.locator('.docs-search-results a').first();
   await result.waitFor();
   await result.click();
   await page
-    .getByRole('heading', { name: 'Review a resolution', exact: true })
+    .getByRole('heading', { name: 'Resolve an issue', exact: true })
     .waitFor();
   expect(new URL(page.url()).pathname).toBe('/docs/issues/resolve');
   await page.reload();
   await page
-    .getByRole('heading', { name: 'Review a resolution', exact: true })
+    .getByRole('heading', { name: 'Resolve an issue', exact: true })
     .waitFor();
   await page
     .getByRole('searchbox', { name: 'Search documentation' })
@@ -62,9 +73,11 @@ test('serves searchable issue guides without a session on desktop and mobile', a
     .getByText('Search is unavailable. Browse the guides below.')
     .waitFor();
   await page.getByRole('searchbox', { name: 'Search documentation' }).fill('');
+  await page.unroute('**/docs-search?*');
   await page.setViewportSize({ width: 390, height: 844 });
   await page
-    .getByRole('navigation', { name: 'Documentation', exact: true })
+    .getByRole('navigation', { name: 'Guides', exact: true })
+    .getByRole('group', { name: 'Daily work' })
     .getByRole('link', { name: 'Investigate an issue' })
     .click();
   await page
@@ -90,5 +103,33 @@ test('serves searchable issue guides without a session on desktop and mobile', a
   const missing = await page.goto('/docs/unknown-guide');
   await page.getByRole('heading', { name: 'Guide not found' }).waitFor();
   expect(missing.status()).toBe(404);
+  // Leave the page first: if it were still hydrating, it would read the new language cookie
+  // and no longer match the English server render.
+  await page.goto('about:blank');
+  await page
+    .context()
+    .addCookies([{ name: 'luma_locale', value: 'de', url: origin }]);
+  await page.goto('/docs/issues/resolve');
+  await page
+    .getByRole('heading', { name: 'Problem lösen', exact: true })
+    .waitFor();
+  expect(new URL(page.url()).pathname).toBe('/docs/issues/resolve');
+  expect(
+    await page
+      .getByText('Diese Anleitung ist noch nicht auf Deutsch verfügbar.')
+      .count(),
+  ).toBe(0);
+  await page
+    .getByRole('navigation', { name: 'Anleitungen', exact: true })
+    .getByRole('group', { name: 'Tägliche Arbeit' })
+    .waitFor();
+  await page
+    .getByRole('searchbox', { name: 'Dokumentation durchsuchen' })
+    .fill('umkehrbar');
+  await page
+    .locator('.docs-search-results a')
+    .filter({ hasText: 'Problem lösen' })
+    .first()
+    .waitFor();
   expect(errors).toEqual([]);
 });

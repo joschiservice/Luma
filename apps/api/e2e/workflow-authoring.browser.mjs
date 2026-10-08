@@ -131,7 +131,7 @@ test('creates workflows from templates and from scratch, then publishes without 
   await page.getByRole('combobox', { name: 'What it acts on' }).click();
   await page.getByRole('option', { name: 'Order', exact: true }).click();
   // Drag a Code Step from the palette to the top of the list.
-  const code = page.getByRole('button', { name: 'Add step: Run a Code Step' });
+  const code = page.getByRole('button', { name: 'Add step: Run a code step' });
   await code.scrollIntoViewIfNeeded();
   const from = await code.boundingBox();
   await page.mouse.move(from.x + 20, from.y + from.height / 2);

@@ -16,26 +16,27 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@luma/connections": "workspace:*",
-    "@luma/identity": "workspace:*",
-    "@luma/workflows": "workspace:*",
-    "@luma/platform": "workspace:*",
-    "zod": "catalog:zod3",
-    "@luma/connector-shopify": "workspace:*",
     "@luma/app-host": "workspace:*",
-    "fastify": "catalog:",
-    "@luma/ui": "workspace:*",
-    "react": "catalog:",
-    "@tanstack/react-form": "catalog:",
+    "@luma/audit": "workspace:*",
+    "@luma/connections": "workspace:*",
+    "@luma/connector-shopify": "workspace:*",
     "@luma/execution": "workspace:*",
+    "@luma/i18n": "workspace:*",
+    "@luma/identity": "workspace:*",
+    "@luma/platform": "workspace:*",
     "@luma/policies": "workspace:*",
-    "@luma/audit": "workspace:*"
+    "@luma/ui": "workspace:*",
+    "@luma/workflows": "workspace:*",
+    "@tanstack/react-form": "catalog:",
+    "fastify": "catalog:",
+    "react": "catalog:",
+    "zod": "catalog:zod3"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",
     "@types/node": "catalog:",
+    "@types/react": "catalog:",
     "graphql": "catalog:",
-    "vitest": "catalog:",
-    "@types/react": "catalog:"
+    "vitest": "catalog:"
   }
 }

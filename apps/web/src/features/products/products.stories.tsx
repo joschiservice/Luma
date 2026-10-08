@@ -534,7 +534,7 @@ export const Detail: Story = {
       canvas.getByRole('table', { name: 'Listing comparison by source' }),
     ).toBeVisible();
     await expect(
-      canvas.getByRole('img', { name: /Shopify · EU store: 19 each/ }),
+      canvas.getByRole('img', { name: /Shopify · EU store: 19 units/ }),
     ).toBeVisible();
   },
 };

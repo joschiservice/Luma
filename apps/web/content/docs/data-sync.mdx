@@ -1,89 +1,78 @@
 ---
 title: Import history and keep data in sync
-description: See what Luma has imported from each connected system, how current it is, and what to do when a sync needs you.
+description: See what Luma imports from each connected system, how complete and current it is, and what to do when a sync needs you.
 ---
 
-When you connect a store or ERP, Luma imports its history and then keeps it current. Luma only reads during a sync; it never changes records in your systems.
+When you connect a store or ERP, Luma imports its history and then keeps it current. Syncing only reads data: Luma never changes records in your systems while it syncs. Open **Data sync** from the sidebar, or press **G** then **D**, to see what Luma holds from each connection.
 
 ## What Luma imports
 
-For each connection, Luma imports every record type the connection allows:
+Each connection has one sync per record type:
 
-- **Orders** with their lines, totals and placed dates.
-- **Fulfillments** such as fulfillment orders, shipments and delivery notes. For Shopify, recent fulfillments start once recent orders are imported; older history follows, because each fulfillment belongs to an order.
-- **Products** with their variants and SKU codes.
-- **Stock levels** per SKU and location.
-- **Customers**, when the connection is approved to share customer data. Contact details and addresses are imported only if that access is approved as well.
+| Record type                                                                | Shopify       | JTL Cloud and JTL-Wawi |
+| -------------------------------------------------------------------------- | ------------- | ---------------------- |
+| **Orders** with lines, totals and placed dates                             | Yes           | Yes                    |
+| **Fulfillments**, such as fulfillment orders, shipments and delivery notes | Yes           | Yes                    |
+| **Products** with their variants and SKU codes                             | Yes           | Yes                    |
+| **Stock levels** per SKU and location                                      | Yes           | Yes                    |
+| **Customers**                                                              | When approved | No                     |
+| **Returns and refunds**                                                    | Yes           | No                     |
 
-A record type that isn't part of a connection, or that the source didn't grant, is listed as such. Open **Manage connection** to change what the connection allows.
+Customers come from Shopify only when Shopify approved access to customer data and the store granted it. Contact details and addresses need their own approval. A record type the connection doesn’t cover shows **Not part of this connection**. One the system didn’t grant shows **The source didn’t grant access**. If a Shopify store shows **Not part of this connection** for returns and refunds, reconnect the store to add them. To change what a connection may read, open **Manage connection** next to it; see [Install apps and connect your systems](/docs/apps-and-connections).
+
+Suppliers and purchase orders from JTL aren’t listed here. [Procurement](/docs/procurement) reads them for each purchase order.
 
 ## Follow the import
 
-Open **Data sync** from the sidebar (`G`, then `D`). Each connection lists its record types with:
+The top of the page sums up every sync, such as **Importing history**, **Up to date** or **2 syncs need attention**, along with **Records in Luma**, **Connections** and the **Oldest full check**. Below, each connection lists its record types with:
 
-- **Status**: importing history, reading changes, checking all records, up to date, retrying, failing, paused or waiting for someone.
-- **Progress**, while a read runs. When the source reports how many records it has, you see a count and a percentage.
-- **Coverage**: how many records Luma holds and the date range they cover.
-- **Last sync** and when the next check is due.
+- **Status**, such as **Importing recent history**, **Reading changes** or **Up to date**.
+- **Progress** while a read runs, as a count and a percentage when the source reports its total.
+- **Coverage**: how many records Luma holds and the dates they cover.
+- When it last synced, and when the next check or retry is due.
 
-You can use Luma while history imports. Orders, stock and customers appear as they arrive. Orders, Products, Fulfillment, Inventory, Returns and Customers show a one-line coverage summary above the list. It says when the list is still incomplete or a source needs attention; open it to see each source.
+**Recent sync runs** lists each history import, change sync and full check, what started it, and how many records were imported, unchanged, waiting, not imported or no longer found.
+
+You can use Luma while history imports; records appear as they arrive. Orders, Products, Fulfillment, Inventory, Returns and Customers show a one-line **Coverage** summary above their list. It says when the list is still incomplete or a source needs attention. Choose **Open Data sync** for the details.
 
 ## Understand coverage
 
-Shopify imports the last 30 days of orders first, followed by their recent fulfillments and returns. **Recent history imported** means that window has been read and imported. Older history continues in the background; it has separate progress and stays incomplete until its import finishes. Records that need attention are shown separately.
+Shopify imports recent orders first, followed by their fulfillments, returns and refunds, then older history in the background. **Recent history imported** means the recent period is complete; older history has its own progress and stays incomplete until it finishes. Fulfillments and returns show **Waiting for orders** until the orders they belong to are imported.
 
-**Preparing history** means the source is building an export. There may be no record progress yet. You can leave the page; Luma continues automatically and resumes from its saved progress after a restart.
+**Preparing history** means the source is building an export, so there may be no progress yet. You can leave the page. Luma continues on its own and picks up where it stopped after an interruption.
 
-Coverage says exactly what Luma holds. During an import, it shows how many records have arrived so far and the completed recent window, without claiming full history is complete.
+Coverage says exactly what Luma holds and never claims more. Some sources share only recent history: Shopify shares the last 60 days of orders unless access to older orders is approved. Data sync then shows **Only recent orders were shared** with the date the shared history starts. Luma keeps everything it imports, so coverage grows over time. When older records become available, Data sync shows **Older orders are now available** with a button to import them.
 
-Some sources share only recent history. Shopify shares the last 60 days of orders unless the Luma app has the `read_all_orders` permission. In that case Data sync says which date the shared history starts from. Luma keeps every order it imports, so coverage grows over time. When older orders become available, Data sync offers to import them.
-
-A **full check** rereads every record once a day. Records the source no longer returns are counted as no longer found. Luma keeps them, so you can check whether they were deleted at the source.
+Some records may need attention. **Waiting for related records** means Luma imports them once the records they depend on arrive. **Couldn’t import** names records Luma couldn’t read, with the reason. **Not found in the last full check** lists records the source no longer returns. Luma keeps them, so check whether they were deleted in the source.
 
 ## How Luma stays current
 
-Luma reads new changes while Shopify history imports and after the import finishes:
+- When a system sends change notifications, as Shopify does, most changes arrive within seconds. A busy system can delay them.
+- Luma also checks for changes every few minutes. Sources that can’t list recent changes are reread in full every 30 minutes.
+- Once a day, Luma rereads every record in a **full check**.
 
-- When a source sends change notifications, Luma queues a read within seconds. A page already running or a source rate limit can delay the read.
-- Otherwise Luma checks for changes every few minutes. Sources that can't list recent changes are reread in full every 30 minutes.
-- Every record type gets a full check once a day.
+Luma recognizes records it already has. Importing the same history again, or receiving a change twice or out of order, never creates duplicates, and an older version never replaces a newer one. A record imported from history shows its state at import time; earlier changes at the source aren’t reconstructed.
 
-Luma recognizes records it already has. Importing the same history again, or receiving a change twice or out of order, never creates duplicates, and an older version never replaces a newer one.
+## Run, pause or re-import a sync
 
-Observed history on an order shows the states Luma read. A record imported from history shows its state at import time. Earlier changes at the source are not reconstructed.
+If your role includes **Manage imports**, each record type has an actions menu:
+
+- **Sync now** reads from the source again right away.
+- **Check all records** starts a full check.
+- **Re-import history** rereads everything the source shares. Records already in Luma stay available and aren’t duplicated. Large histories can take a while.
+- **Pause** stops the sync. Records already imported stay available. **Resume** continues it.
+
+Without **Manage imports**, you can follow every sync but not change it.
 
 ## When a sync needs you
 
-- **Retrying** means a read failed and Luma will try again automatically, waiting a little longer each time.
-- **Failing** means it has failed several times in a row. The message explains why. Fix the cause, such as reconnecting the connection, and choose **Retry now**.
-- **Needs someone to resume** means the person the sync ran as no longer manages the workspace. Someone whose role includes **Manage imports** chooses **Resume with my access**.
-- **Paused** means someone paused it. Records already imported stay available.
+- **Retrying**: a read failed and Luma tries again automatically, waiting a little longer each time.
+- **Failing**: it failed several times in a row. The message explains why. Fix the cause, for example by reconnecting the connection, then choose **Retry now**.
+- **Needs someone to resume**: the person the sync ran as no longer manages the workspace. Someone with **Manage imports** chooses **Resume with my access**, and the sync continues with their access.
+- **Access removed**: the connection no longer grants this record type. Reconnect it with the access in [Apps](/docs/apps-and-connections#change-or-reconnect-a-connection).
+- **Connection unavailable**: the connection isn’t active. Syncing pauses until it is; records already imported stay in Luma.
+- **Paused**: someone paused it.
 
-If a store or ERP stops accepting Luma, for example because its token was revoked or the app was removed there, its connection shows **Access revoked** and an issue opens in **Issues**. Choose **Reconnect** on the issue or the connection and enter new access. The connection keeps its records and links. The issue closes after the next complete sync. Disconnecting a connection yourself opens no issue.
+If a store or ERP stops accepting Luma, for example because its token was revoked or the Luma app was removed there, the connection shows **Access revoked** and an issue opens in **Issues**. Reconnect from the issue or the connection and enter new access. The connection keeps its records and links, and the issue closes after the next complete sync. Disconnecting a connection yourself opens no issue.
 
-If your role includes **Manage imports**, you can also choose **Sync now**, **Check all records** or **Re-import history** from the actions menu on each record type.
-
-## Link the same SKU across sources
-
-Luma keeps each source's records separate until a person confirms they are the same. On a stock position, **Linked sources** lists the source records behind the SKU and suggests possible matches that share a SKU code.
-
-Choose **Link**, say why the records match and confirm. Luma then groups stock, products and order lines from both sources under one SKU, while each source keeps its own quantities. **Unlink** separates a source again. Every link and unlink is recorded with who made it and why.
-
-## Correct a Shopify stock discrepancy
-
-Open the stock position in **Inventory**. In **Reconcile Shopify stock**, choose
-Shopify as the destination and the matching ERP source as authority. Review the
-location, evidence times and proposed available quantity, then select **Review
-correction**. Someone else who can approve changes must approve it before the
-requester can select **Apply to Shopify**.
-
-Luma checks both sources again and refuses stale evidence, ambiguous mappings or
-concurrent Shopify changes. If ERP evidence is stale, run Data sync first.
-Reconnect Shopify when inventory write access is missing. ERP stock is never
-changed by this correction.
-
-**Shopify accepted** confirms the request, while **Quantity verified** confirms a
-separate read matched the approved quantity. Use **Verify stock** for an accepted
-or uncertain result. An uncertain correction is never resent. Inventory’s saved
-observations and related issue status update through their own sync and
-verification checks.
+To link the same SKU across sources or correct Shopify stock from your ERP, see [Inventory](/docs/inventory).

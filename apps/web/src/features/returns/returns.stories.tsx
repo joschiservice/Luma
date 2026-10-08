@@ -132,7 +132,7 @@ function Content({ state }: { state: string }) {
       }
       loading={state === 'loading'}
       offline={state === 'offline'}
-      error={state === 'error' ? 'Returns could not be loaded.' : undefined}
+      error={state === 'error' ? 'Service unavailable.' : undefined}
     />
   );
 }
@@ -176,7 +176,7 @@ export const Browse: Story = {
     await expect(canvas.queryByText(/€48.00 refunded/)).toBeNull();
     // JTL does not share returns, and the page says so.
     await expect(
-      canvas.getByText(/JTL-Wawi does not share returns with Luma/),
+      canvas.getByText(/JTL-Wawi doesn’t share returns with Luma/),
     ).toBeVisible();
     await userEvent.click(
       canvas.getByRole('button', { name: /^Refund failed/ }),
@@ -232,7 +232,7 @@ export const Requested: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(
-      await canvas.findByRole('heading', { name: 'Next step: to review' }),
+      await canvas.findByRole('heading', { name: 'Next step: To review' }),
     ).toBeVisible();
   },
 };
@@ -246,7 +246,7 @@ export const NothingPending: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(
-      await canvas.findByRole('heading', { name: 'Nothing needs action' }),
+      await canvas.findByRole('heading', { name: 'No returns need action' }),
     ).toBeVisible();
   },
 };

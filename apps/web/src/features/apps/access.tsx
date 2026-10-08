@@ -1,4 +1,5 @@
 import type { AppManifest } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -12,10 +13,17 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { Check, KeyRound, LockKeyhole } from 'lucide-react';
 
+import {
+  permissionDescription,
+  permissionLabel,
+} from '../identity/permission-text';
 import { usePermissions } from '../identity/permissions';
 import { rolesOptions } from '../settings/roles-data';
 
-/** Describes core permissions in people-facing words, using the workspace catalog. */
+/**
+ * Describes core permissions in people-facing words in the interface language, using the workspace
+ * catalog for permissions the client doesn't know.
+ */
 function useScopeLabels(organizationId: string) {
   const roles = useQuery({ ...rolesOptions(organizationId), retry: false });
 
@@ -23,8 +31,8 @@ function useScopeLabels(organizationId: string) {
     const permission = roles.data?.permissions.find((item) => item.key === key);
 
     return {
-      label: permission?.label ?? key,
-      description: permission?.description ?? '',
+      label: permissionLabel(key, permission?.label ?? key),
+      description: permissionDescription(key, permission?.description ?? ''),
       consequential: permission?.consequential ?? false,
     };
   };
@@ -42,35 +50,41 @@ export function ScopeList({
 }) {
   const describe = useScopeLabels(organizationId);
   const { can } = usePermissions(organizationId);
+  const sensitive = scopes.some((scope) => describe(scope).consequential);
 
   return (
-    <ul className="app-scopes">
-      {scopes.map((scope) => {
-        const { label, description, consequential } = describe(scope);
-        const missing = checkGrantable && !can(scope);
+    <>
+      <ul className="app-scopes">
+        {scopes.map((scope) => {
+          const { label, description, consequential } = describe(scope);
+          const missing = checkGrantable && !can(scope);
 
-        return (
-          <li key={scope} data-missing={missing || undefined}>
-            {missing ? (
-              <LockKeyhole size={14} aria-hidden="true" />
-            ) : (
-              <Check size={14} aria-hidden="true" />
-            )}
-            <span>
-              <strong>
-                {label}
-                {consequential ? <Badge tone="warning">Sensitive</Badge> : null}
-              </strong>
+          return (
+            <li key={scope} data-missing={missing || undefined}>
+              {missing ? (
+                <LockKeyhole size={14} aria-hidden="true" />
+              ) : (
+                <Check size={14} aria-hidden="true" />
+              )}
               <span>
-                {missing
-                  ? 'Your role doesn’t include this, so you can’t grant it.'
-                  : description}
+                <strong>
+                  {label}
+                  {consequential ? (
+                    <Badge tone="warning">{m.apps_access_sensitive()}</Badge>
+                  ) : null}
+                </strong>
+                <span>
+                  {missing ? m.apps_access_scope_not_grantable() : description}
+                </span>
               </span>
-            </span>
-          </li>
-        );
-      })}
-    </ul>
+            </li>
+          );
+        })}
+      </ul>
+      {sensitive ? (
+        <p className="apps-note">{m.apps_access_sensitive_note()}</p>
+      ) : null}
+    </>
   );
 }
 
@@ -114,17 +128,21 @@ export function AppAccessDialog({
       <DialogContent className="app-access-dialog">
         <DialogTitle>
           {mode === 'install'
-            ? `Install ${app.name}?`
-            : `Review new access for ${app.name}`}
+            ? m.apps_access_install_title({ app: app.name })
+            : m.apps_access_approve_title({ app: app.name })}
         </DialogTitle>
         <DialogDescription>
           {mode === 'install'
-            ? `${app.name} can use this workspace data and these actions for the people who use it. It never does more than their own role allows.`
-            : `The latest version of ${app.name} asks for more access. Until you approve it, ${app.name} keeps working with the access it already has.`}
+            ? m.apps_access_install_description({ app: app.name })
+            : m.apps_access_approve_description({ app: app.name })}
         </DialogDescription>
         {scopes.length ? (
           <div className="app-access-section">
-            <h3>{app.name} can</h3>
+            <h3>
+              {mode === 'install'
+                ? m.apps_access_scopes_title({ app: app.name })
+                : m.apps_access_scopes_new_title({ app: app.name })}
+            </h3>
             <ScopeList
               organizationId={organizationId}
               scopes={scopes}
@@ -132,11 +150,13 @@ export function AppAccessDialog({
             />
           </div>
         ) : (
-          <p className="apps-note">This app doesn’t use any workspace data.</p>
+          <p className="apps-note">
+            {m.apps_access_no_scopes({ app: app.name })}
+          </p>
         )}
         {mode === 'install' && app.permissions.length ? (
           <div className="app-access-section">
-            <h3>Adds permissions to Roles</h3>
+            <h3>{m.apps_access_permissions_title()}</h3>
             <ul className="app-scopes">
               {app.permissions.map((permission) => (
                 <li key={permission.key}>
@@ -145,7 +165,9 @@ export function AppAccessDialog({
                     <strong>
                       {permission.label}
                       {permission.consequential ? (
-                        <Badge tone="warning">Sensitive</Badge>
+                        <Badge tone="warning">
+                          {m.apps_access_sensitive()}
+                        </Badge>
                       ) : null}
                     </strong>
                     <span>{permission.description}</span>
@@ -153,16 +175,17 @@ export function AppAccessDialog({
                 </li>
               ))}
             </ul>
-            <p className="apps-note">
-              Owners and admins get these automatically. Grant them to custom
-              roles in Settings → Roles.
-            </p>
+            {app.permissions.some((permission) => permission.consequential) ? (
+              <p className="apps-note">{m.apps_access_sensitive_note()}</p>
+            ) : null}
+            <p className="apps-note">{m.apps_access_permissions_note()}</p>
           </div>
         ) : null}
         {missing.length ? (
           <Alert tone="warning">
-            You can only grant access your role includes. Ask an owner to{' '}
-            {mode === 'install' ? 'install this app' : 'approve this access'}.
+            {mode === 'install'
+              ? m.apps_access_missing_install({ app: app.name })
+              : m.apps_access_missing_approve()}
           </Alert>
         ) : null}
         {error ? (
@@ -172,16 +195,16 @@ export function AppAccessDialog({
         ) : null}
         <DialogFooter>
           <Button variant="outline" disabled={pending} onClick={close}>
-            Cancel
+            {m.common_cancel()}
           </Button>
           <Button disabled={pending || !!missing.length} onClick={confirm}>
             {pending
               ? mode === 'install'
-                ? 'Installing…'
-                : 'Approving…'
+                ? m.apps_access_installing()
+                : m.apps_access_approving()
               : mode === 'install'
-                ? 'Install and grant access'
-                : 'Approve access'}
+                ? m.apps_access_install_confirm({ app: app.name })
+                : m.apps_access_approve_confirm()}
           </Button>
         </DialogFooter>
       </DialogContent>

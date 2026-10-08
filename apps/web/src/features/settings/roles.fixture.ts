@@ -37,7 +37,7 @@ const groups: RolesSnapshot['groups'] = [
   {
     id: 'app:jtl',
     label: 'JTL',
-    description: 'Permissions JTL declares for its own features.',
+    description: 'Permissions for JTL’s own features.',
     app: { id: 'jtl', name: 'JTL', available: true },
   },
 ];
@@ -64,7 +64,7 @@ export const rolesFixture: RolesSnapshot = {
     permission(
       'workspace.approval_policy.manage',
       'workspace',
-      'Manage approval policy',
+      'Manage approval rules',
       'Decide whether every permitted change needs independent approval.',
       true,
     ),
@@ -130,7 +130,7 @@ export const rolesFixture: RolesSnapshot = {
     permission(
       'jtl:purchase_orders.submit',
       'app:jtl',
-      'Submit purchase orders to JTL',
+      'Send purchase orders to JTL',
       'Propose, approve and send purchase orders to JTL.',
       true,
       null,
@@ -157,7 +157,7 @@ export const rolesFixture: RolesSnapshot = {
       key: 'admin',
       name: 'Admin',
       description:
-        'Runs the workspace: settings, team, connections, workflows and every action. Cannot change owners.',
+        'Runs the workspace: settings, team, connections, workflows, and every change. Can’t change owners.',
       builtIn: true,
       revision: 1,
       archived: false,
@@ -172,7 +172,7 @@ export const rolesFixture: RolesSnapshot = {
       key: 'member',
       name: 'Member',
       description:
-        'Sees operations, records and workflows, takes decisions and asks Luma. Cannot change data or settings.',
+        'Sees operations, records, and workflows, takes decisions, and asks Luma. Can’t change data or settings.',
       builtIn: true,
       revision: 1,
       archived: false,

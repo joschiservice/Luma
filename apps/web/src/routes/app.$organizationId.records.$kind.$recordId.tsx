@@ -7,5 +7,6 @@ export const Route = createFileRoute(
   '/app/$organizationId/records/$kind/$recordId',
 )({
   validateSearch: recordsSearch,
+  staticData: { help: 'records' },
   component: RecordDetailPage,
 });

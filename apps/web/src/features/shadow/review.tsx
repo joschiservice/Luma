@@ -1,6 +1,7 @@
 import './shadow.css';
 
 import { shadowReviewSchema } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import { CaseNotice } from '@luma/ui/components/issues/case-investigation';
 import { IssueCollection } from '@luma/ui/components/issues/issue-collection';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -74,15 +75,16 @@ export function ShadowReviewForm({
   const [retry, setRetry] = useState<ShadowReview>();
   const lock = useRef(false);
   const unavailable = shadowAccessDenied(history.error);
+  const selectedLabel = refs.length
+    ? m.shadow_review_evidence_selected({ count: refs.length })
+    : m.shadow_review_evidence_none_selected();
 
   async function submit() {
     if (lock.current || unavailable) return;
     let body: ShadowReview;
     try {
       if (!retry && (!needed || !eligible))
-        throw new Error(
-          'Assess whether action was needed and whether the case was eligible.',
-        );
+        throw new Error(m.shadow_review_error_answers());
       body =
         retry ??
         shadowReviewSchema.parse({
@@ -107,14 +109,12 @@ export function ShadowReviewForm({
         Date.parse(body.occurredAt) < Date.parse(evaluation.createdAt) ||
         Date.parse(body.occurredAt) > Date.now()
       )
-        throw new Error(
-          'The observation must follow this evaluation and cannot be in the future.',
-        );
+        throw new Error(m.shadow_review_error_time());
     } catch (error) {
       setError(
         error instanceof Error && !('issues' in error)
           ? error.message
-          : 'Check the action fields, target ID and selected evidence.',
+          : m.shadow_review_error_fields(),
       );
 
       return;
@@ -140,7 +140,7 @@ export function ShadowReviewForm({
 
   if (unavailable)
     return (
-      <CaseNotice error title="Evidence unavailable">
+      <CaseNotice error title={m.shadow_review_evidence_failed()}>
         {shadowError(history.error)}
       </CaseNotice>
     );
@@ -153,62 +153,59 @@ export function ShadowReviewForm({
         void submit();
       }}
     >
-      <h4>Compare with the operator’s action</h4>
-      <p>
-        Record what happened after this prediction. Saved reviews cannot be
-        edited.
-      </p>
+      <h4>{m.shadow_review_title()}</h4>
+      <p>{m.shadow_review_description()}</p>
       <fieldset disabled={pending || !!retry} className="shadow-fields">
         <FieldGroup>
           <div className="shadow-form-grid">
             <Field>
               <FieldLabel htmlFor={`${id}-needed`}>
-                Was an action needed?
+                {m.shadow_review_needed()}
               </FieldLabel>
               <Select
                 id={`${id}-needed`}
-                aria-label="Was an action needed?"
+                aria-label={m.shadow_review_needed()}
                 value={needed}
                 onValueChange={(v) => setNeeded(v ?? '')}
                 options={[
-                  { value: '', label: 'Choose an assessment' },
-                  { value: 'yes', label: 'Yes' },
-                  { value: 'no', label: 'No' },
+                  { value: '', label: m.shadow_review_choose() },
+                  { value: 'yes', label: m.common_yes() },
+                  { value: 'no', label: m.common_no() },
                 ]}
               />
             </Field>
             <Field>
               <FieldLabel htmlFor={`${id}-eligible`}>
-                Was this case eligible?
+                {m.shadow_review_fits()}
               </FieldLabel>
               <Select
                 id={`${id}-eligible`}
-                aria-label="Was this case eligible?"
+                aria-label={m.shadow_review_fits()}
                 value={eligible}
                 onValueChange={(v) => setEligible(v ?? '')}
                 options={[
-                  { value: '', label: 'Choose an assessment' },
-                  { value: 'yes', label: 'Yes' },
-                  { value: 'no', label: 'No' },
+                  { value: '', label: m.shadow_review_choose() },
+                  { value: 'yes', label: m.common_yes() },
+                  { value: 'no', label: m.common_no() },
                 ]}
               />
             </Field>
           </div>
           <Field>
             <FieldLabel htmlFor={`${id}-action`}>
-              Observed operator action
+              {m.shadow_review_action()}
             </FieldLabel>
             <Select
               id={`${id}-action`}
-              aria-label="Observed operator action"
+              aria-label={m.shadow_review_action()}
               value={choice}
               onValueChange={(v) => setChoice(v ?? 'unknown')}
               options={[
-                { value: 'unknown', label: 'Not observed' },
+                { value: 'unknown', label: m.shadow_review_action_unknown() },
                 ...(action
-                  ? [{ value: 'same', label: 'Same as the proposed action' }]
+                  ? [{ value: 'same', label: m.shadow_review_action_same() }]
                   : []),
-                { value: 'different', label: 'Record another action' },
+                { value: 'different', label: m.shadow_review_action_other() },
               ]}
             />
           </Field>
@@ -216,7 +213,7 @@ export function ShadowReviewForm({
             <>
               <Field>
                 <FieldLabel htmlFor={`${id}-capability`}>
-                  Action capability
+                  {m.shadow_review_change_type()}
                 </FieldLabel>
                 <Input
                   id={`${id}-capability`}
@@ -227,7 +224,9 @@ export function ShadowReviewForm({
               </Field>
               <div className="shadow-form-grid">
                 <Field>
-                  <FieldLabel htmlFor={`${id}-kind`}>Target type</FieldLabel>
+                  <FieldLabel htmlFor={`${id}-kind`}>
+                    {m.shadow_review_record_type()}
+                  </FieldLabel>
                   <Input
                     id={`${id}-kind`}
                     value={kind}
@@ -236,7 +235,9 @@ export function ShadowReviewForm({
                   />
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor={`${id}-target`}>Target ID</FieldLabel>
+                  <FieldLabel htmlFor={`${id}-target`}>
+                    {m.shadow_review_record_id()}
+                  </FieldLabel>
                   <Input
                     id={`${id}-target`}
                     value={target}
@@ -246,12 +247,12 @@ export function ShadowReviewForm({
                 </Field>
               </div>
               <ActionFieldsEditor
-                title="Parameters"
+                group="parameters"
                 rows={parameters}
                 change={setParameters}
               />
               <ActionFieldsEditor
-                title="Expected result"
+                group="expected"
                 rows={expected}
                 change={setExpected}
               />
@@ -259,7 +260,7 @@ export function ShadowReviewForm({
           ) : null}
           <Field>
             <FieldLabel htmlFor={`${id}-when`}>
-              Observed at ({timeZone})
+              {m.shadow_review_when({ timeZone })}
             </FieldLabel>
             <Input
               id={`${id}-when`}
@@ -271,58 +272,60 @@ export function ShadowReviewForm({
             />
           </Field>
           <fieldset className="shadow-fields">
-            <legend>Supporting incident evidence</legend>
+            <legend>{m.shadow_review_evidence_title()}</legend>
             {history.isPending ? (
-              <p role="status">Loading evidence…</p>
+              <p role="status">{m.shadow_review_evidence_loading()}</p>
             ) : history.error && !history.data ? (
-              <CaseNotice error title="Evidence could not be loaded">
+              <CaseNotice error title={m.shadow_review_evidence_failed()}>
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => void history.refetch()}
                 >
-                  Retry evidence
+                  {m.common_retry()}
                 </Button>
               </CaseNotice>
             ) : !history.data?.evidence.length ? (
-              <p>No retained evidence is available for this case yet.</p>
+              <p>{m.shadow_review_evidence_empty()}</p>
             ) : (
               <>
-                <p role="status">{refs.length} evidence records selected</p>
+                <p role="status">{selectedLabel}</p>
                 <IssueCollection
-                  title="Supporting incident evidence"
-                  noun="incident evidence records"
+                  title={m.shadow_review_evidence_title()}
+                  noun={m.shadow_review_evidence_noun()}
                   items={history.data.evidence}
                   hasMore={history.data.hasMoreEvidence}
                   loading={history.isFetching}
                   onLoadMore={() => setPages((value) => value + 1)}
                   filters={[
                     {
-                      label: 'Provider',
+                      label: m.common_source(),
                       value: (evidence) =>
-                        evidence.source?.provider ?? 'Observation',
+                        evidence.source?.provider ??
+                        m.shadow_review_no_source(),
                     },
                     {
-                      label: 'Selection',
+                      label: m.shadow_review_filter_selection(),
                       value: (evidence) =>
                         refs.includes(evidence.id)
-                          ? 'Selected'
-                          : 'Not selected',
+                          ? m.shadow_review_selected()
+                          : m.shadow_review_not_selected(),
                     },
                   ]}
                   notice={
                     <>
-                      <p role="status">
-                        {refs.length} evidence records selected
-                      </p>
+                      <p role="status">{selectedLabel}</p>
                       {history.error ? (
-                        <CaseNotice error title="Evidence could not be loaded">
+                        <CaseNotice
+                          error
+                          title={m.shadow_review_evidence_failed()}
+                        >
                           <Button
                             type="button"
                             variant="outline"
                             onClick={() => void history.refetch()}
                           >
-                            Retry evidence
+                            {m.common_retry()}
                           </Button>
                         </CaseNotice>
                       ) : null}
@@ -347,7 +350,7 @@ export function ShadowReviewForm({
                         <span>
                           {evidence.source
                             ? `${evidence.source.provider} · ${evidence.source.resource}`
-                            : 'Observation'}{' '}
+                            : m.shadow_review_no_source()}{' '}
                           · <WorkspaceDate value={evidence.observedAt} />
                           <code>{evidence.id}</code>
                         </span>
@@ -360,27 +363,25 @@ export function ShadowReviewForm({
           </fieldset>
           <Field>
             <FieldLabel htmlFor={`${id}-feedback`}>
-              Would you trust this recommendation?
+              {m.shadow_review_trust()}
             </FieldLabel>
             <Select
               id={`${id}-feedback`}
-              aria-label="Would you trust this recommendation?"
+              aria-label={m.shadow_review_trust()}
               value={feedback}
               onValueChange={(v) => setFeedback(v ?? 'none')}
               options={[
-                { value: 'none', label: 'No feedback' },
-                { value: 'trust', label: 'Trust' },
-                { value: 'distrust', label: 'Distrust' },
-                { value: 'unsure', label: 'Unsure' },
+                { value: 'none', label: m.shadow_trust_none() },
+                { value: 'trust', label: m.shadow_trust_trust() },
+                { value: 'distrust', label: m.shadow_trust_distrust() },
+                { value: 'unsure', label: m.shadow_trust_unsure() },
               ]}
             />
           </Field>
         </FieldGroup>
       </fieldset>
       {error ? <p role="alert">{error}</p> : null}
-      {retry ? (
-        <p>The save is uncertain. Retry sends the same review.</p>
-      ) : null}
+      {retry ? <p>{m.shadow_review_uncertain()}</p> : null}
       <Button
         type="submit"
         disabled={
@@ -391,10 +392,10 @@ export function ShadowReviewForm({
         }
       >
         {pending
-          ? 'Saving comparison…'
+          ? m.shadow_review_saving()
           : retry
-            ? 'Retry saving comparison'
-            : 'Save operator comparison'}
+            ? m.shadow_review_retry()
+            : m.shadow_review_save()}
       </Button>
     </form>
   );

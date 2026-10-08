@@ -1,0 +1,77 @@
+---
+title: Zurückgehaltenes und verzögertes Fulfillment lösen
+description: Finden Sie Fulfillment-Arbeit, die zurückgehalten wird oder nicht vorankommt, sehen Sie den Grund, stellen Sie Shopify-Fulfillments mit Genehmigung wieder her und prüfen Sie, ob die Arbeit weiterläuft.
+---
+
+Fulfillment zeigt die Arbeit, die Ihre verbundenen Systeme zu jeder Bestellung melden: **Fulfillment-Aufträge**, also die Arbeit, die ein Lagerort kommissionieren und verpacken muss, und **Sendungen**, die einen Lagerort verlassen haben. Die Arbeit jedes Systems wird getrennt aufgeführt, auch wenn ein Shop und ein ERP dieselbe Bestellung führen. Öffnen Sie **Fulfillment** in der Seitenleiste oder drücken Sie **G**, dann **F**.
+
+## Finden, was Aufmerksamkeit braucht [#find-what-needs-attention]
+
+Die Seite öffnet mit **Braucht Aufmerksamkeit**: zurückgehaltene, verzögerte und fehlgeschlagene Fulfillments, längste Wartezeit zuerst. Ein Fulfillment braucht Aufmerksamkeit, wenn es eines dieser Signale zeigt:
+
+- **Zurückgehalten**: Die Quelle hat offene Arbeit angehalten, zum Beispiel wegen einer falschen Adresse oder einer ausstehenden Zahlung.
+- **Termin überschritten**: Offene Arbeit hat das Datum überschritten, das die Quelle für die Erfüllung gesetzt hat.
+- **Kein Fortschritt**: Offene Arbeit hat seit 48 Stunden keinen Fortschritt gemeldet. Arbeit, die erst später beginnen soll, zählt nicht.
+- **Zustellproblem**: Der Versanddienstleister meldet einen Zustellversuch, eine Verzögerung oder eine fehlgeschlagene Zustellung.
+- **Verspätete Zustellung**: Eine Sendung hat ihr voraussichtliches Lieferdatum überschritten und ist nicht zugestellt.
+- **Fehlgeschlagen**: Die Quelle meldet, dass das Fulfillment fehlgeschlagen ist.
+
+Die weiteren Ansichten sind **Zurückgehalten**, **Verzögert**, **Offene Arbeit**, **Unterwegs** und **Alle**. Suchen Sie nach Bestellnummer, Sendungsnummer, Standort oder Quell-ID. Grenzen Sie die Liste mit **Quelle**, **Standort** und **Typ** ein, und sortieren Sie nach **Längste Wartezeit**, **Letzter Fortschritt** oder **Termin**. Ansicht und Filter sind Teil der Seitenadresse. So können Sie sie teilen oder an die Seitenleiste anheften.
+
+Eine leere Ansicht, etwa **Keine Fulfillments brauchen Aufmerksamkeit**, gilt nur für diese Ansicht. **Keine Fulfillments entsprechen diesen Filtern** bedeutet, dass Suche oder Filter alles ausschließen. **Noch keine Fulfillments** bedeutet, dass noch kein verbundenes System Fulfillment-Arbeit gemeldet hat. Siehe [Datenabgleich](/docs/data-sync).
+
+## Fulfillment lesen [#read-a-fulfillment]
+
+Öffnen Sie ein Fulfillment, um Folgendes zu sehen:
+
+- **Nächster sicherer Schritt**: was passiert und was zu tun ist, etwa zuerst den Grund einer Sperre beheben oder eine Sendung beim Versanddienstleister prüfen.
+- **Angaben der Quelle**: Typ, Status, Sperren, Lagerort, Versandart, Termine, Status beim Versanddienstleister und Sendungsverfolgung. Was die Quelle nicht meldet, wird als nicht gemeldet markiert statt weggelassen.
+- **Nachweise zum Fortschritt**: wann die Quelle zuletzt Fortschritt gemeldet hat, die letzte Änderung, die Luma gesehen hat, und wann Luma zuletzt abgerufen hat, dazu die Workflow-Ausführungen der Bestellung.
+- **Artikel** in diesem Fulfillment im Vergleich zur bestellten Menge.
+- **Verlauf in der Quelle**: jeder Stand, den Luma gelesen hat, der neueste zuerst, mit den Änderungen seit dem vorherigen Abruf.
+- Die **Bestellung**, **Weitere Fulfillments dieser Bestellung**, **Probleme** und **Luma-Aktivität**.
+
+Kunden-, Zahlungs- und Adressdaten stehen in der Bestellung, die sie live aus dem Shop liest.
+
+## Shopify-Fulfillment wiederherstellen [#recover-a-shopify-fulfillment]
+
+Bei einem offenen Shopify-Fulfillment-Auftrag erscheint **Fulfillment wiederherstellen** unter **Nächster sicherer Schritt**. Sie erreichen den Bereich auch über einen Fulfillment-Auftrag in den Live-Shopify-Details einer Bestellung. Dafür brauchen Sie **Shopify-Fulfillments wiederherstellen**; ohne diese Berechtigung erscheint der Bereich nicht.
+
+Beheben Sie den Grund einer Sperre, bevor Sie sie aufheben. Wenn Sie eine Sperre wegen falscher Adresse aufheben, ohne die Adresse zu korrigieren, geht die Sendung an die falsche Adresse.
+
+1. Wählen Sie **Fulfillment aktualisieren**, wenn die Angaben veraltet sein könnten. Luma liest das Fulfillment dann aus Shopify.
+2. Wählen Sie unter **Aktion**, was geschehen soll:
+   - **Eine Sperre aufheben**: Wählen Sie die **Aufzuhebende Sperre**. Luma hebt nur diese Sperre auf; andere Sperren bleiben bestehen.
+   - **Fulfillment wieder öffnen**: Öffnet den Fulfillment-Auftrag sofort für die Bearbeitung, zum Beispiel einen, den Shopify für später geplant hat.
+   - **Restliche Artikel verlagern**: Wählen Sie das **Ziel**. Alle restlichen Artikel werden verlagert; bereits erfüllte Artikel bleiben am ursprünglichen Lagerort.
+3. Wählen Sie **Vorschau anzeigen**. Die Vorschau nennt die genaue Änderung und wann sie abläuft. Ändert sich die Bestellung vorher in Shopify, prüfen Sie sie erneut.
+4. Eine andere Person, deren Rolle **Shopify-Fulfillments wiederherstellen** und **Änderungen genehmigen oder ablehnen** enthält, öffnet dasselbe Fulfillment und wählt **Aktion genehmigen** oder **Ablehnen**. Ihre eigene Wiederherstellung können Sie nicht genehmigen.
+5. Wählen Sie nach der Genehmigung **Genehmigung prüfen**, um die Prüfung zu aktualisieren, und dann **An Shopify senden**. Nur die Person, die die Wiederherstellung angefordert hat, kann sie senden.
+
+Wiederherstellungen, die auf Genehmigung warten, genehmigte Wiederherstellungen, die noch gesendet werden müssen, und Ergebnisse, die noch geprüft werden müssen, erscheinen auch unter [Wartet auf Sie](/docs/needs-you).
+
+Shopify entscheidet, welche Aktionen möglich sind. Ist eine Aktion nicht verfügbar, nennt der Bereich den Grund, zum Beispiel dass der Fulfillment-Auftrag abgeschlossen oder storniert ist, dass die ausgewählte Sperre nicht mehr besteht oder dass Shopify nicht alle verbleibenden Artikel an den gewählten Standort verschieben kann. **Verbinden Sie Shopify neu und erlauben Sie Luma, Fulfillments zu ändern** bedeutet, dass jemand mit **Verbindungen verwalten** den Shop neu verbinden muss; siehe [Apps und Verbindungen](/docs/apps-and-connections#change-or-reconnect-a-connection).
+
+Luma prüft Shopify unmittelbar vor dem Senden erneut. Hat sich das Fulfillment geändert, ist die Vorschau abgelaufen, haben sich die Genehmigungsregeln geändert oder wurde die Aktion abgelehnt, wird nichts gesendet. Wählen Sie **Andere Aktion prüfen**, um neu zu beginnen. Gibt es für ein Fulfillment mehrere Wiederherstellungen, wählen Sie eine unter **Gespeicherte Wiederherstellungen**.
+
+## Prüfen, ob die Arbeit weiterläuft [#check-that-the-work-moved]
+
+Eine Wiederherstellung hat drei getrennte Schritte, und jeder zeigt seinen eigenen Stand:
+
+- **Prüfung und Genehmigung**: Die Aktion wartet auf Genehmigung oder ist genehmigt.
+- **Von Shopify angenommen**: Shopify hat die Anfrage angenommen. Die Arbeit läuft damit nicht unbedingt weiter.
+- **Fortschritt bestätigt**: Ein neuer Abruf aus Shopify zeigt weniger unerfüllte Artikel.
+
+Wählen Sie **Fulfillment-Fortschritt prüfen**, um Shopify erneut zu lesen. Solange der Fortschritt nicht bestätigt ist, behandeln Sie das Fulfillment als weiterhin festhängend. Luma zählt es erst als wiederhergestellt, wenn ein neuer Abruf weniger verbleibende Einheiten zeigt.
+
+Die Versandart einer Bestellung zu korrigieren ist etwas anderes, als sie zu erfüllen: Es ändert, wie die Bestellung versendet wird, nicht ob sie versendet wurde. **Nachweise zum Fortschritt** zeigt, ob Luma die Bestellung seitdem als versendet oder ihre Arbeit als abgeschlossen gesehen hat.
+
+## Wenn das Ergebnis unklar ist [#when-the-outcome-is-unclear]
+
+**Ergebnis unklar** bedeutet, dass Luma nicht feststellen konnte, ob Shopify die Aktion erhalten hat, zum Beispiel weil die Verbindung unterbrochen wurde. Luma sendet dieselbe Aktion nie zweimal. Prüfen Sie die Bestellung in Shopify und wählen Sie **Fulfillment-Fortschritt prüfen**, bevor Sie eine weitere Wiederherstellung beginnen.
+
+## Andere Quellen und Zustellprobleme [#other-sources-and-delivery-problems]
+
+Bei anderen Systemen und bei Sendungen, die das Lager bereits verlassen haben, nennt **Nächster sicherer Schritt**, wo Sie handeln: im Quellsystem, am ausführenden Lagerort oder beim Versanddienstleister. JTL-Wawi meldet keine Sperren, deshalb erscheinen sie dort als nicht gemeldet. Luma zeigt den neuen Stand nach dem nächsten Abruf.
+
+Zum Ansehen von Fulfillment brauchen Sie **Fulfillment ansehen**. Sie erreichen ein Fulfillment über eine Bestellung, ein Problem zu einem Fulfillment, **Datensätze** und die Suche.

@@ -1,9 +1,11 @@
+import { m } from '@luma/i18n/messages';
+import { baseLocale, getLocale } from '@luma/i18n/runtime';
 import { Link } from '@tanstack/react-router';
 import type { MDXComponents } from 'mdx/types';
 import { use, useEffect, useRef } from 'react';
 
 import { docLocation } from './context';
-import { source } from './source';
+import { docPage, docSection } from './source';
 
 function focusHeading(root: HTMLElement | null, hash: string) {
   const heading = hash
@@ -16,7 +18,10 @@ function focusHeading(root: HTMLElement | null, hash: string) {
   heading?.focus({ preventScroll: true });
 }
 
-/** Renders a shared MDX article and keeps embedded links and heading navigation in the drawer. */
+/**
+ * Renders a shared MDX article in the reader's language, or in English with a note when no
+ * translation exists, and keeps embedded links and heading navigation in the drawer.
+ */
 export function DocArticle({
   slug,
   hash = '',
@@ -26,7 +31,9 @@ export function DocArticle({
   hash?: string;
   onNavigate?: (href: string) => void;
 }) {
-  const page = source.getPage(slug.split('/'));
+  const locale = getLocale();
+  const found = docPage(slug, locale);
+  const page = found?.page;
   const root = useRef<HTMLElement>(null);
   const embedded = Boolean(onNavigate);
   const content = page ? use(page.data.load()) : undefined;
@@ -45,11 +52,13 @@ export function DocArticle({
   if (!page || !content)
     return (
       <p>
-        This guide could not be found. <a href="/docs">Browse documentation</a>.
+        {m.docs_article_missing()} <a href="/docs">{m.docs_missing_link()}</a>
       </p>
     );
   const Body = page.data.body;
   const Title = embedded ? 'h2' : 'h1';
+  const section = docSection(slug, locale);
+  const contentLang = found.translated ? undefined : baseLocale;
   const components: MDXComponents = {
     a: ({ href = '', children, ...props }) => {
       const location = docLocation(href);
@@ -107,17 +116,25 @@ export function DocArticle({
 
   return (
     <article className="docs-article" ref={root}>
-      <p className="docs-eyebrow">Issues · Guide</p>
-      <Title data-article-title tabIndex={-1}>
+      {section ? <p className="docs-eyebrow">{section}</p> : null}
+      {found.translated ? null : (
+        <p className="docs-translation-note" role="note">
+          {m.docs_article_untranslated()}
+        </p>
+      )}
+      <Title data-article-title tabIndex={-1} lang={contentLang}>
         {page.data.title}
       </Title>
-      <p className="docs-description">{page.data.description}</p>
+      <p className="docs-description" lang={contentLang}>
+        {page.data.description}
+      </p>
       {content.toc.length ? (
-        <nav className="docs-toc" aria-label="On this page">
-          <span>On this page</span>
+        <nav className="docs-toc" aria-label={m.docs_article_toc()}>
+          <span>{m.docs_article_toc()}</span>
           {content.toc.map((item) => (
             <a
               key={item.url}
+              lang={contentLang}
               href={embedded ? `${page.url}${item.url}` : item.url}
               onClick={
                 embedded
@@ -140,7 +157,7 @@ export function DocArticle({
           ))}
         </nav>
       ) : null}
-      <div className="docs-prose">
+      <div className="docs-prose" lang={contentLang}>
         <Body components={components} />
       </div>
     </article>

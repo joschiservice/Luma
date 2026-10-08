@@ -1,4 +1,6 @@
 import { useDraggable } from '@dnd-kit/core';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Input } from '@luma/ui/components/primitives/input';
 import { CircleAlert, GripVertical, Search, X } from 'lucide-react';
@@ -20,6 +22,9 @@ function PaletteEntry({
   onAdd(item: PaletteItem): void;
 }) {
   const describedBy = useId();
+  const limit = item.reason
+    ? m.authoring_palette_limited_reason({ reason: item.reason })
+    : m.authoring_palette_limited();
   const { setNodeRef, listeners, isDragging } = useDraggable({
     id: `${paletteDragPrefix}${item.key}`,
     data: { item },
@@ -35,11 +40,9 @@ function PaletteEntry({
         data-kind={item.kind}
         data-dragging={isDragging}
         data-limited={!item.executable}
-        aria-label={`Add step: ${item.label}`}
+        aria-label={m.authoring_palette_add_step({ step: item.label })}
         aria-describedby={describedBy}
-        title={
-          item.executable ? undefined : `Can’t run here yet: ${item.reason}`
-        }
+        title={item.executable ? undefined : limit}
         // Only pointer drags start here; Enter and Space add the step at the chosen place.
         onPointerDown={
           listeners?.onPointerDown as
@@ -53,15 +56,12 @@ function PaletteEntry({
           <span className="authoring-palette-description" id={describedBy}>
             {item.description}
             {!item.executable ? (
-              <span className="sr-only">
-                {' '}
-                Can’t run here yet: {item.reason}
-              </span>
+              <span className="sr-only"> {limit}</span>
             ) : null}
           </span>
           {!item.executable ? (
             <span className="authoring-palette-limit" aria-hidden="true">
-              <CircleAlert size={12} /> Can’t run here
+              <CircleAlert size={12} /> {m.authoring_limited_badge()}
             </span>
           ) : null}
         </span>
@@ -106,12 +106,14 @@ export function StepPalette({
   return (
     <div className="authoring-palette">
       <div className="authoring-palette-heading">
-        <h2>Add steps</h2>
+        <h2>{m.authoring_palette_title()}</h2>
         <p>
-          {draggable
-            ? 'Drag a step into the workflow, or select one to add it '
-            : 'Select a step to add it '}
-          <strong>{target}</strong>.
+          {rich(
+            draggable
+              ? m.authoring_palette_hint_drag
+              : m.authoring_palette_hint_select,
+            { place: <strong>{target}</strong> },
+          )}
           {onResetTarget ? (
             <Button
               variant="ghost"
@@ -119,7 +121,7 @@ export function StepPalette({
               className="authoring-palette-reset"
               onClick={onResetTarget}
             >
-              <X aria-hidden="true" /> Reset
+              <X aria-hidden="true" /> {m.authoring_palette_reset()}
             </Button>
           ) : null}
         </p>
@@ -129,8 +131,8 @@ export function StepPalette({
         <Input
           ref={searchRef}
           type="search"
-          aria-label="Search steps"
-          placeholder="Search steps…"
+          aria-label={m.authoring_palette_search_label()}
+          placeholder={m.authoring_palette_search_placeholder()}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
@@ -141,8 +143,8 @@ export function StepPalette({
           if (!entries.length) return null;
 
           return (
-            <section key={group} aria-label={label}>
-              <h3>{label}</h3>
+            <section key={group} aria-label={label()}>
+              <h3>{label()}</h3>
               <ul>
                 {entries.map((item) => (
                   <PaletteEntry
@@ -158,7 +160,7 @@ export function StepPalette({
         })
       ) : (
         <p className="authoring-hint" role="status">
-          No steps match “{query}”.
+          {m.authoring_palette_no_match({ query })}
         </p>
       )}
     </div>

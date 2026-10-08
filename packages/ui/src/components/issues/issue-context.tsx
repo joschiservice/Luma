@@ -1,5 +1,15 @@
 import type { CaseSummary } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import { GitBranch, Package, Truck, Unplug } from 'lucide-react';
+
+import { issueKind, sourceLabel } from './case-presentation';
+
+const icons: Record<string, typeof Package> = {
+  inventory_mismatch: Package,
+  sync_failure: Unplug,
+  stuck_fulfillment: Truck,
+  workflow_failure: GitBranch,
+};
 
 /** Displays the affected item, issue type, and source systems. */
 export function IssueContext({
@@ -9,16 +19,8 @@ export function IssueContext({
   item: CaseSummary;
   compact?: boolean;
 }) {
-  const types: Record<string, { label: string; Icon: typeof Package }> = {
-    inventory_mismatch: { label: 'Inventory mismatch', Icon: Package },
-    sync_failure: { label: 'Connection issue', Icon: Unplug },
-    stuck_fulfillment: { label: 'Fulfillment delay', Icon: Truck },
-    workflow_failure: { label: 'Workflow issue', Icon: GitBranch },
-  };
-  const { label, Icon } = types[item.class] ?? {
-    label: 'Operational issue',
-    Icon: GitBranch,
-  };
+  const { label } = issueKind(item);
+  const Icon = icons[item.class] ?? GitBranch;
 
   return (
     <div className="issue-context">
@@ -39,8 +41,8 @@ export function IssueContext({
           ·
         </span>
         {item.sources.length
-          ? item.sources.join(' · ')
-          : 'Source system unknown'}
+          ? item.sources.map(sourceLabel).join(' · ')
+          : m.issues_source_system_unknown()}
       </div>
     </div>
   );

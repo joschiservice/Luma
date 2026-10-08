@@ -1,0 +1,66 @@
+---
+title: Test a workflow safely
+description: See what a workflow would do with a real issue without changing anything, record what your team did, and compare the results before you rely on the workflow.
+---
+
+A workflow test shows what a workflow that fixes issues would propose for a real issue, without sending anything to your systems. Use it to decide whether you trust a workflow before you turn it on. Results are previews: they never count as confirmed fixes.
+
+## Who can test workflows
+
+Testing workflows and reading test results need **Test and turn on issue workflows**. Without it, the test section says your role doesn’t allow testing workflows.
+
+You can only test published workflows that fix issues. If there’s none, the test section says **Publish a Workflow to test it on this issue**.
+
+## Run a test on an issue
+
+1. Open an issue and select **Test a Workflow on this issue**, marked **Preview only. Nothing is changed.**
+2. Under **Workflow to test**, choose a workflow.
+3. Select **Run test**.
+
+Luma uses the issue’s current investigation and the change the workflow prepared for it. If that change is missing or out of date, the test can’t predict success. While you’re offline or the issue isn’t confirmed, you can’t run a test.
+
+If Luma can’t confirm the result, select **Retry test**. It sends the same request, so the test isn’t run twice.
+
+## Read the result
+
+Every result is labeled **Preview only. Nothing was changed.** It shows:
+
+- **Proposed change**: what the workflow would do, or that it didn’t prepare a change.
+- **Workflow applies**: **Yes**, **No**, **Issue details are out of date** or **No change prepared**.
+- **Approval rules**: whether your approval rules would mark the change **Allowed**, **Needs approval** or **Blocked**, and why.
+- **Predicted outcome**: **Should succeed if the assumptions hold**, with the assumptions listed under **This prediction assumes**, or **Can’t predict**.
+- **Actual outcome**: what Luma later confirmed for the issue: **Confirmed**, **Not confirmed** or **Not checked yet**.
+
+Only changes to an order’s shipping method get a prediction today. For every other change, the predicted outcome is **Can’t predict**.
+
+## Record what your team did
+
+After the issue is handled, record what actually happened under **Record what your team did**:
+
+1. Answer **Was a change needed?** and **Should this Workflow handle this issue?**
+2. Under **What did your team do?**, choose **Made the proposed change**, **Made a different change** or **Not known**. For a different change, say what changed and when.
+3. Select the evidence that supports your answers.
+4. Answer **Would you trust this Workflow to make this change on its own?**
+5. Select **Save review**.
+
+You can’t edit a review after you save it. If Luma couldn’t confirm that your review was saved, select **Retry saving review**; it sends the same review again.
+
+## Compare results across issues
+
+Open the workflow and go to **Activity**, or select **Compare results across issues** from a test. **Test results** compares the latest test on each issue with what your team did and what Luma confirmed afterward.
+
+It starts with the last 30 days. Choose another period under **From** and **Through** and select **Apply dates**. Dates use your workspace’s time zone. A period shows up to 500 issues; choose fewer days to see more.
+
+- **Matches your team**: proposed changes that match what your team did.
+- **Unnecessary proposals**: proposals your team marked as not needed.
+- **Missed issues**: issues that needed a change but had no allowed proposal.
+- **Correct predictions**: predictions that match the confirmed outcome.
+- **Could fix on its own (estimate)**: allowed proposals that are predicted to succeed.
+- **Manual work it could save (estimate)**: proposals it could make on its own that match changes your team made by hand.
+- **Team trust**: reviews that would trust the workflow, out of all yes or no answers.
+
+Each figure shows how many issues it’s based on. **Not enough data** means there’s nothing to count yet. Below the figures, each tested issue shows its prediction, its outcome and whether it was reviewed. Select **Record what your team did** to review one.
+
+## What test results don’t tell you
+
+Estimates show what the workflow could do. They aren’t completed fixes, and they never count toward verified outcomes in [Insights](/docs/insights). A workflow’s real results come from its runs after you turn it on; see [Manage workflows](/docs/workflows).

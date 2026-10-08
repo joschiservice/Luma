@@ -1,4 +1,6 @@
 import type { AppUiProps } from '@luma/app-host/web';
+import { formatDateTime } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Input } from '@luma/ui/components/primitives/input';
 import { useRef, useState } from 'react';
@@ -12,6 +14,17 @@ import {
 import { ShopifyFulfillmentRecovery } from './fulfillment-recovery.js';
 import { recordError } from './record-error.js';
 import { ShopifyRecordSections } from './sections.js';
+
+const kindLabels = {
+  Order: m.shopify_kind_order,
+  Customer: m.shopify_kind_customer,
+  Product: m.shopify_kind_product,
+  ProductVariant: m.shopify_kind_product_variant,
+  InventoryItem: m.shopify_kind_inventory_item,
+  FulfillmentOrder: m.shopify_kind_fulfillment_order,
+  Return: m.shopify_kind_return,
+  Refund: m.shopify_kind_refund,
+} satisfies Record<ShopifyRecordKind, () => string>;
 
 /** Shows live Shopify records and follows source links within the selected connection. */
 export function ShopifyRecords({
@@ -66,14 +79,11 @@ export function ShopifyRecords({
   return (
     <section
       className="shopify-records"
-      aria-label="Shopify records"
+      aria-label={m.shopify_records_title()}
       aria-busy={pending}
     >
-      <h2>Shopify records</h2>
-      <p className="field-help">
-        Read a record from this store, then follow its linked orders, variants,
-        inventory, returns and refunds.
-      </p>
+      <h2>{m.shopify_records_title()}</h2>
+      <p className="field-help">{m.shopify_records_help()}</p>
       <div className="shopify-record-links">
         <Button
           type="button"
@@ -81,7 +91,7 @@ export function ShopifyRecords({
           disabled={pending}
           onClick={() => void load('Order')}
         >
-          Browse orders
+          {m.shopify_records_browse_orders()}
         </Button>
         <Button
           type="button"
@@ -89,11 +99,11 @@ export function ShopifyRecords({
           disabled={pending}
           onClick={() => void load('Product')}
         >
-          Browse products
+          {m.shopify_records_browse_products()}
         </Button>
       </div>
       <details className="shopify-record-lookup">
-        <summary>Find by Shopify ID</summary>
+        <summary>{m.shopify_records_lookup()}</summary>
         <form
           className="connection-setup-form"
           onSubmit={(event) => {
@@ -102,7 +112,9 @@ export function ShopifyRecords({
           }}
         >
           <div className="form-field">
-            <label htmlFor="shopify-record-kind">Record type</label>
+            <label htmlFor="shopify-record-kind">
+              {m.shopify_records_kind_label()}
+            </label>
             <select
               id="shopify-record-kind"
               value={kind}
@@ -113,24 +125,26 @@ export function ShopifyRecords({
             >
               {recordKinds.map((value) => (
                 <option key={value} value={value}>
-                  {value.replace(/([a-z])([A-Z])/g, '$1 $2')}
+                  {kindLabels[value]()}
                 </option>
               ))}
             </select>
           </div>
           <div className="form-field">
-            <label htmlFor="shopify-record-id">Shopify record ID</label>
+            <label htmlFor="shopify-record-id">
+              {m.shopify_records_id_label()}
+            </label>
             <Input
               id="shopify-record-id"
               required
               value={id}
               onChange={(event) => setId(event.target.value)}
-              placeholder="Record ID from Shopify"
+              placeholder={m.shopify_records_id_placeholder()}
               disabled={pending}
             />
           </div>
           <Button type="submit" disabled={pending}>
-            {pending ? 'Loading record…' : 'Load record'}
+            {pending ? m.shopify_records_loading() : m.shopify_records_load()}
           </Button>
         </form>
       </details>
@@ -138,7 +152,10 @@ export function ShopifyRecords({
       {detail ? (
         <div aria-live="polite">
           <p className="field-help">
-            {detail.shop} · Read {new Date(detail.observedAt).toLocaleString()}
+            {m.shopify_records_read_at({
+              shop: detail.shop,
+              time: formatDateTime(detail.observedAt),
+            })}
           </p>
           {detail.kind === 'FulfillmentOrder'
             ? detail.sections
@@ -170,7 +187,7 @@ export function ShopifyRecords({
                 void load(detail.kind, '', detail.nextCursor ?? undefined)
               }
             >
-              Next page
+              {m.shopify_records_next_page()}
             </Button>
           ) : null}
         </div>

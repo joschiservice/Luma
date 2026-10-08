@@ -24,6 +24,7 @@ import type {
   DraftValidation,
   WorkflowDraftContent,
 } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import {
   Dialog,
   DialogContent,
@@ -70,10 +71,10 @@ function stepKeys(content: WorkflowDraftContent) {
 }
 
 function place(index: number, content: WorkflowDraftContent) {
-  if (index === 0) return 'at the start';
-  if (index >= content.steps.length) return 'at the end';
+  if (index === 0) return m.authoring_place_start();
+  if (index >= content.steps.length) return m.authoring_place_end();
 
-  return `after step ${index}`;
+  return m.authoring_place_after({ step: index });
 }
 
 /**
@@ -246,34 +247,49 @@ export function WorkflowBuilder({
     setDropIndex(null);
   }
 
-  const name = (id: unknown) => {
+  // Describes a dragged step by its position and type, as screen readers announce it.
+  const named = (id: unknown) => {
     const index = indexOf(id);
     const step = content.steps[index];
 
-    return step
-      ? `step ${index + 1}, ${stepKinds[step.kind].name}`
-      : 'the new step';
+    return {
+      position: index + 1,
+      kind: step
+        ? stepKinds[step.kind].name()
+        : m.authoring_drag_unknown_kind(),
+    };
   };
+  const fromPalette = (id: unknown) => String(id).startsWith(paletteDragPrefix);
   const announcements: Announcements = {
     onDragStart: ({ active }) =>
-      String(active.id).startsWith(paletteDragPrefix)
-        ? `Picked up ${(active.data.current?.item as PaletteItem).label}. Drop it between steps to add it.`
-        : `Picked up ${name(active.id)}. Use the arrow keys to move it, Space to drop it, or Escape to cancel.`,
+      fromPalette(active.id)
+        ? m.authoring_drag_palette_start({
+            step: (active.data.current?.item as PaletteItem).label,
+          })
+        : m.authoring_drag_step_start(named(active.id)),
     onDragOver: ({ active, over }) =>
-      over &&
-      String(over.id).startsWith('step:') &&
-      !String(active.id).startsWith(paletteDragPrefix)
-        ? `${name(active.id)} is now at position ${indexOf(over.id) + 1} of ${content.steps.length}.`
+      over && String(over.id).startsWith('step:') && !fromPalette(active.id)
+        ? m.authoring_drag_step_over({
+            ...named(active.id),
+            target: indexOf(over.id) + 1,
+            count: content.steps.length,
+          })
         : undefined,
     onDragEnd: ({ active, over }) =>
-      String(active.id).startsWith(paletteDragPrefix)
+      fromPalette(active.id)
         ? over
-          ? 'Step added.'
-          : 'Nothing was added.'
+          ? m.authoring_drag_palette_added()
+          : m.authoring_drag_palette_none()
         : over
-          ? `${name(active.id)} moved to position ${indexOf(over.id) + 1}.`
-          : `${name(active.id)} was not moved.`,
-    onDragCancel: ({ active }) => `Stopped moving ${name(active.id)}.`,
+          ? m.authoring_drag_step_moved({
+              ...named(active.id),
+              target: indexOf(over.id) + 1,
+            })
+          : m.authoring_drag_step_not_moved(named(active.id)),
+    onDragCancel: ({ active }) =>
+      fromPalette(active.id)
+        ? m.authoring_drag_palette_none()
+        : m.authoring_drag_step_canceled(named(active.id)),
   };
   const receiving = dragging?.kind === 'palette';
   const palette = (
@@ -294,8 +310,7 @@ export function WorkflowBuilder({
       accessibility={{
         announcements,
         screenReaderInstructions: {
-          draggable:
-            'To reorder, press Space or Enter on the handle, move with the arrow keys, then press Space or Enter again. Press Escape to cancel.',
+          draggable: m.authoring_drag_instructions(),
         },
       }}
       onDragStart={onDragStart}
@@ -321,11 +336,8 @@ export function WorkflowBuilder({
           >
             <div className="authoring-section-heading">
               <div>
-                <h2 id="authoring-steps-title">Steps</h2>
-                <p>
-                  Steps run from top to bottom. The last step finishes or
-                  escalates the run.
-                </p>
+                <h2 id="authoring-steps-title">{m.authoring_steps_title()}</h2>
+                <p>{m.authoring_steps_description()}</p>
               </div>
             </div>
             <StartNode content={content} vocabulary={vocabulary} />
@@ -343,7 +355,10 @@ export function WorkflowBuilder({
               items={keys}
               strategy={verticalListSortingStrategy}
             >
-              <ol className="authoring-steps" aria-label="Workflow steps">
+              <ol
+                className="authoring-steps"
+                aria-label={m.authoring_steps_list_label()}
+              >
                 {content.steps.map((step, index) => (
                   <StepCard
                     key={keys[index]}
@@ -389,7 +404,10 @@ export function WorkflowBuilder({
           </section>
         </div>
         {!readOnly && !small ? (
-          <aside className="authoring-palette-panel" aria-label="Step palette">
+          <aside
+            className="authoring-palette-panel"
+            aria-label={m.authoring_palette_panel_label()}
+          >
             {palette}
           </aside>
         ) : null}
@@ -402,7 +420,7 @@ export function WorkflowBuilder({
             kind={content.steps[dragging.index]!.kind}
             label={
               validation?.steps[dragging.index]?.description ??
-              stepKinds[content.steps[dragging.index]!.kind].name
+              stepKinds[content.steps[dragging.index]!.kind].name()
             }
           />
         ) : null}
@@ -421,9 +439,11 @@ export function WorkflowBuilder({
           // On touch, focusing the search box would open the on-screen keyboard over the list.
           initialFocus={(type) => (type === 'touch' ? sheetRef.current : true)}
         >
-          <DialogTitle>Add a step</DialogTitle>
+          <DialogTitle>{m.authoring_sheet_title()}</DialogTitle>
           <DialogDescription>
-            The step is added {place(insertAt, content)}.
+            {m.authoring_sheet_description({
+              place: place(insertAt, content),
+            })}
           </DialogDescription>
           {palette}
         </DialogContent>

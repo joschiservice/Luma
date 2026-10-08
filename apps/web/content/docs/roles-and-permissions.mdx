@@ -3,55 +3,104 @@ title: Roles and permissions
 description: Decide what each person can see and do, create custom roles, and control what installed apps may use.
 ---
 
-Every person in a workspace has one role. A role is a set of permissions, such as **View orders**, **Manage procurement** or **Approve or reject changes**. Open **Settings → Roles** to see what each role allows.
+Every person in a workspace has one role. A role is a set of permissions, such as **View orders**, **Manage procurement** or **Approve or reject changes**. Open **Settings → Roles** to see what each role allows and who has it.
 
 ## Built-in roles
 
-Every workspace has three roles you can't change:
+Every workspace has three roles that can’t be changed:
 
 - **Owner** can do everything, including making other people owners. Every workspace keeps at least one owner.
-- **Admin** can do everything except change owners.
-- **Member** can see operations, records and workflows, take decisions in **Needs you** and use Ask Luma, but can't change data or settings.
+- **Admin** can do everything except grant or remove ownership.
+- **Member** can see operations, records and workflows, take decisions and use Ask Luma, but can’t change data or settings.
 
-Owner and Admin gain new permissions as Luma adds features. Custom roles only change when someone edits them.
+Owner and Admin also have the permissions of every installed app, and they gain new permissions as Luma adds features. Custom roles only change when someone edits them, so new features stay off until you grant them.
+
+### What Members can and can’t do
+
+Members can see orders, fulfillment, inventory, products, customers, returns, insights, issues, workflows, procurement and activity, and they can use Ask Luma. **View customers** includes names, email addresses and postal addresses.
+
+In [Needs you](/docs/needs-you), Members can take a decision to show they’re looking after it, but they can’t approve or reject changes. They also can’t work on issues, propose or apply changes, edit workflows, purchase orders or suppliers, manage connections, imports or apps, or change settings, the team or roles. For any of this, create a custom role.
+
+## Permissions
+
+| Group                | Permission                                                                   | Lets people                                                           | Member |
+| -------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------- | ------ |
+| Workspace            | **Edit workspace settings**                                                  | Change the workspace name and time zone.                              | No     |
+| Workspace            | **Manage approval rules**                                                    | Decide whether every permitted change needs approval.                 | No     |
+| Team and access      | **Manage team members**                                                      | Invite people, change their role and remove their access.             | No     |
+| Team and access      | **Manage roles**                                                             | Create, edit and archive custom roles and see their history.          | No     |
+| Commerce records     | **View orders**, **View fulfillment**, **View inventory**, **View products** | See those records.                                                    | Yes    |
+| Commerce records     | **View customers**                                                           | See customer profiles, including personal data.                       | Yes    |
+| Commerce records     | **View returns**                                                             | See returns, refunds and money returned.                              | Yes    |
+| Commerce records     | **View insights**                                                            | See operational metrics, charts and import coverage.                  | Yes    |
+| Issues and decisions | **View issues**                                                              | See issues, their evidence, causes and proposed fixes.                | Yes    |
+| Issues and decisions | **Work on issues**                                                           | Check, escalate and resolve issues and refresh their evidence.        | No     |
+| Issues and decisions | **Take decisions**                                                           | Take unassigned decisions in Needs you and release their own.         | Yes    |
+| Issues and decisions | **Assign decisions**                                                         | Assign any decision to a teammate.                                    | No     |
+| Issues and decisions | **Approve or reject changes**                                                | Respond to approval requests from other people.                       | No     |
+| Actions              | **Propose changes**                                                          | Ask Luma to prepare changes in connected systems.                     | No     |
+| Actions              | **Apply changes**                                                            | Apply permitted or approved changes in connected systems.             | No     |
+| Workflows            | **View workflows**                                                           | See workflows, versions, runs and their evidence.                     | Yes    |
+| Workflows            | **Edit workflows**                                                           | Create and edit drafts and test them.                                 | No     |
+| Workflows            | **Publish and enable workflows**                                             | Publish workflow versions and turn workflows on or off.               | No     |
+| Workflows            | **Manage workflow triggers**                                                 | Create, change and pause schedules and event triggers.                | No     |
+| Workflows            | **Test and turn on issue workflows**                                         | Test a workflow on an issue and review test results.                  | No     |
+| Procurement          | **View procurement**                                                         | See suppliers, purchase orders, commitments and replenishment.        | Yes    |
+| Procurement          | **Manage procurement**                                                       | Edit suppliers and purchase orders and set up replenishment.          | No     |
+| Connections and apps | **Manage connections**                                                       | Connect, reconnect and disconnect systems.                            | No     |
+| Connections and apps | **Manage imports**                                                           | Start, pause and repair imports and review links between records.     | No     |
+| Connections and apps | **Manage apps**                                                              | Install, update and uninstall apps and grant the access they ask for. | No     |
+| Ask Luma             | **Use Ask Luma**                                                             | Ask questions about workspace data the role can see.                  | Yes    |
+| Activity             | **View activity**                                                            | See the workspace activity log.                                       | Yes    |
+| Activity             | **View restricted activity**                                                 | Also see access changes and restricted entries in Activity.           | No     |
+
+Permissions marked **Sensitive** in the role editor let people change data in connected systems, move money, change access or approval rules, or see personal data. Grant them only to people who need them.
 
 ## Create a custom role
 
 You need **Manage roles**, and you can only grant permissions your own role includes.
 
-1. Open **Settings → Roles** and select **Create role**.
-2. Enter a name, such as _Buyer_, and a short description. Choose **No permissions** or start from an existing role.
-3. Turn on the permissions the role needs. Permissions marked **Sensitive** let people change data in connected systems, money, access or policy, or see personal data.
-4. Select **Review and create**, check the list, then select **Create role**.
+1. In **Settings → Roles**, select **Create role**.
+2. Enter a name, such as _Buyer_, and a description that helps people choose the right role.
+3. Under **Start from**, choose **No permissions** or an existing role, then select **Continue to permissions**.
+4. Turn on the permissions the role needs. Search for a permission, use **Granted only** to check your choices, or use **Grant all** for a whole group.
+5. Select **Review and create**, check the list, then select **Create role**.
 
-To start from a built-in role, open it and select **Duplicate**.
+App permissions aren’t copied when you start from another role; grant the ones the new role needs. To start from a built-in role, open it and select **Duplicate**.
 
-## Give someone a role
+## Assign a role
 
-You need **Manage team members**. In **Settings → Team**, choose a role when you invite someone, or select **⋯** next to a teammate to change their role. You can only assign roles whose permissions you hold, and only owners can make someone an owner. Invitations can't grant ownership.
+In **Settings → Team**, choose a role when you invite someone, or select **⋯** next to a person to change their role. You need **Manage team members**, and you can only assign roles whose permissions you hold. Only owners can make someone an owner. See [Team](/docs/workspace-settings#team).
 
-Changes apply the next time the person does something in Luma. Work Luma runs on their behalf, such as imports and workflows, checks their permissions again at each step and stops with an explanation if a permission is gone.
+A role change applies from the person’s next action in Luma. Work Luma does on their behalf, such as imports and workflow runs, checks their permissions again at each step and stops with an explanation if a permission is gone.
 
 ## Change or archive a role
 
-Open the role, change its name, description or permissions, and select **Review changes**. The review lists what is granted and removed and how many people are affected. If someone else changed the role meanwhile, review their version before saving.
+Open the role, change its name, description or permissions, and select **Review changes**. The review lists what is granted and removed and how many people the change affects. Changes apply from each person’s next action.
 
-The **History** tab shows who changed the role, when, which permissions changed, and who was given the role.
+The **People** tab lists who has the role. The **History** tab shows who changed the role, when, which permissions changed and who was given the role.
 
-To retire a role, give everyone who has it another role, then select **Archive**. Pending invitations for an archived role are revoked; invite those people again with another role.
+To retire a role, give everyone who has it another role, then select **Archive** and **Archive role**. Pending invitations for the role are revoked; invite those people again with another role. Archived roles can’t be assigned, and their history stays available.
 
 ## What people without access see
 
-Areas a role doesn't include are hidden from the sidebar and search. If someone opens one through a link, Luma says which permission is missing instead of showing an empty page. Needs you, Home, Insights and Ask Luma only include records the person may see.
+Areas a role doesn’t include are hidden from the sidebar and from search. If someone opens one from a link, Luma names the missing permission and offers **See what your role allows**. Home, Needs you, Insights and Ask Luma only include records the person may see. Settings sections they can’t change stay visible but read-only.
 
 ## Approvals
 
-Approving or rejecting a change needs **Approve or reject changes**, and the approver must be someone other than the person who proposed it. Some actions also need their own permission. For example, approving a JTL purchase order needs **Submit purchase orders to JTL**, so a buyer role can approve purchase orders without being able to change shipping methods.
+Approving or rejecting a change needs **Approve or reject changes**, and the approver must be someone other than the person who requested it. Some changes also need their own app permission. For example, approving a JTL purchase order also needs **Send purchase orders to JTL**, so a buyer role can approve purchase orders without being able to change shipping methods.
 
-## Apps
+To require approval for every change, see [Approvals](/docs/workspace-settings#approvals).
 
-Installing an app needs **Manage apps**. Luma lists what the app will be able to use, such as orders or customer details, and you can only grant access your role includes. When an app does something for a person, it can never do more than that person's role allows.
+## App permissions
 
-Apps can add their own permissions, such as **Recover Shopify fulfillments**. Owners and Admins have them automatically; add them to custom roles in **Settings → Roles**. When an app update asks for more access, the app's page shows **Review access**; until someone approves, the app keeps working with its earlier access.
+Installing an app needs **Manage apps**. Luma lists what the app will be able to use, such as orders or customer details, and you can only grant access your role includes. When an app acts for a person, it can never do more than that person’s role allows.
 
-Uninstalling an app removes its permissions from every role. Reinstalling doesn't bring them back.
+Apps can add their own permissions:
+
+- JTL: **Send purchase orders to JTL** and **Change JTL shipping methods**.
+- Shopify: **Recover Shopify fulfillments** and **Correct Shopify inventory**.
+
+Owners and Admins have these automatically. To give them to a custom role, edit the role in **Settings → Roles**; they appear in a group for each app.
+
+When an app update asks for more access, its page shows **Review new access**. Until someone selects **Approve new access**, the app keeps working with its earlier access. Uninstalling an app removes its permissions from every role, and reinstalling it doesn’t bring them back. See [Apps and connections](/docs/apps-and-connections).

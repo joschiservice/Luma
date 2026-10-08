@@ -1,0 +1,83 @@
+---
+title: Manage workspace settings
+description: Change the workspace name and time zone, invite and manage your team, set approval rules, and choose your notifications, language and layout.
+---
+
+**Settings** has two groups. **Workspace** settings are shared by everyone in the workspace: **Workspace**, **Team**, **Roles** and **Approvals**. **Personal** settings apply only to you: **Security**, **Notifications**, **Language & appearance** and **Home & sidebar**. Press **G** then **S** to open Settings.
+
+Everyone can view the workspace sections. If your role can’t change one, it says which permission you need.
+
+## Workspace
+
+Change the **Workspace name** and **Time zone**, then select **Save changes**. You need **Edit workspace settings**. The name appears in navigation and the workspace switcher. Luma shows dates and times in this workspace in its time zone, for everyone.
+
+The **Workspace identifier** and **Data region** can’t be changed. Workspace data is stored in the European Union.
+
+If Luma couldn’t confirm whether a change was saved, select **Check status and retry** before you change anything else.
+
+## Team
+
+**Team** lists everyone with access to this workspace and their role. Inviting people and changing their access needs **Manage team members**.
+
+### Invite someone
+
+1. Select **Invite teammate**.
+2. Enter their email address and choose a role.
+3. Select **Send invitation**.
+
+Luma emails a personal link. Access starts when the person accepts, signed in with that email address. Invitations can’t make someone an owner; an owner can change their role after they join.
+
+Open invitations appear under **Invitations** with their status, such as **Email sent. Waiting for them to accept.** or **Email not delivered. Resend to try again.** Invitations expire after 7 days.
+
+- **Resend** sends a new link. The earlier link stops working.
+- **Revoke** cancels the invitation. The link stops working immediately.
+- **Invite again** sends a new invitation after one expired.
+
+If this Luma server isn’t set up to send email, you can’t invite people. Ask whoever runs Luma for you to set up email delivery.
+
+### Change someone’s role or remove access
+
+Select **⋯** next to the person to open **Manage access**. Choose a role and select **Save role**, or select **Remove access**.
+
+- A new role applies from the person’s next action in Luma.
+- You can only assign roles whose permissions your own role includes.
+- Only owners can make someone an owner or change another owner.
+- Every workspace needs an owner. Make someone else an owner before you change or remove the only one.
+
+## Roles
+
+**Roles** shows what each role allows and lets you create custom roles. See [Roles and permissions](/docs/roles-and-permissions).
+
+## Approvals
+
+**Approvals** decides when a change needs a second person before Luma makes it. Changing it needs **Manage approval rules**.
+
+- **Standard approval rules**: low-risk changes that people are permitted to make go ahead. Higher-risk changes need approval from someone else.
+- **Always require approval**: every change people are otherwise permitted to make needs approval from someone else, including low-risk changes.
+
+Either way, **Always applies** lists what never changes: approvals Luma always requires and actions it never allows, each person’s current permissions checked again before a change runs, and approval by someone other than the requester followed by a fresh check of the outcome. This setting can only make the rules stricter.
+
+People whose role includes **Approve or reject changes** can approve. When you change this setting, reviews that are already open must be refreshed before their changes can run.
+
+## Security
+
+**Security** holds your sign-in settings: two-factor authentication, backup codes and passkeys. They apply to your account in every workspace. See [Secure your sign-in](/docs/account-security).
+
+## Notifications
+
+Choose which emails Luma sends you about this workspace:
+
+- **Issues that need you**: an issue needs your approval, a manual step or a look at evidence Luma couldn’t confirm.
+- **Connection problems**: a connected system isn’t responding reliably or its access was revoked.
+
+Turning a notification on doesn’t send emails about earlier events. Needs you and Home always show work that needs your attention, whatever you choose here.
+
+Under **Test email delivery**, select **Send test email** to check that emails reach you. **Test email accepted for delivery** means the mail server took the email, not that it arrived; it can take a few minutes to reach your inbox. If you see **Email delivery isn’t set up**, this Luma server can’t send email yet. Your choices are saved and apply once someone sets it up.
+
+## Language & appearance
+
+Choose the **Language** and **Theme** (**System**, **Light** or **Dark**), and whether to **Collapse the sidebar**. These choices apply to this device. Luma reloads the page to switch the language. See [Change the language](/docs/navigation#change-the-language).
+
+## Home & sidebar
+
+Choose which **Home modules** appear, in which order and at which width, or select **Reset to default**. Under **Pinned pages**, rename, reorder or unpin the pages in your sidebar; you can pin up to 12. Only you see these choices, and they belong to this workspace. See [Customize Home](/docs/home#customize-home) and [Pin a page](/docs/navigation#pin-a-page).

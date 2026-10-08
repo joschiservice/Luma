@@ -1,6 +1,9 @@
 import './inventory.css';
 
 import type { InventoryDetail, StockSource } from '@luma/api-contract';
+import { formatNumber } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Card } from '@luma/ui/components/primitives/card';
@@ -8,6 +11,7 @@ import { DataTable } from '@luma/ui/components/primitives/data-table';
 import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { PageHeader } from '@luma/ui/components/workspace/page-header';
+import { quantityUnit, unitOfMeasure } from '@luma/ui/lib/units';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams, useSearch } from '@tanstack/react-router';
 import { ArrowLeft, RefreshCw } from 'lucide-react';
@@ -17,11 +21,24 @@ import { appsOptions } from '../apps/data';
 import { AppExtension } from '../apps/extension';
 import { SignInRedirect } from '../identity/common';
 import { IdentityError } from '../identity/data';
+import {
+  connectionStatusLabel,
+  formatSourceNumber,
+  issueStateLabel,
+  purchaseOrderLabels,
+  statusLabels as orderStatusLabels,
+} from '../orders/presentation';
 import { recordReturnPath } from '../records/data';
 import { IdentityLinks } from '../sync/identity-links';
 import { WorkflowCoverageCard } from '../workflows/coverage';
 import { type InventorySearch, stockOptions } from './data';
-import { stockFreshness, stockQuantity, StockState } from './presentation';
+import {
+  differingQuantities,
+  quantityLabels,
+  stockFreshness,
+  stockQuantity,
+  StockState,
+} from './presentation';
 
 /** Loads a stock investigation while keeping the list's search and return context. */
 export function StockPage() {
@@ -122,7 +139,7 @@ export function StockDetailView({
       {back ? (
         <Link className="inventory-back" to={back}>
           <ArrowLeft size={14} />
-          Back to context
+          {m.inventory_back_context()}
         </Link>
       ) : (
         <Link
@@ -132,39 +149,37 @@ export function StockDetailView({
           search={listSearch}
         >
           <ArrowLeft size={14} />
-          Back to inventory
+          {m.inventory_detail_back()}
         </Link>
       )}
       <PageHeader
-        title={position?.sku ?? 'Stock position'}
+        title={position?.sku ?? m.inventory_detail_title_fallback()}
         icon={<DomainIcon domain="inventory" size="md" />}
         description={
           position
-            ? `${position.location} · ${position.unit}`
-            : 'Compare source quantities and related work.'
+            ? `${position.location} · ${unitOfMeasure(position.unit)}`
+            : m.inventory_detail_description_fallback()
         }
       />
       <div className="inventory-detail-toolbar">
         {position ? <StockState position={position} /> : null}
         <Button variant="outline" disabled={refreshing} onClick={refresh}>
           <RefreshCw size={14} />
-          Refresh stock
+          {m.inventory_detail_refresh()}
         </Button>
       </div>
-      {offline ? (
-        <Alert role="status">
-          You are offline. Reconnect to refresh stock.
-        </Alert>
-      ) : null}
+      {offline ? <Alert role="status">{m.inventory_offline()}</Alert> : null}
       {error ? (
         <Alert tone="danger" role="alert">
-          {error}{' '}
+          {m.inventory_detail_load_failed()} {error}{' '}
           <Button variant="outline" onClick={refresh}>
-            Retry
+            {m.common_retry()}
           </Button>
         </Alert>
       ) : null}
-      {loading && !error ? <p role="status">Loading stock position…</p> : null}
+      {loading && !error ? (
+        <p role="status">{m.inventory_detail_loading()}</p>
+      ) : null}
       {detail && position ? (
         <>
           <section
@@ -173,38 +188,45 @@ export function StockDetailView({
           >
             <h2 id="stock-explanation">
               {position.differences.length
-                ? 'Same position. Different source quantities.'
-                : 'The source facts behind this position'}
+                ? m.inventory_explanation_differs()
+                : m.inventory_explanation_agree()}
             </h2>
             <p>
               {position.differences.length
-                ? `Sources disagree on ${position.differences.map((field) => ({ onHand: 'on-hand', reserved: 'reserved', available: 'available' })[field]).join(', ')} stock. Compare observation times and availability methods before deciding which quantity to trust.`
-                : 'Only known quantities are compared. Agreement does not confirm a fresh read or establish which source is authoritative.'}
+                ? m.inventory_explanation_differs_body({
+                    fields: differingQuantities(position.differences),
+                  })
+                : m.inventory_explanation_agree_body()}
             </p>
-            <p>
-              Quantities are shown per source and are never added together.
-              Refresh reloads Luma’s latest observations.
-            </p>
+            <p>{m.inventory_explanation_separate()}</p>
           </section>
           <DataTable
             className="inventory-comparison"
-            caption="Source quantity comparison"
+            caption={m.inventory_comparison_caption()}
             rows={position.sources}
             rowKey={(source) => source.connectionId}
             columns={[
               {
                 key: 'source',
-                header: 'Source / provenance',
+                header: m.inventory_comparison_source(),
                 cell: (source: StockSource) => (
                   <div className="inventory-cell">
                     <strong>{source.label}</strong>
                     <small>
-                      {source.status} ·{' '}
-                      {source.mappingMethod ?? 'Mapping method unknown'}
+                      {connectionStatusLabel(source.status)} ·{' '}
+                      {source.mappingMethod ??
+                        m.inventory_link_method_unrecorded()}
                     </small>
                     <small>
-                      SKU {source.externalSku ?? 'Unknown'} · Location{' '}
-                      {source.externalLocation ?? 'Unknown'}
+                      {source.externalSku
+                        ? m.inventory_source_sku({ sku: source.externalSku })
+                        : m.inventory_source_sku_missing()}
+                      {' · '}
+                      {source.externalLocation
+                        ? m.inventory_source_location({
+                            location: source.externalLocation,
+                          })
+                        : m.inventory_source_location_missing()}
                     </small>
                   </div>
                 ),
@@ -212,12 +234,7 @@ export function StockDetailView({
               ...(['onHand', 'reserved', 'available', 'incoming'] as const).map(
                 (field) => ({
                   key: field,
-                  header: {
-                    onHand: 'On hand',
-                    reserved: 'Reserved',
-                    available: 'Available',
-                    incoming: 'Incoming',
-                  }[field],
+                  header: quantityLabels[field](),
                   numeric: true,
                   cell: (source: StockSource) => (
                     <span
@@ -227,37 +244,42 @@ export function StockDetailView({
                           : ''
                       }
                     >
-                      {source.deleted ? '—' : stockQuantity(source[field])}
+                      {source.deleted
+                        ? m.common_empty_value()
+                        : stockQuantity(source[field])}
                     </span>
                   ),
                 }),
               ),
               {
                 key: 'basis',
-                header: 'Availability method',
+                header: m.inventory_comparison_basis(),
                 cell: (source: StockSource) =>
                   source.availabilityBasis === 'derived'
-                    ? 'On hand − reserved'
+                    ? m.inventory_basis_derived_formula()
                     : source.availabilityBasis === 'provider_reported'
-                      ? 'Reported by source'
-                      : 'Unknown',
+                      ? m.inventory_basis_reported_by_source()
+                      : m.common_not_reported(),
               },
               {
                 key: 'observed',
-                header: 'Freshness',
+                header: m.inventory_comparison_freshness(),
                 cell: (source: StockSource) => (
                   <div className="inventory-cell">
                     <span>{stockFreshness(source, detail.asOf)}</span>
                     <small>
-                      Observed <WorkspaceDate value={source.observedAt} />
+                      {rich(m.inventory_comparison_read, {
+                        date: <WorkspaceDate value={source.observedAt} />,
+                      })}
                     </small>
                     <small>
-                      Source updated{' '}
-                      {source.sourceUpdatedAt ? (
-                        <WorkspaceDate value={source.sourceUpdatedAt} />
-                      ) : (
-                        'Unknown'
-                      )}
+                      {source.sourceUpdatedAt
+                        ? rich(m.inventory_comparison_source_updated, {
+                            date: (
+                              <WorkspaceDate value={source.sourceUpdatedAt} />
+                            ),
+                          })
+                        : m.inventory_comparison_source_updated_missing()}
                     </small>
                   </div>
                 ),
@@ -268,11 +290,8 @@ export function StockDetailView({
           {replenishment}
           <div className="inventory-context-grid">
             <Card className="inventory-section">
-              <h2>Orders with this SKU</h2>
-              <p className="inventory-note">
-                Source order quantities. Location allocation and remaining
-                demand are not confirmed.
-              </p>
+              <h2>{m.inventory_orders_title()}</h2>
+              <p className="inventory-note">{m.inventory_orders_note()}</p>
               <ul className="inventory-related">
                 {detail.orders.map((order) => (
                   <li key={`${order.id}:${order.connectionId}:${order.unit}`}>
@@ -283,28 +302,27 @@ export function StockDetailView({
                       {order.label}
                     </Link>
                     <span>
-                      {order.quantity} {order.unit} · {order.status}
+                      {m.inventory_orders_line({
+                        quantity: formatSourceNumber(order.quantity),
+                        unit: quantityUnit(order.unit, order.quantity),
+                        status: orderStatusLabels[order.status] ?? order.status,
+                      })}
                     </span>
                     <small>
                       {position.sources.find(
                         (s) => s.connectionId === order.connectionId,
-                      )?.label ?? 'Connected source'}
+                      )?.label ?? m.inventory_source_fallback()}
                     </small>
                   </li>
                 ))}
               </ul>
               {!detail.orders.length ? (
-                <p className="inventory-note">
-                  No observed orders linked to this SKU.
-                </p>
+                <p className="inventory-note">{m.inventory_orders_empty()}</p>
               ) : null}
             </Card>
             <Card className="inventory-section">
-              <h2>Supply commitments</h2>
-              <p className="inventory-note">
-                Purchase order quantities are not confirmed incoming stock.
-                Receipt progress and destination are unknown.
-              </p>
+              <h2>{m.inventory_supply_title()}</h2>
+              <p className="inventory-note">{m.inventory_supply_note()}</p>
               <ul className="inventory-related">
                 {detail.purchaseOrders.map((order) => (
                   <li key={`${order.id}:${order.unit}`}>
@@ -315,19 +333,22 @@ export function StockDetailView({
                       {order.label}
                     </Link>
                     <span>
-                      {order.quantity} {order.unit} · {order.status}
+                      {m.inventory_orders_line({
+                        quantity: formatNumber(order.quantity),
+                        unit: quantityUnit(order.unit, order.quantity),
+                        status:
+                          purchaseOrderLabels[order.status] ?? order.status,
+                      })}
                     </span>
                   </li>
                 ))}
               </ul>
               {!detail.purchaseOrders.length ? (
-                <p className="inventory-note">
-                  No purchase orders linked to this SKU.
-                </p>
+                <p className="inventory-note">{m.inventory_supply_empty()}</p>
               ) : null}
             </Card>
             <Card className="inventory-section">
-              <h2>Stock issues</h2>
+              <h2>{m.inventory_issues_title()}</h2>
               <ul className="inventory-related">
                 {detail.issues.map((issue) => (
                   <li key={issue.id}>
@@ -338,24 +359,22 @@ export function StockDetailView({
                     >
                       {issue.label}
                     </Link>
-                    <span>{issue.state}</span>
+                    <span>{issueStateLabel(issue.state)}</span>
                   </li>
                 ))}
               </ul>
               {!detail.issues.length ? (
-                <p className="inventory-note">
-                  No recorded issues for this SKU or position.
-                </p>
+                <p className="inventory-note">{m.inventory_issues_empty()}</p>
               ) : null}
             </Card>
             <Card className="inventory-section">
-              <h2>SKU & locations</h2>
+              <h2>{m.inventory_links_title()}</h2>
               <div className="inventory-record-links">
                 <Link
                   to="/app/$organizationId/products/$skuId"
                   params={{ organizationId, skuId: position.skuId }}
                 >
-                  Product listings for this SKU
+                  {m.inventory_links_product()}
                 </Link>
                 <Link
                   to="/app/$organizationId/records/$kind/$recordId"
@@ -365,61 +384,54 @@ export function StockDetailView({
                     recordId: position.skuId,
                   }}
                 >
-                  Open SKU record
+                  {m.inventory_links_record()}
                 </Link>
                 <Link
                   to="/app/$organizationId/inventory"
                   params={{ organizationId }}
                   search={{ skuId: position.skuId }}
                 >
-                  All locations for this SKU
+                  {m.inventory_links_locations()}
                 </Link>
                 <Link
                   to="/app/$organizationId/inventory"
                   params={{ organizationId }}
                   search={{ locationId: position.locationId }}
                 >
-                  Other SKUs at this location
+                  {m.inventory_links_location_skus()}
                 </Link>
               </div>
             </Card>
           </div>
           {identity}
           {detail.relatedTruncated ? (
-            <Alert>
-              Showing the first 50 entries per related record type. Open Orders
-              or Procurement to continue investigating.
-            </Alert>
+            <Alert>{m.inventory_related_truncated()}</Alert>
           ) : null}
           <section className="inventory-section">
-            <h2>Recent observations</h2>
-            <p className="inventory-note">
-              Recorded source snapshots, newest first. An observation is
-              evidence of a read, not necessarily a stock movement. “Current”
-              marks the snapshot selected for that source.
-            </p>
+            <h2>{m.inventory_history_title()}</h2>
+            <p className="inventory-note">{m.inventory_history_note()}</p>
             <DataTable
-              caption="Stock observation history"
+              caption={m.inventory_history_caption()}
               rows={detail.history.entries}
               rowKey={(entry) => entry.id}
               columns={[
                 {
                   key: 'time',
-                  header: 'Observed',
+                  header: m.inventory_history_read(),
                   cell: (entry) => <WorkspaceDate value={entry.observedAt} />,
                 },
                 {
                   key: 'source',
-                  header: 'Source',
+                  header: m.inventory_history_source(),
                   cell: (entry) => (
                     <div className="inventory-cell">
                       <span>{entry.label}</span>
                       <small>
                         {entry.deleted
-                          ? 'Removed at source'
+                          ? m.inventory_history_removed()
                           : entry.current
-                            ? 'Current'
-                            : 'Earlier observation'}
+                            ? m.inventory_history_current()
+                            : m.inventory_history_earlier()}
                       </small>
                     </div>
                   ),
@@ -427,11 +439,7 @@ export function StockDetailView({
                 ...(['onHand', 'reserved', 'available'] as const).map(
                   (field) => ({
                     key: field,
-                    header: {
-                      onHand: 'On hand',
-                      reserved: 'Reserved',
-                      available: 'Available',
-                    }[field],
+                    header: quantityLabels[field](),
                     numeric: true,
                     cell: (entry: StockSource) => stockQuantity(entry[field]),
                   }),
@@ -440,7 +448,7 @@ export function StockDetailView({
             />
             {detail.history.truncated ? (
               <p className="inventory-note">
-                Showing the 100 most recent observations.
+                {m.inventory_history_truncated({ count: 100 })}
               </p>
             ) : null}
           </section>

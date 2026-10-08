@@ -1,0 +1,106 @@
+---
+title: Rollen und Berechtigungen
+description: Legen Sie fest, was jede Person sehen und tun darf, erstellen Sie eigene Rollen und bestimmen Sie, was installierte Apps nutzen dürfen.
+---
+
+Jede Person in einem Workspace hat eine Rolle. Eine Rolle ist eine Sammlung von Berechtigungen, etwa **Bestellungen ansehen**, **Beschaffung verwalten** oder **Änderungen genehmigen oder ablehnen**. Unter **Einstellungen → Rollen** sehen Sie, was jede Rolle erlaubt und wer sie hat.
+
+## Vordefinierte Rollen [#built-in-roles]
+
+Jeder Workspace hat drei Rollen, die sich nicht ändern lassen:
+
+- **Inhaber** darf alles, auch andere Personen zu Inhabern machen. Jeder Workspace behält mindestens einen Inhaber.
+- **Admin** darf alles außer Inhaberschaft vergeben oder entziehen.
+- **Mitglied** sieht Betrieb, Datensätze und Workflows, übernimmt Entscheidungen und nutzt „Luma fragen“, kann aber keine Daten oder Einstellungen ändern.
+
+**Inhaber** und **Admin** haben außerdem die Berechtigungen aller installierten Apps und erhalten neue Berechtigungen, sobald Luma Funktionen ergänzt. Eigene Rollen ändern sich nur, wenn jemand sie bearbeitet; neue Funktionen bleiben dort aus, bis Sie sie freigeben.
+
+### Was Mitglieder dürfen und was nicht [#what-members-can-and-cant-do]
+
+Mitglieder sehen Bestellungen, Fulfillment, Bestand, Produkte, Kunden, Retouren, Auswertungen, Probleme, Workflows, Beschaffung und Aktivität und können „Luma fragen“ nutzen. **Kunden ansehen** umfasst Namen, E-Mail-Adressen und Postanschriften.
+
+Unter [Wartet auf Sie](/docs/needs-you) können Mitglieder eine Entscheidung übernehmen, um zu zeigen, dass sie sich darum kümmern, aber keine Änderungen genehmigen oder ablehnen. Außerdem können sie nicht an Problemen arbeiten, keine Änderungen vorschlagen oder anwenden, keine Workflows, Lieferantenbestellungen oder Lieferanten bearbeiten, keine Verbindungen, Importe oder Apps verwalten und weder Einstellungen noch Team oder Rollen ändern. Dafür erstellen Sie eine eigene Rolle.
+
+## Berechtigungen [#permissions]
+
+| Gruppe                      | Berechtigung                                                                                 | Erlaubt                                                                                   | Mitglied |
+| --------------------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | -------- |
+| Workspace                   | **Workspace-Einstellungen bearbeiten**                                                       | Name und Zeitzone des Workspace ändern.                                                   | Nein     |
+| Workspace                   | **Genehmigungsregeln verwalten**                                                             | Festlegen, ob jede erlaubte Änderung eine Genehmigung braucht.                            | Nein     |
+| Team und Zugriff            | **Mitglieder verwalten**                                                                     | Personen einladen, ihre Rolle ändern und ihren Zugriff entfernen.                         | Nein     |
+| Team und Zugriff            | **Rollen verwalten**                                                                         | Eigene Rollen erstellen, bearbeiten, archivieren und ihren Verlauf sehen.                 | Nein     |
+| Handelsdaten                | **Bestellungen ansehen**, **Fulfillment ansehen**, **Bestand ansehen**, **Produkte ansehen** | Diese Datensätze sehen.                                                                   | Ja       |
+| Handelsdaten                | **Kunden ansehen**                                                                           | Kundenprofile sehen, auch personenbezogene Daten.                                         | Ja       |
+| Handelsdaten                | **Retouren ansehen**                                                                         | Retouren, Erstattungen und erstattete Beträge sehen.                                      | Ja       |
+| Handelsdaten                | **Auswertungen ansehen**                                                                     | Betriebskennzahlen, Diagramme und Importabdeckung sehen.                                  | Ja       |
+| Probleme und Entscheidungen | **Probleme ansehen**                                                                         | Probleme mit Nachweisen, Ursachen und vorgeschlagenen Lösungen sehen.                     | Ja       |
+| Probleme und Entscheidungen | **Probleme bearbeiten**                                                                      | Probleme prüfen, eskalieren und lösen und ihre Nachweise aktualisieren.                   | Nein     |
+| Probleme und Entscheidungen | **Entscheidungen übernehmen**                                                                | Nicht zugewiesene Entscheidungen unter „Wartet auf Sie“ übernehmen und eigene abgeben.    | Ja       |
+| Probleme und Entscheidungen | **Entscheidungen zuweisen**                                                                  | Jede Entscheidung einem Mitglied zuweisen.                                                | Nein     |
+| Probleme und Entscheidungen | **Änderungen genehmigen oder ablehnen**                                                      | Auf Genehmigungsanfragen anderer Personen reagieren.                                      | Nein     |
+| Aktionen                    | **Änderungen vorschlagen**                                                                   | Luma Änderungen in verbundenen Systemen vorbereiten lassen.                               | Nein     |
+| Aktionen                    | **Änderungen anwenden**                                                                      | Erlaubte oder genehmigte Änderungen in verbundenen Systemen anwenden.                     | Nein     |
+| Workflows                   | **Workflows ansehen**                                                                        | Workflows, Versionen, Ausführungen und ihre Nachweise sehen.                              | Ja       |
+| Workflows                   | **Workflows bearbeiten**                                                                     | Entwürfe erstellen, bearbeiten und testen.                                                | Nein     |
+| Workflows                   | **Workflows veröffentlichen und aktivieren**                                                 | Workflow-Versionen veröffentlichen und Workflows ein- oder ausschalten.                   | Nein     |
+| Workflows                   | **Workflow-Auslöser verwalten**                                                              | Zeitpläne und Ereignis-Auslöser erstellen, ändern und pausieren.                          | Nein     |
+| Workflows                   | **Problem-Workflows testen und einschalten**                                                 | Einen Workflow an einem Problem testen und Testergebnisse prüfen.                         | Nein     |
+| Beschaffung                 | **Beschaffung ansehen**                                                                      | Lieferanten, Lieferantenbestellungen, Zusagen und Nachbestellung sehen.                   | Ja       |
+| Beschaffung                 | **Beschaffung verwalten**                                                                    | Lieferanten und Lieferantenbestellungen bearbeiten und Nachbestellung einrichten.         | Nein     |
+| Verbindungen und Apps       | **Verbindungen verwalten**                                                                   | Systeme verbinden, neu verbinden und trennen.                                             | Nein     |
+| Verbindungen und Apps       | **Importe verwalten**                                                                        | Importe starten, pausieren und reparieren und Verknüpfungen zwischen Datensätzen prüfen.  | Nein     |
+| Verbindungen und Apps       | **Apps verwalten**                                                                           | Apps installieren, aktualisieren und deinstallieren und den angefragten Zugriff gewähren. | Nein     |
+| Luma fragen                 | **„Luma fragen“ nutzen**                                                                     | Fragen zu Workspace-Daten stellen, die die Rolle sehen darf.                              | Ja       |
+| Aktivität                   | **Aktivität ansehen**                                                                        | Das Aktivitätsprotokoll des Workspace sehen.                                              | Ja       |
+| Aktivität                   | **Eingeschränkte Aktivität ansehen**                                                         | Unter „Aktivität“ auch Zugriffsänderungen und eingeschränkte Einträge sehen.              | Nein     |
+
+Berechtigungen, die im Rolleneditor als **Sensibel** markiert sind, erlauben Änderungen an Daten in verbundenen Systemen, Geldbewegungen, Änderungen an Zugriff oder Genehmigungsregeln oder den Blick auf personenbezogene Daten. Geben Sie sie nur Personen, die sie brauchen.
+
+## Eigene Rolle erstellen [#create-a-custom-role]
+
+Dafür brauchen Sie **Rollen verwalten**, und Sie können nur Berechtigungen vergeben, die Ihre eigene Rolle enthält.
+
+1. Wählen Sie unter **Einstellungen → Rollen** die Option **Rolle erstellen**.
+2. Geben Sie einen Namen ein, etwa _Einkauf_, und eine Beschreibung, die bei der Wahl der richtigen Rolle hilft.
+3. Wählen Sie unter **Ausgangspunkt** **Ohne Berechtigungen** oder eine vorhandene Rolle und dann **Weiter zu den Berechtigungen**.
+4. Schalten Sie die Berechtigungen ein, die die Rolle braucht. Suchen Sie nach einer Berechtigung, prüfen Sie Ihre Auswahl mit **Nur erteilte** oder vergeben Sie mit **Alle erteilen** eine ganze Gruppe.
+5. Wählen Sie **Prüfen und erstellen**, prüfen Sie die Liste und wählen Sie **Rolle erstellen**.
+
+App-Berechtigungen werden nicht übernommen, wenn Sie von einer anderen Rolle ausgehen; vergeben Sie die nötigen selbst. Um von einer vordefinierten Rolle auszugehen, öffnen Sie sie und wählen **Duplizieren**.
+
+## Rolle zuweisen [#assign-a-role]
+
+Unter **Einstellungen → Team** wählen Sie eine Rolle, wenn Sie jemanden einladen, oder Sie wählen **⋯** neben einer Person, um ihre Rolle zu ändern. Dafür brauchen Sie **Mitglieder verwalten**, und Sie können nur Rollen zuweisen, deren Berechtigungen Sie selbst haben. Nur Inhaber können jemanden zum Inhaber machen. Siehe [Team](/docs/workspace-settings#team).
+
+Eine Rollenänderung gilt ab der nächsten Aktion der Person in Luma. Arbeit, die Luma in ihrem Namen erledigt, etwa Importe und Workflow-Ausführungen, prüft ihre Berechtigungen bei jedem Schritt erneut und hält mit einer Erklärung an, wenn eine Berechtigung fehlt.
+
+## Rolle ändern oder archivieren [#change-or-archive-a-role]
+
+Öffnen Sie die Rolle, ändern Sie Name, Beschreibung oder Berechtigungen und wählen Sie **Änderungen prüfen**. Die Übersicht zeigt, was erteilt und entzogen wird und wie viele Personen betroffen sind. Änderungen gelten ab der nächsten Aktion jeder Person.
+
+Der Tab **Personen** listet, wer die Rolle hat. Der Tab **Verlauf** zeigt, wer die Rolle wann geändert hat, welche Berechtigungen sich geändert haben und wer die Rolle erhalten hat.
+
+Um eine Rolle stillzulegen, geben Sie allen, die sie haben, eine andere Rolle und wählen dann **Archivieren** und **Rolle archivieren**. Offene Einladungen mit dieser Rolle werden widerrufen; laden Sie diese Personen mit einer anderen Rolle erneut ein. Archivierte Rollen können nicht zugewiesen werden; ihr Verlauf bleibt erhalten.
+
+## Was Personen ohne Zugriff sehen [#what-people-without-access-see]
+
+Bereiche, die eine Rolle nicht umfasst, sind in der Seitenleiste und in der Suche ausgeblendet. Öffnet jemand einen solchen Bereich über einen Link, nennt Luma die fehlende Berechtigung und bietet **Berechtigungen Ihrer Rolle ansehen** an. Start, „Wartet auf Sie“, Auswertungen und „Luma fragen“ zeigen nur Datensätze, die die Person sehen darf. Einstellungsbereiche, die sie nicht ändern darf, bleiben sichtbar, aber schreibgeschützt.
+
+## Genehmigungen [#approvals]
+
+Zum Genehmigen oder Ablehnen einer Änderung braucht man **Änderungen genehmigen oder ablehnen**, und die genehmigende Person muss eine andere sein als die anfragende. Manche Änderungen brauchen zusätzlich eine eigene App-Berechtigung. Eine JTL-Lieferantenbestellung zu genehmigen erfordert etwa auch **Lieferantenbestellungen an JTL senden**. So kann eine Einkaufsrolle Lieferantenbestellungen genehmigen, ohne Versandarten ändern zu dürfen.
+
+Wie Sie für jede Änderung eine Genehmigung verlangen, lesen Sie unter [Genehmigungen](/docs/workspace-settings#approvals).
+
+## App-Berechtigungen [#app-permissions]
+
+Zum Installieren einer App brauchen Sie **Apps verwalten**. Luma listet, was die App nutzen darf, etwa Bestellungen oder Kundendaten, und Sie können nur Zugriff gewähren, den Ihre Rolle umfasst. Handelt eine App für eine Person, kann sie nie mehr tun, als deren Rolle erlaubt.
+
+Apps können eigene Berechtigungen mitbringen:
+
+- JTL: **Lieferantenbestellungen an JTL senden** und **JTL-Versandarten ändern**.
+- Shopify: **Shopify-Fulfillments wiederherstellen** und **Shopify-Bestand korrigieren**.
+
+**Inhaber** und **Admin** haben sie automatisch. Um sie einer eigenen Rolle zu geben, bearbeiten Sie die Rolle unter **Einstellungen → Rollen**; sie stehen dort in einer eigenen Gruppe je App.
+
+Fragt ein App-Update nach mehr Zugriff, zeigt die Seite der App **Neuen Zugriff prüfen**. Bis jemand **Neuen Zugriff genehmigen** wählt, arbeitet die App mit ihrem bisherigen Zugriff weiter. Beim Deinstallieren einer App werden ihre Berechtigungen aus allen Rollen entfernt, und eine erneute Installation stellt sie nicht wieder her. Siehe [Apps und Verbindungen](/docs/apps-and-connections).

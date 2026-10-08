@@ -32,9 +32,7 @@ test('creates and reviews procurement records with safe retries on desktop and m
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(`/app/${f.org.id}/procurement`);
-  await page
-    .getByRole('heading', { name: 'Your first order starts with a supplier' })
-    .waitFor();
+  await page.getByRole('heading', { name: 'No purchase orders yet' }).waitFor();
   await page
     .getByRole('button', { name: 'Add your first supplier', exact: true })
     .click();
@@ -89,13 +87,13 @@ test('creates and reviews procurement records with safe retries on desktop and m
       })
     ).body.items,
   ).toHaveLength(1);
-  await page.getByRole('button', { name: 'Open order', exact: true }).click();
+  await page.getByRole('button', { name: 'Mark as open', exact: true }).click();
   await page
     .getByLabel('Reason', { exact: true })
     .fill('Supplier and quantities reviewed for autumn replenishment.');
   await page
     .getByRole('dialog')
-    .getByRole('button', { name: 'Open order', exact: true })
+    .getByRole('button', { name: 'Mark as open', exact: true })
     .click();
   await page.getByText('Draft → Open', { exact: true }).waitFor();
   const detailUrl = page.url();
@@ -161,9 +159,11 @@ test('creates and reviews procurement records with safe retries on desktop and m
     .getByRole('dialog')
     .getByRole('button', { name: 'Cancel order', exact: true })
     .click();
-  await page.getByText('Open → Cancelled', { exact: true }).waitFor();
+  await page.getByText('Open → Canceled', { exact: true }).waitFor();
   expect(
-    await page.getByRole('button', { name: 'Open order', exact: true }).count(),
+    await page
+      .getByRole('button', { name: 'Mark as open', exact: true })
+      .count(),
   ).toBe(0);
   await page.goto(`/app/${f.org.id}/activity?type=procurement`);
   await page

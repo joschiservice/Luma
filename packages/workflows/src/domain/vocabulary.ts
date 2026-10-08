@@ -106,7 +106,7 @@ export interface VocabularyContribution {
 }
 
 const unsupported =
-  'No installed adapter runs this in custom workflows in this workspace.';
+  'No installed app can run this in custom workflows in this workspace.';
 
 const triggerLabels: Record<TriggerEntry['kind'], [string, string]> = {
   manual: [
@@ -119,18 +119,18 @@ const triggerLabels: Record<TriggerEntry['kind'], [string, string]> = {
     'When a condition is true',
     'A monitored fact matches a value, such as stock below its minimum.',
   ],
-  exception: ['When an issue is detected', 'An operational issue is opened.'],
+  exception: ['When an issue is detected', 'Luma opens an operational issue.'],
 };
 
 const stepLabels: Record<StepKindEntry['kind'], [string, string]> = {
-  read: ['Read current data', 'Fetch fresh facts from a connected source.'],
+  read: ['Read current data', 'Get fresh data from a connected system.'],
   condition: [
     'Check a condition',
     'Continue only when a field has a specific value.',
   ],
   capability: [
     'Take an action',
-    'Ask a connected system to make a change. Action Admission checks policy first.',
+    'Ask a connected system to make a change. Luma checks your approval rules first.',
   ],
   approval: [
     'Ask for approval',
@@ -139,13 +139,13 @@ const stepLabels: Record<StepKindEntry['kind'], [string, string]> = {
   wait: ['Wait', 'Pause for a fixed time before continuing.'],
   verification: [
     'Check the result',
-    'Read the result independently to confirm the action worked.',
+    'Read the data again, independently, to confirm the change worked.',
   ],
   escalation: ['Escalate', 'Stop and hand the run to a person.'],
   end: ['Finish', 'Finish the run with a named outcome.'],
   code: [
-    'Run a Code Step',
-    'Compute values with sandboxed TypeScript when the builder is not enough.',
+    'Run a code step',
+    'Compute values with TypeScript, run in isolation, when the builder isn’t enough.',
   ],
 };
 

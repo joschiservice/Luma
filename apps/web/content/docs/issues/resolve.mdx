@@ -1,56 +1,94 @@
 ---
-title: Review a resolution
-description: Check a proposed correction, record your decision, and confirm the outcome.
+title: Resolve an issue
+description: Review a proposed change, approve, reject or escalate it, and confirm that the fix worked.
 ---
 
-Open the resolution section of an issue to review the available next step. You will only see decisions that are permitted for you and the current issue.
+When Luma can fix a problem through a connected system, it proposes a change, for example setting Shopify stock to the quantity in your ERP. Nothing changes in your systems until the change passes your workspace’s approval rules. Afterward, Luma checks the result with a fresh read.
 
-## Read the proposed correction
+Open the change with **Review change** at the top of the full issue page, **Review proposed change** in **Overview**, or the **Proposed change** section. Changes that wait for a person also appear in [Needs you](/docs/needs-you).
 
-Before approving, check:
+## Who can decide
 
-1. **Target system and object:** confirm which connection and record will change.
-2. **Proposed changes:** review the fields and values to be applied.
-3. **Expected result:** understand what a successful correction should establish.
-4. **Preconditions and evidence:** check what the proposal relies on.
-5. **Policy and risk:** read the approval requirement and any restrictions.
+- Approving and rejecting need **Approve or reject changes**. The approver must be someone other than the person who requested the change, shown under **Requested by**.
+- Escalating needs **Work on issues**.
 
-If recovery is not specified, do not assume the change can be undone.
+Without these permissions you can still read the whole issue, and the review says **You can’t make a decision on this issue right now.**
 
-## Record a decision
+## Review the proposed change
 
-Use the available controls to approve, reject, or escalate, and supply a reason when requested. A policy may require approval from another authorized operator. When automatic execution is allowed, no approval click is needed.
+**Review the proposed change** shows:
 
-Luma checks current conditions for proposals that support a fresh review. If the proposed action changes, review the updated details before approving again. Outdated evidence, changed approval settings, or an unavailable capability can block a decision.
+- The change and its risk: **Low risk**, **Medium risk** or **High risk**.
+- **Target system** and **Target record**: which connection and which record will change.
+- **Proposed changes**: the fields and the values Luma will set.
+- **Expected outcome**: what Luma checks afterward to confirm the fix.
+- **Evidence for this change**: the data the proposal relies on. Luma either keeps it current while you review, or shows until when it’s valid and when the proposal expires.
 
-If there is no proposed correction, follow the investigation's recommended manual steps or escalate when that option is available.
+**Can’t be undone automatically** means the proposal has no way to reverse the change. Don’t assume you can undo it.
 
-## Handle an uncertain submission
+## Check what the approval rules require
 
-If a connection problem interrupts a decision, its outcome may be uncertain. Use the receipt recovery controls shown on the page to check whether the decision was recorded. Follow the page's instructions before trying again.
+A notice under the change says what your workspace’s approval rules require:
+
+- **Approval needed**: someone who can approve changes must approve it before Luma sends it.
+- **No approval needed**: Luma sends the change on its own and checks the outcome separately.
+- **Not allowed by workspace rules**: Luma won’t send this change. Follow the recommended steps or escalate the issue.
+
+If your workspace requires approval for every change, every change needs another person’s approval, even a low-risk one. See [Approvals](/docs/workspace-settings#approvals). If you see **Approval rules changed**, refresh before you decide.
+
+**Change unavailable** means the connection can’t make this change right now, for example because it lost access. **Proposal is out of date** means the investigation changed; wait for an updated proposal.
+
+## Approve, reject or escalate
+
+1. Read the change, its evidence and the approval notice.
+2. Enter a **Reason for your decision (required)**, up to 1,000 characters. Luma saves it with your decision.
+3. Choose **Approve change**, **Reject change** or **Escalate**.
+
+Before it records your decision, Luma checks current conditions. Then it confirms what happened:
+
+- **Approval recorded**: Luma recorded your approval. Sending the change and confirming the outcome are tracked separately.
+- **Rejection recorded**: Luma won’t send the change. The issue stays open for follow-up.
+- **Escalation recorded**: the issue is marked for further review. Escalating doesn’t change anything in your systems, and it doesn’t cancel a change that has already started.
+
+If there’s no change to review, follow the recommended steps in **Overview**. To hand the issue to someone else, select **Escalate issue**, say why it needs escalation, and select **Confirm escalation**.
+
+## When the proposal expires or changes
+
+A proposal and its evidence are valid only for a limited time:
+
+- **Approval window expired**: approving needs a new proposal based on fresh evidence. Refreshing the page doesn’t extend the deadline.
+- **The proposed change was updated**: Luma found that the change needs to be different. Review the new details before you approve.
+- **Checking current conditions**: Luma is reading the latest data before you continue. If it can’t, you see **Check before you decide**; select **Check again**.
+
+Luma checks current conditions again right before it sends an approved change. If the change would be different, it asks for a new review instead of sending it.
+
+## If your connection drops while you decide
+
+If your network drops while you submit a decision, Luma may not know whether it was recorded. Before you do anything else:
+
+1. Select **Check if it was recorded**. Luma looks up your decision.
+2. If it wasn’t recorded, select **Send same decision again**. Luma sends the identical decision, so it can’t be recorded twice.
+
+Retrying never turns a rejection into an approval. While you’re offline, decisions are paused until Luma can confirm the current state of the issue.
 
 ## Confirm the outcome
 
-After a decision, follow **Execution and verification**. These are separate from approval:
+Approving a change doesn’t fix the issue. Follow the steps in **Change and outcome check**, or select **View change progress**:
 
-- **Execution** records whether the action ran.
-- **Verification** checks the result using fresh evidence.
-- **Resolution verified** confirms the correction with that evidence.
-- **Closed by human disposition** records closure without proving a correction.
+1. **Waiting for approval** or **Change queued**: nothing has been sent yet.
+2. **Sending change**: Luma is sending the change to the connected system.
+3. **Change accepted**: the system accepted it. This doesn’t prove the issue is fixed.
+4. **Checking outcome**: Luma reads the system again to see whether the expected outcome happened.
 
-If progress is unavailable, refresh before relying on an old status. A successful submission or recorded approval alone does not confirm resolution.
+The issue then ends in one of these states:
 
-Return to [Investigate an issue](/docs/issues/investigate) for guidance on findings and evidence, or [Find and prioritize issues](/docs/issues) to continue through your inbox.
+- **Resolved and confirmed**: a fresh check confirmed the fix.
+- **Outcome not confirmed**: the check didn’t find the expected result. Review the check’s evidence and the current findings.
+- **Outcome unclear**: Luma couldn’t tell whether the change took effect. Check the record in the connected system before trying again.
+- **Change failed**: the system didn’t make the change. Check the attempt details and current findings before you decide what to do next.
 
-## Inspect verified outcomes
+If you see **Closed by a person**, someone closed the issue without a confirmed fix. That doesn’t confirm the problem was fixed.
 
-On **Insights**, open **Verified outcomes & human work**. Choose an environment
-and a detection window, then select a metric to inspect its incidents and evidence.
-The same incident counts once across retries. A repeated problem appears as a new
-linked incident. A later verification stays in the original detection cohort.
+If progress can’t load, you see **Progress couldn’t be confirmed**. Select **Refresh progress** before you rely on an earlier status.
 
-**Verified without help** requires known eligibility, independent verification
-and complete attribution. Approvals, repairs and corrections count as human work.
-Missing attribution stays unknown. Synthetic, partner-pilot and shadow cohorts
-are separate from live results. Partial coverage describes recorded incidents;
-it does not prove every provider record was observed.
+To see how many issues were resolved and confirmed over time, open [Insights](/docs/insights).

@@ -25,7 +25,7 @@ export const Default: Story = {
     await expect(
       canvas.getByRole('navigation', { name: 'Pages' }),
     ).toBeVisible();
-    await expect(canvas.getByText('1–25 of 60 items')).toBeVisible();
+    await expect(canvas.getByText('1–25 of 60')).toBeVisible();
     await expect(
       canvas.getByRole('button', { name: 'Previous' }),
     ).toBeDisabled();
@@ -33,7 +33,12 @@ export const Default: Story = {
 };
 
 export const Named: Story = {
-  args: { page: 3, count: 10, itemLabel: 'orders', label: 'Order pages' },
+  args: {
+    page: 3,
+    count: 10,
+    formatTotal: (total) => `${total} orders`,
+    label: 'Order pages',
+  },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(
@@ -43,18 +48,26 @@ export const Named: Story = {
   },
 };
 
+export const Empty: Story = {
+  args: { count: 0, totalCount: 0, hasNext: false, emptyLabel: 'No orders' },
+  play: async ({ canvasElement }) => {
+    await expect(within(canvasElement).getByRole('status')).toHaveTextContent(
+      'No orders',
+    );
+  },
+};
+
 export const WithoutTotal: Story = {
   args: {
     page: 2,
     pageSize: 50,
     count: 50,
     totalCount: undefined,
-    itemLabel: 'records',
     label: 'Record pages',
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByText('51–100 records')).toBeVisible();
+    await expect(canvas.getByText('51–100')).toBeVisible();
     await expect(
       canvas.getByRole('navigation', { name: 'Record pages' }),
     ).toHaveTextContent('Page 2');

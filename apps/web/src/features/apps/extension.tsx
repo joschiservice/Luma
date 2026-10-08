@@ -1,5 +1,6 @@
 import type { InstalledConnection } from '@luma/api-contract';
 import type { AppUiProps } from '@luma/app-host/web';
+import { m } from '@luma/i18n/messages';
 import { useQuery } from '@tanstack/react-query';
 import {
   Component,
@@ -41,7 +42,7 @@ class ExtensionBoundary extends Component<
   }
   override render() {
     return this.state.failed ? (
-      <p role="alert">This app could not load. Refresh to try again.</p>
+      <p role="alert">{m.apps_extension_failed()}</p>
     ) : (
       this.props.children
     );
@@ -115,7 +116,7 @@ export function AppExtension({
     }),
     [organizationId, appId, slot],
   );
-  if (state.isPending) return <p role="status">Loading app…</p>;
+  if (state.isPending) return <p role="status">{m.apps_loading_app()}</p>;
   if (state.error) return <p role="alert">{connectionError(state.error)}</p>;
   const manifest = state.data.catalog.find((app) => app.id === appId);
   const installed = state.data.installations.some(
@@ -123,7 +124,7 @@ export function AppExtension({
   );
   const Extension = components.get(appId);
   if (!installed || !manifest || !manifest.ui.includes(slot) || !Extension)
-    return <p>This app is unavailable in this workspace.</p>;
+    return <p>{m.apps_extension_unavailable()}</p>;
   const permission = manifest.slotAccess[slot];
   if (!permission || !can(permission))
     return slot === 'page' && permission ? (
@@ -138,7 +139,7 @@ export function AppExtension({
     <ExtensionBoundary
       key={`${session.data?.sessionId ?? ''}/${organizationId}/${appId}/${slot}/${customer?.connectionId ?? ''}/${customer?.id ?? ''}/${record?.connectionId ?? ''}/${record?.externalId ?? ''}/${inventory?.positionId ?? ''}/${fulfillment?.fulfillmentId ?? ''}`}
     >
-      <Suspense fallback={<p role="status">Loading app…</p>}>
+      <Suspense fallback={<p role="status">{m.apps_loading_app()}</p>}>
         {createElement(Extension, {
           organizationId,
           slot,

@@ -5,5 +5,6 @@ import { ActivityPage } from '../features/activity/page';
 
 export const Route = createFileRoute('/app/$organizationId/activity')({
   validateSearch: parseActivityFilters,
+  staticData: { help: 'activity' },
   component: ActivityPage,
 });

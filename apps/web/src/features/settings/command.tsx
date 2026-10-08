@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import { onlineManager, useQueryClient } from '@tanstack/react-query';
@@ -41,7 +42,7 @@ export function useSettingsCommand(organizationId: string) {
 
   async function run(
     operation: (id: string) => Promise<unknown>,
-    success = 'Changes saved.',
+    success = m.settings_command_saved(),
   ) {
     if (pending || uncertain.current) return;
     const command = { id: crypto.randomUUID(), operation, success };
@@ -110,7 +111,9 @@ export function CommandFeedback({
 }) {
   return (
     <div className="settings-feedback" aria-live="polite">
-      {command.pending ? <span role="status">Saving changes…</span> : null}
+      {command.pending ? (
+        <span role="status">{m.settings_command_saving()}</span>
+      ) : null}
       {command.message ? (
         <span className="settings-saved" role="status">
           {command.message}
@@ -119,10 +122,10 @@ export function CommandFeedback({
       {command.error ? (
         <Alert tone="danger" role="alert">
           {command.needsCheck
-            ? 'We could not confirm the result. Check its status before making another change.'
+            ? m.settings_command_uncertain()
             : command.error instanceof Error
               ? command.error.message
-              : 'Could not save. Try again.'}
+              : m.common_save_failed()}
         </Alert>
       ) : null}
       {command.needsCheck ? (
@@ -131,7 +134,7 @@ export function CommandFeedback({
           disabled={command.pending}
           onClick={() => void command.reconcile()}
         >
-          Check status and retry
+          {m.settings_command_check_status()}
         </Button>
       ) : null}
     </div>

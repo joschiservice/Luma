@@ -1,6 +1,9 @@
 import './assistant.css';
 
 import type { AssistantAnswer } from '@luma/api-contract';
+import { formatTime } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { LumaMark } from '@luma/ui/components/primitives/brand';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -48,7 +51,8 @@ import {
 
 const maxQuestion = 2000;
 const subscribePlatform = () => () => undefined;
-const platformModifier = () => (usesCommandKey() ? '⌘' : 'Ctrl');
+const platformModifier = () =>
+  usesCommandKey() ? '⌘' : m.assistant_key_control();
 
 /** Moves focus back to the header toggle after the panel closes. */
 function closePanel() {
@@ -69,7 +73,7 @@ function plainText(answer: AssistantAnswer) {
   });
   if (!answer.citations.length) return text;
 
-  return `${text}\n\nSources\n${answer.citations
+  return `${text}\n\n${m.common_sources()}\n${answer.citations
     .map((citation, index) => `[${index + 1}] ${citation.label}`)
     .join('\n')}`;
 }
@@ -97,7 +101,7 @@ function CopyAnswer({ answer }: { answer: AssistantAnswer }) {
       }}
     >
       {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
-      {copied ? 'Copied' : 'Copy'}
+      {copied ? m.common_copied() : m.common_copy()}
     </Button>
   );
 }
@@ -118,9 +122,7 @@ function Thinking() {
         <span />
         <span />
       </span>
-      {slow
-        ? 'Still reading. Broad questions can take up to a minute.'
-        : 'Reading your workspace…'}
+      {slow ? m.assistant_thinking_slow() : m.assistant_thinking()}
     </div>
   );
 }
@@ -145,14 +147,14 @@ function ExchangeView({
         <div className="assistant-answer-body">
           {state.status === 'pending' ? <Thinking /> : null}
           {state.status === 'stopped' ? (
-            <p className="assistant-muted">Stopped. Nothing was changed.</p>
+            <p className="assistant-muted">{m.assistant_stopped()}</p>
           ) : null}
           {state.status === 'failed' ? (
             <Alert tone="danger" role="alert" className="assistant-failure">
               <p>{state.message}</p>
               <Button variant="outline" size="sm" onClick={onRetry}>
                 <RotateCcw aria-hidden="true" />
-                Try again
+                {m.common_try_again()}
               </Button>
             </Alert>
           ) : null}
@@ -167,14 +169,17 @@ function ExchangeView({
               <footer className="assistant-answer-footer">
                 <span>
                   {state.answer.outcome === 'incomplete' ? (
-                    <span className="assistant-incomplete">Incomplete · </span>
+                    <span className="assistant-incomplete">
+                      {m.assistant_answer_incomplete()} ·{' '}
+                    </span>
                   ) : null}
-                  As of{' '}
-                  {new Intl.DateTimeFormat('en-GB', {
-                    timeZone,
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  }).format(new Date(state.answer.asOf))}
+                  {m.assistant_answer_as_of({
+                    time: formatTime(state.answer.asOf, {
+                      timeZone,
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    }),
+                  })}
                 </span>
                 <CopyAnswer answer={state.answer} />
               </footer>
@@ -214,7 +219,7 @@ export function AssistantPanel({
   const modifier = useSyncExternalStore(
     subscribePlatform,
     platformModifier,
-    () => 'Ctrl',
+    m.assistant_key_control,
   );
   const available = availability.data?.available === true;
 
@@ -273,8 +278,10 @@ export function AssistantPanel({
       update(id, { status: 'answered', answer });
       setAnnouncement(
         answer.citations.length
-          ? `Answer ready with ${answer.citations.length} ${answer.citations.length === 1 ? 'source' : 'sources'}.`
-          : 'Answer ready.',
+          ? m.assistant_announce_answered_sources({
+              count: answer.citations.length,
+            })
+          : m.assistant_announce_answered(),
       );
       reveal(id, 'start');
     } catch (error) {
@@ -311,7 +318,7 @@ export function AssistantPanel({
     abort.current?.abort();
     setExchanges([]);
     setDraft('');
-    setAnnouncement('Started a new conversation.');
+    setAnnouncement(m.assistant_announce_new_conversation());
     input.current?.focus();
   }
 
@@ -321,7 +328,7 @@ export function AssistantPanel({
     <aside
       id="assistant-panel"
       className="assistant-panel"
-      aria-label="Ask Luma"
+      aria-label={m.assistant_title()}
       hidden={!open}
       onKeyDown={(event) => {
         if (event.key === 'Escape' && !event.defaultPrevented) {
@@ -332,13 +339,13 @@ export function AssistantPanel({
     >
       <header className="assistant-header">
         <LumaMark className="assistant-header-mark" />
-        <h2>Ask Luma</h2>
+        <h2>{m.assistant_title()}</h2>
         <div className="assistant-header-tools">
           <Button
             variant="ghost"
             size="icon"
-            aria-label="New conversation"
-            title="New conversation"
+            aria-label={m.assistant_header_new_conversation()}
+            title={m.assistant_header_new_conversation()}
             disabled={!exchanges.length}
             onClick={reset}
           >
@@ -347,8 +354,10 @@ export function AssistantPanel({
           <Button
             variant="ghost"
             size="icon"
-            aria-label="Close Ask Luma"
-            title={`Close (${modifier} J)`}
+            aria-label={m.assistant_header_close()}
+            title={m.assistant_header_close_title({
+              shortcut: `${modifier} J`,
+            })}
             onClick={closePanel}
           >
             <X aria-hidden="true" />
@@ -359,24 +368,24 @@ export function AssistantPanel({
       <div className="assistant-log" ref={log} aria-live="off">
         {availability.isPending && open ? (
           <div className="assistant-state" role="status">
-            <Spinner aria-label="Checking whether Ask Luma is available" />
+            <Spinner aria-label={m.assistant_availability_checking()} />
           </div>
         ) : availability.isError ? (
           <Alert tone="warning" role="alert" className="assistant-notice">
-            <p>Luma couldn’t check whether asking is available here.</p>
+            <p>{m.assistant_availability_failed()}</p>
             <Button
               variant="outline"
               size="sm"
               onClick={() => void availability.refetch()}
             >
               <RotateCcw aria-hidden="true" />
-              Try again
+              {m.common_try_again()}
             </Button>
           </Alert>
         ) : availability.data && !available ? (
           <div className="assistant-empty">
             <LumaMark className="assistant-empty-mark" tone="mono" />
-            <h3>Ask Luma isn’t available yet</h3>
+            <h3>{m.assistant_unavailable_title()}</h3>
             <Alert tone="neutral" role="status" className="assistant-notice">
               {availability.data.reason}
             </Alert>
@@ -395,22 +404,19 @@ export function AssistantPanel({
         ) : availability.data ? (
           <div className="assistant-empty">
             <LumaMark className="assistant-empty-mark" />
-            <h3>Ask about your operations</h3>
-            <p>
-              Luma reads your orders, issues, stock, fulfillment and returns
-              with your access, and links each answer to the records it used.
-            </p>
+            <h3>{m.assistant_empty_title()}</h3>
+            <p>{m.assistant_empty_description()}</p>
             <a
               className="assistant-guide"
               href="/docs/ask-luma"
               target="_blank"
               rel="noreferrer"
             >
-              How Ask Luma works
+              {m.assistant_empty_guide_link()}
             </a>
             <ul
               className="assistant-suggestions"
-              aria-label="Suggested questions"
+              aria-label={m.assistant_suggestions_label()}
             >
               {suggestions.map((suggestion) => (
                 <li key={suggestion}>
@@ -434,7 +440,7 @@ export function AssistantPanel({
           data-disabled={!available || undefined}
         >
           <label htmlFor="assistant-question" className="sr-only">
-            Question for Luma
+            {m.assistant_composer_label()}
           </label>
           <textarea
             id="assistant-question"
@@ -445,8 +451,8 @@ export function AssistantPanel({
             disabled={!available}
             placeholder={
               exchanges.length
-                ? 'Ask a follow-up…'
-                : 'Ask about orders, issues, stock…'
+                ? m.assistant_composer_placeholder_follow_up()
+                : m.assistant_composer_placeholder()
             }
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={onComposerKey}
@@ -457,8 +463,8 @@ export function AssistantPanel({
               size="icon"
               variant="outline"
               className="assistant-send"
-              aria-label="Stop answering"
-              title="Stop"
+              aria-label={m.assistant_composer_stop()}
+              title={m.assistant_composer_stop_title()}
               onClick={() => abort.current?.abort()}
             >
               <Square aria-hidden="true" className="assistant-stop-icon" />
@@ -468,8 +474,8 @@ export function AssistantPanel({
               type="submit"
               size="icon"
               className="assistant-send"
-              aria-label="Ask"
-              title="Ask (Enter)"
+              aria-label={m.assistant_composer_send()}
+              title={m.assistant_composer_send_title()}
               disabled={!available || !draft.trim()}
             >
               <ArrowUp aria-hidden="true" />
@@ -479,13 +485,23 @@ export function AssistantPanel({
         <p className="assistant-footnote">
           {draft.length > maxQuestion - 200 ? (
             <span className="assistant-count">
-              {draft.length}/{maxQuestion} ·{' '}
+              {m.assistant_composer_count({
+                count: draft.length,
+                max: maxQuestion,
+              })}{' '}
+              ·{' '}
             </span>
           ) : null}
-          Read-only. Check answers in the linked records.{' '}
+          {m.assistant_composer_footnote()}{' '}
           <span className="assistant-shortcut">
-            <Kbd>{modifier}</Kbd>
-            <Kbd>J</Kbd> to toggle
+            {rich(m.assistant_composer_shortcut, {
+              keys: (
+                <>
+                  <Kbd>{modifier}</Kbd>
+                  <Kbd>J</Kbd>
+                </>
+              ),
+            })}
           </span>
         </p>
       </form>

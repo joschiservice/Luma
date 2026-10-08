@@ -1,0 +1,94 @@
+---
+title: Problem lösen
+description: Prüfen Sie eine vorgeschlagene Änderung, genehmigen, lehnen Sie ab oder eskalieren Sie, und bestätigen Sie, dass die Korrektur gewirkt hat.
+---
+
+Kann Luma ein Problem über ein verbundenes System beheben, schlägt Luma eine Änderung vor, zum Beispiel den Shopify-Bestand auf die Menge aus Ihrem ERP zu setzen. In Ihren Systemen ändert sich nichts, bevor die Änderung die Genehmigungsregeln Ihres Workspace erfüllt. Danach prüft Luma das Ergebnis mit einem neuen Lesevorgang.
+
+Öffnen Sie die Änderung mit **Änderung prüfen** oben auf der ganzen Problemseite, mit **Vorgeschlagene Änderung prüfen** in der **Übersicht** oder im Abschnitt **Vorgeschlagene Änderung**. Änderungen, die auf eine Person warten, erscheinen auch unter [Wartet auf Sie](/docs/needs-you).
+
+## Wer entscheiden kann [#who-can-decide]
+
+- Genehmigen und Ablehnen erfordern **Änderungen genehmigen oder ablehnen**. Die genehmigende Person muss eine andere sein als die Person, die die Änderung angefordert hat. Diese steht unter **Angefordert von**.
+- Eskalieren erfordert **Probleme bearbeiten**.
+
+Ohne diese Berechtigungen können Sie das ganze Problem lesen, und die Prüfung zeigt **Sie können zu diesem Problem derzeit keine Entscheidung treffen.**
+
+## Vorgeschlagene Änderung prüfen [#review-the-proposed-change]
+
+**Vorgeschlagene Änderung prüfen** zeigt:
+
+- Die Änderung und ihr Risiko: **Geringes Risiko**, **Mittleres Risiko** oder **Hohes Risiko**.
+- **Zielsystem** und **Zieldatensatz**: welche Verbindung und welcher Datensatz geändert werden.
+- **Vorgeschlagene Änderungen**: die Felder und die Werte, die Luma setzt.
+- **Erwartetes Ergebnis**: was Luma danach prüft, um die Korrektur zu bestätigen.
+- **Nachweise für diese Änderung**: die Daten, auf denen der Vorschlag beruht. Luma hält sie entweder während Ihrer Prüfung aktuell oder zeigt, bis wann sie gültig sind und wann der Vorschlag abläuft.
+
+**Nicht automatisch umkehrbar** bedeutet, dass der Vorschlag keinen Weg enthält, die Änderung rückgängig zu machen. Gehen Sie nicht davon aus, dass Sie sie rückgängig machen können.
+
+## Prüfen, was die Genehmigungsregeln verlangen [#check-what-the-approval-rules-require]
+
+Ein Hinweis unter der Änderung zeigt, was die Genehmigungsregeln Ihres Workspace verlangen:
+
+- **Genehmigung nötig**: Eine Person, die Änderungen genehmigen darf, muss sie genehmigen, bevor Luma sie sendet.
+- **Keine Genehmigung nötig**: Luma sendet die Änderung selbst und prüft das Ergebnis separat.
+- **Durch Workspace-Regeln nicht erlaubt**: Luma sendet diese Änderung nicht. Folgen Sie den empfohlenen Schritten oder eskalieren Sie das Problem.
+
+Verlangt Ihr Workspace für jede Änderung eine Genehmigung, braucht jede Änderung die Genehmigung einer weiteren Person, auch bei geringem Risiko. Siehe [Genehmigungen](/docs/workspace-settings#approvals). Sehen Sie **Genehmigungsregeln geändert**, aktualisieren Sie, bevor Sie entscheiden.
+
+**Änderung nicht verfügbar** bedeutet, dass die Verbindung diese Änderung derzeit nicht ausführen kann, etwa weil sie den Zugriff verloren hat. **Vorschlag ist veraltet** bedeutet, dass sich die Untersuchung geändert hat. Warten Sie auf einen aktualisierten Vorschlag.
+
+## Genehmigen, ablehnen oder eskalieren [#approve-reject-or-escalate]
+
+1. Lesen Sie die Änderung, ihre Nachweise und den Genehmigungshinweis.
+2. Geben Sie einen **Grund für Ihre Entscheidung (erforderlich)** ein, bis zu 1.000 Zeichen. Luma speichert ihn mit Ihrer Entscheidung.
+3. Wählen Sie **Änderung genehmigen**, **Änderung ablehnen** oder **Eskalieren**.
+
+Bevor Luma Ihre Entscheidung erfasst, prüft Luma den aktuellen Stand. Danach bestätigt Luma, was passiert ist:
+
+- **Genehmigung erfasst**: Luma hat Ihre Genehmigung erfasst. Das Senden der Änderung und die Bestätigung des Ergebnisses werden separat verfolgt.
+- **Ablehnung erfasst**: Luma sendet die Änderung nicht. Das Problem bleibt zur Nachbearbeitung offen.
+- **Eskalation erfasst**: Das Problem ist zur weiteren Prüfung markiert. Eskalieren ändert nichts in Ihren Systemen und bricht keine Änderung ab, die bereits begonnen hat.
+
+Gibt es keine Änderung zu prüfen, folgen Sie den empfohlenen Schritten in der **Übersicht**. Um das Problem an jemand anderen zu übergeben, wählen Sie **Problem eskalieren**, geben an, warum es eskaliert werden muss, und wählen **Eskalation bestätigen**.
+
+## Wenn der Vorschlag abläuft oder sich ändert [#when-the-proposal-expires-or-changes]
+
+Ein Vorschlag und seine Nachweise gelten nur für begrenzte Zeit:
+
+- **Genehmigungsfrist abgelaufen**: Für eine Genehmigung ist ein neuer Vorschlag mit aktuellen Nachweisen nötig. Das Aktualisieren der Seite verlängert die Frist nicht.
+- „Der Vorschlag hat sich geändert.“: Luma hat festgestellt, dass die Änderung anders ausfallen muss. Prüfen Sie die neuen Details, bevor Sie genehmigen.
+- **Aktuelle Lage wird geprüft**: Luma liest die neuesten Daten, bevor Sie fortfahren. Gelingt das nicht, sehen Sie **Vor der Entscheidung prüfen**. Wählen Sie dann **Erneut prüfen**.
+
+Luma prüft den aktuellen Stand direkt vor dem Senden einer genehmigten Änderung noch einmal. Müsste die Änderung anders ausfallen, bittet Luma um eine neue Prüfung, statt sie zu senden.
+
+## Wenn Ihre Verbindung beim Entscheiden abbricht [#if-your-connection-drops-while-you-decide]
+
+Bricht Ihre Netzwerkverbindung ab, während Sie eine Entscheidung senden, weiß Luma möglicherweise nicht, ob sie erfasst wurde. Bevor Sie etwas anderes tun:
+
+1. Wählen Sie **Prüfen, ob erfasst**. Luma sucht Ihre Entscheidung.
+2. Wurde sie nicht erfasst, wählen Sie **Dieselbe Entscheidung erneut senden**. Luma sendet genau dieselbe Entscheidung, sodass sie nicht doppelt erfasst werden kann.
+
+Ein erneuter Versuch macht aus einer Ablehnung nie eine Genehmigung. Solange Sie offline sind, sind Entscheidungen pausiert, bis Luma den aktuellen Stand des Problems bestätigen kann.
+
+## Ergebnis bestätigen [#confirm-the-outcome]
+
+Eine Genehmigung behebt das Problem noch nicht. Verfolgen Sie die Schritte unter **Änderung und Ergebnisprüfung** oder wählen Sie **Fortschritt der Änderung anzeigen**:
+
+1. **Wartet auf Genehmigung** oder **Änderung eingeplant**: Es wurde noch nichts gesendet.
+2. **Änderung wird gesendet**: Luma sendet die Änderung an das verbundene System.
+3. **Änderung angenommen**: Das System hat sie angenommen. Das beweist nicht, dass das Problem behoben ist.
+4. **Ergebnis wird geprüft**: Luma liest das System erneut, um zu sehen, ob das erwartete Ergebnis eingetreten ist.
+
+Danach endet das Problem in einem dieser Zustände:
+
+- **Gelöst und bestätigt**: Eine neue Prüfung hat die Korrektur bestätigt.
+- **Ergebnis nicht bestätigt**: Die Prüfung hat das erwartete Ergebnis nicht gefunden. Prüfen Sie die Nachweise der Prüfung und die aktuellen Befunde.
+- **Ergebnis unklar**: Luma konnte nicht feststellen, ob die Änderung wirksam wurde. Prüfen Sie den Datensatz im verbundenen System, bevor Sie es erneut versuchen.
+- **Änderung fehlgeschlagen**: Das System hat die Änderung nicht ausgeführt. Prüfen Sie die Details des Versuchs und die aktuellen Befunde, bevor Sie über das weitere Vorgehen entscheiden.
+
+Sehen Sie **Von einer Person geschlossen**, hat jemand das Problem ohne bestätigte Korrektur geschlossen. Das bestätigt nicht, dass das Problem behoben wurde.
+
+Lässt sich der Fortschritt nicht laden, sehen Sie **Fortschritt konnte nicht bestätigt werden**. Wählen Sie **Fortschritt aktualisieren**, bevor Sie sich auf einen früheren Stand verlassen.
+
+Wie viele Probleme über die Zeit gelöst und bestätigt wurden, sehen Sie unter [Auswertungen](/docs/insights).

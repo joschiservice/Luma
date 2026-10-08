@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import { Button } from '@luma/ui/components/primitives/button';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
@@ -38,15 +39,19 @@ export function SignOut() {
   return (
     <EntryFrame>
       <section className="status-panel">
-        <h1>{failed ? 'Sign-out not confirmed' : 'Signing out…'}</h1>
+        <h1>
+          {failed
+            ? m.identity_sign_out_failed_title()
+            : m.identity_sign_out_pending_title()}
+        </h1>
         <p role="status">
           {failed
-            ? 'Your session may still be active. Check your connection and retry sign-out.'
-            : 'Revoking your session.'}
+            ? m.identity_sign_out_failed_body()
+            : m.identity_sign_out_pending_body()}
         </p>
         {failed ? (
           <Button disabled={pending} onClick={() => void signOut()}>
-            Retry sign-out
+            {m.identity_sign_out_retry()}
           </Button>
         ) : null}
       </section>

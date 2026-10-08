@@ -12,6 +12,7 @@ import {
   workflowRunViewSchema,
   workflowSummarySchema,
 } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import { queryOptions } from '@tanstack/react-query';
 
 import { createWebApiClient } from '../../lib/api-client';
@@ -37,7 +38,7 @@ function failure(result: { status: number; body: unknown }): never {
     'message' in result.body &&
     typeof result.body.message === 'string'
       ? result.body.message
-      : 'Reload to check the current workflow state.';
+      : m.workflows_error_fallback();
   throw new WorkflowError(result.status, message);
 }
 
@@ -148,12 +149,12 @@ export async function revokeWorkflow(
 /** Provides actionable feedback for access loss, stale submissions and uncertain responses. */
 export function workflowError(error: unknown) {
   if (error instanceof IdentityError && error.status === 401)
-    return 'Your session expired. Sign in again.';
+    return m.workflows_error_session_expired();
   if (error instanceof IdentityError && error.status === 403)
-    return 'Workspace access changed. Refresh to check your permissions.';
+    return m.workflows_error_access_changed();
   if (error instanceof WorkflowError) return error.feedback;
 
-  return 'The result could not be confirmed. Check your connection, then retry the same request or refresh to inspect its status.';
+  return m.workflows_error_unconfirmed();
 }
 
 /** Reads the supported Resolution catalog for case evaluation; native definitions have no evaluator yet. */

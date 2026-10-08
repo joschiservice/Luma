@@ -1,4 +1,5 @@
 import type { SettingsSnapshot } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
@@ -82,11 +83,7 @@ function Preview({
                   : { ...data, deliveryAvailable: state !== 'mail-unavailable' }
               }
               loading={state === 'loading'}
-              error={
-                state === 'error'
-                  ? 'Settings could not be loaded. Check your connection and retry.'
-                  : undefined
-              }
+              error={state === 'error' ? m.settings_load_failed() : undefined}
               retry={() => {}}
             />
           </QueryClientProvider>

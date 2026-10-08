@@ -121,7 +121,7 @@ it('allows members to inspect connections without mutation controls', () => {
   const html = render({ role: 'member' });
   expect(html).toContain('Main warehouse');
   expect(html).not.toContain('Add connection</button>');
-  expect(html).not.toContain('Uninstall</button>');
+  expect(html).not.toContain('Uninstall app</button>');
   expect(html).not.toContain('Validate access');
 });
 
@@ -152,7 +152,7 @@ it('summarizes multiple connections and attention on the overview', () => {
     items: [connection, { ...connection, id: 'second', status: 'degraded' }],
   });
   expect(html).toContain('2 connections');
-  expect(html).toContain('connection needs');
+  expect(html).toContain('1 connection needs attention');
   expect(html).toContain('Manage app');
   expect(html).not.toContain('Main warehouse');
 });

@@ -1,6 +1,7 @@
 import './orders.css';
 
 import type { OrderList } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Empty } from '@luma/ui/components/primitives/empty';
@@ -166,7 +167,7 @@ export function OrdersView({
 
   return (
     <main className="orders-page">
-      <PageTitle title="Orders" />
+      <PageTitle title={m.orders_page_title()} />
       <OrderFilters
         search={search}
         sources={sources}
@@ -176,29 +177,23 @@ export function OrdersView({
         refreshing={refreshing}
       />
       {coverage}
-      {offline ? (
-        <Alert role="status">
-          You are offline. Reconnect to refresh orders.
-        </Alert>
-      ) : null}
+      {offline ? <Alert role="status">{m.orders_list_offline()}</Alert> : null}
       {error?.kind === 'access' ? (
         <Alert tone="danger" role="alert">
-          You no longer have access to orders in this workspace.
+          {m.orders_access_lost()}
         </Alert>
       ) : error?.kind === 'page' ? (
         <Alert role="alert">
-          {error.message ??
-            'This page link no longer matches the order filters.'}{' '}
+          {error.message ?? m.orders_list_page_mismatch()}{' '}
           <Button variant="outline" onClick={() => update({})}>
-            Go to the first page
+            {m.orders_list_first_page()}
           </Button>
         </Alert>
       ) : error ? (
         <Alert tone="danger" role="alert">
-          Orders could not be loaded.
-          {list ? ' The list below may be out of date.' : ''}{' '}
+          {list ? m.orders_list_refresh_failed() : m.orders_list_load_failed()}{' '}
           <Button variant="outline" onClick={refresh}>
-            Retry
+            {m.common_retry()}
           </Button>
         </Alert>
       ) : null}
@@ -212,15 +207,19 @@ export function OrdersView({
             empty={
               <Empty className="orders-empty">
                 <PackageSearch size={30} aria-hidden="true" />
-                <h2>{filtered ? 'No orders match' : 'No orders yet'}</h2>
+                <h2>
+                  {filtered
+                    ? m.orders_list_unmatched_title()
+                    : m.orders_list_empty_title()}
+                </h2>
                 <p>
                   {filtered
-                    ? 'Try another search, view or filter. Orders a source has not reported yet do not appear.'
-                    : 'Orders appear here once a connected store or ERP reports them.'}
+                    ? m.orders_list_unmatched_body()
+                    : m.orders_list_empty_body()}
                 </p>
                 {filtered ? (
                   <Button variant="outline" onClick={() => change({})}>
-                    Clear filters
+                    {m.common_clear_filters()}
                   </Button>
                 ) : (
                   <Link
@@ -228,7 +227,7 @@ export function OrdersView({
                     to="/app/$organizationId/apps"
                     params={{ organizationId }}
                   >
-                    Connect a store or ERP
+                    {m.orders_list_connect()}
                   </Link>
                 )}
               </Empty>
@@ -244,19 +243,19 @@ export function OrdersView({
               onPrevious={previous}
               onNext={() => next?.()}
               disabled={refreshing}
-              itemLabel="orders"
-              label="Order pages"
+              formatTotal={(count) => m.orders_list_pagination_total({ count })}
+              label={m.orders_list_pagination_label()}
             />
           ) : null}
           {list.items.length && search.cursor && !previous ? (
             <Button variant="ghost" onClick={() => update({})}>
-              Return to first page
+              {m.orders_list_first_page()}
             </Button>
           ) : null}
         </>
       ) : loading && !error ? (
         <div className="orders-loading" role="status">
-          <span className="sr-only">Loading orders…</span>
+          <span className="sr-only">{m.orders_list_loading()}</span>
           {Array.from({ length: 6 }, (_, index) => (
             <span key={index} className="lu-skeleton" />
           ))}

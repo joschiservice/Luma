@@ -8,11 +8,15 @@ import type {
 import { queryOptions } from '@tanstack/react-query';
 
 import { privateQueryDefaults } from '../../lib/private-query';
+import { localizeRoles } from '../identity/permission-text';
 import { settingsApi, SettingsError } from './data';
 
 export type { PermissionDefinition, PermissionGroup, WorkspaceRole };
 
-/** Loads workspace roles with member counts and the grantable permission catalog. */
+/**
+ * Loads workspace roles with member counts and the grantable permission catalog, with known
+ * permissions and built-in roles in the interface language.
+ */
 export const rolesOptions = (organizationId: string) =>
   queryOptions({
     ...privateQueryDefaults,
@@ -27,6 +31,7 @@ export const rolesOptions = (organizationId: string) =>
 
       return result.body;
     },
+    select: localizeRoles,
   });
 
 /** Loads a role's recent changes and member assignments; needs permission to manage roles. */

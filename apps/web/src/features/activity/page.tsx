@@ -6,6 +6,8 @@ import {
   type ActivityPage as Page,
   activityTypes,
 } from '@luma/api-contract';
+import { formatDateTime, formatList } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import { CollectionFilterPanel } from '@luma/ui/components/primitives/collection-filters';
@@ -41,8 +43,10 @@ import { useContext, useEffect, useSyncExternalStore } from 'react';
 import { connectionsOptions } from '../connections/data';
 import { SignInRedirect } from '../identity/common';
 import { IdentityError } from '../identity/data';
+import { providerName } from '../sync/presentation';
 import { type ActivityFilters, activityOptions } from './data';
 import {
+  activityChangeLabel,
   activityConnectionOptions,
   activityLabel,
   type ActivitySource,
@@ -51,6 +55,46 @@ import {
 } from './presentation';
 
 const label = activityLabel;
+
+type Label = () => string;
+
+// Recorded detail values that Luma knows; other values are shown as recorded.
+const actorKinds: Record<string, Label> = {
+  user: m.activity_actor_user,
+  system: m.activity_actor_system,
+  service: m.activity_actor_service,
+};
+const changeStates: Record<string, Label> = {
+  unknown: m.activity_state_unknown,
+  prepared: m.activity_state_prepared,
+  failed: m.activity_state_failed,
+};
+const checkStages: Record<string, Label> = {
+  pending: m.activity_phase_pending,
+};
+const requestStates: Record<string, Label> = {
+  dispatched: m.activity_request_dispatched,
+  accepted: m.activity_request_accepted,
+};
+const checkResults: Record<string, Label> = {
+  passed: m.activity_check_passed,
+  failed: m.activity_check_failed,
+  inconclusive: m.activity_check_inconclusive,
+};
+
+/** Reads a recorded detail value through `labels`, or "Not recorded" when it is missing. */
+const detail = (
+  labels: Record<string, Label>,
+  value: string | null | undefined,
+) => (value ? (labels[value]?.() ?? value) : m.activity_not_recorded());
+
+/** Formats a recorded instant in workspace time with seconds, as audit detail needs them. */
+const instant = (value: string, timeZone: string) =>
+  formatDateTime(value, {
+    dateStyle: 'medium',
+    timeStyle: 'medium',
+    timeZone,
+  });
 const subscribe = (changed: () => void) => onlineManager.subscribe(changed);
 const snapshot = () => onlineManager.isOnline();
 const serverSnapshot = () => true;
@@ -120,11 +164,9 @@ export function ActivityPage() {
       newEvents={newEvents}
       error={
         accessLost
-          ? 'Workspace access changed. Activity is no longer available.'
+          ? m.activity_error_access_lost()
           : (staleMessage ??
-            (error
-              ? 'Activity could not be updated. Previously loaded events may be outdated.'
-              : undefined))
+            (error ? m.activity_error_unavailable() : undefined))
       }
       stalePage={!!staleMessage}
       change={(next) => void navigate({ search: next, resetScroll: false })}
@@ -186,19 +228,19 @@ export function ActivityView({
     {
       kind: 'date-range',
       key: 'recorded',
-      label: 'Recorded',
+      label: m.activity_filter_recorded(),
       icon: CalendarDays,
       from: filters.from,
       to: filters.to,
       today: workspaceDateValue(new Date(), timeZone),
       maxDays: 366,
-      fallback: 'Last 30 days',
+      fallback: m.activity_filter_last_30_days(),
       onChange: (range) => update({ from: range.from, to: range.to }),
     },
     {
       kind: 'choice',
       key: 'connectionId',
-      label: 'Connection',
+      label: m.activity_filter_connection(),
       icon: Plug,
       value: filters.connectionId,
       options: activityConnectionOptions(sources, filters.connectionId),
@@ -207,7 +249,7 @@ export function ActivityView({
     {
       kind: 'choice',
       key: 'system',
-      label: 'System',
+      label: m.activity_filter_system(),
       icon: Server,
       value: filters.system,
       options: activitySystemOptions(sources, filters.system),
@@ -216,7 +258,7 @@ export function ActivityView({
     {
       kind: 'choice',
       key: 'type',
-      label: 'Event type',
+      label: m.activity_filter_type(),
       icon: Tag,
       value: filters.type,
       options: activityTypes.map((value) => ({ value, label: label(value) })),
@@ -226,7 +268,7 @@ export function ActivityView({
     {
       kind: 'choice',
       key: 'outcome',
-      label: 'Outcome',
+      label: m.activity_filter_outcome(),
       icon: CircleDot,
       value: filters.outcome,
       options: activityOutcomes.map((value) => ({
@@ -237,35 +279,37 @@ export function ActivityView({
         update({ outcome: activityOutcomes.find((item) => item === value) }),
     },
   ];
+  // Paging and the open event aren't filters; an empty page without filters gets its own copy.
+  const filtered = Object.entries(filters).some(
+    ([key, value]) => !!value && !['cursor', 'event', 'latest'].includes(key),
+  );
 
   return (
     <div className="activity-page">
-      <PageTitle title="Activity" />
+      <PageTitle title={m.activity_page_title()} />
       <CollectionFilterPanel filters={toolbarFilters}>
         <CollectionToolbar
           panel
           search={{
             value: filters.q,
             onChange: (q) => update({ q }),
-            label: 'Search activity',
-            placeholder: 'Issue, resource, action, actor or run ID…',
+            label: m.activity_search_label(),
+            placeholder: m.activity_search_placeholder(),
             maxLength: 200,
           }}
           filters={toolbarFilters}
           onClear={() => change({})}
           onRefresh={refresh}
           refreshing={refreshing}
-          refreshLabel="Refresh activity"
+          refreshLabel={m.activity_refresh()}
         />
         <p className="activity-coverage">
-          {page ? `${page.coverage} ` : null}Search matches issue IDs, resource
-          references, action labels, actor IDs and workflow run IDs. Dates use
-          recorded workspace time, up to 366 days.
+          {page ? `${page.coverage} ` : null}
+          {m.activity_search_help()}
         </p>
         {offline ? (
           <Alert role="status" className="activity-notice">
-            You are offline. Loaded activity may be outdated. Reconnect to
-            refresh.
+            {m.common_offline()}
           </Alert>
         ) : null}
         {error ? (
@@ -283,11 +327,11 @@ export function ActivityView({
                   })
                 }
               >
-                Latest events
+                {m.activity_latest_events()}
               </Button>
             ) : (
               <Button variant="outline" onClick={refresh}>
-                Retry
+                {m.common_retry()}
               </Button>
             )}
           </Alert>
@@ -305,22 +349,26 @@ export function ActivityView({
               refresh();
             }}
           >
-            New events available — view latest
+            {m.activity_new_events()}
           </Button>
         ) : null}
         {page ? (
           <>
             {!page.items.length ? (
-              <Empty className="activity-empty">
-                <h2>No matching recorded activity</h2>
-                <p>
-                  Try another date range or clear the filters. Unrecorded
-                  changes do not appear here.
-                </p>
-                <Button variant="outline" onClick={() => change({})}>
-                  Clear filters
-                </Button>
-              </Empty>
+              filtered ? (
+                <Empty className="activity-empty">
+                  <h2>{m.activity_empty_filtered_title()}</h2>
+                  <p>{m.activity_empty_filtered_description()}</p>
+                  <Button variant="outline" onClick={() => change({})}>
+                    {m.common_clear_filters()}
+                  </Button>
+                </Empty>
+              ) : (
+                <Empty className="activity-empty">
+                  <h2>{m.activity_empty_title()}</h2>
+                  <p>{m.activity_empty_description()}</p>
+                </Empty>
+              )
             ) : (
               <ol className="activity-list">
                 {Array.from(
@@ -360,11 +408,13 @@ export function ActivityView({
                     })
                   }
                 >
-                  Latest events
+                  {m.activity_latest_events()}
                 </Button>
               ) : null}
               <span role="status">
-                {page.items.length} recorded events on this page
+                {page.items.length
+                  ? m.activity_page_count({ count: page.items.length })
+                  : m.activity_page_count_none()}
               </span>
               {page.nextCursor ? (
                 <Button
@@ -378,13 +428,13 @@ export function ActivityView({
                     })
                   }
                 >
-                  Older events
+                  {m.activity_older_events()}
                 </Button>
               ) : null}
             </div>
           </>
         ) : loading && !error ? (
-          <p role="status">Loading activity…</p>
+          <p role="status">{m.activity_loading()}</p>
         ) : null}
       </CollectionFilterPanel>
     </div>
@@ -404,6 +454,9 @@ function ActivityRow({
   expanded: boolean;
   expand: () => void;
 }) {
+  const timeZone = useContext(WorkspaceTimezone);
+  const group = item.attemptId ?? item.proposalId;
+
   return (
     <li
       className={`activity-event${item.attemptId || item.proposalId ? ' activity-grouped' : ''}${related ? ' activity-related' : ''}`}
@@ -421,26 +474,31 @@ function ActivityRow({
         <StateDot state={activityState(item.outcome)} />
         <span className="activity-event-copy">
           <strong>{activityLabel(item.action)}</strong>
-          {!related && (item.attemptId || item.proposalId) ? (
+          {!related && group ? (
             <small>
-              {item.type === 'procurement' ? 'Purchase order' : 'Attempt group'}{' '}
-              · {item.attemptId ?? item.proposalId}
+              {item.type === 'procurement'
+                ? m.activity_row_group_purchase_order({ id: group })
+                : m.activity_row_group_attempt({ id: group })}
             </small>
           ) : null}
           <small>
-            {item.actorId ?? 'Actor not recorded'} ·{' '}
-            {item.system ?? 'System not recorded'}
+            {m.activity_row_actor_system({
+              actor: item.actorId ?? m.activity_row_actor_not_recorded(),
+              system: item.system
+                ? providerName(item.system)
+                : m.activity_row_system_not_recorded(),
+            })}
           </small>
           <small>
             {item.resource ??
               item.exceptionId ??
               item.connectionId ??
-              'Workspace'}
+              m.activity_row_workspace()}
           </small>
         </span>
         <span className="activity-outcome">
           <StatePill state={activityState(item.outcome)}>
-            {label(item.outcome)}
+            {label(item.outcome, item.system)}
           </StatePill>
           {item.mode !== 'unrecorded' ? (
             <small>{label(item.mode)}</small>
@@ -455,49 +513,86 @@ function ActivityRow({
       {expanded ? (
         <div id={`event-${item.id}`} className="activity-evidence">
           <dl>
-            <dt>Event ID</dt>
+            <dt>{m.activity_detail_event_id()}</dt>
             <dd>{item.id}</dd>
-            <dt>Actor</dt>
+            <dt>{m.activity_detail_actor()}</dt>
             <dd>
-              {item.actorKind ?? 'Unknown'} · {item.actorId ?? 'Not recorded'}
+              {m.activity_detail_actor_value({
+                kind: item.actorKind
+                  ? (actorKinds[item.actorKind]?.() ?? item.actorKind)
+                  : m.common_unknown(),
+                actor: item.actorId ?? m.activity_not_recorded(),
+              })}
             </dd>
-            <dt>Occurred</dt>
-            <dd>{item.occurredAt ?? 'Not recorded'}</dd>
-            <dt>Recorded</dt>
-            <dd>{item.recordedAt}</dd>
-            <dt>
-              {item.type === 'procurement' ? 'Reason' : 'Proposed change'}
-            </dt>
-            <dd>{item.summary ?? 'Not recorded'}</dd>
-            <dt>
-              {item.type === 'procurement'
-                ? 'Purchase order / attempt'
-                : 'Proposal / attempt'}
-            </dt>
+            <dt>{m.activity_detail_occurred()}</dt>
             <dd>
-              {item.proposalId ?? 'None'} / {item.attemptId ?? 'None'}
+              {item.occurredAt ? (
+                <time dateTime={item.occurredAt}>
+                  {instant(item.occurredAt, timeZone)}
+                </time>
+              ) : (
+                m.activity_not_recorded()
+              )}
             </dd>
-            <dt>Execution state</dt>
-            <dd>{item.executionState ?? 'Not recorded'}</dd>
-            <dt>Verification phase</dt>
-            <dd>{item.verificationPhase ?? 'Not recorded'}</dd>
-            <dt>Failure code</dt>
-            <dd>{item.failureCode ?? 'None recorded'}</dd>
-            <dt>Connections</dt>
+            <dt>{m.activity_detail_recorded()}</dt>
             <dd>
-              {item.connections
-                .map((c) => `${c.system ?? 'Unknown system'} · ${c.id}`)
-                .join(', ') || 'Not recorded'}
+              <time dateTime={item.recordedAt}>
+                {instant(item.recordedAt, timeZone)}
+              </time>
             </dd>
-            <dt>Dispatch</dt>
-            <dd>{item.dispatch ?? 'Not recorded'}</dd>
-            <dt>Verification</dt>
-            <dd>{item.verification ?? 'Not recorded'}</dd>
-            <dt>Execution mode</dt>
+            {item.type === 'procurement' ? (
+              <>
+                <dt>{m.activity_detail_reason()}</dt>
+                <dd>{item.summary ?? m.activity_not_recorded()}</dd>
+                <dt>{m.activity_detail_purchase_order()}</dt>
+                <dd>{item.proposalId ?? m.common_none()}</dd>
+              </>
+            ) : (
+              <>
+                <dt>{m.activity_detail_proposed_change()}</dt>
+                <dd>
+                  {item.summary
+                    ? activityChangeLabel(item.summary)
+                    : m.activity_not_recorded()}
+                </dd>
+                <dt>{m.activity_detail_proposal()}</dt>
+                <dd>{item.proposalId ?? m.common_none()}</dd>
+              </>
+            )}
+            <dt>{m.activity_detail_attempt()}</dt>
+            <dd>{item.attemptId ?? m.common_none()}</dd>
+            <dt>{m.activity_detail_change_state()}</dt>
+            <dd>{detail(changeStates, item.executionState)}</dd>
+            <dt>{m.activity_detail_check_stage()}</dt>
+            <dd>{detail(checkStages, item.verificationPhase)}</dd>
+            <dt>{m.activity_detail_error_code()}</dt>
+            <dd>{item.failureCode ?? m.activity_detail_error_code_none()}</dd>
+            <dt>{m.activity_detail_connections()}</dt>
             <dd>
-              {item.mode === 'unrecorded' ? 'Not recorded' : label(item.mode)}
+              {item.connections.length
+                ? formatList(
+                    item.connections.map((c) =>
+                      m.activity_detail_connection_value({
+                        system: c.system
+                          ? providerName(c.system)
+                          : m.activity_detail_unknown_system(),
+                        id: c.id,
+                      }),
+                    ),
+                  )
+                : m.activity_not_recorded()}
             </dd>
-            <dt>Evidence references</dt>
+            <dt>{m.activity_detail_request()}</dt>
+            <dd>{detail(requestStates, item.dispatch)}</dd>
+            <dt>{m.activity_detail_check_result()}</dt>
+            <dd>{detail(checkResults, item.verification)}</dd>
+            <dt>{m.activity_detail_mode()}</dt>
+            <dd>
+              {item.mode === 'unrecorded'
+                ? m.activity_not_recorded()
+                : label(item.mode)}
+            </dd>
+            <dt>{m.activity_detail_evidence()}</dt>
             <dd>
               {item.evidenceRefs.length ? (
                 <ul>
@@ -506,7 +601,7 @@ function ActivityRow({
                   ))}
                 </ul>
               ) : (
-                'No references recorded'
+                m.activity_detail_evidence_none()
               )}
             </dd>
           </dl>
@@ -516,7 +611,7 @@ function ActivityRow({
                 to="/app/$organizationId/procurement/$purchaseOrderId"
                 params={{ organizationId, purchaseOrderId: item.proposalId }}
               >
-                Open purchase order
+                {m.activity_link_purchase_order()}
               </Link>
             ) : null}
             {item.exceptionId ? (
@@ -524,7 +619,7 @@ function ActivityRow({
                 to="/app/$organizationId/exceptions/$exceptionId"
                 params={{ organizationId, exceptionId: item.exceptionId }}
               >
-                Open issue and evidence
+                {m.activity_link_issue()}
               </Link>
             ) : null}
             {item.playbookId ? (
@@ -532,12 +627,12 @@ function ActivityRow({
                 to="/app/$organizationId/workflows/$definitionId"
                 params={{ organizationId, definitionId: item.playbookId }}
               >
-                Open workflow
+                {m.activity_link_workflow()}
               </Link>
             ) : null}
             {item.connectionId ? (
               <Link to="/app/$organizationId/apps" params={{ organizationId }}>
-                Open connections
+                {m.activity_link_apps()}
               </Link>
             ) : null}
           </div>

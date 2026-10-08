@@ -1,3 +1,8 @@
+import type { RecordKind } from '@luma/api-contract';
+import { localeNames } from '@luma/i18n/locales';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
+import { getLocale, type Locale, locales, setLocale } from '@luma/i18n/runtime';
 import {
   Dialog,
   DialogContent,
@@ -14,6 +19,7 @@ import {
   ArrowUp,
   BookOpen,
   CornerDownLeft,
+  Languages,
   type LucideIcon,
   Monitor,
   Moon,
@@ -43,68 +49,93 @@ const platformModifier = () => (usesCommandKey() ? '⌘' : 'Ctrl');
 
 type Command = {
   id: string;
-  label: string;
-  description: string;
+  label: () => string;
+  description: () => string;
   Icon: LucideIcon;
-  keywords: string;
+  /** Extra search terms in the active language, separated by spaces. */
+  keywords: () => string;
 } & (
   | { kind: 'theme'; theme: ThemePreference }
+  | { kind: 'language'; locale: Locale }
   | { kind: 'assistant' }
   | { kind: 'link'; render: (children: ReactNode) => ReactNode }
 );
+
+const recordKinds = {
+  order: m.identity_search_kind_order,
+  fulfillment: m.identity_search_kind_fulfillment,
+  position: m.identity_search_kind_position,
+  sku: m.identity_search_kind_sku,
+  product: m.identity_search_kind_product,
+  issue: m.identity_search_kind_issue,
+} satisfies Record<RecordKind, () => string>;
+
+const languageCommands: Command[] = locales.map((locale) => ({
+  id: `language-${locale}`,
+  kind: 'language',
+  locale,
+  label: () => m.identity_command_language({ language: localeNames[locale] }),
+  description: () =>
+    m.identity_command_language_description({
+      language: localeNames[locale],
+    }),
+  Icon: Languages,
+  keywords: m.identity_command_language_keywords,
+}));
 
 const commands: Command[] = [
   {
     id: 'assistant',
     kind: 'assistant',
-    label: 'Ask Luma',
-    description: 'Ask about orders, issues, stock, fulfillment and returns',
+    label: m.identity_command_assistant,
+    description: m.identity_command_assistant_description,
     Icon: Sparkles,
-    keywords: 'ask luma assistant ai chat question answer',
+    keywords: m.identity_command_assistant_keywords,
   },
   {
     id: 'theme-light',
     kind: 'theme',
     theme: 'light',
-    label: 'Use light appearance',
-    description: 'Switch the workspace to the light theme',
+    label: m.identity_command_theme_light,
+    description: m.identity_command_theme_light_description,
     Icon: Sun,
-    keywords: 'theme appearance light mode',
+    keywords: m.identity_command_theme_light_keywords,
   },
   {
     id: 'theme-dark',
     kind: 'theme',
     theme: 'dark',
-    label: 'Use dark appearance',
-    description: 'Switch the workspace to the dark theme',
+    label: m.identity_command_theme_dark,
+    description: m.identity_command_theme_dark_description,
     Icon: Moon,
-    keywords: 'theme appearance dark mode night',
+    keywords: m.identity_command_theme_dark_keywords,
   },
   {
     id: 'theme-system',
     kind: 'theme',
     theme: 'system',
-    label: 'Match system appearance',
-    description: 'Follow your operating system setting',
+    label: m.identity_command_theme_system,
+    description: m.identity_command_theme_system_description,
     Icon: Monitor,
-    keywords: 'theme appearance system auto',
+    keywords: m.identity_command_theme_system_keywords,
   },
+  ...languageCommands,
   {
     id: 'workspace-new',
     kind: 'link',
-    label: 'Create workspace',
-    description: 'Start a new workspace for another business',
+    label: m.identity_command_workspace_new,
+    description: m.identity_command_workspace_new_description,
     Icon: Plus,
-    keywords: 'new workspace organization create',
+    keywords: m.identity_command_workspace_new_keywords,
     render: (children) => <Link to="/app/workspaces/new">{children}</Link>,
   },
   {
     id: 'docs',
     kind: 'link',
-    label: 'Open documentation',
-    description: 'Guides for working in Luma, opened in a new tab',
+    label: m.identity_command_docs,
+    description: m.identity_command_docs_description,
     Icon: BookOpen,
-    keywords: 'help docs documentation guide',
+    keywords: m.identity_command_docs_keywords,
     render: (children) => (
       <a href="/docs" target="_blank" rel="noreferrer">
         {children}
@@ -190,7 +221,7 @@ export function WorkspaceSearch({
           .map((s) => ({
             key: `supplier:${s.id}`,
             label: s.name,
-            detail: 'Supplier',
+            detail: m.identity_search_supplier(),
             supplierId: s.id,
           })),
         ...(procurementOrders.data?.items ?? [])
@@ -206,7 +237,9 @@ export function WorkspaceSearch({
           .map((o) => ({
             key: `purchase_order:${o.id}`,
             label: o.reference,
-            detail: `Purchase order · ${o.supplierName}`,
+            detail: m.identity_search_purchase_order({
+              supplier: o.supplierName,
+            }),
             purchaseOrderId: o.id,
           })),
       ]
@@ -219,14 +252,20 @@ export function WorkspaceSearch({
   // Any longer query can become a question for Luma.
   const question =
     query.trim().length >= 3 && can('assistant.use') ? query.trim() : '';
+  const locale = getLocale();
   const offered = commands.filter(
-    (item) => item.kind !== 'assistant' || can('assistant.use'),
+    (item) =>
+      (item.kind !== 'assistant' || can('assistant.use')) &&
+      (item.kind !== 'language' || item.locale !== locale),
   );
   const actions = query.trim()
     ? offered.filter(
         (item) =>
           (item.kind === 'assistant' && question) ||
-          matches(query, `${item.label} ${item.description} ${item.keywords}`),
+          matches(
+            query,
+            `${item.label()} ${item.description()} ${item.keywords()}`,
+          ),
       )
     : offered;
   const focusable = () =>
@@ -236,9 +275,12 @@ export function WorkspaceSearch({
 
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
-      <DialogTrigger className="sidebar-search" aria-label="Search pages">
+      <DialogTrigger
+        className="sidebar-search"
+        aria-label={m.identity_search_trigger()}
+      >
         <Search size={15} aria-hidden="true" />
-        <span className="sidebar-search-label">Search</span>
+        <span className="sidebar-search-label">{m.common_search()}</span>
         <span className="sidebar-search-keys" aria-hidden="true">
           <Kbd>{modifier}</Kbd>
           <Kbd>K</Kbd>
@@ -256,18 +298,17 @@ export function WorkspaceSearch({
         }}
       >
         <DialogTitle className="sr-only">
-          Go to a page or run a command
+          {m.identity_search_title()}
         </DialogTitle>
         <DialogDescription className="sr-only">
-          Find a page or action in your workspace. Use the arrow keys to browse
-          results and Enter to open the first match.
+          {m.identity_search_description()}
         </DialogDescription>
         <div className="command-input-row">
           <Search size={17} aria-hidden="true" />
           <input
             ref={input}
-            aria-label="Search workspace"
-            placeholder="Search records, pages and actions…"
+            aria-label={m.identity_search_input_label()}
+            placeholder={m.identity_search_placeholder()}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={(event) => {
@@ -288,7 +329,7 @@ export function WorkspaceSearch({
         </div>
         <nav
           ref={results}
-          aria-label="Search results"
+          aria-label={m.identity_search_results_label()}
           className="command-results"
           onKeyDown={(event) => {
             if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
@@ -300,7 +341,11 @@ export function WorkspaceSearch({
             else items[next]?.focus();
           }}
         >
-          {pages.length ? <p className="command-section-label">Go to</p> : null}
+          {pages.length ? (
+            <p className="command-section-label">
+              {m.identity_search_section_pages()}
+            </p>
+          ) : null}
           {pages.map(({ path, label, Icon, description, domain, shortcut }) => (
             <Link
               key={path}
@@ -327,7 +372,9 @@ export function WorkspaceSearch({
             </Link>
           ))}
           {recordQuery.length >= 2 ? (
-            <p className="command-section-label">Records</p>
+            <p className="command-section-label">
+              {m.identity_search_section_records()}
+            </p>
           ) : null}
           {records.data?.items.slice(0, 8).map((record) => (
             <Link
@@ -368,7 +415,7 @@ export function WorkspaceSearch({
               <span className="command-item-copy">
                 <strong>{record.label}</strong>
                 <span>
-                  {record.kind} · {record.description}
+                  {recordKinds[record.kind]()} · {record.description}
                 </span>
               </span>
               <CornerDownLeft
@@ -412,11 +459,13 @@ export function WorkspaceSearch({
           ))}
           {recordQuery.length >= 2 && records.isPending ? (
             <p className="command-section-label" role="status">
-              Searching records…
+              {m.identity_search_records_searching()}
             </p>
           ) : null}
           {actions.length ? (
-            <p className="command-section-label">Actions</p>
+            <p className="command-section-label">
+              {m.identity_search_section_actions()}
+            </p>
           ) : null}
           {actions.map((command) => {
             const content = (
@@ -425,11 +474,11 @@ export function WorkspaceSearch({
                   <command.Icon size={16} aria-hidden="true" />
                 </span>
                 <span className="command-item-copy">
-                  <strong>{command.label}</strong>
+                  <strong>{command.label()}</strong>
                   <span>
                     {command.kind === 'assistant' && question
-                      ? `Ask “${question}”`
-                      : command.description}
+                      ? m.identity_search_ask_question({ question })
+                      : command.description()}
                   </span>
                 </span>
                 <CornerDownLeft
@@ -440,7 +489,15 @@ export function WorkspaceSearch({
               </>
             );
 
-            return command.kind === 'theme' || command.kind === 'assistant' ? (
+            return command.kind === 'link' ? (
+              <span
+                key={command.id}
+                className="command-item-link"
+                onClickCapture={() => changeOpen(false)}
+              >
+                {command.render(content)}
+              </span>
+            ) : (
               <button
                 key={command.id}
                 type="button"
@@ -448,6 +505,8 @@ export function WorkspaceSearch({
                 onClick={() => {
                   if (command.kind === 'theme')
                     setThemePreference(command.theme);
+                  else if (command.kind === 'language')
+                    void setLocale(command.locale);
                   else {
                     handoff.current = true;
                     askLuma(question);
@@ -457,14 +516,6 @@ export function WorkspaceSearch({
               >
                 {content}
               </button>
-            ) : (
-              <span
-                key={command.id}
-                className="command-item-link"
-                onClickCapture={() => changeOpen(false)}
-              >
-                {command.render(content)}
-              </span>
             );
           })}
           {!pages.length &&
@@ -473,21 +524,23 @@ export function WorkspaceSearch({
           !purchaseResults.length ? (
             <div className="command-empty" role="status">
               <Search size={20} aria-hidden="true" />
-              <strong>No pages found</strong>
-              <span>Try Issues, Workflows or Apps.</span>
+              <strong>{m.identity_search_empty_title()}</strong>
+              <span>{m.identity_search_empty_hint()}</span>
             </div>
           ) : null}
         </nav>
         <footer className="command-footer">
           <span>
             <ArrowUp size={12} aria-hidden="true" />
-            <ArrowDown size={12} aria-hidden="true" /> Move
+            <ArrowDown size={12} aria-hidden="true" />{' '}
+            {m.identity_search_footer_move()}
           </span>
           <span>
-            <CornerDownLeft size={12} aria-hidden="true" /> Open
+            <CornerDownLeft size={12} aria-hidden="true" />{' '}
+            {m.identity_search_footer_open()}
           </span>
           <span className="command-footer-hint">
-            Press <Kbd>G</Kbd> then a letter to jump anywhere
+            {rich(m.identity_search_footer_hint, { key: <Kbd>G</Kbd> })}
           </span>
         </footer>
       </DialogContent>

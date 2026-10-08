@@ -1,40 +1,72 @@
 ---
 title: Investigate an issue
-description: Understand the problem, check the evidence, and choose your next step.
+description: Read what Luma found, check how current the evidence is, and follow an issue from investigation to a confirmed result.
 ---
 
-An investigation combines the detected problem with findings from connected systems. Read the overview first, then check the evidence that supports the recommended next step.
+An issue keeps what Luma found, the data behind it, any change it proposes and everything that happened since. Read it before you decide what to do. Open an issue from [Issues](/docs/issues), or select **Open full page** for more room.
 
-## Understand the overview
+## Read the overview
 
-Check the issue summary, affected records, and source systems. Severity helps you prioritize; the issue state tells you where work stands. A need for review means there is something for a person to assess.
+The top of the issue shows its summary, severity and status. **Overview** then tells you:
 
-Use the section navigation on the full issue page to move through the investigation. On smaller screens, choose a section from **On this page**.
+- What’s affected, such as a SKU, an order or a connection.
+- **Why it matters**: the potential exposure, such as units that could be oversold. Potential exposure doesn’t confirm lost sales or oversold orders. If Luma can’t establish the impact yet, it says the impact is unknown.
+- **Next action**: what to do now. If Luma proposed a change, select **Review proposed change**. If it can’t fix the problem itself, it says so and lists the manual steps.
+- **Steps and checks**: what to confirm **Before you continue**, and the **Expected result and how Luma checks it**.
+
+On the full page, the section list at the side moves through **Overview**, **Findings**, **Change and outcome check**, **History**, **Evidence**, **Proposed change** and **Issue details**. On a narrow screen, choose a section from **On this page**.
 
 ## Check findings and evidence
 
-Read the explanation and supporting observations together. Check when the evidence was observed and whether it is still current. Missing or outdated evidence can prevent a reliable diagnosis or correction.
+**Findings** separates what Luma knows from what it suspects:
 
-The issue details also identify the issue type, source systems, and evidence freshness. Expand supporting records when you need to trace a finding to its source.
+- **Confirmed facts** are backed by data Luma read.
+- **What remains uncertain** and **Possible causes and checks needed** list explanations Luma hasn’t confirmed, and what would confirm them.
+- **Contradicting evidence** shows data that doesn’t fit the conclusion.
 
-Use **Refresh** if the page reports that the investigation could not be confirmed. If an issue is unavailable, it may have been removed or your access may have changed.
+Each finding links to its evidence. **Evidence** lists the reads behind the issue: which system and record each came from, when Luma read it, when the record last changed in the source, and whether the read was complete. The issue shows the latest three; the button below them, such as **View all 12 evidence records**, opens the full list.
 
-## Choose the next step
+## When evidence is out of date or the state isn’t confirmed
 
-Follow the recommended next step in the investigation. Depending on the issue, that may involve a proposed correction, manual work, or escalation.
+Luma labels findings whose data may no longer reflect your systems:
 
-When a proposed correction is available, read [Review a resolution](/docs/issues/resolve) before making a decision. Check the target system, the proposed changes, and the expected result.
+- **Evidence is out of date**: the data is too old to act on. Luma needs fresh data before you choose a fix. Its recommendations may no longer apply.
+- **Investigation in progress**: Luma is still reading data. Findings and next steps appear when it finishes.
+- **More evidence needed**: linked records, the leading system or the data Luma read don’t support a firm conclusion yet.
+- **Investigation couldn’t finish**: there’s no recommendation yet. Select **Check for updates** later.
+- **Investigation not confirmed** or **Current state not confirmed**: Luma lost its live connection to the issue, for example while you’re offline. You see the last confirmed state. Reconnect or refresh before you act.
 
-An absent or disabled action can reflect your permissions, the current evidence, policy restrictions, or an action that is no longer available. Read the message beside the action for the reason.
+Next to **Change and outcome check**, **Live** means the issue updates on its own. **Live updates interrupted** or **Connection lost** means you may be looking at an older state.
 
-## Follow progress
+## Follow an issue to its result
 
-Execution and verification are separate stages. A recorded approval means a decision was accepted; it does not prove the correction succeeded.
+An issue moves through five stages: **Investigation**, **Approval**, **Change**, **Check** and **Result**. Its status shows where it is, for example **Needs approval**, **Sending change** or **Checking outcome**.
 
-Check execution status and the verification result. **Resolution verified** means fresh evidence confirmed the correction. **Closed by human disposition** records a human closure without establishing a verified correction.
+**Change and outcome check** keeps three things apart:
 
-## Return to the inbox
+1. Whether a change was sent, for example **Waiting for approval**, **Change queued** or **No change sent**.
+2. Whether the connected system accepted it: **Change accepted**, **Change failed** or **Outcome unclear**.
+3. Whether a fresh read confirmed the result: **Outcome confirmed** or **Outcome not confirmed**.
 
-Use **Back to issues** on the full page, or close the selected issue in the inbox. Your inbox view and filters are preserved.
+An accepted change doesn’t prove the problem is fixed. Only **Resolved and confirmed** means a fresh check confirmed the fix. See [Confirm the outcome](/docs/issues/resolve#confirm-the-outcome).
 
-See [Find and prioritize issues](/docs/issues) for views, filters, and empty states.
+## Look at related records and connections
+
+On the full page, links next to **Issues** at the top open the records behind the issue:
+
+- **Inspect inventory** and **Inspect product** for a SKU.
+- **Inspect fulfillment** for a delayed fulfillment.
+- **Open connection** for a connection issue. If the connection lost access, the link reads **Reconnect** followed by its name, such as **Reconnect My shop**.
+- **Find records** searches [Records](/docs/records) for the affected record.
+
+**Issue details** lists the source systems, data freshness, affected record, when Luma first detected the issue and its last activity. Select **Copy issue ID** to share the ID with your team.
+
+## Read the history
+
+**History** lists everything that happened, newest first: when the issue was detected, approvals, rejections, escalations, changes sent and checks. Each entry says who did it. Select **View full history** to see every entry and filter them by **Event type** or **Outcome**.
+
+If history can’t load, the rest of the issue still works. Select **Retry history**.
+
+## Next steps
+
+To approve, reject or escalate a proposed change, see [Resolve an issue](/docs/issues/resolve). To see what a workflow would do with this issue without changing anything, open **Test a Workflow on this issue**; see [Test a workflow safely](/docs/shadow-mode).

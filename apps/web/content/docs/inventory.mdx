@@ -1,0 +1,91 @@
+---
+title: Compare stock across systems
+description: See stock by SKU, location and source, find where your systems disagree, link the same SKU across systems and correct Shopify stock from your ERP.
+---
+
+Inventory shows the stock each connected store and ERP reports, by SKU, location and source. Use it to find where systems disagree, see what depends on a SKU’s stock and, with Shopify, correct the available quantity from your ERP. Open **Inventory** in the sidebar or press **G**, then **V**.
+
+## Find stock
+
+Each row is one SKU at one location in one unit, with every source’s quantities stacked in the row. Choose a view:
+
+- **All stock** shows every stock position.
+- **Source differences** shows positions where sources report different quantities.
+- **Incomplete stock** shows positions where a source hasn’t reported every quantity.
+
+Search by SKU or location, or narrow the list with **SKU**, **Location** and **Source**. A source filter selects positions that source reports, and still shows the other sources for each position. The view and filters are part of the page address, so you can share them or pin them to the sidebar.
+
+**No stock imported yet** means no connected system has shared stock; check [Data sync](/docs/data-sync) for progress. **No stock matches** means the search or filters exclude every position.
+
+## Read the quantities
+
+- **On hand**: the units the source reports at the location.
+- **Reserved**: the units the source holds back, for example for open orders.
+- **Available**: the units the source can still sell. Below it, **Reported** means the source reported the quantity, and **Derived** means Luma calculated it as on hand minus reserved.
+- **Incoming**: units the source reports as on their way. Purchase orders don’t count as incoming stock.
+
+Quantities stay with their source and are never added across sources. If Shopify and your ERP both report the same warehouse, adding them would count the same units twice. Luma doesn’t treat any source as the authority, either: when quantities differ, compare the read times before you decide which one to trust.
+
+**Not reported** means the source didn’t send that value. It isn’t zero: a reported 0 means the source says there’s no stock, while Not reported means Luma doesn’t know. **Removed at source** means the source no longer reports the position. Luma keeps its readings as evidence but leaves it out of comparisons.
+
+## Read a stock position
+
+Open a row to see one SKU at one location:
+
+- The comparison at the top says whether **Reported quantities agree** or which quantities differ. Each source shows its SKU and location codes, its quantities, its **Availability method** and its **Freshness**: when Luma read it and when the source last updated it.
+- **Replenishment** shows whether a stock rule reorders this SKU at this location. See [Workflows](/docs/workflows).
+- **Orders with this SKU** lists order quantities as each source reports them. Luma can’t confirm which location fulfills them.
+- **Supply commitments** lists purchase orders for the SKU. They aren’t confirmed incoming stock: Luma doesn’t know how much has arrived or at which location.
+- **Stock issues** lists issues recorded for the SKU or this position.
+- **SKU and locations** links to the product, the SKU record, all locations for this SKU and other SKUs at this location.
+- **Linked sources** lists the source records Luma treats as this SKU.
+- **Recent readings** lists the readings Luma recorded from each source, newest first. **Current** marks the reading Luma uses for that source. A reading shows what the source reported, not necessarily a stock movement.
+
+**Refresh stock** at the top of the page shows Luma’s latest readings. It doesn’t read the sources again; Luma reads them on its regular sync.
+
+## Link the same SKU across systems
+
+Luma treats records from different systems as the same SKU only after a person links them. Until then, Shopify’s and your ERP’s stock for one item appear as separate SKUs, and you can’t compare them or correct one from the other.
+
+1. Open the stock position and go to **Linked sources**. **Possibly the same SKU** lists SKUs in other systems with the same code.
+2. Choose **Link** beside the match.
+3. Check the reason under **Why is this correct?** and change it if needed, then choose **Link records**.
+
+Luma then groups stock, products and order lines from both systems under one SKU, and each system keeps its own quantities. While it regroups them, the panel shows its progress. To separate a system again, choose **Unlink** beside it, then **Unlink source**. Every link and unlink is recorded with who made it and why.
+
+Linking and unlinking need **Manage imports**. Without it, you see the linked sources and possible matches but not **Link** or **Unlink**.
+
+## Correct Shopify stock
+
+When Shopify’s available stock differs from your ERP’s, you can set Shopify to the quantity your ERP reports. Luma changes only available stock in Shopify, and never changes stock in your ERP. This needs **Correct Shopify inventory**. Without it, the stock position doesn’t show **Correct Shopify stock**.
+
+Before you start, the SKU and location must be linked in both systems, both connections must be active, and Shopify must allow Luma to change inventory. Luma uses only ERP stock read in the last five minutes, and reads the ERP again when its data is older.
+
+1. Open the stock position in Inventory. In **Correct Shopify stock**, choose the **Shopify store** and the **ERP source**.
+2. Check **Available stock in each system**. The ERP is marked **Source of truth** and Shopify **To correct**, each with its read time. **Exact target and evidence** shows the Shopify inventory item and location, and the ERP reading the correction uses.
+3. Choose **Review correction**. Luma shows the change, for example 12 → 8 available, and when the review expires.
+4. Someone else whose role includes **Correct Shopify inventory** and **Approve or reject changes** opens the same stock position and chooses **Approve correction** or **Reject**. You can’t approve your own correction.
+5. After approval, choose **Check approval** to update the review, then **Send to Shopify**. Only the person who requested the correction can send it.
+
+Corrections waiting for approval, approved corrections waiting to be sent and results waiting for a check also appear in [Needs you](/docs/needs-you).
+
+Luma reads both systems again before it sends. If stock changed in either system, or the review expired, it shows **Correction blocked**; choose **Review a new correction** to start again.
+
+If Luma can’t offer a correction, it says why:
+
+- **Reconnect Shopify and allow Luma to change inventory.** Someone with **Manage connections** reconnects the store in [Apps](/docs/apps-and-connections#change-or-reconnect-a-connection).
+- **Stock data is more than five minutes old.** Choose **Refresh stock** in **Correct Shopify stock** so Luma reads both systems again. If the message stays, check the ERP’s sync in [Data sync](/docs/data-sync).
+- **Shopify already shows the same quantity** as the ERP. No correction is needed.
+- Shopify didn’t confirm that it tracks stock at this location.
+
+## Check that the stock changed
+
+A correction has three separate steps, and each shows its own state:
+
+- **Review and approval**: the correction is waiting for approval, or approved.
+- **Shopify accepted**: Shopify accepted the request. The quantity isn’t confirmed yet.
+- **Quantity verified**: a fresh read of Shopify matches the approved ERP quantity.
+
+Choose **Verify stock** to read Shopify again. Until the quantity is verified, don’t treat the stock as fixed. Stock issues for the position update after Luma’s next sync.
+
+**Outcome unclear** means Luma couldn’t tell whether Shopify received the correction, for example because the connection was interrupted. Luma never sends the same correction twice. Check the stock in Shopify and choose **Verify stock** before you review a new correction.

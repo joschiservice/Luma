@@ -58,7 +58,7 @@ export const Open: Story = {
   play: async ({ canvasElement }) => {
     await userEvent.click(
       await within(canvasElement).findByRole('button', {
-        name: 'Search pages',
+        name: 'Open search',
       }),
     );
     const body = within(canvasElement.ownerDocument.body);
@@ -77,7 +77,7 @@ export const Open: Story = {
     ).not.toBeInTheDocument();
     await userEvent.clear(input);
     await userEvent.type(input, 'zz');
-    await expect(body.getByRole('status')).toHaveTextContent('No pages found');
+    await expect(body.getByRole('status')).toHaveTextContent('No matches');
     // A longer query can become a question for Luma.
     await userEvent.type(input, 'zz late orders');
     await expect(
@@ -85,7 +85,7 @@ export const Open: Story = {
     ).toBeVisible();
     await userEvent.keyboard('{Escape}');
     const trigger = within(canvasElement).getByRole('button', {
-      name: 'Search pages',
+      name: 'Open search',
     });
     await waitFor(() => expect(trigger).toHaveFocus());
     await userEvent.click(trigger);

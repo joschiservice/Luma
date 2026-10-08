@@ -1,3 +1,5 @@
+import { formatNumber } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
 import {
   type KeyboardEvent,
   type MouseEvent,
@@ -56,8 +58,6 @@ export interface ChartSelection {
   series?: string | undefined;
 }
 
-const numberFormat = new Intl.NumberFormat();
-
 /** Rounds a maximum up to a readable axis: 1, 2 or 5 times a power of ten per step. */
 export function chartTicks(max: number, count = 4) {
   if (max <= 0) return [0, 1];
@@ -84,13 +84,24 @@ function spoken(
   unit: (value: number) => string,
 ) {
   if (category.unknown)
-    return `${category.label}: ${sentence(category.unknown)}`;
+    return m.ui_chart_category_value({
+      category: category.label,
+      value: sentence(category.unknown),
+    });
   const parts = series
     .filter((s) => category.values[s.id])
-    .map((s) => `${s.label} ${numberFormat.format(category.values[s.id]!)}`);
+    .map((s) =>
+      m.ui_chart_series_value({
+        series: s.label,
+        value: formatNumber(category.values[s.id]!),
+      }),
+    );
 
   return [
-    `${category.label}: ${unit(total(category, series))}`,
+    m.ui_chart_category_value({
+      category: category.label,
+      value: unit(total(category, series)),
+    }),
     ...(parts.length > 1 ? [parts.join(', ')] : []),
     ...(category.note ? [category.note] : []),
   ]
@@ -128,9 +139,7 @@ function Tooltip({
                     data-shape="line"
                     data-color={category.color ?? s.color}
                   />
-                  <strong>
-                    {numberFormat.format(category.values[s.id] ?? 0)}
-                  </strong>
+                  <strong>{formatNumber(category.values[s.id] ?? 0)}</strong>
                   <span>{s.label}</span>
                 </li>
               ))}
@@ -142,7 +151,7 @@ function Tooltip({
         </>
       )}
       {selectable && (
-        <p className="lu-chart-tooltip-hint">Select to see the records</p>
+        <p className="lu-chart-tooltip-hint">{m.ui_chart_select_hint()}</p>
       )}
     </>
   );
@@ -161,7 +170,7 @@ export function BarChart({
   orientation = 'vertical',
   series,
   categories,
-  unit = (value) => numberFormat.format(value),
+  unit = formatNumber,
   selected,
   onSelect,
   busy = false,
@@ -305,7 +314,7 @@ export function BarChart({
         {vertical && (
           <div className="lu-chart-y" aria-hidden="true">
             {[...ticks].reverse().map((tick) => (
-              <span key={tick}>{numberFormat.format(tick)}</span>
+              <span key={tick}>{formatNumber(tick)}</span>
             ))}
           </div>
         )}
@@ -370,7 +379,9 @@ export function BarChart({
                     )}
                     {!vertical && (
                       <span className="lu-chart-row-value">
-                        {category.unknown ? '—' : numberFormat.format(sum)}
+                        {category.unknown
+                          ? m.common_empty_value()
+                          : formatNumber(sum)}
                       </span>
                     )}
                   </span>
@@ -395,21 +406,21 @@ export function BarChart({
       </div>
       <p id={`${id}-hint`} className="sr-only">
         {onSelect
-          ? 'Use the arrow keys to move between bars. Press Enter to see the records.'
-          : 'Use the arrow keys to move between bars.'}
+          ? m.ui_chart_keyboard_select_hint()
+          : m.ui_chart_keyboard_hint()}
       </p>
       {(notes || unknown) && (
         <ul className="lu-chart-caveats" aria-hidden="true">
           {notes && (
             <li>
               <span className="lu-chart-note-mark" />
-              Incomplete period
+              {m.ui_chart_incomplete_period()}
             </li>
           )}
           {unknown && (
             <li>
               <span className="lu-chart-key" data-shape="hatch" />
-              Unknown, not zero
+              {m.ui_chart_unknown_not_zero()}
             </li>
           )}
         </ul>
@@ -442,7 +453,7 @@ export function ChartLegend({
       <span>{s.label}</span>
       {totals && (
         <span className="lu-chart-legend-total">
-          {numberFormat.format(totals[s.id] ?? 0)}
+          {formatNumber(totals[s.id] ?? 0)}
         </span>
       )}
     </>

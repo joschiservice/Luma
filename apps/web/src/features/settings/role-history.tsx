@@ -1,4 +1,6 @@
 import type { Membership, RoleHistoryEvent } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -15,7 +17,9 @@ import {
   UserPlus,
   Users,
 } from 'lucide-react';
+import type { ReactElement, ReactNode } from 'react';
 
+import { permissionLabel } from '../identity/permission-text';
 import {
   type PermissionDefinition,
   roleHistoryOptions,
@@ -32,7 +36,7 @@ export function RolePeople({
   people: Membership[];
   loading: boolean;
 }) {
-  if (loading) return <p role="status">Loading people…</p>;
+  if (loading) return <p role="status">{m.settings_role_people_loading()}</p>;
 
   return (
     <>
@@ -45,7 +49,9 @@ export function RolePeople({
               </div>
               <div className="settings-member-identity">
                 <strong>
-                  {member.name ?? member.email ?? 'Workspace member'}
+                  {member.name ??
+                    member.email ??
+                    m.settings_team_member_fallback()}
                 </strong>
                 <span>{member.email ?? member.userId}</span>
               </div>
@@ -55,19 +61,21 @@ export function RolePeople({
       ) : (
         <div className="settings-empty">
           <Users size={22} aria-hidden="true" />
-          <strong>Nobody has this role</strong>
-          <span>Assign it in Team or choose it when inviting someone.</span>
+          <strong>{m.settings_role_people_empty_title()}</strong>
+          <span>{m.settings_role_people_empty_body()}</span>
         </div>
       )}
       <p className="settings-note">
-        Change someone’s role in{' '}
-        <Link
-          to="/app/$organizationId/settings/$section"
-          params={{ organizationId, section: 'team' }}
-        >
-          Team
-        </Link>
-        .
+        {rich(m.settings_role_people_change, {
+          team: (
+            <Link
+              to="/app/$organizationId/settings/$section"
+              params={{ organizationId, section: 'team' }}
+            >
+              {m.settings_role_people_team_link()}
+            </Link>
+          ),
+        })}
       </p>
     </>
   );
@@ -75,28 +83,59 @@ export function RolePeople({
 
 const kinds: Record<
   RoleHistoryEvent['kind'],
-  { Icon: typeof History; text: (event: RoleHistoryEvent) => string }
+  {
+    Icon: typeof History;
+    /** Describes the event as a sentence that names its actor. */
+    text: (event: RoleHistoryEvent, actor: ReactElement) => ReactNode;
+  }
 > = {
-  created: { Icon: Sparkles, text: () => 'created this role' },
+  created: {
+    Icon: Sparkles,
+    text: (_, actor) => rich(m.settings_role_history_created, { actor }),
+  },
   updated: {
     Icon: PencilLine,
-    text: (event) =>
-      event.name ? 'renamed and changed this role' : 'changed this role',
+    text: (event, actor) =>
+      rich(
+        event.name
+          ? m.settings_role_history_renamed
+          : m.settings_role_history_updated,
+        { actor },
+      ),
   },
-  archived: { Icon: Archive, text: () => 'archived this role' },
+  archived: {
+    Icon: Archive,
+    text: (_, actor) => rich(m.settings_role_history_archived, { actor }),
+  },
   app_permissions_removed: {
     Icon: Blocks,
-    text: (event) =>
-      `uninstalled ${event.cause?.appId ?? 'an app'}, which removed its permissions`,
+    text: (event, actor) =>
+      event.cause?.appId
+        ? rich(m.settings_role_history_app_removed, {
+            actor,
+            app: event.cause.appId,
+          })
+        : rich(m.settings_role_history_app_removed_unnamed, { actor }),
   },
   member_assigned: {
     Icon: UserPlus,
-    text: (event) => `gave ${event.member?.name ?? 'a teammate'} this role`,
+    text: (event, actor) =>
+      event.member?.name
+        ? rich(m.settings_role_history_assigned, {
+            actor,
+            member: event.member.name,
+          })
+        : rich(m.settings_role_history_assigned_unnamed, { actor }),
   },
   member_unassigned: {
     Icon: UserMinus,
-    text: (event) =>
-      `moved ${event.member?.name ?? 'a teammate'} to another role or removed them`,
+    text: (event, actor) =>
+      event.member?.name
+        ? rich(m.settings_role_history_unassigned, {
+            actor,
+            member: event.member.name,
+          })
+        : rich(m.settings_role_history_unassigned_unnamed, { actor }),
   },
 };
 
@@ -117,18 +156,15 @@ export function RoleHistory({
     enabled: allowed,
   });
   if (!allowed)
-    return (
-      <Alert tone="neutral">
-        Role history is visible to people who can manage roles.
-      </Alert>
-    );
-  if (history.isPending) return <p role="status">Loading history…</p>;
+    return <Alert tone="neutral">{m.settings_role_history_restricted()}</Alert>;
+  if (history.isPending)
+    return <p role="status">{m.settings_role_history_loading()}</p>;
   if (history.isError)
     return (
       <Alert tone="danger" role="alert">
-        History could not be loaded.{' '}
+        {m.settings_role_history_failed()}{' '}
         <Button variant="outline" onClick={() => void history.refetch()}>
-          Retry
+          {m.common_retry()}
         </Button>
       </Alert>
     );
@@ -136,11 +172,11 @@ export function RoleHistory({
     return (
       <div className="settings-empty">
         <History size={22} aria-hidden="true" />
-        <strong>No changes recorded yet</strong>
+        <strong>{m.settings_role_history_empty_title()}</strong>
         <span>
           {role.builtIn
-            ? 'Built-in roles don’t change; assignments appear here.'
-            : 'Edits and assignments appear here.'}
+            ? m.settings_role_history_empty_built_in()
+            : m.settings_role_history_empty_custom()}
         </span>
       </div>
     );
@@ -149,9 +185,11 @@ export function RoleHistory({
       <Badge key={`${sign}${key}`} tone={tone}>
         <span aria-hidden="true">{sign}</span>
         <span className="sr-only">
-          {sign === '+' ? 'Granted ' : 'Removed '}
+          {sign === '+'
+            ? m.settings_role_history_granted()
+            : m.settings_role_history_removed()}{' '}
         </span>
-        {labels.get(key)?.label ?? key}
+        {permissionLabel(key, labels.get(key)?.label ?? key)}
       </Badge>
     ));
 
@@ -159,6 +197,13 @@ export function RoleHistory({
     <ol className="role-history">
       {history.data.map((event) => {
         const { Icon, text } = kinds[event.kind];
+        const actor = (
+          <strong>
+            {event.actor
+              ? (event.actor.name ?? m.settings_role_history_someone())
+              : 'Luma'}
+          </strong>
+        );
 
         return (
           <li key={event.id}>
@@ -169,16 +214,9 @@ export function RoleHistory({
               <p>
                 {event.kind === 'member_assigned' &&
                 event.actor &&
-                event.actor.id === event.member?.id ? (
-                  <>
-                    <strong>{event.actor.name ?? 'A teammate'}</strong> joined
-                    with this role
-                  </>
-                ) : (
-                  <>
-                    <strong>{event.actor?.name ?? 'Luma'}</strong> {text(event)}
-                  </>
-                )}
+                event.actor.id === event.member?.id
+                  ? rich(m.settings_role_history_joined, { actor })
+                  : text(event, actor)}
               </p>
               {event.name?.before && event.name.after ? (
                 <p className="role-history-detail">
@@ -193,7 +231,6 @@ export function RoleHistory({
               ) : null}
               <small>
                 <WorkspaceDate value={event.occurredAt} />
-                {event.revision ? ` · Revision ${event.revision}` : null}
               </small>
             </div>
           </li>

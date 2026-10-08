@@ -69,10 +69,10 @@ test('filters, expands, returns, paginates and recovers workspace activity on de
   await search.press('Enter');
   await expect.poll(() => param('q')).toBe(actor);
   await page.locator('.activity-event').first().waitFor();
-  await addFilter('Outcome', 'Uncertain');
+  await addFilter('Outcome', 'Outcome unclear');
   await expect.poll(() => param('outcome')).toBe('uncertain');
   await page
-    .getByRole('button', { name: /Execution completed/ })
+    .getByRole('button', { name: /Change attempt finished/ })
     .first()
     .click();
   await page.getByText('observation:shipping-1042', { exact: true }).waitFor();
@@ -87,7 +87,7 @@ test('filters, expands, returns, paginates and recovers workspace activity on de
   await page.getByText('observation:shipping-1042', { exact: true }).waitFor();
   await page
     .getByRole('button', {
-      name: 'Remove Outcome filter: Uncertain',
+      name: 'Remove Outcome filter: Outcome unclear',
       exact: true,
     })
     .click();
@@ -105,14 +105,14 @@ test('filters, expands, returns, paginates and recovers workspace activity on de
     .getByRole('button', { name: 'Apply range', exact: true })
     .click();
   await page
-    .getByRole('heading', { name: 'No matching recorded activity' })
+    .getByRole('heading', { name: 'No activity matches these filters' })
     .waitFor();
   expect(param('from')).toBe('2020-01-01');
   await page.reload();
   // Removing the explicit range returns to the default last 30 days.
   await page
     .getByRole('button', {
-      name: 'Remove Recorded filter: Jan 1 – Jan 31, 2020',
+      name: 'Remove Recorded filter: 1 – 31 Jan 2020',
       exact: true,
     })
     .click();
@@ -146,7 +146,7 @@ test('filters, expands, returns, paginates and recovers workspace activity on de
   await page.getByRole('button', { name: 'Older events', exact: true }).click();
   await page
     .getByRole('alert')
-    .filter({ hasText: 'Activity could not be updated' })
+    .filter({ hasText: 'Activity couldn’t be updated' })
     .waitFor();
   expect(await page.locator('.activity-event').count()).toBe(0);
   failOlder = false;
@@ -188,14 +188,14 @@ test('filters, expands, returns, paginates and recovers workspace activity on de
     .click();
   await page
     .getByRole('button', {
-      name: 'New events available — view latest',
+      name: 'New events available. Show latest',
       exact: true,
     })
     .waitFor();
   expect(page.url()).toBe(older);
   expect(await page.locator('.activity-event').count()).toBe(6);
   await context.setOffline(true);
-  await page.getByText(/You are offline/).waitFor();
+  await page.getByText(/You’re offline/).waitFor();
   await context.setOffline(false);
   await page
     .getByRole('button', { name: 'Latest events', exact: true })
@@ -217,7 +217,7 @@ test('filters, expands, returns, paginates and recovers workspace activity on de
     .click();
   await page
     .getByRole('alert')
-    .filter({ hasText: 'Activity could not be updated' })
+    .filter({ hasText: 'Activity couldn’t be updated' })
     .waitFor();
   expect(await page.locator('.activity-event').count()).toBe(30);
   await page.unroute(pattern);
@@ -226,7 +226,7 @@ test('filters, expands, returns, paginates and recovers workspace activity on de
   await page.setViewportSize({ width: 390, height: 844 });
   const first = page
     .getByRole('button', {
-      name: /Execution completed|Connection connected|Policy approved/,
+      name: /Change attempt finished|System connected|Approved under workspace rules/,
     })
     .first();
   await first.focus();
@@ -251,9 +251,7 @@ test('filters, expands, returns, paginates and recovers workspace activity on de
     .getByRole('button', { name: 'Refresh activity', exact: true })
     .click();
   await expect
-    .poll(() =>
-      page.getByRole('button', { name: /Connection connected/ }).count(),
-    )
+    .poll(() => page.getByRole('button', { name: /System connected/ }).count())
     .toBe(0);
   const second = await context.request.post('/api/v1/organizations', {
     headers: { origin },
@@ -263,7 +261,7 @@ test('filters, expands, returns, paginates and recovers workspace activity on de
   const secondId = (await second.json()).id;
   await page.goto(`/app/${secondId}/activity`);
   await page
-    .getByRole('heading', { name: 'No matching recorded activity' })
+    .getByRole('heading', { name: 'No activity in the last 30 days' })
     .waitFor();
   expect(await page.locator('.activity-event').count()).toBe(0);
   await page.goBack();

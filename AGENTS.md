@@ -66,6 +66,7 @@ Before calling a feature complete, check the paths affected by the change:
 - `packages/connectors/*` — provider protocols and shared transport behavior.
 - `packages/workflow-temporal` — durable workflow implementation and Temporal adapters.
 - `packages/ui` — shared components, semantic design tokens, stories and component tests.
+- `packages/i18n` — interface languages: English and German message catalogs, language runtime and formatting helpers.
 - `apps/simulator`, `apps/simulator-web`, `packages/simulator/*` and `tooling/pilot` — synthetic provider behavior and operational scenarios.
 - `tooling` — development, validation, evaluation and observability commands.
 
@@ -86,7 +87,7 @@ See the [architecture decisions](docs/architecture/README.md), especially [domai
 
 Use existing `@luma/ui` components first. Add a shadcn component or a focused custom component when needed. Shared components own their appearance; features own layout and domain presentation. Use variants for reusable appearance changes instead of overriding shared surfaces, colors or typography in page CSS.
 
-Read semantic tokens from `packages/ui/src/styles`. Preserve accessible contrast, visible focus, reduced-motion behavior and text labels for operational states. Keep feature compositions out of primitive components. Use Storybook for component states and the application for integrated journeys.
+Put user-facing text in the `@luma/i18n` message catalogs in English and German, and format numbers and dates with its helpers; see [localization](docs/localization.md). Read semantic tokens from `packages/ui/src/styles`. Preserve accessible contrast, visible focus, reduced-motion behavior and text labels for operational states. Keep feature compositions out of primitive components. Use Storybook for component states and the application for integrated journeys.
 
 See [shared frontend components](docs/frontend-ui.md) and the [design workflow](docs/design-workflow.md).
 

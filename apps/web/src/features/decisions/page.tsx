@@ -8,6 +8,9 @@ import type {
   DecisionReason,
   DecisionView,
 } from '@luma/api-contract';
+import { formatDateTime, formatList, formatNumber } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import { CaseNotice } from '@luma/ui/components/issues/case-investigation';
 import { elapsed } from '@luma/ui/components/issues/case-presentation';
 import { IssueSplitView } from '@luma/ui/components/issues/issue-split-view';
@@ -24,6 +27,7 @@ import {
   TabsList,
   TabsTrigger,
 } from '@luma/ui/components/primitives/tabs';
+import { WorkspaceTimezone } from '@luma/ui/components/primitives/workspace-date';
 import {
   onlineManager,
   useMutation,
@@ -39,6 +43,7 @@ import {
 import { ChevronDown, ChevronUp, CircleHelp, LayoutGrid } from 'lucide-react';
 import {
   type ReactNode,
+  useContext,
   useEffect,
   useRef,
   useState,
@@ -93,7 +98,9 @@ const reasons: DecisionReason[] = [
 
 /** Names a filter option with its waiting count; the applied option reads without one. */
 const facetLabel = (label: string, count: number | undefined) =>
-  count === undefined ? label : `${label} · ${count}`;
+  count === undefined
+    ? label
+    : m.decisions_filter_option_count({ label, count });
 
 function DecisionRow({
   item,
@@ -108,6 +115,7 @@ function DecisionRow({
 }) {
   const status = decisionStatus(item);
   const assignee = memberName(item.assignment?.assigneeId, members, self);
+  const timeZone = useContext(WorkspaceTimezone);
 
   return (
     <div
@@ -123,9 +131,13 @@ function DecisionRow({
       <div className="issue-row-copy">
         <strong className="case-row-summary">{item.title}</strong>
         <span className="case-row-subject">
-          <span>{kindLabels[item.kind]}</span>
+          <span>{kindLabels[item.kind]()}</span>
           <span>{item.subject.label}</span>
-          <span>{assignee ? `Owner: ${assignee}` : 'Unassigned'}</span>
+          <span>
+            {assignee
+              ? m.decisions_owner_row({ name: assignee })
+              : m.decisions_owner_none()}
+          </span>
         </span>
       </div>
       <div className="issue-row-meta">
@@ -136,11 +148,18 @@ function DecisionRow({
             className="issue-severity"
             data-severity={item.impact.level === 'high' ? 'high' : undefined}
           >
-            {impactLabels[item.impact.level]}
+            {impactLabels[item.impact.level]()}
           </span>
         )}
         <StatePill state={status.state}>{status.label}</StatePill>
-        <span className="case-row-time" title={item.requestedAt}>
+        <span
+          className="case-row-time"
+          title={formatDateTime(item.requestedAt, {
+            dateStyle: 'medium',
+            timeStyle: 'short',
+            timeZone,
+          })}
+        >
           <time dateTime={item.requestedAt}>
             {elapsed(item.requestedAt, now)}
           </time>
@@ -232,38 +251,55 @@ export function NeedsYouView({
       className={`inbox page-full decisions ${search.item ? 'inbox-selected' : ''}`}
     >
       <header className="inbox-heading">
-        <h1 className="sr-only">Needs you</h1>
+        <h1 className="sr-only">{m.decisions_page_title()}</h1>
         <div className="issue-summary" aria-live="polite">
           {list ? (
             <>
               <span className="issue-stat">
-                <strong>{list.counts.views.all}</strong> waiting
+                {rich(m.decisions_summary_waiting, {
+                  count: (
+                    <strong>{formatNumber(list.counts.views.all ?? 0)}</strong>
+                  ),
+                })}
               </span>
               <span className="issue-stat">
-                <strong>{list.counts.views.mine}</strong> assigned to you
+                {rich(m.decisions_summary_mine, {
+                  count: (
+                    <strong>{formatNumber(list.counts.views.mine ?? 0)}</strong>
+                  ),
+                })}
               </span>
               <span className="issue-stat">
-                <strong>{list.counts.views.unassigned}</strong> unassigned
+                {rich(m.decisions_summary_unassigned, {
+                  count: (
+                    <strong>
+                      {formatNumber(list.counts.views.unassigned ?? 0)}
+                    </strong>
+                  ),
+                })}
               </span>
             </>
           ) : null}
           <span className="decisions-live" data-state={live}>
             {live === 'live'
-              ? 'Live'
+              ? m.decisions_live_on()
               : live === 'connecting'
-                ? 'Connecting…'
-                : 'Checking every 30 s'}
+                ? m.decisions_live_connecting()
+                : m.decisions_live_polling()}
           </span>
         </div>
       </header>
       <div className="decisions-toolbar">
         <CollectionToolbar
-          refreshLabel="Refresh Needs you"
+          refreshLabel={m.decisions_refresh()}
           refreshing={refreshing}
           onRefresh={onRefresh}
           views={
             <Tabs value={view} className="decisions-views">
-              <TabsList aria-label="Decision views" activateOnFocus={false}>
+              <TabsList
+                aria-label={m.decisions_views_label()}
+                activateOnFocus={false}
+              >
                 {views.map((option) => (
                   <TabsTrigger
                     key={option}
@@ -284,8 +320,12 @@ export function NeedsYouView({
                       />
                     }
                   >
-                    {viewLabels[option]}
-                    {list ? <Badge>{list.counts.views[option]}</Badge> : null}
+                    {viewLabels[option]()}
+                    {list ? (
+                      <Badge>
+                        {formatNumber(list.counts.views[option] ?? 0)}
+                      </Badge>
+                    ) : null}
                   </TabsTrigger>
                 ))}
               </TabsList>
@@ -295,13 +335,13 @@ export function NeedsYouView({
             {
               kind: 'choice',
               key: 'domain',
-              label: 'Area',
+              label: m.decisions_filter_area(),
               icon: LayoutGrid,
               value: search.domain,
               options: domains.map((domain) => ({
                 value: domain,
                 label: facetLabel(
-                  domainLabels[domain],
+                  domainLabels[domain](),
                   domain !== search.domain && list
                     ? list.counts.domains[domain]
                     : undefined,
@@ -313,13 +353,13 @@ export function NeedsYouView({
             {
               kind: 'choice',
               key: 'reason',
-              label: 'Reason',
+              label: m.decisions_filter_reason(),
               icon: CircleHelp,
               value: search.reason,
               options: reasons.map((reason) => ({
                 value: reason,
                 label: facetLabel(
-                  reasonLabels[reason],
+                  reasonLabels[reason](),
                   reason !== search.reason && list
                     ? list.counts.reasons[reason]
                     : undefined,
@@ -337,23 +377,23 @@ export function NeedsYouView({
                   update({ grouped: checked ? true : undefined })
                 }
               />
-              Group by cause
+              {m.decisions_group_by_cause()}
             </label>
           }
           onClear={() => update({ domain: undefined, reason: undefined })}
         />
       </div>
       {offline ? (
-        <CaseNotice title="You’re offline">
-          The list shows the last decisions Luma confirmed. Responses are paused
-          until you reconnect.
+        <CaseNotice title={m.decisions_offline_title()}>
+          {m.decisions_offline_text()}
         </CaseNotice>
       ) : null}
       {unavailable?.length ? (
-        <CaseNotice error title="Some decisions couldn’t be loaded">
-          {unavailable.map((source) => source.label).join(', ')} didn’t answer,
-          so {unavailable.length === 1 ? 'its' : 'their'} decisions are missing
-          from this list, not resolved. Refresh to try again.
+        <CaseNotice error title={m.decisions_unavailable_title()}>
+          {m.decisions_unavailable_text({
+            count: unavailable.length,
+            sources: formatList(unavailable.map((source) => source.label)),
+          })}
         </CaseNotice>
       ) : null}
       <IssueSplitView
@@ -363,22 +403,22 @@ export function NeedsYouView({
             className="inbox-list"
             ref={listPane}
             tabIndex={-1}
-            aria-label="Decisions"
+            aria-label={m.decisions_list_label()}
           >
             {error ? (
-              <CaseNotice error title="Needs you could not be refreshed">
-                {list ? 'The list below may be out of date. ' : ''}
+              <CaseNotice error title={m.decisions_error_title()}>
+                {list ? `${m.decisions_error_stale()} ` : ''}
                 {error}
                 {search.cursor ? (
                   <Button variant="outline" onClick={() => update({})}>
-                    Return to first page
+                    {m.decisions_first_page()}
                   </Button>
                 ) : null}
               </CaseNotice>
             ) : null}
             {loading ? (
               <div className="decisions-loading" role="status">
-                <span className="sr-only">Loading decisions…</span>
+                <span className="sr-only">{m.decisions_loading_list()}</span>
                 {[0, 1, 2, 3].map((key) => (
                   <span key={key} className="lu-skeleton" />
                 ))}
@@ -397,7 +437,7 @@ export function NeedsYouView({
                           update({ domain: undefined, reason: undefined })
                         }
                       >
-                        Clear filters
+                        {m.common_clear_filters()}
                       </Button>
                     ) : null}
                   </Empty>
@@ -414,15 +454,14 @@ export function NeedsYouView({
                         >
                           {group.label}
                           <span className="lu-numeric">
-                            {group.items.length}
+                            {formatNumber(group.items.length)}
                           </span>
                         </h2>
                         <ul className="inbox-rows">{group.items.map(row)}</ul>
                       </section>
                     ))}
                     <p className="decisions-group-note">
-                      Groups cover this page. Each decision still needs its own
-                      response; nothing is approved in bulk.
+                      {m.decisions_group_note()}
                     </p>
                   </div>
                 ) : (
@@ -437,8 +476,10 @@ export function NeedsYouView({
                   onPrevious={onPrevious}
                   onNext={onNext}
                   disabled={refreshing}
-                  itemLabel="decisions"
-                  label="Decision pages"
+                  formatTotal={(count) =>
+                    m.decisions_pagination_total({ count })
+                  }
+                  label={m.decisions_pagination_label()}
                 />
               </>
             ) : null}
@@ -448,7 +489,7 @@ export function NeedsYouView({
           <section
             className="inbox-detail"
             tabIndex={-1}
-            aria-label="Selected decision"
+            aria-label={m.decisions_selected_label()}
             onKeyDown={(event) => {
               if (
                 event.key !== 'Escape' ||
@@ -473,16 +514,16 @@ export function NeedsYouView({
             {search.item ? (
               selected === 'loading' ? (
                 <div className="decisions-loading" role="status">
-                  <span className="sr-only">Loading decision…</span>
+                  <span className="sr-only">{m.decisions_loading_item()}</span>
                   <span className="lu-skeleton" />
                   <span className="lu-skeleton" />
                 </div>
               ) : selected === 'missing' || !selected ? (
                 <div className="inbox-placeholder">
-                  <h2>This decision no longer needs you</h2>
-                  <p>It was answered, expired or you no longer have access.</p>
+                  <h2>{m.decisions_missing_title()}</h2>
+                  <p>{m.decisions_missing_text()}</p>
                   <Button variant="outline" onClick={() => open(undefined)}>
-                    Back to the list
+                    {m.decisions_back_to_list()}
                   </Button>
                 </div>
               ) : (
@@ -490,11 +531,8 @@ export function NeedsYouView({
               )
             ) : (
               <div className="inbox-placeholder">
-                <h2>Select a decision</h2>
-                <p>
-                  See why you’re needed, the exact change and what your response
-                  does.
-                </p>
+                <h2>{m.decisions_placeholder_title()}</h2>
+                <p>{m.decisions_placeholder_text()}</p>
               </div>
             )}
           </section>
@@ -598,7 +636,7 @@ function TenantQueue({ organizationId }: { organizationId: string }) {
       setAssignError(
         error instanceof IdentityError
           ? error.message
-          : 'The assignment could not be saved. Refresh and try again.',
+          : m.decisions_assign_failed(),
       ),
     onSettled: () =>
       client.invalidateQueries({ queryKey: decisionsKey(organizationId) }),
@@ -661,7 +699,7 @@ function TenantQueue({ organizationId }: { organizationId: string }) {
       refreshing={list.isFetching}
       error={
         denied
-          ? 'You no longer have access to this workspace.'
+          ? m.decisions_error_no_access()
           : list.isError
             ? list.error.message
             : undefined
@@ -696,8 +734,8 @@ function TenantQueue({ organizationId }: { organizationId: string }) {
               <>
                 <Button
                   variant="ghost"
-                  aria-label="Previous decision"
-                  title="Previous decision (K)"
+                  aria-label={m.decisions_previous()}
+                  title={m.decisions_previous_shortcut()}
                   disabled={!previousItem}
                   onClick={() => step(-1)}
                 >
@@ -705,8 +743,8 @@ function TenantQueue({ organizationId }: { organizationId: string }) {
                 </Button>
                 <Button
                   variant="ghost"
-                  aria-label="Next decision"
-                  title="Next decision (J)"
+                  aria-label={m.decisions_next()}
+                  title={m.decisions_next_shortcut()}
                   disabled={!nextItem}
                   onClick={() => step(1)}
                 >

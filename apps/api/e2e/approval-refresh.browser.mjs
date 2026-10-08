@@ -104,18 +104,20 @@ test('refreshes an expired proposal automatically, preserves the review, and exe
   await page.waitForURL('**/app/**');
   await page.goto(`/app/${manifest.organizationId}/exceptions/${id}`);
   await page
-    .getByRole('region', { name: 'Resolution', exact: true })
+    .getByRole('region', { name: 'Proposed change', exact: true })
     .locator('summary')
     .first()
     .click();
-  await page.getByRole('button', { name: 'Approve', exact: true }).waitFor();
+  await page
+    .getByRole('button', { name: 'Approve change', exact: true })
+    .waitFor();
   expect(
     (await pilot.desk.review(await pilot.operator(), id)).proposal.id,
   ).not.toBe(old.id);
   expect(
     await page.getByText('Approval window expired', { exact: true }).count(),
   ).toBe(0);
-  const reason = page.getByLabel('Decision reason (required)');
+  const reason = page.getByLabel('Reason for your decision (required)');
   await reason.fill('Apply the checked shipping correction');
   await page.screenshot({
     path: '/tmp/luma-approval-ready.png',
@@ -130,7 +132,9 @@ test('refreshes an expired proposal automatically, preserves the review, and exe
       order: { ...originalState.order, shippingMethodId: '9' },
     }),
   );
-  await page.getByRole('button', { name: 'Approve', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Approve change', exact: true })
+    .click();
   await page
     .getByText(
       'The shipping method changed. Review the order before choosing another action.',
@@ -158,14 +162,18 @@ test('refreshes an expired proposal automatically, preserves the review, and exe
   await pilot.desk.refresh(await pilot.operator(), id);
   await expect
     .poll(() =>
-      page.getByText('Review needs attention', { exact: true }).count(),
+      page.getByText('Check before you decide', { exact: true }).count(),
     )
     .toBe(0);
-  await page.getByRole('button', { name: 'Approve', exact: true }).waitFor();
+  await page
+    .getByRole('button', { name: 'Approve change', exact: true })
+    .waitFor();
   expect(await reason.inputValue()).toBe(
     'Apply the checked shipping correction',
   );
-  await page.getByRole('button', { name: 'Approve', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Approve change', exact: true })
+    .click();
   await page.getByText('Approval recorded', { exact: true }).first().waitFor();
   const worker = await pilot.runtime.createWorker();
   const running = worker.run();
@@ -183,12 +191,12 @@ test('refreshes an expired proposal automatically, preserves the review, and exe
       )
       .toBe('resolved');
     await page
-      .getByRole('region', { name: 'Execution', exact: true })
+      .getByRole('region', { name: 'Change and outcome check', exact: true })
       .locator('summary')
       .first()
       .click();
     await page
-      .getByText('Recorded verified resolution', { exact: true })
+      .getByText('Confirmed by a fresh check', { exact: true })
       .first()
       .waitFor();
   }
@@ -196,7 +204,7 @@ test('refreshes an expired proposal automatically, preserves the review, and exe
   expect(errors).toEqual([]);
   await page.setViewportSize({ width: 390, height: 844 });
   await page
-    .getByText('Recorded verified resolution', { exact: true })
+    .getByText('Confirmed by a fresh check', { exact: true })
     .first()
     .scrollIntoViewIfNeeded();
   await page.screenshot({

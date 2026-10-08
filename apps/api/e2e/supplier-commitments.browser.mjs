@@ -120,7 +120,7 @@ test('sends an order with a second approver, follows the supplier to receipt and
   await buyer
     .getByRole('heading', { name: 'PO-2026-201', exact: true })
     .waitFor();
-  await buyer.getByText('Draft · not sent').waitFor();
+  await buyer.getByText('Draft, not sent').waitFor();
 
   // A committed request whose response is lost keeps its body; retry returns the same submission.
   await buyer
@@ -240,7 +240,7 @@ test('sends an order with a second approver, follows the supplier to receipt and
     .getByRole('button', { name: 'Record commitment' })
     .click();
   await buyer.getByRole('dialog').waitFor({ state: 'hidden' });
-  await buyer.getByText('Shipped: 2026-10-09').first().waitFor();
+  await buyer.getByText('Shipped: 9 Oct 2026').first().waitFor();
   const record = await call(`/purchase-orders/${order.id}/record`);
   expect(
     record.commitments.find((c) => c.kind === 'shipped')?.source,

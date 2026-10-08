@@ -520,9 +520,24 @@
 }
 
 .entry-footer {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
   color: var(--foreground-subtle);
   font-size: 12px;
   text-align: center;
+}
+
+/* The language choice stays compact on pages people reach before Settings. */
+.entry-language,
+.auth-language {
+  width: auto;
+  min-width: 128px;
+}
+
+.auth-panel-footer {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .entry-panel,

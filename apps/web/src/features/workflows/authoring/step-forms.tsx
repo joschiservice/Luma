@@ -5,6 +5,8 @@ import type {
   WorkflowDiagnostic,
   WorkflowDraftContent,
 } from '@luma/api-contract';
+import { formatList } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Input } from '@luma/ui/components/primitives/input';
 import { Select } from '@luma/ui/components/primitives/select';
@@ -21,19 +23,42 @@ import {
   valueLabel,
 } from './draft-model';
 
-const fieldTypes: { value: FieldType; label: string }[] = [
-  { value: 'string', label: 'Text' },
-  { value: 'number', label: 'Number' },
-  { value: 'boolean', label: 'Yes or no' },
-  { value: 'null', label: 'Empty' },
-];
+const typeLabels = {
+  string: m.authoring_field_type_text,
+  number: m.authoring_field_type_number,
+  boolean: m.authoring_field_type_boolean,
+  null: m.authoring_field_type_empty,
+} satisfies Record<FieldType, () => string>;
 
-const typeNames: Record<FieldType, string> = {
-  string: 'text',
-  number: 'number',
-  boolean: 'yes or no',
-  null: 'empty',
-};
+const typeNeeds = {
+  string: m.authoring_value_needs_text,
+  number: m.authoring_value_needs_number,
+  boolean: m.authoring_value_needs_boolean,
+  null: m.authoring_value_needs_empty,
+} satisfies Record<FieldType, () => string>;
+
+const fieldTypes = () =>
+  (Object.keys(typeLabels) as FieldType[]).map((value) => ({
+    value,
+    label: typeLabels[value](),
+  }));
+
+const riskLabels = {
+  low: m.authoring_risk_low,
+  medium: m.authoring_risk_medium,
+  high: m.authoring_risk_high,
+} satisfies Record<'low' | 'medium' | 'high', () => string>;
+
+const minimumRisks = {
+  low: m.authoring_action_minimum_risk_low,
+  medium: m.authoring_action_minimum_risk_medium,
+  high: m.authoring_action_minimum_risk_high,
+} satisfies Record<'low' | 'medium' | 'high', () => string>;
+
+/** Adds a note to an option the workspace can't run yet. */
+function limitedOption(label: string, executable: boolean) {
+  return executable ? label : m.authoring_option_limited({ option: label });
+}
 
 /** Shows the diagnostics for one field next to its control. */
 export function FieldProblems({
@@ -126,7 +151,7 @@ export function ScalarInput({
   if (type === 'boolean')
     return (
       <Select
-        aria-label={props['aria-label'] ?? 'Value'}
+        aria-label={props['aria-label'] ?? m.authoring_value_label()}
         {...(props['aria-describedby']
           ? { 'aria-describedby': props['aria-describedby'] }
           : {})}
@@ -134,12 +159,13 @@ export function ScalarInput({
         value={value === true ? 'yes' : 'no'}
         onValueChange={(next) => onChange(next === 'yes')}
         options={[
-          { value: 'yes', label: 'Yes' },
-          { value: 'no', label: 'No' },
+          { value: 'yes', label: m.common_yes() },
+          { value: 'no', label: m.common_no() },
         ]}
       />
     );
-  if (type === 'null') return <p className="authoring-hint">Empty</p>;
+  if (type === 'null')
+    return <p className="authoring-hint">{m.authoring_field_type_empty()}</p>;
 
   return (
     <Input
@@ -190,13 +216,13 @@ export function ValuePicker({
   return (
     <Field
       label={label}
-      hint={type ? `Needs ${typeNames[type]}.` : undefined}
+      hint={type ? typeNeeds[type]() : undefined}
       diagnostics={diagnostics}
     >
       {(props) => (
         <div className="authoring-value-picker">
           <Select
-            aria-label={`${label}: source`}
+            aria-label={m.authoring_value_source_label({ field: label })}
             {...(props['aria-describedby']
               ? { 'aria-describedby': props['aria-describedby'] }
               : {})}
@@ -225,7 +251,7 @@ export function ValuePicker({
               );
             }}
             options={[
-              { value: 'literal', label: 'A fixed value' },
+              { value: 'literal', label: m.authoring_value_fixed() },
               ...options.map((option) => ({
                 value: valueKey(option),
                 label: valueLabel(option),
@@ -234,7 +260,9 @@ export function ValuePicker({
                 ? [
                     {
                       value: current,
-                      label: `${valueLabel(value)} (not available here)`,
+                      label: m.authoring_value_unavailable({
+                        value: valueLabel(value),
+                      }),
                       disabled: true,
                     },
                   ]
@@ -244,7 +272,7 @@ export function ValuePicker({
           {value?.source === 'literal' || !value ? (
             <ScalarInput
               {...props}
-              aria-label={`${label}: value`}
+              aria-label={m.authoring_value_value_label({ field: label })}
               disabled={disabled}
               type={type ?? 'string'}
               value={
@@ -290,28 +318,43 @@ export function FieldListEditor({
       aria-describedby={diagnostics.length ? `${id}-problems` : undefined}
     >
       <legend>{label}</legend>
-      {entries.length ? null : <p className="authoring-hint">None yet.</p>}
+      {entries.length ? null : (
+        <p className="authoring-hint">{m.authoring_field_list_empty()}</p>
+      )}
       {entries.map(([name, type], index) => (
         <div key={index} className="authoring-field-row">
           <Input
-            aria-label={`${label} ${index + 1} name`}
+            aria-label={m.authoring_field_list_name({
+              list: label,
+              position: index + 1,
+            })}
             disabled={disabled}
             value={name}
             onChange={(event) => rename(name, event.target.value)}
           />
           <Select
-            aria-label={`${label} ${index + 1} type`}
+            aria-label={m.authoring_field_list_type({
+              list: label,
+              position: index + 1,
+            })}
             disabled={disabled}
             value={type}
             onValueChange={(next) =>
               next && onChange({ ...fields, [name]: next as FieldType })
             }
-            options={fieldTypes}
+            options={fieldTypes()}
           />
           <Button
             variant="ghost"
             size="icon"
-            aria-label={`Remove ${name || `${label} ${index + 1}`}`}
+            aria-label={
+              name
+                ? m.authoring_field_list_remove({ field: name })
+                : m.authoring_field_list_remove_unnamed({
+                    list: label,
+                    position: index + 1,
+                  })
+            }
             disabled={disabled}
             onClick={() =>
               onChange(
@@ -333,7 +376,7 @@ export function FieldListEditor({
           onChange({ ...fields, [`field${index}`]: 'string' });
         }}
       >
-        <Plus aria-hidden="true" /> Add field
+        <Plus aria-hidden="true" /> {m.authoring_field_list_add()}
       </Button>
       <FieldProblems id={`${id}-problems`} diagnostics={diagnostics} />
     </fieldset>
@@ -367,7 +410,7 @@ function FieldChoices({
     >
       <legend>{legend}</legend>
       {names.length ? null : (
-        <p className="authoring-hint">Choose a source first.</p>
+        <p className="authoring-hint">{m.authoring_field_choices_empty()}</p>
       )}
       {names.map((name) => (
         <label key={name}>
@@ -385,7 +428,7 @@ function FieldChoices({
           />
           {humanize(name)}{' '}
           <span className="authoring-hint">
-            ({typeNames[available[name] ?? chosen[name] ?? 'string']})
+            ({typeLabels[available[name] ?? chosen[name] ?? 'string']()})
           </span>
         </label>
       ))}
@@ -394,10 +437,10 @@ function FieldChoices({
   );
 }
 
-const durations = [
-  { value: '60', label: 'Minutes' },
-  { value: '3600', label: 'Hours' },
-  { value: '86400', label: 'Days' },
+const durations = () => [
+  { value: '60', label: m.authoring_duration_minutes() },
+  { value: '3600', label: m.authoring_duration_hours() },
+  { value: '86400', label: m.authoring_duration_days() },
 ];
 
 function Duration({
@@ -433,13 +476,13 @@ function Duration({
             }
           />
           <Select
-            aria-label={`${label} unit`}
+            aria-label={m.authoring_duration_unit_label({ field: label })}
             disabled={disabled}
             value={String(unit)}
             onValueChange={(next) =>
               next && onChange(Math.round(seconds / unit) * Number(next))
             }
-            options={durations}
+            options={durations()}
           />
         </div>
       )}
@@ -486,16 +529,16 @@ export function StepForm({
 
       return (
         <div className="authoring-step-form">
-          <Field label="Data source" diagnostics={at('source')}>
+          <Field label={m.authoring_read_source()} diagnostics={at('source')}>
             {(props) => (
               <Select
-                aria-label="Data source"
+                aria-label={m.authoring_read_source()}
                 {...(props['aria-describedby']
                   ? { 'aria-describedby': props['aria-describedby'] }
                   : {})}
                 disabled={disabled}
                 value={step.source}
-                placeholder="Choose a data source"
+                placeholder={m.authoring_read_source_placeholder()}
                 onValueChange={(next) => {
                   const chosen = vocabulary.reads.find(
                     (item) => item.source === next,
@@ -509,7 +552,7 @@ export function StepForm({
                 }}
                 options={vocabulary.reads.map((item) => ({
                   value: item.source,
-                  label: `${item.label}${item.executable ? '' : ' · can’t run here'}`,
+                  label: limitedOption(item.label, item.executable),
                 }))}
               />
             )}
@@ -518,7 +561,7 @@ export function StepForm({
             <p className="authoring-hint">{source.description}</p>
           ) : null}
           <FieldChoices
-            legend="Fields to read"
+            legend={m.authoring_read_fields()}
             available={source?.fields ?? {}}
             chosen={step.fields}
             disabled={disabled}
@@ -539,16 +582,19 @@ export function StepForm({
 
       return (
         <div className="authoring-step-form">
-          <Field label="Field to check" diagnostics={at('field')}>
+          <Field
+            label={m.authoring_condition_field()}
+            diagnostics={at('field')}
+          >
             {(props) => (
               <Select
-                aria-label="Field to check"
+                aria-label={m.authoring_condition_field()}
                 {...(props['aria-describedby']
                   ? { 'aria-describedby': props['aria-describedby'] }
                   : {})}
                 disabled={disabled}
                 value={step.field}
-                placeholder="Choose a field"
+                placeholder={m.authoring_condition_field_placeholder()}
                 onValueChange={(next) => {
                   const option = names.find((item) => item.field === next);
                   if (option)
@@ -563,16 +609,31 @@ export function StepForm({
                 }}
                 options={names.map((item) => ({
                   value: item.field,
-                  label: `${humanize(item.field)} · ${item.source === 'step' ? `from ${item.stepId}` : item.source}`,
+                  label:
+                    item.source === 'step'
+                      ? m.authoring_condition_option_step({
+                          field: humanize(item.field),
+                          step: item.stepId ?? '',
+                        })
+                      : item.source === 'input'
+                        ? m.authoring_condition_option_input({
+                            field: humanize(item.field),
+                          })
+                        : m.authoring_condition_option_evidence({
+                            field: humanize(item.field),
+                          }),
                 }))}
               />
             )}
           </Field>
-          <Field label="Continue when it is" diagnostics={at('equals')}>
+          <Field
+            label={m.authoring_condition_equals()}
+            diagnostics={at('equals')}
+          >
             {(props) => (
               <ScalarInput
                 {...props}
-                aria-label="Continue when it is"
+                aria-label={m.authoring_condition_equals()}
                 disabled={disabled}
                 type={type}
                 value={step.equals}
@@ -580,18 +641,27 @@ export function StepForm({
               />
             )}
           </Field>
-          <Field label="Otherwise" diagnostics={at('onFalse')}>
+          <Field
+            label={m.authoring_condition_otherwise()}
+            diagnostics={at('onFalse')}
+          >
             {() => (
               <Select
-                aria-label="Otherwise"
+                aria-label={m.authoring_condition_otherwise()}
                 disabled={disabled}
                 value={step.onFalse}
                 onValueChange={(next) =>
                   next && set({ ...step, onFalse: next as 'end' | 'escalate' })
                 }
                 options={[
-                  { value: 'end', label: 'Finish the run' },
-                  { value: 'escalate', label: 'Escalate to a person' },
+                  {
+                    value: 'end',
+                    label: m.authoring_condition_otherwise_finish(),
+                  },
+                  {
+                    value: 'escalate',
+                    label: m.authoring_condition_otherwise_escalate(),
+                  },
                 ]}
               />
             )}
@@ -611,16 +681,19 @@ export function StepForm({
 
       return (
         <div className="authoring-step-form">
-          <Field label="Action" diagnostics={at('capability')}>
+          <Field
+            label={m.authoring_action_label()}
+            diagnostics={at('capability')}
+          >
             {(props) => (
               <Select
-                aria-label="Action"
+                aria-label={m.authoring_action_label()}
                 {...(props['aria-describedby']
                   ? { 'aria-describedby': props['aria-describedby'] }
                   : {})}
                 disabled={disabled}
                 value={`${step.capability}@${step.capabilityVersion}`}
-                placeholder="Choose an action"
+                placeholder={m.authoring_action_placeholder()}
                 onValueChange={(next) => {
                   const chosen = vocabulary.capabilities.find(
                     (item) => `${item.capability}@${item.version}` === next,
@@ -669,7 +742,7 @@ export function StepForm({
                 }}
                 options={vocabulary.capabilities.map((item) => ({
                   value: `${item.capability}@${item.version}`,
-                  label: `${item.label}${item.executable ? '' : ' · can’t run here'}`,
+                  label: limitedOption(item.label, item.executable),
                 }))}
               />
             )}
@@ -678,21 +751,29 @@ export function StepForm({
             <div className="authoring-action-facts">
               <p>{entry.description}</p>
               <p>
-                <strong>Approval:</strong> {entry.approval}{' '}
+                <strong>{m.authoring_action_approval_label()}</strong>{' '}
+                {entry.approval}{' '}
                 {approval
-                  ? 'An approval step before it asks a person first.'
-                  : 'Add an approval step before it to always ask a person.'}
+                  ? m.authoring_action_approval_present()
+                  : m.authoring_action_approval_missing()}
               </p>
               <p>
-                <strong>Changes:</strong> a {humanize(entry.targetKind)}.{' '}
-                <strong>Risk:</strong> at least {entry.minimumRisk}.
+                <strong>{m.authoring_action_changes_label()}</strong>{' '}
+                {humanize(entry.targetKind)}
+              </p>
+              <p>
+                <strong>{m.authoring_action_risk_label()}</strong>{' '}
+                {minimumRisks[entry.minimumRisk]()}
               </p>
             </div>
           ) : null}
-          <Field label="Risk" diagnostics={at('minimumRisk')}>
+          <Field
+            label={m.authoring_risk_label()}
+            diagnostics={at('minimumRisk')}
+          >
             {() => (
               <Select
-                aria-label="Risk"
+                aria-label={m.authoring_risk_label()}
                 disabled={disabled}
                 value={step.minimumRisk}
                 onValueChange={(next) =>
@@ -701,7 +782,7 @@ export function StepForm({
                 }
                 options={order.map((risk) => ({
                   value: risk,
-                  label: risk.charAt(0).toUpperCase() + risk.slice(1),
+                  label: riskLabels[risk](),
                   disabled: order.indexOf(risk) < order.indexOf(floor),
                 }))}
               />
@@ -709,7 +790,7 @@ export function StepForm({
           </Field>
           {Object.entries(entry?.parameters ?? {}).length ? (
             <fieldset className="authoring-values">
-              <legend>Values for the action</legend>
+              <legend>{m.authoring_action_values()}</legend>
               {Object.entries(entry?.parameters ?? {}).map(([name, kind]) => (
                 <ValuePicker
                   key={name}
@@ -730,7 +811,7 @@ export function StepForm({
             </fieldset>
           ) : null}
           <fieldset className="authoring-values">
-            <legend>Expected result</legend>
+            <legend>{m.authoring_action_expected()}</legend>
             {Object.entries(entry?.postcondition ?? {}).map(([name, kind]) => (
               <ValuePicker
                 key={name}
@@ -765,19 +846,19 @@ export function StepForm({
       return (
         <div className="authoring-step-form">
           <Field
-            label="Approves"
-            hint="An approval must come right before the action it approves."
+            label={m.authoring_approval_for()}
+            hint={m.authoring_approval_for_hint()}
             diagnostics={at('forStep')}
           >
             {(props) => (
               <Select
-                aria-label="Approves"
+                aria-label={m.authoring_approval_for()}
                 {...(props['aria-describedby']
                   ? { 'aria-describedby': props['aria-describedby'] }
                   : {})}
                 disabled={disabled}
                 value={step.forStep}
-                placeholder="Choose an action"
+                placeholder={m.authoring_action_placeholder()}
                 onValueChange={(next) =>
                   next && set({ ...step, forStep: next })
                 }
@@ -789,7 +870,7 @@ export function StepForm({
             )}
           </Field>
           <Duration
-            label="Time to decide"
+            label={m.authoring_approval_expires()}
             seconds={step.expiresAfterSeconds}
             disabled={disabled}
             diagnostics={at('expiresAfterSeconds')}
@@ -803,7 +884,7 @@ export function StepForm({
       return (
         <div className="authoring-step-form">
           <Duration
-            label="Wait for"
+            label={m.authoring_wait_for()}
             seconds={step.seconds}
             disabled={disabled}
             diagnostics={at('seconds')}
@@ -830,16 +911,16 @@ export function StepForm({
 
       return (
         <div className="authoring-step-form">
-          <Field label="Checks the result of" diagnostics={at('forStep')}>
+          <Field label={m.authoring_check_for()} diagnostics={at('forStep')}>
             {(props) => (
               <Select
-                aria-label="Checks the result of"
+                aria-label={m.authoring_check_for()}
                 {...(props['aria-describedby']
                   ? { 'aria-describedby': props['aria-describedby'] }
                   : {})}
                 disabled={disabled}
                 value={step.forStep}
-                placeholder="Choose an action"
+                placeholder={m.authoring_action_placeholder()}
                 onValueChange={(next) =>
                   next && set({ ...step, forStep: next })
                 }
@@ -850,16 +931,19 @@ export function StepForm({
               />
             )}
           </Field>
-          <Field label="Result check" diagnostics={at('evaluatorVersion')}>
+          <Field
+            label={m.authoring_step_kind_check()}
+            diagnostics={at('evaluatorVersion')}
+          >
             {(props) => (
               <Select
-                aria-label="Result check"
+                aria-label={m.authoring_step_kind_check()}
                 {...(props['aria-describedby']
                   ? { 'aria-describedby': props['aria-describedby'] }
                   : {})}
                 disabled={disabled}
                 value={step.evaluatorVersion}
-                placeholder="Choose a check"
+                placeholder={m.authoring_check_placeholder()}
                 onValueChange={(next) => {
                   const chosen = vocabulary.evaluators.find(
                     (item) => item.version === next,
@@ -873,13 +957,13 @@ export function StepForm({
                 }}
                 options={choices.map((item) => ({
                   value: item.version,
-                  label: `${item.label}${item.executable ? '' : ' · can’t run here'}`,
+                  label: limitedOption(item.label, item.executable),
                 }))}
               />
             )}
           </Field>
           <FieldChoices
-            legend="Fields to confirm"
+            legend={m.authoring_check_fields()}
             available={evaluator?.fields ?? {}}
             chosen={step.fields}
             disabled={disabled}
@@ -887,7 +971,7 @@ export function StepForm({
             onChange={(fields) => set({ ...step, fields })}
           />
           <Field
-            label="Time limit in seconds"
+            label={m.authoring_check_time_limit()}
             diagnostics={at('maxDurationSeconds')}
           >
             {(props) => (
@@ -913,7 +997,10 @@ export function StepForm({
     case 'escalation':
       return (
         <div className="authoring-step-form">
-          <Field label="Reason shown to the person" diagnostics={at('reason')}>
+          <Field
+            label={m.authoring_escalation_reason()}
+            diagnostics={at('reason')}
+          >
             {(props) => (
               <Input
                 {...props}
@@ -930,7 +1017,10 @@ export function StepForm({
     case 'end':
       return (
         <div className="authoring-step-form">
-          <Field label="Outcome" diagnostics={at('outcome')}>
+          <Field
+            label={m.authoring_finish_outcome()}
+            diagnostics={at('outcome')}
+          >
             {(props) => (
               <Input
                 {...props}
@@ -949,26 +1039,35 @@ export function StepForm({
         <div className="authoring-step-form">
           <dl className="authoring-code-summary">
             <div>
-              <dt>Reads</dt>
+              <dt>{m.authoring_code_summary_uses()}</dt>
               <dd>
                 {scope.length
-                  ? scope.map((item) => valueLabel(item)).join(', ')
-                  : 'No inputs yet'}
+                  ? formatList(scope.map((item) => valueLabel(item)))
+                  : m.authoring_code_summary_uses_empty()}
               </dd>
             </div>
             <div>
-              <dt>Returns</dt>
+              <dt>{m.authoring_code_summary_returns()}</dt>
               <dd>
-                {Object.entries(step.fields)
-                  .map(
-                    ([name, kind]) => `${humanize(name)} (${typeNames[kind]})`,
-                  )
-                  .join(', ') || 'Nothing declared'}
+                {Object.keys(step.fields).length
+                  ? formatList(
+                      Object.entries(step.fields).map(([name, kind]) =>
+                        m.authoring_code_summary_field({
+                          field: humanize(name),
+                          type: typeLabels[kind](),
+                        }),
+                      ),
+                    )
+                  : m.authoring_code_summary_returns_empty()}
               </dd>
             </div>
             <div>
-              <dt>Can request</dt>
-              <dd>{step.grants.join(', ') || 'No other steps'}</dd>
+              <dt>{m.authoring_code_summary_requests()}</dt>
+              <dd>
+                {step.grants.length
+                  ? formatList(step.grants)
+                  : m.authoring_code_summary_requests_empty()}
+              </dd>
             </div>
           </dl>
           <FieldProblems
@@ -978,7 +1077,9 @@ export function StepForm({
             )}
           />
           <Button variant="outline" onClick={openCode}>
-            {disabled ? 'View Code Step' : 'Edit Code Step'}
+            {disabled
+              ? m.authoring_code_step_view()
+              : m.authoring_code_step_edit()}
           </Button>
         </div>
       );

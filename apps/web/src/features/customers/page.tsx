@@ -7,6 +7,8 @@ import {
   customerSortSchema,
   customerStateSchema,
 } from '@luma/api-contract';
+import { formatNumber } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import { CollectionToolbar } from '@luma/ui/components/primitives/collection-toolbar';
@@ -167,17 +169,17 @@ function customerColumns(
   const sharing = list.sources.filter((source) => source.access === 'granted');
   const sourceLabel = (connectionId: string) =>
     list.sources.find((source) => source.connectionId === connectionId)
-      ?.label ?? 'Connected source';
+      ?.label ?? m.customers_source_fallback();
 
   return [
     {
       key: 'customer',
-      header: 'Customer',
+      header: m.customers_column_customer(),
       sortKey: 'name',
       cell: (item) => {
         const details = [
           !item.shared.contact
-            ? 'Contact details not shared'
+            ? m.customers_contact_not_shared()
             : item.displayName && item.email
               ? item.email
               : null,
@@ -203,40 +205,40 @@ function customerColumns(
     },
     {
       key: 'orders',
-      header: 'Orders',
+      header: m.customers_column_orders(),
       sortKey: 'orders',
       numeric: true,
       cell: (item) =>
         item.orderCount === null ? (
-          <span className="customers-muted">—</span>
+          <span className="customers-muted">{m.common_empty_value()}</span>
         ) : (
-          item.orderCount.toLocaleString()
+          formatNumber(item.orderCount)
         ),
     },
     {
       key: 'spent',
-      header: 'Amount spent',
+      header: m.customers_column_spent(),
       numeric: true,
       cell: (item) =>
         formatMoney(item.amountSpent) ?? (
-          <span className="customers-muted">—</span>
+          <span className="customers-muted">{m.common_empty_value()}</span>
         ),
     },
     {
       key: 'since',
-      header: 'Customer since',
+      header: m.customers_column_since(),
       sortKey: 'created',
       hideOnNarrow: true,
       cell: (item) =>
         item.sourceCreatedAt ? (
           <WorkspaceDate value={item.sourceCreatedAt} precision="day" />
         ) : (
-          <span className="customers-muted">Not reported</span>
+          <span className="customers-muted">{m.common_not_reported()}</span>
         ),
     },
     {
       key: 'account',
-      header: 'Account',
+      header: m.customers_column_account(),
       hideOnNarrow: true,
       cell: (item) => (
         <span title={stateDescriptions[item.state]}>
@@ -315,7 +317,7 @@ export function CustomersView({
       value: search.connectionId,
       label:
         sources.find((source) => source.connectionId === search.connectionId)
-          ?.label ?? 'Selected source',
+          ?.label ?? m.customers_source_selected(),
     });
   const { sort, direction } = customerListQuery(search);
   const filtered = !!(q.trim() || search.state || search.connectionId);
@@ -332,19 +334,19 @@ export function CustomersView({
 
   return (
     <main className="customers-page">
-      <PageTitle title="Customers" />
+      <PageTitle title={m.customers_page_title()} />
       <CollectionToolbar
         search={{
           value: q || undefined,
           onChange: (value) => setQ(value ?? ''),
-          label: 'Search customers',
-          placeholder: 'Name, email, phone or source ID…',
+          label: m.customers_list_search_label(),
+          placeholder: m.customers_list_search_placeholder(),
         }}
         filters={[
           {
             kind: 'choice',
             key: 'state',
-            label: 'Account',
+            label: m.customers_filter_account(),
             icon: UserRound,
             value: search.state,
             options: customerStateSchema.options.map((value) => ({
@@ -361,7 +363,7 @@ export function CustomersView({
           {
             kind: 'choice',
             key: 'connectionId',
-            label: 'Source',
+            label: m.customers_filter_source(),
             icon: Plug,
             value: search.connectionId,
             options: sourceOptions,
@@ -386,22 +388,19 @@ export function CustomersView({
         onClear={clear}
         onRefresh={refresh}
         refreshing={refreshing}
-        refreshLabel="Refresh customers"
+        refreshLabel={m.customers_list_refresh()}
       />
       {coverage}
       {unresolved ? (
         <Alert tone="info" role="status">
-          <p>
-            This customer is not in Luma yet. Data sync imports customers from
-            connected stores; they appear here after the next sync.
-          </p>
+          <p>{m.customers_list_unresolved()}</p>
           <Button
             variant="outline"
             onClick={() =>
               change({ sort: search.sort, direction: search.direction })
             }
           >
-            Show all customers
+            {m.customers_list_show_all()}
           </Button>
         </Alert>
       ) : null}
@@ -412,30 +411,28 @@ export function CustomersView({
             to="/app/$organizationId/connections"
             params={{ organizationId }}
           >
-            Review connections
+            {m.customers_review_connections()}
           </Link>
         </Alert>
       ))}
       {offline ? (
-        <Alert role="status">
-          You are offline. Reconnect to refresh customers.
-        </Alert>
+        <Alert role="status">{m.customers_list_offline()}</Alert>
       ) : null}
       {error === 'access' ? (
         <Alert tone="danger" role="alert">
-          You no longer have access to customers in this workspace.
+          {m.customers_access_lost()}
         </Alert>
       ) : error ? (
         <Alert tone="danger" role="alert">
           {stale
-            ? 'Customers could not be refreshed. The list below may be out of date.'
-            : error}{' '}
+            ? m.customers_list_refresh_failed()
+            : `${m.customers_list_load_failed()} ${error}`}{' '}
           <Button variant="outline" onClick={refresh}>
-            Retry
+            {m.common_retry()}
           </Button>
           {search.cursor ? (
             <Button variant="ghost" onClick={() => update({})}>
-              Go to first page
+              {m.customers_list_first_page()}
             </Button>
           ) : null}
         </Alert>
@@ -443,7 +440,7 @@ export function CustomersView({
       {shown && error !== 'access' ? (
         <>
           <DataTable
-            caption={`Customers, sorted by ${sortLabels[sort].toLowerCase()}`}
+            caption={m.customers_list_caption({ sort: sortLabels[sort] })}
             columns={customerColumns(organizationId, shown)}
             rows={shown.items}
             rowKey={(item) => item.id}
@@ -469,19 +466,21 @@ export function CustomersView({
               onPrevious={previous}
               onNext={() => next?.()}
               disabled={refreshing}
-              itemLabel="customers"
-              label="Customer pages"
+              formatTotal={(count) =>
+                m.customers_list_pagination_total({ count })
+              }
+              label={m.customers_list_pagination_label()}
             />
           ) : null}
           {shown.items.length && search.cursor && !previous ? (
             <Button variant="ghost" onClick={() => update({})}>
-              Return to first page
+              {m.customers_list_first_page()}
             </Button>
           ) : null}
         </>
       ) : loading && !error ? (
         <div className="customers-loading" role="status">
-          <span className="sr-only">Loading customers…</span>
+          <span className="sr-only">{m.customers_list_loading()}</span>
           {Array.from({ length: 6 }, (_, i) => (
             <span className="lu-skeleton" key={i} />
           ))}
@@ -507,10 +506,10 @@ function CustomersEmpty({
     return (
       <Empty>
         <Search size={30} aria-hidden="true" />
-        <h2>No customers match</h2>
-        <p>Try another name, email address, phone number or source.</p>
+        <h2>{m.customers_empty_unmatched_title()}</h2>
+        <p>{m.customers_empty_unmatched_body()}</p>
         <Button onClick={clear} variant="outline">
-          Clear filters
+          {m.common_clear_filters()}
         </Button>
       </Empty>
     );
@@ -524,17 +523,17 @@ function CustomersEmpty({
       <UsersRound size={30} aria-hidden="true" />
       <h2>
         {!sharing
-          ? 'Customers are not shared yet'
+          ? m.customers_empty_not_shared_title()
           : importing
-            ? 'Importing customers'
-            : 'No customers yet'}
+            ? m.customers_empty_importing_title()
+            : m.customers_empty_title()}
       </h2>
       <p>
         {!sharing
-          ? 'Customers appear here once a connected store shares its customers with Luma.'
+          ? m.customers_empty_not_shared_body()
           : importing
-            ? 'Luma is reading customers from your store. They appear here as they are imported.'
-            : 'No connected store has reported a customer. New customers appear here after the next sync.'}
+            ? m.customers_empty_importing_body()
+            : m.customers_empty_body()}
       </p>
       <Link
         to={
@@ -544,7 +543,9 @@ function CustomersEmpty({
         }
         params={{ organizationId }}
       >
-        {sharing ? 'Open Data sync' : 'Review connections'}
+        {sharing
+          ? m.customers_open_data_sync()
+          : m.customers_review_connections()}
       </Link>
     </Empty>
   );

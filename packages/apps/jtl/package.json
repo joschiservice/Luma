@@ -16,20 +16,21 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@luma/connections": "workspace:*",
-    "@luma/identity": "workspace:*",
-    "zod": "catalog:zod3",
-    "@luma/connector-jtl": "workspace:*",
-    "@luma/app-host": "workspace:*",
-    "@luma/ui": "workspace:*",
     "@luma/api-contract": "workspace:*",
+    "@luma/app-host": "workspace:*",
+    "@luma/connections": "workspace:*",
+    "@luma/connector-jtl": "workspace:*",
+    "@luma/i18n": "workspace:*",
+    "@luma/identity": "workspace:*",
+    "@luma/ui": "workspace:*",
+    "@tanstack/react-form": "catalog:",
     "react": "catalog:",
-    "@tanstack/react-form": "catalog:"
+    "zod": "catalog:zod3"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",
     "@types/node": "catalog:",
-    "vitest": "catalog:",
-    "@types/react": "catalog:"
+    "@types/react": "catalog:",
+    "vitest": "catalog:"
   }
 }

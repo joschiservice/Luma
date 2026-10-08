@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import {
   type CollectionFilter,
   CollectionToolbar,
@@ -64,7 +65,7 @@ export function OrderFilters({
     {
       kind: 'choice',
       key: 'status',
-      label: 'Status',
+      label: m.orders_filter_status(),
       icon: CircleDot,
       value: search.status,
       options: orderStatuses.map((value) => ({
@@ -77,7 +78,7 @@ export function OrderFilters({
     {
       kind: 'choice',
       key: 'paymentStatus',
-      label: 'Payment',
+      label: m.orders_filter_payment(),
       icon: CreditCard,
       value: search.paymentStatus,
       options: orderPaymentStatuses.map((value) => ({
@@ -92,7 +93,7 @@ export function OrderFilters({
     {
       kind: 'choice',
       key: 'connectionId',
-      label: 'Source',
+      label: m.orders_filter_source(),
       icon: Plug,
       value: search.connectionId,
       options: (sources.length > 1 ||
@@ -105,7 +106,7 @@ export function OrderFilters({
     {
       kind: 'date-range',
       key: 'placed',
-      label: 'Placed',
+      label: m.orders_filter_placed(),
       icon: CalendarDays,
       from: search.placedFrom,
       to: search.placedTo,
@@ -116,10 +117,10 @@ export function OrderFilters({
     {
       kind: 'applied',
       key: 'updated',
-      label: 'Updated',
+      label: m.orders_filter_updated(),
       value:
         search.updatedFrom || search.updatedBefore
-          ? 'In metric window'
+          ? m.orders_filter_updated_window()
           : undefined,
       onRemove: () =>
         update({ updatedFrom: undefined, updatedBefore: undefined }),
@@ -130,7 +131,7 @@ export function OrderFilters({
     <CollectionToolbar
       views={
         <CollectionViews
-          label="Order views"
+          label={m.orders_list_views_label()}
           value={view}
           views={orderViews.map((value) => ({
             value,
@@ -145,8 +146,8 @@ export function OrderFilters({
       search={{
         value: search.q,
         onChange: (q) => update({ q }),
-        label: 'Search orders',
-        placeholder: 'Order number, source ID or SKU…',
+        label: m.orders_list_search_label(),
+        placeholder: m.orders_list_search_placeholder(),
       }}
       filters={filters}
       sort={{
@@ -172,7 +173,7 @@ export function OrderFilters({
       }
       onRefresh={refresh}
       refreshing={refreshing}
-      refreshLabel="Refresh orders"
+      refreshLabel={m.orders_list_refresh()}
     />
   );
 }

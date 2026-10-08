@@ -122,8 +122,8 @@ type Story = StoryObj<typeof meta>;
 export const ApprovalWait: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByText('No attempt recorded')).toBeVisible();
-    await userEvent.click(canvas.getByText('Action and verification criteria'));
+    await expect(canvas.getByText('Not sent yet')).toBeVisible();
+    await userEvent.click(canvas.getByText('Change and expected outcome'));
     await expect(canvas.getByText('Quantity')).toBeVisible();
     await expect(
       canvas.queryByText('never-render-parameters'),
@@ -153,12 +153,12 @@ export const Verifying: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByText('Succeeded')).toBeVisible();
+    await expect(canvas.getByText('Accepted')).toBeVisible();
     await expect(
-      canvas.getByText('Not recorded', { exact: true }),
+      canvas.getByText('Not checked yet', { exact: true }),
     ).toBeVisible();
     await expect(
-      canvas.queryByText('Recorded verified resolution'),
+      canvas.queryByText('Confirmed by a fresh check'),
     ).not.toBeInTheDocument();
   },
 };
@@ -188,11 +188,9 @@ export const VerifiedResolution: Story = {
   args: { progress: resolved },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(
-      canvas.getByText('Recorded verified resolution'),
-    ).toBeVisible();
-    await userEvent.click(canvas.getByText('Attempt 1 · Succeeded'));
-    await expect(canvas.getByText('Observed result: Passed')).toBeVisible();
+    await expect(canvas.getByText('Confirmed by a fresh check')).toBeVisible();
+    await userEvent.click(canvas.getByText('Attempt 1 · Accepted'));
+    await expect(canvas.getByText('Outcome check: Confirmed')).toBeVisible();
     const summary = canvas.getByText('Shopify · Inventory', { exact: false });
     summary.focus();
     await expect(summary).toHaveFocus();
@@ -223,7 +221,7 @@ export const Failed: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(
-      canvas.getByText(/Permitted decisions: Escalate/),
+      canvas.getByText(/Available decisions: Escalate/),
     ).toBeVisible();
     await expect(
       canvas.queryByRole('button', { name: /retry/i }),
@@ -276,10 +274,8 @@ export const ConnectionLost: Story = {
   args: { progress: resolved, connection: 'disconnected' },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(
-      canvas.getByText('Current state is unconfirmed'),
-    ).toBeVisible();
-    await expect(canvas.getByText(/Last confirmed case state/)).toBeVisible();
+    await expect(canvas.getByText('Current state not confirmed')).toBeVisible();
+    await expect(canvas.getByText(/Last confirmed issue state/)).toBeVisible();
   },
 };
 
@@ -345,11 +341,9 @@ export const LongCollections: Story = {
     const scroll = canvas.getByTestId('issue-scroll');
     const position = scroll.scrollTop;
     await userEvent.click(open);
-    const history = within(
-      canvas.getByRole('region', { name: 'Audit history' }),
-    );
+    const history = within(canvas.getByRole('region', { name: 'History' }));
     await expect(
-      canvas.getByRole('heading', { name: 'Audit history' }),
+      canvas.getByRole('heading', { name: 'History' }),
     ).toHaveFocus();
     await expect(canvas.getByText('Other issue details')).not.toBeVisible();
     await expect(history.getAllByText(/^By /)).toHaveLength(20);
@@ -369,9 +363,7 @@ export const LongCollections: Story = {
     await userEvent.click(
       canvas.getByRole('button', { name: 'View all 24 evidence records' }),
     );
-    const evidence = within(
-      canvas.getByRole('region', { name: 'Evidence provenance' }),
-    );
+    const evidence = within(canvas.getByRole('region', { name: 'Evidence' }));
     await userEvent.click(evidence.getByRole('combobox', { name: 'Source' }));
     await userEvent.click(
       await within(document.body).findByRole('option', {
@@ -383,16 +375,14 @@ export const LongCollections: Story = {
     await within(document.body).findByRole('listbox');
     await userEvent.keyboard('{Escape}');
     await expect(
-      canvas.getByRole('region', { name: 'Evidence provenance' }),
+      canvas.getByRole('region', { name: 'Evidence' }),
     ).toBeVisible();
 
     await userEvent.click(
       evidence.getAllByText(/JTL · Inventory/, { selector: 'summary' })[0]!,
     );
     await expect(evidence.getAllByText('sku-104')[0]!).toBeVisible();
-    await userEvent.click(
-      canvas.getByRole('heading', { name: 'Evidence provenance' }),
-    );
+    await userEvent.click(canvas.getByRole('heading', { name: 'Evidence' }));
     await userEvent.keyboard('{Escape}');
     await expect(
       canvas.getByRole('button', { name: 'View all 24 evidence records' }),
@@ -412,24 +402,24 @@ export const PageNotStarted: Story = {
   },
   play: async ({ canvasElement }) => {
     const section = within(
-      within(canvasElement).getByRole('region', { name: 'Execution' }),
+      within(canvasElement).getByRole('region', {
+        name: 'Change and outcome check',
+      }),
     );
     await expect(
-      section.getByRole('heading', { name: 'No execution recorded' }),
+      section.getByRole('heading', { name: 'No change sent' }),
     ).toBeVisible();
     await expect(
-      section.queryByRole('list', { name: 'Case lifecycle' }),
+      section.queryByRole('list', { name: 'Issue progress' }),
     ).not.toBeInTheDocument();
-    await expect(
-      section.queryByText('Outcome verification'),
-    ).not.toBeInTheDocument();
+    await expect(section.queryByText('Outcome check')).not.toBeInTheDocument();
     await expect(
       section.queryByText(
-        'Verification criteria are not available for this attempt.',
+        'The expected outcome isn’t available for this attempt.',
       ),
     ).not.toBeInTheDocument();
     await expect(section.getByText('Live updates')).toBeVisible();
-    await userEvent.click(section.getByText('Execution details'));
+    await userEvent.click(section.getByText('Change details'));
     await expect(section.getByText('Not started')).toBeVisible();
   },
 };
@@ -439,7 +429,7 @@ export const PageApprovalWait: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(
-      canvas.getByRole('heading', { name: 'Awaiting approval' }),
+      canvas.getByRole('heading', { name: 'Waiting for approval' }),
     ).toBeVisible();
   },
 };
@@ -456,12 +446,12 @@ export const PageUnknownOutcome: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(
-      canvas.getByRole('heading', { name: 'Action outcome unknown' }),
+      canvas.getByRole('heading', { name: 'Outcome unclear' }),
     ).toBeVisible();
     await expect(
-      canvas.getByText(
-        'The action may have taken effect. Inspect fresh observations before taking further action.',
-      ),
+      canvas.getAllByText(
+        'Luma couldn’t tell whether the change took effect. Check the record in the connected system before trying again.',
+      )[0],
     ).toBeVisible();
   },
 };
@@ -474,16 +464,16 @@ export const PageSucceededUnverified: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(
-      canvas.getByRole('heading', { name: 'Verifying outcome' }),
+      canvas.getByRole('heading', { name: 'Checking outcome' }),
     ).toBeVisible();
     await expect(
-      canvas.getByText('Succeeded', { selector: 'strong' }),
+      canvas.getByText('Accepted', { selector: 'strong' }),
     ).toBeVisible();
     await expect(
-      canvas.getByText('Pending', { selector: 'strong' }),
+      canvas.getByText('Checking', { selector: 'strong' }),
     ).toBeVisible();
     await expect(
-      canvas.queryByRole('heading', { name: 'Resolution verified' }),
+      canvas.queryByRole('heading', { name: 'Resolved and confirmed' }),
     ).not.toBeInTheDocument();
   },
 };
@@ -508,11 +498,11 @@ export const PageVerificationFailed: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(
-      canvas.getByRole('heading', { name: 'Verification failed' }),
+      canvas.getByRole('heading', { name: 'Outcome not confirmed' }),
     ).toBeVisible();
     await expect(
       canvas.getByText(
-        'The expected outcome was not confirmed. Review the verification evidence and current findings.',
+        'The outcome check didn’t confirm the expected result. Review the check’s evidence and the current findings.',
       ),
     ).toBeVisible();
   },
@@ -540,13 +530,11 @@ export const PageAuditHistory: Story = {
   ],
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const history = within(
-      canvas.getByRole('region', { name: 'Audit history' }),
-    );
+    const history = within(canvas.getByRole('region', { name: 'History' }));
     const events = history.getAllByRole('listitem');
     await expect(events).toHaveLength(3);
     const newest = within(events[0]!);
-    await expect(newest.getByText('2026-09-24 06:50:03 UTC')).toBeVisible();
+    await expect(newest.getByText(/^24 Sept? 2026, 06:50 UTC$/)).toBeVisible();
     await expect(newest.getByText('Not recorded')).not.toBeVisible();
     await userEvent.click(newest.getByText('Event details'));
     await expect(newest.getByText('Not recorded')).toBeVisible();
@@ -555,12 +543,13 @@ export const PageAuditHistory: Story = {
       history.getByRole('button', { name: 'View full history (4)' }),
     );
     await expect(
-      canvas.getByRole('heading', { name: 'Audit history' }),
+      canvas.getByRole('heading', { name: 'History' }),
     ).toHaveFocus();
     await expect(
-      within(
-        canvas.getByRole('region', { name: 'Audit history' }),
-      ).getAllByText('Issue detected', { selector: 'strong' }),
+      within(canvas.getByRole('region', { name: 'History' })).getAllByText(
+        'Issue detected',
+        { selector: 'strong' },
+      ),
     ).toHaveLength(4);
     await userEvent.click(
       canvas.getByRole('button', { name: 'Back to issue' }),

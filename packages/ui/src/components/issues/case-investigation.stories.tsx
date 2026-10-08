@@ -101,7 +101,7 @@ export const Inventory: Story = {
     await expect(
       canvas.queryByRole('button', { name: /approve/i }),
     ).not.toBeInTheDocument();
-    await userEvent.click(canvas.getByText('Findings & evidence'));
+    await userEvent.click(canvas.getByText('Findings and evidence'));
     const evidence = canvas
       .getByText('Shopify · Inventory', { exact: false })
       .closest('summary')!;
@@ -119,7 +119,7 @@ export const MissingAuthority: Story = {
   args: { item: caseFixture('uncertain') },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByText('More evidence is needed')).toBeVisible();
+    await expect(canvas.getByText('More evidence needed')).toBeVisible();
     await expect(
       canvas.queryByText(/8 units potentially exposed/),
     ).not.toBeInTheDocument();
@@ -130,7 +130,7 @@ export const StaleEvidence: Story = {
   args: { item: caseFixture('stale') },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByText('Evidence is stale')).toBeVisible();
+    await expect(canvas.getByText('Evidence is out of date')).toBeVisible();
     await expect(
       canvas.queryByText(
         'Review authoritative JTL stock and have an authorized operator correct Shopify.',
@@ -146,19 +146,19 @@ export const InvestigationFailed: Story = {
     await expect(
       canvas.getByRole('heading', { name: 'Investigation failed' }),
     ).toBeVisible();
-    await expect(canvas.getByText('Established facts')).not.toBeVisible();
+    await expect(canvas.getByText('Confirmed facts')).not.toBeVisible();
     await userEvent.click(
       canvas.getByRole('button', { name: 'Check for updates' }),
     );
     await expect(args.onRefresh).toHaveBeenCalledOnce();
-    await userEvent.click(canvas.getByText('Findings & evidence'));
-    await expect(canvas.getByText('Established facts')).toBeVisible();
+    await userEvent.click(canvas.getByText('Findings and evidence'));
+    await expect(canvas.getByText('Confirmed facts')).toBeVisible();
     await expect(
       canvas.queryByText(
         'Review authoritative JTL stock and have an authorized operator correct Shopify.',
       ),
     ).not.toBeInTheDocument();
-    await userEvent.click(canvas.getByText('Findings & evidence'));
+    await userEvent.click(canvas.getByText('Findings and evidence'));
   },
 };
 
@@ -215,11 +215,9 @@ export const Unconfirmed: Story = {
   args: { unconfirmed: true },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    await expect(canvas.getByText('Investigation not confirmed')).toBeVisible();
     await expect(
-      canvas.getByText('Current investigation is unconfirmed'),
-    ).toBeVisible();
-    await expect(
-      canvas.queryByText('Evidence is stale'),
+      canvas.queryByText('Evidence is out of date'),
     ).not.toBeInTheDocument();
     await expect(
       canvas.queryByText(
@@ -252,7 +250,7 @@ export const InvestigationFailedWithPreviousFindings: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByText('Findings & evidence'));
+    await userEvent.click(canvas.getByText('Findings and evidence'));
     await userEvent.click(canvas.getByText('Issue details'));
     await expect(
       canvas.getByText('shared-stock-pool', { selector: 'li' }),
@@ -285,10 +283,10 @@ export const LongSupportingEvidence: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(
-      canvas.getByText('Findings & evidence', { exact: true }),
+      canvas.getByText('Findings and evidence', { exact: true }),
     );
     const open = canvas.getByRole('button', {
-      name: 'View all 24 supporting evidence records',
+      name: 'View all 24 evidence records',
     });
     await userEvent.click(open);
     const collection = within(

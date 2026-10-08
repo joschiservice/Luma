@@ -1,0 +1,49 @@
+{
+  "name": "@luma/i18n",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./messages": {
+      "types": "./dist/paraglide/messages.d.ts",
+      "default": "./dist/paraglide/messages.js"
+    },
+    "./runtime": {
+      "types": "./dist/paraglide/runtime.d.ts",
+      "default": "./dist/paraglide/runtime.js"
+    },
+    "./server": {
+      "types": "./dist/paraglide/server.d.ts",
+      "default": "./dist/paraglide/server.js"
+    },
+    "./format": "./src/format.ts",
+    "./locales": "./src/locales.ts",
+    "./vite": {
+      "types": "./vite.d.mts",
+      "default": "./vite.mjs"
+    },
+    "./rich": "./src/rich.tsx"
+  },
+  "scripts": {
+    "build": "node scripts/compile.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "react": "catalog:"
+  },
+  "dependencies": {
+    "@inlang/paraglide-js": "2.26.0",
+    "@inlang/plugin-icu1": "1.1.1"
+  },
+  "devDependencies": {
+    "@luma/typescript-config": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:typescript-compatible-5-9-3",
+    "vitest": "catalog:"
+  }
+}

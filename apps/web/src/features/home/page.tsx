@@ -6,6 +6,9 @@ import type {
   OperationsOverview,
 } from '@luma/api-contract';
 import { homeModuleIds } from '@luma/api-contract';
+import { formatDate } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import { CaseNotice } from '@luma/ui/components/issues/case-investigation';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -74,45 +77,58 @@ import {
 function setupNotice(data: OperationsOverview) {
   if (!data.connections.length)
     return {
-      title: 'Connect your first system.',
+      title: m.home_notice_first_title(),
       tone: 'info' as const,
-      description:
-        'Start with Shopify or JTL-Wawi. Once Luma receives observations, issues and outcomes appear here.',
+      description: m.home_notice_first_description(),
     };
   const monitored = data.connections.filter((c) => c.status !== 'disconnected');
   if (!monitored.length)
     return {
-      title: 'No connected systems.',
+      title: m.home_notice_disconnected_title(),
       tone: 'warning' as const,
-      description:
-        'Your previous connections are disconnected. Connect a system to monitor operations again.',
+      description: m.home_notice_disconnected_description(),
     };
   if (monitored.some((c) => c.status !== 'active'))
     return {
-      title: 'Check your connections.',
+      title: m.home_notice_inactive_title(),
       tone: 'warning' as const,
-      description:
-        'Some systems are not active. Review their status before relying on what Home shows.',
+      description: m.home_notice_inactive_description(),
     };
   if (monitored.some((c) => c.freshness === 'unobserved'))
     return {
-      title: 'Waiting for observations.',
+      title: m.home_notice_waiting_title(),
       tone: 'info' as const,
-      description:
-        'At least one system hasn’t sent data for a permitted read yet, so health is still unknown.',
+      description: m.home_notice_waiting_description(),
     };
   if (monitored.some((c) => c.freshness === 'stale'))
     return {
-      title: 'Your data needs a refresh.',
+      title: m.home_notice_stale_title(),
       tone: 'warning' as const,
-      description:
-        'Some observations are older than 24 hours. Current operational health is unknown.',
+      description: m.home_notice_stale_description({
+        hours: data.freshnessThresholdHours,
+      }),
     };
 
   return null;
 }
 
+const greetings = {
+  morning: {
+    plain: m.home_greeting_morning,
+    named: m.home_greeting_morning_named,
+  },
+  afternoon: {
+    plain: m.home_greeting_afternoon,
+    named: m.home_greeting_afternoon_named,
+  },
+  evening: {
+    plain: m.home_greeting_evening,
+    named: m.home_greeting_evening_named,
+  },
+};
+
 function greeting(timeZone: string, name?: string) {
+  // Reads the workspace hour as a number; not displayed.
   const hour = Number(
     new Intl.DateTimeFormat('en-GB', {
       timeZone,
@@ -120,10 +136,11 @@ function greeting(timeZone: string, name?: string) {
       hourCycle: 'h23',
     }).format(new Date()),
   );
-  const part = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
+  const part =
+    greetings[hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening'];
   const first = name?.trim().split(/\s+/)[0];
 
-  return `Good ${part}${first ? `, ${first}` : ''}`;
+  return first ? part.named({ name: first }) : part.plain();
 }
 
 function ModuleFrame({
@@ -162,7 +179,7 @@ function ModuleFrame({
     <div
       className="home-module-controls"
       role="group"
-      aria-label={`Arrange ${info.title}`}
+      aria-label={m.home_module_arrange({ module: info.title })}
     >
       <span className="home-module-grip" aria-hidden="true">
         <GripVertical size={15} />
@@ -170,7 +187,7 @@ function ModuleFrame({
       <Button
         variant="ghost"
         size="icon"
-        aria-label={`Move ${info.title} earlier`}
+        aria-label={m.home_module_move_up({ module: info.title })}
         disabled={index === 0}
         onClick={() => onMove(-1)}
       >
@@ -179,7 +196,7 @@ function ModuleFrame({
       <Button
         variant="ghost"
         size="icon"
-        aria-label={`Move ${info.title} later`}
+        aria-label={m.home_module_move_down({ module: info.title })}
         disabled={index === count - 1}
         onClick={() => onMove(1)}
       >
@@ -190,8 +207,8 @@ function ModuleFrame({
         size="icon"
         aria-label={
           module.size === 'full'
-            ? `Show ${info.title} at half width`
-            : `Show ${info.title} at full width`
+            ? m.home_module_half_width({ module: info.title })
+            : m.home_module_full_width({ module: info.title })
         }
         onClick={onResize}
       >
@@ -200,7 +217,7 @@ function ModuleFrame({
       <Button
         variant="ghost"
         size="icon"
-        aria-label={`Remove ${info.title} from Home`}
+        aria-label={m.home_module_remove({ module: info.title })}
         onClick={onRemove}
       >
         <X />
@@ -289,12 +306,12 @@ export function HomePage() {
     overview.isError || overview.isPaused ? undefined : overview.data;
   const notice = data ? setupNotice(data) : null;
   const update = (next: HomeModule[]) => workspace.save({ home: next });
-  const today = new Intl.DateTimeFormat('en-GB', {
+  const today = formatDate(new Date(), {
     timeZone,
     weekday: 'long',
     day: 'numeric',
     month: 'long',
-  }).format(new Date());
+  });
 
   function content(module: HomeModule) {
     switch (module.id) {
@@ -360,28 +377,29 @@ export function HomePage() {
           <p className="home-lead">
             {waiting.data !== undefined
               ? waiting.data
-                ? `${waiting.data} ${waiting.data === 1 ? 'decision needs' : 'decisions need'} you. Luma is handling the rest.`
-                : 'Nothing needs your decision right now. Here’s what Luma is handling.'
-              : 'Here’s what needs you and what Luma is handling.'}
+                ? m.home_lead_waiting({ count: waiting.data })
+                : m.home_lead_none()
+              : m.home_lead_loading()}
           </p>
           {data ? (
             <p className="home-asof">
-              Updated <WorkspaceDate value={data.generatedAt} /> · refreshes
-              every 30 seconds
+              {rich(m.home_updated, {
+                time: <WorkspaceDate value={data.generatedAt} />,
+              })}
             </p>
           ) : null}
         </div>
         <div className="home-header-actions">
           <Select<HomeWindow>
-            aria-label="Resolution window"
+            aria-label={m.home_window_label()}
             className="home-window"
             value={window}
             onValueChange={(value) => {
               if (value) void navigate({ search: { window: value } });
             }}
             options={[
-              { value: '24h', label: 'Last 24 hours' },
-              { value: '7d', label: 'Last 7 days' },
+              { value: '24h', label: m.home_window_24h() },
+              { value: '7d', label: m.home_window_7d() },
             ]}
           />
           <Button
@@ -393,7 +411,7 @@ export function HomePage() {
               aria-hidden="true"
               className={overview.isFetching ? 'home-spin' : undefined}
             />
-            {overview.isError ? 'Retry' : 'Refresh'}
+            {overview.isError ? m.common_retry() : m.common_refresh()}
           </Button>
           <Button
             variant={editing ? 'default' : 'outline'}
@@ -406,32 +424,30 @@ export function HomePage() {
             ) : (
               <SlidersHorizontal aria-hidden="true" />
             )}
-            {editing ? 'Done' : 'Customize'}
+            {editing ? m.common_done() : m.home_customize()}
           </Button>
         </div>
       </header>
 
       {overview.isPaused ? (
-        <CaseNotice title="Updates paused while offline">
-          Current health and totals are unavailable. Reconnect to refresh Home
-          automatically.
+        <CaseNotice title={m.home_paused_title()}>
+          {m.home_paused_description()}
         </CaseNotice>
       ) : overview.isError ? (
-        <CaseNotice error title="Operations overview unavailable">
-          Current health and totals could not be confirmed. Retry to load
-          authoritative data.
+        <CaseNotice error title={m.home_failed_title()}>
+          {m.home_failed_description()}
         </CaseNotice>
       ) : notice ? (
         <Alert
           tone={notice.tone}
           role="region"
-          aria-label="Operational health"
+          aria-label={m.home_notice_region()}
           className="home-notice"
         >
           <h2>{notice.title}</h2>
           <p>{notice.description}</p>
           <Link to="/app/$organizationId/apps" params={{ organizationId }}>
-            Manage connections
+            {m.home_notice_manage_connections()}
           </Link>
         </Alert>
       ) : null}
@@ -440,11 +456,11 @@ export function HomePage() {
         <div
           className="home-customize"
           role="region"
-          aria-label="Customize Home"
+          aria-label={m.home_customize_region()}
         >
           <p>
-            <strong>Customize your Home.</strong> Drag modules or use the arrows
-            to reorder them. Changes save automatically and only affect you.
+            <strong>{m.home_customize_title()}</strong>{' '}
+            {m.home_customize_description()}
           </p>
           <div className="home-customize-actions">
             <DropdownMenu>
@@ -452,11 +468,13 @@ export function HomePage() {
                 render={<Button variant="outline" disabled={!hidden.length} />}
               >
                 <Plus aria-hidden="true" />
-                Add module
+                {m.home_customize_add()}
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="home-module-menu">
                 <DropdownMenuGroup>
-                  <DropdownMenuLabel>Available modules</DropdownMenuLabel>
+                  <DropdownMenuLabel>
+                    {m.home_customize_available()}
+                  </DropdownMenuLabel>
                   {hidden.map((id) => {
                     const info = homeModules[id];
 
@@ -484,7 +502,7 @@ export function HomePage() {
               disabled={workspace.layout?.home === null}
             >
               <RotateCcw aria-hidden="true" />
-              Reset to default
+              {m.home_customize_reset()}
             </Button>
           </div>
         </div>
@@ -492,12 +510,11 @@ export function HomePage() {
 
       {workspace.conflict ? (
         <Alert tone="warning" role="status" className="home-notice">
-          Your Home changed in another session. We loaded the latest version.
+          {m.home_layout_conflict()}
         </Alert>
       ) : workspace.saveFailed ? (
         <Alert tone="danger" role="alert" className="home-notice">
-          Your last change couldn’t be saved. Check your connection and try
-          again.
+          {m.common_save_failed()}
         </Alert>
       ) : null}
 
@@ -546,11 +563,11 @@ export function HomePage() {
         </div>
       ) : (
         <div className="home-blank">
-          <strong>Your Home is empty.</strong>
-          <p>Add modules to see what needs you and what Luma is handling.</p>
+          <strong>{m.home_blank_title()}</strong>
+          <p>{m.home_blank_description()}</p>
           <Button variant="outline" onClick={() => setEditing(true)}>
             <SlidersHorizontal aria-hidden="true" />
-            Customize
+            {m.home_customize()}
           </Button>
         </div>
       )}

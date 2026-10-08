@@ -3,6 +3,7 @@ import {
   assistantAnswerSchema,
   assistantAvailabilitySchema,
 } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import { queryOptions } from '@tanstack/react-query';
 
 import { createWebApiClient } from '../../lib/api-client';
@@ -48,16 +49,19 @@ export async function askAssistant(
   return assistantAnswerSchema.parse(result.body);
 }
 
-/** Feedback for a failed question, using the server's reason when it sent one. */
+/**
+ * Localized feedback for a failed question. Other API errors show the server's message as
+ * delivered, untranslated.
+ */
 export function assistantError(error: unknown) {
   if (error instanceof IdentityError && error.status === 401)
-    return 'Your session expired. Sign in again to keep asking.';
+    return m.assistant_error_session_expired();
   if (error instanceof IdentityError && error.status === 403)
-    return 'Your access to this workspace changed. Refresh to check your permissions.';
+    return m.assistant_error_access_changed();
   if (error instanceof IdentityError && error.code)
     return error.status === 400
-      ? 'Luma couldn’t read this question. Shorten it and try again.'
+      ? m.assistant_error_unreadable_question()
       : error.message;
 
-  return 'Luma couldn’t be reached. Check your connection and try again.';
+  return m.assistant_error_unreachable();
 }

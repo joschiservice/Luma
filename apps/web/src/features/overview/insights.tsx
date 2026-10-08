@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import { PageTitle } from '@luma/ui/components/workspace/page-header';
 import {
   useLocation,
@@ -45,7 +46,7 @@ export function InsightsPage() {
 
   return (
     <div className="insights">
-      <PageTitle title="Insights" />
+      <PageTitle title={m.overview_insights_title()} />
       <OperationalMetrics
         key={`summary-${organizationId}`}
         organizationId={organizationId}

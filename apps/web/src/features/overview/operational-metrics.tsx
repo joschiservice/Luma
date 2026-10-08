@@ -4,6 +4,9 @@ import type {
   OperationalMetricRequest,
   OperationalMetricResponse,
 } from '@luma/api-contract';
+import { formatNumber, formatRelativeTime } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import {
   CaseLoading,
   CaseNotice,
@@ -19,6 +22,7 @@ import {
   DialogTitle,
 } from '@luma/ui/components/primitives/dialog';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
+import { quantityUnit } from '@luma/ui/lib/units';
 import { Link } from '@tanstack/react-router';
 import {
   ArrowUpRight,
@@ -31,6 +35,11 @@ import {
 import { useRef, useState } from 'react';
 
 import { IdentityError } from '../identity/data';
+import {
+  metricDescription,
+  metricTimeSemantics,
+  metricTitle,
+} from './metric-text';
 import { type LiveMetricView, usePagedMetric } from './metrics-live';
 import {
   operationalMetricRequest,
@@ -42,54 +51,98 @@ type Metric = OperationalMetricResponse['metrics'][number];
 
 type Item = Metric['items'][number];
 
-const groups = [
+/** A titled set of metrics on the summary. Without `metrics`, it shows one metric family. */
+export interface MetricGroup {
+  id: string;
+  title: () => string;
+  subtitle: () => string;
+  icon: typeof CircleAlert;
+  metrics?: string[];
+}
+
+const groups: MetricGroup[] = [
   {
     id: 'cases',
-    title: 'Issues',
-    subtitle: 'Intervention & workload',
+    title: m.overview_group_cases_title,
+    subtitle: m.overview_group_cases_subtitle,
     icon: CircleAlert,
   },
   {
     id: 'inventory',
-    title: 'Monitored stock',
-    subtitle: 'Active replenishment rules',
+    title: m.overview_group_inventory_title,
+    subtitle: m.overview_group_inventory_subtitle,
     icon: Boxes,
   },
   {
     id: 'procurement',
-    title: 'Procurement',
-    subtitle: 'Recorded purchase orders',
+    title: m.overview_group_procurement_title,
+    subtitle: m.overview_group_procurement_subtitle,
     icon: ClipboardList,
   },
   {
     id: 'connections',
-    title: 'Connections',
-    subtitle: 'Health & observation freshness',
+    title: m.overview_group_connections_title,
+    subtitle: m.overview_group_connections_subtitle,
     icon: Plug,
   },
 ];
-const reasonLabels: Record<string, string> = {
-  eligible: 'Eligible',
-  unknown_eligibility: 'Unknown eligibility',
-  unknown_attribution: 'Unknown attribution',
-  unknown_environment: 'Unknown environment · excluded',
-  approval: 'Approval',
-  manual_intervention: 'Manual intervention',
-  uncertainty: 'Uncertainty',
-  existing_commitment: 'Existing commitment',
-  no_commitment: 'No commitment',
-  missing: 'Missing stock',
-  deleted: 'Deleted stock',
-  nonnumeric: 'Invalid quantity',
-  future: 'Future observation',
-  expired: 'Expired observation',
-  invalid_time: 'Invalid observation time',
-  pending: 'Pending',
-  degraded: 'Degraded',
-  revoked: 'Revoked',
-  stale: 'Stale reads',
-  unobserved: 'Unobserved reads',
+const reasonLabels: Record<string, () => string> = {
+  eligible: m.overview_eligibility_eligible,
+  unknown_eligibility: m.overview_eligibility_unknown,
+  unknown_attribution: m.overview_involvement_unknown,
+  unknown_environment: m.overview_reason_unknown_environment,
+  approval: m.overview_reason_approval,
+  manual_intervention: m.overview_reason_manual_intervention,
+  uncertainty: m.overview_reason_uncertainty,
+  existing_commitment: m.overview_reason_existing_commitment,
+  no_commitment: m.overview_reason_no_commitment,
+  missing: m.overview_reason_missing,
+  deleted: m.overview_reason_deleted,
+  nonnumeric: m.overview_reason_nonnumeric,
+  future: m.overview_reason_future,
+  expired: m.overview_reason_expired,
+  invalid_time: m.overview_reason_invalid_time,
+  pending: m.overview_reason_pending,
+  degraded: m.overview_reason_degraded,
+  revoked: m.overview_reason_revoked,
+  stale: m.overview_reason_stale,
+  unobserved: m.overview_reason_unobserved,
 };
+
+// Reasons the server adds later fall back to their code until the client names them.
+const reasonLabel = (reason: string) => reasonLabels[reason]?.() ?? reason;
+
+const attentionHints: Record<string, (inputs: { count: number }) => string> = {
+  approval: m.overview_hint_attention_approval,
+  manual_intervention: m.overview_hint_attention_manual,
+  uncertainty: m.overview_hint_attention_uncertainty,
+};
+
+const involvementLabels = {
+  none: m.overview_involvement_none,
+  human: m.overview_involvement_human,
+  unknown: m.overview_involvement_unknown,
+} satisfies Record<
+  Extract<Item, { kind: 'resolution' }>['involvement'],
+  () => string
+>;
+
+const eligibilityLabels = {
+  eligible: m.overview_eligibility_eligible,
+  ineligible: m.overview_eligibility_ineligible,
+  unknown: m.overview_eligibility_unknown,
+} satisfies Record<
+  Extract<Item, { kind: 'resolution' }>['eligibility'],
+  () => string
+>;
+
+const purchaseOrderStatusLabels = {
+  draft: m.overview_po_status_draft,
+  open: m.overview_po_status_open,
+} satisfies Record<
+  Extract<Item, { kind: 'purchase_order' }>['status'],
+  () => string
+>;
 
 /**
  * Groups current operational priorities and opens their authorized matching records. `live` is
@@ -99,8 +152,8 @@ export function OperationalMetrics({
   organizationId,
   live,
   initialRequest,
-  heading = 'Your operational pulse',
-  description = 'Find the work that needs your next move.',
+  heading = m.overview_pulse_title(),
+  description = m.overview_pulse_description(),
   metricGroups = groups,
 }: {
   organizationId: string;
@@ -108,13 +161,7 @@ export function OperationalMetrics({
   initialRequest?: OperationalMetricRequest;
   heading?: string;
   description?: string;
-  metricGroups?: {
-    id: string;
-    title: string;
-    subtitle: string;
-    icon: typeof CircleAlert;
-    metrics?: string[];
-  }[];
+  metricGroups?: MetricGroup[];
 }) {
   const initial = initialRequest ?? operationalMetricRequest;
   const { query, request, setRequest, connection } = usePagedMetric(
@@ -144,7 +191,9 @@ export function OperationalMetrics({
       <header className="operational-heading">
         <div>
           <p className="order-metrics-eyebrow">
-            {initialRequest ? 'Detection cohort' : 'Right now'}
+            {initialRequest
+              ? m.overview_cohort_eyebrow()
+              : m.overview_pulse_eyebrow()}
           </p>
           <h2>{heading}</h2>
           <p>{description}</p>
@@ -152,16 +201,16 @@ export function OperationalMetrics({
         <div className="operational-status">
           <Badge tone={connection === 'live' ? 'neutral' : 'warning'}>
             {connection === 'denied'
-              ? 'Access changed'
+              ? m.overview_live_access_changed()
               : connection === 'offline'
-                ? 'Offline'
+                ? m.overview_live_offline()
                 : query.isError
-                  ? 'Updates unavailable'
+                  ? m.overview_live_unavailable()
                   : connection === 'live'
-                    ? 'Live updates'
+                    ? m.overview_live_on()
                     : connection === 'syncing'
-                      ? 'Updating'
-                      : 'Connecting'}
+                      ? m.overview_live_updating()
+                      : m.overview_live_connecting()}
           </Badge>
           <Button
             variant="outline"
@@ -174,8 +223,8 @@ export function OperationalMetrics({
               connection === 'offline'
             }
           >
-            <RefreshCw size={14} />
-            Refresh summary
+            <RefreshCw size={14} aria-hidden="true" />
+            {m.overview_refresh_summary()}
           </Button>
         </div>
       </header>
@@ -184,17 +233,17 @@ export function OperationalMetrics({
           error
           title={
             connection === 'denied'
-              ? 'Workspace access changed'
+              ? m.overview_notice_access_title()
               : conflict
-                ? 'The matching records changed'
-                : 'Summary unavailable'
+                ? m.overview_notice_conflict_title()
+                : m.overview_notice_unavailable_title()
           }
         >
           {connection === 'denied'
-            ? 'Sign in again to continue.'
+            ? m.overview_notice_access_body()
             : connection === 'offline'
-              ? 'Reconnect to load current metrics.'
-              : 'Refresh the summary to load current records.'}
+              ? m.overview_notice_offline_body()
+              : m.overview_notice_unavailable_body()}
         </CaseNotice>
       ) : query.isPending ? (
         <CaseLoading />
@@ -209,8 +258,8 @@ export function OperationalMetrics({
                   <header>
                     <Icon size={17} aria-hidden="true" />
                     <div>
-                      <h3>{group.title}</h3>
-                      <p>{group.subtitle}</p>
+                      <h3>{group.title()}</h3>
+                      <p>{group.subtitle()}</p>
                     </div>
                   </header>
                   <div>
@@ -233,7 +282,7 @@ export function OperationalMetrics({
                           }}
                         >
                           <span className="operational-label">
-                            {m.definition.title}
+                            {metricTitle(m.definition)}
                             <small>{metricHint(m)}</small>
                           </span>
                           <strong className="operational-value">
@@ -248,8 +297,9 @@ export function OperationalMetrics({
             })}
           </div>
           <p className="operational-footnote">
-            Evaluated <WorkspaceDate value={data.asOf} /> · Select a metric to
-            inspect its definition and matching records.
+            {rich(m.overview_footnote, {
+              time: <WorkspaceDate value={data.asOf} />,
+            })}
           </p>
         </>
       ) : null}
@@ -265,11 +315,12 @@ export function OperationalMetrics({
         <DialogContent className="operational-dialog" finalFocus={trigger}>
           <DialogHeader>
             <DialogTitle>
-              {metric?.definition.title ?? 'Operational records'}
+              {metric
+                ? metricTitle(metric.definition)
+                : m.overview_dialog_title_fallback()}
             </DialogTitle>
             <DialogDescription>
-              Matching records from one snapshot. Live changes return this list
-              to the first page.
+              {m.overview_dialog_description()}
             </DialogDescription>
           </DialogHeader>
           {metric && data ? (
@@ -277,45 +328,48 @@ export function OperationalMetrics({
               <div className="order-cohort-definition">
                 <Badge tone="neutral">
                   {metric.coverage === 'complete'
-                    ? 'Complete within scope'
+                    ? m.overview_coverage_complete()
                     : metric.coverage === 'partial'
-                      ? 'Partial coverage'
-                      : 'No monitored population'}
+                      ? m.overview_coverage_partial()
+                      : m.overview_coverage_unavailable()}
                 </Badge>
-                <p>{metric.definition.description}</p>
-                <p>{metric.definition.timeSemantics}</p>
+                <p>{metricDescription(metric.definition)}</p>
+                <p>{metricTimeSemantics(metric.definition)}</p>
               </div>
               <dl className="order-cohort-facts">
                 <div>
                   <dt>
                     {metric.definition.id === 'resolution.time_to_outcome'
-                      ? 'Median verified duration'
+                      ? m.overview_fact_median_duration()
                       : metric.definition.unit === 'second'
-                        ? 'Age since first detection'
-                        : 'Known matches'}
+                        ? m.overview_fact_age()
+                        : m.overview_fact_counted()}
                   </dt>
                   <dd>{metricValue(metric)}</dd>
                 </div>
                 <div>
-                  <dt>Unknown classification</dt>
-                  <dd>{metric.unknownCount}</dd>
+                  <dt>{m.common_unknown()}</dt>
+                  <dd>{formatNumber(metric.unknownCount)}</dd>
                 </div>
                 <div>
-                  <dt>Population in scope</dt>
-                  <dd>{metric.population}</dd>
+                  <dt>{m.overview_fact_population()}</dt>
+                  <dd>{formatNumber(metric.population)}</dd>
                 </div>
               </dl>
               {metric.breakdown.length ? (
                 <div
                   className="operational-breakdown"
-                  aria-label="Reason breakdown"
+                  aria-label={m.overview_breakdown_label()}
                 >
                   {metric.breakdown.map((b) => (
                     <Badge
                       key={b.reason}
                       tone={b.count ? 'warning' : 'neutral'}
                     >
-                      {reasonLabels[b.reason] ?? b.reason} · {b.count}
+                      {m.overview_breakdown_item({
+                        reason: reasonLabel(b.reason),
+                        count: b.count,
+                      })}
                     </Badge>
                   ))}
                 </div>
@@ -323,18 +377,17 @@ export function OperationalMetrics({
               <p className="order-cohort-note">{metric.coverageExplanation}</p>
               {metric.definition.family === 'resolution' ? (
                 <p className="order-cohort-note">
-                  Data-through time:{' '}
-                  {metric.dataThrough ? (
-                    <WorkspaceDate value={metric.dataThrough} />
-                  ) : (
-                    'Unknown. No complete provider scan watermark.'
-                  )}
+                  {metric.dataThrough
+                    ? rich(m.overview_data_through, {
+                        time: <WorkspaceDate value={metric.dataThrough} />,
+                      })
+                    : m.overview_data_through_unknown()}
                 </p>
               ) : null}
               {metric.items.length ? (
                 <ul
                   className="operational-cohort"
-                  aria-label="Matching records"
+                  aria-label={m.overview_records_label()}
                 >
                   {metric.items.map((item) => (
                     <li key={item.id}>
@@ -344,32 +397,39 @@ export function OperationalMetrics({
                 </ul>
               ) : (
                 <div className="order-cohort-empty">
-                  <ClipboardList size={26} />
+                  <ClipboardList size={26} aria-hidden="true" />
                   <strong>
                     {metric.population === 0 &&
                     metric.definition.family === 'inventory'
-                      ? 'No active stock rules'
+                      ? m.overview_empty_no_rules_title()
                       : metric.definition.unit === 'second' &&
                           metric.unknownCount
-                        ? 'Detection time unavailable'
-                        : 'No matching records'}
+                        ? m.overview_empty_no_detection_title()
+                        : m.overview_empty_title()}
                   </strong>
                   <p>
                     {metric.unknownCount
-                      ? 'Unknown records prevent a complete total.'
+                      ? m.overview_empty_unknown_body()
                       : metric.coverage === 'unavailable'
                         ? metric.definition.family === 'resolution'
-                          ? 'No classified incidents in this environment and detection window. Check unknown environment or choose another cohort.'
-                          : 'Add a replenishment rule to monitor a stock position.'
-                        : 'This cohort is empty at the evaluation time.'}
+                          ? m.overview_empty_resolution_body()
+                          : m.overview_empty_inventory_body()
+                        : m.overview_empty_body()}
                   </p>
                 </div>
               )}
               <div className="order-cohort-pagination">
                 <span>
                   {metric.observedCount
-                    ? `${Math.min(data.offset + 1, metric.observedCount)}–${Math.min(data.offset + metric.items.length, metric.observedCount)} of ${metric.observedCount}`
-                    : '0 matching records'}{' '}
+                    ? m.overview_records_range({
+                        from: Math.min(data.offset + 1, metric.observedCount),
+                        to: Math.min(
+                          data.offset + metric.items.length,
+                          metric.observedCount,
+                        ),
+                        total: metric.observedCount,
+                      })
+                    : m.overview_records_none()}{' '}
                   · <WorkspaceDate value={data.asOf} />
                 </span>
                 <div>
@@ -386,7 +446,7 @@ export function OperationalMetrics({
                       })
                     }
                   >
-                    Previous
+                    {m.common_previous()}
                   </Button>
                   <Button
                     variant="outline"
@@ -405,7 +465,7 @@ export function OperationalMetrics({
                       })
                     }
                   >
-                    Next
+                    {m.common_next()}
                   </Button>
                 </div>
               </div>
@@ -417,13 +477,13 @@ export function OperationalMetrics({
               error
               title={
                 conflict
-                  ? 'The matching records changed'
-                  : 'Records unavailable'
+                  ? m.overview_notice_conflict_title()
+                  : m.overview_records_error_title()
               }
             >
-              Refresh to load current records.{' '}
+              {m.overview_records_error_body()}{' '}
               <Button variant="outline" onClick={refresh}>
-                Refresh summary
+                {m.overview_refresh_summary()}
               </Button>
             </CaseNotice>
           )}
@@ -439,59 +499,86 @@ function metricValue(metric: Metric) {
     metric.total === null &&
     metric.coverage !== 'unavailable'
   )
-    return `${metric.observedCount} known`;
+    return m.overview_value_known({ count: metric.observedCount });
   if (metric.definition.unit === 'second')
-    return metric.value === null ? '—' : age(metric.value);
+    return metric.value === null
+      ? m.common_empty_value()
+      : duration(metric.value);
 
-  return metric.coverage === 'unavailable'
-    ? '—'
-    : (metric.value?.toLocaleString() ?? '—');
+  return metric.coverage === 'unavailable' || metric.value === null
+    ? m.common_empty_value()
+    : formatNumber(metric.value);
 }
 
 function metricHint(metric: Metric) {
   if (metric.definition.family === 'resolution')
     return metric.coverage === 'unavailable'
-      ? 'No classified cohort'
+      ? m.overview_hint_resolution_empty()
       : metric.unknownCount
-        ? `${metric.unknownCount} unknown · partial coverage`
+        ? m.overview_hint_resolution_unknown({ count: metric.unknownCount })
         : metric.definition.id === 'resolution.autonomous'
-          ? 'Eligible · verified · complete attribution'
-          : 'Each incident counted once';
+          ? m.overview_hint_resolution_autonomous()
+          : m.overview_hint_resolution_default();
   if (metric.definition.unit === 'second')
     return metric.unknownCount
-      ? 'Unknown detection times'
-      : 'Since first detection';
+      ? m.overview_hint_duration_unknown()
+      : m.overview_hint_duration_default();
   if (metric.definition.family === 'inventory') {
-    if (!metric.population) return 'No active rules';
-    if (metric.definition.id === 'inventory.below_minimum')
-      return `${metric.breakdown.find((b) => b.reason === 'no_commitment')?.count ?? 0} without a commitment${metric.unknownCount ? ` · ${metric.unknownCount} unknown` : ''}`;
+    if (!metric.population) return m.overview_hint_inventory_no_rules();
+    if (metric.definition.id === 'inventory.below_minimum') {
+      const count =
+        metric.breakdown.find((b) => b.reason === 'no_commitment')?.count ?? 0;
 
-    return 'Configured source · five-minute freshness';
+      return metric.unknownCount
+        ? m.overview_hint_inventory_not_ordered_unknown({
+            count,
+            unknown: metric.unknownCount,
+          })
+        : m.overview_hint_inventory_not_ordered({ count });
+    }
+
+    return m.overview_hint_inventory_default();
   }
   if (metric.definition.id === 'cases.attention')
     return (
       metric.breakdown
-        .filter((b) => b.count)
-        .map((b) => `${b.count} ${reasonLabels[b.reason]?.toLowerCase()}`)
-        .join(' · ') || 'No intervention requested'
+        .filter((b) => b.count && attentionHints[b.reason])
+        .map((b) => attentionHints[b.reason]!({ count: b.count }))
+        .join(' · ') || m.overview_hint_attention_none()
     );
   if (metric.definition.family === 'procurement')
     return metric.definition.id.endsWith('.draft')
-      ? 'Awaiting the next step'
-      : 'Recorded operational commitments';
+      ? m.overview_hint_procurement_draft()
+      : m.overview_hint_procurement_open();
 
   return metric.definition.family === 'connections'
-    ? 'Each connection counted once'
-    : 'Across all subject kinds';
+    ? m.overview_hint_connections()
+    : m.overview_hint_default();
 }
 
-function age(seconds: number) {
-  if (seconds < 60) return `${Math.floor(seconds)}s`;
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
+const durationUnits = [
+  ['day', 86400],
+  ['hour', 3600],
+  ['minute', 60],
+] as const;
 
-  return `${Math.floor(seconds / 86400)}d`;
+// Shows a duration in its largest whole unit, such as “3h”, so values stay compact in the grid.
+function duration(seconds: number) {
+  const [unit, size] = durationUnits.find(([, size]) => seconds >= size) ?? [
+    'second',
+    1,
+  ];
+
+  return formatNumber(Math.floor(seconds / size), {
+    style: 'unit',
+    unit,
+    unitDisplay: 'narrow',
+  });
 }
+
+// Describes how long ago something happened from an age reported by the server.
+const ago = (seconds: number) =>
+  formatRelativeTime(Date.now() - seconds * 1000);
 
 function CohortItem({
   item,
@@ -508,27 +595,24 @@ function CohortItem({
           params={{ organizationId, exceptionId: item.id }}
           search={{ view: item.outcome === 'verified' ? 'history' : 'active' }}
         >
-          {item.title.replaceAll('_', ' ')} <ArrowUpRight size={13} />
+          {item.title.replaceAll('_', ' ')}{' '}
+          <ArrowUpRight size={13} aria-hidden="true" />
         </Link>
         <span>
           <Badge tone={item.involvement === 'unknown' ? 'warning' : 'neutral'}>
-            {item.involvement === 'none'
-              ? 'Complete attribution · no human work'
-              : item.involvement === 'human'
-                ? 'Human involvement recorded'
-                : 'Attribution unknown'}
+            {involvementLabels[item.involvement]()}
           </Badge>{' '}
-          <Badge tone="neutral">{item.eligibility}</Badge>
+          <Badge tone="neutral">{eligibilityLabels[item.eligibility]()}</Badge>
         </span>
         <small>
-          First detected <WorkspaceDate value={item.detectedAt} /> ·{' '}
-          {item.verifiedAt ? (
-            <>
-              Verified <WorkspaceDate value={item.verifiedAt} />
-            </>
-          ) : (
-            'Awaiting independent verification'
-          )}
+          {item.verifiedAt
+            ? rich(m.overview_resolution_verified, {
+                detected: <WorkspaceDate value={item.detectedAt} />,
+                verified: <WorkspaceDate value={item.verifiedAt} />,
+              })
+            : rich(m.overview_resolution_pending, {
+                detected: <WorkspaceDate value={item.detectedAt} />,
+              })}
         </small>
         <ResolutionEvidence organizationId={organizationId} item={item} />
       </div>
@@ -543,25 +627,23 @@ function CohortItem({
             search={{ view: 'active' }}
           >
             {item.title.replaceAll('_', ' ')}
-            <ArrowUpRight size={13} />
+            <ArrowUpRight size={13} aria-hidden="true" />
           </Link>
           <span>
             {item.subjectKind.replaceAll('_', ' ')} · {item.subjectId}
           </span>
           <small>
-            {item.detectedAt && item.ageSeconds !== null ? (
-              <>
-                First detected <WorkspaceDate value={item.detectedAt} /> ·{' '}
-                {age(item.ageSeconds)} ago
-              </>
-            ) : (
-              'Detection time unknown'
-            )}
+            {item.detectedAt && item.ageSeconds !== null
+              ? rich(m.overview_case_detected, {
+                  time: <WorkspaceDate value={item.detectedAt} />,
+                  ago: ago(item.ageSeconds),
+                })
+              : m.overview_case_detected_unknown()}
           </small>
         </div>
         <Badge tone={item.reason ? 'warning' : 'neutral'}>
           {item.reason
-            ? reasonLabels[item.reason]
+            ? reasonLabel(item.reason)
             : item.state.replaceAll('_', ' ')}
         </Badge>
       </>
@@ -575,18 +657,26 @@ function CohortItem({
             params={{ organizationId, purchaseOrderId: item.id }}
           >
             {item.reference}
-            <ArrowUpRight size={13} />
+            <ArrowUpRight size={13} aria-hidden="true" />
           </Link>
           <span>
             {item.supplierName} ·{' '}
-            {item.authority === 'luma' ? 'Luma-managed' : 'External authority'}
+            {item.authority === 'luma'
+              ? m.overview_po_authority_luma()
+              : m.overview_po_authority_external()}
           </span>
           <small>
-            Created <WorkspaceDate value={item.createdAt} />
-            {item.ageSeconds !== null ? ` · ${age(item.ageSeconds)} ago` : ''}
+            {item.ageSeconds !== null
+              ? rich(m.overview_po_created_age, {
+                  time: <WorkspaceDate value={item.createdAt} />,
+                  ago: ago(item.ageSeconds),
+                })
+              : rich(m.overview_po_created, {
+                  time: <WorkspaceDate value={item.createdAt} />,
+                })}
           </small>
         </div>
-        <Badge tone="neutral">{item.status}</Badge>
+        <Badge tone="neutral">{purchaseOrderStatusLabels[item.status]()}</Badge>
       </>
     );
   if (item.kind === 'connection')
@@ -597,19 +687,17 @@ function CohortItem({
             {item.label}
           </ConnectionLink>
           <small>
-            {item.lastObservedAt ? (
-              <>
-                Last observed <WorkspaceDate value={item.lastObservedAt} />
-              </>
-            ) : (
-              'No permitted read observations'
-            )}
+            {item.lastObservedAt
+              ? rich(m.overview_connection_last_read, {
+                  time: <WorkspaceDate value={item.lastObservedAt} />,
+                })
+              : m.overview_connection_never_read()}
           </small>
         </div>
         <div className="operational-breakdown">
           {item.reasons.map((reason) => (
             <Badge key={reason} tone="warning">
-              {reasonLabels[reason] ?? reason}
+              {reasonLabel(reason)}
             </Badge>
           ))}
         </div>
@@ -622,31 +710,42 @@ function CohortItem({
         <strong>{item.sku}</strong>
         <span>
           {item.reason
-            ? reasonLabels[item.reason]
-            : `${item.available} ${item.unit ?? ''} available · minimum ${item.minimum}`}
+            ? reasonLabel(item.reason)
+            : item.available === null
+              ? m.overview_stock_unknown()
+              : item.unit
+                ? m.overview_stock_available({
+                    available: item.available,
+                    unit: quantityUnit(item.unit, item.available),
+                    minimum: item.minimum,
+                  })
+                : m.overview_stock_available_no_unit({
+                    available: item.available,
+                    minimum: item.minimum,
+                  })}
         </span>
-        <small>Position {item.id.slice(0, 8)}</small>
+        <small>{m.overview_stock_position({ id: item.id.slice(0, 8) })}</small>
         <div className="operational-links">
           <Link
             to="/app/$organizationId/inventory/$positionId"
             params={{ organizationId, positionId: item.id }}
           >
-            Inspect stock
-            <ArrowUpRight size={12} />
+            {m.overview_stock_open_position()}
+            <ArrowUpRight size={12} aria-hidden="true" />
           </Link>
           <Link
             to="/app/$organizationId/workflows/$definitionId"
             params={{ organizationId, definitionId: 'inventory-replenishment' }}
             hash={`rule-${item.ruleId}`}
           >
-            Stock rule
-            <ArrowUpRight size={12} />
+            {m.overview_stock_open_rule()}
+            <ArrowUpRight size={12} aria-hidden="true" />
           </Link>
           <ConnectionLink
             id={item.connectionId}
             organizationId={organizationId}
           >
-            Configured connection
+            {m.overview_stock_open_connection()}
           </ConnectionLink>
         </div>
         {item.commitmentIds.map((id) => (
@@ -655,8 +754,8 @@ function CohortItem({
             to="/app/$organizationId/procurement/$purchaseOrderId"
             params={{ organizationId, purchaseOrderId: id }}
           >
-            Commitment {id.slice(0, 8)}
-            <ArrowUpRight size={12} />
+            {m.overview_stock_purchase_order({ id: id.slice(0, 8) })}
+            <ArrowUpRight size={12} aria-hidden="true" />
           </Link>
         ))}
       </div>
@@ -664,10 +763,10 @@ function CohortItem({
         tone={item.reason || !item.commitmentIds.length ? 'warning' : 'neutral'}
       >
         {item.reason
-          ? 'Stock unknown'
+          ? m.overview_stock_unknown()
           : item.commitmentIds.length
-            ? 'Existing commitment'
-            : 'No commitment'}
+            ? m.overview_reason_existing_commitment()
+            : m.overview_reason_no_commitment()}
       </Badge>
     </>
   );
@@ -689,7 +788,7 @@ function ConnectionLink({
       hash={`connection-${id}`}
     >
       {children}
-      <ArrowUpRight size={12} />
+      <ArrowUpRight size={12} aria-hidden="true" />
     </Link>
   );
 }

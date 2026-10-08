@@ -1,10 +1,14 @@
 import './readiness.css';
 
 import type { WorkflowCoverage } from '@luma/api-contract';
+import { formatNumber } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button, buttonVariants } from '@luma/ui/components/primitives/button';
 import { Card } from '@luma/ui/components/primitives/card';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
+import { quantityUnit } from '@luma/ui/lib/units';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { ShieldCheck } from 'lucide-react';
@@ -76,31 +80,31 @@ export function WorkflowCoverageView({
     >
       <div className="workflow-coverage-head">
         <div>
-          <h2 id={title}>Replenishment</h2>
+          <h2 id={title}>{m.workflows_coverage_title()}</h2>
           <p>
             {item
               ? readinessHeadline(item.readiness)
               : loading
-                ? 'Checking readiness…'
-                : 'Readiness unknown'}
+                ? m.workflows_coverage_checking()
+                : m.workflows_coverage_unknown()}
           </p>
         </div>
         {item ? <ReadinessPills readiness={item.readiness} /> : null}
       </div>
       {loading ? (
         <p role="status" className="workflow-coverage-rule">
-          Checking whether a stock rule covers this position…
+          {m.workflows_coverage_loading()}
         </p>
       ) : error ? (
         <Alert tone="danger" role="alert">
-          Replenishment readiness is unavailable. {error}{' '}
+          {m.workflows_coverage_error({ error })}{' '}
           <Button variant="outline" size="sm" onClick={retry}>
-            Retry
+            {m.common_retry()}
           </Button>
         </Alert>
       ) : !item ? (
         <p className="workflow-coverage-rule">
-          No workflow covers this record.
+          {m.workflows_coverage_none_for_record()}
         </p>
       ) : (
         <CoverageDetail organizationId={organizationId} item={item} />
@@ -117,7 +121,16 @@ function CoverageDetail({
   item: WorkflowCoverage['items'][number];
 }) {
   const { readiness, rule, stock, latestRun } = item;
-  const unit = stock?.unit ?? 'units';
+  const unit = (value: number) =>
+    stock?.unit ? quantityUnit(stock.unit, value) : m.workflows_unit_fallback();
+  const quantity = (value: number) => (
+    <strong>
+      {m.workflows_coverage_quantity({
+        quantity: formatNumber(value),
+        unit: unit(value),
+      })}
+    </strong>
+  );
   const { nextAction } = readiness;
   const setup = nextAction.repair?.destination === 'workflow_rules';
   const others = readiness.issues.filter(
@@ -130,16 +143,15 @@ function CoverageDetail({
     <>
       {rule?.active ? (
         <p className="workflow-coverage-rule">
-          Reorders from <strong>{rule.supplier}</strong> when available stock
-          falls below{' '}
-          <strong>
-            {rule.minimum} {unit}
-          </strong>
-          , proposing enough to reach{' '}
-          <strong>
-            {rule.target} {unit}
-          </strong>
-          . Drafts above {rule.approvalQuantity} {unit} are high risk.
+          {rich(m.workflows_coverage_rule, {
+            supplier: <strong>{rule.supplier}</strong>,
+            minimum: quantity(rule.minimum),
+            target: quantity(rule.target),
+            limit: m.workflows_coverage_quantity({
+              quantity: formatNumber(rule.approvalQuantity),
+              unit: unit(rule.approvalQuantity),
+            }),
+          })}
         </p>
       ) : (
         <p className="workflow-coverage-rule">
@@ -147,12 +159,12 @@ function CoverageDetail({
         </p>
       )}
       <div className="workflow-next" data-state={readiness.state}>
-        <span className="workflow-next-label">Next</span>
+        <span className="workflow-next-label">{m.workflows_next()}</span>
         <div>
           <strong>{nextAction.label}</strong>
           <p>
             {setup && !item.canManage
-              ? 'Your role doesn’t include Manage procurement, so you can’t set up a stock rule for this position.'
+              ? m.workflows_coverage_cannot_manage()
               : nextAction.description}
           </p>
         </div>
@@ -169,7 +181,10 @@ function CoverageDetail({
         ) : null}
       </div>
       {others.length ? (
-        <ul className="workflow-issues" aria-label="Readiness issues">
+        <ul
+          className="workflow-issues"
+          aria-label={m.workflows_readiness_issues_label()}
+        >
           {others.map((issue) => (
             <li key={issue.code} data-severity={issue.severity}>
               <span className="workflow-issue-dot" aria-hidden="true" />
@@ -193,7 +208,10 @@ function CoverageDetail({
       </p>
       {latestRun ? (
         <p className="workflow-coverage-rule">
-          Latest run: {latestRun.summary} <WorkspaceDate value={latestRun.at} />
+          {rich(m.workflows_coverage_latest_run, {
+            summary: latestRun.summary,
+            date: <WorkspaceDate value={latestRun.at} />,
+          })}
         </p>
       ) : null}
       <div className="workflow-coverage-links">
@@ -209,7 +227,7 @@ function CoverageDetail({
             organizationId={organizationId}
             definitionId={item.definitionId}
             repair={{
-              label: 'Purchase order',
+              label: m.workflows_coverage_purchase_order(),
               destination: 'purchase_order',
               recordId: latestRun.purchaseOrderId,
             }}
@@ -220,7 +238,7 @@ function CoverageDetail({
             organizationId={organizationId}
             definitionId={item.definitionId}
             repair={{
-              label: 'Run evidence',
+              label: m.workflows_coverage_run_details(),
               destination: 'workflow_activity',
               recordId: latestRun.runId,
             }}

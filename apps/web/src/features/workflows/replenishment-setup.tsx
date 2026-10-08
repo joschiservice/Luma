@@ -5,6 +5,9 @@ import type {
   ReplenishmentSetup,
   WorkflowDetail,
 } from '@luma/api-contract';
+import { formatNumber } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -12,6 +15,7 @@ import { Input } from '@luma/ui/components/primitives/input';
 import { Select } from '@luma/ui/components/primitives/select';
 import { StatePill } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
+import { quantityUnit } from '@luma/ui/lib/units';
 import { useMutation } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { ArrowRight, Search, ShieldCheck } from 'lucide-react';
@@ -56,6 +60,19 @@ function validQuantities(q: Quantities) {
     limit <= 1000000
   );
 }
+
+const availableLabel = (available: number | null) =>
+  available === null ? m.common_unknown() : formatNumber(available);
+
+const previewOutcomes = {
+  ready: m.workflows_setup_outcome_ready,
+  covered: m.workflows_setup_outcome_covered,
+  invalid: m.workflows_setup_outcome_invalid,
+  unavailable: m.workflows_setup_outcome_unavailable,
+} satisfies Record<
+  ReplenishmentPreview['items'][number]['outcome'],
+  () => string
+>;
 
 const uncertainError = (error: unknown) =>
   !(error instanceof IdentityError) || error.status >= 500;
@@ -210,11 +227,14 @@ export function ReplenishmentSetupFlow({
           </div>
         </div>
         <p className="replenishment-setup-note">
-          Ordering from <strong>{preview.supplier.name}</strong>. Each rule
-          covers exactly one stock position. Positions you didn’t select aren’t
-          included.
+          {rich(m.workflows_setup_ordering_from, {
+            supplier: <strong>{preview.supplier.name}</strong>,
+          })}
         </p>
-        <ul className="replenishment-targets" aria-label="Rules to activate">
+        <ul
+          className="replenishment-targets"
+          aria-label={m.workflows_setup_targets_label()}
+        >
           {preview.items.map((item) => {
             const key = keyOf(item);
             const q = quantities(key);
@@ -232,15 +252,26 @@ export function ReplenishmentSetupFlow({
               <li key={key} data-outcome={item.outcome}>
                 <div className="replenishment-target-head">
                   <div>
-                    <strong>{item.sku ?? 'Unknown SKU'}</strong>
+                    <strong>
+                      {item.sku ?? m.workflows_setup_unknown_sku()}
+                    </strong>
                     <small>
-                      {item.available ?? 'Unknown'} {item.unit ?? ''} available
-                      {item.observedAt ? (
-                        <>
-                          {' · read '}
-                          <WorkspaceDate value={item.observedAt} />
-                        </>
-                      ) : null}
+                      {item.observedAt
+                        ? rich(m.workflows_setup_available_read, {
+                            available: availableLabel(item.available),
+                            unit: quantityUnit(
+                              item.unit ?? '',
+                              item.available ?? '',
+                            ),
+                            date: <WorkspaceDate value={item.observedAt} />,
+                          })
+                        : m.workflows_setup_available({
+                            available: availableLabel(item.available),
+                            unit: quantityUnit(
+                              item.unit ?? '',
+                              item.available ?? '',
+                            ),
+                          })}
                     </small>
                   </div>
                   <Badge
@@ -252,48 +283,48 @@ export function ReplenishmentSetupFlow({
                           : 'warning'
                     }
                   >
-                    {item.outcome === 'ready'
-                      ? 'Will activate'
-                      : item.outcome === 'covered'
-                        ? 'Already covered'
-                        : item.outcome === 'invalid'
-                          ? 'Check quantities'
-                          : 'Unavailable'}
+                    {previewOutcomes[item.outcome]()}
                   </Badge>
                 </div>
                 {editable ? (
                   <div className="replenishment-target-quantities">
                     <label>
-                      Minimum
+                      {m.workflows_setup_minimum()}
                       <Input
                         type="number"
                         min="0"
                         step="1"
-                        aria-label={`Minimum stock for ${item.sku}`}
+                        aria-label={m.workflows_setup_minimum_for({
+                          sku: item.sku ?? m.workflows_setup_unknown_sku(),
+                        })}
                         value={q.minimum}
                         disabled={activating.isPending}
                         onChange={(e) => update('minimum', e.target.value)}
                       />
                     </label>
                     <label>
-                      Target
+                      {m.workflows_setup_target()}
                       <Input
                         type="number"
                         min="1"
                         step="1"
-                        aria-label={`Target stock for ${item.sku}`}
+                        aria-label={m.workflows_setup_target_for({
+                          sku: item.sku ?? m.workflows_setup_unknown_sku(),
+                        })}
                         value={q.target}
                         disabled={activating.isPending}
                         onChange={(e) => update('target', e.target.value)}
                       />
                     </label>
                     <label>
-                      High risk above
+                      {m.workflows_setup_high_risk()}
                       <Input
                         type="number"
                         min="0"
                         step="1"
-                        aria-label={`High-risk quantity for ${item.sku}`}
+                        aria-label={m.workflows_setup_high_risk_for({
+                          sku: item.sku ?? m.workflows_setup_unknown_sku(),
+                        })}
                         value={q.approvalQuantity}
                         disabled={activating.isPending}
                         onChange={(e) =>
@@ -305,13 +336,14 @@ export function ReplenishmentSetupFlow({
                 ) : null}
                 <p>
                   {stale && editable
-                    ? 'Quantities changed. Update the preview to check them.'
+                    ? m.workflows_setup_quantities_changed()
                     : item.message}
                 </p>
                 {!stale && item.risk ? (
                   <p className="replenishment-target-proposal">
-                    {item.risk === 'high' ? 'High risk' : 'Medium risk'} · needs
-                    approval
+                    {item.risk === 'high'
+                      ? m.workflows_setup_high_risk_note()
+                      : m.workflows_setup_medium_risk_note()}
                   </p>
                 ) : null}
               </li>
@@ -320,13 +352,16 @@ export function ReplenishmentSetupFlow({
         </ul>
         <p className="replenishment-setup-note" aria-live="polite">
           {stale
-            ? 'Update the preview before activating.'
-            : `${ready.length} ${ready.length === 1 ? 'rule' : 'rules'} will activate. ${preview.items.length - ready.length} ${preview.items.length - ready.length === 1 ? 'position stays' : 'positions stay'} unchanged.`}
+            ? m.workflows_setup_update_first()
+            : m.workflows_setup_review_summary({
+                ready: ready.length,
+                unchanged: preview.items.length - ready.length,
+              })}
         </p>
         {failure ? (
           <Alert tone="danger" role="alert">
             {uncertainError(failure) && activating.error
-              ? 'Luma couldn’t confirm the activations. Retry; the same requests never create a second rule.'
+              ? m.workflows_setup_unconfirmed()
               : workflowError(failure)}
           </Alert>
         ) : null}
@@ -344,7 +379,7 @@ export function ReplenishmentSetupFlow({
               setStep('choose');
             }}
           >
-            Back
+            {m.common_back()}
           </Button>
           {stale ? (
             <Button
@@ -354,14 +389,16 @@ export function ReplenishmentSetupFlow({
               }
               onClick={() => previewing.mutate()}
             >
-              {previewing.isPending ? 'Checking…' : 'Update preview'}
+              {previewing.isPending
+                ? m.workflows_setup_checking()
+                : m.workflows_setup_update_preview()}
             </Button>
           ) : activating.error && uncertainError(activating.error) ? (
             <Button
               disabled={activating.isPending}
               onClick={() => activating.mutate(submitted)}
             >
-              Retry activation
+              {m.workflows_setup_retry_activation()}
             </Button>
           ) : (
             <Button
@@ -369,8 +406,8 @@ export function ReplenishmentSetupFlow({
               onClick={activate}
             >
               {activating.isPending
-                ? 'Activating…'
-                : `Activate ${ready.length} ${ready.length === 1 ? 'rule' : 'rules'}`}
+                ? m.workflows_setup_activating()
+                : m.workflows_setup_activate({ count: ready.length })}
             </Button>
           )}
         </div>
@@ -395,23 +432,23 @@ export function ReplenishmentSetupFlow({
     >
       {!setup.suppliers.length ? (
         <Alert tone="warning">
-          Add the supplier you reorder from first.{' '}
+          {m.workflows_setup_add_supplier_first()}{' '}
           <Link
             to="/app/$organizationId/procurement"
             params={{ organizationId }}
             search={{ view: 'suppliers', q: '', status: '' }}
           >
-            Add a supplier in Procurement <ArrowRight size={13} />
+            {m.workflows_rules_add_supplier()} <ArrowRight size={13} />
           </Link>
         </Alert>
       ) : (
         <label>
-          Supplier
+          {m.workflows_setup_supplier()}
           <Select
-            aria-label="Supplier"
+            aria-label={m.workflows_setup_supplier()}
             value={supplierId}
             onValueChange={(value) => setSupplierId(value ?? '')}
-            placeholder="Choose supplier"
+            placeholder={m.workflows_setup_supplier_placeholder()}
             options={setup.suppliers.map((s) => ({
               value: s.id,
               label: s.name,
@@ -420,30 +457,36 @@ export function ReplenishmentSetupFlow({
         </label>
       )}
       <fieldset className="replenishment-setup-positions">
-        <legend>Stock positions</legend>
+        <legend>{m.workflows_setup_positions()}</legend>
         <div className="replenishment-filter">
           <Search size={15} aria-hidden="true" />
           <Input
             type="search"
-            aria-label="Filter stock positions"
-            placeholder="Filter by SKU"
+            aria-label={m.workflows_setup_filter_label()}
+            placeholder={m.workflows_setup_filter_placeholder()}
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
           />
         </div>
         <p className="replenishment-setup-note" aria-live="polite">
-          {selected.length} of {setupLimit} selected
           {selected.length >= setupLimit
-            ? '. Set up more positions in another batch.'
-            : ''}
+            ? m.workflows_setup_selected_full({
+                selected: selected.length,
+                limit: setupLimit,
+              })
+            : m.workflows_setup_selected({
+                selected: selected.length,
+                limit: setupLimit,
+              })}
         </p>
         {!setup.positions.length ? (
           <p className="replenishment-setup-note">
-            No stock positions yet. Connect an inventory source and let Luma
-            read its stock.
+            {m.workflows_setup_no_positions()}
           </p>
         ) : !visible.length ? (
-          <p className="replenishment-setup-note">No SKU matches “{filter}”.</p>
+          <p className="replenishment-setup-note">
+            {m.workflows_setup_no_match({ filter })}
+          </p>
         ) : null}
         <div className="replenishment-position-list">
           {visible.map((position) => (
@@ -471,10 +514,10 @@ export function ReplenishmentSetupFlow({
         </div>
       </fieldset>
       <fieldset className="replenishment-setup-defaults">
-        <legend>Quantities</legend>
+        <legend>{m.workflows_setup_quantities()}</legend>
         <div className="replenishment-form-pair">
           <label>
-            Minimum stock
+            {m.workflows_setup_minimum_stock()}
             <Input
               type="number"
               min="0"
@@ -488,7 +531,7 @@ export function ReplenishmentSetupFlow({
             />
           </label>
           <label>
-            Target stock
+            {m.workflows_setup_target_stock()}
             <Input
               type="number"
               min="1"
@@ -503,7 +546,7 @@ export function ReplenishmentSetupFlow({
           </label>
         </div>
         <label>
-          High-risk quantity threshold
+          {m.workflows_setup_high_risk_threshold()}
           <Input
             type="number"
             min="0"
@@ -517,9 +560,7 @@ export function ReplenishmentSetupFlow({
           />
         </label>
         <p className="replenishment-setup-note">
-          When stock falls below the minimum, Luma proposes enough to reach the
-          target. Drafts above the threshold are high risk. Every draft still
-          needs approval. You can adjust each position on the next step.
+          {m.workflows_setup_quantities_help()}
         </p>
       </fieldset>
       {previewing.error ? (
@@ -529,17 +570,19 @@ export function ReplenishmentSetupFlow({
       ) : null}
       {selected.length && !validQuantities(defaults) ? (
         <p className="replenishment-setup-note" role="status">
-          Use whole quantities, with target stock above the minimum.
+          {m.workflows_setup_whole_numbers()}
         </p>
       ) : null}
       <div className="workflow-dialog-actions">
         <Button type="button" variant="outline" onClick={() => done(false)}>
-          Cancel
+          {m.common_cancel()}
         </Button>
         <Button type="submit" disabled={!canPreview || previewing.isPending}>
           {previewing.isPending
-            ? 'Checking…'
-            : `Preview ${selected.length || ''} ${selected.length === 1 ? 'rule' : 'rules'}`}
+            ? m.workflows_setup_checking()
+            : selected.length
+              ? m.workflows_setup_preview({ count: selected.length })
+              : m.workflows_setup_preview_none()}
         </Button>
       </div>
     </form>
@@ -575,10 +618,21 @@ function PositionOption({
       <span>
         <strong>{position.sku}</strong>
         <small>
-          {position.available ?? 'Unknown'} {position.unit} available
-          {showSource ? ` · source ${position.connectionId.slice(0, 8)}` : ''}
-          {covered ? ' · already has an active rule' : ''}
-          {otherSource ? ' · another source is selected' : ''}
+          {[
+            m.workflows_setup_available({
+              available: availableLabel(position.available),
+              unit: quantityUnit(position.unit, position.available ?? ''),
+            }),
+            ...(showSource
+              ? [
+                  m.workflows_setup_position_source({
+                    source: position.connectionId.slice(0, 8),
+                  }),
+                ]
+              : []),
+            ...(covered ? [m.workflows_setup_position_covered()] : []),
+            ...(otherSource ? [m.workflows_setup_position_other_source()] : []),
+          ].join(' · ')}
         </small>
       </span>
     </label>
@@ -616,11 +670,30 @@ function SetupResults({
   return (
     <div className="replenishment-setup">
       <p className="replenishment-setup-note" role="status">
-        {count('activated')} activated
-        {count('failed') ? ` · ${count('failed')} not activated` : ''}
-        {count('uncertain') ? ` · ${count('uncertain')} unconfirmed` : ''}
+        {[
+          m.workflows_setup_result_activated_count({
+            count: count('activated'),
+          }),
+          ...(count('failed')
+            ? [
+                m.workflows_setup_result_failed_count({
+                  count: count('failed'),
+                }),
+              ]
+            : []),
+          ...(count('uncertain')
+            ? [
+                m.workflows_setup_result_uncertain_count({
+                  count: count('uncertain'),
+                }),
+              ]
+            : []),
+        ].join(' · ')}
       </p>
-      <ul className="replenishment-targets" aria-label="Activation results">
+      <ul
+        className="replenishment-targets"
+        aria-label={m.workflows_setup_results_label()}
+      >
         {results.map((result) => (
           <li key={result.id} data-outcome={result.status}>
             <div className="replenishment-target-head">
@@ -635,12 +708,12 @@ function SetupResults({
                 }
               >
                 {result.status === 'activated'
-                  ? 'Activated'
+                  ? m.workflows_setup_result_activated()
                   : result.status === 'uncertain'
-                    ? 'Unconfirmed'
+                    ? m.workflows_setup_result_uncertain()
                     : result.code === 'covered'
-                      ? 'Already covered'
-                      : 'Not activated'}
+                      ? m.workflows_setup_result_covered()
+                      : m.workflows_setup_result_failed()}
               </StatePill>
             </div>
             <p>{result.message}</p>
@@ -650,7 +723,8 @@ function SetupResults({
                 to="/app/$organizationId/inventory/$positionId"
                 params={{ organizationId, positionId: result.positionId }}
               >
-                Stock record <ArrowRight size={13} aria-hidden="true" />
+                {m.workflows_rule_stock_record()}{' '}
+                <ArrowRight size={13} aria-hidden="true" />
               </Link>
             ) : null}
           </li>
@@ -668,11 +742,15 @@ function SetupResults({
             disabled={retrying}
             onClick={() => retry(uncertain)}
           >
-            {retrying ? 'Retrying…' : `Retry ${uncertain.length} unconfirmed`}
+            {retrying
+              ? m.workflows_setup_retrying()
+              : m.workflows_setup_retry_unconfirmed({
+                  count: uncertain.length,
+                })}
           </Button>
         ) : null}
         <Button disabled={retrying} onClick={done}>
-          Done
+          {m.common_done()}
         </Button>
       </div>
     </div>

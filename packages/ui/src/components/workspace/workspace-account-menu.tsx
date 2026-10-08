@@ -1,7 +1,11 @@
 import { Menu } from '@base-ui/react/menu';
+import { localeNames } from '@luma/i18n/locales';
+import { m } from '@luma/i18n/messages';
+import { getLocale, type Locale, locales, setLocale } from '@luma/i18n/runtime';
 import {
   BookOpen,
   Check,
+  Languages,
   LogOut,
   Monitor,
   Moon,
@@ -15,14 +19,16 @@ import { initialsOf } from './workspace-switcher';
 export type ThemeChoice = 'system' | 'light' | 'dark';
 
 const themes = [
-  { value: 'system', label: 'System', Icon: Monitor },
-  { value: 'light', label: 'Light', Icon: Sun },
-  { value: 'dark', label: 'Dark', Icon: Moon },
+  { value: 'system', label: m.ui_account_theme_system, Icon: Monitor },
+  { value: 'light', label: m.ui_account_theme_light, Icon: Sun },
+  { value: 'dark', label: m.ui_account_theme_dark, Icon: Moon },
 ] as const;
 
 /**
- * Shows the signed-in person with their appearance, settings, documentation and
- * sign-out actions. The host stores the theme and supplies the navigation links.
+ * Shows the signed-in person with their appearance, language, settings, documentation and
+ * sign-out actions. The host stores the theme and supplies the navigation links. Choosing
+ * another language stores it in a cookie and reloads the page, so server-rendered text and
+ * formatting switch together.
  */
 export function WorkspaceAccountMenu({
   name,
@@ -43,7 +49,7 @@ export function WorkspaceAccountMenu({
     <Menu.Root>
       <Menu.Trigger
         className="account-trigger"
-        aria-label={`${name}. Open account menu`}
+        aria-label={m.ui_account_menu_open({ name })}
       >
         <span className="account-avatar" aria-hidden="true">
           {initialsOf(name, 'U')}
@@ -68,7 +74,7 @@ export function WorkspaceAccountMenu({
             <Menu.Separator className="workspace-menu-separator" />
             <Menu.Group>
               <Menu.GroupLabel className="workspace-menu-label">
-                Appearance
+                {m.ui_account_appearance()}
               </Menu.GroupLabel>
               <Menu.RadioGroup
                 value={theme}
@@ -82,7 +88,36 @@ export function WorkspaceAccountMenu({
                     closeOnClick={false}
                   >
                     <Icon size={15} aria-hidden="true" />
-                    <span className="account-menu-grow">{label}</span>
+                    <span className="account-menu-grow">{label()}</span>
+                    <Menu.RadioItemIndicator className="account-menu-check">
+                      <Check size={14} aria-hidden="true" />
+                    </Menu.RadioItemIndicator>
+                  </Menu.RadioItem>
+                ))}
+              </Menu.RadioGroup>
+            </Menu.Group>
+            <Menu.Separator className="workspace-menu-separator" />
+            <Menu.Group>
+              <Menu.GroupLabel className="workspace-menu-label">
+                {m.ui_language_label()}
+              </Menu.GroupLabel>
+              <Menu.RadioGroup
+                value={getLocale()}
+                onValueChange={(value: Locale) => {
+                  if (value !== getLocale()) void setLocale(value);
+                }}
+              >
+                {locales.map((locale) => (
+                  <Menu.RadioItem
+                    key={locale}
+                    value={locale}
+                    lang={locale}
+                    className="lu-menu-item"
+                  >
+                    <Languages size={15} aria-hidden="true" />
+                    <span className="account-menu-grow">
+                      {localeNames[locale]}
+                    </span>
                     <Menu.RadioItemIndicator className="account-menu-check">
                       <Check size={14} aria-hidden="true" />
                     </Menu.RadioItemIndicator>
@@ -93,16 +128,16 @@ export function WorkspaceAccountMenu({
             <Menu.Separator className="workspace-menu-separator" />
             <Menu.Item render={settingsLink} className="lu-menu-item">
               <Settings size={15} aria-hidden="true" />
-              Settings
+              {m.ui_account_settings()}
             </Menu.Item>
             <Menu.Item render={docsLink} className="lu-menu-item">
               <BookOpen size={15} aria-hidden="true" />
-              Documentation
+              {m.ui_account_documentation()}
             </Menu.Item>
             <Menu.Separator className="workspace-menu-separator" />
             <Menu.Item render={<a href="/sign-out" />} className="lu-menu-item">
               <LogOut size={15} aria-hidden="true" />
-              Sign out
+              {m.ui_account_sign_out()}
             </Menu.Item>
           </Menu.Popup>
         </Menu.Positioner>

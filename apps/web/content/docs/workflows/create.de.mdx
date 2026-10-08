@@ -1,0 +1,82 @@
+---
+title: Workflow erstellen
+description: Starten Sie mit einer Vorlage oder beschreiben, bauen oder schreiben Sie einen eigenen Workflow, testen Sie ihn mit Beispieldaten und veröffentlichen Sie ihn.
+---
+
+Wählen Sie auf der Seite **Workflows** **Neuer Workflow**, um mit einer Vorlage oder ohne Vorlage zu starten. Jeder Weg ergibt dieselbe Art von Workflow, und Sie können jederzeit zwischen ihnen wechseln. Nichts läuft, bevor der Workflow veröffentlicht und eingeschaltet ist.
+
+## Vorlage verwenden [#use-a-template]
+
+Vorlagen sind fertige Workflows. Jede Karte zeigt, wann der Workflow startet, was er tut, wann er erfolgreich ist und **Was er braucht**, etwa einen Lieferanten oder eine Verbindung, die Bestellungen ändern darf. Beheben Sie zuerst alles, was mit **Fehlt** markiert ist. Die Karte verlinkt die passende Stelle.
+
+1. Wählen Sie **Vorlage verwenden**.
+2. Prüfen Sie die Voraussetzungen. Beim ersten Mal wählen Sie **Hinzufügen und weiter**, um die geprüfte Version der Vorlage zu Ihrem Workspace hinzuzufügen. Dadurch wird nichts eingeschaltet.
+3. Legen Sie genau fest, wo der Workflow gilt und welche Grenzen er hat, prüfen Sie das und aktivieren Sie ihn.
+
+Um die Arbeitsweise einer Vorlage zu ändern, wählen Sie **Anpassen**. Luma kopiert sie in einen neuen Entwurf. Die Vorlage selbst bleibt unverändert.
+
+## Ohne Vorlage starten [#start-from-scratch]
+
+- **Beschreiben**: Schreiben Sie, was passieren soll, etwa „Wenn eine SKU unter 20 Stück fällt, eine Lieferantenbestellung beim üblichen Lieferanten entwerfen und mich um Genehmigung bitten.“ Luma entwirft die Schritte nur mit dem, was in Ihrem Workspace installiert ist, und listet **Annahmen** und **Fragen an Sie** auf. Prüfen Sie diese, bevor Sie weitermachen. Um den Entwurf zu ändern, beschreiben Sie die Änderung unter **Änderung anfragen** und wählen **Änderung übernehmen** oder **Ablehnen**. Ist das Beschreiben in Ihrem Workspace nicht verfügbar, wenden Sie sich an Ihre Administration.
+- **Visuell erstellen**: Wählen Sie **Workflow erstellen** und fügen Sie die Schritte einzeln hinzu.
+- **Code schreiben**: Wählen Sie **Workflow schreiben**, um den ganzen Workflow als Code zu bearbeiten.
+
+Beginnen Sie mit **Über diesen Workflow**: Geben Sie einen Namen ein, beschreiben Sie, wofür er gedacht ist, und wählen Sie **Wann er startet** (durch eine Person, zu einem geplanten Zeitpunkt, bei einem Ereignis, bei einem erkannten Problem oder wenn eine Bedingung erfüllt ist) sowie **Worauf er sich bezieht**, etwa eine Bestellung oder eine Bestandsposition. Jede Ausführung behandelt genau eines davon.
+
+## Schritte hinzufügen [#add-steps]
+
+Die Schritte laufen von oben nach unten. Der letzte Schritt schließt die Ausführung ab oder übergibt sie an eine Person. Der Bereich **Schritte hinzufügen** gruppiert die verfügbaren Schritte:
+
+- **Daten abrufen**: aktuelle Daten aus einem verbundenen System lesen.
+- **Entscheiden und warten**: eine **Bedingung** prüfen, eine **Genehmigung** einholen oder eine festgelegte Zeit **Warten**.
+- **Aktionen ausführen**: etwas in einem verbundenen System ändern und das Ergebnis mit einer **Ergebnisprüfung** kontrollieren. Wenn Sie eine Aktion hinzufügen, wird die Prüfung, die sie bestätigt, gleich mit hinzugefügt.
+- **Berechnen**: einen **Code-Schritt** ausführen.
+- **Abschließen**: an eine Person übergeben mit **Eskalieren** oder die Ausführung beenden mit **Abschließen**.
+
+Ziehen Sie einen Schritt aus dem Bereich an die passende Stelle, oder wählen Sie **+** zwischen zwei Schritten und dann einen Schritt. Auf dem Smartphone öffnet **+** die Liste der Schritte. Zum Umsortieren ziehen Sie einen Schritt an seinem Griff, oder Sie öffnen das Menü des Schritts und wählen **Nach oben** oder **Nach unten**. Mit der Tastatur fokussieren Sie den Griff, drücken die Leertaste, bewegen den Schritt mit den Pfeiltasten und drücken erneut die Leertaste. Esc bricht ab.
+
+Eine Aktion folgt den Genehmigungsregeln Ihres Workspace. Soll immer zuerst eine Person gefragt werden, setzen Sie direkt vor die Aktion einen Schritt **Genehmigung**.
+
+Der Bereich und die Felder der Schritte bieten nur an, was in Ihrem Workspace installiert ist. Ein Schritt mit **Hier nicht ausführbar** braucht eine App oder Verbindung, die Sie noch nicht haben. Der Schritt nennt den Grund. Probleme erscheinen am betroffenen Schritt und Feld, und **Zeigen, was zu beheben ist** listet alles, was das Veröffentlichen verhindert.
+
+Ihre Änderungen werden automatisch gespeichert. Hat jemand anderes denselben Entwurf zuerst gespeichert, überschreibt Luma dessen Arbeit nicht: Wählen Sie **Neueste Version laden**, um mit dieser Version weiterzuarbeiten.
+
+## Code-Schritt verwenden [#use-a-code-step]
+
+Ein Code-Schritt berechnet Werte, die andere Schritte nicht ausdrücken können, etwa „genug bestellen, um den Zielbestand zu erreichen, aufgerundet auf volle Kartons zu 12 Stück“. Wählen Sie am Schritt **Code bearbeiten**. Sie schreiben eine Funktion in TypeScript, die die Eingaben des Workflows, seine aktuellen Daten und die Ergebnisse früherer Schritte erhält und die Felder unter **Rückgabefelder** zurückgibt. Für den Einstieg nutzen Sie **Code aus einer Beschreibung vorschlagen** und prüfen den Vorschlag, bevor Sie **Diesen Code verwenden** wählen.
+
+Ein Code-Schritt läuft isoliert:
+
+- Er kann Werte berechnen und zurückgeben.
+- Er kann einen Lesevorgang oder eine Aktion nur anfordern, wenn dieser Schritt direkt nach ihm steht. Diese Anforderungen folgen weiterhin Ihren Genehmigungsregeln und Ergebnisprüfungen.
+- Er kann nicht auf das Internet zugreifen, keine Pakete laden, keine Dateien lesen und keine Zugangsdaten sehen.
+- Er stoppt, wenn er seine Zeit-, Speicher- oder Rechengrenze erreicht.
+
+Sind Code-Schritte in Ihrem Workspace nicht verfügbar, wenden Sie sich an Ihre Administration.
+
+## Mit Beispieldaten testen [#test-with-example-data]
+
+Der Tab **Testen** führt die echten Schritte des Workflows mit Beispielantworten statt mit Ihren verbundenen Systemen aus. Es wird nichts gesendet, und bestandene Tests schalten nichts ein und genehmigen nichts.
+
+1. Wählen Sie **Neuer Test** und geben Sie ihm einen Namen.
+2. Unter **Ausfüllen mit** starten Sie mit leeren Werten, einer letzten Ausführung oder einem Szenario.
+3. Unter **Beispielantworten** legen Sie fest, was jeder Schritt erhält, etwa ob eine genehmigende Person die Änderung genehmigt oder abgelehnt hat und ob die Ergebnisprüfung sie bestätigt hat.
+4. Wählen Sie unter **Erwartetes Ergebnis** das gewünschte Ergebnis oder **Nur zeigen, was passiert**.
+5. Wählen Sie **Test speichern** oder **Ohne Speichern ausführen**.
+
+Das Ergebnis zeigt, was jeder Schritt verwendet und erzeugt hat, welchen Weg der Workflow genommen hat und wo er auf eine Person warten würde. Gespeicherte Tests laufen vor dem Veröffentlichen erneut. **Seit der letzten Änderung nicht ausgeführt** bedeutet, dass das Ergebnis von einem früheren Entwurf stammt.
+
+## Veröffentlichen [#publish]
+
+Wählen Sie **Veröffentlichen…**, beschreiben Sie unter **Versionshinweise**, was sich geändert hat, und wählen Sie **Version … veröffentlichen** mit der Versionsnummer. Beim Veröffentlichen entsteht eine Version, die sich nicht mehr ändern lässt. Der Workflow wird dadurch weder eingeschaltet, noch erhält er Zugriff auf etwas. Fehlschlagende gespeicherte Tests verhindern das Veröffentlichen nicht, prüfen Sie sie aber vorher.
+
+Können Teile des Workflows in Ihrem Workspace noch nicht laufen, können Sie ihn trotzdem veröffentlichen. Er wird als nicht verfügbar angezeigt, bis eine installierte App diese Teile unterstützt.
+
+Öffnen Sie danach den veröffentlichten Workflow und schalten Sie ihn unter **Regeln** ein. Siehe [Workflows verwalten](/docs/workflows#turn-a-workflow-on-or-off).
+
+Um einen veröffentlichten Workflow zu ändern, wählen Sie auf seiner Seite **Als neuen Entwurf bearbeiten**. Wenn Sie diesen Entwurf veröffentlichen, entsteht eine neue Version. Bereits gestartete Ausführungen behalten ihre Version. **Verwerfen** entfernt einen Entwurf, ohne veröffentlichte Versionen zu berühren.
+
+## Wer was tun kann [#who-can-do-what]
+
+- **Workflows bearbeiten**: Entwürfe erstellen und bearbeiten, Workflows beschreiben, Code-Schritte verwenden und Tests ausführen. Ohne diese Berechtigung können Sie Vorlagen und Entwürfe ansehen.
+- **Workflows veröffentlichen und aktivieren**: Versionen veröffentlichen und Vorlagen zu Ihrem Workspace hinzufügen.

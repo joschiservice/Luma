@@ -34,7 +34,7 @@ const item = (patch: Partial<CatalogItem>): CatalogItem => ({
 describe('product presentation', () => {
   it('never converts or compares prices without a currency', () => {
     expect(formatPrice({ amount: '26.00', currency: null })).toBe(
-      '26.00 (currency not reported)',
+      '26.00, currency not reported',
     );
     expect(formatPrice({ amount: '26.5', currency: 'EUR' }, 'en')).toBe(
       '€26.50',
@@ -52,7 +52,7 @@ describe('product presentation', () => {
     const asOf = '2026-09-30T09:00:00Z';
     expect(
       gapText({ connectionId: source.connectionId, match: null }, source, asOf),
-    ).toMatch('full catalog has not been read yet');
+    ).toMatch('hasn’t read its full catalog yet');
     expect(
       gapText(
         { connectionId: source.connectionId, match: null },
@@ -60,7 +60,7 @@ describe('product presentation', () => {
         asOf,
       ),
     ).toBe(
-      'JTL-Wawi does not list this SKU. Its full catalog was read 2h ago.',
+      'JTL-Wawi doesn’t list this SKU. Luma read its full catalog 2 hours ago.',
     );
     expect(
       gapText(

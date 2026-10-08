@@ -180,7 +180,7 @@ test('opens an imported customer from an order, reads live history and keeps oth
 
   // The order's source panel links to the source customer, which opens the imported profile.
   await page.goto(`/app/${f.org.id}/orders/${orderId}`);
-  await page.getByRole('link', { name: 'Open customer workspace' }).click();
+  await page.getByRole('link', { name: 'Open customer in Luma' }).click();
   await page.waitForURL(`**/customers/${averyId}`);
   await page.getByRole('heading', { name: 'Avery Tan', level: 1 }).waitFor();
   await page.getByText('71@example.test', { exact: true }).waitFor();
@@ -214,7 +214,7 @@ test('opens an imported customer from an order, reads live history and keeps oth
     .click();
   await page
     .getByRole('alert')
-    .filter({ hasText: 'does not have access' })
+    .filter({ hasText: 'doesn’t have access' })
     .waitFor();
   expect(await page.getByText('12.00 EUR', { exact: true }).count()).toBe(0);
   revoked = false;
@@ -241,7 +241,7 @@ test('opens an imported customer from an order, reads live history and keeps oth
   await page.goto(
     `/app/${f.org.id}/customers?${new URLSearchParams({ connectionId: source.store, customerId: 'gid://shopify/Customer/999' })}`,
   );
-  await page.getByText('This customer is not in Luma yet.').waitFor();
+  await page.getByText('This customer isn’t in Luma yet.').waitFor();
 
   const other = await f.request(
     f.owner,
@@ -259,7 +259,7 @@ test('opens an imported customer from an order, reads live history and keeps oth
   );
   await page.goto(`/app/${other.id}/customers`);
   await page
-    .getByRole('heading', { name: 'Customers are not shared yet' })
+    .getByRole('heading', { name: 'Customers aren’t shared yet' })
     .waitFor();
   expect(await page.getByText('Avery Tan', { exact: true }).count()).toBe(0);
   await page.goto(`/app/${other.id}/customers/${averyId}`);

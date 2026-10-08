@@ -1,5 +1,7 @@
 import './shadow.css';
 
+import { formatCalendarDate, formatPercent } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
 import { CaseNotice } from '@luma/ui/components/issues/case-investigation';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Card, CardHeader } from '@luma/ui/components/primitives/card';
@@ -23,45 +25,45 @@ import {
   shadowReportOptions,
   shadowWindow,
 } from './data';
-import { ShadowResult } from './result';
+import { actualLabels, ShadowResult } from './result';
 
 const metrics = [
   [
     'agreementWithOperator',
-    'Agreement with operator',
-    'Matching proposed and observed actions.',
+    m.shadow_metric_agreement,
+    m.shadow_metric_agreement_description,
   ],
   [
     'falsePositiveActionRate',
-    'Unnecessary proposals',
-    'Reviewed proposals assessed as unnecessary.',
+    m.shadow_metric_unnecessary,
+    m.shadow_metric_unnecessary_description,
   ],
   [
     'missedEligibleCases',
-    'Missed eligible cases',
-    'Eligible cases needing action without a permitted candidate.',
+    m.shadow_metric_missed,
+    m.shadow_metric_missed_description,
   ],
   [
     'predictedVsActualOutcome',
-    'Prediction agreement',
-    'Predictions matching authoritative outcomes.',
+    m.shadow_metric_prediction,
+    m.shadow_metric_prediction_description,
   ],
   [
     'projectedAutonomousResolutionRate',
-    'Projected autonomous resolution',
-    'Allowed candidates with a supported passing prediction.',
+    m.shadow_metric_autonomous,
+    m.shadow_metric_autonomous_description,
   ],
   [
     'projectedUnnecessaryHumanInterventionRate',
-    'Potentially avoidable intervention',
-    'Autonomous candidates matching observed interventions.',
+    m.shadow_metric_avoidable,
+    m.shadow_metric_avoidable_description,
   ],
-  [
-    'operatorTrust',
-    'Operator trust',
-    'Trust responses among trust and distrust feedback.',
-  ],
-] as const;
+  ['operatorTrust', m.shadow_metric_trust, m.shadow_metric_trust_description],
+] as const satisfies readonly (readonly [
+  keyof Report['metrics'],
+  () => string,
+  () => string,
+])[];
 
 /** Compares the latest evaluation per case for a Workflow within an explicit workspace date range. */
 export function ShadowReport({
@@ -92,22 +94,18 @@ export function ShadowReport({
     >
       <CardHeader className="workflows-heading">
         <div>
-          <p className="shadow-label">Shadow — not executed</p>
-          <h2 id={`${id}-title`}>Shadow comparisons</h2>
+          <p className="shadow-label">{m.shadow_preview_label()}</p>
+          <h2 id={`${id}-title`}>{m.shadow_report_title()}</h2>
         </div>
         <Button
           variant="outline"
           disabled={query.isFetching}
           onClick={() => void query.refetch()}
         >
-          Refresh comparisons
+          {m.shadow_report_refresh()}
         </Button>
       </CardHeader>
-      <p>
-        Compare the latest prediction per case with operator actions and
-        authoritative outcomes. Projected rates do not represent live
-        resolutions.
-      </p>
+      <p>{m.shadow_report_description()}</p>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -118,14 +116,16 @@ export function ShadowReport({
             setError(
               error instanceof Error
                 ? error.message
-                : 'Check the selected dates.',
+                : m.shadow_report_dates_invalid(),
             );
           }
         }}
       >
         <FieldGroup className="shadow-date-fields">
           <Field data-invalid={!!error}>
-            <FieldLabel htmlFor={`${id}-from`}>From ({timeZone})</FieldLabel>
+            <FieldLabel htmlFor={`${id}-from`}>
+              {m.shadow_report_from({ timeZone })}
+            </FieldLabel>
             <Input
               id={`${id}-from`}
               type="date"
@@ -136,7 +136,9 @@ export function ShadowReport({
             />
           </Field>
           <Field data-invalid={!!error}>
-            <FieldLabel htmlFor={`${id}-to`}>Through ({timeZone})</FieldLabel>
+            <FieldLabel htmlFor={`${id}-to`}>
+              {m.shadow_report_through({ timeZone })}
+            </FieldLabel>
             <Input
               id={`${id}-to`}
               type="date"
@@ -146,21 +148,30 @@ export function ShadowReport({
               required
             />
           </Field>
-          <Button type="submit">Apply dates</Button>
+          <Button type="submit">{m.shadow_report_apply()}</Button>
         </FieldGroup>
         {error ? <p role="alert">{error}</p> : null}
       </form>
       <p className="shadow-meta">
-        Showing {workspaceDateValue(new Date(window.since), timeZone)} through{' '}
-        {workspaceDateValue(new Date(Date.parse(window.until) - 1), timeZone)}{' '}
-        {timeZone}. Up to 500 cases; narrow the dates for larger reports.
+        {m.shadow_report_range({
+          from: formatCalendarDate(
+            workspaceDateValue(new Date(window.since), timeZone),
+          ),
+          to: formatCalendarDate(
+            workspaceDateValue(
+              new Date(Date.parse(window.until) - 1),
+              timeZone,
+            ),
+          ),
+          timeZone,
+        })}
       </p>
       {query.error ? (
-        <CaseNotice error title="Comparisons unavailable">
+        <CaseNotice error title={m.shadow_report_failed()}>
           {shadowError(query.error)}
         </CaseNotice>
       ) : query.isPending ? (
-        <p role="status">Loading comparisons…</p>
+        <p role="status">{m.shadow_report_loading()}</p>
       ) : query.data ? (
         <ShadowReportResults
           report={query.data}
@@ -183,10 +194,9 @@ export function ShadowReportResults({
     <>
       <p>
         <strong>
-          {report.metrics.evaluations}{' '}
-          {report.metrics.evaluations === 1 ? 'case' : 'cases'} evaluated
+          {m.shadow_report_tested({ count: report.metrics.evaluations })}
         </strong>{' '}
-        · {report.metrics.reviewed} reviewed by operators
+        · {m.shadow_report_reviewed({ count: report.metrics.reviewed })}
       </p>
       <dl className="shadow-metrics">
         {metrics.map(([key, title, description]) => {
@@ -194,22 +204,26 @@ export function ShadowReportResults({
 
           return (
             <div key={key}>
-              <dt>{title}</dt>
+              <dt>{title()}</dt>
               <dd>
                 {metric.rate === null
-                  ? 'Not enough evidence'
-                  : `${Math.round(metric.rate * 100)}%`}
+                  ? m.shadow_report_not_enough_data()
+                  : formatPercent(metric.rate)}
               </dd>
               <dd className="shadow-metric-description">
-                {metric.numerator} / {metric.denominator} · {description}
+                {m.shadow_metric_count({
+                  numerator: metric.numerator,
+                  denominator: metric.denominator,
+                  description: description(),
+                })}
               </dd>
             </div>
           );
         })}
       </dl>
       {!report.items.length ? (
-        <CaseNotice title="No Shadow evaluations in this period">
-          Run an evaluation from an issue, or choose another date range.
+        <CaseNotice title={m.shadow_report_empty_title()}>
+          {m.shadow_report_empty_description()}
         </CaseNotice>
       ) : (
         <div className="shadow-comparisons">
@@ -238,7 +252,11 @@ function ComparisonCard({
   return (
     <article>
       <div className="workflows-heading">
-        <h3>Case {item.evaluation.incidentId.slice(0, 8)}</h3>
+        <h3>
+          {m.shadow_report_issue_title({
+            id: item.evaluation.incidentId.slice(0, 8),
+          })}
+        </h3>
         <Link
           to="/app/$organizationId/exceptions/$exceptionId"
           params={{
@@ -248,19 +266,31 @@ function ComparisonCard({
           search={{ view: 'active', shadow: item.evaluation.workflow }}
           hash="shadow"
         >
-          {item.review ? 'Open case' : 'Record operator comparison'}
+          {item.review
+            ? m.shadow_report_open_issue()
+            : m.shadow_report_review_link()}
         </Link>
       </div>
       <p className="shadow-meta">
-        Predicted:{' '}
-        {item.evaluation.simulation.predictedOutcome === 'passed'
-          ? 'conditional pass'
-          : 'inconclusive'}{' '}
-        · Actual: {item.actual?.outcome ?? 'not observed'} ·{' '}
-        {item.review ? 'Reviewed' : 'Awaiting operator review'}
+        {m.shadow_report_card_predicted({
+          value:
+            item.evaluation.simulation.predictedOutcome === 'passed'
+              ? m.shadow_predicted_passed_short()
+              : m.shadow_predicted_inconclusive(),
+        })}{' '}
+        ·{' '}
+        {m.shadow_report_card_actual({
+          value: item.actual
+            ? actualLabels[item.actual.outcome]()
+            : m.shadow_actual_unknown(),
+        })}{' '}
+        ·{' '}
+        {item.review
+          ? m.shadow_report_card_reviewed()
+          : m.shadow_report_card_awaiting()}
       </p>
       <Disclosure onToggle={(event) => setOpen(event.currentTarget.open)}>
-        <summary>View prediction and evidence</summary>
+        <summary>{m.shadow_report_card_details()}</summary>
         {open ? <ShadowResult item={item} /> : null}
       </Disclosure>
     </article>

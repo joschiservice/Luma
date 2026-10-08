@@ -56,13 +56,13 @@ test('investigates stock differences, follows affected orders and preserves filt
       name: 'Same position. Different source quantities.',
     })
     .waitFor();
-  await page.getByRole('heading', { name: 'Recent observations' }).waitFor();
+  await page.getByRole('heading', { name: 'Recent readings' }).waitFor();
   await page.getByRole('link', { name: '#100', exact: true }).waitFor();
   expect(
     await page
       .getByRole('table', { name: 'Source quantity comparison' })
       .innerText(),
-  ).toContain('Unknown');
+  ).toContain('Not reported');
   await page.screenshot({
     path: '/tmp/luma99-detail-light.png',
     fullPage: true,

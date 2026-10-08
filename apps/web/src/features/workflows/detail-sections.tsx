@@ -3,6 +3,8 @@ import type {
   WorkflowDetail,
   WorkflowVersionView,
 } from '@luma/api-contract';
+import { formatList } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Card, CardTitle } from '@luma/ui/components/primitives/card';
@@ -23,12 +25,18 @@ import { WorkflowReadinessPanel } from './readiness';
 /** States what success means for a version in operator language. */
 function successDefinition(version: WorkflowVersionView) {
   if (version.format === 'workflow/2')
-    return version.finalOutcome ?? 'The process hands the run to a person';
+    return version.finalOutcome ?? m.workflows_overview_success_handoff();
 
   return version.capability === 'orders.shipping-method.write'
-    ? 'The order uses the mapped shipping method'
-    : 'The expected change is verified';
+    ? m.workflows_overview_success_shipping()
+    : m.workflows_overview_success_default();
 }
+
+const versionSources = {
+  pilot: m.workflows_versions_source_pilot,
+  resolution: m.workflows_versions_source_resolution,
+  native: m.workflows_versions_source_native,
+} satisfies Record<WorkflowVersionView['provenance']['kind'], () => string>;
 
 /**
  * Puts purpose, trigger, success and readiness first, followed by the steps in business
@@ -44,7 +52,10 @@ export function WorkflowOverview({
   organizationId: string;
 }) {
   return (
-    <section className="workflow-overview" aria-label="Workflow overview">
+    <section
+      className="workflow-overview"
+      aria-label={m.workflows_overview_label()}
+    >
       <div className="workflow-intent">
         <p className="workflow-eyebrow">
           {workflowCategoryLabel(version.category)}
@@ -55,10 +66,10 @@ export function WorkflowOverview({
       <div className="workflow-contract-flow">
         <div>
           <span className="workflow-contract-label">
-            <Zap size={14} aria-hidden="true" /> When
+            <Zap size={14} aria-hidden="true" /> {m.workflows_overview_when()}
           </span>
           <strong>{workflowTriggerLabel(version.applicability.trigger)}</strong>
-          <p>Luma checks fresh evidence before proposing a change.</p>
+          <p>{m.workflows_overview_when_help()}</p>
         </div>
         <ArrowRight
           className="workflow-contract-arrow"
@@ -67,13 +78,11 @@ export function WorkflowOverview({
         />
         <div>
           <span className="workflow-contract-label">
-            <ShieldCheck size={14} aria-hidden="true" /> Success means
+            <ShieldCheck size={14} aria-hidden="true" />{' '}
+            {m.workflows_overview_success()}
           </span>
           <strong>{successDefinition(version)}</strong>
-          <p>
-            An independent read confirms the result. A successful request alone
-            doesn’t count.
-          </p>
+          <p>{m.workflows_overview_success_help()}</p>
         </div>
       </div>
       <WorkflowReadinessPanel
@@ -87,7 +96,7 @@ export function WorkflowOverview({
         aria-labelledby="steps-title"
       >
         <CardTitle as="h2" id="steps-title">
-          How it works
+          {m.workflows_overview_steps_title()}
         </CardTitle>
         <ol className="workflow-steps">
           {version.steps.map((step, i) => (
@@ -103,15 +112,14 @@ export function WorkflowOverview({
           ))}
         </ol>
         <p className="workflow-caption">
-          Each published version is fixed. Selecting another version changes
-          this view only.
+          {m.workflows_overview_versions_caption()}
         </p>
       </Card>
     </section>
   );
 }
 
-/** Keeps capability IDs, permissions, inputs and version artifacts inspectable. */
+/** Keeps action references, permissions, inputs and published versions inspectable. */
 export function WorkflowTechnical({
   detail,
   version,
@@ -127,13 +135,12 @@ export function WorkflowTechnical({
   return (
     <div className="workflow-technical">
       <Card as="section" className="workflow-section">
-        <CardTitle as="h2">Technical details</CardTitle>
+        <CardTitle as="h2">{m.workflows_technical_title()}</CardTitle>
         <p className="workflow-caption">
-          Exact identifiers behind version {version.version}. You don’t need
-          them to run this workflow.
+          {m.workflows_technical_caption({ version: version.version })}
         </p>
         <Disclosure>
-          <summary>Steps and capabilities</summary>
+          <summary>{m.workflows_technical_steps()}</summary>
           <ol className="workflow-steps">
             {version.steps.map((step, i) => (
               <li key={step.id}>
@@ -156,7 +163,7 @@ export function WorkflowTechnical({
           </ol>
         </Disclosure>
         <Disclosure>
-          <summary>Compatibility and permissions</summary>
+          <summary>{m.workflows_technical_requirements()}</summary>
           <WorkflowCompatibility
             detail={detail}
             version={version}
@@ -164,10 +171,10 @@ export function WorkflowTechnical({
           />
         </Disclosure>
         <Disclosure>
-          <summary>Inputs and evidence</summary>
+          <summary>{m.workflows_technical_inputs()}</summary>
           <dl className="workflow-facts">
             <div>
-              <dt>Applies to</dt>
+              <dt>{m.workflows_technical_applies_to()}</dt>
               <dd>
                 <code>{version.applicability.subjectKind}</code>
               </dd>
@@ -175,23 +182,24 @@ export function WorkflowTechnical({
             {Object.entries(version.inputs).map(([name, type]) => (
               <div key={name}>
                 <dt>{name.replace(/([a-z])([A-Z])/g, '$1 $2')}</dt>
-                <dd>{type} · required input</dd>
+                <dd>{m.workflows_technical_input_type({ type })}</dd>
               </div>
             ))}
             {Object.entries(version.context.fields).map(([name, type]) => (
               <div key={name}>
                 <dt>{name.replace(/([a-z])([A-Z])/g, '$1 $2')}</dt>
-                <dd>{type} · observed evidence</dd>
+                <dd>{m.workflows_technical_data_type({ type })}</dd>
               </div>
             ))}
           </dl>
           <p className="workflow-caption">
-            Evidence must be less than {version.context.maxAgeSeconds} seconds
-            old. Each run keeps the exact inputs it used.
+            {m.workflows_technical_max_age({
+              seconds: version.context.maxAgeSeconds,
+            })}
           </p>
         </Disclosure>
         <Disclosure>
-          <summary>Version history and artifacts</summary>
+          <summary>{m.workflows_technical_versions()}</summary>
           <WorkflowVersions detail={detail} />
         </Disclosure>
       </Card>
@@ -214,21 +222,11 @@ export function WorkflowCompatibility({
     version.format === 'workflow/2' &&
     version.executionMode === 'computation'
   )
-    return (
-      <p>
-        People who can manage workflow triggers start this version from Rules.
-        It computes values from the supplied evidence and doesn’t need
-        connection access or action grants.
-      </p>
-    );
+    return <p>{m.workflows_technical_computation()}</p>;
   if (detail.presentation === 'procurement.replenishment')
     return (
       <>
-        <p>
-          Each rule covers one stock position and supplier. Stock must be less
-          than five minutes old, and someone else who can approve changes
-          approves every purchase-order draft.
-        </p>
+        <p>{m.workflows_technical_replenishment()}</p>
         {version.blockers.map((reason) => (
           <Alert key={reason}>{reason}</Alert>
         ))}
@@ -237,7 +235,7 @@ export function WorkflowCompatibility({
 
   return (
     <>
-      <p>Required permissions on the connection:</p>
+      <p>{m.workflows_technical_permissions()}</p>
       <ul>
         {version.permissions.map((permission) => (
           <li key={permission}>
@@ -251,7 +249,7 @@ export function WorkflowCompatibility({
         </Alert>
       ))}
       {!detail.connections.length ? (
-        <p>No connections installed.</p>
+        <p>{m.workflows_technical_no_connections()}</p>
       ) : (
         detail.connections.map((c) => (
           <article className="workflow-connection" key={c.id}>
@@ -265,8 +263,12 @@ export function WorkflowCompatibility({
               </Link>
             </h3>
             <p>
-              {workflowSystemLabel(c.system)} ·{' '}
-              {c.blockers.length ? 'Access missing' : 'Eligible connection'}
+              {m.workflows_technical_connection_status({
+                system: workflowSystemLabel(c.system),
+                status: c.blockers.length
+                  ? m.workflows_technical_connection_missing()
+                  : m.workflows_technical_connection_ready(),
+              })}
             </p>
             {c.blockers.map((reason) => (
               <p key={reason}>{reason}</p>
@@ -301,22 +303,22 @@ export function WorkflowActivations({
   return (
     <Card as="section" className="workflow-section">
       <div className="workflows-heading">
-        <CardTitle as="h2">Activations</CardTitle>
+        <CardTitle as="h2">{m.workflows_activations_title()}</CardTitle>
         {action}
       </div>
-      <p>
-        An activation lets one exact version act on the orders it names.
-        Revoking it stops future runs; work already dispatched may still
-        complete.
-      </p>
+      <p>{m.workflows_activations_description()}</p>
       {!detail.activations.length ? (
         <Empty className="workflow-section-empty">
           <ShieldCheck size={22} aria-hidden="true" />
-          <h3>{processOnly ? 'No action grants' : 'Not activated yet'}</h3>
+          <h3>
+            {processOnly
+              ? m.workflows_activations_empty_process_title()
+              : m.workflows_activations_empty_title()}
+          </h3>
           <p>
             {processOnly
-              ? 'Each action needs its own decision and access check before it runs.'
-              : 'Review a version and choose its orders to let this workflow run.'}
+              ? m.workflows_activations_empty_process_body()
+              : m.workflows_activations_empty_body()}
           </p>
         </Empty>
       ) : (
@@ -324,7 +326,9 @@ export function WorkflowActivations({
           <article key={a.id} className="workflow-activation-record">
             <div className="workflows-heading">
               <h3>
-                Version {a.version} · {a.active ? 'Active' : 'Revoked'}
+                {a.active
+                  ? m.workflows_activations_active({ version: a.version })
+                  : m.workflows_activations_revoked({ version: a.version })}
               </h3>
               {detail.canManage && a.active ? (
                 <Button
@@ -332,35 +336,53 @@ export function WorkflowActivations({
                   disabled={refreshing}
                   onClick={() => onRevoke(a)}
                 >
-                  Revoke activation
+                  {m.workflows_activations_revoke()}
                 </Button>
               ) : null}
             </div>
             <p>
-              Connection:{' '}
-              {a.grants.connectionIds
-                .map(
-                  (id) =>
-                    detail.connections.find((c) => c.id === id)?.label ?? id,
-                )
-                .join(', ')}
+              {m.workflows_activations_connection({
+                connections: formatList(
+                  a.grants.connectionIds.map(
+                    (id) =>
+                      detail.connections.find((c) => c.id === id)?.label ?? id,
+                  ),
+                ),
+              })}
             </p>
             <p>
-              Orders:{' '}
-              {a.grants.targetIds
-                .map((id) => targets.find((t) => t.id === id)?.label ?? id)
-                .join(', ')}
+              {m.workflows_activations_orders({
+                orders: formatList(
+                  a.grants.targetIds.map(
+                    (id) => targets.find((t) => t.id === id)?.label ?? id,
+                  ),
+                ),
+              })}
             </p>
             <Disclosure>
-              <summary>Exact scope and review</summary>
-              <p>Orders: {a.grants.targetIds.join(', ')}</p>
-              <p>Principals: {a.grants.principalIds.join(', ')}</p>
-              <p>Activation: {a.id}</p>
-              <p>Policy: {a.policyVersion}</p>
+              <summary>{m.workflows_activations_details()}</summary>
               <p>
-                Reviewed by:{' '}
-                {a.reviewedBy ??
-                  'Trusted provisioning; no product review record'}
+                {m.workflows_activations_orders({
+                  orders: a.grants.targetIds.join(', '),
+                })}
+              </p>
+              <p>
+                {m.workflows_activations_people({
+                  people: a.grants.principalIds.join(', '),
+                })}
+              </p>
+              <p>{m.workflows_activations_id({ id: a.id })}</p>
+              <p>
+                {m.workflows_activations_rules_version({
+                  version: a.policyVersion,
+                })}
+              </p>
+              <p>
+                {a.reviewedBy
+                  ? m.workflows_activations_reviewed_by({
+                      person: a.reviewedBy,
+                    })
+                  : m.workflows_activations_reviewed_outside()}
               </p>
               {a.reviewedAt ? (
                 <time dateTime={a.reviewedAt}>
@@ -368,10 +390,12 @@ export function WorkflowActivations({
                 </time>
               ) : null}
               <p>
-                Version digest: <code>{a.versionDigest}</code>
+                {m.workflows_activations_version_fingerprint()}{' '}
+                <code>{a.versionDigest}</code>
               </p>
               <p>
-                Artifact digest: <code>{a.artifactDigest}</code>
+                {m.workflows_activations_fingerprint()}{' '}
+                <code>{a.artifactDigest}</code>
               </p>
             </Disclosure>
           </article>
@@ -381,20 +405,30 @@ export function WorkflowActivations({
   );
 }
 
-/** Keeps published version provenance and exact artifacts available for inspection. */
+/** Keeps where each published version came from and its exact content available for inspection. */
 export function WorkflowVersions({ detail }: { detail: WorkflowDetail }) {
   return (
     <>
       {detail.versions.map((v) => (
         <Disclosure key={v.version}>
           <summary>
-            Version {v.version} · {v.provenance.kind} ·{' '}
-            {v.compatible ? 'Compatible' : 'Unavailable'}
+            {m.workflows_versions_summary({
+              version: v.version,
+              source: versionSources[v.provenance.kind](),
+              status: v.compatible
+                ? m.workflows_versions_compatible()
+                : m.workflows_versions_unavailable(),
+            })}
           </summary>
           <p>
-            Authored by {v.provenance.authoredBy}. {v.provenance.reference}
+            {m.workflows_versions_author({ author: v.provenance.authoredBy })}{' '}
+            {v.provenance.reference}
           </p>
-          <p>Evidence: {v.provenance.evidenceRefs.join(', ')}</p>
+          <p>
+            {m.workflows_versions_sources({
+              sources: v.provenance.evidenceRefs.join(', '),
+            })}
+          </p>
           <code>{v.digest}</code>
           <pre>{v.representation}</pre>
         </Disclosure>

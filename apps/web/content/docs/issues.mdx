@@ -1,40 +1,68 @@
 ---
 title: Find and prioritize issues
-description: Use the inbox to see what needs your attention and follow work through to resolution.
+description: See the problems Luma found in your connected systems, filter the list and open each issue to decide what happens next.
 ---
 
-Issues bring together a detected problem, the evidence behind it, and the next step. Start with **Needs review** to find work that needs a decision.
+Luma reads the data your connected systems send and opens an issue when it notices a problem, such as stock that differs between Shopify and your ERP, a fulfillment that stopped moving or a connection Luma can’t read. **Issues** lists them with their evidence and the next step. Open it from the sidebar, or press **G** then **I**.
+
+## Where issues come from
+
+Each issue has a type:
+
+- **Stock mismatch**: linked stock differs between your systems.
+- **Fulfillment delay**: an order isn’t moving through fulfillment as expected.
+- **Connection issue**: Luma can’t read a connected system, for example because access was revoked.
+- **Workflow issue**: a workflow run couldn’t finish.
+
+Issues only cover data Luma can read. If a system isn’t connected, or hasn’t sent data yet, Luma can’t notice problems in it.
 
 ## Choose a view
 
-- **Needs review** shows issues that currently require your attention.
-- **All open** shows issues that are not resolved, including work already in progress.
-- **History** shows resolved issues. Open an issue to see how it was closed.
+- **Needs review** shows issues that need a person, for example to approve a change, do a manual step or check an outcome Luma couldn’t confirm.
+- **All open** shows every unresolved issue, including those Luma is still investigating or fixing.
+- **History** shows closed issues. Each one says whether a fresh check confirmed the fix or a person closed it.
 
-The summary above the inbox gives you a wider view of operations. Its totals are separate from the filters applied to your list.
+The numbers above the list show how many issues need review, how many are open and how many were verified in the last 24 hours. They cover the whole workspace and don’t change with your filters.
 
-## Narrow the list
+## Filter the list
 
-Filter by issue type, severity, or state. Filters work together: an issue must match all selected filters to appear. Clear a filter or switch views if you cannot find an issue.
+Select **Filters**, or a filter name above the list, to narrow it by **Severity**, **Issue type** or **Status**. An issue appears only if it matches every filter you set. Each filter you set appears above the list: select it to change the value, select its **×** to remove it, or select **Clear** to remove them all.
 
-Use the pagination controls to move through results. **Refresh** checks for changes and returns a paginated list to its first page.
+Your view and filters are part of the page address, so you can bookmark them or select **Pin this page to the sidebar** in the top bar. If the list seems out of date, select **Refresh issues**. Refreshing returns you to the first page.
 
 ## Open an issue
 
-Select a row to read the investigation beside the inbox. On a small screen, the selected issue takes the place of the list. **Open full page** gives you more room to read and a link you can share with someone who has access to the workspace.
+Select an issue to read it beside the list. On a narrow screen, the issue replaces the list.
 
-Your filters stay in the URL. Returning to the inbox keeps that view. If an issue changes state while you are reading, it can leave the current view; its details remain open so you can finish.
+- **Next issue**, the arrow at the top of the issue, opens the next one in the list.
+- **Open full page** gives the issue more room and a link you can share with people in your workspace.
+- **Close panel**, or Esc, returns to the list. Your view and filters stay as they were.
 
-Continue with [Investigate an issue](/docs/issues/investigate) to understand the findings, evidence, and recommended next step.
+If an issue changes while you read it, for example because someone approved its change, it can leave your view. Luma says so and keeps it open until you’re done.
 
-## Understand an empty inbox
+Learn how to read an issue in [Investigate an issue](/docs/issues/investigate).
 
-**Nothing needs review** means no issue currently needs your attention. Check **All open** for ongoing work.
+## When the list is empty
 
-**No matching issues** means the current filters found no results. Adjust or clear them.
+- **No issues need your review**: nothing in this view needs a person right now. Issues Luma is still working on are under **All open**.
+- **No matching issues**: your filters exclude every issue. Change or clear them.
+- **No open issues in this view** or **No closed issues yet**: this view has nothing to show.
+- **No data received yet**: Luma hasn’t read any data from a connected system, so it can’t have found problems yet.
+- **No active connections**: connect a system in [Apps](/docs/apps-and-connections) so Luma can start checking.
 
-**No data received yet** or **No active connections** means monitoring does not yet have the coverage it needs. Check your connections before treating an empty inbox as confirmation that everything is healthy.
+An empty list doesn’t mean your operations are healthy. It means Luma found nothing in the data it could read.
 
-## Get help as you work
+## When something couldn’t load
 
-Choose **Help** in the top bar to open the guide for your current page. Search across the guides or follow article links without leaving your issue. **Open full documentation** opens the current article in a new tab.
+- **Issues couldn’t be refreshed**: Luma couldn’t load the latest list. The issues you still see may be out of date. Select **Refresh issues** to try again.
+- **Summary unavailable**: the numbers above the list couldn’t load. The list itself still works.
+- **Connections couldn’t be checked**: Luma couldn’t check your connections. Your issues are still shown.
+- **Issue unavailable**: the issue no longer exists, or you no longer have access to it.
+
+## Get help for this page
+
+Select **Help for this page**, the question mark in the top bar, to read this guide beside your work. Searching the guides or following a link doesn’t change your selection or filters. **Open full documentation** opens the guide in a new tab.
+
+## Who can see issues
+
+Your role needs **View issues** to open this page. Approving, rejecting and escalating need more permissions; see [Resolve an issue](/docs/issues/resolve).

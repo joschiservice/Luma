@@ -1,4 +1,5 @@
 import type { CaseQuery } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import {
   caseFixture,
   inventoryCase,
@@ -85,7 +86,7 @@ function IssuesExample({
 
   return (
     <>
-      <StoryShell page="Issues">
+      <StoryShell page="exceptions">
         <div
           className={`inbox ${selected !== undefined ? 'inbox-selected' : ''}`}
         >
@@ -142,8 +143,10 @@ function IssuesExample({
                   hasNext={page === 1}
                   onPrevious={page > 1 ? () => setPage(page - 1) : undefined}
                   onNext={() => setPage(page + 1)}
-                  itemLabel="issues"
-                  label="Issue pages"
+                  formatTotal={(count) =>
+                    m.exceptions_pagination_total({ count })
+                  }
+                  label={m.exceptions_pagination_label()}
                 />
               </div>
             }
@@ -276,7 +279,7 @@ export const LongEvidence: Story = {
     const header = canvas
       .getByRole('heading', { name: 'Supporting evidence' })
       .closest('header')!;
-    await expect(within(header).getByText('48 records')).toBeVisible();
+    await expect(within(header).getByText('48 evidence records')).toBeVisible();
     await expect(
       within(header).getByText('Shopify shows 8 more available than JTL.'),
     ).toBeVisible();
@@ -305,16 +308,16 @@ export const PanelNavigation: Story = {
     await userEvent.click(findings.querySelector('summary')!);
     await expect(findings).not.toHaveAttribute('open');
     const execution = panel
-      .getByRole('region', { name: 'Execution' })
+      .getByRole('region', { name: 'Change and outcome check' })
       .querySelector('details')!;
     await expect(execution).not.toHaveAttribute('open');
     await userEvent.click(execution.querySelector('summary')!);
     await expect(execution).toHaveAttribute('open');
     await expect(
-      panel.queryByRole('list', { name: 'Case lifecycle' }),
+      panel.queryByRole('list', { name: 'Issue progress' }),
     ).not.toBeInTheDocument();
     const resolution = panel
-      .getByRole('region', { name: 'Resolution' })
+      .getByRole('region', { name: 'Proposed change' })
       .querySelector('details')!;
     await expect(resolution).not.toHaveAttribute('open');
     await userEvent.click(resolution.querySelector('summary')!);
@@ -363,7 +366,7 @@ export const ProposedChange: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const overview = within(canvas.getByRole('region', { name: 'Overview' }));
-    const resolution = canvas.getByRole('region', { name: 'Resolution' });
+    const resolution = canvas.getByRole('region', { name: 'Proposed change' });
     await expect(resolution.querySelector('details')).not.toHaveAttribute(
       'open',
     );
@@ -373,11 +376,11 @@ export const ProposedChange: Story = {
     await expect(resolution.querySelector('details')).toHaveAttribute('open');
     await expect(
       within(resolution).getByRole('heading', {
-        name: 'Review the proposed correction',
+        name: 'Review the proposed change',
       }),
     ).toBeVisible();
     await expect(
-      canvas.getByRole('region', { name: 'Resolution' }),
+      canvas.getByRole('region', { name: 'Proposed change' }),
     ).toHaveFocus();
   },
 };

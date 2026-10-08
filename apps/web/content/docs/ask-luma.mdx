@@ -1,46 +1,58 @@
 ---
 title: Ask Luma
-description: Ask questions about your orders, issues, stock, fulfillment and returns in plain language, and follow each answer to the records it came from.
+description: Ask questions about your orders, issues, stock, fulfillment and returns in plain language, and check each answer against the records it came from.
 ---
 
-**Ask Luma** answers questions about your workspace, such as "Which orders from last week are still unfulfilled?" or "Which shipments are stalled?". Open it with **Ask Luma** in the top bar or press ⌘ J (Ctrl J on Windows and Linux). Press the same keys, or Esc while you're in the panel, to close it. You can also type a question in the command menu (⌘ K) and choose **Ask Luma**.
+**Ask Luma** answers questions about your workspace in plain language, such as “Which orders from last week are still unfulfilled?” or “Which shipments are stalled?”. Each answer links to the records it used, so you can check it before you act.
 
-The panel stays open beside the page while you move around the workspace. On small screens it covers the page, and opening a linked record closes it.
+## Open Ask Luma
 
-## What Luma reads
+- Select **Ask Luma** in the top bar.
+- Press ⌘ J on a Mac or Ctrl J on Windows and Linux. This works even while you’re typing in a field.
+- In the command menu (⌘ K or Ctrl K), type a question of 3 characters or more and choose **Ask Luma**.
 
-Luma looks up current records for every question:
+Press the same keys, select **Close Ask Luma** or press Esc in the panel to close it. The panel stays open beside the page while you move around the workspace. On a narrow screen it covers the page, and opening a linked record closes it.
 
-- **Orders**: search, the outstanding, overdue, needs-you and sources-disagree views, and an order's lines, fulfillments, returns, issues and workflow runs.
-- **Issues**: the Issues inbox views, and an issue's diagnosis with its likely causes and next steps.
-- **Stock**: each source's on-hand, reserved, available and incoming quantities.
+Type your question and press Enter, or choose one of the **Suggested questions**. Select **Stop answering** to cancel; nothing is changed.
+
+## What Ask Luma can answer
+
+Ask Luma reads current records for every question:
+
+- **Orders**: find orders and see an order’s lines, fulfillments, returns, issues and workflow runs.
+- **Issues**: what needs attention, and an issue’s findings, possible causes and next steps.
+- **Stock**: on hand, reserved, available and incoming quantities in each system.
 - **Fulfillment**: held, delayed, stalled and in-transit work.
-- **Returns**: returns and refunds by stage, with the money actually returned.
+- **Returns**: returns and refunds by stage, with the amount actually refunded.
 
-Luma uses your access. It sees exactly what you can see on the matching pages, and nothing from other workspaces. If your access changes while it's answering, it stops.
+It reads with your access. It sees only what your role lets you see on the matching pages, and nothing from other workspaces. If your role doesn’t include orders, for example, it can’t read orders for you. If your access changes while it’s answering, it stops.
 
-Customer contact and payment details stay in the connected apps. Luma can't read them.
+Customer contact and payment details stay in your connected systems. Ask Luma can’t read them.
 
-## Check the answer
+## Check an answer
 
-Numbers in an answer link to the records they came from. **Sources** lists each one, with the source system and when Luma last read it. Select a record to open its page.
+Answers can be wrong. Before you act on one, open the records it links to.
 
-Select the read summary above an answer, such as **2 reads · 14 records**, to see each lookup Luma made. A read marked **Couldn't read** failed. The answer should say what it couldn't check.
+- Numbers and names in an answer link to the records they came from. **Sources** lists each record with its system and when Luma last read it. Select a record to open its page.
+- The line above the answer, such as **2 reads · 14 records**, opens the list of lookups Luma made. A lookup marked **Couldn’t read** failed, and the answer should say what it couldn’t check.
+- **As of** shows when the answer was written.
 
-Answers come from a language model and can be wrong. Before you act, check the linked records. Luma says so when sources disagree, data is stale or a list was cut short.
+Ask Luma says so when systems disagree, when data is out of date or when a list was cut short.
 
-## Follow-up questions
+## Ask a follow-up
 
-Ask a follow-up in the same conversation, for example "Which of those is the oldest?". Luma reads the records again instead of relying on its earlier answer. **New conversation** starts over.
+Ask a follow-up in the same conversation, for example “Which of those is the oldest?”. Ask Luma reads the records again instead of relying on its earlier answer. **New conversation** starts over.
 
-Conversations aren't saved. They stay in this browser tab until you start a new one or reload the page.
+Conversations aren’t saved. They stay in this browser tab until you start a new one or reload the page.
 
 ## Limits
 
-Luma only reads. It can't change records, approve, retry or start workflows. To act on something, open the cited record and use its controls with your own permissions.
+- Ask Luma only reads. It can’t change records, approve changes, retry anything or start workflows. To act, open the linked record and use its controls.
+- Each question can make a limited number of lookups and takes up to about a minute. When Ask Luma reaches a limit, the answer is marked **Incomplete**. Ask a narrower question, for example with a shorter date range, one status or one order number.
+- Questions can be up to 2,000 characters.
 
-Each question has a limit on lookups, answer length and time, about a minute. When Luma reaches a limit, the answer is marked **Incomplete**. Ask a narrower question, for example with a shorter date range, one status or an order number.
+## Who can use Ask Luma
 
-## When Ask Luma isn't available
+Your role needs **Use Ask Luma**. Without it, the panel says your role doesn’t include Ask Luma; ask a workspace admin for access.
 
-Ask Luma needs a model service that processes data in the EU and doesn't keep it. If the server doesn't have one, the panel says what's missing and nothing is sent. Whoever runs your Luma server can set it up.
+If Ask Luma isn’t available in your workspace, ask your administrator.

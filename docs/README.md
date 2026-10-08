@@ -30,6 +30,7 @@ for Luma's users live in `apps/web/content/docs`.
 - [Model gateway](model-gateway.md): routes, profiles and model data policy.
 - [Shared frontend components](frontend-ui.md) and the [design workflow](design-workflow.md).
 - [Documentation and contextual help](contextual-help.md).
+- [Localization](localization.md): interface languages, message rules and formatting.
 
 **Providers and commerce data**
 

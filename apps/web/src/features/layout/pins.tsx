@@ -1,4 +1,5 @@
 import type { PinnedPage } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import { Button } from '@luma/ui/components/primitives/button';
 import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { useLocation, useNavigate } from '@tanstack/react-router';
@@ -25,7 +26,7 @@ function currentLabel() {
     .querySelector('.header-context')
     ?.textContent?.trim();
 
-  return (heading || breadcrumb || 'Pinned page').slice(0, 120);
+  return (heading || breadcrumb || m.layout_pin_fallback_label()).slice(0, 120);
 }
 
 /**
@@ -45,13 +46,15 @@ export function PinCurrentPage({ organizationId }: { organizationId: string }) {
       variant="ghost"
       size="icon"
       aria-pressed={pinned}
-      aria-label={pinned ? 'Unpin this page' : 'Pin this page to the sidebar'}
+      aria-label={
+        pinned ? m.layout_pin_unpin_current() : m.layout_pin_current()
+      }
       title={
         full
-          ? `You can pin up to ${maxPins} pages`
+          ? m.layout_pin_limit({ count: maxPins })
           : pinned
-            ? 'Unpin this page'
-            : 'Pin this page to the sidebar'
+            ? m.layout_pin_unpin_current()
+            : m.layout_pin_current()
       }
       disabled={full}
       onClick={() =>
@@ -86,7 +89,7 @@ export function PinnedNavigation({
   return (
     <section className="sidebar-section" aria-labelledby="nav-pinned">
       <h2 className="sidebar-section-label" id="nav-pinned">
-        Pinned
+        {m.layout_pinned_heading()}
       </h2>
       <ul className="sidebar-list">
         {layout.pinned.map((pin) => {
@@ -131,7 +134,7 @@ export function PinnedNavigation({
               <button
                 type="button"
                 className="sidebar-unpin"
-                aria-label={`Unpin ${pin.label}`}
+                aria-label={m.layout_pin_unpin({ page: pin.label })}
                 onClick={() => unpin(pin)}
               >
                 <X size={13} aria-hidden="true" />

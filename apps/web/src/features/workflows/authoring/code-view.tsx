@@ -4,6 +4,8 @@ import type {
   WorkflowDiagnostic,
   WorkflowDraftContent,
 } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import type {
   CodeEditorCompletion,
@@ -83,7 +85,10 @@ export function vocabularyCompletions(
     })),
     ...vocabulary.capabilities.map((item) => ({
       label: `'${item.capability}'`,
-      detail: `${item.label} · version ${item.version}`,
+      detail: m.authoring_code_completion_version({
+        label: item.label,
+        version: item.version,
+      }),
       type: 'constant' as const,
     })),
     ...vocabulary.reads.map((item) => ({
@@ -165,18 +170,15 @@ export function DraftCodeView({
     <div className="authoring-code-view">
       {narrow || readOnly ? (
         <Alert tone="neutral" className="workflow-notice">
-          {readOnly
-            ? 'You can review the code. Changing drafts requires Author workflows.'
-            : 'Code is read-only on small screens. Use a wider screen to edit it.'}
+          {readOnly ? m.authoring_code_view_only() : m.authoring_code_narrow()}
         </Alert>
       ) : (
         <p className="authoring-hint" id="authoring-code-help">
-          The code is read as data, never run. Use literal values only. Code
-          Step source goes between <code>code`</code> backticks.
+          {rich(m.authoring_code_help, { marker: <code>code`</code> })}
         </p>
       )}
       <LazyCodeEditor
-        label="Workflow code"
+        label={m.authoring_code_editor_label()}
         describedBy="authoring-code-help"
         value={text}
         readOnly={narrow || readOnly}
@@ -190,14 +192,14 @@ export function DraftCodeView({
       />
       <div role="status" className="authoring-code-status">
         {error
-          ? `Couldn’t check the code. ${error}`
+          ? m.authoring_code_check_failed({ error })
           : parseProblem
-            ? `Not saved: ${parseProblem.message}`
+            ? m.authoring_code_not_saved({ problem: parseProblem.message })
             : result
               ? result.diagnostics.some((item) => item.severity === 'error')
-                ? 'Saved. Fix the problems shown before publishing.'
-                : 'Code matches the draft.'
-              : 'Checking…'}
+                ? m.authoring_code_saved_with_problems()
+                : m.authoring_code_matches()
+              : m.authoring_checking()}
       </div>
     </div>
   );

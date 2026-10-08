@@ -1,4 +1,7 @@
 import type { RolesSnapshot } from '@luma/api-contract';
+import { formatList, formatNumber } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -30,6 +33,7 @@ import {
 } from 'lucide-react';
 import { useId, useMemo, useState } from 'react';
 
+import { permissionLabel } from '../identity/permission-text';
 import { usePermissions } from '../identity/permissions';
 import {
   CommandFeedback,
@@ -159,9 +163,7 @@ export function RoleEditor({
         setReviewing(false);
         setEdits(null);
       },
-      role
-        ? 'Role saved. It applies on each person’s next request.'
-        : 'Role created.',
+      role ? m.settings_role_editor_saved() : m.settings_role_editor_created(),
     );
     if (creating && created) close(created);
   }
@@ -194,7 +196,8 @@ export function RoleEditor({
         className="role-back"
         onClick={() => close()}
       >
-        <ArrowLeft size={15} /> All roles
+        <ArrowLeft size={15} aria-hidden="true" />{' '}
+        {m.settings_role_editor_back()}
       </Button>
       <header className="role-header">
         {role ? (
@@ -204,23 +207,32 @@ export function RoleEditor({
         )}
         <div className="role-header-copy">
           <h2 id="role-title">
-            {values.name.trim() || 'New role'}
-            {role?.builtIn ? <Badge>Built-in</Badge> : null}
-            {role?.archived ? <Badge tone="warning">Archived</Badge> : null}
-            {creating ? <Badge tone="accent">Not saved yet</Badge> : null}
+            {values.name.trim() || m.settings_role_editor_new()}
+            {role?.builtIn ? <Badge>{m.settings_role_built_in()}</Badge> : null}
+            {role?.archived ? (
+              <Badge tone="warning">{m.settings_role_archived()}</Badge>
+            ) : null}
+            {creating ? (
+              <Badge tone="accent">{m.settings_role_editor_unsaved()}</Badge>
+            ) : null}
           </h2>
-          <p>{values.description.trim() || 'No description'}</p>
+          <p>{values.description.trim() || m.settings_role_no_description()}</p>
           <span className="role-header-meta">
             {role
-              ? `${role.memberCount} ${role.memberCount === 1 ? 'person' : 'people'} · `
+              ? `${m.settings_role_people({ count: role.memberCount })} · `
               : null}
             {role?.allAppPermissions
-              ? 'Every permission, including installed apps'
-              : `${count} of ${total} permissions${sensitive ? ` · ${sensitive} sensitive` : ''}`}
+              ? m.settings_role_editor_all_permissions()
+              : m.settings_role_reach({ count, total })}
+            {!role?.allAppPermissions && sensitive
+              ? ` · ${m.settings_role_editor_sensitive_count({ count: sensitive })}`
+              : null}
             {role?.updatedAt ? (
               <>
-                {' · Updated '}
-                <WorkspaceDate value={role.updatedAt} />
+                {' · '}
+                {rich(m.settings_role_editor_updated, {
+                  date: <WorkspaceDate value={role.updatedAt} />,
+                })}
               </>
             ) : null}
           </span>
@@ -233,7 +245,8 @@ export function RoleEditor({
               disabled={blocked}
               onClick={() => duplicate(role)}
             >
-              <Copy size={14} /> Duplicate
+              <Copy size={14} aria-hidden="true" />{' '}
+              {m.settings_role_editor_duplicate()}
             </Button>
             {!role.builtIn && !role.archived && withinReach ? (
               <Button
@@ -242,7 +255,8 @@ export function RoleEditor({
                 disabled={blocked}
                 onClick={() => setArchiving(true)}
               >
-                <Archive size={14} /> Archive
+                <Archive size={14} aria-hidden="true" />{' '}
+                {m.settings_role_editor_archive()}
               </Button>
             ) : null}
           </div>
@@ -250,21 +264,16 @@ export function RoleEditor({
       </header>
       {role?.builtIn ? (
         <Alert tone="neutral">
-          Built-in roles can’t be changed and gain new permissions as Luma adds
-          features.
-          {manage ? ' Duplicate this role to start a custom one.' : null}
+          {manage
+            ? m.settings_role_editor_built_in_duplicate()
+            : m.settings_role_editor_built_in()}
         </Alert>
       ) : null}
       {role?.archived ? (
-        <Alert tone="neutral">
-          This role is archived. Nobody has it, and it can’t be assigned.
-        </Alert>
+        <Alert tone="neutral">{m.settings_role_editor_archived()}</Alert>
       ) : null}
       {role && manage && !withinReach && !role.builtIn && !role.archived ? (
-        <Alert tone="neutral">
-          This role has permissions your role doesn’t include, so only an owner
-          or someone with all of them can change it.
-        </Alert>
+        <Alert tone="neutral">{m.settings_role_editor_out_of_reach()}</Alert>
       ) : null}
       {!creating ? (
         <Tabs
@@ -275,12 +284,22 @@ export function RoleEditor({
             )
           }
         >
-          <TabsList aria-label="Role details" activateOnFocus={false}>
-            <TabsTrigger value="permissions">Permissions</TabsTrigger>
-            <TabsTrigger value="people">
-              People <span className="role-tab-count">{role.memberCount}</span>
+          <TabsList
+            aria-label={m.settings_role_editor_tabs_label()}
+            activateOnFocus={false}
+          >
+            <TabsTrigger value="permissions">
+              {m.settings_role_editor_tab_permissions()}
             </TabsTrigger>
-            <TabsTrigger value="history">History</TabsTrigger>
+            <TabsTrigger value="people">
+              {m.settings_role_editor_tab_people()}{' '}
+              <span className="role-tab-count">
+                {formatNumber(role.memberCount)}
+              </span>
+            </TabsTrigger>
+            <TabsTrigger value="history">
+              {m.settings_role_editor_tab_history()}
+            </TabsTrigger>
           </TabsList>
         </Tabs>
       ) : null}
@@ -304,7 +323,9 @@ export function RoleEditor({
           {editable ? (
             <div className="settings-panel">
               <div className="settings-field">
-                <label htmlFor="role-edit-name">Name</label>
+                <label htmlFor="role-edit-name">
+                  {m.settings_role_name_label()}
+                </label>
                 <Input
                   id="role-edit-name"
                   value={values.name}
@@ -316,13 +337,15 @@ export function RoleEditor({
                 />
                 {nameTaken ? (
                   <small className="roles-field-error">
-                    Another role already has this name.
+                    {m.settings_role_name_taken()}
                   </small>
                 ) : null}
               </div>
               <div className="settings-field">
-                <label htmlFor="role-edit-description">Description</label>
-                <p>Help admins choose the right role when inviting people.</p>
+                <label htmlFor="role-edit-description">
+                  {m.settings_role_description_label()}
+                </label>
+                <p>{m.settings_role_editor_description_help()}</p>
                 <Textarea
                   id="role-edit-description"
                   value={values.description}
@@ -341,8 +364,8 @@ export function RoleEditor({
             <div className="settings-search">
               <Search size={15} aria-hidden="true" />
               <Input
-                aria-label="Search permissions"
-                placeholder="Search permissions…"
+                aria-label={m.settings_role_editor_search_label()}
+                placeholder={m.settings_role_editor_search_placeholder()}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
               />
@@ -351,15 +374,15 @@ export function RoleEditor({
               <Switch
                 checked={grantedOnly}
                 onCheckedChange={setGrantedOnly}
-                aria-label="Show granted permissions only"
+                aria-label={m.settings_role_editor_granted_only_label()}
               />
-              Granted only
+              {m.settings_role_editor_granted_only()}
             </label>
           </div>
           {groups.every(({ shown }) => !shown.length) ? (
             <div className="settings-empty">
               <Search size={20} aria-hidden="true" />
-              <strong>No permissions match</strong>
+              <strong>{m.settings_role_editor_no_matches()}</strong>
               <Button
                 variant="ghost"
                 onClick={() => {
@@ -367,7 +390,7 @@ export function RoleEditor({
                   setGrantedOnly(false);
                 }}
               >
-                Clear filters
+                {m.common_clear_filters()}
               </Button>
             </div>
           ) : null}
@@ -398,19 +421,25 @@ export function RoleEditor({
             <div
               className="role-savebar"
               role="region"
-              aria-label="Unsaved role changes"
+              aria-label={m.settings_role_editor_unsaved_region()}
             >
               <span>
                 {creating
-                  ? `${values.permissions.length} permission${values.permissions.length === 1 ? '' : 's'} selected`
+                  ? m.settings_role_editor_selected({
+                      count: values.permissions.length,
+                    })
                   : [
                       changes.added.length
-                        ? `${changes.added.length} added`
+                        ? m.settings_role_editor_added({
+                            count: changes.added.length,
+                          })
                         : null,
                       changes.removed.length
-                        ? `${changes.removed.length} removed`
+                        ? m.settings_role_editor_removed({
+                            count: changes.removed.length,
+                          })
                         : null,
-                      renamed ? 'details changed' : null,
+                      renamed ? m.settings_role_editor_details_changed() : null,
                     ]
                       .filter(Boolean)
                       .join(' · ')}
@@ -420,13 +449,15 @@ export function RoleEditor({
                 disabled={command.pending}
                 onClick={() => (creating ? close() : setEdits(null))}
               >
-                {creating ? 'Cancel' : 'Discard changes'}
+                {creating ? m.common_cancel() : m.common_discard_changes()}
               </Button>
               <Button
                 disabled={blocked || !values.name.trim() || nameTaken}
                 onClick={() => setReviewing(true)}
               >
-                {creating ? 'Review and create' : 'Review changes'}
+                {creating
+                  ? m.settings_role_editor_review_create()
+                  : m.settings_role_editor_review()}
               </Button>
             </div>
           ) : null}
@@ -447,7 +478,8 @@ export function RoleEditor({
         removed={creating ? [] : changes.removed}
         labels={labels}
         people={people.map(
-          (member) => member.name ?? member.email ?? 'A teammate',
+          (member) =>
+            member.name ?? member.email ?? m.settings_role_history_someone(),
         )}
         command={command}
         save={() => void save()}
@@ -503,16 +535,20 @@ function PermissionGroup({
         <div>
           <h3 id={titleId}>
             {group.label}
-            {group.app ? <Badge tone="info">App</Badge> : null}
+            {group.app ? (
+              <Badge tone="info">{m.settings_role_group_app()}</Badge>
+            ) : null}
             {group.app && !group.app.available ? (
-              <Badge tone="warning">Unavailable</Badge>
+              <Badge tone="warning">
+                {m.settings_role_group_unavailable()}
+              </Badge>
             ) : null}
           </h3>
           <p>{group.description}</p>
         </div>
         <div className="role-group-summary">
           <span>
-            {held}/{all.length}
+            {m.common_shown_of_total({ shown: held, total: all.length })}
           </span>
           {editable && reachable.length > 1 ? (
             <Button
@@ -526,7 +562,9 @@ function PermissionGroup({
                 )
               }
             >
-              {allOn ? 'Remove all' : 'Grant all'}
+              {allOn
+                ? m.settings_role_group_remove_all()
+                : m.settings_role_group_grant_all()}
             </Button>
           ) : null}
         </div>
@@ -577,14 +615,18 @@ function PermissionRow({
         <strong id={titleId}>
           {permission.label}
           {permission.consequential ? (
-            <Badge tone="warning">Sensitive</Badge>
+            <Badge tone="warning">
+              {m.settings_role_permission_sensitive()}
+            </Badge>
           ) : null}
-          {isNew ? <Badge tone="accent">New</Badge> : null}
+          {isNew ? (
+            <Badge tone="accent">{m.settings_role_permission_new()}</Badge>
+          ) : null}
         </strong>
         <span id={descriptionId}>
           {permission.description}
           {editable && locked ? (
-            <em> You can’t grant this because your role doesn’t include it.</em>
+            <em> {m.settings_role_permission_locked()}</em>
           ) : null}
         </span>
       </span>
@@ -600,11 +642,13 @@ function PermissionRow({
         <span className="role-permission-state" data-on={on || undefined}>
           {on ? (
             <>
-              <Check size={14} aria-hidden="true" /> Included
+              <Check size={14} aria-hidden="true" />{' '}
+              {m.settings_role_permission_included()}
             </>
           ) : (
             <>
-              <Minus size={14} aria-hidden="true" /> Not included
+              <Minus size={14} aria-hidden="true" />{' '}
+              {m.settings_role_permission_not_included()}
             </>
           )}
         </span>
@@ -649,11 +693,15 @@ function ReviewDialog({
             <Minus size={13} aria-hidden="true" />
           )}
           <span className="sr-only">
-            {tone === 'added' ? 'Grant' : 'Remove'}:
+            {tone === 'added'
+              ? m.settings_role_review_grant()
+              : m.settings_role_review_remove()}{' '}
           </span>
-          {labels.get(key)?.label ?? key}
+          {permissionLabel(key, labels.get(key)?.label ?? key)}
           {labels.get(key)?.consequential ? (
-            <Badge tone="warning">Sensitive</Badge>
+            <Badge tone="warning">
+              {m.settings_role_permission_sensitive()}
+            </Badge>
           ) : null}
         </li>
       ))}
@@ -669,75 +717,86 @@ function ReviewDialog({
     >
       <DialogContent className="role-review">
         <DialogTitle>
-          {creating ? `Create ${name}` : `Review changes to ${name}`}
+          {creating
+            ? m.settings_role_review_create_title({ name })
+            : m.settings_role_review_title({ name })}
         </DialogTitle>
         <DialogDescription>
           {creating
-            ? 'Check what this role allows. You can assign it to people after it’s created.'
+            ? m.settings_role_review_create_description()
             : people.length
-              ? `These changes apply to ${people.length} ${people.length === 1 ? 'person' : 'people'} on their next request.`
-              : 'Nobody has this role yet, so the changes affect no one right now.'}
+              ? m.settings_role_review_affects({ count: people.length })
+              : m.settings_role_review_affects_nobody()}
         </DialogDescription>
         {renamed &&
         (renamed.before.name !== renamed.after.name.trim() ||
           renamed.before.description !== renamed.after.description.trim()) ? (
           <div className="role-review-section">
-            <h3>Details</h3>
+            <h3>{m.settings_role_review_details()}</h3>
             {renamed.before.name !== renamed.after.name.trim() ? (
               <p>
-                Name: {renamed.before.name} → {renamed.after.name.trim()}
+                {m.settings_role_review_name_change({
+                  before: renamed.before.name,
+                  after: renamed.after.name.trim(),
+                })}
               </p>
             ) : null}
             {renamed.before.description !== renamed.after.description.trim() ? (
-              <p>Description updated</p>
+              <p>{m.settings_role_review_description_updated()}</p>
             ) : null}
           </div>
         ) : null}
         {added.length ? (
           <div className="role-review-section">
-            <h3>{creating ? 'Permissions' : `Granted (${added.length})`}</h3>
+            <h3>
+              {creating
+                ? m.settings_role_review_permissions()
+                : m.settings_role_review_granted({ count: added.length })}
+            </h3>
             {list(added, 'added')}
           </div>
         ) : creating ? (
           <p className="settings-note">
-            This role has no permissions. People with it can sign in but see no
-            workspace data.
+            {m.settings_role_review_no_permissions()}
           </p>
         ) : null}
         {removed.length ? (
           <div className="role-review-section">
-            <h3>Removed ({removed.length})</h3>
+            <h3>{m.settings_role_review_removed({ count: removed.length })}</h3>
             {list(removed, 'removed')}
           </div>
         ) : null}
         {sensitive.length ? (
           <Alert tone="warning">
-            {sensitive.length === 1
-              ? 'One permission lets people change data, access or policy, or see personal data.'
-              : `${sensitive.length} permissions let people change data, access or policy, or see personal data.`}{' '}
-            Grant them only to people who need them.
+            {m.settings_role_review_sensitive({ count: sensitive.length })}
           </Alert>
         ) : null}
         {!creating && people.length ? (
           <div className="role-review-section">
-            <h3>People with this role</h3>
+            <h3>{m.settings_role_review_people()}</h3>
             <p className="role-review-people">
-              {people.slice(0, 6).join(', ')}
-              {people.length > 6 ? ` and ${people.length - 6} more` : ''}
+              {formatList(
+                people.length > 6
+                  ? [
+                      ...people.slice(0, 6),
+                      m.common_count_more({ count: people.length - 6 }),
+                    ]
+                  : people,
+              )}
             </p>
           </div>
         ) : null}
         {open ? <CommandFeedback command={command} /> : null}
         <DialogFooter>
           <Button variant="outline" disabled={command.locked} onClick={close}>
-            Back to editing
+            {m.settings_role_review_back()}
           </Button>
           <Button disabled={command.locked} onClick={save}>
             {command.pending
-              ? 'Saving…'
+              ? m.common_saving()
               : creating
-                ? 'Create role'
-                : 'Save changes'}
+                ? m.settings_role_review_create()
+                : m.common_save_changes()}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -771,23 +830,27 @@ function ArchiveDialog({
       }}
     >
       <DialogContent>
-        <DialogTitle>Archive {role.name}?</DialogTitle>
+        <DialogTitle>
+          {m.settings_role_archive_title({ role: role.name })}
+        </DialogTitle>
         <DialogDescription>
           {inUse
-            ? `${role.memberCount} ${role.memberCount === 1 ? 'person has' : 'people have'} this role. Give them another role in Team before archiving it.`
-            : 'Archived roles can’t be assigned. Their history stays available.'}
+            ? m.settings_role_archive_in_use({ count: role.memberCount })
+            : m.settings_role_archive_description()}
         </DialogDescription>
         {!inUse && role.pendingInvitations ? (
           <Alert tone="warning">
-            {role.pendingInvitations} pending invitation
-            {role.pendingInvitations === 1 ? '' : 's'} for this role will be
-            revoked. Invite those people again with another role.
+            {m.settings_role_archive_invitations({
+              count: role.pendingInvitations,
+            })}
           </Alert>
         ) : null}
         <CommandFeedback command={command} />
         <DialogFooter>
           {inUse ? (
-            <Button onClick={showPeople}>Show people</Button>
+            <Button onClick={showPeople}>
+              {m.settings_role_archive_show_people()}
+            </Button>
           ) : (
             <>
               <Button
@@ -795,7 +858,7 @@ function ArchiveDialog({
                 disabled={command.locked}
                 onClick={close}
               >
-                Keep role
+                {m.settings_role_archive_keep()}
               </Button>
               <Button
                 variant="destructive"
@@ -811,10 +874,12 @@ function ArchiveDialog({
                     );
                     close();
                     archived();
-                  }, 'Role archived.')
+                  }, m.settings_role_archive_done())
                 }
               >
-                {command.pending ? 'Archiving…' : 'Archive role'}
+                {command.pending
+                  ? m.settings_role_archive_pending()
+                  : m.settings_role_archive_confirm()}
               </Button>
             </>
           )}

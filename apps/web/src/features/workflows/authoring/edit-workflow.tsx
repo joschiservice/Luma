@@ -1,4 +1,5 @@
 import type { WorkflowDetail } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import { Button } from '@luma/ui/components/primitives/button';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
@@ -65,10 +66,10 @@ export function EditWorkflowButton({
       <Button variant="outline" disabled={pending} onClick={() => void edit()}>
         <FilePenLine aria-hidden="true" />
         {pending
-          ? 'Opening…'
+          ? m.authoring_edit_opening()
           : request && error
-            ? 'Retry edit'
-            : 'Edit as new draft'}
+            ? m.common_try_again()
+            : m.authoring_edit_button()}
       </Button>
       {error ? (
         <span role="alert" className="authoring-inline-error">

@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import { createContext, type ReactNode, useContext } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -11,6 +12,6 @@ export function WorkspaceBreadcrumb({ children }: { children: ReactNode }) {
   return target ? (
     createPortal(children, target)
   ) : (
-    <nav aria-label="Breadcrumb">{children}</nav>
+    <nav aria-label={m.ui_breadcrumb_label()}>{children}</nav>
   );
 }

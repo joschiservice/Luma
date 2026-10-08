@@ -131,10 +131,10 @@ export const History: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(
-      await canvas.findByRole('button', { name: /Execution completed/ }),
+      await canvas.findByRole('button', { name: /Change attempt finished/ }),
     );
     await expect(
-      canvas.getByText('inconclusive', { exact: true }),
+      canvas.getByText('Inconclusive', { exact: true }),
     ).toBeVisible();
     await expect(
       canvas.getByRole('link', { name: 'Open issue and evidence' }),
@@ -200,7 +200,7 @@ export const Filtering: Story = {
     );
     await userEvent.click(
       await canvas.findByRole('button', {
-        name: 'Remove Recorded filter: Sep 1 – Sep 22, 2026',
+        name: 'Remove Recorded filter: 1 – 22 Sept 2026',
       }),
     );
     await expect(

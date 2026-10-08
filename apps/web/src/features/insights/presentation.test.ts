@@ -80,12 +80,12 @@ describe('chart presentation', () => {
   it('keeps unknown periods distinct from zero and explains incomplete ones', () => {
     const categories = chartCategories(orders, 'UTC');
     expect(categories.map((c) => [c.label, c.unknown !== undefined])).toEqual([
-      ['Tue, Sep 29', true],
-      ['Wed, Sep 30', false],
-      ['Thu, Oct 1', false],
+      ['Tue 29 Sept', true],
+      ['Wed 30 Sept', false],
+      ['Thu 1 Oct', false],
     ]);
     expect(categories[2]!.note).toBe(
-      'Incomplete: sources read through Oct 1, 09:30',
+      'Incomplete: sources read through 1 Oct, 09:30',
     );
     expect(categories[1]!.note).toBeUndefined();
   });
@@ -111,9 +111,9 @@ describe('chart presentation', () => {
         ...orders,
         coverage: { ...orders.coverage, state: 'unavailable', sources: [] },
       }).label,
-    ).toBe('No source in scope');
+    ).toBe('No source in this view');
     expect(dataThroughText(orders, 'Europe/Berlin')).toBe(
-      'Data through Oct 1, 11:30',
+      'Data through 1 Oct, 11:30',
     );
     expect(dataThroughText({ ...orders, dataThrough: null }, 'UTC')).toMatch(
       /unknown/,
@@ -125,7 +125,7 @@ describe('chart presentation', () => {
     expect(chartSeries(orders).map((s) => s.label)).toEqual([
       'Open',
       'Completed',
-      'Cancelled',
+      'Canceled',
       'Status unknown',
     ]);
   });
@@ -133,7 +133,7 @@ describe('chart presentation', () => {
   it('titles and totals a selection the way the chart showed it', () => {
     expect(
       selectionTitle(orders, { point: '2026-09-30', series: 'open' }, 'UTC'),
-    ).toBe('Orders · Open · Wed, Sep 30');
+    ).toBe('Orders · Open · Wed 30 Sept');
     expect(selectionValue(orders, { point: '2026-09-30' })).toBe(3);
     expect(selectionValue(orders, { series: 'open' })).toBe(3);
     expect(selectionValue(orders, {})).toBe(5);

@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import {
   CaseInvestigation,
   CaseLoading,
@@ -29,8 +30,8 @@ export function LiveCaseDetail({
   } = observation;
   if (denied)
     return (
-      <CaseNotice error title="Case unavailable">
-        This case is missing or you no longer have access.
+      <CaseNotice error title={m.exceptions_issue_unavailable()}>
+        {m.exceptions_detail_denied_text()}
       </CaseNotice>
     );
   const data = snapshot.data;
@@ -38,10 +39,10 @@ export function LiveCaseDetail({
     return snapshot.isPending ? (
       <CaseLoading />
     ) : (
-      <CaseNotice error title="Progress could not be confirmed">
-        Refresh to read the latest case state.
+      <CaseNotice error title={m.exceptions_progress_failed_title()}>
+        {m.exceptions_progress_failed_text()}
         <Button variant="outline" onClick={refresh}>
-          Refresh progress
+          {m.exceptions_progress_refresh()}
         </Button>
       </CaseNotice>
     );
@@ -71,11 +72,12 @@ export function LiveCaseDetail({
           onRefresh={refresh}
         >
           {history.isError ? (
-            <CaseNotice error title="History could not be refreshed">
-              {history.data ? 'Showing previously loaded history. ' : ''}
-              The current case review is shown separately.
+            <CaseNotice error title={m.exceptions_history_failed_title()}>
+              {history.data
+                ? m.exceptions_history_failed_stale()
+                : m.exceptions_history_failed_text()}
               <Button variant="outline" onClick={observation.retryHistory}>
-                Retry history
+                {m.exceptions_history_retry()}
               </Button>
             </CaseNotice>
           ) : history.isPending ? (

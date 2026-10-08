@@ -1,50 +1,54 @@
 ---
 title: Secure your sign-in
-description: Add an authenticator app code to your password, keep backup codes, and sign in with a passkey.
+description: Add an authenticator app code to your password, keep backup codes, sign in with a passkey, and know what to do if you lose access.
 ---
 
-Your sign-in protects every workspace you belong to, including approvals and changes to connected systems. Open **Settings → Security** to add a second step after your password, or a passkey that replaces the password. These settings belong to your account, not to one workspace.
+Your sign-in protects every workspace you belong to, including approvals and changes to connected systems. Open **Settings → Security** to add a code step after your password, or a passkey that replaces the password. These settings belong to your account and apply in every workspace.
 
 ## Turn on two-factor authentication
 
 With two-factor authentication on, Luma asks for a 6-digit code from an authenticator app after your password. Any app that supports time-based codes works, such as 1Password, Google Authenticator or Microsoft Authenticator.
 
 1. Under **Authenticator app**, select **Set up** and enter your password.
-2. Save the 10 backup codes somewhere safe, such as your password manager. You won't see them again.
-3. Scan the QR code with your authenticator app, or enter the setup key.
+2. **Save your backup codes** shows 10 codes. Store them somewhere safe, such as your password manager; **Copy codes** copies them all. You won’t see them again. Then select **I’ve saved my codes**.
+3. Scan the QR code with your authenticator app, or enter the **Setup key**.
 4. Enter the 6-digit code the app shows and select **Turn on**.
 
-Two-factor authentication starts only once the code is confirmed. If you close the dialog earlier, nothing changes.
+Two-factor authentication starts only once the code is confirmed. If you close the dialog earlier, nothing changes and signing in still needs only your password.
 
 If a code is rejected, check that your device sets its time automatically. Codes change every 30 seconds.
 
 ## Sign in with a code
 
-After your email and password, enter the current code from your authenticator app. If you don't have your device, select **Use a backup code**. Each backup code works once.
+After your email and password, Luma asks you to **Confirm it’s you**. Enter the current code from your authenticator app and select **Verify**. If you don’t have your device, select **Use a backup code**. Each backup code works once.
 
-After five incorrect codes, sign in with your password again. After repeated failures, Luma locks code entry for 15 minutes.
+Enter the code within 10 minutes of entering your password. If the sign-in attempt expires, or after five incorrect codes, select **Sign in again** and enter your password again. After repeated incorrect codes, Luma locks code entry for 15 minutes.
 
 ## Replace your backup codes
 
-Select **New backup codes** and enter your password. Your previous codes stop working immediately. Do this if you've used most of your codes or think someone else has seen them.
+Select **New backup codes**, enter your password and select **Create codes**. Your earlier codes stop working immediately. Do this if you’ve used most of your codes or think someone else has seen them.
 
 ## Use a passkey
 
-A passkey signs you in with your fingerprint, face, device PIN or a security key. It can't be phished or reused on another site. Signing in with a passkey skips both your password and the code step.
+A passkey signs you in with your fingerprint, face, device PIN or a security key. It can’t be phished or reused on another site. Signing in with a passkey skips both your password and the code step.
 
-1. Under **Passkeys**, optionally name the passkey, for example "Work laptop".
-2. Select **Add passkey** and follow your device's prompt.
+1. Under **Passkeys**, optionally enter a name, such as “Work laptop”.
+2. Select **Add passkey** and follow your device’s prompt.
 
-On the sign-in page, select **Sign in with a passkey**. Add a passkey on each device you use, unless your password manager syncs passkeys between devices. The list shows whether each passkey is synced or tied to one device.
+On the sign-in page, select **Sign in with a passkey**. Add a passkey on each device you sign in from, unless your password manager syncs passkeys between devices. The list shows whether each one is a **Synced passkey** or a **Passkey on one device**.
 
-To add a passkey, you need to have signed in within the last day. If Luma asks you to sign in again, sign out and back in, then add the passkey.
+To add a passkey, you need to have signed in within the last day. If Luma asks you to sign out and sign in again first, do that and then add the passkey. If your browser can’t create passkeys, use a current version of Chrome, Edge, Firefox or Safari.
 
 ## Remove a passkey or turn off two-factor authentication
 
-Select **Remove** next to a passkey. Also delete it from your device or password manager.
+Select **Remove** next to a passkey, then **Remove passkey**. Also delete it from your device or password manager.
 
-To stop using codes, select **Turn off** and enter your password. Your backup codes stop working. Passkeys you've added keep working.
+To stop using codes, select **Turn off** under **Authenticator app** and enter your password. Your backup codes stop working. Passkeys you’ve added keep working.
 
 ## If you lose access
 
-If you lose your authenticator device, sign in with a backup code or a passkey, then turn two-factor authentication off and set it up again on your new device. Without a backup code or a passkey, you can't finish signing in, so keep at least one of them available.
+- **Lost your authenticator device**: sign in with a backup code or a passkey. Then turn two-factor authentication off and set it up again on your new device.
+- **Used up your backup codes**: sign in with your authenticator app or a passkey and select **New backup codes**.
+- **Forgot your password**: sign in with a passkey if you’ve added one. Luma doesn’t offer a password reset on the sign-in page.
+
+Without your authenticator app, a backup code or a passkey, you can’t finish signing in. Keep at least two of them available.

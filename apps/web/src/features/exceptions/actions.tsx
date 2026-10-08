@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import { IssuePageNavigation } from '@luma/ui/components/issues/issue-section';
 import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import { useContext } from 'react';
@@ -25,7 +26,7 @@ export function IssueActions({
 
   return (
     <>
-      <section tabIndex={-1} aria-label="Resolution review">
+      <section tabIndex={-1} aria-label={m.exceptions_resolution_label()}>
         <CaseResolution
           organizationId={organizationId}
           exceptionId={exceptionId}
@@ -39,7 +40,8 @@ export function IssueActions({
       >
         {navigate ? (
           <summary>
-            Evaluate a Workflow <span>Preview only · No action executed</span>
+            {m.exceptions_shadow_title()}{' '}
+            <span>{m.exceptions_shadow_note()}</span>
           </summary>
         ) : null}
         <CaseShadow

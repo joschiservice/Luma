@@ -19,21 +19,22 @@ export const caseMetricDefinitions: OperationalMetricDefinition[] = [
   {
     id: 'cases.active',
     title: 'Unresolved issues',
-    description: 'Distinct unresolved issues across all subject kinds.',
+    description:
+      'Every unresolved issue, counted once, whatever record it affects.',
     unit: 'case',
   },
   {
     id: 'cases.attention',
     title: 'Issues needing attention',
     description:
-      'Unresolved issues requesting approval, manual intervention or uncertainty review. Each issue has one inbox reason.',
+      'Unresolved issues waiting for an approval, a manual fix, or a review of an unclear outcome. Each issue counts under one reason.',
     unit: 'case',
   },
   {
     id: 'cases.oldest_unresolved_age',
     title: 'Oldest unresolved issue',
     description:
-      'Age since first detection of the oldest unresolved issue. Reopening retains first detection. Missing or future detection times are unknown.',
+      'Time since the oldest unresolved issue was first detected. A reopened issue keeps its first detection time. Missing or future detection times count as unknown.',
     unit: 'second',
   },
 ].map((d) => ({
@@ -43,7 +44,7 @@ export const caseMetricDefinitions: OperationalMetricDefinition[] = [
   filters: [],
   permissions: 'workspace_member',
   timeSemantics:
-    'Current unresolved state and inbox attention evaluated at asOf.',
+    'Counts unresolved issues, and what they wait for, at the time shown.',
 })) as OperationalMetricDefinition[];
 
 /** Counts the inbox projection, preserving unknown ages and mutually exclusive attention reasons. */

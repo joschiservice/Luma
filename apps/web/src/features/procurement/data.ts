@@ -7,6 +7,7 @@ import type {
   SupplierLinkInput,
   TransitionInput,
 } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import { queryOptions } from '@tanstack/react-query';
 
 import { createWebApiClient } from '../../lib/api-client';
@@ -30,7 +31,7 @@ function failure(response: { status: number; body: unknown }): never {
     response.status,
     typeof body === 'object' && body !== null && 'message' in body
       ? String(body.message)
-      : 'Procurement is unavailable. Try again.',
+      : m.procurement_error_unavailable(),
   );
 }
 
@@ -133,7 +134,7 @@ export async function transitionOrder(
 export function procurementError(error: unknown) {
   if (error instanceof ProcurementError) return error.feedback;
 
-  return 'The result could not be confirmed. Check your connection and retry the same request.';
+  return m.procurement_error_unconfirmed();
 }
 
 const contextApi = createWebApiClient().procurementContext;

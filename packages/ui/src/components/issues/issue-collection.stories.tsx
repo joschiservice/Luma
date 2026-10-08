@@ -67,7 +67,7 @@ export const UpdatesAndOlderRecords: Story = {
     await expect(collection.queryByText('event-3')).not.toBeInTheDocument();
     await userEvent.click(
       collection.getByRole('button', {
-        name: 'New records available · Update list',
+        name: 'New entries available · Update list',
       }),
     );
     await expect(collection.getAllByRole('listitem')).toHaveLength(3);

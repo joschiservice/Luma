@@ -1,4 +1,6 @@
 import type { WorkflowDetail, WorkflowRunView } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Card, CardHeader } from '@luma/ui/components/primitives/card';
@@ -17,25 +19,46 @@ import { CancelScheduledStart } from './triggers';
 
 type ProcessState = NonNullable<WorkflowRunView['processState']>;
 
-/** Operator labels for process states; only `verified` reads as a confirmed outcome. */
-export const processStateLabels: Record<
+type ProcessStep = NonNullable<WorkflowRunView['processSteps']>[number];
+
+/** Labels for run states; only `verified` reads as a confirmed outcome. */
+const processStateLabels: Record<
   ProcessState,
-  [string, OperationalState]
+  [() => string, OperationalState]
 > = {
-  running: ['Running', 'running'],
-  awaiting_decision: ['Waiting for approval', 'approval'],
-  waiting: ['Waiting', 'waiting'],
-  verified: ['Verified', 'verified'],
-  ended: ['Ended without acting', 'idle'],
-  denied: ['Rejected', 'attention'],
-  failed_verification: ['Verification failed', 'error'],
-  inconclusive_verification: ['Couldn’t verify', 'attention'],
-  escalated: ['Handed to a person', 'attention'],
+  running: [m.workflows_run_state_running, 'running'],
+  awaiting_decision: [m.workflows_run_state_awaiting_decision, 'approval'],
+  waiting: [m.workflows_run_state_waiting, 'waiting'],
+  verified: [m.workflows_run_state_verified, 'verified'],
+  ended: [m.workflows_run_state_ended, 'idle'],
+  denied: [m.workflows_run_state_denied, 'attention'],
+  failed_verification: [m.workflows_run_state_failed_verification, 'error'],
+  inconclusive_verification: [
+    m.workflows_run_state_inconclusive_verification,
+    'attention',
+  ],
+  escalated: [m.workflows_run_state_escalated, 'attention'],
 };
 
-function processStepDescription(
-  step: NonNullable<WorkflowRunView['processSteps']>[number],
-) {
+const stepStateLabels = {
+  completed: m.workflows_step_state_completed,
+  waiting: m.workflows_step_state_waiting,
+  denied: m.workflows_step_state_denied,
+  failed: m.workflows_step_state_failed,
+  inconclusive: m.workflows_step_state_inconclusive,
+  ended: m.workflows_step_state_ended,
+  escalated: m.workflows_step_state_escalated,
+} satisfies Record<ProcessStep['state'], () => string>;
+
+const evidenceLabels = {
+  pilot: m.workflows_runs_source_pilot,
+  live: m.workflows_runs_source_live,
+  simulation: m.workflows_runs_source_simulation,
+  shadow: m.workflows_runs_source_shadow,
+  unclassified: m.workflows_runs_source_unclassified,
+} satisfies Record<WorkflowRunView['evidenceKind'], () => string>;
+
+function processStepDescription(step: ProcessStep) {
   if (
     step.reason &&
     !['condition_not_met', 'policy_approval_required'].includes(step.reason)
@@ -45,42 +68,42 @@ function processStepDescription(
   switch (step.kind) {
     case 'code':
       return step.state === 'completed'
-        ? 'The code returned its declared outputs.'
+        ? m.workflows_step_code_completed()
         : step.state === 'waiting'
-          ? 'A requested capability needs approval.'
-          : 'The code stopped. Review its execution details.';
+          ? m.workflows_step_code_waiting()
+          : m.workflows_step_code_stopped();
     case 'read':
-      return 'Current context refreshed.';
+      return m.workflows_step_read();
     case 'condition':
       return step.values.matched
-        ? 'The observed conditions matched.'
-        : 'The observed conditions did not match.';
+        ? m.workflows_step_condition_matched()
+        : m.workflows_step_condition_not_matched();
     case 'approval':
       return step.state === 'waiting'
-        ? 'Waiting for a decision.'
-        : 'Decision recorded.';
+        ? m.workflows_step_approval_waiting()
+        : m.workflows_step_approval_done();
     case 'capability':
       return step.state === 'waiting'
-        ? 'Waiting for policy approval.'
+        ? m.workflows_step_change_waiting()
         : step.state === 'completed'
-          ? 'Action accepted. Verification is still required.'
-          : 'The action did not proceed. Review the recorded reason.';
+          ? m.workflows_step_change_accepted()
+          : m.workflows_step_change_stopped();
     case 'wait':
       return step.state === 'waiting'
-        ? 'Waiting before the next step.'
-        : 'Wait finished.';
+        ? m.workflows_step_wait_waiting()
+        : m.workflows_step_wait_done();
     case 'verification':
       return step.state === 'completed'
-        ? 'Expected result confirmed.'
+        ? m.workflows_step_verify_confirmed()
         : step.state === 'failed'
-          ? 'The result differs from the expected outcome.'
-          : 'The result could not be confirmed.';
+          ? m.workflows_step_verify_failed()
+          : m.workflows_step_verify_unclear();
     case 'escalation':
-      return 'This run needs attention.';
+      return m.workflows_step_escalation();
     case 'end':
       return typeof step.values.outcome === 'string'
         ? step.values.outcome
-        : 'Process finished.';
+        : m.workflows_step_end();
   }
 }
 
@@ -117,22 +140,22 @@ export function WorkflowRuns({
       aria-labelledby="runs-title"
     >
       <CardHeader className="workflows-heading">
-        <h2 id="runs-title">Recent runs</h2>
+        <h2 id="runs-title">{m.workflows_runs_title()}</h2>
         <Button variant="outline" disabled={refreshing} onClick={refetch}>
-          Refresh runs
+          {m.workflows_runs_refresh()}
         </Button>
       </CardHeader>
       <p>
         {detail.versions.every((version) => version.format === 'workflow/2')
-          ? 'Follow each decision, action and check through the run. An accepted action still needs verification.'
-          : 'Execution acceptance and verified correction are separate results. Pilot, simulation and shadow evidence are not live verified success.'}
+          ? m.workflows_runs_description_process()
+          : m.workflows_runs_description_legacy()}
       </p>
       {error ? (
-        <p role="alert">Run history is unavailable. {error}</p>
+        <p role="alert">{m.workflows_runs_error({ error })}</p>
       ) : loading ? (
-        <p role="status">Loading runs…</p>
+        <p role="status">{m.workflows_runs_loading()}</p>
       ) : !runs?.length ? (
-        <p>No runs recorded for this workflow.</p>
+        <p>{m.workflows_runs_empty()}</p>
       ) : (
         <div className="workflow-runs">
           {runs.map((run) => {
@@ -144,7 +167,7 @@ export function WorkflowRuns({
               stepId.replaceAll(/[_-]/g, ' ');
             const [stateLabel, pill] = run.processState
               ? processStateLabels[run.processState]
-              : ['', 'idle' as const];
+              : [() => '', 'idle' as const];
 
             return (
               <article key={run.id} id={`run-${run.id}`} tabIndex={-1}>
@@ -157,7 +180,7 @@ export function WorkflowRuns({
                         exceptionId: run.resolution.incidentId,
                       }}
                     >
-                      Open issue
+                      {m.workflows_runs_open_issue()}
                     </Link>
                   ) : run.subject.kind === 'inventory_position' ? (
                     <Link
@@ -165,7 +188,7 @@ export function WorkflowRuns({
                       params={{ organizationId, positionId: run.subject.id }}
                       search={{ from: here }}
                     >
-                      Stock position
+                      {m.workflows_runs_stock_position()}
                     </Link>
                   ) : (
                     <span>{run.subject.kind.replaceAll('_', ' ')}</span>
@@ -175,24 +198,24 @@ export function WorkflowRuns({
                   </time>
                 </div>
                 <p>
-                  Version {run.version} ·{' '}
-                  <strong>
-                    {run.processSteps?.length
-                      ? 'Process evidence'
-                      : run.evidenceKind === 'pilot'
-                        ? 'Pilot evidence'
-                        : run.evidenceKind === 'unclassified'
-                          ? 'Unclassified evidence — live success not established'
-                          : `${run.evidenceKind} evidence`}
-                  </strong>
+                  {rich(m.workflows_runs_version_source, {
+                    version: run.version,
+                    source: (
+                      <strong>
+                        {run.processSteps?.length
+                          ? m.workflows_runs_source_process()
+                          : evidenceLabels[run.evidenceKind]()}
+                      </strong>
+                    ),
+                  })}
                 </p>
                 <p className="workflow-run-trigger">
-                  <strong>Triggered by: </strong>
+                  <strong>{m.workflows_runs_triggered_by()} </strong>
                   {workflowTriggerLabel(run.trigger)}
                 </p>
                 {run.processState ? (
                   <div className="workflow-process-status" role="status">
-                    <StatePill state={pill}>{stateLabel}</StatePill>
+                    <StatePill state={pill}>{stateLabel()}</StatePill>
                     <span>{run.reason}</span>
                   </div>
                 ) : null}
@@ -227,7 +250,7 @@ export function WorkflowRuns({
                 {run.processSteps?.length ? (
                   <ol
                     className="workflow-process-timeline"
-                    aria-label="Step progress"
+                    aria-label={m.workflows_runs_steps_label()}
                   >
                     {run.processSteps.map((step) => (
                       <li key={`${step.stepId}:${step.state}`}>
@@ -238,16 +261,15 @@ export function WorkflowRuns({
                         <div>
                           <div className="workflow-process-step-heading">
                             <strong>{stepTitle(step.stepId)}</strong>
-                            <span>{step.state.replaceAll('_', ' ')}</span>
+                            <span>{stepStateLabels[step.state]()}</span>
                             <WorkspaceDate value={step.recordedAt} />
                           </div>
                           <p>{processStepDescription(step)}</p>
                           {step.evidenceRefs.length ? (
                             <p>
-                              {step.evidenceRefs.length} evidence{' '}
-                              {step.evidenceRefs.length === 1
-                                ? 'reference'
-                                : 'references'}
+                              {m.workflows_runs_evidence_count({
+                                count: step.evidenceRefs.length,
+                              })}
                             </p>
                           ) : null}
                         </div>
@@ -258,25 +280,25 @@ export function WorkflowRuns({
                   <>
                     <dl className="workflow-run-story">
                       <div>
-                        <dt>Investigation</dt>
+                        <dt>{m.workflows_runs_story_context()}</dt>
                         <dd>{run.story.context}</dd>
                       </div>
                       <div>
-                        <dt>Decision & human input</dt>
+                        <dt>{m.workflows_runs_story_decision()}</dt>
                         <dd>{run.story.decision}</dd>
                       </div>
                       <div>
-                        <dt>Proposed action</dt>
+                        <dt>{m.workflows_runs_story_action()}</dt>
                         <dd>{run.story.action}</dd>
                       </div>
                     </dl>
                     <dl>
                       <div>
-                        <dt>Execution</dt>
+                        <dt>{m.workflows_runs_change_status()}</dt>
                         <dd>{run.execution.replaceAll('_', ' ')}</dd>
                       </div>
                       <div>
-                        <dt>Verification</dt>
+                        <dt>{m.workflows_runs_check_status()}</dt>
                         <dd>{run.verification.replaceAll('_', ' ')}</dd>
                       </div>
                     </dl>
@@ -286,29 +308,48 @@ export function WorkflowRuns({
                   </>
                 )}
                 <Disclosure>
-                  <summary>Run evidence references</summary>
-                  <p>Run: {run.id}</p>
-                  <p>Activation: {run.activationId ?? 'Not granted'}</p>
+                  <summary>{m.workflows_runs_details()}</summary>
+                  <p>{m.workflows_runs_id({ id: run.id })}</p>
+                  <p>
+                    {run.activationId
+                      ? m.workflows_runs_activation({ id: run.activationId })
+                      : m.workflows_runs_activation_none()}
+                  </p>
                   {run.triggerEvidence ? (
                     <p>
-                      Source: {run.triggerEvidence.sourceId} ·{' '}
-                      <WorkspaceDate value={run.triggerEvidence.occurredAt} />
+                      {rich(m.workflows_runs_source, {
+                        source: run.triggerEvidence.sourceId,
+                        date: (
+                          <WorkspaceDate
+                            value={run.triggerEvidence.occurredAt}
+                          />
+                        ),
+                      })}
                     </p>
                   ) : null}
                   <p>
-                    Started by: {run.actor.kind} · {run.actor.id}
+                    {m.workflows_runs_started_by({
+                      kind: run.actor.kind,
+                      id: run.actor.id,
+                    })}
                   </p>
                   <p>
-                    Subject: {run.subject.kind} · {run.subject.id}
+                    {m.workflows_runs_record({
+                      kind: run.subject.kind,
+                      id: run.subject.id,
+                    })}
                   </p>
                   <p>
-                    Trigger:{' '}
-                    {run.trigger.kind === 'exception'
-                      ? run.trigger.issueType.replaceAll('_', ' ')
-                      : run.trigger.kind}
+                    {m.workflows_runs_trigger({
+                      trigger:
+                        run.trigger.kind === 'exception'
+                          ? run.trigger.issueType.replaceAll('_', ' ')
+                          : run.trigger.kind,
+                    })}
                   </p>
                   <p>
-                    Input snapshot: <code>{run.contextDigest}</code>
+                    {m.workflows_runs_input_fingerprint()}{' '}
+                    <code>{run.contextDigest}</code>
                   </p>
                   {run.steps.length ? (
                     <ol>
@@ -320,7 +361,7 @@ export function WorkflowRuns({
                       ))}
                     </ol>
                   ) : !run.processSteps?.length ? (
-                    <p>No step outcome recorded.</p>
+                    <p>{m.workflows_runs_no_steps()}</p>
                   ) : null}
                   {run.processSteps?.length ? (
                     <ol>

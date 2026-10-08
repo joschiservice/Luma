@@ -1,0 +1,91 @@
+---
+title: Bestand systemübergreifend vergleichen
+description: Sehen Sie den Bestand nach SKU, Lagerort und Quelle, finden Sie Abweichungen zwischen Ihren Systemen, verknüpfen Sie dieselbe SKU systemübergreifend und korrigieren Sie den Shopify-Bestand anhand Ihres ERP.
+---
+
+Bestand zeigt den Bestand, den jeder verbundene Shop und jedes ERP meldet, nach SKU, Lagerort und Quelle. Hier finden Sie Abweichungen zwischen Systemen, sehen, was vom Bestand einer SKU abhängt, und korrigieren mit Shopify die verfügbare Menge anhand Ihres ERP. Öffnen Sie **Bestand** in der Seitenleiste oder drücken Sie **G**, dann **V**.
+
+## Bestand finden [#find-stock]
+
+Jede Zeile ist eine SKU an einem Lagerort in einer Einheit. Die Mengen aller Quellen stehen untereinander in der Zeile. Wählen Sie eine Ansicht:
+
+- **Gesamter Bestand** zeigt alle Bestandspositionen.
+- **Abweichungen zwischen Quellen** zeigt Positionen, für die Quellen unterschiedliche Mengen melden.
+- **Unvollständiger Bestand** zeigt Positionen, für die eine Quelle nicht alle Mengen gemeldet hat.
+
+Suchen Sie nach SKU oder Lagerort, oder grenzen Sie die Liste mit **SKU**, **Lagerort** und **Quelle** ein. Ein Quellenfilter wählt die Positionen dieser Quelle aus und zeigt trotzdem die anderen Quellen jeder Position. Ansicht und Filter sind Teil der Seitenadresse. So können Sie sie teilen oder an die Seitenleiste anheften.
+
+**Noch kein Bestand importiert** bedeutet, dass noch kein verbundenes System Bestand geteilt hat. Den Fortschritt sehen Sie unter [Datenabgleich](/docs/data-sync). **Kein passender Bestand** bedeutet, dass Suche oder Filter alle Positionen ausschließen.
+
+## Mengen lesen [#read-the-quantities]
+
+- **Physischer Bestand**: die Einheiten, die die Quelle am Lagerort meldet.
+- **Reserviert**: die Einheiten, die die Quelle zurückhält, zum Beispiel für offene Bestellungen.
+- **Verfügbar**: die Einheiten, die die Quelle noch verkaufen kann. Darunter bedeutet **Gemeldet**, dass die Quelle die Menge gemeldet hat, und **Berechnet**, dass Luma sie als physischen Bestand minus reservierte Menge berechnet hat.
+- **Im Zulauf**: Einheiten, die laut Quelle unterwegs sind. Lieferantenbestellungen zählen nicht als Zulauf.
+
+Mengen bleiben bei ihrer Quelle und werden nie über Quellen hinweg addiert. Melden Shopify und Ihr ERP dasselbe Lager, würden dieselben Einheiten sonst doppelt gezählt. Luma hält auch keine Quelle für maßgeblich: Weichen Mengen ab, vergleichen Sie die Abrufzeiten, bevor Sie entscheiden, welcher Menge Sie vertrauen.
+
+**Nicht gemeldet** bedeutet, dass die Quelle diesen Wert nicht gesendet hat. Das ist nicht null: Eine gemeldete 0 heißt, dass laut Quelle kein Bestand vorhanden ist. Nicht gemeldet heißt, dass Luma es nicht weiß. **An der Quelle entfernt** bedeutet, dass die Quelle die Position nicht mehr meldet. Luma behält ihre Abrufe als Nachweise, lässt sie aber bei Vergleichen weg.
+
+## Bestandsposition lesen [#read-a-stock-position]
+
+Öffnen Sie eine Zeile, um eine SKU an einem Lagerort zu sehen:
+
+- Der Vergleich oben zeigt, ob **Gemeldete Mengen stimmen überein** oder welche Mengen abweichen. Jede Quelle zeigt ihre SKU- und Lagerort-Codes, ihre Mengen, ihre **Verfügbarkeitsbasis** und ihre **Aktualität**: wann Luma sie abgerufen und wann die Quelle sie zuletzt aktualisiert hat.
+- **Nachbestellung** zeigt, ob eine Bestandsregel diese SKU an diesem Lagerort nachbestellt. Siehe [Workflows](/docs/workflows).
+- **Bestellungen mit dieser SKU** listet Bestellmengen, wie jede Quelle sie meldet. Luma kann nicht bestätigen, welcher Lagerort sie ausführt.
+- **Lieferzusagen** listet Lieferantenbestellungen für die SKU. Sie sind kein bestätigter Zulauf: Luma weiß nicht, wie viel angekommen ist und an welchem Lagerort.
+- **Bestandsprobleme** listet Probleme zur SKU oder zu dieser Position.
+- **SKU und Lagerorte** verlinkt das Produkt, den SKU-Datensatz, alle Lagerorte dieser SKU und weitere SKUs an diesem Lagerort.
+- **Verknüpfte Quellen** listet die Quelldatensätze, die Luma als diese SKU behandelt.
+- **Letzte Abrufe** listet die Abrufe, die Luma aus jeder Quelle erfasst hat, den neuesten zuerst. **Aktuell** markiert den Abruf, den Luma für diese Quelle verwendet. Ein Abruf zeigt, was die Quelle gemeldet hat, nicht unbedingt eine Bestandsbewegung.
+
+**Bestand aktualisieren** oben auf der Seite zeigt die neuesten Abrufe von Luma. Die Quellen werden dabei nicht erneut gelesen; Luma liest sie beim regelmäßigen Abgleich.
+
+## Dieselbe SKU systemübergreifend verknüpfen [#link-the-same-sku-across-systems]
+
+Luma behandelt Datensätze aus verschiedenen Systemen erst dann als dieselbe SKU, wenn eine Person sie verknüpft. Bis dahin erscheint der Bestand eines Artikels aus Shopify und aus Ihrem ERP als getrennte SKUs, und Sie können ihn weder vergleichen noch den einen anhand des anderen korrigieren.
+
+1. Öffnen Sie die Bestandsposition und gehen Sie zu **Verknüpfte Quellen**. **Möglicherweise dieselbe SKU** listet SKUs mit demselben Code aus anderen Systemen.
+2. Wählen Sie **Verknüpfen** neben dem Treffer.
+3. Prüfen Sie die Begründung unter **Warum ist das richtig?**, ändern Sie sie bei Bedarf und wählen Sie **Datensätze verknüpfen**.
+
+Luma fasst dann Bestand, Produkte und Bestellpositionen aus beiden Systemen unter einer SKU zusammen, und jedes System behält seine eigenen Mengen. Während Luma sie neu gruppiert, zeigt der Bereich den Fortschritt. Um ein System wieder zu trennen, wählen Sie **Trennen** daneben und dann **Quelle trennen**. Jede Verknüpfung und Trennung wird mit Person und Grund erfasst.
+
+Verknüpfen und Trennen erfordert **Importe verwalten**. Ohne diese Berechtigung sehen Sie die verknüpften Quellen und möglichen Treffer, aber nicht **Verknüpfen** oder **Trennen**.
+
+## Shopify-Bestand korrigieren [#correct-shopify-stock]
+
+Weicht der verfügbare Bestand in Shopify von dem Ihres ERP ab, können Sie Shopify auf die Menge setzen, die Ihr ERP meldet. Luma ändert in Shopify nur den verfügbaren Bestand und ändert nie den Bestand in Ihrem ERP. Dafür brauchen Sie **Shopify-Bestand korrigieren**. Ohne diese Berechtigung zeigt die Bestandsposition **Shopify-Bestand korrigieren** nicht an.
+
+Voraussetzungen: SKU und Lagerort sind in beiden Systemen verknüpft, beide Verbindungen sind aktiv, und Shopify erlaubt Luma, den Bestand zu ändern. Luma verwendet nur ERP-Bestand, der in den letzten fünf Minuten abgerufen wurde, und liest das ERP erneut, wenn die Daten älter sind.
+
+1. Öffnen Sie die Bestandsposition unter Bestand. Wählen Sie in **Shopify-Bestand korrigieren** den **Shopify-Shop** und die **ERP-Quelle**.
+2. Prüfen Sie **Verfügbarer Bestand je System**. Das ERP ist als **Maßgeblich** markiert, Shopify als **Zu korrigieren**, jeweils mit Abrufzeit. **Genaues Ziel und Nachweise** zeigt den Shopify-Bestandsartikel, den Lagerort und den ERP-Abruf, den die Korrektur verwendet.
+3. Wählen Sie **Korrektur prüfen**. Luma zeigt die Änderung, zum Beispiel 12 → 8 verfügbar, und wann die Prüfung abläuft.
+4. Eine andere Person, deren Rolle **Shopify-Bestand korrigieren** und **Änderungen genehmigen oder ablehnen** enthält, öffnet dieselbe Bestandsposition und wählt **Korrektur genehmigen** oder **Ablehnen**. Ihre eigene Korrektur können Sie nicht genehmigen.
+5. Wählen Sie nach der Genehmigung **Genehmigung prüfen**, um die Prüfung zu aktualisieren, und dann **An Shopify senden**. Nur die Person, die die Korrektur angefordert hat, kann sie senden.
+
+Korrekturen, die auf Genehmigung warten, genehmigte Korrekturen, die noch gesendet werden müssen, und Ergebnisse, die noch geprüft werden müssen, erscheinen auch unter [Wartet auf Sie](/docs/needs-you).
+
+Luma liest vor dem Senden beide Systeme erneut. Hat sich der Bestand in einem System geändert oder ist die Prüfung abgelaufen, zeigt Luma **Korrektur blockiert**. Wählen Sie **Neue Korrektur prüfen**, um neu zu beginnen.
+
+Kann Luma keine Korrektur anbieten, nennt es den Grund:
+
+- **Verbinden Sie Shopify neu und erlauben Sie Luma, den Bestand zu ändern.** Jemand mit **Verbindungen verwalten** verbindet den Shop unter [Apps](/docs/apps-and-connections#change-or-reconnect-a-connection) neu.
+- **Die Bestandsdaten sind älter als fünf Minuten.** Wählen Sie **Bestand aktualisieren** in **Shopify-Bestand korrigieren**, damit Luma beide Systeme erneut liest. Bleibt die Meldung, prüfen Sie den Abgleich des ERP unter [Datenabgleich](/docs/data-sync).
+- **Shopify zeigt bereits dieselbe Menge** wie das ERP. Eine Korrektur ist nicht nötig.
+- Shopify hat nicht bestätigt, dass an diesem Lagerort Bestand geführt wird.
+
+## Prüfen, ob sich der Bestand geändert hat [#check-that-the-stock-changed]
+
+Eine Korrektur hat drei getrennte Schritte, und jeder zeigt seinen eigenen Stand:
+
+- **Prüfung und Genehmigung**: Die Korrektur wartet auf Genehmigung oder ist genehmigt.
+- **Von Shopify angenommen**: Shopify hat die Anfrage angenommen. Die Menge ist noch nicht bestätigt.
+- **Menge bestätigt**: Ein neuer Abruf aus Shopify stimmt mit der genehmigten ERP-Menge überein.
+
+Wählen Sie **Bestand prüfen**, um Shopify erneut zu lesen. Solange die Menge nicht bestätigt ist, gilt der Bestand nicht als korrigiert. Bestandsprobleme zur Position werden nach dem nächsten Abgleich von Luma aktualisiert.
+
+**Ergebnis unklar** bedeutet, dass Luma nicht feststellen konnte, ob Shopify die Korrektur erhalten hat, zum Beispiel weil die Verbindung unterbrochen wurde. Luma sendet dieselbe Korrektur nie zweimal. Prüfen Sie den Bestand in Shopify und wählen Sie **Bestand prüfen**, bevor Sie eine neue Korrektur prüfen.

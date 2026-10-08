@@ -1,3 +1,5 @@
+import { formatNumber } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
 import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import {
   type ThemeChoice,
@@ -10,15 +12,15 @@ import appStyles from '../../styles.css?inline';
 import { workspaceDestinations } from './workspace-destinations';
 import { WorkspaceLayout } from './workspace-layout';
 
-/** Page labels available in story navigation. */
-export type StoryPage = (typeof workspaceDestinations)[number]['label'];
+/** A page in story navigation, named by its path, such as `exceptions`. */
+export type StoryPage = string;
 
 /**
  * Renders the production workspace frame with fixture navigation, workspace and account
  * data for app stories. Mounts the app stylesheet only while the story is visible.
  */
 export function StoryShell({
-  page: initialPage = 'Home',
+  page: initialPage = 'home',
   workspace: initialWorkspace = 'Northstar Commerce',
   account = 'Alex Morgan',
   email = 'alex@northstar.example',
@@ -35,12 +37,19 @@ export function StoryShell({
   assistant?: ReactNode;
   children?: ReactNode | ((page: string) => ReactNode);
 }) {
-  const [page, setPage] = useState<string>(initialPage);
+  const [path, setPath] = useState(
+    () =>
+      (
+        workspaceDestinations.find((item) => item.path === initialPage) ??
+        workspaceDestinations[0]!
+      ).path,
+  );
   const [workspace, setWorkspace] = useState(initialWorkspace);
   const [theme, setTheme] = useState<ThemeChoice>('system');
   const current =
-    workspaceDestinations.find((item) => item.label === page) ??
+    workspaceDestinations.find((item) => item.path === path) ??
     workspaceDestinations[0]!;
+  const page = current.label;
   const link = (
     item: (typeof workspaceDestinations)[number],
     close?: () => void,
@@ -50,10 +59,10 @@ export function StoryShell({
         className="sidebar-link"
         data-label={item.label}
         href={`#${item.path}`}
-        aria-current={page === item.label ? 'page' : undefined}
+        aria-current={path === item.path ? 'page' : undefined}
         onClick={(event) => {
           event.preventDefault();
-          setPage(item.label);
+          setPath(item.path);
           close?.();
         }}
       >
@@ -69,8 +78,10 @@ export function StoryShell({
         <span className="sidebar-link-label">{item.label}</span>
         {item.path === 'needs-you' && attention ? (
           <span className="sidebar-link-count">
-            {attention}
-            <span className="sr-only"> need you</span>
+            <span aria-hidden="true">{formatNumber(attention)}</span>
+            <span className="sr-only">
+              {m.identity_nav_waiting_count({ count: attention })}
+            </span>
           </span>
         ) : null}
       </a>
@@ -102,14 +113,16 @@ export function StoryShell({
           />
         }
         navigation={(close) => (
-          <nav aria-label="Workspace navigation" className="sidebar-nav">
+          <nav aria-label={m.identity_nav_label()} className="sidebar-nav">
             <ul className="sidebar-list">
               {workspaceDestinations
                 .filter((item) => item.group === 'core')
                 .map((item) => link(item, close))}
             </ul>
             <section className="sidebar-section">
-              <h2 className="sidebar-section-label">Operations</h2>
+              <h2 className="sidebar-section-label">
+                {m.identity_nav_operations()}
+              </h2>
               <ul className="sidebar-list">
                 {workspaceDestinations
                   .filter((item) => item.group === 'operations')

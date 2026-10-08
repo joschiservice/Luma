@@ -5,59 +5,74 @@ import type {
   CatalogSource,
   CatalogView,
 } from '@luma/api-contract';
+import { formatList, formatRelativeTime } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
 import type { OperationalState } from '@luma/ui/components/primitives/state';
 
-import { ago } from '../sync/presentation';
+import { formatMoney, localizedLabels } from '../orders/presentation';
 
-export const statusLabels: Record<CatalogListing['status'], string> = {
-  active: 'Active',
-  draft: 'Draft',
-  archived: 'Archived',
-  unknown: 'Status unknown',
+export const statusLabels: Record<CatalogListing['status'], string> =
+  localizedLabels({
+    active: m.products_status_active,
+    draft: m.products_status_draft,
+    archived: m.products_status_archived,
+    unknown: m.products_status_unknown,
+  });
+
+export const fieldLabels: Record<CatalogField, string> = localizedLabels({
+  title: m.products_field_title,
+  status: m.products_field_status,
+  published: m.products_field_published,
+  price: m.products_field_price,
+  barcode: m.products_field_barcode,
+});
+
+/** Field names as they read inside a sentence, which differs from labels in some languages. */
+const fieldNames: Record<CatalogField, () => string> = {
+  title: m.products_field_title_in_sentence,
+  status: m.products_field_status_in_sentence,
+  published: m.products_field_published_in_sentence,
+  price: m.products_field_price_in_sentence,
+  barcode: m.products_field_barcode_in_sentence,
 };
 
-export const fieldLabels: Record<CatalogField, string> = {
-  title: 'Title',
-  status: 'Status',
-  published: 'Sales channel',
-  price: 'Price',
-  barcode: 'Barcode',
-};
+export const viewLabels: Record<CatalogView, string> = localizedLabels({
+  all: m.products_view_all,
+  differs: m.products_view_differs,
+  missing: m.products_view_missing,
+  unlinked: m.products_view_unlinked,
+});
 
-export const viewLabels: Record<CatalogView, string> = {
-  all: 'All SKUs',
-  differs: 'Differs by source',
-  missing: 'Not in every source',
-  unlinked: 'Possible matches',
-};
-
-export const viewDescriptions: Record<CatalogView, string> = {
-  all: 'Every SKU in a connected catalog, one row per SKU with each source side by side.',
-  differs:
-    'SKUs whose sources disagree on title, status, sales channel, price or barcode.',
-  missing:
-    'SKUs that at least one catalog source does not list. Some items are intentionally sold or managed in one system only.',
-  unlinked:
-    'SKUs with a same-code SKU in another source that is not linked yet. Link them if they are the same item.',
-};
+export const viewDescriptions: Record<CatalogView, string> = localizedLabels({
+  all: m.products_view_all_description,
+  differs: m.products_view_differs_description,
+  missing: m.products_view_missing_description,
+  unlinked: m.products_view_unlinked_description,
+});
 
 /** Names the kind of system behind a connection, for example "Shopify" or "JTL-Wawi". */
 export function systemName(system: string | null) {
   if (system === 'shopify') return 'Shopify';
   if (system?.startsWith('jtl')) return 'JTL-Wawi';
 
-  return 'Connected source';
+  return m.products_system_fallback();
 }
 
 /** Describes a source's own sales channel listing in that system's terms. */
 export function listingLabel(published: boolean | null, system: string | null) {
-  if (published === null) return 'Not reported';
+  if (published === null) return m.common_not_reported();
   if (system === 'shopify')
-    return published ? 'Published to Online Store' : 'Not on Online Store';
+    return published
+      ? m.products_listing_shopify_published()
+      : m.products_listing_shopify_unpublished();
   if (system?.startsWith('jtl'))
-    return published ? 'Active for shops' : 'Not active for shops';
+    return published
+      ? m.products_listing_jtl_published()
+      : m.products_listing_jtl_unpublished();
 
-  return published ? 'Listed for sale' : 'Not listed for sale';
+  return published
+    ? m.products_listing_published()
+    : m.products_listing_unpublished();
 }
 
 /**
@@ -66,33 +81,29 @@ export function listingLabel(published: boolean | null, system: string | null) {
  */
 export function formatPrice(price: CatalogListing['price'], locale?: string) {
   if (!price) return null;
-  const amount = Number(price.amount);
-  if (!price.currency) return `${price.amount} (currency not reported)`;
-  if (!Number.isFinite(amount)) return `${price.amount} ${price.currency}`;
-  try {
-    return new Intl.NumberFormat(locale, {
-      style: 'currency',
-      currency: price.currency,
-    }).format(amount);
-  } catch {
-    return `${price.amount} ${price.currency}`;
-  }
+  if (!price.currency)
+    return m.products_price_no_currency({ amount: price.amount });
+
+  return formatMoney(
+    { amount: price.amount, currency: price.currency },
+    locale,
+  );
 }
 
 /** Joins a product title and variant title as each source names the SKU. */
 export function listingTitle(listing: CatalogListing) {
   return (
     [listing.productTitle, listing.variantTitle].filter(Boolean).join(' · ') ||
-    'Untitled'
+    m.products_listing_untitled()
   );
 }
 
 /** Labels how long ago Luma read a listing; source update time is shown separately. */
 export function readAge(observedAt: string, asOf: string) {
   const age = Date.parse(asOf) - Date.parse(observedAt);
-  if (age < 0) return 'Read time is ahead';
+  if (age < 0) return m.products_read_time_unclear();
 
-  return `Read ${ago(observedAt, Date.parse(asOf))}`;
+  return m.products_read_ago({ time: formatRelativeTime(observedAt, asOf) });
 }
 
 /** Summarizes one SKU's catalog state as a labelled operational state. */
@@ -101,18 +112,18 @@ export function catalogState(
   sources: CatalogSource[],
 ): { state: OperationalState; label: string } {
   if (item.differences.length)
-    return { state: 'attention', label: 'Differs by source' };
+    return { state: 'attention', label: m.products_state_differs() };
   if (item.gaps.some((gap) => gap.match))
-    return { state: 'waiting', label: 'Possible match to link' };
+    return { state: 'waiting', label: m.products_state_possible_match() };
   if (!item.listings.length)
-    return { state: 'idle', label: 'Not in any catalog' };
+    return { state: 'idle', label: m.products_state_no_catalog() };
   if (item.gaps.length)
-    return { state: 'waiting', label: 'Not in every source' };
+    return { state: 'waiting', label: m.products_state_missing() };
   const count = new Set(item.listings.map((l) => l.connectionId)).size;
   if (count === 1 || sources.length < 2)
-    return { state: 'idle', label: 'One source' };
+    return { state: 'idle', label: m.products_state_one_source() };
 
-  return { state: 'idle', label: `Listed in all ${count} sources` };
+  return { state: 'idle', label: m.products_state_all_sources({ count }) };
 }
 
 /** Explains a catalog gap, separating a confirmed absence from an incomplete catalog read. */
@@ -121,23 +132,22 @@ export function gapText(
   source: CatalogSource | undefined,
   asOf: string,
 ) {
-  const label = source?.label ?? 'This source';
+  const label = source?.label ?? m.products_source_unknown();
   if (gap.match)
-    return `${label} has a SKU with the same code (${gap.match.sku.trim()}) that is not linked to this one.`;
-  if (!source?.fullReadAt)
-    return `${label} does not list this SKU in what Luma has read so far. Its full catalog has not been read yet.`;
+    return m.products_gap_match({ source: label, code: gap.match.sku.trim() });
+  if (!source?.fullReadAt) return m.products_gap_unread({ source: label });
 
-  return `${label} does not list this SKU. Its full catalog was read ${ago(source.fullReadAt, Date.parse(asOf))}.`;
+  return m.products_gap_absent({
+    source: label,
+    time: formatRelativeTime(source.fullReadAt, asOf),
+  });
 }
 
-/** Explains which fields differ in one sentence. */
+/** Explains which fields differ in one sentence, or null when none do. */
 export function differenceSentence(fields: CatalogField[]) {
-  const names = fields.map((field) => fieldLabels[field].toLowerCase());
-  if (!names.length) return null;
-  const list =
-    names.length === 1
-      ? names[0]
-      : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
+  if (!fields.length) return null;
 
-  return `Sources disagree on ${list}.`;
+  return m.products_difference_sentence({
+    fields: formatList(fields.map((field) => fieldNames[field]())),
+  });
 }

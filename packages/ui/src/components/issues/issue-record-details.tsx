@@ -1,4 +1,5 @@
 import type { CaseDetail } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import {
   Check,
   ChevronRight,
@@ -32,7 +33,7 @@ export function IssueRecordDetails({
     <Disclosure className="issue-record-details" open={expanded}>
       <summary>
         <FileText size={16} aria-hidden="true" />
-        Issue details
+        {m.issues_section_details()}
         <ChevronRight size={16} aria-hidden="true" />
       </summary>
       <div className="issue-record-content">
@@ -40,13 +41,15 @@ export function IssueRecordDetails({
           <div>
             <dt>
               <Package size={13} aria-hidden="true" />
-              {item.subject.kind === 'sku' ? 'SKU ID' : 'Affected item'}
+              {item.subject.kind === 'sku'
+                ? m.issues_record_sku()
+                : m.issues_details_affected()}
             </dt>
             <dd>{item.subject.id}</dd>
           </div>
           <div>
             <dt>
-              <Layers size={13} aria-hidden="true" /> Affected scope
+              <Layers size={13} aria-hidden="true" /> {m.issues_details_scope()}
             </dt>
             <dd>
               {item.subject.scope.length ? (
@@ -56,7 +59,7 @@ export function IssueRecordDetails({
                   ))}
                 </ul>
               ) : (
-                'No scope recorded'
+                m.issues_details_scope_none()
               )}
             </dd>
           </div>
@@ -64,13 +67,15 @@ export function IssueRecordDetails({
         <dl className="issue-record-timeline">
           <div>
             <dt>
-              <Clock3 size={13} aria-hidden="true" /> First observed
+              <Clock3 size={13} aria-hidden="true" />{' '}
+              {m.issues_details_first_detected()}
             </dt>
             <dd>{timestamp(item.detectedAt)}</dd>
           </div>
           <div>
             <dt>
-              <Clock3 size={13} aria-hidden="true" /> Last activity
+              <Clock3 size={13} aria-hidden="true" />{' '}
+              {m.issues_details_last_activity()}
             </dt>
             <dd>{timestamp(item.lastActivityAt)}</dd>
           </div>
@@ -78,7 +83,7 @@ export function IssueRecordDetails({
         {item.diagnosis ? (
           <dl className="issue-record-reference">
             <div>
-              <dt>Investigation revision</dt>
+              <dt>{m.issues_meta_investigation_version()}</dt>
               <dd>{item.diagnosis.revision}</dd>
             </div>
           </dl>
@@ -86,15 +91,15 @@ export function IssueRecordDetails({
         <dl className="issue-record-reference">
           <div>
             <dt>
-              <Hash size={13} aria-hidden="true" /> Issue ID
+              <Hash size={13} aria-hidden="true" /> {m.issues_details_id()}
             </dt>
             <dd className="issue-id">
               <code>{item.id}</code>
               <Button
                 variant="ghost"
                 size="icon"
-                aria-label="Copy issue ID"
-                title="Copy issue ID"
+                aria-label={m.issues_details_copy_id()}
+                title={m.issues_details_copy_id()}
                 onClick={async () => {
                   try {
                     await navigator.clipboard.writeText(item.id);
@@ -116,9 +121,9 @@ export function IssueRecordDetails({
       </div>
       <span role="status">
         {copyState === 'copied'
-          ? 'Issue ID copied'
+          ? m.issues_details_id_copied()
           : copyState === 'failed'
-            ? 'Could not copy. Select the issue ID to copy it manually.'
+            ? m.issues_details_copy_failed()
             : ''}
       </span>
     </Disclosure>

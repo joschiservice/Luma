@@ -1,6 +1,8 @@
 import './settings.css';
 
 import type { SettingsSnapshot } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Input } from '@luma/ui/components/primitives/input';
@@ -41,37 +43,52 @@ import { SecuritySettings } from './security';
 import { TeamSettings } from './team';
 
 export const settingsSections = [
-  { id: 'workspace', label: 'Workspace', group: 'Workspace', Icon: Building2 },
-  { id: 'team', label: 'Team', group: 'Workspace', Icon: Users },
-  { id: 'roles', label: 'Roles', group: 'Workspace', Icon: IdCard },
+  {
+    id: 'workspace',
+    label: m.settings_section_workspace,
+    group: m.settings_group_workspace,
+    Icon: Building2,
+  },
+  {
+    id: 'team',
+    label: m.settings_section_team,
+    group: m.settings_group_workspace,
+    Icon: Users,
+  },
+  {
+    id: 'roles',
+    label: m.settings_section_roles,
+    group: m.settings_group_workspace,
+    Icon: IdCard,
+  },
   {
     id: 'approvals',
-    label: 'Approvals',
-    group: 'Workspace',
+    label: m.settings_section_approvals,
+    group: m.settings_group_workspace,
     Icon: ShieldCheck,
   },
   {
     id: 'security',
-    label: 'Security',
-    group: 'Personal',
+    label: m.settings_section_security,
+    group: m.settings_group_personal,
     Icon: KeyRound,
   },
   {
     id: 'notifications',
-    label: 'Notifications',
-    group: 'Personal',
+    label: m.settings_section_notifications,
+    group: m.settings_group_personal,
     Icon: Bell,
   },
   {
     id: 'appearance',
-    label: 'Appearance',
-    group: 'Personal',
+    label: m.settings_section_appearance,
+    group: m.settings_group_personal,
     Icon: Palette,
   },
   {
     id: 'home',
-    label: 'Home & sidebar',
-    group: 'Personal',
+    label: m.settings_section_home,
+    group: m.settings_group_personal,
     Icon: LayoutDashboard,
   },
 ] as const;
@@ -104,11 +121,7 @@ export function SettingsPage({
       can={permissions.can}
       actorId={access.data?.actor.id ?? ''}
       loading={query.isPending}
-      error={
-        error
-          ? 'Settings could not be refreshed. Check your connection and retry.'
-          : undefined
-      }
+      error={error ? m.settings_load_failed() : undefined}
       retry={() => void query.refetch()}
     />
   );
@@ -147,15 +160,15 @@ export function SettingsView({
 
   return (
     <div className="settings-page">
-      <PageTitle title="Settings" />
+      <PageTitle title={m.settings_page_title()} />
       <div className="settings-layout">
         <SectionNavigation
           className="settings-navigation"
-          aria-label="Settings sections"
+          aria-label={m.settings_navigation_label()}
           items={settingsSections.map(({ id, label, group, Icon }) => ({
             value: id,
-            label,
-            group,
+            label: label(),
+            group: group(),
             icon: <Icon size={16} />,
           }))}
           value={section}
@@ -179,14 +192,14 @@ export function SettingsView({
         <div className="settings-content">
           {!online ? (
             <Alert tone="warning" role="status">
-              You are offline. Reconnect before saving changes.
+              {m.common_offline_save()}
             </Alert>
           ) : null}
           {error ? (
             <Alert tone="danger" role="alert">
               {error}{' '}
               <Button variant="outline" onClick={retry}>
-                Retry
+                {m.common_retry()}
               </Button>
             </Alert>
           ) : null}
@@ -195,7 +208,7 @@ export function SettingsView({
               <div />
               <div />
               <div />
-              Loading settings…
+              {m.settings_loading()}
             </div>
           ) : null}
           {data ? (
@@ -282,8 +295,8 @@ function WorkspaceForm({
   return (
     <section>
       <SectionHeading
-        title="Workspace"
-        description="The details your team shares."
+        title={m.settings_workspace_title()}
+        description={m.settings_workspace_description()}
       />
       <form
         onSubmit={(event) => {
@@ -306,8 +319,10 @@ function WorkspaceForm({
       >
         <div className="settings-panel">
           <div className="settings-field">
-            <label htmlFor="workspace-name">Workspace name</label>
-            <p>Shown in navigation and the workspace switcher.</p>
+            <label htmlFor="workspace-name">
+              {m.settings_workspace_name_label()}
+            </label>
+            <p>{m.settings_workspace_name_help()}</p>
             <Input
               id="workspace-name"
               value={value.name}
@@ -320,8 +335,10 @@ function WorkspaceForm({
             />
           </div>
           <div className="settings-field">
-            <label id="timezone-label">Display timezone</label>
-            <p>Dates throughout this workspace use this timezone.</p>
+            <label id="timezone-label">
+              {m.settings_workspace_timezone_label()}
+            </label>
+            <p>{m.settings_workspace_timezone_help()}</p>
             <SearchableSelect
               aria-labelledby="timezone-label"
               options={zones}
@@ -334,18 +351,21 @@ function WorkspaceForm({
           </div>
           <div className="settings-readonly">
             <div>
-              <span>Workspace slug</span>
+              <span>{m.settings_workspace_identifier_label()}</span>
               <code>{current.slug}</code>
             </div>
             <div>
-              <span>Data region</span>
+              <span>{m.settings_workspace_region_label()}</span>
               <strong>
                 {current.dataRegion === 'EU'
-                  ? 'European Union'
+                  ? m.settings_workspace_region_eu()
                   : current.dataRegion}
               </strong>
             </div>
-            <LockKeyhole size={15} aria-label="Read-only" />
+            <LockKeyhole
+              size={15}
+              aria-label={m.settings_workspace_read_only()}
+            />
           </div>
         </div>
         <SaveBar
@@ -363,6 +383,16 @@ function WorkspaceForm({
     </section>
   );
 }
+
+const testEmailStates = {
+  sent: m.settings_notifications_test_sent,
+  failed: m.settings_notifications_test_failed,
+  queued: m.settings_notifications_test_queued,
+  cancelled: m.settings_notifications_test_canceled,
+} satisfies Record<
+  NonNullable<SettingsSnapshot['lastTest']>['state'],
+  () => string
+>;
 
 function NotificationsForm({
   data,
@@ -383,17 +413,14 @@ function NotificationsForm({
   return (
     <section>
       <SectionHeading
-        title="Notifications"
-        description="Choose what reaches your inbox. These preferences are only yours."
-        badge="Personal"
+        title={m.settings_notifications_title()}
+        description={m.settings_notifications_description()}
+        badge={m.settings_badge_personal()}
       />
       {!data.deliveryAvailable ? (
         <Alert tone="warning">
-          <strong>Email delivery unavailable</strong>
-          <p>
-            Your choices are saved, but email cannot be sent until an
-            administrator configures delivery.
-          </p>
+          <strong>{m.settings_notifications_unavailable_title()}</strong>
+          <p>{m.settings_notifications_unavailable_body()}</p>
         </Alert>
       ) : null}
       <form
@@ -412,23 +439,23 @@ function NotificationsForm({
       >
         <div className="settings-panel">
           <PreferenceRow
-            title="Issues that need you"
-            description="An issue needs approval, manual intervention, or a review of uncertain evidence."
+            title={m.settings_notifications_issues_title()}
+            description={m.settings_notifications_issues_description()}
             checked={value.issues}
             disabled={disabled || command.locked}
             change={(issues) => setDraft({ ...value, issues })}
           />
           <PreferenceRow
-            title="Connection health"
-            description="A connected system is degraded or its access has been revoked."
+            title={m.settings_notifications_connections_title()}
+            description={m.settings_notifications_connections_description()}
             checked={value.connections}
             disabled={disabled || command.locked}
             change={(connections) => setDraft({ ...value, connections })}
           />
         </div>
         <p className="settings-note">
-          <Check size={14} /> Issues → Needs you and Overview always show work
-          requiring attention.
+          <Check size={14} aria-hidden="true" />{' '}
+          {m.settings_notifications_always_shown()}
         </p>
         <SaveBar
           reset={draft && !command.locked ? () => setDraft(null) : undefined}
@@ -445,18 +472,10 @@ function NotificationsForm({
       <div className="settings-test">
         <Mail size={18} />
         <div>
-          <strong>Check your inbox connection</strong>
-          <p>Send a test email to your signed-in account.</p>
+          <strong>{m.settings_notifications_test_title()}</strong>
+          <p>{m.settings_notifications_test_description()}</p>
           {data.lastTest ? (
-            <span role="status">
-              {data.lastTest.state === 'sent'
-                ? 'Test email accepted for delivery.'
-                : data.lastTest.state === 'failed'
-                  ? 'Delivery failed. Check email configuration and try again.'
-                  : data.lastTest.state === 'queued'
-                    ? 'Test email queued. Waiting for delivery…'
-                    : 'Test email cancelled.'}
-            </span>
+            <span role="status">{testEmailStates[data.lastTest.state]()}</span>
           ) : null}
         </div>
         <Button
@@ -476,11 +495,11 @@ function NotificationsForm({
                     body: { commandId },
                   }),
                 ),
-              'Test email queued.',
+              m.settings_notifications_test_queued_notice(),
             )
           }
         >
-          Send test email
+          {m.settings_notifications_test_send()}
         </Button>
       </div>
       <CommandFeedback command={test} />
@@ -503,29 +522,34 @@ function ApprovalsForm({
   } | null>(null);
   const required = draft?.required ?? data.workspace.alwaysRequireApproval;
   const command = useSettingsCommand(organizationId);
+  const approverPermission = usePermissionLabel(
+    organizationId,
+    'decisions.respond',
+  );
 
   return (
     <section>
       <SectionHeading
-        title="Approvals"
-        description="Set the level of human review for your workspace."
+        title={m.settings_approvals_title()}
+        description={m.settings_approvals_description()}
       />
       <div className="settings-policy">
         <ShieldCheck size={22} />
         <div>
           <strong>
             {data.workspace.alwaysRequireApproval
-              ? 'Independent approval for every permitted change'
-              : 'Platform approval policy'}
+              ? m.settings_approvals_always_summary_title()
+              : m.settings_approvals_standard_summary_title()}
           </strong>
           <p>
             {data.workspace.alwaysRequireApproval
-              ? 'Every otherwise permitted change needs review by someone else who can approve changes.'
-              : 'Low-risk permitted changes can proceed. Higher-risk changes require independent approval.'}
+              ? m.settings_approvals_always_summary_body()
+              : m.settings_approvals_standard_summary_body()}
           </p>
           <span>
-            Policy revision {data.workspace.policyRevision} · People whose role
-            includes Approve or reject changes can approve
+            {rich(m.settings_approvals_approvers, {
+              permission: <strong>{approverPermission}</strong>,
+            })}
           </span>
         </div>
       </div>
@@ -544,13 +568,13 @@ function ApprovalsForm({
               }),
             );
             setDraft(null);
-          }, 'Approval preference saved. Older reviews must be refreshed.');
+          }, m.settings_approvals_saved());
         }}
       >
         <div className="settings-panel">
           <PreferenceRow
-            title="Always require approval"
-            description="Require someone else who can approve changes to approve otherwise permitted changes."
+            title={m.settings_approvals_always_title()}
+            description={m.settings_approvals_always_description()}
             checked={required}
             disabled={disabled || command.locked}
             change={(value) =>
@@ -562,21 +586,21 @@ function ApprovalsForm({
           />
         </div>
         <div className="settings-guardrails">
-          <h3>Always enforced</h3>
+          <h3>{m.settings_approvals_guardrails_title()}</h3>
           <p>
-            <Check size={14} /> Platform-required approvals and denied actions
+            <Check size={14} aria-hidden="true" />{' '}
+            {m.settings_approvals_guardrail_required()}
           </p>
           <p>
-            <Check size={14} /> Current capability grants and execution checks
+            <Check size={14} aria-hidden="true" />{' '}
+            {m.settings_approvals_guardrail_permissions()}
           </p>
           <p>
-            <Check size={14} /> Independent approval and outcome verification
+            <Check size={14} aria-hidden="true" />{' '}
+            {m.settings_approvals_guardrail_independent()}
           </p>
         </div>
-        <p className="settings-note">
-          Turning this off restores platform policy. Saved changes require fresh
-          policy review before execution.
-        </p>
+        <p className="settings-note">{m.settings_approvals_change_note()}</p>
         <SaveBar
           reset={draft && !command.locked ? () => setDraft(null) : undefined}
           disabled={
@@ -604,8 +628,10 @@ function ReadOnlyNotice({
 
   return (
     <Alert tone="neutral">
-      <LockKeyhole size={14} /> You can view this section. Changing it requires{' '}
-      <strong>{label}</strong>, which your role doesn’t include.
+      <LockKeyhole size={14} aria-hidden="true" />{' '}
+      {rich(m.settings_read_only_notice, {
+        permission: <strong>{label}</strong>,
+      })}
     </Alert>
   );
 }
@@ -656,11 +682,11 @@ function SaveBar({
     <div className="settings-save">
       {reset ? (
         <Button type="button" variant="ghost" onClick={reset}>
-          Cancel changes
+          {m.common_discard_changes()}
         </Button>
       ) : null}
       <Button type="submit" disabled={disabled}>
-        {pending ? 'Saving…' : 'Save changes'}
+        {pending ? m.common_saving() : m.common_save_changes()}
       </Button>
     </div>
   );

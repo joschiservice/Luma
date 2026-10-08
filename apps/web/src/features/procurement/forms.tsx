@@ -3,6 +3,8 @@ import type {
   PurchaseOrderStatus,
   Supplier,
 } from '@luma/api-contract';
+import { formatNumber } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import {
@@ -77,30 +79,31 @@ function ExternalFields({
   return (
     <details className="procurement-external-fields">
       <summary>
-        External reference <span>Optional</span>
+        {m.procurement_form_reference_title()}{' '}
+        <span>{m.common_optional()}</span>
       </summary>
-      <p>Link the same record in another system.</p>
+      <p>{m.procurement_form_reference_description()}</p>
       <div className="procurement-form-pair">
         <label>
-          System
+          {m.procurement_form_reference_system()}
           <Input
             value={system}
             onChange={(e) => setSystem(e.target.value)}
             maxLength={200}
             required={!!externalId}
             disabled={disabled}
-            placeholder="e.g. JTL"
+            placeholder={m.procurement_form_reference_system_placeholder()}
           />
         </label>
         <label>
-          External ID
+          {m.procurement_form_reference_id()}
           <Input
             value={externalId}
             onChange={(e) => setExternalId(e.target.value)}
             maxLength={200}
             required={!!system}
             disabled={disabled}
-            placeholder="Record ID"
+            placeholder={m.procurement_form_reference_id_placeholder()}
           />
         </label>
       </div>
@@ -135,9 +138,9 @@ export function SupplierDialog({
       }}
     >
       <DialogContent showCloseButton={!command.locked}>
-        <DialogTitle>Add supplier</DialogTitle>
+        <DialogTitle>{m.procurement_supplier_dialog_title()}</DialogTitle>
         <DialogDescription>
-          Keep supplier records and their external references together.
+          {m.procurement_supplier_dialog_description()}
         </DialogDescription>
         <form
           className="procurement-form"
@@ -152,14 +155,14 @@ export function SupplierDialog({
         >
           <fieldset disabled={command.locked}>
             <label>
-              Supplier name
+              {m.procurement_supplier_dialog_name()}
               <Input
                 autoFocus
                 required
                 maxLength={200}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Northstar Supply"
+                placeholder={m.procurement_supplier_dialog_name_placeholder()}
               />
             </label>
             <ExternalFields
@@ -179,14 +182,14 @@ export function SupplierDialog({
               disabled={command.locked}
               onClick={close}
             >
-              Cancel
+              {m.common_cancel()}
             </Button>
             <Button type="submit" disabled={command.isPending}>
               {command.isPending
-                ? 'Saving…'
+                ? m.common_saving()
                 : command.uncertain
-                  ? 'Retry save'
-                  : 'Add supplier'}
+                  ? m.procurement_form_retry_save()
+                  : m.procurement_supplier_dialog_title()}
             </Button>
           </DialogFooter>
         </form>
@@ -245,9 +248,9 @@ export function OrderDialog({
         className="procurement-order-dialog"
         showCloseButton={!command.locked}
       >
-        <DialogTitle>New purchase order</DialogTitle>
+        <DialogTitle>{m.procurement_order_dialog_title()}</DialogTitle>
         <DialogDescription>
-          Create a Luma-owned draft. Review its details before opening it.
+          {m.procurement_order_dialog_description()}
         </DialogDescription>
         <form
           className="procurement-form"
@@ -269,20 +272,20 @@ export function OrderDialog({
           <fieldset disabled={command.locked}>
             <div className="procurement-form-pair">
               <label>
-                Order reference
+                {m.procurement_order_dialog_reference()}
                 <Input
                   autoFocus
                   required
                   maxLength={200}
-                  placeholder="e.g. PO-2026-001"
+                  placeholder={m.procurement_order_dialog_reference_placeholder()}
                   value={reference}
                   onChange={(e) => setReference(e.target.value)}
                 />
               </label>
               <label>
-                Supplier
+                {m.procurement_order_dialog_supplier()}
                 <Select
-                  aria-label="Supplier"
+                  aria-label={m.procurement_order_dialog_supplier()}
                   value={supplierId}
                   onValueChange={(value) => setSupplierId(value ?? '')}
                   options={suppliers.map((s) => ({
@@ -294,42 +297,55 @@ export function OrderDialog({
               </label>
             </div>
             <div className="procurement-lines-heading">
-              <h3>Order lines</h3>
-              <span>{lines.length} / 100</span>
+              <h3>{m.procurement_order_dialog_lines()}</h3>
+              <span>
+                {m.procurement_order_dialog_line_count({
+                  count: lines.length,
+                  max: 100,
+                })}
+              </span>
             </div>
             <div className="procurement-line-inputs">
               {lines.map((line, index) => (
                 <div key={line.id} className="procurement-line-input">
                   <label>
-                    SKU {index + 1}
+                    {m.procurement_order_dialog_sku_numbered({
+                      line: formatNumber(index + 1),
+                    })}
                     <Input
-                      aria-label={`SKU ${index + 1}`}
+                      aria-label={m.procurement_order_dialog_sku_numbered({
+                        line: formatNumber(index + 1),
+                      })}
                       required
                       maxLength={200}
                       value={line.sku}
                       onChange={(e) =>
                         updateLine(line.id, 'sku', e.target.value)
                       }
-                      placeholder="SKU"
+                      placeholder={m.procurement_order_dialog_sku()}
                     />
                   </label>
                   <label>
-                    Description
+                    {m.procurement_order_dialog_description_field()}
                     <Input
-                      aria-label={`Description ${index + 1}`}
+                      aria-label={m.procurement_order_dialog_description_numbered(
+                        { line: formatNumber(index + 1) },
+                      )}
                       required
                       maxLength={200}
                       value={line.description}
                       onChange={(e) =>
                         updateLine(line.id, 'description', e.target.value)
                       }
-                      placeholder="Item name"
+                      placeholder={m.procurement_order_dialog_description_placeholder()}
                     />
                   </label>
                   <label>
-                    Quantity
+                    {m.procurement_order_dialog_quantity()}
                     <Input
-                      aria-label={`Quantity ${index + 1}`}
+                      aria-label={m.procurement_order_dialog_quantity_numbered({
+                        line: formatNumber(index + 1),
+                      })}
                       type="number"
                       min="0.000001"
                       max="1000000000"
@@ -342,9 +358,11 @@ export function OrderDialog({
                     />
                   </label>
                   <label>
-                    Unit
+                    {m.procurement_order_dialog_unit()}
                     <Input
-                      aria-label={`Unit ${index + 1}`}
+                      aria-label={m.procurement_order_dialog_unit_numbered({
+                        line: formatNumber(index + 1),
+                      })}
                       required
                       maxLength={40}
                       value={line.unit}
@@ -357,7 +375,9 @@ export function OrderDialog({
                     type="button"
                     variant="ghost"
                     size="icon"
-                    aria-label={`Remove line ${index + 1}`}
+                    aria-label={m.procurement_order_dialog_remove_line({
+                      line: formatNumber(index + 1),
+                    })}
                     disabled={lines.length === 1}
                     onClick={() =>
                       setLines((previous) =>
@@ -388,7 +408,7 @@ export function OrderDialog({
               }
             >
               <Plus size={15} />
-              Add line
+              {m.procurement_order_dialog_add_line()}
             </Button>
             <ExternalFields
               {...{ system, externalId, setSystem, setExternalId }}
@@ -407,14 +427,14 @@ export function OrderDialog({
               disabled={command.locked}
               onClick={close}
             >
-              Cancel
+              {m.common_cancel()}
             </Button>
             <Button type="submit" disabled={command.isPending || !supplierId}>
               {command.isPending
-                ? 'Creating…'
+                ? m.procurement_order_dialog_creating()
                 : command.uncertain
-                  ? 'Retry save'
-                  : 'Create draft'}
+                  ? m.procurement_form_retry_save()
+                  : m.procurement_order_dialog_create()}
             </Button>
           </DialogFooter>
         </form>
@@ -422,6 +442,14 @@ export function OrderDialog({
     </Dialog>
   );
 }
+
+/** Button and dialog wording for each Luma status change. */
+export const transitionLabels = {
+  draft: m.procurement_transition_open,
+  open: m.procurement_transition_open,
+  closed: m.procurement_transition_close,
+  cancelled: m.procurement_transition_cancel,
+} satisfies Record<PurchaseOrderStatus, () => string>;
 
 /** Confirms the next state and records the operator's reason against the reviewed revision. */
 export function TransitionDialog({
@@ -443,12 +471,12 @@ export function TransitionDialog({
       transitionOrder(organizationId, order.id, body),
     close,
   );
-  const label =
-    status === 'open'
-      ? 'Open order'
-      : status === 'closed'
-        ? 'Close order'
-        : 'Cancel order';
+  const label = transitionLabels[status]();
+  const change = {
+    order: order.reference,
+    from: statusLabels[order.status](),
+    to: statusLabels[status](),
+  };
 
   return (
     <Dialog
@@ -460,11 +488,9 @@ export function TransitionDialog({
       <DialogContent showCloseButton={!command.locked}>
         <DialogTitle>{label}</DialogTitle>
         <DialogDescription>
-          {order.reference} · {statusLabels[order.status]} →{' '}
-          {statusLabels[status]}.{' '}
           {status === 'open'
-            ? 'This records the order as open. It does not send it to the supplier.'
-            : 'This is a final status. The order and its history stay available.'}
+            ? m.procurement_transition_open_description(change)
+            : m.procurement_transition_final_description(change)}
         </DialogDescription>
         <form
           className="procurement-form"
@@ -479,7 +505,7 @@ export function TransitionDialog({
           }}
         >
           <label>
-            Reason
+            {m.procurement_transition_reason()}
             <Input
               autoFocus
               required
@@ -487,7 +513,7 @@ export function TransitionDialog({
               disabled={command.locked}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="Why is the status changing?"
+              placeholder={m.procurement_transition_reason_placeholder()}
             />
           </label>
           {command.error && (
@@ -502,13 +528,13 @@ export function TransitionDialog({
               disabled={command.locked}
               onClick={close}
             >
-              Back
+              {m.common_back()}
             </Button>
             <Button type="submit" disabled={command.isPending}>
               {command.isPending
-                ? 'Saving…'
+                ? m.common_saving()
                 : command.uncertain
-                  ? 'Retry save'
+                  ? m.procurement_form_retry_save()
                   : label}
             </Button>
           </DialogFooter>

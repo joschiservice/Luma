@@ -7,6 +7,8 @@ import {
   type PurchaseOrder,
   type Supplier,
 } from '@luma/api-contract';
+import { formatList, formatNumber } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -66,7 +68,7 @@ function orderColumns(
   return [
     {
       key: 'reference',
-      header: 'Purchase order',
+      header: m.procurement_column_purchase_order(),
       cell: (order) => (
         <span className="procurement-cell">
           <DataTableRowLink
@@ -80,9 +82,9 @@ function orderColumns(
             {order.reference}
           </DataTableRowLink>
           <small>
-            {order.lines.length} {order.lines.length === 1 ? 'line' : 'lines'}
+            {m.procurement_lines_count({ count: order.lines.length })}
             {progress?.get(order.id)?.externalOrderNumber
-              ? ` · ERP ${progress.get(order.id)!.externalOrderNumber}`
+              ? ` · ${m.procurement_erp_order_number({ number: progress.get(order.id)!.externalOrderNumber! })}`
               : ''}
           </small>
         </span>
@@ -90,12 +92,12 @@ function orderColumns(
     },
     {
       key: 'supplier',
-      header: 'Supplier',
+      header: m.procurement_column_supplier(),
       cell: (order) => order.supplierName,
     },
     {
       key: 'stage',
-      header: 'Stage',
+      header: m.procurement_column_stage(),
       cell: (order) => {
         const summary = progress?.get(order.id);
 
@@ -104,7 +106,9 @@ function orderColumns(
             <StagePill stage={summary.stage} />
             {summary.attention ? (
               <Badge tone={summary.overdue ? 'danger' : 'warning'}>
-                {summary.overdue ? 'Overdue' : `${summary.attention} to answer`}
+                {summary.overdue
+                  ? m.procurement_overdue()
+                  : m.procurement_to_answer({ count: summary.attention })}
               </Badge>
             ) : null}
           </span>
@@ -115,7 +119,7 @@ function orderColumns(
     },
     {
       key: 'expected',
-      header: 'Expected',
+      header: m.procurement_column_expected(),
       hideOnNarrow: true,
       cell: (order) => {
         const date = progress?.get(order.id)?.expectedDate;
@@ -123,18 +127,18 @@ function orderColumns(
         return date ? (
           calendarDate(date)
         ) : (
-          <span className="procurement-muted">—</span>
+          <span className="procurement-muted">{m.common_empty_value()}</span>
         );
       },
     },
     {
       key: 'next',
-      header: 'Who’s next',
+      header: m.procurement_column_owner(),
       hideOnNarrow: true,
       cell: (order) => {
         const owner = progress?.get(order.id)?.nextOwner;
 
-        return owner ? ownerLabels[owner] : '—';
+        return owner ? ownerLabels[owner]() : m.common_empty_value();
       },
     },
   ];
@@ -152,7 +156,7 @@ function supplierColumns({
   return [
     {
       key: 'name',
-      header: 'Supplier',
+      header: m.procurement_column_supplier(),
       cell: (supplier) => (
         <DataTableRowLink
           render={
@@ -168,49 +172,64 @@ function supplierColumns({
     },
     {
       key: 'link',
-      header: 'Purchasing link',
+      header: m.procurement_column_link(),
       hideOnNarrow: true,
       cell: (supplier) =>
         supplier.link ? (
           <StatePill state="verified">
-            {supplier.link.name ?? `Supplier ${supplier.link.externalId}`}
+            {supplier.link.name ??
+              m.procurement_supplier_external({
+                id: supplier.link.externalId,
+              })}
           </StatePill>
         ) : (
-          <span className="procurement-muted">Not linked</span>
+          <span className="procurement-muted">
+            {m.procurement_not_linked()}
+          </span>
         ),
     },
     {
       key: 'references',
-      header: 'External references',
+      header: m.procurement_column_references(),
       hideOnNarrow: true,
       cell: (supplier) =>
         supplier.externalReferences.length
-          ? supplier.externalReferences
-              .map((ref) => `${ref.system} · ${ref.externalId}`)
-              .join(' / ')
-          : 'None',
+          ? formatList(
+              supplier.externalReferences.map(
+                (ref) => `${ref.system} · ${ref.externalId}`,
+              ),
+            )
+          : m.common_none(),
     },
     {
       key: 'added',
-      header: 'Added',
+      header: m.procurement_column_added(),
       hideOnNarrow: true,
       cell: (supplier) => <WorkspaceDate value={supplier.createdAt} />,
     },
     {
       key: 'orders',
-      header: 'Orders',
+      header: m.procurement_column_orders(),
       numeric: true,
-      cell: (supplier) => orderCount(supplier) ?? '—',
+      cell: (supplier) => {
+        const count = orderCount(supplier);
+
+        return count === undefined
+          ? m.common_empty_value()
+          : formatNumber(count);
+      },
     },
     {
       key: 'actions',
-      header: <span className="sr-only">Actions</span>,
+      header: <span className="sr-only">{m.common_actions()}</span>,
       cell: (supplier) => (
         <Button
           variant="ghost"
           size="icon"
-          aria-label={`View orders for ${supplier.name}`}
-          title="View orders"
+          aria-label={m.procurement_list_show_supplier_orders({
+            supplier: supplier.name,
+          })}
+          title={m.procurement_list_show_orders()}
           onClick={() => showOrders(supplier)}
         >
           <ArrowUpRight size={16} aria-hidden="true" />
@@ -232,12 +251,12 @@ function stageOptions(status: string) {
   );
 
   return [
-    { value: 'attention', label: 'Needs a response' },
+    { value: 'attention', label: m.procurement_list_filter_attention() },
     ...orderStageSchema.options.map((value) => ({
       value,
       label: stages[value].label,
     })),
-    ...(legacy ? [{ value: `status:${legacy[0]}`, label: legacy[1] }] : []),
+    ...(legacy ? [{ value: `status:${legacy[0]}`, label: legacy[1]() }] : []),
   ];
 }
 
@@ -334,7 +353,7 @@ export function ProcurementPage() {
   return (
     <div className="procurement-page">
       <PageTitle
-        title="Procurement"
+        title={m.procurement_title()}
         actions={
           canManage ? (
             <Button
@@ -349,8 +368,8 @@ export function ProcurementPage() {
             >
               <Plus size={16} />
               {filters.view === 'suppliers' || !suppliers.data?.items.length
-                ? 'Add supplier'
-                : 'New purchase order'}
+                ? m.procurement_list_add_supplier()
+                : m.procurement_list_new_order()}
             </Button>
           ) : null
         }
@@ -358,16 +377,13 @@ export function ProcurementPage() {
       <div className="procurement-summary">
         <section
           className="procurement-overview"
-          aria-label="Supplier commitments"
+          aria-label={m.procurement_overview_title()}
         >
           <div className="procurement-overview-heading">
             <PackageCheck size={17} aria-hidden="true" />
             <div>
-              <h2>Supplier commitments</h2>
-              <p>
-                What’s drafted, sent, confirmed and received, and what needs a
-                response.
-              </p>
+              <h2>{m.procurement_overview_title()}</h2>
+              <p>{m.procurement_overview_description()}</p>
             </div>
           </div>
           <div className="procurement-overview-actions">
@@ -376,27 +392,27 @@ export function ProcurementPage() {
                 [
                   'attention',
                   attentionCount,
-                  'Need a response',
-                  'Show orders that need a response',
+                  m.procurement_overview_attention,
+                  m.procurement_overview_attention_label,
                 ],
                 [
                   'awaiting_confirmation',
                   waitingCount,
-                  'Waiting on supplier',
-                  'Show orders waiting for supplier confirmation',
+                  m.procurement_overview_waiting,
+                  m.procurement_overview_waiting_label,
                 ],
                 [
                   'draft',
                   draftCount,
-                  'Drafts not sent',
-                  'Show draft purchase orders',
+                  m.procurement_overview_drafts,
+                  m.procurement_overview_drafts_label,
                 ],
               ] as const
             ).map(([stage, count, label, aria]) => (
               <Button
                 key={stage}
                 variant="ghost"
-                aria-label={aria}
+                aria-label={aria()}
                 aria-pressed={
                   filters.view === 'orders' && filters.stage === stage
                 }
@@ -408,8 +424,12 @@ export function ProcurementPage() {
                   )
                 }
               >
-                <strong>{count ?? '—'}</strong>
-                <span>{label}</span>
+                <strong>
+                  {count === undefined
+                    ? m.common_empty_value()
+                    : formatNumber(count)}
+                </strong>
+                <span>{label()}</span>
                 <ArrowUpRight size={14} aria-hidden="true" />
               </Button>
             ))}
@@ -421,18 +441,18 @@ export function ProcurementPage() {
         <CollectionToolbar
           views={
             <CollectionViews
-              label="Procurement views"
+              label={m.procurement_list_views()}
               value={filters.view}
               views={[
                 {
                   value: 'orders',
-                  label: 'Purchase orders',
+                  label: m.procurement_list_view_orders(),
                   icon: <FileText aria-hidden="true" />,
                   count: orders.data?.items.length,
                 },
                 {
                   value: 'suppliers',
-                  label: 'Suppliers',
+                  label: m.procurement_list_view_suppliers(),
                   icon: <Building2 aria-hidden="true" />,
                   count: suppliers.data?.items.length,
                 },
@@ -445,12 +465,12 @@ export function ProcurementPage() {
             onChange: (q) => change({ q: q ?? '' }),
             label:
               filters.view === 'orders'
-                ? 'Search purchase orders'
-                : 'Search suppliers',
+                ? m.procurement_list_search_orders()
+                : m.procurement_list_search_suppliers(),
             placeholder:
               filters.view === 'orders'
-                ? 'Search orders, suppliers, or SKUs…'
-                : 'Search suppliers…',
+                ? m.procurement_list_search_orders_placeholder()
+                : m.procurement_list_search_suppliers_placeholder(),
             maxLength: 200,
           }}
           filters={
@@ -459,7 +479,7 @@ export function ProcurementPage() {
                   {
                     kind: 'choice',
                     key: 'stage',
-                    label: 'Stage',
+                    label: m.procurement_list_filter_stage(),
                     icon: CircleDot,
                     value:
                       filters.stage ??
@@ -486,17 +506,19 @@ export function ProcurementPage() {
             void suppliers.refetch();
           }}
           refreshing={orders.isFetching || suppliers.isFetching}
-          refreshLabel="Refresh procurement"
+          refreshLabel={m.procurement_list_refresh()}
         />
         {selected.isPending ? (
           <div className="procurement-loading" role="status">
-            Loading procurement records…
+            {filters.view === 'orders'
+              ? m.procurement_list_loading_orders()
+              : m.procurement_list_loading_suppliers()}
           </div>
         ) : selected.error ? (
           <Alert role="alert" tone="danger">
             {procurementError(selected.error)}
             <Button variant="outline" onClick={() => void selected.refetch()}>
-              Retry
+              {m.common_retry()}
             </Button>
           </Alert>
         ) : filters.view === 'orders' ? (
@@ -506,13 +528,13 @@ export function ProcurementPage() {
                 <FileText size={30} />
                 <h3>
                   {orders.data?.items.length
-                    ? 'No matching purchase orders'
-                    : 'Your first order starts with a supplier'}
+                    ? m.procurement_list_orders_filtered_title()
+                    : m.procurement_list_orders_empty_title()}
                 </h3>
                 <p>
                   {orders.data?.items.length
-                    ? 'Try a different search or status.'
-                    : 'Add a supplier, create a draft, then track every status change here.'}
+                    ? m.procurement_list_orders_filtered_body()
+                    : m.procurement_list_orders_empty_body()}
                 </p>
                 {filters.q || filters.status || filters.stage ? (
                   <Button
@@ -521,7 +543,7 @@ export function ProcurementPage() {
                       change({ q: '', status: '', stage: undefined })
                     }
                   >
-                    Clear filters
+                    {m.common_clear_filters()}
                   </Button>
                 ) : canManage ? (
                   <Button
@@ -534,19 +556,16 @@ export function ProcurementPage() {
                     }
                   >
                     {suppliers.data?.items.length
-                      ? 'Create purchase order'
-                      : 'Add your first supplier'}
+                      ? m.procurement_list_create_order()
+                      : m.procurement_list_add_first_supplier()}
                   </Button>
                 ) : (
-                  <p>
-                    Your role doesn’t include Manage procurement, so you can’t
-                    create purchase orders.
-                  </p>
+                  <p>{m.procurement_list_no_permission()}</p>
                 )}
               </Empty>
             ) : (
               <DataTable
-                caption="Purchase orders"
+                caption={m.procurement_list_view_orders()}
                 columns={orderColumns(organizationId, summaries)}
                 rows={visibleOrders}
                 rowKey={(order) => order.id}
@@ -558,29 +577,29 @@ export function ProcurementPage() {
             <Building2 size={30} />
             <h3>
               {suppliers.data?.items.length
-                ? 'No matching suppliers'
-                : 'Build your supplier directory'}
+                ? m.procurement_list_suppliers_filtered_title()
+                : m.procurement_list_suppliers_empty_title()}
             </h3>
             <p>
               {suppliers.data?.items.length
-                ? 'Try another name or external reference.'
-                : 'Start with a name. Add an external reference when the supplier also exists in another system.'}
+                ? m.procurement_list_suppliers_filtered_body()
+                : m.procurement_list_suppliers_empty_body()}
             </p>
             {filters.q ? (
               <Button variant="outline" onClick={() => change({ q: '' })}>
-                Clear search
+                {m.procurement_list_clear_search()}
               </Button>
             ) : (
               canManage && (
                 <Button variant="outline" onClick={() => setDialog('supplier')}>
-                  Add your first supplier
+                  {m.procurement_list_add_first_supplier()}
                 </Button>
               )
             )}
           </Empty>
         ) : (
           <DataTable
-            caption="Suppliers"
+            caption={m.procurement_list_view_suppliers()}
             columns={supplierColumns({
               organizationId,
               orderCount: (supplier) =>
@@ -595,9 +614,9 @@ export function ProcurementPage() {
       </div>
       {suppliers.error && filters.view === 'orders' && (
         <Alert tone="warning">
-          Suppliers could not be loaded.{' '}
+          {m.procurement_list_suppliers_failed()}{' '}
           <Button variant="ghost" onClick={() => void suppliers.refetch()}>
-            Retry suppliers
+            {m.procurement_list_suppliers_retry()}
           </Button>
         </Alert>
       )}

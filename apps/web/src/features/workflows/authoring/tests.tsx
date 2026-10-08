@@ -7,6 +7,8 @@ import type {
   WorkflowDraft,
   WorkflowDraftContent,
 } from '@luma/api-contract';
+import { formatDateTime, formatList, formatNumber } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -31,30 +33,55 @@ import {
 import { type FieldType, humanize } from './draft-model';
 import { ScalarInput } from './step-forms';
 
-const outcomes: Record<TestOutcome, string> = {
-  verified: 'Finished with a verified result',
-  ended: 'Finished',
-  denied: 'Stopped by a decision',
-  failed_verification: 'Result check failed',
-  inconclusive_verification: 'Result check was inconclusive',
-  escalated: 'Handed to a person',
-  awaiting_decision: 'Waits for a person to decide',
-};
+const outcomes = {
+  verified: m.authoring_test_outcome_verified,
+  ended: m.authoring_test_outcome_ended,
+  denied: m.authoring_test_outcome_denied,
+  failed_verification: m.authoring_test_outcome_failed_verification,
+  inconclusive_verification: m.authoring_test_outcome_inconclusive,
+  escalated: m.authoring_test_outcome_escalated,
+  awaiting_decision: m.authoring_test_outcome_awaiting_decision,
+} satisfies Record<TestOutcome, () => string>;
+
+type TestStep = NonNullable<DraftTestRun['result']>['steps'][number];
+
+const stepStates = {
+  completed: m.authoring_test_step_completed,
+  waiting: m.authoring_test_step_waiting,
+  denied: m.authoring_test_step_denied,
+  failed: m.authoring_test_step_failed,
+  inconclusive: m.authoring_test_step_inconclusive,
+  ended: m.authoring_test_step_ended,
+  escalated: m.authoring_test_step_escalated,
+} satisfies Record<TestStep['state'], () => string>;
+
+const codeOutcomes = {
+  completed: m.authoring_test_code_completed,
+  code_error: m.authoring_test_code_error,
+  resource_limit: m.authoring_test_code_limit,
+  cancelled: m.authoring_test_code_canceled,
+  invalid_output: m.authoring_test_code_invalid_output,
+  capability_denied: m.authoring_test_code_request_denied,
+  unavailable: m.authoring_test_code_unavailable,
+} satisfies Record<NonNullable<TestStep['code']>['outcome'], () => string>;
 
 type Result = DraftTestSummary['results'][number] | undefined;
 
-function resultBadge(result: Result, draftRevision: number) {
+function resultBadge(result: Result) {
   if (!result?.state)
-    return <Badge tone="neutral">Not run on revision {draftRevision}</Badge>;
-  if (result.state === 'running') return <Badge tone="info">Running…</Badge>;
+    return <Badge tone="neutral">{m.authoring_test_not_run()}</Badge>;
+  if (result.state === 'running')
+    return <Badge tone="info">{m.authoring_test_running_badge()}</Badge>;
   if (result.error || result.state !== 'completed')
-    return <Badge tone="warning">Couldn’t run</Badge>;
-  if (result.passed === true) return <Badge tone="success">Passed</Badge>;
-  if (result.passed === false) return <Badge tone="danger">Failed</Badge>;
+    return <Badge tone="warning">{m.authoring_test_could_not_run()}</Badge>;
+  if (result.passed === true)
+    return <Badge tone="success">{m.authoring_test_passed()}</Badge>;
+  if (result.passed === false)
+    return <Badge tone="danger">{m.authoring_test_failed()}</Badge>;
 
   return (
     <Badge tone="neutral">
-      {result.outcome ? outcomes[result.outcome] : 'Ran'}
+      {result.outcome ? outcomes[result.outcome]() : m.authoring_test_ran()}
     </Badge>
   );
 }
@@ -142,7 +169,7 @@ export function DraftTestPanel({
     } catch (failure) {
       setError(
         failure instanceof IdentityError && failure.status === 409
-          ? 'Someone else changed these tests. Reload them before saving.'
+          ? m.authoring_test_conflict()
           : workflowError(failure),
       );
     } finally {
@@ -177,12 +204,8 @@ export function DraftTestPanel({
     <div className="authoring-tests">
       <div className="authoring-section-heading">
         <div>
-          <h2>Test with example data</h2>
-          <p>
-            Tests run the real workflow steps with your example replies. Nothing
-            is sent to connected systems, and passing tests don’t activate or
-            approve anything.
-          </p>
+          <h2>{m.authoring_tests_title()}</h2>
+          <p>{m.authoring_tests_description()}</p>
         </div>
         {canManage ? (
           <Button
@@ -191,7 +214,9 @@ export function DraftTestPanel({
             onClick={() =>
               setEditing({
                 id: crypto.randomUUID(),
-                name: `Example ${(data?.cases.length ?? 0) + 1}`,
+                name: m.authoring_test_default_name({
+                  number: (data?.cases.length ?? 0) + 1,
+                }),
                 inputs: {},
                 evidence: {},
                 replies: {},
@@ -199,13 +224,13 @@ export function DraftTestPanel({
               })
             }
           >
-            <Plus aria-hidden="true" /> New test
+            <Plus aria-hidden="true" /> {m.authoring_test_new()}
           </Button>
         ) : null}
       </div>
       {!saved ? (
         <Alert tone="neutral" role="status">
-          Tests run on the saved draft. Wait until your changes are saved.
+          {m.authoring_tests_unsaved()}
         </Alert>
       ) : null}
       {data?.blocked ? (
@@ -222,18 +247,18 @@ export function DraftTestPanel({
         <Alert tone="danger" role="alert">
           <span>{workflowError(summary.error)}</span>
           <Button variant="outline" onClick={() => void summary.refetch()}>
-            Retry
+            {m.common_retry()}
           </Button>
         </Alert>
       ) : summary.isPending ? (
-        <p role="status">Loading tests…</p>
+        <p role="status">{m.authoring_tests_loading()}</p>
       ) : !data?.cases.length && !editing ? (
-        <p className="authoring-hint">
-          No saved tests yet. Add one to check what the workflow does with
-          example data.
-        </p>
+        <p className="authoring-hint">{m.authoring_tests_empty()}</p>
       ) : (
-        <ul className="authoring-test-cases" aria-label="Saved tests">
+        <ul
+          className="authoring-test-cases"
+          aria-label={m.authoring_tests_saved_label()}
+        >
           {data?.cases.map((testCase) => {
             const result = data.results.find(
               (item) => item.caseId === testCase.id,
@@ -245,11 +270,13 @@ export function DraftTestPanel({
                   <strong>{testCase.name}</strong>
                   <span className="authoring-hint">
                     {testCase.expected
-                      ? `Expects: ${outcomes[testCase.expected.outcome]}`
-                      : 'Records what happens'}
+                      ? m.authoring_test_expects({
+                          outcome: outcomes[testCase.expected.outcome](),
+                        })
+                      : m.authoring_test_records()}
                   </span>
                 </div>
-                {resultBadge(result, draft.revision)}
+                {resultBadge(result)}
                 <div className="authoring-test-actions">
                   {result?.runId ? (
                     <Button
@@ -257,7 +284,7 @@ export function DraftTestPanel({
                       size="sm"
                       onClick={() => setRunId(result.runId)}
                     >
-                      Show result
+                      {m.authoring_test_show_result()}
                     </Button>
                   ) : null}
                   {canManage ? (
@@ -268,19 +295,21 @@ export function DraftTestPanel({
                         disabled={!saved || pending || !!data.blocked}
                         onClick={() => void run(testCase, true)}
                       >
-                        <Play aria-hidden="true" /> Run
+                        <Play aria-hidden="true" /> {m.authoring_test_run()}
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => setEditing(testCase)}
                       >
-                        Edit
+                        {m.common_edit()}
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
-                        aria-label={`Delete ${testCase.name}`}
+                        aria-label={m.authoring_test_delete({
+                          test: testCase.name,
+                        })}
                         disabled={pending}
                         onClick={() =>
                           void persist(
@@ -378,7 +407,10 @@ function Values({
         <label key={name} className="authoring-field">
           {humanize(name)}
           <ScalarInput
-            aria-label={`${legend}: ${humanize(name)}`}
+            aria-label={m.authoring_test_value_label({
+              group: legend,
+              field: humanize(name),
+            })}
             type={type}
             value={
               values[name] ??
@@ -433,10 +465,14 @@ function TestCaseEditor({
     });
 
   return (
-    <Card as="section" className="authoring-test-editor" aria-label="Edit test">
+    <Card
+      as="section"
+      className="authoring-test-editor"
+      aria-label={m.authoring_test_editor_label()}
+    >
       <div className="authoring-settings-grid">
         <label className="authoring-field">
-          Test name
+          {m.authoring_test_name()}
           <Input
             value={testCase.name}
             maxLength={200}
@@ -446,9 +482,9 @@ function TestCaseEditor({
           />
         </label>
         <label className="authoring-field">
-          Expected result
+          {m.authoring_test_expected()}
           <Select
-            aria-label="Expected result"
+            aria-label={m.authoring_test_expected()}
             value={testCase.expected?.outcome ?? ''}
             onValueChange={(value) =>
               setTestCase({
@@ -457,21 +493,23 @@ function TestCaseEditor({
               })
             }
             options={[
-              { value: '', label: 'Just show what happens' },
+              { value: '', label: m.authoring_test_expected_none() },
               ...Object.entries(outcomes).map(([value, label]) => ({
                 value,
-                label,
+                label: label(),
               })),
             ]}
           />
         </label>
         <label className="authoring-field">
-          Fill in from
+          {m.authoring_test_prefill()}
           <Select
-            aria-label="Fill in from"
+            aria-label={m.authoring_test_prefill()}
             value=""
             placeholder={
-              examples.isPending ? 'Loading examples…' : 'Choose example data'
+              examples.isPending
+                ? m.authoring_test_prefill_loading()
+                : m.authoring_test_prefill_placeholder()
             }
             disabled={!examples.data}
             onValueChange={(value) => {
@@ -488,32 +526,39 @@ function TestCaseEditor({
               if (scenario) prefill(scenario.case);
             }}
             options={[
-              { value: 'fields', label: 'Empty values for each field' },
+              { value: 'fields', label: m.authoring_test_prefill_empty() },
               ...(examples.data?.runs ?? []).map((item) => ({
                 value: `run:${item.runId}`,
-                label: `Recent run · ${new Date(item.createdAt).toLocaleString()}`,
+                label: m.authoring_test_prefill_run({
+                  time: formatDateTime(item.createdAt),
+                }),
               })),
               ...(examples.data?.scenarios ?? []).map((item) => ({
                 value: `scenario:${item.id}`,
-                label: `Scenario · ${item.name}`,
+                label: m.authoring_test_prefill_scenario({
+                  scenario: item.name,
+                }),
               })),
             ]}
           />
         </label>
       </div>
       <Values
-        legend="Inputs"
+        legend={m.authoring_settings_inputs()}
         fields={content.inputs as Record<string, FieldType>}
         values={testCase.inputs}
         onChange={(inputs) => setTestCase({ ...testCase, inputs })}
       />
       <Values
-        legend="Evidence"
+        legend={m.authoring_test_evidence()}
         fields={content.context.fields as Record<string, FieldType>}
         values={testCase.evidence}
         onChange={(evidence) => setTestCase({ ...testCase, evidence })}
       />
-      <ol className="authoring-test-replies" aria-label="Example replies">
+      <ol
+        className="authoring-test-replies"
+        aria-label={m.authoring_test_replies_label()}
+      >
         {content.steps.map((step) => {
           const reply = replyFor(step, testCase.replies[step.id]);
           if (!reply) return null;
@@ -528,14 +573,16 @@ function TestCaseEditor({
               <strong>{step.id}</strong>
               {reply.kind === 'read' && step.kind === 'read' ? (
                 <Values
-                  legend={`${step.id} reads`}
+                  legend={m.authoring_test_reply_reads({ step: step.id })}
                   fields={step.fields as Record<string, FieldType>}
                   values={reply.values}
                   onChange={(values) => set({ kind: 'read', values })}
                 />
               ) : reply.kind === 'approval' ? (
                 <Select
-                  aria-label={`${step.id} decision`}
+                  aria-label={m.authoring_test_reply_decision({
+                    step: step.id,
+                  })}
                   value={reply.decision}
                   onValueChange={(value) =>
                     value &&
@@ -545,14 +592,23 @@ function TestCaseEditor({
                     })
                   }
                   options={[
-                    { value: 'approved', label: 'Approved' },
-                    { value: 'denied', label: 'Denied' },
-                    { value: 'pending', label: 'Nobody has decided yet' },
+                    {
+                      value: 'approved',
+                      label: m.authoring_test_reply_approved(),
+                    },
+                    {
+                      value: 'denied',
+                      label: m.authoring_test_reply_rejected(),
+                    },
+                    {
+                      value: 'pending',
+                      label: m.authoring_test_reply_undecided(),
+                    },
                   ]}
                 />
               ) : reply.kind === 'capability' ? (
                 <Select
-                  aria-label={`${step.id} outcome`}
+                  aria-label={m.authoring_test_reply_outcome({ step: step.id })}
                   value={reply.result}
                   onValueChange={(value) =>
                     value &&
@@ -562,35 +618,51 @@ function TestCaseEditor({
                     })
                   }
                   options={[
-                    { value: 'accepted', label: 'Action accepted' },
+                    {
+                      value: 'accepted',
+                      label: m.authoring_test_reply_accepted(),
+                    },
                     {
                       value: 'approval_required',
-                      label: 'Policy asks a person first',
+                      label: m.authoring_test_reply_approval_required(),
                     },
-                    { value: 'denied', label: 'Action denied' },
+                    {
+                      value: 'denied',
+                      label: m.authoring_test_reply_not_allowed(),
+                    },
                   ]}
                 />
               ) : reply.kind === 'verification' &&
                 step.kind === 'verification' ? (
                 <>
                   <Select
-                    aria-label={`${step.id} result`}
+                    aria-label={m.authoring_test_reply_result({
+                      step: step.id,
+                    })}
                     value={reply.state}
                     onValueChange={(value) =>
                       value &&
                       set({ ...reply, state: value as typeof reply.state })
                     }
                     options={[
-                      { value: 'verified', label: 'Confirmed' },
+                      {
+                        value: 'verified',
+                        label: m.authoring_test_reply_confirmed(),
+                      },
                       {
                         value: 'failed',
-                        label: 'Differs from the expected result',
+                        label: m.authoring_test_reply_differs(),
                       },
-                      { value: 'inconclusive', label: 'Couldn’t be confirmed' },
+                      {
+                        value: 'inconclusive',
+                        label: m.authoring_test_reply_unconfirmed(),
+                      },
                     ]}
                   />
                   <Values
-                    legend={`${step.id} reads back`}
+                    legend={m.authoring_test_reply_reads_back({
+                      step: step.id,
+                    })}
                     fields={step.fields as Record<string, FieldType>}
                     values={reply.values}
                     onChange={(values) => set({ ...reply, values })}
@@ -603,20 +675,20 @@ function TestCaseEditor({
       </ol>
       <div className="workflow-dialog-actions">
         <Button variant="outline" disabled={pending} onClick={cancel}>
-          Cancel
+          {m.common_cancel()}
         </Button>
         <Button
           variant="outline"
           disabled={pending || !canRun}
           onClick={() => run(testCase)}
         >
-          <Play aria-hidden="true" /> Run without saving
+          <Play aria-hidden="true" /> {m.authoring_test_run_unsaved()}
         </Button>
         <Button
           disabled={pending || !testCase.name.trim()}
           onClick={() => save(testCase)}
         >
-          Save test
+          {m.authoring_test_save()}
         </Button>
       </div>
     </Card>
@@ -647,11 +719,11 @@ export function TestRunView({
     <Card
       as="section"
       className="authoring-test-run"
-      aria-label="Test result"
+      aria-label={m.authoring_test_result_title()}
       aria-live="polite"
     >
       <div className="authoring-section-heading">
-        <h3>Test result</h3>
+        <h3>{m.authoring_test_result_title()}</h3>
         {run?.state === 'running' && canManage ? (
           <Button
             variant="outline"
@@ -662,7 +734,7 @@ export function TestRunView({
               )
             }
           >
-            Cancel
+            {m.common_cancel()}
           </Button>
         ) : null}
       </div>
@@ -671,7 +743,7 @@ export function TestRunView({
           {workflowError(query.error)}
         </Alert>
       ) : !run || run.state === 'running' ? (
-        <p role="status">Running the test…</p>
+        <p role="status">{m.authoring_test_running()}</p>
       ) : run.error ? (
         <Alert tone="warning" role="status">
           {run.error}
@@ -689,19 +761,22 @@ export function TestRunView({
               }
             >
               {result.passed === true
-                ? 'Passed'
+                ? m.authoring_test_passed()
                 : result.passed === false
-                  ? 'Failed'
-                  : 'Ran'}
+                  ? m.authoring_test_failed()
+                  : m.authoring_test_ran()}
             </Badge>
-            <span>{outcomes[result.outcome]}</span>
+            <span>{outcomes[result.outcome]()}</span>
             {result.reason ? (
               <span className="authoring-hint">
                 ({humanize(result.reason)})
               </span>
             ) : null}
           </div>
-          <ol className="authoring-test-steps" aria-label="Steps in this test">
+          <ol
+            className="authoring-test-steps"
+            aria-label={m.authoring_test_steps_label()}
+          >
             {result.steps.map((step, index) => (
               <li
                 key={`${step.stepId}:${index}`}
@@ -710,7 +785,7 @@ export function TestRunView({
                 <div className="workflow-process-step-heading">
                   <strong>{step.title}</strong>
                   <span>{step.stepId}</span>
-                  <span>{humanize(step.state)}</span>
+                  <span>{stepStates[step.state]()}</span>
                 </div>
                 <p>{step.note}</p>
                 {Object.keys(step.inputs).length ||
@@ -718,13 +793,21 @@ export function TestRunView({
                   <dl className="authoring-test-values">
                     {Object.entries(step.inputs).map(([name, value]) => (
                       <div key={`in:${name}`}>
-                        <dt>Used {humanize(name)}</dt>
+                        <dt>
+                          {m.authoring_test_value_used({
+                            field: humanize(name),
+                          })}
+                        </dt>
                         <dd>{JSON.stringify(value)}</dd>
                       </div>
                     ))}
                     {Object.entries(step.outputs).map(([name, value]) => (
                       <div key={`out:${name}`}>
-                        <dt>Produced {humanize(name)}</dt>
+                        <dt>
+                          {m.authoring_test_value_produced({
+                            field: humanize(name),
+                          })}
+                        </dt>
                         <dd>{JSON.stringify(value)}</dd>
                       </div>
                     ))}
@@ -732,9 +815,14 @@ export function TestRunView({
                 ) : null}
                 {step.code ? (
                   <p className="authoring-hint">
-                    Sandbox: {humanize(step.code.outcome)} in{' '}
-                    {Math.round(step.code.wallTimeMs)} ms, {step.code.requests}{' '}
-                    request(s).
+                    {m.authoring_test_code_summary({
+                      outcome: codeOutcomes[step.code.outcome](),
+                      time: formatNumber(Math.round(step.code.wallTimeMs), {
+                        style: 'unit',
+                        unit: 'millisecond',
+                      }),
+                      count: step.code.requests,
+                    })}
                   </p>
                 ) : null}
               </li>
@@ -742,7 +830,7 @@ export function TestRunView({
           </ol>
         </>
       ) : (
-        <p>The test was cancelled.</p>
+        <p>{m.authoring_test_canceled()}</p>
       )}
     </Card>
   );
@@ -785,7 +873,7 @@ export function PublishTestSummary({
 
   const data = summary.data;
   if (!data?.cases.length)
-    return <p className="authoring-hint">No saved tests for this draft.</p>;
+    return <p className="authoring-hint">{m.authoring_publish_tests_none()}</p>;
   const failed = data.results.filter((item) => item.passed === false);
   const running = data.results.filter(
     (item) => item.state === 'running' || !item.state,
@@ -797,18 +885,20 @@ export function PublishTestSummary({
       role="status"
     >
       {failed.length
-        ? `${failed.length} of ${data.cases.length} saved tests fail on this revision: ${failed
-            .map(
-              (item) =>
-                data.cases.find((testCase) => testCase.id === item.caseId)
-                  ?.name,
-            )
-            .join(
-              ', ',
-            )}. Publishing is still possible; tests are evidence for you, not approval.`
+        ? m.authoring_publish_tests_failed({
+            count: failed.length,
+            total: data.cases.length,
+            tests: formatList(
+              failed.map(
+                (item) =>
+                  data.cases.find((testCase) => testCase.id === item.caseId)
+                    ?.name ?? m.common_unknown(),
+              ),
+            ),
+          })
         : running.length
-          ? 'Running saved tests on this revision…'
-          : `All ${data.cases.length} saved tests pass on this revision.`}
+          ? m.authoring_publish_tests_running()
+          : m.authoring_publish_tests_passed({ count: data.cases.length })}
     </Alert>
   );
 }

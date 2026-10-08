@@ -1,11 +1,75 @@
 import './shadow.css';
 
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import { caseLabel } from '@luma/ui/components/issues/case-investigation';
 import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { useState } from 'react';
 
-import { candidateAction, type ShadowComparison } from './data';
+import {
+  candidateAction,
+  type ShadowComparison,
+  type ShadowReview,
+} from './data';
+
+type Evaluation = ShadowComparison['evaluation'];
+
+const eligibilityLabels = {
+  eligible: m.shadow_eligibility_eligible,
+  ineligible: m.shadow_eligibility_ineligible,
+  stale_evidence: m.shadow_eligibility_stale_evidence,
+  no_candidate: m.shadow_eligibility_no_candidate,
+} satisfies Record<Evaluation['eligibility'], () => string>;
+
+const rulesLabels = {
+  allowed: m.shadow_rules_allowed,
+  denied: m.shadow_rules_denied,
+  approval_required: m.shadow_rules_approval_required,
+} satisfies Record<NonNullable<Evaluation['policy']>['outcome'], () => string>;
+
+const reasonLabels: Record<string, (() => string) | undefined> = {
+  authorized: m.shadow_reason_authorized,
+  permission_denied: m.shadow_reason_permission_denied,
+  capability_unavailable: m.shadow_reason_capability_unavailable,
+  stale_intent: m.shadow_reason_stale_intent,
+  approval_required: m.shadow_reason_approval_required,
+  approval_rejected: m.shadow_reason_approval_rejected,
+};
+
+const predictedLabels = {
+  passed: m.shadow_predicted_passed,
+  inconclusive: m.shadow_predicted_inconclusive,
+} satisfies Record<Evaluation['simulation']['predictedOutcome'], () => string>;
+
+/** Short labels for the confirmed outcome; shared with the comparison report. */
+export const actualLabels = {
+  passed: m.shadow_actual_passed,
+  failed: m.shadow_actual_failed,
+} satisfies Record<
+  NonNullable<ShadowComparison['actual']>['outcome'],
+  () => string
+>;
+
+const trustLabels = {
+  trust: m.shadow_trust_trust,
+  distrust: m.shadow_trust_distrust,
+  unsure: m.shadow_trust_unsure,
+} satisfies Record<
+  NonNullable<NonNullable<ShadowComparison['review']>['feedback']>,
+  () => string
+>;
+
+function actionSummary(action: NonNullable<ShadowReview['operatorAction']>) {
+  return m.shadow_action_summary({
+    action:
+      action.capability === 'orders.shipping-method.write'
+        ? m.shadow_action_set_shipping_method()
+        : caseLabel(action.capability),
+    kind: action.target.kind,
+    id: action.target.id,
+  });
+}
 
 /** Presents conditional predictions separately from recorded operator and authoritative outcomes. */
 export function ShadowResult({ item }: { item: ShadowComparison }) {
@@ -13,70 +77,69 @@ export function ShadowResult({ item }: { item: ShadowComparison }) {
   const [expanded, setExpanded] = useState(false);
   const action = candidateAction(evaluation);
   const version = evaluation.candidate?.version;
+  const reason = evaluation.policy?.reason;
 
   return (
     <div className="shadow-result">
-      <p className="shadow-label">Shadow — not executed</p>
+      <p className="shadow-label">{m.shadow_preview_label()}</p>
       <p className="shadow-meta">
-        <time dateTime={evaluation.createdAt}>
-          <WorkspaceDate value={evaluation.createdAt} />
-        </time>
-        {typeof version === 'string' ? ` · Workflow ${version}` : ''}
+        <WorkspaceDate value={evaluation.createdAt} />
+        {typeof version === 'string'
+          ? ` · ${m.shadow_result_workflow_version({ version })}`
+          : ''}
       </p>
       <dl className="shadow-facts">
         <div>
-          <dt>Eligibility</dt>
-          <dd>{caseLabel(evaluation.eligibility)}</dd>
+          <dt>{m.shadow_result_fits_label()}</dt>
+          <dd>{eligibilityLabels[evaluation.eligibility]()}</dd>
         </div>
         <div>
-          <dt>Policy</dt>
+          <dt>{m.shadow_result_rules_label()}</dt>
           <dd>
             {evaluation.policy
-              ? caseLabel(evaluation.policy.outcome)
-              : 'No candidate to assess'}
+              ? rulesLabels[evaluation.policy.outcome]()
+              : m.shadow_result_rules_none()}
           </dd>
         </div>
         <div>
-          <dt>Predicted outcome</dt>
+          <dt>{m.shadow_result_predicted_label()}</dt>
+          <dd>{predictedLabels[evaluation.simulation.predictedOutcome]()}</dd>
+        </div>
+        <div>
+          <dt>{m.shadow_result_actual_label()}</dt>
           <dd>
-            {evaluation.simulation.predictedOutcome === 'passed'
-              ? 'Pass, if assumptions hold'
-              : 'Inconclusive'}
+            {actual
+              ? actualLabels[actual.outcome]()
+              : m.shadow_actual_unknown()}
           </dd>
-        </div>
-        <div>
-          <dt>Actual outcome</dt>
-          <dd>{actual ? caseLabel(actual.outcome) : 'Not observed'}</dd>
         </div>
       </dl>
-      {evaluation.policy ? (
-        <p>Policy reason: {caseLabel(evaluation.policy.reason)}.</p>
+      {reason ? (
+        <p>
+          {reasonLabels[reason]?.() ??
+            m.shadow_reason_other({ reason: caseLabel(reason) })}
+        </p>
       ) : null}
-      <h4>Proposed action</h4>
+      <h4>{m.shadow_result_proposed_title()}</h4>
       {action ? (
         <>
-          <p>
-            {action.capability === 'orders.shipping-method.write'
-              ? 'Set shipping method'
-              : caseLabel(action.capability)}{' '}
-            · {action.target.kind} {action.target.id}
-          </p>
+          <p>{actionSummary(action)}</p>
           <ActionFields
             fields={action.parameters}
-            empty="No additional parameters."
+            empty={m.shadow_result_no_details()}
           />
         </>
       ) : (
-        <p>No bound candidate was available for this case and Workflow.</p>
+        <p>{m.shadow_result_no_change()}</p>
       )}
-      <h4>Predicted effects</h4>
+      <h4>{m.shadow_result_effects_title()}</h4>
       <ActionFields
         fields={evaluation.simulation.effects}
-        empty="No effects predicted."
+        empty={m.shadow_result_no_effects()}
       />
       {evaluation.simulation.assumptions.length ? (
         <>
-          <h4>Prediction assumptions</h4>
+          <h4>{m.shadow_result_assumptions_title()}</h4>
           <ul>
             {evaluation.simulation.assumptions.map((assumption) => (
               <li key={assumption}>{assumption}</li>
@@ -86,46 +149,55 @@ export function ShadowResult({ item }: { item: ShadowComparison }) {
       ) : null}
       {actual ? (
         <p>
-          Observed <WorkspaceDate value={actual.occurredAt} /> ·{' '}
-          {actual.evidenceRefs.length} evidence references ·{' '}
-          {actual.evaluatorVersion}
+          {rich(m.shadow_result_checked, {
+            count: actual.evidenceRefs.length,
+            time: <WorkspaceDate value={actual.occurredAt} />,
+          })}
         </p>
       ) : null}
       {review ? (
         <div className="shadow-recorded">
-          <h4>Operator comparison recorded</h4>
-          <p>
-            Action {review.actionNeeded ? 'needed' : 'not needed'} ·{' '}
-            {review.eligible ? 'Eligible case' : 'Ineligible case'} · Feedback:{' '}
-            {review.feedback ?? 'Not provided'}
-          </p>
+          <h4>{m.shadow_result_review_title()}</h4>
+          <dl className="shadow-facts">
+            <div>
+              <dt>{m.shadow_result_review_needed_label()}</dt>
+              <dd>{review.actionNeeded ? m.common_yes() : m.common_no()}</dd>
+            </div>
+            <div>
+              <dt>{m.shadow_result_review_fits_label()}</dt>
+              <dd>{review.eligible ? m.common_yes() : m.common_no()}</dd>
+            </div>
+            <div>
+              <dt>{m.shadow_result_review_trust_label()}</dt>
+              <dd>
+                {review.feedback
+                  ? trustLabels[review.feedback]()
+                  : m.shadow_trust_none()}
+              </dd>
+            </div>
+          </dl>
           {review.operatorAction ? (
             <>
-              <p>
-                {review.operatorAction.capability ===
-                'orders.shipping-method.write'
-                  ? 'Set shipping method'
-                  : caseLabel(review.operatorAction.capability)}{' '}
-                · {review.operatorAction.target.kind}{' '}
-                {review.operatorAction.target.id}
-              </p>
+              <p>{actionSummary(review.operatorAction)}</p>
               <ActionFields
                 fields={review.operatorAction.expectedPostcondition}
-                empty="No expected result recorded."
+                empty={m.shadow_result_review_no_expected()}
               />
             </>
           ) : (
-            <p>Operator action not observed.</p>
+            <p>{m.shadow_result_review_no_action()}</p>
           )}
           <p>
-            {review.evidenceRefs.length} evidence references ·{' '}
-            <WorkspaceDate value={review.occurredAt} />
+            {rich(m.shadow_result_review_evidence, {
+              count: review.evidenceRefs.length,
+              time: <WorkspaceDate value={review.occurredAt} />,
+            })}
           </p>
         </div>
       ) : null}
       <Disclosure onToggle={(event) => setExpanded(event.currentTarget.open)}>
-        <summary>Bound inputs and evidence</summary>
-        <p>Evaluation: {evaluation.id}</p>
+        <summary>{m.shadow_result_details()}</summary>
+        <p>{m.shadow_result_test_id({ id: evaluation.id })}</p>
         {expanded ? (
           <pre>
             {JSON.stringify(
@@ -158,7 +230,15 @@ export function ActionFields({
       {Object.entries(fields).map(([key, value]) => (
         <div key={key}>
           <dt>{caseLabel(key.replace(/([a-z])([A-Z])/g, '$1 $2'))}</dt>
-          <dd>{value === null ? 'None' : String(value)}</dd>
+          <dd>
+            {value === null
+              ? m.common_none()
+              : typeof value === 'boolean'
+                ? value
+                  ? m.common_yes()
+                  : m.common_no()
+                : String(value)}
+          </dd>
         </div>
       ))}
     </dl>

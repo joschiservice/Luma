@@ -93,3 +93,29 @@ export const values = [randomUUID(), randomBytes(1)];
     ),
   );
 });
+
+test('localized text is produced while rendering, never at module scope', async () => {
+  const eslint = new ESLint();
+  const [result] = await eslint.lintText(
+    `import { formatNumber } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
+
+export const frozen = m.common_loading();
+export const total = formatNumber(3);
+export const labels = { loading: m.common_loading };
+export const lazy = { get loading() { return m.common_loading(); } };
+
+/** Renders the label in the request's language. */
+export function Label() {
+  return m.common_loading();
+}
+`,
+    { filePath: 'apps/web/src/features/style-fixture.tsx' },
+  );
+  assert.deepEqual(
+    result.messages
+      .filter((message) => message.ruleId === 'ui/module-scope-message')
+      .map((message) => message.line),
+    [4, 5],
+  );
+});

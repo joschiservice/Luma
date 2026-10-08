@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import { X } from 'lucide-react';
 
 import { Button } from '../primitives/button';
@@ -11,8 +12,8 @@ export function IssuePanelClose({ onClose }: { onClose: () => void }) {
       className="issue-panel-close"
       onClick={onClose}
       aria-keyshortcuts="Escape"
-      aria-label="Close panel"
-      title="Close panel (Esc)"
+      aria-label={m.issues_panel_close()}
+      title={m.issues_panel_close_shortcut()}
     >
       <X aria-hidden="true" />
     </Button>

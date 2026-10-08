@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import { Check, type LucideIcon } from 'lucide-react';
 import {
   type ReactNode,
@@ -56,7 +57,10 @@ export type CollectionFilter =
       today: string;
       /** The longest inclusive range the collection accepts. */
       maxDays?: number | undefined;
-      /** Names the range applied when none is chosen, such as "Last 30 days". */
+      /**
+       * Names the range applied when none is chosen, such as "Last 30 days". Pass
+       * `calendarPresetLabel('last_30_days')` when it equals a preset, so the preset stands in.
+       */
       fallback?: string | undefined;
       onChange: (range: CalendarRange) => void;
     })
@@ -151,21 +155,21 @@ function ChoiceOptions({
     <div
       className="collection-filter-options"
       role="group"
-      aria-label={`${filter.label} options`}
+      aria-label={m.ui_filter_options_label({ filter: filter.label })}
     >
       {filter.options.length >
       searchableOptions[inline ? 'inline' : 'picker'] ? (
         <Input
           type="search"
-          aria-label={`Find ${filter.label.toLowerCase()}`}
-          placeholder={`Find ${filter.label.toLowerCase()}…`}
+          aria-label={m.ui_filter_find_label()}
+          placeholder={m.ui_filter_find_placeholder()}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
       ) : null}
       {query ? null : (
         <Option
-          label="Any"
+          label={m.ui_filter_any()}
           active={filter.value === undefined}
           onClick={() => choose(undefined)}
         />
@@ -179,7 +183,7 @@ function ChoiceOptions({
         />
       ))}
       {!options.length ? (
-        <p className="collection-filter-none">No matching options</p>
+        <p className="collection-filter-none">{m.ui_select_no_matches()}</p>
       ) : null}
     </div>
   );
@@ -207,7 +211,7 @@ function DateRangeOptions({
   const choices: { label: string; range: CalendarRange }[] = [
     ...(presets.some((preset) => preset.label === filter.fallback)
       ? []
-      : [{ label: filter.fallback ?? 'Any time', range: {} }]),
+      : [{ label: filter.fallback ?? m.ui_date_range_any_time(), range: {} }]),
     ...presets.map((preset) => ({
       label: preset.label,
       range:
@@ -240,10 +244,12 @@ function DateRangeOptions({
       }}
     >
       {inline ? null : (
-        <p className="collection-filter-heading">Custom range</p>
+        <p className="collection-filter-heading">
+          {m.ui_filter_custom_range()}
+        </p>
       )}
       <label>
-        <span>From</span>
+        <span>{m.ui_filter_range_from()}</span>
         <Input
           type="date"
           value={from}
@@ -253,7 +259,7 @@ function DateRangeOptions({
         />
       </label>
       <label>
-        <span>Through</span>
+        <span>{m.ui_filter_range_through()}</span>
         <Input
           type="date"
           value={to}
@@ -268,7 +274,7 @@ function DateRangeOptions({
         </p>
       ) : null}
       <Button type="submit" variant="outline" size="sm">
-        Apply range
+        {m.ui_filter_apply_range()}
       </Button>
     </form>
   );
@@ -278,7 +284,7 @@ function DateRangeOptions({
       <div
         className="collection-filter-options"
         role="group"
-        aria-label={`${filter.label} presets`}
+        aria-label={m.ui_filter_presets_label({ filter: filter.label })}
       >
         {choices.map((choice) => (
           <Option
@@ -296,8 +302,11 @@ function DateRangeOptions({
           open={custom}
         >
           <summary>
-            Custom range
-            {custom ? `: ${describeCalendarRange(filter, filter.today)}` : ''}
+            {custom
+              ? m.ui_filter_custom_range_value({
+                  range: describeCalendarRange(filter, filter.today),
+                })
+              : m.ui_filter_custom_range()}
           </summary>
           {form}
         </Disclosure>
@@ -377,7 +386,7 @@ export function CollectionFilterPanel({
     <div className="collection-panel-layout">
       <aside className="collection-filter-panel" aria-labelledby={id}>
         <h2 id={id} className="collection-filter-panel-title">
-          Filters
+          {m.common_filters()}
         </h2>
         <FilterFields filters={filters} />
       </aside>

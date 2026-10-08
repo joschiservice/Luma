@@ -79,7 +79,7 @@ test('follows history import coverage and pauses a sync', async ({
     .click();
   await page.getByRole('menuitem', { name: 'Pause' }).click();
   await page.getByText('Sync paused.', { exact: false }).waitFor();
-  await page.getByRole('group', { name: 'Orders paused' }).waitFor();
+  await page.getByRole('group', { name: 'Orders: Paused' }).waitFor();
   await page.getByRole('heading', { name: 'History import paused' }).waitFor();
 
   await page.evaluate(() => document.documentElement.classList.add('dark'));

@@ -2,24 +2,21 @@ import type {
   OperationalMetricRequest,
   OperationalMetricResponse,
 } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Select } from '@luma/ui/components/primitives/select';
 import { CheckCheck, Fingerprint, Timer } from 'lucide-react';
 
 import type { LiveMetricView } from './metrics-live';
-import { OperationalMetrics } from './operational-metrics';
+import { type MetricGroup, OperationalMetrics } from './operational-metrics';
 
-const groups: {
-  id: string;
-  title: string;
-  subtitle: string;
-  icon: typeof CheckCheck;
+const groups: (MetricGroup & {
   metrics: OperationalMetricRequest['metrics'];
-}[] = [
+})[] = [
   {
     id: 'outcomes',
-    title: 'Verified outcomes',
-    subtitle: 'One incident, across every attempt',
+    title: m.overview_outcomes_group_verified_title,
+    subtitle: m.overview_outcomes_group_verified_subtitle,
     icon: CheckCheck,
     metrics: [
       'resolution.eligible',
@@ -30,8 +27,8 @@ const groups: {
   },
   {
     id: 'involvement',
-    title: 'Human involvement',
-    subtitle: 'Retained approvals, repairs & corrections',
+    title: m.overview_outcomes_group_human_title,
+    subtitle: m.overview_outcomes_group_human_subtitle,
     icon: Fingerprint,
     metrics: [
       'resolution.human',
@@ -42,8 +39,8 @@ const groups: {
   },
   {
     id: 'duration',
-    title: 'Time & recurrence',
-    subtitle: 'Measured from first detection',
+    title: m.overview_outcomes_group_time_title,
+    subtitle: m.overview_outcomes_group_time_subtitle,
     icon: Timer,
     metrics: [
       'resolution.time_to_outcome',
@@ -71,20 +68,28 @@ export function resolutionMetricRequest(
   };
 }
 
-const environments = [
-  { value: 'live', label: 'Live operations' },
-  { value: 'pilot', label: 'Partner pilot' },
-  { value: 'synthetic', label: 'Synthetic' },
-  { value: 'shadow', label: 'Shadow' },
-  { value: 'unknown', label: 'Unknown environment' },
-] as const;
-const windows = [
-  { value: '24h', label: 'Detected in last 24 hours' },
-  { value: '7d', label: 'Detected in last 7 days' },
-] as const;
+const environments = {
+  live: m.overview_outcomes_env_live,
+  pilot: m.overview_outcomes_env_pilot,
+  synthetic: m.overview_outcomes_env_synthetic,
+  shadow: m.overview_outcomes_env_shadow,
+  unknown: m.overview_outcomes_env_unknown,
+} satisfies Record<OutcomeEnvironment, () => string>;
+const windows = {
+  '24h': m.overview_outcomes_window_24h,
+  '7d': m.overview_outcomes_window_7d,
+} satisfies Record<OutcomeWindow, () => string>;
+const environmentOrder: OutcomeEnvironment[] = [
+  'live',
+  'pilot',
+  'synthetic',
+  'shadow',
+  'unknown',
+];
+const windowOrder: OutcomeWindow[] = ['24h', '7d'];
 
 /**
- * Shows verified outcomes and attribution with explicit environment/window controls and authorized
+ * Shows verified outcomes and human help with explicit environment/window controls and authorized
  * evidence drilldowns. The page owns the cohort so its metric summary reads the matching request.
  */
 export function ResolutionOutcomes({
@@ -102,13 +107,22 @@ export function ResolutionOutcomes({
   onEnvironmentChange: (environment: OutcomeEnvironment) => void;
   onWindowChange: (window: OutcomeWindow) => void;
 }) {
+  const environmentOptions = environmentOrder.map((value) => ({
+    value,
+    label: environments[value](),
+  }));
+  const windowOptions = windowOrder.map((value) => ({
+    value,
+    label: windows[value](),
+  }));
+
   return (
     <div className="outcome-measurement">
       <div className="outcome-measurement-controls">
         <Select
           className="outcome-environment-select"
-          aria-label="Outcome environment"
-          options={environments}
+          aria-label={m.overview_outcomes_env_label()}
+          options={environmentOptions}
           value={environment}
           onValueChange={(value) => {
             if (value) onEnvironmentChange(value);
@@ -116,15 +130,15 @@ export function ResolutionOutcomes({
         />
         <Select
           className="outcome-window-select"
-          aria-label="Outcome detection window"
-          options={windows}
+          aria-label={m.overview_outcomes_window_label()}
+          options={windowOptions}
           value={window}
           onValueChange={(value) => {
             if (value) onWindowChange(value);
           }}
         />
         {environment !== 'live' ? (
-          <Badge tone="warning">Excluded from live results</Badge>
+          <Badge tone="warning">{m.overview_outcomes_excluded()}</Badge>
         ) : null}
       </div>
       <OperationalMetrics
@@ -133,8 +147,8 @@ export function ResolutionOutcomes({
         live={live}
         initialRequest={resolutionMetricRequest(environment, window)}
         metricGroups={groups}
-        heading="Verified outcomes & human work"
-        description="See what finished correctly, where people helped, and what the evidence cannot yet establish."
+        heading={m.overview_outcomes_title()}
+        description={m.overview_outcomes_description()}
       />
     </div>
   );

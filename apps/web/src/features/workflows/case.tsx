@@ -4,6 +4,8 @@ import type {
   WorkflowDetail,
   WorkflowRunView,
 } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Card, CardTitle } from '@luma/ui/components/primitives/card';
@@ -28,12 +30,15 @@ import {
   workflowsKey,
 } from './data';
 
-const issueLabel = (detail: WorkflowDetail) => {
+/** Says which new cases start a run; the issue type is the server's code with spaces. */
+const startsDescription = (detail: WorkflowDetail) => {
   const trigger = detail.versions[0]?.applicability.trigger;
 
   return trigger?.kind === 'exception'
-    ? trigger.issueType.replaceAll('_', ' ')
-    : 'matching';
+    ? m.workflows_case_starts_issue({
+        issue: trigger.issueType.replaceAll('_', ' '),
+      })
+    : m.workflows_case_starts_matching();
 };
 
 /**
@@ -98,14 +103,14 @@ export function CaseActivationForm({
     >
       <div className="workflow-activation-summary">
         <strong>
-          {detail.summary.name} · v{version.version}
+          {m.workflows_name_version({
+            name: detail.summary.name,
+            version: version.version,
+          })}
         </strong>
+        <p>{startsDescription(detail)}</p>
         <p>
-          Luma starts a run for each new {issueLabel(detail)} case that
-          detection confirms. Runs act as you.
-        </p>
-        <p>
-          <strong>Approval: </strong>
+          <strong>{m.workflows_approval_label()} </strong>
           {approval.summary}
         </p>
         <ul>
@@ -121,12 +126,15 @@ export function CaseActivationForm({
           checked={reviewed || request !== null}
           onChange={(event) => setReviewed(event.target.checked)}
         />{' '}
-        I reviewed this version and who approves its changes.
+        {m.workflows_case_confirm()}
       </label>
       <Disclosure>
-        <summary>Version details</summary>
+        <summary>{m.workflows_case_details()}</summary>
         <p>
-          Policy {detail.policyVersion} · Runs as {detail.principalId}
+          {m.workflows_case_details_line({
+            policy: detail.policyVersion,
+            principal: detail.principalId,
+          })}
         </p>
         <code>{version.digest}</code>
       </Disclosure>
@@ -136,9 +144,7 @@ export function CaseActivationForm({
         </Alert>
       ) : null}
       {request && !pending ? (
-        <p role="status">
-          The request is kept. Retrying sends the same request.
-        </p>
+        <p role="status">{m.workflows_case_kept()}</p>
       ) : null}
       <div className="workflow-dialog-actions">
         <Button
@@ -147,13 +153,17 @@ export function CaseActivationForm({
           disabled={pending}
           onClick={cancel}
         >
-          Cancel
+          {m.common_cancel()}
         </Button>
         <Button
           type="submit"
           disabled={pending || (!request && !reviewed) || !version.compatible}
         >
-          {pending ? 'Turning on…' : request ? 'Retry' : 'Turn on'}
+          {pending
+            ? m.workflows_case_turning_on()
+            : request
+              ? m.common_retry()
+              : m.workflows_case_turn_on()}
         </Button>
       </div>
     </form>
@@ -190,9 +200,7 @@ export function CaseWorkflowPanel({
         revoking.artifactDigest,
       );
       setRevoking(null);
-      setMessage(
-        'Turned off. No new runs start; runs already waiting send no new change.',
-      );
+      setMessage(m.workflows_case_turned_off());
       await refresh();
     } catch (failure) {
       setError(workflowError(failure));
@@ -207,10 +215,11 @@ export function CaseWorkflowPanel({
       className="workflow-section"
       aria-labelledby="case-title"
     >
-      <CardTitle id="case-title">When it runs</CardTitle>
+      <CardTitle id="case-title">{m.workflows_case_title()}</CardTitle>
       <p>
-        {detail.summary.readiness.coverage.explanation} Every change waits for
-        approval by someone else who can approve changes.
+        {m.workflows_case_explanation({
+          explanation: detail.summary.readiness.coverage.explanation,
+        })}
       </p>
       {message ? (
         <Alert tone="success" role="status">
@@ -220,32 +229,29 @@ export function CaseWorkflowPanel({
       <div className="workflow-case-status" role="status">
         {active ? (
           <>
-            <StatePill state="running">On</StatePill>
+            <StatePill state="running">{m.workflows_case_on()}</StatePill>
             <span>
-              Runs as{' '}
-              {active.reviewedBy === detail.principalId
-                ? 'you'
-                : 'the person who turned it on'}
-              {active.reviewedAt ? (
-                <>
-                  {' '}
-                  since <WorkspaceDate value={active.reviewedAt} />
-                </>
-              ) : null}
+              {active.reviewedAt
+                ? rich(
+                    active.reviewedBy === detail.principalId
+                      ? m.workflows_case_mine_since
+                      : m.workflows_case_other_since,
+                    { date: <WorkspaceDate value={active.reviewedAt} /> },
+                  )
+                : active.reviewedBy === detail.principalId
+                  ? m.workflows_case_mine()
+                  : m.workflows_case_other()}
             </span>
           </>
         ) : (
           <>
-            <StatePill state="idle">Off</StatePill>
-            <span>No new case starts this workflow.</span>
+            <StatePill state="idle">{m.workflows_case_off()}</StatePill>
+            <span>{m.workflows_case_off_help()}</span>
           </>
         )}
       </div>
       {!detail.canManage ? (
-        <p>
-          Your role doesn’t include Publish and enable workflows, so you can’t
-          turn this workflow on or off.
-        </p>
+        <p>{m.workflows_case_cannot_manage()}</p>
       ) : active ? (
         <Button
           variant="outline"
@@ -254,13 +260,13 @@ export function CaseWorkflowPanel({
             setError('');
           }}
         >
-          Turn off
+          {m.workflows_case_turn_off()}
         </Button>
       ) : (
         <>
           {blocked ? (
             <Alert tone="warning" id="case-activation-reason">
-              Fix the issues in Overview before turning this workflow on.
+              {m.workflows_case_blocked()}
             </Alert>
           ) : null}
           <Button
@@ -268,7 +274,7 @@ export function CaseWorkflowPanel({
             aria-describedby={blocked ? 'case-activation-reason' : undefined}
             onClick={() => setActivating(true)}
           >
-            Turn on
+            {m.workflows_case_turn_on()}
           </Button>
         </>
       )}
@@ -279,9 +285,11 @@ export function CaseWorkflowPanel({
         }}
       >
         <DialogContent className="workflow-dialog">
-          <DialogTitle>Turn on “{detail.summary.name}”?</DialogTitle>
+          <DialogTitle>
+            {m.workflows_case_dialog_title({ name: detail.summary.name })}
+          </DialogTitle>
           <DialogDescription>
-            Review what starts a run and who approves its changes.
+            {m.workflows_case_dialog_description()}
           </DialogDescription>
           <CaseActivationForm
             organizationId={organizationId}
@@ -289,7 +297,7 @@ export function CaseWorkflowPanel({
             cancel={() => setActivating(false)}
             done={async () => {
               setActivating(false);
-              setMessage('Turned on. New cases now start a run.');
+              setMessage(m.workflows_case_turned_on());
             }}
           />
         </DialogContent>
@@ -301,11 +309,9 @@ export function CaseWorkflowPanel({
         }}
       >
         <DialogContent className="workflow-dialog">
-          <DialogTitle>Turn off this workflow?</DialogTitle>
+          <DialogTitle>{m.workflows_case_off_title()}</DialogTitle>
           <DialogDescription>
-            New cases won’t start a run. Runs already waiting can finish
-            checking earlier changes but send no new change. Nothing already
-            changed is undone.
+            {m.workflows_case_off_description()}
           </DialogDescription>
           {error ? <p role="alert">{error}</p> : null}
           <div className="workflow-dialog-actions">
@@ -314,14 +320,16 @@ export function CaseWorkflowPanel({
               disabled={pending}
               onClick={() => setRevoking(null)}
             >
-              Cancel
+              {m.common_cancel()}
             </Button>
             <Button
               variant="destructive"
               disabled={pending}
               onClick={() => void revoke()}
             >
-              {pending ? 'Turning off…' : 'Turn off'}
+              {pending
+                ? m.workflows_case_turning_off()
+                : m.workflows_case_turn_off()}
             </Button>
           </div>
         </DialogContent>
@@ -347,12 +355,12 @@ export function CaseRunContext({
           to="/app/$organizationId/exceptions/$exceptionId"
           params={{ organizationId, exceptionId: caseId }}
         >
-          Open issue
+          {m.workflows_case_open_issue()}
         </Link>
       ) : null}
       {run.processState === 'awaiting_decision' ? (
         <Link to="/app/$organizationId/needs-you" params={{ organizationId }}>
-          Review in Needs you
+          {m.workflows_case_review_needs_you()}
         </Link>
       ) : null}
     </p>

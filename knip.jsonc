@@ -39,6 +39,11 @@
       // CLI integration tests load tsx through child_process execArgv --import.
       "ignoreDependencies": ["tsx"],
     },
+    // The inlang project settings load the ICU storage plugin from node_modules by path.
+    "packages/i18n": {
+      "entry": ["scripts/compile.mjs", "vite.mjs"],
+      "ignoreDependencies": ["@inlang/plugin-icu1"],
+    },
     "packages/ui": {
       "entry": [".storybook/*.{ts,tsx}", "src/**/*.stories.tsx"],
     },

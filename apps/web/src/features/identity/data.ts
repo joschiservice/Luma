@@ -1,5 +1,6 @@
 import { passkeyClient } from '@better-auth/passkey/client';
 import { type ApiError, apiErrorSchema } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import { type QueryClient, queryOptions } from '@tanstack/react-query';
 import { createAuthClient } from 'better-auth/client';
 import { twoFactorClient } from 'better-auth/client/plugins';
@@ -37,7 +38,8 @@ export function usePasskeySupport() {
 /**
  * A failed API or auth request. Keeps the HTTP status and, when the response carried the API
  * error payload, its `code`, `message` and `requestId`. `message` falls back to a generic
- * description when the server sent none, so check `code` before showing it to people.
+ * localized sentence when the server sent none, so check `code` before showing it to people,
+ * or use `requestErrorMessage` from `./errors`.
  */
 export class IdentityError extends Error {
   readonly code: ApiError['code'] | undefined;
@@ -52,7 +54,7 @@ export class IdentityError extends Error {
       'message' in payload && typeof payload.message === 'string'
         ? payload.message
         : undefined;
-    super(message ?? 'The request could not be completed.');
+    super(message ?? m.identity_error_unavailable());
     this.name = 'IdentityError';
     const code = apiErrorSchema.shape.code.safeParse(
       'code' in payload ? payload.code : undefined,
@@ -93,8 +95,8 @@ export const authSearch = z.object({
 export const workspaceName = z
   .string()
   .trim()
-  .min(1, 'Enter a workspace name.')
-  .max(200, 'Use 200 characters or fewer.');
+  .min(1, { error: () => m.identity_new_workspace_name_required() })
+  .max(200, { error: () => m.identity_new_workspace_name_too_long() });
 
 /** Builds a normalized workspace slug with a random suffix to reduce naming collisions. */
 export function organizationSlug(name: string) {

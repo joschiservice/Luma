@@ -1,3 +1,5 @@
+import { formatDateTime } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
 import { Button } from '@luma/ui/components/primitives/button';
 
 import type {
@@ -6,8 +8,8 @@ import type {
 } from '../domain/records.js';
 
 function value(field: ShopifyRecordRow['fields'][string]) {
-  if (field === null) return 'Not provided';
-  if (typeof field === 'boolean') return field ? 'Yes' : 'No';
+  if (field === null) return m.shopify_sections_not_provided();
+  if (typeof field === 'boolean') return field ? m.common_yes() : m.common_no();
 
   return String(field);
 }
@@ -42,7 +44,7 @@ export function ShopifyRecordSections({
         </p>
       ) : null}
       {section.status === 'available' && section.rows.length === 0 ? (
-        <p className="field-help">No records returned by Shopify.</p>
+        <p className="field-help">{m.shopify_sections_empty()}</p>
       ) : null}
       {section.rows.map((row) => (
         <article key={row.id} className="shopify-source-record">
@@ -57,8 +59,9 @@ export function ShopifyRecordSections({
           </dl>
           {row.sourceUpdatedAt ? (
             <p className="field-help">
-              Updated in Shopify{' '}
-              {new Date(row.sourceUpdatedAt).toLocaleString()}
+              {m.shopify_sections_updated({
+                time: formatDateTime(row.sourceUpdatedAt),
+              })}
             </p>
           ) : null}
           {follow ? (

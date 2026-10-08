@@ -1,0 +1,46 @@
+---
+title: Kunden finden und verstehen
+description: Finden Sie Kunden aus einem verbundenen Shop, lesen Sie Profil und Bestellverlauf, und sehen Sie die Probleme und Aktionen zu ihren Bestellungen.
+---
+
+Kunden zeigt die Kundenprofile, die Ihre verbundenen Shops mit Luma teilen. Hier prüfen Sie, wer ein Kunde ist, was er bestellt hat und was Luma bei seinen Bestellungen getan hat. Öffnen Sie **Kunden** in der Seitenleiste oder drücken Sie **G**, dann **U**. In den Live-Shopify-Details einer Bestellung öffnet **Kunden in Luma öffnen →** direkt den Kunden dieser Bestellung.
+
+## Kunden finden [#find-a-customer]
+
+Suchen Sie nach Name, E-Mail-Adresse, Telefonnummer oder der Kunden-ID im Shop. Grenzen Sie die Liste mit **Kundenkonto** und **Quelle** ein, und sortieren Sie nach **Kunde seit**, **Bestellungen** oder **Name**. **Kundenkonto** zeigt, ob der Kunde ein Konto im Shop hat: **Hat Kundenkonto**, **Kein Kundenkonto** (zum Beispiel nach einem Gastkauf), **Eingeladen** oder **Einladung abgelehnt**.
+
+Jeder Shop führt seine eigenen Kunden, und Luma führt Kunden verschiedener Shops nie über Name oder E-Mail-Adresse zusammen. Wer in zwei Shops gekauft hat, erscheint zweimal, einmal je Shop. Vergleichen Sie Quelle und Kontaktdaten, bevor Sie einen Eintrag wählen.
+
+Ihr Suchtext wird nicht in der Seitenadresse gespeichert. Links, die Sie teilen oder anheften, enthalten daher nie den Namen oder die E-Mail-Adresse eines Kunden. Filter und Sortierung werden gespeichert.
+
+**Abdeckung** über der Liste zeigt, welche Shops wann importiert wurden. Verweist ein Link auf einen Kunden, den Luma noch nicht importiert hat, sagt die Seite das. Mit **Alle Kunden anzeigen** kehren Sie zur Liste zurück.
+
+## Kundenprofil lesen [#read-a-customer]
+
+Die Kundenseite zeigt den Shop und die Kunden-ID darin, außerdem:
+
+- **Kontakt**: E-Mail, Telefon und Adresse, soweit der Shop sie teilt.
+- Einen Abschnitt mit dem Namen des Shops, etwa **In Main Store**: die Anzahl der Bestellungen und den Umsatz laut Shop, seit wann der Kunde besteht, den Kontostatus und die Tags.
+- **Quelle und Nachweise**: den Shop, die Kunden-ID, wann der Shop das Profil zuletzt aktualisiert hat und wann Luma es zuletzt abgerufen hat.
+
+**Nicht freigegeben** bedeutet, dass der Shop dieses Feld Luma vorenthält. **Nicht gemeldet** bedeutet, dass der Shop keinen Wert gesendet hat. Mit **Kundendaten aktualisieren** laden Sie das Profil neu.
+
+## Bestellverlauf verfolgen [#follow-the-order-history]
+
+Der **Bestellverlauf** wird bei jedem Öffnen live aus dem Shop gelesen, mit den Berechtigungen der Verbindung. Er listet jede Bestellung mit Zahlung, Fulfillment und Summe. Blättern Sie mit der Seitensteuerung, und wählen Sie **Bestellungen aktualisieren**, um ihn erneut zu lesen. Shopify teilt Bestellungen der letzten 60 Tage, sofern für den Shop kein Zugriff auf ältere Bestellungen besteht.
+
+Wählen Sie eine Bestellung, um ihren Serviceverlauf zu sehen: Fulfillment, Retouren und Erstattungen aus dem Shop. Ist die Bestellung mit einer Bestellung in Luma verknüpft, sehen Sie außerdem **Offene Probleme** und **Aktionen von Luma**. Der Link **… in Luma öffnen →** öffnet die vollständige Bestellung mit Nachweisen und Workflow-Ausführungen. Ist die Shopify-Bestellung noch mit keiner oder mit mehr als einer Bestellung in Luma verknüpft, sagt die Seite das und zeigt nur den Verlauf aus dem Shop.
+
+## Wenn Kundendaten fehlen [#when-customer-data-is-missing]
+
+- **Noch keine Kunden freigegeben** bedeutet, dass kein verbundener Shop Kunden mit Luma teilt. Shopify teilt Kunden erst, wenn Shopify den Zugriff von Luma auf Kundendaten genehmigt und Ihr Shop ihn erteilt hat.
+- **Nicht freigegeben** bei Kontaktdaten oder Adresse bedeutet, dass dieser Teil nicht zur Freigabe genehmigt ist. Der Rest des Profils wird trotzdem angezeigt.
+- Ein Shop, der verbunden wurde, bevor Luma Kunden lesen konnte, muss neu verbunden werden, um sie zu teilen. Die Seite nennt jeden betroffenen Shop, auch Shops, die keinen Zugriff auf Kunden gewährt haben.
+- Sagt der Bestellverlauf, dass die App des Shops nicht installiert oder autorisiert ist, kann jemand mit **Apps verwalten** sie unter **Apps** einrichten. Ein Hinweis auf fehlende Berechtigungen ist etwas anderes als ein leerer Verlauf.
+- **Kunde nicht gefunden** bedeutet, dass es den Kunden in diesem Workspace nicht gibt oder der Shop Luma gebeten hat, seine Daten zu löschen.
+
+Wer **Verbindungen verwalten** in seiner Rolle hat, kann einen Shop unter **Apps** neu verbinden. Siehe [Apps und Verbindungen](/docs/apps-and-connections#change-or-reconnect-a-connection).
+
+## Wer Kunden sehen kann [#who-can-see-customers]
+
+Kundenprofile enthalten Namen, E-Mail-Adressen und Postanschriften. Deshalb brauchen Sie **Kunden ansehen**. Die vordefinierten Rollen enthalten diese Berechtigung, eine eigene Rolle möglicherweise nicht. Ohne sie ist Kunden in der Seitenleiste und in der Suche ausgeblendet, und ein Link zu einem Kunden meldet, dass Sie keinen Zugriff auf Kunden in diesem Workspace haben. Bitten Sie eine Admin-Person um Zugriff. Siehe [Rollen und Berechtigungen](/docs/roles-and-permissions).

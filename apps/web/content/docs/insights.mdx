@@ -1,53 +1,75 @@
 ---
-title: Read operational trends and open the records behind them
-description: See how orders, fulfillment work, stock risk, issues and purchase orders develop, and open the exact records behind any bar.
+title: Read operational trends and verified outcomes
+description: See where work is waiting, how orders, fulfillment, stock, issues and purchase orders develop, which issues were verified as fixed, and open the records behind any number.
 ---
 
-**Insights** shows live counts at the top and, under **Operational trends**, charts of your operations. Every bar opens the records it counts, so you can go from a pattern to the order, fulfillment, stock position, issue or purchase order that needs you.
+**Insights** shows your operations in numbers: what is waiting right now, how work develops over time, and which issues Luma verified as fixed with or without a person’s help. Every number and bar opens the exact records it counts. Open it from the sidebar, or press **G** then **M**. You need **View insights**.
+
+## See where work is waiting
+
+**Where work is waiting** counts what may need your next step now, grouped into **Issues**, **Monitored stock**, **Procurement** and **Connections**. Select a number to see how it’s counted, a breakdown by reason, and the matching records. The list shows one point in time; live changes return it to the first page.
+
+The numbers update live. If updates stop, the section says **Offline** or **Updates unavailable** and hides numbers it can’t keep current. Choose **Refresh summary** to try again.
 
 ## Choose a time range and source
 
-Use the filters above the charts:
+Under **Operational trends**, use the filters above the charts:
 
-- **Time range**: the last 7 or 30 days by day, or the last 13 weeks by week. Days and weeks follow your workspace time zone, and weeks start on Monday. The current day or week is still filling up and is marked as such.
-- **Source**: all connected sources, or one connection. Charts of Luma's own records, such as issues and purchase orders, aren't split by source.
+- **Time range**: **Last 7 days** or **Last 30 days** by day, or **Last 13 weeks** by week. Days and weeks follow your workspace time zone, and weeks start on Monday. The current day or week is marked **Today so far** or **This week so far**.
+- **Source**: **All sources**, or one connection. Charts of Luma’s own records, such as issues and purchase orders, aren’t split by source.
 
 Both filters are part of the address, so you can share a view, pin it to the sidebar or come back to it later.
 
 ## What each chart counts
 
-- **Orders placed**: orders by the day their source says they were placed, colored by their status now. An order linked across Shopify and JTL counts once. With one source selected, that source's own orders count. Orders without a placed time are listed below the chart instead.
-- **Fulfillment backlog**: open fulfillment work by how long ago its source last reported progress. Each item counts under its first signal: on hold, then past fulfill-by, then no progress for 48 hours. When a store and an ERP both report the same work, each system's work counts separately.
-- **Stock risk**: positions with an active replenishment rule, compared with the rule's minimum. Stock is compared only when its source read is under five minutes old; anything else is **Stock unknown**. A recorded purchase order doesn't mean the supplier confirmed it or that enough stock is on its way.
-- **Issues detected**: issues by the day Luma first detected them, by kind. A reopened issue stays on its first day.
-- **Purchase orders**: purchase orders that aren't closed or cancelled, by the stage their evidence supports. **Received** means a goods receipt was booked in your purchasing system. **Overdue** means a supplier confirmation or delivery is late.
+- **Orders placed**: orders by the day their source says they were placed, colored by their status today. An order linked across Shopify and JTL counts once. Orders without a placed time are listed below the chart instead.
+- **Fulfillment backlog**: open fulfillment work by how long ago its source last reported progress. Each item counts under its first signal: on hold, past its fulfill-by date, then no progress for 48 hours. Work reported by two systems counts once in each.
+- **Stock risk**: stock positions with an active replenishment rule, compared with the rule’s minimum. Stock counts only if it was read from its source in the last 5 minutes; anything else is **Stock unknown**. A recorded purchase order doesn’t mean the supplier confirmed it or that enough stock is on its way.
+- **Issues detected**: issues by kind and the day Luma first detected them. A reopened issue stays on the day it was first detected.
+- **Purchase orders**: purchase orders that aren’t closed or canceled, by the stage their evidence supports. **Received** means a goods receipt was booked in your purchasing system. **Overdue** means a supplier confirmation or delivery is late.
 
-The fulfillment backlog, stock risk and purchase orders show the state right now. Luma doesn't rebuild past states it never observed, so these charts have no history.
+Fulfillment backlog, stock risk and purchase orders show the state right now. Luma doesn’t rebuild past states it never read, so these charts have no history. Open **What this chart doesn’t show** on any chart to see its limits.
 
 ## Tell unknown from zero
 
-Each chart states its **window**, its **sources** and how current the data is:
+A zero means Luma checked and found none. Unknown means Luma lacks the evidence to count. Each chart says which one applies:
 
-- **Data through** is the time of the oldest complete read across the sources. Changes at a source after that time may not be counted yet.
-- A source marked **Observed records only** sends individual records but hasn't completed an import, so records it never sent can't be ruled out.
-- A hatched bar marked **Not imported** lies before a source's imported history. Its count is unknown, not zero.
-- A small ring under a day or week marks an **incomplete period**, such as today.
-- **No source in scope** or **No active rules** means nothing can report these records yet. The chart shows no numbers rather than zeros.
+- **Period**, **Sources** and **Data through** describe what the chart is based on. **Data through** is the time of the oldest complete read across its sources; later changes may not be counted yet.
+- Each source shows its state, such as **Complete**, **Limited history**, **Importing**, **Stale** or **Not fully imported**. A source that isn’t fully imported may be missing records, so they can’t be ruled out.
+- A hatched bar marked **Not imported** lies before a source’s imported history. Its count is unknown, not zero.
+- When nothing can report the records, such as **No source reports orders yet** or **No active replenishment rules**, the chart shows no numbers rather than zeros. It offers **Connect a source** or **Set up replenishment rules**.
 
-Open **What this chart doesn't show** on any chart to see its limits.
+If a chart can’t load, it says **Chart unavailable** and hides earlier values, so they aren’t mistaken for current ones.
 
 ## Open the records behind a bar
 
-Select a bar, a segment of a bar, a legend entry or a value in the table view. A panel lists the exact records counted there, evaluated at the same moment as the chart. The panel says when its total matches the chart. If records changed since the chart was read, it says so and offers **Refresh chart**.
+Select a bar, a segment, a legend entry or a value in the table view. A panel lists the exact records counted there, as of the moment the chart was loaded, and says whether its total matches the chart. If records changed since, choose **Refresh chart** to count them again.
 
-From the panel you can:
-
-- Open each order, fulfillment, stock position, issue or purchase order. Its page links back to these records.
-- Open **Decide in Needs you** when a decision on the record is waiting.
-- Open the matching view of the Orders, Fulfillment, Issues or Procurement workspace.
-
-Use the browser's back button to return to the chart with the same panel open.
+From the panel you can open each order, fulfillment, stock position, issue or purchase order, choose **Decide in Needs you** when a decision on the record is waiting, or open the matching view in Orders, Fulfillment, Issues or Procurement. The browser’s back button returns you to the chart with the same panel open.
 
 ## Use the charts with a keyboard or screen reader
 
-Each chart is one stop in the tab order. Use the arrow keys to move between bars, Home and End to jump to the first and last, and Enter to open a bar's records. Each bar is announced with its period, total and parts. Switch any chart to **Table** for the same values as a table, with each value opening its records.
+Each chart is one stop in the tab order. Use the arrow keys to move between bars, Home and End to jump to the first and last, and Enter to open a bar’s records. Each bar is announced with its period, total and parts. Switch any chart to **Table** for the same values as a table, with each value opening its records.
+
+## Verified outcomes and human help
+
+**Verified outcomes and human help** shows which issues were verified as fixed, where people helped, and where Luma can’t tell yet.
+
+1. Choose the **Environment**: **Live operations**, **Partner pilot**, **Simulated**, **Shadow mode** or **Unknown environment**. Anything other than live operations is marked **Excluded from live results**.
+2. Choose the **Detection period**: **Detected in the last 24 hours** or **Detected in the last 7 days**.
+3. Select a number, such as **Verified outcomes**, **Resolved without help** or **Human involvement**, to list its issues.
+
+Each issue in the list shows when it was first detected and verified, whether it was eligible for automation, and a help badge: **No human help**, **A person helped** or **Help unknown**. Open **Evidence and measurement history** to see what the counts are based on, then open the issue for its source data and what Luma did.
+
+How issues are counted:
+
+- An issue counts once, however many attempts or retries it took. If the problem comes back, Luma counts a new, linked issue under **Recurring issues**.
+- An issue stays in the period in which it was first detected, even when it’s verified later.
+- **Verified** needs a separate, current check that confirmed the outcome. A change the connected system accepted, or an issue someone closed manually, doesn’t count as verified.
+- Approvals, manual repairs and corrections by a person count as help. When Luma doesn’t have a complete record of who helped, the issue counts as **Help unknown**, not as no help.
+
+An issue was resolved automatically when it was eligible for automation, verified, and has a complete record showing no person helped. Those issues count as **Resolved without help**. Home’s **Resolution outcomes** module shows the same live results as **Resolved automatically** and an **Automatic resolution rate**. [Workflow tests](/docs/shadow-mode) never count as live outcomes.
+
+## Orders that need work
+
+**Orders that need work** counts orders that need attention, such as overdue orders and orders waiting for you. Each order counts once, even when it appears in several connected systems. Choose **Show matching orders** to see them, or open them in Orders. The section says whether the data is current, **Data out of date** or **No order data yet**. Counts include only orders Luma has read, so a zero doesn’t prove there are none.

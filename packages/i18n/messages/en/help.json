@@ -1,0 +1,10 @@
+{
+  "help_button_label": "Help for this page",
+  "help_drawer_description": "Guides for the page you’re working on.",
+  "help_load_failed": "This guide couldn’t be loaded.",
+  "help_load_failed_link": "Open the guide in a new tab",
+  "help_open_full": "Open full documentation",
+  "help_new_tab": "(opens in a new tab)",
+  "help_guides_label": "Guides",
+  "help_guides_heading": "Explore the guides"
+}

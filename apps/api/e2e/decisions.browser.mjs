@@ -57,11 +57,11 @@ test('finds a replenishment approval in Needs you, decides it once and updates e
   await attention.getByRole('link', { name: 'Open Needs you' }).click();
   await requester.waitForURL(`**${path}`);
   const requested = requester.getByRole('link', { name: new RegExp(title) });
-  await requested.getByText('Needs another approver').waitFor();
+  await requested.getByText('Waiting for another approver').waitFor();
   await requester
     .getByRole('navigation', { name: 'Workspace navigation' })
     .getByRole('link', { name: /Needs you/ })
-    .getByText('need you')
+    .getByText(/waiting for you/)
     .waitFor({ state: 'attached' });
 
   // A different admin opens it, takes it and reads the exact change before approving.
@@ -89,7 +89,7 @@ test('finds a replenishment approval in Needs you, decides it once and updates e
     })
     .waitFor();
   await inspector.getByRole('button', { name: 'Take it' }).click();
-  await inspector.getByRole('button', { name: 'Release' }).waitFor();
+  await inspector.getByRole('button', { name: 'Unassign me' }).waitFor();
   await approver.screenshot({
     path: '/tmp/luma78-needs-you-desktop.png',
     fullPage: true,

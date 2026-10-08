@@ -160,7 +160,7 @@ export function createApp(context: AppFactoryContext): AppDefinition {
       id: 'jtl',
       name: 'JTL',
       description:
-        'Connect JTL Cloud and JTL-Wawi to read commerce data, manage permitted shipping corrections and submit approved purchase orders.',
+        'Connect JTL Cloud or JTL-Wawi to read commerce data, correct shipping methods, and send approved purchase orders.',
       version: '1.0.0',
       category: 'erp',
       ui: ['connections', 'settings'],
@@ -171,16 +171,16 @@ export function createApp(context: AppFactoryContext): AppDefinition {
       permissions: [
         {
           key: jtlPermissions.purchaseOrders,
-          label: 'Submit purchase orders to JTL',
+          label: 'Send purchase orders to JTL',
           description:
-            'Propose, approve and send purchase orders to JTL. Approving also needs permission to approve changes.',
+            'Propose, approve, and send purchase orders to JTL. Approving also needs the permission to approve changes.',
           consequential: true,
         },
         {
           key: jtlPermissions.shippingMethod,
           label: 'Change JTL shipping methods',
           description:
-            'Propose, approve and apply shipping-method corrections on JTL orders. Approving also needs permission to approve changes.',
+            'Propose, approve, and apply shipping method corrections to JTL orders. Approving also needs the permission to approve changes.',
           consequential: true,
         },
       ],

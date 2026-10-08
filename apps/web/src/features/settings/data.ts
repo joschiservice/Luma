@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import { queryOptions } from '@tanstack/react-query';
 
 import { createWebApiClient } from '../../lib/api-client';
@@ -23,7 +24,7 @@ export function settingsResult(result: {
     const body = result.body as { message?: string };
     throw new SettingsError(
       result.status,
-      body.message ?? 'The request could not be completed.',
+      body.message ?? m.settings_request_failed(),
     );
   }
 

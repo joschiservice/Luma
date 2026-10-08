@@ -1,12 +1,13 @@
+import { m } from '@luma/i18n/messages';
 import { CircleDot, History, Inbox } from 'lucide-react';
 import type { ReactElement } from 'react';
 
 import { Tabs, TabsList, TabsTrigger } from '../primitives/tabs';
 
 const views = [
-  { value: 'needs_you', label: 'Needs review', icon: Inbox },
-  { value: 'active', label: 'All open', icon: CircleDot },
-  { value: 'history', label: 'History', icon: History },
+  { value: 'needs_you', label: m.issues_view_needs_review, icon: Inbox },
+  { value: 'active', label: m.issues_view_open, icon: CircleDot },
+  { value: 'history', label: m.issues_view_history, icon: History },
 ] as const;
 
 type IssueView = (typeof views)[number]['value'];
@@ -21,7 +22,7 @@ export function IssueViewTabs({
 }) {
   return (
     <Tabs value={value} className="issue-view-tabs">
-      <TabsList aria-label="Issue views" activateOnFocus={false}>
+      <TabsList aria-label={m.issues_views_label()} activateOnFocus={false}>
         {views.map(({ value: view, label, icon: Icon }) => (
           <TabsTrigger
             key={view}
@@ -31,7 +32,7 @@ export function IssueViewTabs({
             render={renderLink(view)}
           >
             <Icon aria-hidden="true" />
-            {label}
+            {label()}
           </TabsTrigger>
         ))}
       </TabsList>

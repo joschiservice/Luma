@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import { z } from 'zod';
 
 /** Presents record-read failures without exposing provider messages or suggesting credential entry. */
@@ -7,12 +8,9 @@ export function recordError(
 ): string {
   const result = z.object({ status: z.number() }).safeParse(error);
   if (result.success) {
-    if (result.data.status === 404)
-      return 'This record or connection is unavailable. Older orders may require additional Shopify history access.';
-    if (result.data.status === 403)
-      return 'This connection does not have access to this record. Check its permissions in Apps & connections.';
-    if (result.data.status === 422)
-      return 'Choose the matching record type and enter its Shopify ID.';
+    if (result.data.status === 404) return m.shopify_record_error_not_found();
+    if (result.data.status === 403) return m.shopify_record_error_forbidden();
+    if (result.data.status === 422) return m.shopify_record_error_invalid();
   }
 
   return fallback(error);

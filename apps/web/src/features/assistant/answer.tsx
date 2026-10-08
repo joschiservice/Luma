@@ -3,6 +3,13 @@ import type {
   AssistantCitation,
   AssistantStep,
 } from '@luma/api-contract';
+import {
+  formatDate,
+  formatDateTime,
+  formatList,
+  formatTime,
+} from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
 import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { WorkspaceTimezone } from '@luma/ui/components/primitives/workspace-date';
 import { Link } from '@tanstack/react-router';
@@ -99,22 +106,8 @@ function RecordLink({
 /** "11:02" for today and "5 Oct" before, in the workspace timezone, with the full time as a title. */
 function useReadTime() {
   const timeZone = useContext(WorkspaceTimezone);
+  // ISO calendar day for comparing dates, not for display.
   const day = new Intl.DateTimeFormat('en-CA', { timeZone });
-  const time = new Intl.DateTimeFormat('en-GB', {
-    timeZone,
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-  const date = new Intl.DateTimeFormat('en-GB', {
-    timeZone,
-    day: 'numeric',
-    month: 'short',
-  });
-  const full = new Intl.DateTimeFormat('en-GB', {
-    timeZone,
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  });
 
   return (value: string) => {
     const at = new Date(value);
@@ -122,15 +115,18 @@ function useReadTime() {
     return {
       short:
         day.format(at) === day.format(new Date())
-          ? time.format(at)
-          : date.format(at),
-      full: `${full.format(at)} ${timeZone}`,
+          ? formatTime(at, { timeZone, hour: '2-digit', minute: '2-digit' })
+          : formatDate(at, { timeZone, day: 'numeric', month: 'short' }),
+      full: `${formatDateTime(at, { timeZone, dateStyle: 'medium', timeStyle: 'short' })} ${timeZone}`,
     };
   };
 }
 
 function sourceLine(citation: AssistantCitation) {
-  return citation.sources.map((source) => source.label).join(', ');
+  return formatList(
+    citation.sources.map((source) => source.label),
+    { type: 'unit', style: 'short' },
+  );
 }
 
 function InlineContent({
@@ -160,7 +156,10 @@ function InlineContent({
           >
             <span aria-hidden="true">{part.number}</span>
             <span className="sr-only">
-              Source {part.number}: {citationTitle(part.citation)}
+              {m.assistant_citation_source({
+                number: part.number,
+                title: citationTitle(part.citation),
+              })}
             </span>
           </RecordLink>
         );
@@ -238,8 +237,8 @@ export function AnswerSteps({ steps }: { steps: AssistantStep[] }) {
             <span>
               {step.summary}
               <span className="assistant-step-meta">
-                {stepOutcomeLabel[step.outcome] ??
-                  (step.records === 1 ? '1 record' : `${step.records} records`)}
+                {stepOutcomeLabel[step.outcome]?.() ??
+                  m.assistant_steps_records({ count: step.records })}
               </span>
             </span>
           </li>
@@ -275,8 +274,8 @@ export function AnswerContent({
         />
       </div>
       {answer.citations.length ? (
-        <section className="assistant-sources" aria-label="Sources">
-          <h3>Sources</h3>
+        <section className="assistant-sources" aria-label={m.common_sources()}>
+          <h3>{m.common_sources()}</h3>
           <ol>
             {answer.citations.map((citation, index) => {
               const read = citation.observedAt
@@ -308,12 +307,22 @@ export function AnswerContent({
                       <time
                         className="assistant-source-time"
                         dateTime={citation.observedAt ?? undefined}
-                        title={`${citation.kind === 'issue' ? 'Last activity' : 'Read from source'} ${read.full}`}
+                        title={
+                          citation.kind === 'issue'
+                            ? m.assistant_source_issue_time({ time: read.full })
+                            : m.assistant_source_read_time({ time: read.full })
+                        }
                       >
+                        <span aria-hidden="true">{read.short}</span>
                         <span className="sr-only">
-                          {citation.kind === 'issue' ? 'Updated' : 'Read'}{' '}
+                          {citation.kind === 'issue'
+                            ? m.assistant_source_issue_time_short({
+                                time: read.short,
+                              })
+                            : m.assistant_source_read_time_short({
+                                time: read.short,
+                              })}
                         </span>
-                        {read.short}
                       </time>
                     ) : null}
                   </RecordLink>

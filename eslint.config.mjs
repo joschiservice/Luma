@@ -65,6 +65,13 @@ export default tseslint.config(
     plugins: { ui },
     rules: { 'ui/primitive-appearance': 'error' },
   },
+  {
+    // Server rendering shares module scope across requests in different languages.
+    files: ['apps/web/src/**/*.{ts,tsx}', 'packages/**/src/**/*.{ts,tsx}'],
+    ignores: ['**/*.test.*', '**/*.stories.*', '**/storybook-*'],
+    plugins: { ui },
+    rules: { 'ui/module-scope-message': 'error' },
+  },
   prettier,
   {
     files: ['**/*.{ts,tsx,js,mjs}'],

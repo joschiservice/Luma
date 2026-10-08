@@ -61,6 +61,20 @@ import type {
   ReplenishmentStore,
 } from './replenishment.js';
 
+/** Records replenishment workflows act on, as offered to workflow authors. */
+export const replenishmentSubjects = [
+  {
+    kind: 'inventory_position',
+    label: 'Stock position',
+    description: 'A linked SKU at one inventory location.',
+  },
+  {
+    kind: 'purchase_order',
+    label: 'Purchase order',
+    description: 'A purchase order recorded in Procurement.',
+  },
+];
+
 export interface ReplenishmentTransport {
   /** Starts the committed run with a stable Temporal workflow ID. */
   start(
@@ -1559,20 +1573,10 @@ export function createReplenishmentService(deps: {
     const unavailable = { executable: false, reason: outsideBuiltIn };
 
     return {
-      subjects: [
-        {
-          kind: 'inventory_position',
-          label: 'Stock position',
-          description: 'A mapped SKU at one inventory location.',
-          ...unavailable,
-        },
-        {
-          kind: 'purchase_order',
-          label: 'Purchase order',
-          description: 'A purchase order recorded in Procurement.',
-          ...unavailable,
-        },
-      ],
+      subjects: replenishmentSubjects.map((subject) => ({
+        ...subject,
+        ...unavailable,
+      })),
       reads: reads.map((step) => ({
         source: step.source,
         label: readLabels[step.source]?.[0] ?? step.source,

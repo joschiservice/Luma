@@ -6,12 +6,12 @@ Each role grants a set of these permissions. Owner and Admin also hold every per
 
 ## Workspace
 
-Shared workspace details and approval policy.
+Workspace details and approval rules.
 
 | Permission | Key | Description | Sensitive | Owner | Admin | Member |
 | --- | --- | --- | --- | --- | --- | --- |
-| Edit workspace settings | `workspace.settings.manage` | Change the workspace name and display timezone. |  | Yes | Yes |  |
-| Manage approval policy | `workspace.approval_policy.manage` | Decide whether every permitted change needs independent approval. | Yes | Yes | Yes |  |
+| Edit workspace settings | `workspace.settings.manage` | Change the workspace name and display time zone. |  | Yes | Yes |  |
+| Manage approval rules | `workspace.approval_policy.manage` | Decide whether every allowed change needs approval from a second person. | Yes | Yes | Yes |  |
 
 ## Team and access
 
@@ -19,34 +19,34 @@ Who belongs to the workspace and what each role can do.
 
 | Permission | Key | Description | Sensitive | Owner | Admin | Member |
 | --- | --- | --- | --- | --- | --- | --- |
-| Manage team members | `members.manage` | Invite people, change their role and remove their access. People can only assign roles whose permissions they hold. | Yes | Yes | Yes |  |
-| Manage roles | `roles.manage` | Create, edit and archive custom roles, and read their change history. People can only grant permissions they hold. | Yes | Yes | Yes |  |
+| Manage team members | `members.manage` | Invite people, change their role, and remove their access. People can only assign roles whose permissions they hold. | Yes | Yes | Yes |  |
+| Manage roles | `roles.manage` | Create, edit, and archive custom roles, and see their change history. People can only grant permissions they hold. | Yes | Yes | Yes |  |
 
 ## Commerce records
 
-Imported orders, stock, products, customers and returns.
+Imported orders, stock, products, customers, and returns.
 
 | Permission | Key | Description | Sensitive | Owner | Admin | Member |
 | --- | --- | --- | --- | --- | --- | --- |
-| View orders | `orders.read` | See orders, their lines, payments and provider links. |  | Yes | Yes | Yes |
-| View fulfillment | `fulfillment.read` | See shipments, carriers and fulfillment progress. |  | Yes | Yes | Yes |
-| View inventory | `inventory.read` | See stock positions, locations and stock history. |  | Yes | Yes | Yes |
+| View orders | `orders.read` | See orders, their lines, payments, and links to the source systems. |  | Yes | Yes | Yes |
+| View fulfillment | `fulfillment.read` | See shipments, carriers, and fulfillment progress. |  | Yes | Yes | Yes |
+| View inventory | `inventory.read` | See stock positions, locations, and stock history. |  | Yes | Yes | Yes |
 | View products | `products.read` | See the product catalog and SKU comparisons. |  | Yes | Yes | Yes |
-| View customers | `customers.read` | See customer profiles, including names, email addresses and postal addresses. | Yes | Yes | Yes | Yes |
-| View returns | `returns.read` | See returns, refunds and money returned. |  | Yes | Yes | Yes |
-| View insights | `insights.read` | See operational metrics, rule charts and import coverage. |  | Yes | Yes | Yes |
+| View customers | `customers.read` | See customer profiles, including names, email addresses, and postal addresses. | Yes | Yes | Yes | Yes |
+| View returns | `returns.read` | See returns, refunds, and money returned. |  | Yes | Yes | Yes |
+| View insights | `insights.read` | See operational metrics, rule charts, and import coverage. |  | Yes | Yes | Yes |
 
 ## Issues and decisions
 
-Operational issues, their evidence and the decisions they need.
+Operational issues, their evidence, and the decisions they need.
 
 | Permission | Key | Description | Sensitive | Owner | Admin | Member |
 | --- | --- | --- | --- | --- | --- | --- |
-| View issues | `issues.read` | See issues, their evidence, diagnoses and proposed actions. |  | Yes | Yes | Yes |
-| Work on issues | `issues.manage` | Verify, escalate and resolve issues, refresh their evidence and record what was learned. |  | Yes | Yes |  |
+| View issues | `issues.read` | See issues, their evidence, diagnoses, and proposed changes. |  | Yes | Yes | Yes |
+| Work on issues | `issues.manage` | Check, escalate, and resolve issues, refresh their evidence, and record what was learned. |  | Yes | Yes |  |
 | Take decisions | `decisions.self_assign` | Take unassigned decisions in Needs you and release your own. |  | Yes | Yes | Yes |
 | Assign decisions | `decisions.assign` | Assign or reassign any decision to a teammate. |  | Yes | Yes |  |
-| Approve or reject changes | `decisions.respond` | Respond to approval requests. The approver must differ from the person who proposed the change. | Yes | Yes | Yes |  |
+| Approve or reject changes | `decisions.respond` | Respond to approval requests. The approver must be someone other than the person who proposed the change. | Yes | Yes | Yes |  |
 
 ## Actions
 
@@ -54,41 +54,41 @@ Changes Luma makes in connected systems.
 
 | Permission | Key | Description | Sensitive | Owner | Admin | Member |
 | --- | --- | --- | --- | --- | --- | --- |
-| Propose actions | `actions.propose` | Ask Luma to prepare changes in connected systems, subject to policy and approval. | Yes | Yes | Yes |  |
-| Run actions | `actions.execute` | Run permitted or approved changes in connected systems. Some actions need their own app permission instead. | Yes | Yes | Yes |  |
+| Propose changes | `actions.propose` | Ask Luma to prepare changes in connected systems. Approval rules decide whether someone must approve them. | Yes | Yes | Yes |  |
+| Apply changes | `actions.execute` | Apply allowed or approved changes in connected systems. Some changes need their own app permission instead. | Yes | Yes | Yes |  |
 
 ## Workflows
 
-Automated processes, their drafts, versions and triggers.
+Workflows, their drafts, versions, and triggers.
 
 | Permission | Key | Description | Sensitive | Owner | Admin | Member |
 | --- | --- | --- | --- | --- | --- | --- |
-| View workflows | `workflows.read` | See workflows, versions, runs and their evidence. |  | Yes | Yes | Yes |
-| Author workflows | `workflows.author` | Create and edit drafts, generate drafts with Luma and run draft tests. |  | Yes | Yes |  |
+| View workflows | `workflows.read` | See workflows, their versions, runs, and evidence. |  | Yes | Yes | Yes |
+| Edit workflows | `workflows.author` | Create and edit drafts, generate drafts with Luma, and test drafts. |  | Yes | Yes |  |
 | Publish and enable workflows | `workflows.publish` | Publish workflow versions and turn workflows on or off. | Yes | Yes | Yes |  |
-| Manage workflow triggers | `workflows.triggers.manage` | Create, change and pause schedules and event triggers. | Yes | Yes | Yes |  |
-| Activate playbooks | `playbooks.activate` | Activate resolution playbooks and review their shadow-mode results. | Yes | Yes | Yes |  |
+| Manage workflow triggers | `workflows.triggers.manage` | Create, change, and pause schedules and event triggers. | Yes | Yes | Yes |  |
+| Test and turn on issue workflows | `playbooks.activate` | Run Workflow tests on issues, review their results, and turn on issue workflows for selected records. | Yes | Yes | Yes |  |
 
 ## Procurement
 
-Suppliers, purchase orders and replenishment.
+Suppliers, purchase orders, and replenishment.
 
 | Permission | Key | Description | Sensitive | Owner | Admin | Member |
 | --- | --- | --- | --- | --- | --- | --- |
-| View procurement | `procurement.read` | See suppliers, purchase orders, commitments and replenishment. |  | Yes | Yes | Yes |
-| Manage procurement | `procurement.manage` | Edit suppliers and purchase orders, review commitments and configure replenishment. | Yes | Yes | Yes |  |
+| View procurement | `procurement.read` | See suppliers, purchase orders, supplier commitments, and replenishment. |  | Yes | Yes | Yes |
+| Manage procurement | `procurement.manage` | Edit suppliers and purchase orders, review supplier commitments, and set up replenishment. | Yes | Yes | Yes |  |
 
 ## Connections and apps
 
-Connected systems, imports and installed apps.
+Connected systems, imports, and installed apps.
 
 | Permission | Key | Description | Sensitive | Owner | Admin | Member |
 | --- | --- | --- | --- | --- | --- | --- |
-| Manage connections | `connections.manage` | Connect, reauthorize and disconnect systems. | Yes | Yes | Yes |  |
-| Manage imports | `sync.manage` | Start, pause and repair imports, and review links between imported records. |  | Yes | Yes |  |
-| Manage apps | `apps.manage` | Install, upgrade and uninstall apps, and grant the access they request. | Yes | Yes | Yes |  |
+| Manage connections | `connections.manage` | Connect, reconnect, and disconnect systems. | Yes | Yes | Yes |  |
+| Manage imports | `sync.manage` | Start, pause, and fix imports, and review links between imported records. |  | Yes | Yes |  |
+| Manage apps | `apps.manage` | Install, update, and uninstall apps, and grant the access they request. | Yes | Yes | Yes |  |
 
-## Assistant
+## Ask Luma
 
 Ask Luma questions about workspace data.
 
@@ -103,4 +103,4 @@ The record of what people and Luma did.
 | Permission | Key | Description | Sensitive | Owner | Admin | Member |
 | --- | --- | --- | --- | --- | --- | --- |
 | View activity | `activity.read` | See the workspace activity log. |  | Yes | Yes | Yes |
-| View restricted activity | `activity.read_restricted` | See access changes, actor details and restricted activity entries. | Yes | Yes | Yes |  |
+| View restricted activity | `activity.read_restricted` | See access changes, who made each change, and other restricted activity. | Yes | Yes | Yes |  |

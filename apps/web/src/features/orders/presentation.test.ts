@@ -86,6 +86,9 @@ describe('order presentation', () => {
     expect(formatMoney({ amount: 'n/a', currency: 'EUR' }, 'en-US')).toBe(
       'n/a EUR',
     );
+    expect(formatMoney({ amount: '1234.5', currency: 'EUR' })).toBe(
+      '€1,234.50',
+    );
     expect(formatMoney(null)).toBeNull();
   });
 
@@ -126,11 +129,11 @@ describe('order presentation', () => {
         (value) => value.slice(0, 10),
       ),
     ).toEqual([
-      'Shopify store reports the order as open, and it is paid.',
+      'Shopify store reports the order as open. The order is paid.',
       '2 units still to fulfill across 1 line.',
-      'Past its source deadline of 2026-09-19.',
+      'Past the deadline of 2026-09-19 set in the source.',
       '1 issue needs you.',
-      'Payment differs: Shopify store paid; JTL-Wawi payment pending.',
+      'Payment differs between sources: “Paid” in Shopify store and “Payment pending” in JTL-Wawi.',
     ]);
   });
 
@@ -152,7 +155,7 @@ describe('order presentation', () => {
       (value) => value,
     );
     expect(summary[1]).toBe(
-      'Remaining work is unknown for 1 line because Shopify store does not report cancelled quantities. 1 of 3 units are fulfilled.',
+      'Luma can’t tell how much remains on 1 line because Shopify store doesn’t report canceled quantities. 1 of 3 units are fulfilled.',
     );
   });
 });

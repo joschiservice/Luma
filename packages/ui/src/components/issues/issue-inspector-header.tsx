@@ -2,7 +2,7 @@ import type { CaseSummary } from '@luma/api-contract';
 import type { ReactNode } from 'react';
 
 import { StatePill } from '../primitives/state';
-import { issueStatus } from './case-presentation';
+import { issueStatus, severityFullLabel } from './case-presentation';
 import { IssuePanelClose } from './issue-panel-close';
 import { IssuePanelHeading } from './issue-panel-heading';
 
@@ -34,7 +34,7 @@ export function IssueInspectorHeader({
               {issueStatus(item).label}
             </StatePill>
             <span className="issue-severity" data-severity={item.severity}>
-              {item.severity === 'high' ? 'High' : 'Medium'} severity
+              {severityFullLabel(item.severity)}
             </span>
           </div>
         ) : null}

@@ -46,9 +46,11 @@ it('shows only the requested and granted intersection as permitted', () => {
   expect(html.match(/>Permitted</g)).toHaveLength(3);
   const readOnly = render({ ...fixture, permissions: ['orders.read'] });
   expect(readOnly).toContain('Read-only access');
-  expect(readOnly).not.toContain('Correct shipping method');
-  expect(html).toContain('Credentials and requested permissions validated.');
-  expect(html).not.toContain('View data sync');
+  expect(readOnly).not.toContain('Correct shipping methods');
+  expect(html).toContain(
+    'Luma confirmed the credentials and the requested permissions.',
+  );
+  expect(html).not.toContain('View Data sync');
   expect(html).not.toContain(fixture.updatedAt);
 });
 
@@ -56,7 +58,7 @@ it.each(['pending', 'degraded', 'disconnected', 'revoked'] as const)(
   'never enables capabilities in the %s state',
   (status) => {
     const html = render({ ...fixture, status });
-    expect(html).toContain('No capabilities enabled');
+    expect(html).toContain('No access enabled');
     expect(html).not.toContain('>Permitted<');
     if (status === 'disconnected') expect(html).not.toContain('<button');
   },

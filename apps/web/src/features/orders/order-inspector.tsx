@@ -1,4 +1,6 @@
 import type { OrderDetail } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import { issueKind } from '@luma/ui/components/issues/case-presentation';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -14,6 +16,12 @@ import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { Link } from '@tanstack/react-router';
 import { ArrowRight, Copy } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
+
+import {
+  connectionStatusLabel,
+  issueStateLabel,
+  runStateLabel,
+} from './presentation';
 
 function InspectorCard({
   title,
@@ -45,7 +53,7 @@ function OrderActions({
   const needsYou = detail.issues.find((issue) => issue.needsYou);
 
   return (
-    <Card as="section" aria-label="Actions">
+    <Card as="section" aria-label={m.common_actions()}>
       <CardContent className="order-actions">
         {needsYou ? (
           <Link
@@ -54,7 +62,8 @@ function OrderActions({
             params={{ organizationId, exceptionId: needsYou.id }}
             search={{ view: 'needs_you' }}
           >
-            Review issue <ArrowRight size={14} aria-hidden="true" />
+            {m.orders_inspector_review_issue()}{' '}
+            <ArrowRight size={14} aria-hidden="true" />
           </Link>
         ) : null}
         <Link
@@ -62,7 +71,8 @@ function OrderActions({
           params={{ organizationId, kind: 'order', recordId: detail.order.id }}
           search={{ from: here }}
         >
-          Open in Records <ArrowRight size={14} aria-hidden="true" />
+          {m.orders_inspector_open_records()}{' '}
+          <ArrowRight size={14} aria-hidden="true" />
         </Link>
         <Button
           variant="outline"
@@ -73,10 +83,10 @@ function OrderActions({
               .then(() => setCopied(true));
           }}
         >
-          <Copy aria-hidden="true" /> Copy link
+          <Copy aria-hidden="true" /> {m.orders_inspector_copy_link()}
         </Button>
         <span role="status" className="order-note">
-          {copied ? 'Link copied.' : ''}
+          {copied ? m.orders_inspector_link_copied() : ''}
         </span>
       </CardContent>
     </Card>
@@ -90,7 +100,8 @@ function OrderIssues({
   issues: OrderDetail['issues'];
   organizationId: string;
 }) {
-  if (!issues.length) return <p className="order-note">No linked issues.</p>;
+  if (!issues.length)
+    return <p className="order-note">{m.orders_inspector_no_issues()}</p>;
 
   return (
     <ul className="order-list">
@@ -99,19 +110,17 @@ function OrderIssues({
           <span className="orders-cell-stack">
             <strong>{issueKind(issue).label}</strong>
             <small>
-              {issue.state === 'resolved'
-                ? 'Resolved'
-                : issue.state.replaceAll('_', ' ')}
+              {issueStateLabel(issue.state)}
               {' · '}
               {issue.relationship === 'sku'
-                ? 'Affects an ordered item'
+                ? m.orders_inspector_issue_sku()
                 : issue.relationship === 'fulfillment'
-                  ? 'On a fulfillment'
-                  : 'On this order'}
+                  ? m.orders_inspector_issue_fulfillment()
+                  : m.orders_inspector_issue_order()}
             </small>
           </span>
           {issue.needsYou ? (
-            <StatePill state="attention">Needs you</StatePill>
+            <StatePill state="attention">{m.orders_flag_needs_you()}</StatePill>
           ) : null}
           <Link
             to="/app/$organizationId/exceptions/$exceptionId"
@@ -124,9 +133,11 @@ function OrderIssues({
                     ? 'needs_you'
                     : 'active',
             }}
-            aria-label={`Open ${issueKind(issue).label} issue`}
+            aria-label={m.orders_inspector_open_issue({
+              issue: issueKind(issue).label,
+            })}
           >
-            Open
+            {m.common_open()}
           </Link>
         </li>
       ))}
@@ -142,11 +153,7 @@ function WorkflowRuns({
   organizationId: string;
 }) {
   if (!runs.length)
-    return (
-      <p className="order-note">
-        No workflow has run for this order or its issues.
-      </p>
-    );
+    return <p className="order-note">{m.orders_inspector_no_runs()}</p>;
 
   return (
     <ul className="order-list">
@@ -155,7 +162,9 @@ function WorkflowRuns({
           <span className="orders-cell-stack">
             <strong>{run.name ?? run.definitionId}</strong>
             <small>
-              {run.state.replaceAll('_', ' ')} · version {run.version}
+              {runStateLabel(run.state)}
+              {' · '}
+              {m.orders_inspector_run_version({ version: run.version })}
               {run.createdAt ? (
                 <>
                   {' · '}
@@ -167,9 +176,11 @@ function WorkflowRuns({
           <Link
             to="/app/$organizationId/workflows/$definitionId"
             params={{ organizationId, definitionId: run.definitionId }}
-            aria-label={`Open workflow ${run.name ?? run.definitionId}`}
+            aria-label={m.orders_inspector_open_workflow({
+              workflow: run.name ?? run.definitionId,
+            })}
           >
-            Open
+            {m.common_open()}
           </Link>
         </li>
       ))}
@@ -184,29 +195,37 @@ function OrderSources({ sources }: { sources: OrderDetail['sources'] }) {
         <li key={source.connectionId}>
           <span className="orders-cell-stack">
             <strong>
-              {source.label}
-              {source.selected ? ' · shown' : ''}
+              {source.selected
+                ? m.orders_source_shown({ source: source.label })
+                : source.label}
             </strong>
-            <small>Source ID {source.externalId ?? 'not mapped'}</small>
+            <small>
+              {source.externalId
+                ? m.orders_inspector_source_id({ id: source.externalId })
+                : m.orders_inspector_source_id_missing()}
+            </small>
             <small>
               {source.mappingMethod
                 ? source.mappingMethod.startsWith('Imported')
-                  ? 'Imported from this source'
+                  ? m.orders_inspector_link_imported()
                   : source.mappingMethod.startsWith('Linked')
-                    ? 'Linked by a person'
+                    ? m.orders_inspector_link_linked()
                     : source.mappingMethod.startsWith('Unlinked')
-                      ? 'Unlinked by a person'
-                      : `Link confirmed: ${source.mappingMethod.replaceAll('-', ' ')}`
-                : 'Link method not recorded'}
+                      ? m.orders_inspector_link_unlinked()
+                      : m.orders_inspector_link_confirmed({
+                          method: source.mappingMethod.replaceAll('-', ' '),
+                        })
+                : m.orders_inspector_link_unrecorded()}
             </small>
             <small>
-              Updated{' '}
-              {source.sourceUpdatedAt ? (
-                <WorkspaceDate value={source.sourceUpdatedAt} />
-              ) : (
-                'time not reported'
-              )}{' '}
-              · Read <WorkspaceDate value={source.observedAt} />
+              {source.sourceUpdatedAt
+                ? rich(m.orders_inspector_source_times, {
+                    updated: <WorkspaceDate value={source.sourceUpdatedAt} />,
+                    read: <WorkspaceDate value={source.observedAt} />,
+                  })
+                : rich(m.orders_inspector_source_times_unreported, {
+                    read: <WorkspaceDate value={source.observedAt} />,
+                  })}
             </small>
           </span>
           <Badge
@@ -216,7 +235,9 @@ function OrderSources({ sources }: { sources: OrderDetail['sources'] }) {
                 : 'neutral'
             }
           >
-            {source.deleted ? 'Removed at source' : source.connectionStatus}
+            {source.deleted
+              ? m.orders_inspector_removed_at_source()
+              : connectionStatusLabel(source.connectionStatus)}
           </Badge>
         </li>
       ))}
@@ -238,26 +259,27 @@ export function OrderInspector({
   here: string;
 }) {
   return (
-    <aside className="order-inspector" aria-label="Order details">
+    <aside className="order-inspector" aria-label={m.orders_inspector_label()}>
       <OrderActions
         detail={detail}
         organizationId={organizationId}
         here={here}
       />
-      <InspectorCard title="Issues">
+      <InspectorCard title={m.orders_inspector_issues()}>
         <OrderIssues issues={detail.issues} organizationId={organizationId} />
       </InspectorCard>
-      <InspectorCard title="Workflow runs">
+      <InspectorCard title={m.orders_inspector_runs()}>
         <WorkflowRuns runs={detail.workflows} organizationId={organizationId} />
       </InspectorCard>
-      <InspectorCard title="Sources">
+      <InspectorCard title={m.orders_inspector_sources()}>
         <OrderSources sources={detail.sources} />
       </InspectorCard>
       <Disclosure>
-        <summary>Luma identity</summary>
+        <summary>{m.orders_inspector_identity_title()}</summary>
         <p className="order-note">
-          Luma ID <code>{detail.order.id}</code>. Sources are linked only
-          through confirmed source IDs, never by matching numbers or SKU text.
+          {rich(m.orders_inspector_identity_body, {
+            id: <code>{detail.order.id}</code>,
+          })}
         </p>
       </Disclosure>
     </aside>

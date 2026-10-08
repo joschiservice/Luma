@@ -5,32 +5,35 @@ import type {
   CustomerSource,
   CustomerState,
 } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 
+import { localizedLabels } from '../orders/presentation';
 import { sourceId } from '../sync/presentation';
 
 /** Shopify customer states describe the online store account, not whether someone buys. */
-export const stateLabels: Record<CustomerState, string> = {
-  enabled: 'Has account',
-  disabled: 'No account',
-  invited: 'Invited',
-  declined: 'Declined invite',
-  unknown: 'Not reported',
-};
+export const stateLabels: Record<CustomerState, string> = localizedLabels({
+  enabled: m.customers_state_enabled,
+  disabled: m.customers_state_disabled,
+  invited: m.customers_state_invited,
+  declined: m.customers_state_declined,
+  unknown: m.customers_state_unknown,
+});
 
-export const stateDescriptions: Record<CustomerState, string> = {
-  enabled: 'The customer activated an account in the store.',
-  disabled:
-    'The customer has no store account, for example after a guest checkout.',
-  invited: 'The store invited the customer to create an account.',
-  declined: 'The customer declined the store’s account invitation.',
-  unknown: 'The source did not report an account state.',
-};
+export const stateDescriptions: Record<CustomerState, string> = localizedLabels(
+  {
+    enabled: m.customers_state_enabled_description,
+    disabled: m.customers_state_disabled_description,
+    invited: m.customers_state_invited_description,
+    declined: m.customers_state_declined_description,
+    unknown: m.customers_state_unknown_description,
+  },
+);
 
-export const sortLabels: Record<CustomerSort, string> = {
-  created: 'Customer since',
-  orders: 'Orders',
-  name: 'Name',
-};
+export const sortLabels: Record<CustomerSort, string> = localizedLabels({
+  created: m.customers_sort_created,
+  orders: m.customers_sort_orders,
+  name: m.customers_sort_name,
+});
 
 /**
  * Names a customer by what the source shares: name, then email, then the short source ID.
@@ -42,7 +45,7 @@ export function customerName(
   return (
     item.displayName?.trim() ||
     item.email ||
-    `Customer ${sourceId(item.externalId)}`
+    m.customers_name_fallback({ id: sourceId(item.externalId) })
   );
 }
 
@@ -67,9 +70,9 @@ export function addressLines(address: CustomerDetail['address']) {
 export function accessMessage(source: CustomerSource) {
   if (source.access === 'granted') return null;
   if (source.access === 'not_granted')
-    return `${source.label} has not granted access to customers. Reconnect it to see its customers here.`;
+    return m.customers_access_not_granted({ source: source.label });
 
   return source.system === 'shopify'
-    ? `${source.label} was connected before customers were available. Reconnect it to share customers with Luma.`
+    ? m.customers_access_reconnect_shopify({ source: source.label })
     : null;
 }

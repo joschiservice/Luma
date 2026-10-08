@@ -1,9 +1,21 @@
-import type { CaseDetail, Diagnosis } from '@luma/api-contract';
+import type {
+  CaseDetail,
+  CaseEvidencePage,
+  Diagnosis,
+} from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 
 import { Disclosure } from '../primitives/disclosure';
+import { WorkspaceDate } from '../primitives/workspace-date';
+import { freshnessLabel, quantityLabel, unitLabel } from './case-presentation';
 import { IssueCollection } from './issue-collection';
 
 type Fact = Diagnosis['facts'][number];
+
+type Evidence = Diagnosis['provenance']['evidence'][number] & {
+  completeness?: CaseEvidencePage['items'][number]['completeness'];
+};
 
 function sourceLabel(provider: string | null | undefined) {
   if (!provider) return null;
@@ -17,10 +29,69 @@ function sourceLabel(provider: string | null | undefined) {
   return names[provider.toLowerCase()] ?? provider;
 }
 
-function numberLabel(value: string) {
-  return value.includes('.')
-    ? value.replace(/0+$/, '').replace(/\.$/, '')
-    : value;
+/** Names where a piece of evidence came from, such as “Shopify · Inventory”, or Luma’s own record. */
+export function evidenceSourceLabel(entry: Pick<Evidence, 'source'>) {
+  return entry.source
+    ? `${entry.source.provider} · ${entry.source.resource}`
+    : m.issues_evidence_luma_record();
+}
+
+const completeness = {
+  complete: m.issues_evidence_complete,
+  incomplete: m.issues_evidence_incomplete,
+  unknown: m.common_unknown,
+} satisfies Record<NonNullable<Evidence['completeness']>, () => string>;
+
+/** Shows one piece of evidence: its source, when Luma read it and how to find it in the source system. */
+export function EvidenceRecord({ entry }: { entry: Evidence }) {
+  return (
+    <Disclosure className="case-evidence">
+      <summary>
+        {evidenceSourceLabel(entry)}{' '}
+        <span>
+          {rich(m.issues_evidence_read_at, {
+            time: <WorkspaceDate value={entry.observedAt} />,
+          })}
+        </span>
+      </summary>
+      <dl>
+        <dt>{m.issues_evidence_id()}</dt>
+        <dd>
+          <code>{entry.id}</code>
+        </dd>
+        <dt>{m.issues_evidence_read()}</dt>
+        <dd>
+          <WorkspaceDate value={entry.observedAt} />
+        </dd>
+        <dt>{m.issues_evidence_source_updated()}</dt>
+        <dd>
+          {entry.sourceUpdatedAt ? (
+            <WorkspaceDate value={entry.sourceUpdatedAt} />
+          ) : (
+            m.common_unknown()
+          )}
+        </dd>
+        {entry.completeness ? (
+          <>
+            <dt>{m.issues_evidence_completeness()}</dt>
+            <dd>{completeness[entry.completeness]()}</dd>
+          </>
+        ) : null}
+        {entry.source ? (
+          <>
+            <dt>{m.issues_evidence_source_record()}</dt>
+            <dd>{entry.source.externalId}</dd>
+            <dt>{m.issues_evidence_source_scope()}</dt>
+            <dd>{entry.source.scopeKey || m.issues_not_specified()}</dd>
+          </>
+        ) : null}
+        <dt>{m.issues_evidence_technical_version()}</dt>
+        <dd>
+          {entry.adapterVersion} · {entry.schemaVersion}
+        </dd>
+      </dl>
+    </Disclosure>
+  );
 }
 
 function Sources({
@@ -35,9 +106,7 @@ function Sources({
 
   return (
     <Disclosure className="finding-sources">
-      <summary>
-        {ids.length} {ids.length === 1 ? 'source' : 'sources'}
-      </summary>
+      <summary>{m.issues_findings_source_count({ count: ids.length })}</summary>
       <ul>
         {ids.map((id) => {
           const evidence = diagnosis.provenance.evidence.find(
@@ -46,9 +115,9 @@ function Sources({
 
           return (
             <li key={id}>
-              {evidence?.source
-                ? `${evidence.source.provider} · ${evidence.source.resource}`
-                : 'Evidence reference'}
+              {evidence
+                ? evidenceSourceLabel(evidence)
+                : m.issues_findings_evidence_reference()}
               <code>{id}</code>
             </li>
           );
@@ -80,7 +149,7 @@ export function IssueFindings({
   unconfirmed?: boolean;
 }) {
   const diagnosis = item.diagnosis;
-  if (!diagnosis) return <p>No established findings yet.</p>;
+  if (!diagnosis) return <p>{m.issues_findings_none()}</p>;
   const quantities = diagnosis.facts.find(
     (fact) => fact.code === 'reported_availability',
   );
@@ -99,7 +168,6 @@ export function IssueFindings({
   );
   const comparable =
     match && delta && match[2] === match[4] && match[2] === delta[2];
-  const unit = (value: string) => (value === 'each' ? 'units' : value);
   const facts = diagnosis.facts.filter(
     (fact) =>
       !match || (fact !== quantities && (!comparable || fact !== difference)),
@@ -117,38 +185,40 @@ export function IssueFindings({
       {historical || unconfirmed ? (
         <p className="case-caption">
           {unconfirmed
-            ? 'Current state is unconfirmed. These are the last recorded findings.'
-            : 'These findings describe historical observations, not current conditions.'}
+            ? m.issues_findings_unconfirmed()
+            : m.issues_findings_historical()}
         </p>
       ) : null}
       {match ? (
         <div className="issue-findings-comparison">
-          <h3>Observed availability</h3>
+          <h3>{m.issues_findings_reported_availability()}</h3>
           <dl>
             <div>
               <dt>
                 {sourceLabel(item.inventorySources?.left) ??
-                  'Source not identified'}
+                  m.issues_findings_source_unknown()}
               </dt>
               <dd>
-                {numberLabel(match[1]!)} <small>{unit(match[2]!)}</small>
+                {quantityLabel(match[1]!)}{' '}
+                <small>{unitLabel(match[2]!, match[1]!)}</small>
               </dd>
             </div>
             <div>
               <dt>
                 {sourceLabel(item.inventorySources?.right) ??
-                  'Source not identified'}
+                  m.issues_findings_source_unknown()}
               </dt>
               <dd>
-                {numberLabel(match[3]!)} <small>{unit(match[4]!)}</small>
+                {quantityLabel(match[3]!)}{' '}
+                <small>{unitLabel(match[4]!, match[3]!)}</small>
               </dd>
             </div>
             {comparable ? (
               <div>
-                <dt>Difference</dt>
+                <dt>{m.issues_findings_difference()}</dt>
                 <dd>
-                  {numberLabel(delta[1]!.replace(/^-/, ''))}{' '}
-                  <small>{unit(delta[2]!)}</small>
+                  {quantityLabel(delta[1]!.replace(/^-/, ''))}{' '}
+                  <small>{unitLabel(delta[2]!, delta[1]!)}</small>
                 </dd>
               </div>
             ) : null}
@@ -164,44 +234,50 @@ export function IssueFindings({
       ) : null}
       {facts.length ? (
         <div className="issue-findings-block">
-          <h3>Confirmed facts</h3>
+          <h3>{m.issues_findings_confirmed_facts()}</h3>
           <Facts facts={facts} diagnosis={diagnosis} />
         </div>
       ) : !match ? (
-        <p>No established findings yet.</p>
+        <p>{m.issues_findings_none()}</p>
       ) : null}
       {diagnosis.impact.observed.length ? (
         <div className="issue-findings-block">
-          <h3>Observed impact</h3>
+          <h3>{m.issues_findings_confirmed_impact()}</h3>
           <Facts facts={diagnosis.impact.observed} diagnosis={diagnosis} />
         </div>
       ) : null}
       {diagnosis.constraints.length || diagnosis.hypotheses.length ? (
         <div className="issue-findings-block">
-          <h3>What remains uncertain</h3>
+          <h3>{m.issues_findings_uncertain()}</h3>
           {diagnosis.hypotheses.length ? (
-            <p>Possible explanations remain unconfirmed.</p>
+            <p>{m.issues_findings_causes_unconfirmed()}</p>
           ) : null}
           <ul className="issue-findings-constraints">
             {diagnosis.constraints.map((text) => (
               <li key={text}>
                 {text ===
                 'Quantities describe observed availability. Oversold orders, lost revenue and synchronization failure are not established.'
-                  ? 'These observations do not confirm overselling, lost revenue, or a synchronization failure.'
+                  ? m.issues_findings_inventory_limits()
                   : text}
               </li>
             ))}
           </ul>
           {diagnosis.hypotheses.length ? (
             <Disclosure className="issue-findings-causes">
-              <summary>Possible causes · {diagnosis.hypotheses.length}</summary>
+              <summary>
+                {m.issues_findings_causes({
+                  count: diagnosis.hypotheses.length,
+                })}
+              </summary>
               {diagnosis.hypotheses.map((hypothesis) => (
                 <div className="issue-findings-cause" key={hypothesis.code}>
-                  <span className="case-caption">Unconfirmed</span>
+                  <span className="case-caption">
+                    {m.issues_findings_unconfirmed_label()}
+                  </span>
                   <p>{hypothesis.text}</p>
                   {hypothesis.missingChecks.length ? (
                     <>
-                      <h4>Checks needed</h4>
+                      <h4>{m.issues_findings_checks_needed()}</h4>
                       <ul>
                         {hypothesis.missingChecks.map((text) => (
                           <li key={text}>{text}</li>
@@ -215,7 +291,7 @@ export function IssueFindings({
                   />
                   {hypothesis.contradictingEvidenceRefs.length ? (
                     <>
-                      <h4>Contradicting evidence</h4>
+                      <h4>{m.issues_findings_contradicting_evidence()}</h4>
                       <Sources
                         refs={hypothesis.contradictingEvidenceRefs}
                         diagnosis={diagnosis}
@@ -230,79 +306,45 @@ export function IssueFindings({
       ) : null}
       {diagnosis.impact.potential.length ? (
         <Disclosure className="issue-findings-impact">
-          <summary>Potential impact</summary>
+          <summary>{m.issues_findings_potential_impact()}</summary>
           <Facts facts={diagnosis.impact.potential} diagnosis={diagnosis} />
           <p className="case-caption">
-            Potential impact does not establish realized losses.
+            {m.issues_findings_potential_impact_note()}
           </p>
         </Disclosure>
       ) : null}
       <div className="issue-findings-footer">
-        <h3>Sources</h3>
+        <h3>{m.common_sources()}</h3>
         <p className="case-caption">
-          {evidence.length} evidence{' '}
-          {evidence.length === 1 ? 'record' : 'records'} · Recorded freshness:{' '}
-          {item.freshness}. Source update time may be unknown.
+          {m.issues_findings_sources_summary({
+            count: evidence.length,
+            freshness: freshnessLabel(item.freshness),
+          })}
         </p>
         <IssueCollection
-          title="Supporting evidence"
-          noun="supporting evidence records"
+          title={m.issues_evidence_supporting_title()}
+          noun="evidence"
           previewCount={0}
-          triggerLabel="View supporting evidence"
+          triggerLabel={m.issues_evidence_supporting_view()}
           items={evidence}
-          filters={[
-            {
-              label: 'Source',
-              value: (entry) =>
-                entry.source
-                  ? `${entry.source.provider} · ${entry.source.resource}`
-                  : 'Canonical evidence',
-            },
-          ]}
+          filters={[{ label: m.common_source(), value: evidenceSourceLabel }]}
           renderItems={(entries) =>
             entries.map((entry) => (
-              <Disclosure className="case-evidence" key={entry.id}>
-                <summary>
-                  {entry.source
-                    ? `${entry.source.provider} · ${entry.source.resource}`
-                    : 'Canonical evidence'}
-                  <span>Observed {entry.observedAt}</span>
-                </summary>
-                <dl>
-                  <dt>Evidence ID</dt>
-                  <dd>{entry.id}</dd>
-                  <dt>Observed</dt>
-                  <dd>{entry.observedAt}</dd>
-                  <dt>Source updated</dt>
-                  <dd>{entry.sourceUpdatedAt ?? 'Unknown'}</dd>
-                  {entry.source ? (
-                    <>
-                      <dt>Source object</dt>
-                      <dd>{entry.source.externalId}</dd>
-                      <dt>Source scope</dt>
-                      <dd>{entry.source.scopeKey || 'Not specified'}</dd>
-                    </>
-                  ) : null}
-                  <dt>Adapter</dt>
-                  <dd>{entry.adapterVersion}</dd>
-                  <dt>Schema</dt>
-                  <dd>{entry.schemaVersion}</dd>
-                </dl>
-              </Disclosure>
+              <EvidenceRecord key={entry.id} entry={entry} />
             ))
           }
         />
         <Disclosure className="issue-findings-technical">
-          <summary>Technical details</summary>
+          <summary>{m.issues_findings_technical()}</summary>
           <dl>
-            <dt>Mapping versions</dt>
+            <dt>{m.issues_findings_link_versions()}</dt>
             <dd>
               {diagnosis.provenance.mappingVersions.join(', ') ||
-                'Not recorded'}
+                m.issues_not_recorded()}
             </dd>
-            <dt>Configuration</dt>
+            <dt>{m.issues_findings_configuration()}</dt>
             <dd>{diagnosis.provenance.configVersion}</dd>
-            <dt>Rules</dt>
+            <dt>{m.issues_findings_rules()}</dt>
             <dd>{diagnosis.provenance.ruleVersion}</dd>
           </dl>
         </Disclosure>

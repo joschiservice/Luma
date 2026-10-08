@@ -16,6 +16,7 @@
     "@dnd-kit/utilities": "3.2.2",
     "@luma/api-contract": "workspace:*",
     "@luma/app-host": "workspace:*",
+    "@luma/i18n": "workspace:*",
     "@luma/ui": "workspace:*",
     "@tanstack/react-form": "catalog:",
     "@tanstack/react-query": "catalog:",

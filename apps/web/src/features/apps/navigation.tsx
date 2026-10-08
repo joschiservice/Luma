@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 
@@ -32,7 +33,7 @@ export function AppNavigation({
   return (
     <section className="sidebar-section" aria-labelledby="nav-apps">
       <h2 className="sidebar-section-label" id="nav-apps">
-        Apps
+        {m.apps_title()}
       </h2>
       <ul className="sidebar-list">
         {pages.map((app) => (

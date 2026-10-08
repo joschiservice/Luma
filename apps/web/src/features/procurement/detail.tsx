@@ -8,6 +8,9 @@ import type {
   PurchaseOrderRecord,
   PurchaseOrderStatus,
 } from '@luma/api-contract';
+import { formatList } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -19,6 +22,7 @@ import { Empty } from '@luma/ui/components/primitives/empty';
 import { StateDot, StatePill } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { PageHeader } from '@luma/ui/components/workspace/page-header';
+import { quantityWithUnit } from '@luma/ui/lib/units';
 import {
   onlineManager,
   useMutation,
@@ -54,7 +58,7 @@ import {
   reviewCommitment,
   sendSubmission,
 } from './data';
-import { TransitionDialog } from './forms';
+import { TransitionDialog, transitionLabels } from './forms';
 import {
   calendarDate,
   commitmentKinds,
@@ -81,6 +85,34 @@ import {
 const subscribe = (changed: () => void) => onlineManager.subscribe(changed);
 const onlineSnapshot = () => onlineManager.isOnline();
 const serverSnapshot = () => true;
+
+const channelLabels = {
+  email: m.procurement_channel_email,
+  portal: m.procurement_channel_portal,
+  phone: m.procurement_channel_phone,
+  other: m.procurement_channel_other,
+} satisfies Record<Communication['channel'], () => string>;
+
+const approvalLabels = {
+  approved: m.procurement_trace_approved,
+  rejected: m.procurement_trace_rejected,
+  pending: m.procurement_trace_pending,
+  not_required: m.procurement_trace_not_required,
+  unknown: m.procurement_trace_approval_unknown,
+} satisfies Record<
+  NonNullable<PurchaseOrderContext['replenishment']>['approval'],
+  () => string
+>;
+
+const verificationLabels = {
+  verified: m.procurement_trace_verified,
+  failed: m.procurement_trace_verification_failed,
+  inconclusive: m.procurement_trace_inconclusive,
+  not_verified: m.procurement_trace_not_verified,
+} satisfies Record<
+  NonNullable<PurchaseOrderContext['replenishment']>['verification'],
+  () => string
+>;
 
 type Dialog =
   | { kind: 'submit' }
@@ -180,10 +212,10 @@ export function PurchaseOrderRecordView({
         search={{ view: 'orders', q: '', status: '' }}
       >
         <ArrowLeft size={14} aria-hidden="true" />
-        Purchase orders
+        {m.procurement_detail_back()}
       </Link>
       <PageHeader
-        title={order?.reference ?? 'Purchase order'}
+        title={order?.reference ?? m.procurement_detail_title_fallback()}
         icon={<DomainIcon domain="procurement" size="md" />}
         description={
           record && order ? (
@@ -194,13 +226,22 @@ export function PurchaseOrderRecordView({
               >
                 {order.supplierName}
               </Link>
-              {` · ${order.lines.length} ${order.lines.length === 1 ? 'line' : 'lines'}`}
+              {` · ${m.procurement_lines_count({ count: order.lines.length })}`}
               {record.submission?.externalOrder?.orderNumber
-                ? ` · Order ${record.submission.externalOrder.orderNumber} in ${record.readiness.connection?.label ?? 'the purchasing system'}`
+                ? ` · ${
+                    record.readiness.connection?.label
+                      ? m.procurement_detail_external_order({
+                          number: record.submission.externalOrder.orderNumber,
+                          system: record.readiness.connection.label,
+                        })
+                      : m.procurement_detail_external_order_generic({
+                          number: record.submission.externalOrder.orderNumber,
+                        })
+                  }`
                 : ''}
             </>
           ) : (
-            'Supplier commitments from draft to goods received.'
+            m.procurement_detail_description_fallback()
           )
         }
       />
@@ -209,11 +250,15 @@ export function PurchaseOrderRecordView({
           {record ? <StagePill stage={record.stage} /> : null}
           {order ? (
             <Badge>
-              {order.authority === 'luma' ? 'Luma-owned' : 'Externally owned'}
+              {order.authority === 'luma'
+                ? m.procurement_detail_managed_luma()
+                : m.procurement_detail_managed_external()}
             </Badge>
           ) : null}
           {record?.draftVerified ? (
-            <Badge tone="success">Draft verified</Badge>
+            <Badge tone="success">
+              {m.procurement_detail_draft_verified()}
+            </Badge>
           ) : null}
         </span>
         <span className="procurement-flags">
@@ -221,23 +266,29 @@ export function PurchaseOrderRecordView({
             <Button
               variant="outline"
               disabled={sync.isPending || offline}
-              title={`Read confirmations and goods receipts from ${record.readiness.connection?.label ?? 'the purchasing system'} now`}
+              title={
+                record.readiness.connection?.label
+                  ? m.procurement_detail_check_updates_title({
+                      system: record.readiness.connection.label,
+                    })
+                  : m.procurement_detail_check_updates_title_generic()
+              }
               onClick={() => sync.mutate()}
             >
               <RefreshCw size={14} aria-hidden="true" />
-              {sync.isPending ? 'Checking…' : 'Check for updates'}
+              {sync.isPending
+                ? m.procurement_detail_checking()
+                : m.procurement_detail_check_updates()}
             </Button>
           ) : null}
           <Button variant="ghost" disabled={refreshing} onClick={reload}>
             <RefreshCw size={14} aria-hidden="true" />
-            Refresh
+            {m.common_refresh()}
           </Button>
         </span>
       </div>
       {offline ? (
-        <Alert role="status">
-          You are offline. Reconnect to refresh this order.
-        </Alert>
+        <Alert role="status">{m.procurement_detail_offline()}</Alert>
       ) : null}
       {sync.error ? (
         <Alert tone="warning" role="alert">
@@ -247,29 +298,27 @@ export function PurchaseOrderRecordView({
       {error === 'missing' ? (
         <Empty>
           <FileX size={30} aria-hidden="true" />
-          <h2>Purchase order not found</h2>
-          <p>This order is not in this workspace.</p>
+          <h2>{m.procurement_detail_missing_title()}</h2>
+          <p>{m.procurement_detail_missing_body()}</p>
           <Link
             to="/app/$organizationId/procurement"
             params={{ organizationId }}
             search={{ view: 'orders', q: '', status: '' }}
           >
-            Browse purchase orders
+            {m.procurement_detail_missing_link()}
           </Link>
         </Empty>
       ) : error ? (
         <Alert tone="danger" role="alert">
-          {record
-            ? 'This order could not be refreshed. The details below may be out of date.'
-            : error}{' '}
+          {record ? m.procurement_detail_refresh_failed() : error}{' '}
           <Button variant="outline" onClick={reload}>
-            Retry
+            {m.common_retry()}
           </Button>
         </Alert>
       ) : null}
       {!record && loading && !error ? (
         <div className="procurement-skeleton" role="status">
-          <span className="sr-only">Loading purchase order…</span>
+          <span className="sr-only">{m.procurement_detail_loading()}</span>
           {Array.from({ length: 3 }, (_, i) => (
             <span className="lu-skeleton" key={i} />
           ))}
@@ -365,7 +414,10 @@ export function PurchaseOrderRecordView({
 /** The four supplier milestones, each with the evidence behind its state. */
 function Milestones({ record }: { record: PurchaseOrderRecord }) {
   return (
-    <ol className="procurement-milestones" aria-label="Order progress">
+    <ol
+      className="procurement-milestones"
+      aria-label={m.procurement_detail_progress()}
+    >
       {record.progress.milestones.map((milestone) => {
         const state = milestoneStates[milestone.state];
 
@@ -373,9 +425,9 @@ function Milestones({ record }: { record: PurchaseOrderRecord }) {
           <li key={milestone.key} data-state={milestone.state}>
             <StateDot state={state.state} />
             <div>
-              <h2>{milestoneLabels[milestone.key]}</h2>
+              <h2>{milestoneLabels[milestone.key]()}</h2>
               <p className="procurement-milestone-state">
-                {state.label}
+                {state.label()}
                 {milestone.at ? (
                   <>
                     {' · '}
@@ -432,6 +484,7 @@ function NextStep({
     ['draft', 'open'].includes(order.status) &&
     (!submission ||
       ['rejected', 'expired', 'failed'].includes(submission.state));
+  const system = readiness.connection?.label;
   const others = progress.attention.filter(
     (a) => !['submission_approval', 'submission_uncertain'].includes(a.kind),
   );
@@ -439,9 +492,9 @@ function NextStep({
   return (
     <Card as="section" className="procurement-next" aria-labelledby="next-step">
       <div className="procurement-next-heading">
-        <p className="procurement-eyebrow">Next step</p>
+        <p className="procurement-eyebrow">{m.procurement_next_title()}</p>
         <Badge tone={progress.next.owner === 'none' ? 'neutral' : 'accent'}>
-          {ownerLabels[progress.next.owner]}
+          {ownerLabels[progress.next.owner]()}
         </Badge>
       </div>
       <h2 id="next-step">{progress.next.title}</h2>
@@ -462,17 +515,17 @@ function NextStep({
       {submission?.state === 'approval_required' ? (
         <dl className="procurement-send-facts">
           <div>
-            <dt>Requested delivery</dt>
+            <dt>{m.procurement_next_requested_delivery()}</dt>
             <dd>{calendarDate(submission.requestedDeliveryDate)}</dd>
           </div>
           <div>
-            <dt>Requested</dt>
+            <dt>{m.procurement_next_requested_at()}</dt>
             <dd>
               <WorkspaceDate value={submission.requestedAt} />
             </dd>
           </div>
           <div>
-            <dt>Approval expires</dt>
+            <dt>{m.procurement_next_approval_expires()}</dt>
             <dd>
               <WorkspaceDate value={submission.expiresAt} />
             </dd>
@@ -487,21 +540,25 @@ function NextStep({
               onClick={() => decide.mutate('approved')}
             >
               <Send size={14} aria-hidden="true" />
-              {decide.isPending ? 'Sending…' : 'Approve and send'}
+              {decide.isPending
+                ? m.procurement_next_sending()
+                : m.procurement_next_approve_send()}
             </Button>
             <Button
               variant="outline"
               disabled={decide.isPending}
               onClick={() => decide.mutate('rejected')}
             >
-              Reject
+              {m.procurement_next_reject()}
             </Button>
           </>
         ) : null}
         {submission?.canSend ? (
           <Button disabled={send.isPending} onClick={() => send.mutate()}>
             <Send size={14} aria-hidden="true" />
-            {send.isPending ? 'Sending…' : 'Send now'}
+            {send.isPending
+              ? m.procurement_next_sending()
+              : m.procurement_next_send_now()}
           </Button>
         ) : null}
         {submission?.canCheck ? (
@@ -511,13 +568,17 @@ function NextStep({
             onClick={() => check.mutate()}
           >
             <RefreshCw size={14} aria-hidden="true" />
-            {check.isPending ? 'Checking…' : 'Check purchasing system'}
+            {check.isPending
+              ? m.procurement_detail_checking()
+              : system
+                ? m.procurement_next_check_system({ system })
+                : m.procurement_next_check_system_generic()}
           </Button>
         ) : null}
         {canSend && readiness.ready ? (
           <Button onClick={() => open({ kind: 'submit' })}>
             <Send size={14} aria-hidden="true" />
-            Send to supplier
+            {m.procurement_next_send()}
           </Button>
         ) : null}
         {canSend &&
@@ -525,12 +586,15 @@ function NextStep({
         !record.supplier?.link &&
         record.supplier ? (
           <Button variant="outline" onClick={() => open({ kind: 'link' })}>
-            Link supplier
+            {m.procurement_next_link_supplier()}
           </Button>
         ) : null}
       </div>
       {canSend && !readiness.ready ? (
-        <ul className="procurement-blockers" aria-label="Before sending">
+        <ul
+          className="procurement-blockers"
+          aria-label={m.procurement_next_blockers()}
+        >
           {readiness.blockers.map((blocker) => (
             <li key={blocker}>{blocker}</li>
           ))}
@@ -542,7 +606,10 @@ function NextStep({
         </Alert>
       ) : null}
       {others.length ? (
-        <ul className="procurement-attention" aria-label="Needs a response">
+        <ul
+          className="procurement-attention"
+          aria-label={m.procurement_next_attention()}
+        >
           {others.map((attention) => (
             <li key={attention.key}>
               <StateDot
@@ -556,13 +623,12 @@ function NextStep({
                 <strong>{attention.summary}</strong>
                 <small>
                   {attention.kind === 'review_commitment'
-                    ? 'Read from a supplier message. Review it below.'
+                    ? m.procurement_next_attention_read()
                     : attention.kind === 'commitment_changed'
-                      ? 'Differs from the order'
-                      : 'Overdue since '}
-                  {attention.kind.endsWith('overdue') ? (
-                    <WorkspaceDate value={attention.dueAt} />
-                  ) : null}
+                      ? m.procurement_next_attention_changed()
+                      : rich(m.procurement_next_attention_overdue, {
+                          date: <WorkspaceDate value={attention.dueAt} />,
+                        })}
                 </small>
               </span>
               {canManage && attention.kind !== 'review_commitment' ? (
@@ -572,15 +638,15 @@ function NextStep({
                   onClick={() => open({ kind: 'respond', attention })}
                 >
                   {attention.kind === 'commitment_changed'
-                    ? 'Accept or follow up'
-                    : 'Record follow-up'}
+                    ? m.procurement_next_accept_or_follow_up()
+                    : m.procurement_next_record_follow_up()}
                 </Button>
               ) : attention.kind === 'review_commitment' && !inline ? (
                 <a
                   className="procurement-inline-link"
                   href="#supplier-messages"
                 >
-                  Review
+                  {m.procurement_next_review()}
                 </a>
               ) : null}
             </li>
@@ -611,22 +677,24 @@ function Lines({
   return (
     <section className="procurement-section" aria-labelledby="order-lines">
       <div className="procurement-section-heading">
-        <h2 id="order-lines">Lines and stock</h2>
+        <h2 id="order-lines">{m.procurement_lines_title()}</h2>
         {record.progress.expectedDate ? (
           <span>
-            Next expected {calendarDate(record.progress.expectedDate)}
+            {m.procurement_lines_next_expected({
+              date: calendarDate(record.progress.expectedDate),
+            })}
           </span>
         ) : null}
       </div>
       <DataTable
-        caption="Order lines with supplier commitments and stock"
+        caption={m.procurement_lines_caption()}
         density="compact"
         rows={rows}
         rowKey={(row) => row.line.lineId}
         columns={[
           {
             key: 'item',
-            header: 'Item',
+            header: m.procurement_lines_item(),
             cell: ({ line, context }) => (
               <span className="procurement-cell">
                 {context?.skuId ? (
@@ -641,24 +709,27 @@ function Lines({
                 )}
                 <small>
                   <code>{context?.positions[0]?.sku ?? line.sku}</code>
-                  {line.overdue ? ' · overdue' : ''}
+                  {line.overdue ? ` · ${m.procurement_overdue()}` : ''}
                 </small>
               </span>
             ),
           },
           {
             key: 'ordered',
-            header: 'Ordered',
+            header: m.procurement_lines_ordered(),
             numeric: true,
-            cell: ({ line }) => `${quantity(line.ordered)} ${line.unit}`,
+            cell: ({ line }) =>
+              quantityWithUnit(quantity(line.ordered), line.unit, line.ordered),
           },
           {
             key: 'confirmed',
-            header: 'Confirmed',
+            header: m.procurement_lines_confirmed(),
             numeric: true,
             cell: ({ line }) =>
               line.confirmed === null ? (
-                <span className="procurement-muted">—</span>
+                <span className="procurement-muted">
+                  {m.common_empty_value()}
+                </span>
               ) : (
                 <span
                   className={
@@ -673,40 +744,54 @@ function Lines({
           },
           {
             key: 'received',
-            header: 'Received',
+            header: m.procurement_lines_received(),
             numeric: true,
             cell: ({ line }) => (
               <span className="procurement-cell procurement-cell-end">
                 <span>{quantity(line.received)}</span>
                 {line.outstanding > 1e-9 && line.received > 0 ? (
-                  <small>{quantity(line.outstanding)} open</small>
+                  <small>
+                    {m.procurement_lines_outstanding({
+                      quantity: quantity(line.outstanding),
+                    })}
+                  </small>
                 ) : null}
               </span>
             ),
           },
           {
             key: 'expected',
-            header: 'Expected',
+            header: m.procurement_column_expected(),
             hideOnNarrow: true,
             cell: ({ line }) =>
               line.stage === 'received' ? (
-                <span className="procurement-muted">Arrived</span>
+                <span className="procurement-muted">
+                  {m.procurement_lines_arrived()}
+                </span>
               ) : line.expectedDate ? (
                 <span className="procurement-cell">
                   <span>{calendarDate(line.expectedDate)}</span>
-                  <small>{line.promisedDate ? 'Promised' : 'Requested'}</small>
+                  <small>
+                    {line.promisedDate
+                      ? m.procurement_lines_promised()
+                      : m.procurement_lines_requested()}
+                  </small>
                 </span>
               ) : (
-                <span className="procurement-muted">Not set</span>
+                <span className="procurement-muted">
+                  {m.procurement_lines_not_set()}
+                </span>
               ),
           },
           {
             key: 'stock',
-            header: 'Stock now',
+            header: m.procurement_lines_stock(),
             hideOnNarrow: true,
             cell: ({ context }) =>
               contextError ? (
-                <span className="procurement-muted">Unavailable</span>
+                <span className="procurement-muted">
+                  {m.common_not_available()}
+                </span>
               ) : !context ? (
                 <span className="procurement-muted">…</span>
               ) : context.positions.length ? (
@@ -718,9 +803,14 @@ function Lines({
                       params={{ organizationId, positionId: position.id }}
                     >
                       {position.sources
-                        .map(
-                          (s) =>
-                            `${s.deleted ? 'removed' : stockQuantity(s.available)} ${position.unit}`,
+                        .map((s) =>
+                          s.deleted
+                            ? m.procurement_stock_removed()
+                            : quantityWithUnit(
+                                stockQuantity(s.available),
+                                position.unit,
+                                s.available ?? '',
+                              ),
                         )
                         .join(' / ')}{' '}
                       <small>{position.location}</small>
@@ -728,33 +818,33 @@ function Lines({
                   ))}
                   {context.otherOrders.length ? (
                     <small>
-                      Also on {context.otherOrders.length} other{' '}
-                      {context.otherOrders.length === 1 ? 'order' : 'orders'}
+                      {m.procurement_lines_other_orders({
+                        count: context.otherOrders.length,
+                      })}
                     </small>
                   ) : null}
                 </span>
               ) : (
                 <span className="procurement-muted">
-                  {context.skuId ? 'No stock observed' : 'Unknown SKU'}
+                  {context.skuId
+                    ? m.procurement_stock_none()
+                    : m.procurement_lines_unknown_sku()}
                 </span>
               ),
           },
           {
             key: 'stage',
-            header: 'State',
+            header: m.procurement_lines_state(),
             hideOnNarrow: true,
             cell: ({ line }) => (
               <StatePill state={lineStages[line.stage].state}>
-                {lineStages[line.stage].label}
+                {lineStages[line.stage].label()}
               </StatePill>
             ),
           },
         ]}
       />
-      <p className="procurement-note">
-        Receipt counts only what the purchasing system booked as received. Stock
-        is shown per source and location; sources are never added together.
-      </p>
+      <p className="procurement-note">{m.procurement_lines_note()}</p>
     </section>
   );
 }
@@ -770,7 +860,10 @@ function segments(
   }[],
 ) {
   const sorted = [...marks]
-    .filter((m) => m.start >= 0 && m.end <= text.length && m.end > m.start)
+    .filter(
+      (mark) =>
+        mark.start >= 0 && mark.end <= text.length && mark.end > mark.start,
+    )
     .sort((a, b) => a.start - b.start);
   const out: { text: string; mark?: (typeof sorted)[number] }[] = [];
   let at = 0;
@@ -805,7 +898,9 @@ function Messages({
     >
       <div className="procurement-section-heading">
         <h2>
-          <span id="supplier-messages-title">Supplier messages</span>
+          <span id="supplier-messages-title">
+            {m.procurement_messages_title()}
+          </span>
         </h2>
         {canManage ? (
           <Button
@@ -814,15 +909,17 @@ function Messages({
             onClick={() => open({ kind: 'message' })}
           >
             <MessageSquarePlus size={14} aria-hidden="true" />
-            Add message
+            {m.procurement_messages_add()}
           </Button>
         ) : null}
       </div>
       {!record.extraction.available && canManage ? (
         <p className="procurement-note">
-          {record.extraction.reason ??
-            'Automatic reading isn’t set up on this server.'}{' '}
-          Select words in a message to record what the supplier committed to.
+          {record.extraction.reason
+            ? m.procurement_messages_manual_reason({
+                reason: record.extraction.reason,
+              })
+            : m.procurement_messages_manual()}
         </p>
       ) : null}
       {communications.length ? (
@@ -846,10 +943,7 @@ function Messages({
           ))}
         </ol>
       ) : (
-        <p className="procurement-empty">
-          No supplier messages yet. Add the supplier’s order confirmation or
-          delivery notice to track what they committed to.
-        </p>
+        <p className="procurement-empty">{m.procurement_messages_empty()}</p>
       )}
     </section>
   );
@@ -907,7 +1001,7 @@ function Message({
     record.order.lines.find((l) => l.id === lineId)?.unit;
   const lineLabel = (lineId: string | null) =>
     record.order.lines.find((l) => l.id === lineId)?.description ??
-    'Whole order';
+    m.procurement_whole_order();
 
   const capture = () => {
     const root = textRef.current;
@@ -941,13 +1035,7 @@ function Message({
           <strong>{communication.from}</strong>
           <small>
             <WorkspaceDate value={communication.receivedAt} /> ·{' '}
-            {communication.channel === 'email'
-              ? 'Email'
-              : communication.channel === 'portal'
-                ? 'Supplier portal'
-                : communication.channel === 'phone'
-                  ? 'Phone notes'
-                  : 'Other'}
+            {channelLabels[communication.channel]()}
           </small>
         </span>
         {extraction ? (
@@ -961,20 +1049,22 @@ function Message({
             }
           >
             {extraction.state === 'completed'
-              ? `${commitments.length} ${commitments.length === 1 ? 'fact' : 'facts'} read`
+              ? commitments.length
+                ? m.procurement_message_read_count({
+                    count: commitments.length,
+                  })
+                : m.procurement_message_read_none()
               : extraction.state === 'failed'
-                ? 'Not read'
-                : 'Not read automatically'}
+                ? m.procurement_message_read_failed()
+                : m.procurement_message_not_read()}
           </Badge>
         ) : null}
       </header>
       {purged ? (
         <p className="procurement-note">
-          Message text removed{' '}
           {communication.purgeReason === 'retention'
-            ? 'after the retention period'
-            : 'on request'}
-          . Recorded commitments remain.
+            ? m.procurement_message_purged_retention()
+            : m.procurement_message_purged_request()}
         </p>
       ) : (
         <div
@@ -983,7 +1073,7 @@ function Message({
           onMouseUp={record.canManage ? capture : undefined}
           onKeyUp={record.canManage ? capture : undefined}
           tabIndex={0}
-          aria-label={`Message from ${communication.from}`}
+          aria-label={m.procurement_message_from({ from: communication.from })}
         >
           {segments(
             text,
@@ -1008,8 +1098,9 @@ function Message({
       {selection && record.canManage ? (
         <div className="procurement-selection" role="status">
           <span>
-            “{selection.quote.slice(0, 80)}
-            {selection.quote.length > 80 ? '…' : ''}”
+            {m.procurement_quote({
+              quote: `${selection.quote.slice(0, 80)}${selection.quote.length > 80 ? '…' : ''}`,
+            })}
           </span>
           <Button
             size="sm"
@@ -1026,7 +1117,7 @@ function Message({
               setSelection(null);
             }}
           >
-            Record what this says
+            {m.procurement_message_record_selection()}
           </Button>
         </div>
       ) : null}
@@ -1040,7 +1131,7 @@ function Message({
               disabled={reread.isPending}
               onClick={() => reread.mutate()}
             >
-              Read again
+              {m.procurement_message_read_again()}
             </Button>
           </p>
         ) : null
@@ -1048,8 +1139,7 @@ function Message({
       {extraction?.state === 'completed' &&
       extraction.relatesToOrder === false ? (
         <Alert tone="warning">
-          This message may not be about {record.order.reference}. Its facts wait
-          for review.
+          {m.procurement_message_unrelated({ order: record.order.reference })}
         </Alert>
       ) : null}
       {commitments.length ? (
@@ -1067,20 +1157,24 @@ function Message({
               />
               <span className="procurement-cell">
                 <strong>
-                  {commitmentKinds[c.kind]}:{' '}
-                  {commitmentValue(c, unit(c.lineId))}
+                  {m.procurement_commitment_statement({
+                    kind: commitmentKinds[c.kind](),
+                    value: commitmentValue(c, unit(c.lineId)),
+                  })}
                 </strong>
                 <small>
                   {lineLabel(c.lineId)} ·{' '}
                   {c.status === 'needs_review'
-                    ? c.reviewReasons
-                        .map((r) => reviewReasonLabels[r])
-                        .join(', ') || 'Needs review'
+                    ? c.reviewReasons.length
+                      ? formatList(
+                          c.reviewReasons.map((r) => reviewReasonLabels[r]()),
+                        )
+                      : m.procurement_message_needs_review()
                     : c.status === 'rejected'
-                      ? 'Rejected'
+                      ? m.procurement_message_rejected()
                       : c.source.kind === 'communication' && c.source.extraction
-                        ? 'Read automatically'
-                        : 'Recorded by hand'}
+                        ? m.procurement_message_read_by_luma()
+                        : m.procurement_message_recorded_by_hand()}
                 </small>
               </span>
               {c.status === 'needs_review' && record.canManage ? (
@@ -1109,8 +1203,8 @@ function Message({
                         'supplier_condition',
                       ].includes(r),
                     )
-                      ? 'Confirm and accept'
-                      : 'Confirm'}
+                      ? m.procurement_message_confirm_accept()
+                      : m.procurement_message_confirm()}
                   </Button>
                   <Button
                     size="sm"
@@ -1124,7 +1218,7 @@ function Message({
                       })
                     }
                   >
-                    Reject
+                    {m.procurement_next_reject()}
                   </Button>
                 </span>
               ) : null}
@@ -1139,13 +1233,17 @@ function Message({
       ) : null}
       {!purged && record.canManage ? (
         <Disclosure variant="plain" className="procurement-message-more">
-          <summary>Message details</summary>
+          <summary>{m.procurement_message_details()}</summary>
           <p className="procurement-note">
-            Kept until <WorkspaceDate value={communication.retainUntil} />, then
-            the text is removed.{' '}
+            {rich(m.procurement_message_retention, {
+              date: <WorkspaceDate value={communication.retainUntil} />,
+            })}
             {communication.messageId ? (
               <>
-                Message ID <code>{communication.messageId}</code>.
+                {' '}
+                {rich(m.procurement_message_id, {
+                  id: <code>{communication.messageId}</code>,
+                })}
               </>
             ) : null}
           </p>
@@ -1155,7 +1253,7 @@ function Message({
             disabled={remove.isPending}
             onClick={() => remove.mutate()}
           >
-            Remove message text now
+            {m.procurement_message_remove_text()}
           </Button>
         </Disclosure>
       ) : null}
@@ -1182,8 +1280,10 @@ function CommitmentHistory({
       aria-labelledby="commitment-history"
     >
       <div className="procurement-section-heading">
-        <h2 id="commitment-history">Commitment history</h2>
-        <span>{record.commitments.length} recorded</span>
+        <h2 id="commitment-history">{m.procurement_history_title()}</h2>
+        <span>
+          {m.procurement_history_count({ count: record.commitments.length })}
+        </span>
       </div>
       {entries.length ? (
         <ol className="procurement-commitments">
@@ -1207,18 +1307,24 @@ function CommitmentHistory({
                 />
                 <span className="procurement-cell">
                   <strong>
-                    {commitmentKinds[c.kind]}:{' '}
-                    {commitmentValue(c, unit(c.lineId))}
-                    {corrected ? ' · corrected' : ''}
+                    {m.procurement_commitment_statement({
+                      kind: commitmentKinds[c.kind](),
+                      value: commitmentValue(c, unit(c.lineId)),
+                    })}
+                    {corrected ? ` · ${m.procurement_history_corrected()}` : ''}
                   </strong>
                   <small>
                     {record.order.lines.find((l) => l.id === c.lineId)
-                      ?.description ?? 'Whole order'}{' '}
+                      ?.description ?? m.procurement_whole_order()}{' '}
                     · {commitmentSource(c, label)} ·{' '}
                     <WorkspaceDate value={c.recordedAt} />
                   </small>
                   {c.source.kind === 'correction' ? (
-                    <small>Reason: {c.source.reason}</small>
+                    <small>
+                      {m.procurement_history_reason({
+                        reason: c.source.reason,
+                      })}
+                    </small>
                   ) : null}
                 </span>
                 {record.canManage &&
@@ -1235,7 +1341,7 @@ function CommitmentHistory({
                       })
                     }
                   >
-                    Correct
+                    {m.procurement_history_correct()}
                   </Button>
                 ) : null}
               </li>
@@ -1243,23 +1349,26 @@ function CommitmentHistory({
           })}
         </ol>
       ) : (
-        <p className="procurement-empty">
-          No commitments yet. They appear when the supplier confirms in the
-          purchasing system or in a message.
-        </p>
+        <p className="procurement-empty">{m.procurement_history_empty()}</p>
       )}
       {record.observations.length ? (
         <Disclosure>
           <summary>
-            Purchasing-system reads ({record.observations.length})
+            {m.procurement_history_reads({
+              count: record.observations.length,
+            })}
           </summary>
           <ol className="procurement-reads">
             {record.observations.map((o) => (
               <li key={o.id}>
-                <WorkspaceDate value={o.observedAt} /> · order{' '}
-                {o.orderNumber ?? o.externalId} ·{' '}
-                {o.status.replaceAll('_', ' ')}
-                {o.confirmed ? ' · confirmed' : ''}
+                <WorkspaceDate value={o.observedAt} /> ·{' '}
+                {m.procurement_history_read_order({
+                  number: o.orderNumber ?? o.externalId,
+                })}{' '}
+                · {o.status.replaceAll('_', ' ')}
+                {o.confirmed
+                  ? ` · ${m.procurement_history_read_confirmed()}`
+                  : ''}
               </li>
             ))}
           </ol>
@@ -1277,8 +1386,7 @@ function Lifecycle({ record }: { record: PurchaseOrderRecord }) {
       aria-labelledby="lifecycle-history"
     >
       <div className="procurement-section-heading">
-        <h2 id="lifecycle-history">Status history in Luma</h2>
-        <span>Revision {record.order.revision}</span>
+        <h2 id="lifecycle-history">{m.procurement_lifecycle_title()}</h2>
       </div>
       <ol className="procurement-commitments">
         {record.history.map((event) => (
@@ -1287,8 +1395,11 @@ function Lifecycle({ record }: { record: PurchaseOrderRecord }) {
             <span className="procurement-cell">
               <strong>
                 {event.from
-                  ? `${statusLabels[event.from]} → ${statusLabels[event.to]}`
-                  : 'Purchase order created'}
+                  ? m.procurement_status_change({
+                      from: statusLabels[event.from](),
+                      to: statusLabels[event.to](),
+                    })
+                  : m.procurement_lifecycle_created()}
               </strong>
               <small>
                 <WorkspaceDate value={event.occurredAt} />
@@ -1329,9 +1440,9 @@ function SupplierCard({
       className="procurement-side"
       aria-labelledby="side-supplier"
     >
-      <h2 id="side-supplier">Supplier</h2>
+      <h2 id="side-supplier">{m.procurement_supplier_card_title()}</h2>
       <dl className="procurement-side-facts">
-        <Fact label="Name">
+        <Fact label={m.procurement_supplier_card_name()}>
           <Link
             to="/app/$organizationId/procurement/suppliers/$supplierId"
             params={{ organizationId, supplierId: record.order.supplierId }}
@@ -1339,23 +1450,32 @@ function SupplierCard({
             {record.order.supplierName}
           </Link>
         </Fact>
-        <Fact label="Purchasing link">
+        <Fact label={m.procurement_supplier_card_link()}>
           {supplier?.link ? (
             <>
-              {supplier.link.name ?? `Supplier ${supplier.link.externalId}`}
+              {supplier.link.name ??
+                m.procurement_supplier_external({
+                  id: supplier.link.externalId,
+                })}
               <small>
-                in {record.readiness.connection?.label ?? 'a purchasing system'}
+                {record.readiness.connection?.label
+                  ? m.procurement_supplier_card_link_in({
+                      system: record.readiness.connection.label,
+                    })
+                  : m.procurement_supplier_card_link_in_generic()}
               </small>
             </>
           ) : (
-            <span className="procurement-muted">Not linked</span>
+            <span className="procurement-muted">
+              {m.procurement_not_linked()}
+            </span>
           )}
         </Fact>
-        <Fact label="Confirmation expected within">
-          {supplier?.confirmationHours ?? 48} hours
+        <Fact label={m.procurement_supplier_card_window()}>
+          {m.procurement_hours({ hours: supplier?.confirmationHours ?? 48 })}
         </Fact>
         {record.progress.confirmationDueAt ? (
-          <Fact label="Confirmation due">
+          <Fact label={m.procurement_supplier_card_due()}>
             <WorkspaceDate value={record.progress.confirmationDueAt} />
           </Fact>
         ) : null}
@@ -1366,7 +1486,9 @@ function SupplierCard({
           variant="outline"
           onClick={() => open({ kind: 'link' })}
         >
-          {supplier.link ? 'Change link' : 'Link supplier'}
+          {supplier.link
+            ? m.procurement_supplier_change_link()
+            : m.procurement_next_link_supplier()}
         </Button>
       ) : null}
     </Card>
@@ -1385,6 +1507,12 @@ function TraceCard({
   const here = useLocation({ select: (location) => location.href });
   if (!trace) return null;
   const unit = trace.stock.unit ?? '';
+  const amount = (value: number | null) =>
+    value === null
+      ? m.common_empty_value()
+      : unit
+        ? quantityWithUnit(quantity(value), unit, value)
+        : quantity(value);
 
   return (
     <>
@@ -1394,27 +1522,33 @@ function TraceCard({
         aria-labelledby="side-trace"
       >
         <h2 id="side-trace">
-          <Workflow size={14} aria-hidden="true" /> Why it was ordered
+          <Workflow size={14} aria-hidden="true" />{' '}
+          {m.procurement_trace_title()}
         </h2>
         <ol className="procurement-trace">
           <li>
             <StateDot state="verified" />
             <span className="procurement-cell">
               <strong>
-                Stock{' '}
                 {trace.stock.available === null
-                  ? 'unknown'
-                  : `${quantity(trace.stock.available)} ${unit}`}
-                {trace.minimum !== null
-                  ? `, below ${quantity(trace.minimum)}`
-                  : ''}
+                  ? m.procurement_trace_stock_unknown()
+                  : trace.minimum !== null
+                    ? m.procurement_trace_stock_below({
+                        quantity: amount(trace.stock.available),
+                        minimum: quantity(trace.minimum),
+                      })
+                    : m.procurement_trace_stock({
+                        quantity: amount(trace.stock.available),
+                      })}
               </strong>
               <small>
-                {trace.location ?? 'Stock position'}
+                {trace.location ?? m.procurement_trace_position()}
                 {trace.stock.checkedAt ? (
                   <>
-                    {' · checked '}
-                    <WorkspaceDate value={trace.stock.checkedAt} />
+                    {' · '}
+                    {rich(m.procurement_trace_checked, {
+                      date: <WorkspaceDate value={trace.stock.checkedAt} />,
+                    })}
                   </>
                 ) : null}
               </small>
@@ -1424,15 +1558,12 @@ function TraceCard({
             <StateDot state="verified" />
             <span className="procurement-cell">
               <strong>
-                Proposed{' '}
-                {trace.proposedQuantity === null
-                  ? '—'
-                  : quantity(trace.proposedQuantity)}{' '}
-                {unit}
+                {m.procurement_trace_proposed({
+                  quantity: amount(trace.proposedQuantity),
+                })}
               </strong>
               <small>
-                Refill to {trace.target === null ? '—' : quantity(trace.target)}{' '}
-                {unit}
+                {m.procurement_trace_target({ quantity: amount(trace.target) })}
               </small>
             </span>
           </li>
@@ -1447,15 +1578,7 @@ function TraceCard({
               }
             />
             <span className="procurement-cell">
-              <strong>
-                {trace.approval === 'approved'
-                  ? 'Approved by a second person'
-                  : trace.approval === 'rejected'
-                    ? 'Rejected'
-                    : trace.approval === 'pending'
-                      ? 'Waiting for approval'
-                      : 'Approval not recorded'}
-              </strong>
+              <strong>{approvalLabels[trace.approval]()}</strong>
               {trace.approvedAt ? (
                 <small>
                   <WorkspaceDate value={trace.approvedAt} />
@@ -1474,15 +1597,7 @@ function TraceCard({
               }
             />
             <span className="procurement-cell">
-              <strong>
-                {trace.verification === 'verified'
-                  ? 'Draft verified by a separate read'
-                  : trace.verification === 'failed'
-                    ? 'Draft verification failed'
-                    : trace.verification === 'inconclusive'
-                      ? 'Draft verification inconclusive'
-                      : 'Draft not verified yet'}
-              </strong>
+              <strong>{verificationLabels[trace.verification]()}</strong>
               {trace.verifiedAt ? (
                 <small>
                   <WorkspaceDate value={trace.verifiedAt} />
@@ -1498,7 +1613,8 @@ function TraceCard({
               params={{ organizationId, positionId: trace.positionId }}
               search={{ from: here }}
             >
-              Stock position <ArrowRight size={13} aria-hidden="true" />
+              {m.procurement_trace_position_link()}{' '}
+              <ArrowRight size={13} aria-hidden="true" />
             </Link>
           ) : null}
           <Link
@@ -1507,7 +1623,8 @@ function TraceCard({
             search={{}}
             hash={`run-${trace.runId}`}
           >
-            Workflow run <ArrowRight size={13} aria-hidden="true" />
+            {m.procurement_trace_run_link()}{' '}
+            <ArrowRight size={13} aria-hidden="true" />
           </Link>
         </div>
       </Card>
@@ -1538,7 +1655,7 @@ function IssuesCard({
       className="procurement-side"
       aria-labelledby="side-issues"
     >
-      <h2 id="side-issues">Related issues</h2>
+      <h2 id="side-issues">{m.procurement_related_issues()}</h2>
       {context.issues.length ? (
         <ul className="procurement-side-list">
           {context.issues.map((issue) => (
@@ -1555,9 +1672,7 @@ function IssuesCard({
           ))}
         </ul>
       ) : (
-        <p className="procurement-note">
-          No issues for these SKUs or their stock.
-        </p>
+        <p className="procurement-note">{m.procurement_issues_empty()}</p>
       )}
     </Card>
   );
@@ -1588,16 +1703,16 @@ function OrderCard({
       className="procurement-side"
       aria-labelledby="side-order"
     >
-      <h2 id="side-order">Order in Luma</h2>
+      <h2 id="side-order">{m.procurement_order_card_title()}</h2>
       <dl className="procurement-side-facts">
-        <Fact label="Status">{statusLabels[order.status]}</Fact>
-        <Fact label="Created">
+        <Fact label={m.common_status()}>{statusLabels[order.status]()}</Fact>
+        <Fact label={m.procurement_order_card_created()}>
           <WorkspaceDate value={order.createdAt} />
         </Fact>
-        <Fact label="Origin">
+        <Fact label={m.procurement_order_card_origin()}>
           {order.origin.workflowRunId
-            ? 'Replenishment workflow'
-            : 'Created in Luma'}
+            ? m.procurement_order_card_origin_workflow()
+            : m.procurement_order_card_origin_manual()}
         </Fact>
         {order.externalReferences.map((ref) => (
           <Fact key={`${ref.system}:${ref.externalId}`} label={ref.system}>
@@ -1614,11 +1729,7 @@ function OrderCard({
               variant="outline"
               onClick={() => open({ kind: 'transition', status })}
             >
-              {status === 'open'
-                ? 'Open order'
-                : status === 'closed'
-                  ? 'Close order'
-                  : 'Cancel order'}
+              {transitionLabels[status]()}
             </Button>
           ))}
         </div>
@@ -1627,14 +1738,15 @@ function OrderCard({
       record.stage !== 'received' &&
       record.submission?.state === 'submitted' ? (
         <p className="procurement-note">
-          Closing records completion in Luma. It doesn’t cancel the order in the
-          purchasing system.
+          {m.procurement_order_card_close_note()}
         </p>
       ) : null}
       <Disclosure variant="plain">
-        <summary>IDs</summary>
+        <summary>{m.procurement_order_card_ids()}</summary>
         <p className="procurement-note">
-          Order <code>{order.id}</code>
+          {rich(m.procurement_order_card_order_id, {
+            id: <code>{order.id}</code>,
+          })}
         </p>
       </Disclosure>
     </Card>
@@ -1671,12 +1783,13 @@ export function PurchaseOrderReview({
     onSettled: () =>
       client.invalidateQueries({ queryKey: procurementKey(organizationId) }),
   });
-  if (record.isPending) return <p role="status">Loading the purchase order…</p>;
+  if (record.isPending)
+    return <p role="status">{m.procurement_detail_loading()}</p>;
   if (!record.data)
     return (
       <p role="alert">
         {record.error instanceof IdentityError && record.error.status === 404
-          ? 'This purchase order is missing or you no longer have access.'
+          ? m.procurement_review_missing()
           : procurementError(record.error)}
       </p>
     );
@@ -1693,12 +1806,15 @@ export function PurchaseOrderReview({
         inline
       />
       {pending.length ? (
-        <ul className="procurement-facts" aria-label="Facts to review">
+        <ul
+          className="procurement-facts"
+          aria-label={m.procurement_review_facts()}
+        >
           {pending.map((c) => {
             const communication = data.communications.find(
-              (m) =>
+              (message) =>
                 c.source.kind === 'communication' &&
-                m.id === c.source.communicationId,
+                message.id === c.source.communicationId,
             );
             const quote =
               communication?.body != null && c.source.kind === 'communication'
@@ -1714,13 +1830,18 @@ export function PurchaseOrderReview({
                 <StateDot state="approval" />
                 <span className="procurement-cell">
                   <strong>
-                    {commitmentKinds[c.kind]}: {commitmentValue(c, unit)}
+                    {m.procurement_commitment_statement({
+                      kind: commitmentKinds[c.kind](),
+                      value: commitmentValue(c, unit),
+                    })}
                   </strong>
-                  {quote ? <small>“{quote}”</small> : null}
+                  {quote ? (
+                    <small>{m.procurement_quote({ quote })}</small>
+                  ) : null}
                   <small>
-                    {c.reviewReasons
-                      .map((r) => reviewReasonLabels[r])
-                      .join(', ')}
+                    {formatList(
+                      c.reviewReasons.map((r) => reviewReasonLabels[r]()),
+                    )}
                   </small>
                 </span>
                 {data.canManage ? (
@@ -1738,7 +1859,7 @@ export function PurchaseOrderReview({
                         })
                       }
                     >
-                      Confirm
+                      {m.procurement_message_confirm()}
                     </Button>
                     <Button
                       size="sm"
@@ -1752,7 +1873,7 @@ export function PurchaseOrderReview({
                         })
                       }
                     >
-                      Reject
+                      {m.procurement_next_reject()}
                     </Button>
                   </span>
                 ) : null}
@@ -1770,7 +1891,8 @@ export function PurchaseOrderReview({
         to="/app/$organizationId/procurement/$purchaseOrderId"
         params={{ organizationId, purchaseOrderId }}
       >
-        Open {data.order.reference} <ArrowRight size={14} aria-hidden="true" />
+        {m.procurement_review_open({ order: data.order.reference })}{' '}
+        <ArrowRight size={14} aria-hidden="true" />
       </Link>
       {dialog?.kind === 'submit' ? (
         <SubmitDialog

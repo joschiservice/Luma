@@ -1,0 +1,74 @@
+---
+title: Bestellungen finden und lesen
+description: Finden Sie eine Bestellung, sehen Sie, was noch zu tun ist, vergleichen Sie die Angaben der verbundenen Systeme und verknüpfen Sie eine Shopify-Bestellung mit ihrer JTL-Wawi-Bestellung.
+---
+
+Bestellungen zeigt alle aktuellen Bestellungen, die Ihre verbundenen Shops und ERP-Systeme melden. Hier finden Sie Bestellungen, an denen noch Arbeit offen ist, sehen, wo Systeme voneinander abweichen, und gelangen von einer Bestellung zu ihren Problemen, Fulfillments und Retouren. Öffnen Sie **Bestellungen** in der Seitenleiste oder drücken Sie **G**, dann **O**.
+
+## Bestellung finden [#find-an-order]
+
+Wählen Sie über der Liste eine Ansicht:
+
+- **Alle Bestellungen** zeigt alle aktuellen Bestellungen aus Ihren verbundenen Systemen.
+- **Ausstehend** zeigt offene Bestellungen mit Einheiten, die noch zu erfüllen sind.
+- **Überfällig** zeigt ausstehende Bestellungen, deren Frist aus der Quelle überschritten ist.
+- **Wartet auf Sie** zeigt Bestellungen mit einem Problem, das Ihre Entscheidung oder Prüfung braucht.
+- **Quellen weichen ab** zeigt Bestellungen, bei denen Status, Zahlung, Summe oder bestellte Artikel zwischen den Quellen abweichen.
+
+Suchen Sie nach Bestellnummer, der ID der Bestellung in ihrer Quelle oder einer SKU in einer Position. Grenzen Sie die Liste mit **Status**, **Zahlung**, **Quelle**, **Bestellt** und **Aktualisiert** ein, und sortieren Sie nach **Zuletzt aktualisiert**, **Bestelldatum**, **Bestellnummer** oder **Fälligkeitsdatum**. Auf schmalen Bildschirmen sehen Sie alle Filter unter **Filter**.
+
+Ansicht, Filter, Sortierung und Seite sind Teil der Seitenadresse. So können Sie die Liste teilen oder an die Seitenleiste anheften. Ausstehend, Überfällig und Wartet auf Sie zählen dieselben Bestellungen wie die Bestellzahlen auf der Startseite und in den [Auswertungen](/docs/insights). Wenn Sie dort eine Zahl wählen, öffnet sich hier die passende Ansicht.
+
+**Abdeckung** über der Liste zeigt, ob die Liste vollständig ist, zum Beispiel solange ältere Daten noch importiert werden oder wenn eine Quelle nur neuere Bestellungen teilt. Siehe [Datenabgleich](/docs/data-sync).
+
+**Keine passenden Bestellungen** bedeutet, dass Suche, Ansicht oder Filter alle Bestellungen ausschließen. **Noch keine Bestellungen** bedeutet, dass noch kein verbundener Shop und kein ERP eine Bestellung gemeldet hat. Passt ein Seitenlink nicht mehr zu seinen Filtern, wählen Sie **Zur ersten Seite**.
+
+## Bestellung lesen [#read-an-order]
+
+Oben sehen Sie, wann die Bestellung aufgegeben wurde, ihre Summe, ihre Fälligkeit und wann Luma sie zuletzt abgerufen hat. Darunter:
+
+- **Aktueller Stand** fasst die Bestellung zusammen: Status und Zahlung, wie viele Einheiten noch zu erfüllen sind, ob die Frist überschritten ist und welche Probleme auf Sie warten. Grundlage ist die Quelle, die zuletzt aktualisiert wurde.
+- **Positionen** zeigt je Artikel die bestellten, stornierten, erfüllten und verbleibenden Mengen. Stammt die Bestellung aus mehreren Quellen, wählen Sie die Quelle unter **Positionen anzeigen aus**. Meldet eine Quelle keine stornierten Mengen, sagt Luma, dass die Restmenge nicht bestimmbar ist, statt zu raten. **Produkt und Bestand** öffnet das Produkt des Artikels.
+- **Fulfillments** listet die Fulfillment-Arbeit, die jede Quelle meldet. Dieselbe Arbeit aus zwei Systemen wird nie zusammengezählt.
+- **Retouren und Erstattungen** listet die importierten Retouren und Erstattungen der Bestellung. Siehe [Retouren](/docs/returns).
+- **Abrufe aus Quellen** listet jeden Stand, den Luma aus einer Quelle gelesen hat, den neuesten zuerst. Er zeigt, was die Quelle zu diesem Zeitpunkt gemeldet hat, nicht jede Änderung in der Quelle.
+- **Luma-Aktivität** listet Entscheidungen, Aktionen und Ergebnisse, die Luma für die Bestellung, ihre Probleme und ihre Workflow-Ausführungen erfasst hat.
+
+Die Seitenleiste der Bestellung zeigt **Probleme**, **Workflow-Ausführungen** und **Quellen**, jeweils mit dem Zeitpunkt der letzten Aktualisierung in der Quelle und dem letzten Abruf durch Luma. Mit **Link kopieren** teilen Sie die Bestellung, mit **In Datensätzen öffnen** sehen Sie die Datensätze dahinter.
+
+## Wenn Quellen abweichen [#when-sources-disagree]
+
+Gibt es eine Bestellung in mehreren Systemen, stellt **Quellenvergleich** die Angaben jeder Quelle nebeneinander. **Abweichend** markiert die Felder, die nicht übereinstimmen. Bestellnummern und Daten werden angezeigt, aber nicht verglichen, weil jedes System eigene vergibt.
+
+**Aktueller Stand** nennt jede Abweichung, zum Beispiel: Die Zahlung weicht zwischen Quellen ab: „Bezahlt“ in Shopify und „Zahlung ausstehend“ in JTL-Wawi. Luma hält keines der Systeme für maßgeblich. Systeme aktualisieren oft zu unterschiedlichen Zeiten. Vergleichen Sie deshalb, wann jede Quelle die Bestellung zuletzt aktualisiert hat, bevor Sie entscheiden, welche falsch ist. Korrigieren Sie die Bestellung in diesem System; Luma zeigt die Änderung nach dem nächsten Abruf.
+
+## Live-Details aus Shopify ansehen [#see-live-shopify-details]
+
+Bei einer Bestellung aus Shopify liest ein Abschnitt mit Live-Details Zahlungen, Kunde, Fulfillment-Sperren, Retouren, Erstattungen und Ereignisse direkt aus Ihrem Shop, mit den Berechtigungen der Verbindung. Luma speichert diese Details nicht. Wählen Sie **Aktualisieren**, um sie erneut zu lesen, oder **In Shopify Admin öffnen**, um die Bestellung in Shopify zu öffnen.
+
+**Kunden in Luma öffnen →** öffnet den Kunden der Bestellung unter [Kunden](/docs/customers). Kundendaten erscheinen erst, wenn Shopify den Zugriff von Luma auf Kundendaten genehmigt und Ihr Shop ihn erteilt hat. Hat eine Bestellung keine Shopify-Bestell-ID, kann Luma keine Live-Details dazu lesen.
+
+## Shopify-Bestellung mit ihrer JTL-Wawi-Bestellung verknüpfen [#link-a-shopify-order-with-its-jtl-wawi-order]
+
+Wenn Shopify eine Bestellung an JTL-Wawi übergibt, importiert Luma beide als getrennte Bestellungen. Verknüpfen Sie sie, damit Luma eine Bestellung zeigt. Jedes System behält dabei seine eigenen Positionen, Sendungen und Nachweise.
+
+1. Öffnen Sie die Bestellung und gehen Sie zu **Verknüpfte Quellen**.
+2. Unter **Möglicherweise dieselbe Bestellung** schlägt Luma Bestellungen vor, deren externe Bestellnummer in JTL-Wawi passt. Vergleichen Sie externe Bestellnummer, Bestelldatum und Summe. Teilen sich mehrere Bestellungen dieselbe Referenz, prüfen Sie jeden Quelldatensatz, bevor Sie wählen.
+3. Wählen Sie **Verknüpfen** neben der richtigen Bestellung. Hat Luma sie nicht vorgeschlagen, suchen Sie unter **Andere Bestellung suchen** nach der Bestellnummer und wählen Sie **Verknüpfung prüfen**.
+4. Geben Sie unter **Warum ist das richtig?** an, warum beide Datensätze dieselbe Bestellung sind, und wählen Sie **Datensätze verknüpfen**.
+
+Luma zeigt den Fortschritt, während es die Datensätze verknüpft. Danach erscheinen beide Quellversionen in einer Bestellung. Links zu einer der beiden Bestellungen öffnen die zusammengeführte Bestellung, und frühere Probleme, Aktivitäten und Abrufe bleiben erreichbar. Luma verknüpft Vorschläge nie automatisch, und die Verknüpfung ändert die Bestellungen in Shopify und JTL-Wawi nicht.
+
+Um sie wieder zu trennen, wählen Sie **Trennen** neben einer Quelle, geben einen Grund an und wählen **Quelle trennen**. Diese Quelle wird wieder eine eigene Bestellung mit eigenen Positionen und Sendungen. Jede Verknüpfung und Trennung wird mit Person und Grund erfasst.
+
+Verknüpfen und Trennen erfordert **Importe verwalten**. Ohne diese Berechtigung sehen Sie die verknüpften Quellen und Vorschläge, aber nicht **Verknüpfen** oder **Trennen**.
+
+## Zurückgehaltenes oder verzögertes Fulfillment lösen [#fix-a-held-or-delayed-fulfillment]
+
+Um eine Shopify-Sperre aufzuheben, ein Fulfillment wieder zu öffnen oder die Arbeit an einen anderen Standort zu verlagern, öffnen Sie das Fulfillment unter **Fulfillments** in der Bestellung. Siehe [Shopify-Fulfillment wiederherstellen](/docs/fulfillment#recover-a-shopify-fulfillment).
+
+## Wenn eine Bestellung nicht verfügbar ist [#when-an-order-is-unavailable]
+
+- **Diese Bestellung gibt es in diesem Workspace nicht, oder kein verbundenes System meldet sie mehr** bedeutet, dass der Link falsch ist oder alle Quellen die Bestellung entfernt haben.
+- **Sie sind offline. Diese Bestellung ist möglicherweise veraltet.** Stellen Sie die Verbindung wieder her, um aktuelle Daten zu sehen.
+- **Sie haben keinen Zugriff auf Bestellungen in diesem Workspace.** Zum Ansehen von Bestellungen brauchen Sie **Bestellungen ansehen**. Bitten Sie eine Admin-Person um Zugriff.
