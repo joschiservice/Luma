@@ -1,16 +1,23 @@
 import type { CoverageReader } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError, requirePermission } from '@luma/identity';
-import type { OrderMetricRead, OrderMetricScope } from '@luma/orders';
-import { orderMetricDefinitions } from '@luma/orders';
+import { requirePermission } from '@luma/identity';
+import type {
+  OrderMetricId,
+  OrderMetricRead,
+  OrderMetricScope,
+} from '@luma/orders';
+import { orderMetricDefinitions, orderMetricIds } from '@luma/orders';
+
+import { encodeMetricCursor, readMetricCursor } from './metric-pages.js';
+
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface MetricRequest {
   definitionVersion?: 1 | undefined;
   scope?: OrderMetricScope | undefined;
   limit?: number | undefined;
-  offset?: number | undefined;
-  asOf?: string | undefined;
-  snapshot?: string | undefined;
+  /** A metric's `nextCursor`: that metric lists the orders after the previous page. */
+  cursor?: string | undefined;
 }
 
 export interface MetricResponse {
@@ -19,7 +26,6 @@ export interface MetricResponse {
   scope: OrderMetricScope;
   asOf: string;
   readAt: string;
-  snapshot: string;
   timezone: 'UTC';
   observedAt: string | null;
   dataThrough: string | null;
@@ -27,29 +33,31 @@ export interface MetricResponse {
   coverage: 'partial' | 'unavailable';
   coverageExplanation: string;
   limit: number;
-  offset: number;
   metrics: (OrderMetricRead['metrics'][number] & {
     definition: (typeof orderMetricDefinitions)[number];
     total: null;
+    offset: number;
+    nextCursor: string | null;
   })[];
 }
 
-/** Reads registered metrics and matching orders in one authorized snapshot. */
+/** Reads registered metrics and a page of matching orders for each, from current data. */
 export type OperationalMetrics = (
   context: TenantContext,
   request: MetricRequest,
 ) => Promise<MetricResponse>;
 
-interface ParsedMetricRequest extends MetricRequest {
+interface ParsedMetricRequest {
   definitionVersion: 1;
   scope: OrderMetricScope;
   limit: number;
-  offset: number;
+  cursor?: string | undefined;
 }
 
 /**
- * Applies authorization, snapshot expiry and shared coverage semantics to registered order
- * metrics. Readers need `orders.read`; others get a 403 error.
+ * Applies authorization and shared coverage semantics to registered order metrics. Readers need
+ * `orders.read`; others get a 403 error. Every page reads current data: records that changed
+ * since the previous page don't fail the read, and callers deduplicate by ID.
  */
 export function createMetricService(dependencies: {
   parse(input: MetricRequest): ParsedMetricRequest;
@@ -57,39 +65,36 @@ export function createMetricService(dependencies: {
     context: TenantContext,
     request: ParsedMetricRequest,
     asOf: string,
+    limit: number,
+    after: { metric: OrderMetricId; id: string } | undefined,
   ): Promise<{
     result: OrderMetricRead;
     connections: Awaited<ReturnType<CoverageReader>>;
-    snapshot: string;
   }>;
   now(): Date;
 }): OperationalMetrics {
   return async (context, input) => {
     requirePermission(context, 'orders.read');
     const request = dependencies.parse(input);
-    const readAt = dependencies.now().toISOString();
-    const asOf = request.asOf ?? readAt;
-    if (
-      Date.parse(asOf) > Date.parse(readAt) ||
-      Date.parse(readAt) - Date.parse(asOf) > 15 * 60_000
-    )
-      throw new IdentityError(
-        409,
-        'CONFLICT',
-        'This snapshot expired. Refresh the metrics.',
-      );
-
-    const { result, connections, snapshot } = await dependencies.read(
+    const asOf = dependencies.now().toISOString();
+    const { limit } = request;
+    // Orders page by ID, so a cursor's key is one order ID.
+    const cursor = readMetricCursor(
+      request.cursor,
+      orderMetricIds,
+      (key) => key.length === 1 && uuid.test(key[0]!),
+    );
+    const paged = orderMetricIds.find((id) => id === cursor?.metric);
+    // One extra order shows whether another page follows.
+    const { result, connections } = await dependencies.read(
       context,
       request,
       asOf,
+      limit + 1,
+      paged && cursor?.key[0]
+        ? { metric: paged, id: cursor.key[0] }
+        : undefined,
     );
-    if (request.snapshot && request.snapshot !== snapshot)
-      throw new IdentityError(
-        409,
-        'CONFLICT',
-        'The matching records changed. Refresh the metrics.',
-      );
     const monitored = connections.filter(
       (c) =>
         (!request.scope.connectionId || c.id === request.scope.connectionId) &&
@@ -108,8 +113,7 @@ export function createMetricService(dependencies: {
       definitionVersion: 1,
       scope: request.scope,
       asOf,
-      readAt,
-      snapshot,
+      readAt: asOf,
       timezone: 'UTC',
       observedAt: result.observedAt,
       dataThrough: null,
@@ -127,13 +131,27 @@ export function createMetricService(dependencies: {
       coverage: result.population > 0 ? 'partial' : 'unavailable',
       coverageExplanation:
         'Complete order and fulfillment scans are not established. Observed counts may omit orders; totals remain unavailable.',
-      limit: request.limit,
-      offset: request.offset,
-      metrics: result.metrics.map((metric) => ({
-        ...metric,
-        definition: orderMetricDefinitions.find((d) => d.id === metric.id)!,
-        total: null,
-      })),
+      limit,
+      metrics: result.metrics.map((metric) => {
+        const offset = metric.id === paged ? (cursor?.offset ?? 0) : 0;
+        const items = metric.items.slice(0, limit);
+
+        return {
+          ...metric,
+          items,
+          definition: orderMetricDefinitions.find((d) => d.id === metric.id)!,
+          total: null,
+          offset,
+          nextCursor:
+            metric.items.length > limit
+              ? encodeMetricCursor({
+                  metric: metric.id,
+                  offset: offset + limit,
+                  key: [items.at(-1)!.id],
+                })
+              : null,
+        };
+      }),
     };
   };
 }

@@ -150,8 +150,13 @@ test('explains unknown order totals, opens accessible cohorts and recovers from 
     path: '/tmp/luma84-ui/mobile-cohort.png',
     fullPage: true,
   });
+  // A live change keeps the page in place until the person asks for the latest records.
   await seed(26);
+  await dialog.getByText('The matching orders changed').waitFor();
+  await dialog.getByText('21–25 of 25 matching orders').waitFor();
+  await dialog.getByRole('button', { name: 'Show latest' }).click();
   await dialog.getByText('1–20 of 26 matching orders').waitFor();
+  expect(await dialog.getByText('The matching orders changed').count()).toBe(0);
   await page.keyboard.press('Escape');
   await dialog.waitFor({ state: 'hidden' });
   await page.setViewportSize({ width: 1440, height: 1100 });

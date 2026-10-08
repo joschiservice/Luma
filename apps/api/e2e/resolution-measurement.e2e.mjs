@@ -43,14 +43,12 @@ it('reconciles authorized incident cohorts, excludes synthetic data and retains 
   expect(m('unknown').value).toBe(1);
   expect(m('pending').items.map((i) => i.id)).toEqual([pending.id]);
   expect(m('recurrent').items[0].previousIncidentId).toBe(a.id);
-  const second = await query({
-    limit: 1,
-    offset: 1,
-    asOf: result.asOf,
-    snapshot: result.snapshot,
-  });
+  const verified = (read) =>
+    read.metrics.find((m) => m.definition.id === 'resolution.verified');
+  const second = await query({ limit: 1, cursor: m('verified').nextCursor });
+  expect(verified(second)).toMatchObject({ offset: 1, nextCursor: null });
   expect(
-    new Set([m('verified').items[0].id, second.metrics[1].items[0].id]).size,
+    new Set([m('verified').items[0].id, verified(second).items[0].id]).size,
   ).toBe(2);
   await f.request(f.outsider, endpoint, 'POST', request, 404);
   await f.request(null, endpoint, 'POST', request, 401);
@@ -94,13 +92,14 @@ it('reconciles authorized incident cohorts, excludes synthetic data and retains 
     ruleVersion: 'partner-rule/2',
     reasonCode: 'outside_scope',
   });
-  await f.request(
-    f.member,
-    endpoint,
-    'POST',
-    { ...request, asOf: result.asOf, snapshot: result.snapshot, offset: 1 },
-    409,
-  );
+  // A later page reads current data instead of failing after a change.
+  const later = await f.request(f.member, endpoint, 'POST', {
+    ...request,
+    cursor: m('verified').nextCursor,
+  });
+  expect(
+    later.metrics.find((m) => m.definition.id === 'resolution.eligible').value,
+  ).toBe(2);
   expect((await f.request(f.member, recurrence.path)).items).toHaveLength(4);
   result = await query();
   expect(m('eligible').value).toBe(2);

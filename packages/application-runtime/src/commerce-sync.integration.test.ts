@@ -1746,7 +1746,7 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
     ).toEqual([a]);
     const metrics = await createOrderMetricReader(db, orderAttentionQuery)(
       context(),
-      { asOf: new Date().toISOString(), scope: {}, limit: 50, offset: 0 },
+      { asOf: new Date().toISOString(), scope: {}, limit: 50 },
     );
     expect(metrics.population).toBe(1);
     const records = createRecordExplorer(db);

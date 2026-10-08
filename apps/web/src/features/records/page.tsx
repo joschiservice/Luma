@@ -326,7 +326,6 @@ export function RecordsPage() {
                   }));
                 goTo(nextCursor, (search.page ?? 1) + 1);
               }}
-              disabled={query.isFetching}
               emptyLabel={m.records_pagination_empty()}
               label={m.records_pagination_label()}
             />

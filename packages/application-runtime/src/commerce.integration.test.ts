@@ -1475,15 +1475,7 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
     expect(first.metrics[0]!.observedCount).toBe(
       first.metrics[0]!.items.length,
     );
-    expect(
-      (
-        await metrics(context(), {
-          asOf: first.asOf,
-          snapshot: first.snapshot,
-          offset: 1,
-        })
-      ).metrics[0]!.items,
-    ).toEqual([]);
+    expect(first.metrics[0]!.nextCursor).toBeNull();
     const update = async (change: (v: typeof order) => void, time?: string) => {
       const next = structuredClone(order);
       next.observation.id = randomUUID();
@@ -1540,9 +1532,6 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
     await services.ingestion.ingest(context(), 'metric-full', shipment);
     await services.ingestion.replay(context(), connection, 'metric-full');
     expect(await counts()).toEqual([0, 0, 0]);
-    await expect(
-      metrics(context(), { asOf: first.asOf, snapshot: first.snapshot }),
-    ).rejects.toMatchObject({ statusCode: 409 });
     await update((v) => {
       v.observation.data.status = 'cancelled';
     });

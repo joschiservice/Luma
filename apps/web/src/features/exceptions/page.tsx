@@ -300,7 +300,6 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
                   hasNext={Boolean(listData.nextCursor)}
                   onPrevious={goPrevious}
                   onNext={goNext}
-                  disabled={list.isFetching}
                   formatTotal={(count) =>
                     m.exceptions_pagination_total({ count })
                   }
@@ -377,7 +376,6 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
                         aria-label={m.exceptions_refresh_issue()}
                         title={m.exceptions_refresh_issue()}
                         onClick={observation.restart}
-                        disabled={detail.isFetching}
                       >
                         <RefreshCw size={14} aria-hidden="true" />
                       </Button>

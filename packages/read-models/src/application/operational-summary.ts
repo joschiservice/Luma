@@ -50,9 +50,8 @@ export interface OperationalSummaryRequest {
       }
     | undefined;
   limit?: number | undefined;
-  offset?: number | undefined;
-  asOf?: string | undefined;
-  snapshot?: string | undefined;
+  /** A metric's `nextCursor`: that metric lists the records after the previous page. */
+  cursor?: string | undefined;
 }
 
 export type OperationalCohortItem =
@@ -67,12 +66,14 @@ export interface OperationalSummaryResponse {
   scope: NonNullable<OperationalSummaryRequest['scope']>;
   asOf: string;
   readAt: string;
-  snapshot: string;
   timezone: 'UTC';
   nextRefreshAt: string | null;
   limit: number;
-  offset: number;
-  metrics: OperationalMetricRead<OperationalCohortItem>[];
+  /** Each metric's page: `offset` records were paged past; `nextCursor` reads the next page. */
+  metrics: (OperationalMetricRead<OperationalCohortItem> & {
+    offset: number;
+    nextCursor: string | null;
+  })[];
   /**
    * Requested metric IDs whose family the reader can't read. They keep their place in `metrics`
    * with unavailable coverage, no value and no records.
@@ -81,7 +82,7 @@ export interface OperationalSummaryResponse {
 }
 
 /**
- * Reads selected domain metrics and their paginated cohorts in one authorized snapshot. Metrics
+ * Reads selected domain metrics and a page of each cohort from one consistent, current read. Metrics
  * whose family needs a permission the reader lacks are withheld rather than failing the read.
  */
 export type OperationalSummary = (

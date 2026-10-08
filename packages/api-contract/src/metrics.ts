@@ -20,12 +20,14 @@ export const metricRequestSchema = z
     definitionVersion: z.literal(1).default(1),
     scope: metricScopeSchema.default({}),
     limit: z.number().int().min(1).max(100).default(20),
-    offset: z.number().int().min(0).max(10000).default(0),
-    asOf: timestamp.optional(),
-    snapshot: z
+    cursor: z
       .string()
-      .regex(/^[a-f0-9]{64}$/)
-      .optional(),
+      .min(1)
+      .max(2048)
+      .optional()
+      .describe(
+        'A metric’s nextCursor. That metric lists the records after the previous page, read from current data; the other metrics return their first page.',
+      ),
   })
   .strict()
   .refine(
@@ -34,11 +36,6 @@ export const metricRequestSchema = z
       !v.scope.updatedBefore ||
       Date.parse(v.scope.updatedFrom) < Date.parse(v.scope.updatedBefore),
     'The reporting window must end after it starts.',
-  )
-  .refine(
-    (v) =>
-      (!v.snapshot && !v.asOf && v.offset === 0) || (!!v.snapshot && !!v.asOf),
-    'Pagination requires the snapshot and evaluation time.',
   );
 
 export const metricDefinitionSchema = z.object({
@@ -66,7 +63,6 @@ export const metricResponseSchema = z.object({
   scope: metricScopeSchema,
   asOf: timestamp,
   readAt: timestamp,
-  snapshot: z.string(),
   timezone: z.literal('UTC'),
   observedAt: timestamp.nullable(),
   dataThrough: timestamp.nullable(),
@@ -74,13 +70,25 @@ export const metricResponseSchema = z.object({
   coverage: z.enum(['partial', 'unavailable']),
   coverageExplanation: z.string(),
   limit: z.number(),
-  offset: z.number(),
   metrics: z.array(
     z.object({
       definition: metricDefinitionSchema,
       total: z.number().int().nonnegative().nullable(),
       observedCount: z.number().int().nonnegative(),
       unknownCount: z.number().int().nonnegative(),
+      offset: z
+        .number()
+        .int()
+        .nonnegative()
+        .describe(
+          'Records paged past before this page. It labels the page; records may have changed since earlier pages.',
+        ),
+      nextCursor: z
+        .string()
+        .nullable()
+        .describe(
+          'Pass as cursor to read the records after this page. Null when no more records match.',
+        ),
       items: z.array(
         z.object({
           id: z.string().uuid(),

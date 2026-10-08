@@ -5,24 +5,23 @@ import { metricsOptions } from './metrics-data';
 
 afterEach(() => vi.unstubAllGlobals());
 
-it('isolates workspace, filter and snapshot caches without retrying expired snapshots', () => {
+it('isolates workspace, filter and page caches without retrying failed reads', () => {
   expect(metricsOptions('a').queryKey).not.toEqual(
     metricsOptions('b').queryKey,
   );
   expect(
     metricsOptions('a', { scope: { connectionId: 'one' } }).queryKey,
   ).not.toEqual(metricsOptions('a').queryKey);
-  expect(metricsOptions('a', { snapshot: 'one' }).queryKey).not.toEqual(
-    metricsOptions('a', { snapshot: 'two' }).queryKey,
+  expect(metricsOptions('a', { cursor: 'one' }).queryKey).not.toEqual(
+    metricsOptions('a', { cursor: 'two' }).queryKey,
   );
-  expect(metricsOptions('a', { snapshot: 'one' })).toMatchObject({
+  expect(metricsOptions('a', { cursor: 'one' })).toMatchObject({
     gcTime: 0,
     retry: false,
-    refetchOnWindowFocus: false,
   });
 });
 
-it('rejects expired snapshots and malformed responses without exposing cached counts', async () => {
+it('rejects failed and malformed responses without exposing cached counts', async () => {
   vi.stubGlobal(
     'fetch',
     vi
@@ -30,12 +29,12 @@ it('rejects expired snapshots and malformed responses without exposing cached co
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
-            code: 'CONFLICT',
-            message: 'Snapshot changed',
+            code: 'SERVICE_UNAVAILABLE',
+            message: 'Operational metrics are unavailable',
             requestId: 'test',
           }),
           {
-            status: 409,
+            status: 503,
             headers: { 'content-type': 'application/json' },
           },
         ),
@@ -50,7 +49,7 @@ it('rejects expired snapshots and malformed responses without exposing cached co
   const client = new QueryClient();
   try {
     await expect(client.fetchQuery(metricsOptions('a'))).rejects.toMatchObject({
-      status: 409,
+      status: 503,
     });
     await expect(client.fetchQuery(metricsOptions('b'))).rejects.toThrow();
     expect(client.getQueryData(metricsOptions('a').queryKey)).toBeUndefined();

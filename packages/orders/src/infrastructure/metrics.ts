@@ -39,7 +39,6 @@ SELECT jsonb_build_object(
  UNION ALL SELECT "observedAt" + interval '24 hours 1 millisecond' FROM rows
  UNION ALL SELECT s.observed_at FROM orders_projections p JOIN orders_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id WHERE p.tenant_id=$1 AND s.kind='fulfillment' AND ($3::uuid IS NULL OR p.connection_id=$3)
  ) boundaries WHERE boundary > $2),
- 'revision', md5(COALESCE((SELECT string_agg(row_to_json(r)::text,',' ORDER BY r.id) FROM rows r),'')),
  'population',(SELECT count(*) FROM rows),
  'oldestObservedAt',(SELECT CASE WHEN max("observedAt") <= $2 THEN min("observedAt") END FROM rows),
  'observedAt',(SELECT max("observedAt") FROM rows WHERE "observedAt" <= $2),
@@ -47,7 +46,7 @@ SELECT jsonb_build_object(
  'metrics',(SELECT jsonb_agg(jsonb_build_object('id',m.id,
  'observedCount',(SELECT count(*) FROM rows r WHERE CASE m.id WHEN 'orders.open' THEN open WHEN 'orders.overdue' THEN overdue ELSE attention END),
  'unknownCount',(SELECT count(*) FROM rows r WHERE (CASE m.id WHEN 'orders.open' THEN open WHEN 'orders.overdue' THEN overdue ELSE attention END) IS NULL),
- 'items',COALESCE((SELECT jsonb_agg(page) FROM (SELECT * FROM rows r WHERE CASE m.id WHEN 'orders.open' THEN open WHEN 'orders.overdue' THEN overdue ELSE attention END ORDER BY id LIMIT $6 OFFSET $7) page),'[]'::jsonb)
+ 'items',COALESCE((SELECT jsonb_agg(page) FROM (SELECT * FROM rows r WHERE CASE m.id WHEN 'orders.open' THEN open WHEN 'orders.overdue' THEN overdue ELSE attention END AND ($7::text IS NULL OR m.id<>$7 OR r.id>$8::uuid) ORDER BY id LIMIT $6) page),'[]'::jsonb)
  )) FROM metrics m)
 ) AS result`;
 
@@ -74,7 +73,8 @@ export function createOrderMetricReader(
         request.scope.updatedFrom ?? null,
         request.scope.updatedBefore ?? null,
         request.limit,
-        request.offset,
+        request.after?.metric ?? null,
+        request.after?.id ?? null,
       ]);
 
       return result.rows[0]!.result;
