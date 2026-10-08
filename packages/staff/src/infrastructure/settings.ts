@@ -1,7 +1,24 @@
+import { isIP } from 'node:net';
+
+import { Client } from 'pg';
 import { z } from 'zod';
 
 const loopback = (hostname: string) =>
   ['localhost', '127.0.0.1', '[::1]', '::1'].includes(hostname);
+
+function isNarrowProxyAddress(value: string): boolean {
+  const [address, prefix, ...extra] = value.split('/');
+  if (!address || extra.length || address.includes('%')) return false;
+  const version = isIP(address);
+  if (!version || address === '0.0.0.0' || address === '::') return false;
+  if (prefix === undefined) return true;
+  if (!/^(0|[1-9]\d*)$/.test(prefix)) return false;
+  const bits = Number(prefix);
+
+  // Explicit ingress ranges may include at most 256 addresses, not whole networks.
+  return version === 4 ? bits >= 24 && bits <= 32 : bits >= 120 && bits <= 128;
+}
+
 const databaseUrlSchema = z
   .string()
   .url()
@@ -51,6 +68,18 @@ export function validateStaffProvisioning(input: unknown) {
 export function validateStaffAdministratorDatabaseUrl(value: string) {
   return databaseUrlSchema.parse(value);
 }
+
+/** Validates the driver's effective local destination, including connection-string query overrides. */
+export function validateLocalStaffDatabaseUrl(value: string) {
+  const validated = databaseUrlSchema.parse(value);
+  // Client.host is assigned from connectionParameters.host; constructing a client opens no connection.
+  if (!loopback(new Client({ connectionString: validated }).host))
+    throw new Error(
+      'Local staff access requires an effective loopback database destination.',
+    );
+
+  return validated;
+}
 const settingsSchema = z
   .object({
     databaseUrl: databaseUrlSchema,
@@ -67,13 +96,25 @@ const settingsSchema = z
     googleClientId: z.string().optional(),
     googleClientSecret: z.string().optional(),
     googleHostedDomain: z.string().optional(),
+    trustedProxy: z
+      .array(
+        z
+          .string()
+          .refine(
+            isNarrowProxyAddress,
+            'Trusted proxies must be explicit IP addresses or narrow CIDR ranges.',
+          ),
+      )
+      .max(64)
+      .default([]),
   })
   .superRefine((settings, context) => {
     let url: URL;
-    let database: URL;
+    let databaseHost: string;
     try {
       url = new URL(settings.publicOrigin);
-      database = new URL(settings.databaseUrl);
+      databaseHost = new Client({ connectionString: settings.databaseUrl })
+        .host;
     } catch {
       context.addIssue({
         code: 'custom',
@@ -97,7 +138,7 @@ const settingsSchema = z
       (settings.environment === 'production' ||
         !loopback(url.hostname) ||
         !loopback(settings.host) ||
-        !loopback(database.hostname))
+        !loopback(databaseHost))
     )
       context.addIssue({
         code: 'custom',
@@ -121,9 +162,19 @@ const settingsSchema = z
         code: 'custom',
         message: 'Google staff authentication requires HTTPS.',
       });
+    if (
+      settings.mode === 'google' &&
+      settings.environment === 'production' &&
+      !settings.trustedProxy.length
+    )
+      context.addIssue({
+        code: 'custom',
+        message:
+          'Production staff authentication requires an explicit trusted ingress proxy.',
+      });
   });
 
-export type StaffSettings = z.infer<typeof settingsSchema>;
+export type StaffSettings = z.input<typeof settingsSchema>;
 
 /** Reads isolated staff settings and rejects unsafe local or incomplete production configuration. */
 export function readStaffSettings(
@@ -141,6 +192,9 @@ export function readStaffSettings(
     googleClientId: env.STAFF_GOOGLE_CLIENT_ID,
     googleClientSecret: env.STAFF_GOOGLE_CLIENT_SECRET,
     googleHostedDomain: env.STAFF_GOOGLE_HOSTED_DOMAIN,
+    trustedProxy: env.STAFF_TRUSTED_PROXY?.trim()
+      ? env.STAFF_TRUSTED_PROXY.split(',').map((value) => value.trim())
+      : [],
   });
 }
 

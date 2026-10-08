@@ -1,27 +1,10 @@
-import { randomUUID } from 'node:crypto';
-
 import { createStaff, readStaffSettings } from '@luma/staff/composition';
-import { registerStaffHttp } from '@luma/staff/http';
-import Fastify, { LogController } from 'fastify';
+
+import { createStaffHttpApp } from './composition/http-app.js';
 
 const settings = readStaffSettings();
 const staff = createStaff(settings);
-const app = Fastify({
-  logger: {
-    serializers: {
-      req: (request: { method: string; url: string }) => ({
-        method: request.method,
-        url: request.url.split('?')[0] ?? '/',
-      }),
-    },
-  },
-  logController: new LogController({ disableRequestLogging: true }),
-  genReqId: () => randomUUID(),
-  bodyLimit: 16 * 1024,
-  trustProxy: false,
-});
-registerStaffHttp(app, staff);
-app.addHook('onClose', () => staff.close());
+const app = createStaffHttpApp(staff, settings.trustedProxy ?? []);
 for (const signal of ['SIGINT', 'SIGTERM'] as const)
   process.once(signal, () => {
     void app.close();

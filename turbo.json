@@ -83,7 +83,8 @@
         "STAFF_COOKIE_PREFIX",
         "STAFF_GOOGLE_CLIENT_ID",
         "STAFF_GOOGLE_CLIENT_SECRET",
-        "STAFF_GOOGLE_HOSTED_DOMAIN"
+        "STAFF_GOOGLE_HOSTED_DOMAIN",
+        "STAFF_TRUSTED_PROXY"
       ]
     },
     "build:storybook": {

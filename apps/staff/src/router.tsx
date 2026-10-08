@@ -45,7 +45,10 @@ const rootRoute = createRootRoute({
 export const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/login',
-  validateSearch: z.object({ denied: z.boolean().optional().catch(false) }),
+  validateSearch: z.object({
+    denied: z.boolean().optional().catch(false),
+    signInFailed: z.boolean().optional().catch(false),
+  }),
   component: lazyRouteComponent(() => import('./login'), 'LoginPage'),
 });
 

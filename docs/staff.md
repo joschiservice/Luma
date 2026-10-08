@@ -50,8 +50,12 @@ pnpm --filter @luma/staff-api staff:provision --input /secure/path/staff.json
 Run the same command with `active: false` to revoke admission, or with a reviewed
 permission list to change access. Deactivation or changes to the bound subject or
 permissions delete existing staff sessions and their support grants in the same
-transaction. Sessions also recheck admission on every request. The administrator
-operation records its operator, reason and resulting grant atomically; the running
+transaction. Subject rebinding also replaces the Google account binding through this
+explicit administrator operation, preserving the staff principal and its audit history.
+Google sessions retain the verified subject from their sign-in. A session without a
+matching subject is rejected, including an old callback that finishes after rebinding.
+Sessions also recheck admission on every request. The administrator operation records
+its operator, reason and resulting grant atomically; the running
 staff credentials cannot perform it. Opening support grants
 requires both `staff.directory.read` and `staff.workspace.inspect`. Global customer
 session revocation additionally requires `staff.sessions.revoke`.
@@ -83,9 +87,12 @@ and valid for thirty minutes. Grants are checked again on every read and command
 policies preserve workspace boundaries without inserting artificial customer memberships.
 Inspection can support suspended workspaces; it grants no commerce execution authority.
 
-Staff sessions have an eight-hour absolute lifetime and a thirty-minute idle limit. Access
-is resolved from current storage, without a browser cookie permission cache. Revoking
-customer sessions additionally requires staff authentication within fifteen minutes.
+Staff sessions have an eight-hour absolute lifetime and a thirty-minute idle limit.
+Passive polling does not extend the idle deadline. Only browser interaction reported on
+private requests advances activity; background refresh and focus checks still resolve
+current access. Access is resolved from current storage, without a browser cookie
+permission cache. Revoking customer sessions additionally requires staff authentication
+within fifteen minutes.
 
 Customer session revocation affects the account across all of its workspaces. The UI and
 API require explicit acknowledgement of that effect. The identity-owned operation checks
@@ -114,6 +121,24 @@ private network. The upstream must not be independently reachable through a publ
 listener, alternate hostname or the customer API. The API still authenticates and authorizes
 each request. If a gateway forwards identity headers, strip client-supplied values and
 validate the gateway's assertion before treating them as identity evidence.
+
+Set `STAFF_TRUSTED_PROXY` to the reviewed ingress IP addresses or narrow CIDR ranges,
+separated by commas. Production Google authentication requires this setting; other modes
+trust no forwarded addresses by default. Prefer exact proxy IPs. IPv4 prefixes must be
+`/24` or narrower and IPv6 prefixes `/120` or narrower, limiting each trusted range to 256
+addresses. Hostnames, symbolic ranges, booleans and hop counts are rejected because they
+could trust unintended callers. Keep the trusted ranges limited to the ingress service.
+
+The trusted proxy must replace incoming `X-Forwarded-For` with the verified client address.
+If several proxies participate, each retained hop must be verified and explicitly trusted.
+Fastify stops the address chain at the first untrusted hop; the auth bridge then strips
+forwarding headers and supplies only that resolved address to Better Auth. Direct callers
+cannot change their authentication limiter key by supplying address headers. Incorrect
+proxy trust collapses clients into a shared limiter bucket or lets callers evade limits.
+For example, a same-host reverse proxy can use `STAFF_TRUSTED_PROXY=127.0.0.1` while
+overwriting the forwarded address from its verified upstream connection. Authentication
+limits are per API process; use a gateway limiter or shared storage before relying on them
+across several API instances.
 
 Serve private responses with `Cache-Control: no-store`. Apply a restrictive content security
 policy and `frame-ancestors 'none'` to the frontend. Keep the staff API, database, support

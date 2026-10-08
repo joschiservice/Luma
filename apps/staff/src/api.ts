@@ -7,6 +7,8 @@ import {
   staffWorkspaceDetailSchema,
 } from '@luma/api-contract/staff';
 
+import { staffActivity } from './activity';
+
 /** A rejected staff request. Status zero means no response arrived. */
 export class StaffApiError extends Error {
   constructor(
@@ -45,12 +47,17 @@ function failureMessage(status: number, path: string) {
  * Creates the same-origin staff API client. Cookies stay HTTP-only and all responses bypass
  * the browser cache; successful business responses are validated against shared contracts.
  */
-export function createStaffApi(fetcher: typeof fetch = fetch) {
+export function createStaffApi(
+  fetcher: typeof fetch = fetch,
+  activity: Pick<typeof staffActivity, 'consume'> = staffActivity,
+) {
   async function request(
     path: string,
     body?: unknown,
     signal?: AbortSignal,
   ): Promise<unknown> {
+    const active =
+      path !== 'config' && !path.startsWith('auth/') && activity.consume();
     let response: Response;
     try {
       response = await fetcher(
@@ -59,11 +66,16 @@ export function createStaffApi(fetcher: typeof fetch = fetch) {
           method: body === undefined ? 'GET' : 'POST',
           credentials: 'same-origin',
           cache: 'no-store',
+          headers: {
+            ...(active ? { 'x-luma-staff-activity': 'true' } : {}),
+            ...(body === undefined
+              ? {}
+              : { 'content-type': 'application/json' }),
+          },
           ...(signal ? { signal } : {}),
           ...(body === undefined
             ? {}
             : {
-                headers: { 'content-type': 'application/json' },
                 body: JSON.stringify(body),
               }),
         },
@@ -145,6 +157,7 @@ export function createStaffApi(fetcher: typeof fetch = fetch) {
       const response = await request('auth/sign-in/social', {
         provider: 'google',
         callbackURL: `${window.location.origin}/`,
+        errorCallbackURL: `${window.location.origin}/login?signInFailed=true`,
       });
       if (
         !response ||

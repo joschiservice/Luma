@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { createStaffActivityTracker } from './activity';
 import { createStaffApi, StaffApiError } from './api';
 
 const workspaceId = 'f9834020-2998-4822-9bcb-077a9f560dc7';
@@ -16,6 +17,8 @@ function fetchResult(body: unknown, status = 200) {
       }),
   );
 }
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe('staff browser API', () => {
   it('keeps credentials on the same origin and bypasses private response caches', async () => {
@@ -111,5 +114,82 @@ describe('staff browser API', () => {
     await expect(
       createStaffApi(fetcher).directory('customer'),
     ).rejects.toMatchObject({ status: 0 });
+  });
+});
+
+describe('staff authentication and activity boundaries', () => {
+  const session = {
+    user: {
+      id: userId,
+      name: 'Support operator',
+      email: 'support@example.test',
+    },
+    permissions: ['staff.directory.read'],
+  };
+
+  it('reports real activity on one private request, then leaves passive polls read-only', async () => {
+    const tracker = createStaffActivityTracker();
+    const fetcher = fetchResult(session);
+    const api = createStaffApi(fetcher, tracker);
+    tracker.record({ isTrusted: true });
+    await api.session();
+    await api.session();
+    expect(fetcher).toHaveBeenNthCalledWith(
+      1,
+      '/api/v1/staff/session',
+      expect.objectContaining({ headers: { 'x-luma-staff-activity': 'true' } }),
+    );
+    expect(fetcher).toHaveBeenNthCalledWith(
+      2,
+      '/api/v1/staff/session',
+      expect.objectContaining({ headers: {} }),
+    );
+  });
+
+  it('does not consume activity or attach activity reports to public configuration or auth', async () => {
+    const tracker = createStaffActivityTracker();
+    const fetcher = fetchResult({ mode: 'local', providerId: null });
+    const api = createStaffApi(fetcher, tracker);
+    tracker.record({ isTrusted: true });
+    await api.config();
+    await api.signIn('support@example.test', 'local-development-password');
+    expect(fetcher).toHaveBeenNthCalledWith(
+      1,
+      '/api/v1/staff/config',
+      expect.objectContaining({ headers: {} }),
+    );
+    expect(fetcher).toHaveBeenNthCalledWith(
+      2,
+      '/api/auth/sign-in/email',
+      expect.objectContaining({
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+    expect(tracker.consume()).toBe(true);
+  });
+
+  it('returns rejected Google callbacks to the same-origin staff login with sanitized failure state', async () => {
+    const assign = vi.fn();
+    vi.stubGlobal('window', {
+      location: { origin: 'https://staff.example.test', assign },
+    });
+    const fetcher = fetchResult({
+      url: 'https://accounts.google.com/o/oauth2/v2/auth?state=opaque',
+    });
+    await createStaffApi(fetcher).google();
+    expect(fetcher).toHaveBeenCalledWith(
+      '/api/auth/sign-in/social',
+      expect.objectContaining({
+        body: JSON.stringify({
+          provider: 'google',
+          callbackURL: 'https://staff.example.test/',
+          errorCallbackURL:
+            'https://staff.example.test/login?signInFailed=true',
+        }),
+      }),
+    );
+    expect(assign).toHaveBeenCalledWith(
+      'https://accounts.google.com/o/oauth2/v2/auth?state=opaque',
+    );
   });
 });

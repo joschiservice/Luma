@@ -5,7 +5,11 @@ import { RouterProvider } from '@tanstack/react-router';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
+import { trackStaffActivity } from './activity';
 import { queryClient, router } from './router';
+
+const stopTrackingActivity = trackStaffActivity(window);
+if (import.meta.hot) import.meta.hot.dispose(stopTrackingActivity);
 
 const media = window.matchMedia('(prefers-color-scheme: dark)');
 const applyTheme = () =>

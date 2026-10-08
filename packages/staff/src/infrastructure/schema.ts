@@ -15,6 +15,7 @@ export const user = pgTable('staff_users', {
 export const session = pgTable('staff_sessions', {
   id: uuid('id').primaryKey(),
   token: text('token').notNull().unique(),
+  providerSubject: text('provider_subject'),
   userId: uuid('user_id')
     .notNull()
     .references(() => user.id, { onDelete: 'cascade' }),

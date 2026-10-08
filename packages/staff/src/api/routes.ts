@@ -188,6 +188,7 @@ export function registerStaffHttp(app: FastifyInstance, staff: StaffRuntime) {
       authHeaders.set('x-luma-staff-request-id', request.id);
       authHeaders.set('x-luma-staff-client-ip', request.ip);
       authHeaders.delete('x-forwarded-for');
+      authHeaders.delete('forwarded');
       authHeaders.delete('x-real-ip');
       const response = await staff.authHandler(
         new Request(url, {

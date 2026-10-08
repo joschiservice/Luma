@@ -49,6 +49,7 @@ async function fixture(t) {
     STAFF_AUTH_MODE: 'local',
     STAFF_API_HOST: '127.0.0.1',
     STAFF_API_PORT: String(apiPort),
+    STAFF_TRUSTED_PROXY: '127.0.0.1',
     STAFF_COOKIE_PREFIX: login,
   };
   await seedLocalStaff(
@@ -94,7 +95,16 @@ async function fixture(t) {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
 
-  return { page, context, db, customerApi, customer, workspace, errors };
+  return {
+    page,
+    context,
+    db,
+    customerApi,
+    customer,
+    workspace,
+    staffOrigin,
+    errors,
+  };
 }
 
 async function signIn(page) {
@@ -238,5 +248,156 @@ test('staff access removal clears customer details and rejects direct API calls'
     '/api/v1/staff/directory?query=Support',
   );
   expect(response.status()).toBe(403);
+  expect(errors).toEqual([]);
+});
+
+test('passive refreshes preserve idle limits while trusted input refreshes active support access', async ({
+  resources: t,
+}) => {
+  const { page, db, errors } = await fixture(t);
+  await signIn(page);
+  const previous = await db.owner.query(
+    "UPDATE staff_sessions SET updated_at=now()-interval '5 minutes' RETURNING updated_at",
+  );
+  const [passive] = await Promise.all([
+    page.waitForResponse((response) =>
+      response.url().endsWith('/api/v1/staff/session'),
+    ),
+    page.evaluate(() => window.dispatchEvent(new Event('focus'))),
+  ]);
+  expect(passive.status()).toBe(200);
+  expect(passive.request().headers()['x-luma-staff-activity']).toBeUndefined();
+  const unchanged = await db.owner.query(
+    'SELECT updated_at FROM staff_sessions',
+  );
+  expect(unchanged.rows[0].updated_at).toEqual(previous.rows[0].updated_at);
+
+  await page.getByLabel('Name, email or workspace').click();
+  await page.getByLabel('Name, email or workspace').press('a');
+  const [active] = await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.url().endsWith('/api/v1/staff/session') &&
+        response.request().headers()['x-luma-staff-activity'] === 'true',
+    ),
+    page.evaluate(() => window.dispatchEvent(new Event('focus'))),
+  ]);
+  expect(active.status()).toBe(200);
+  const refreshed = await db.owner.query(
+    'SELECT updated_at FROM staff_sessions',
+  );
+  expect(refreshed.rows[0].updated_at.getTime()).toBeGreaterThan(
+    previous.rows[0].updated_at.getTime(),
+  );
+
+  await db.owner.query(
+    "UPDATE staff_sessions SET updated_at=now()-interval '31 minutes'",
+  );
+  const [expired] = await Promise.all([
+    page.waitForResponse((response) =>
+      response.url().endsWith('/api/v1/staff/session'),
+    ),
+    page.evaluate(() => window.dispatchEvent(new Event('focus'))),
+  ]);
+  expect(expired.request().headers()['x-luma-staff-activity']).toBeUndefined();
+  expect(expired.status()).toBe(403);
+  await expect(
+    page.getByRole('heading', { name: 'Sign in to Luma staff', exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Support directory', exact: true }),
+  ).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('rejected Google callbacks return to staff login with a sanitized failure message', async ({
+  resources: t,
+}) => {
+  const { page, errors } = await fixture(t);
+  let errorCallbackURL;
+  await page.route('**/api/v1/staff/config', (route) =>
+    route.fulfill({ json: { mode: 'google', providerId: 'google' } }),
+  );
+  await page.route('**/api/auth/sign-in/social', async (route) => {
+    const body = route.request().postDataJSON();
+    errorCallbackURL = body.errorCallbackURL;
+    expect(errorCallbackURL).toBe(
+      `${new URL(page.url()).origin}/login?signInFailed=true`,
+    );
+    await route.fulfill({
+      json: {
+        url: 'https://accounts.google.com/o/oauth2/v2/auth?state=synthetic',
+      },
+    });
+  });
+  await page.route('https://accounts.google.com/**', async (route) => {
+    await route.fulfill({
+      status: 302,
+      headers: {
+        location: `${errorCallbackURL}&error=sensitive-provider-diagnostic`,
+      },
+      body: '',
+    });
+  });
+  await page.goto('/login');
+  await page
+    .getByRole('button', {
+      name: 'Continue with Google Workspace',
+      exact: true,
+    })
+    .click();
+  await expect(
+    page.getByRole('heading', { name: 'Sign in to Luma staff', exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole('alert')).toContainText(
+    'Google Workspace sign-in was not completed.',
+  );
+  await expect(page.getByText('sensitive-provider-diagnostic')).toHaveCount(0);
+  await expect(
+    page.getByRole('button', {
+      name: 'Continue with Google Workspace',
+      exact: true,
+    }),
+  ).toBeEnabled();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await expect(page.getByRole('alert')).toBeVisible();
+  await page.keyboard.press('Tab');
+  await expect(
+    page.getByRole('button', {
+      name: 'Continue with Google Workspace',
+      exact: true,
+    }),
+  ).toBeFocused();
+  expect(errors).toEqual([]);
+});
+
+test('staff sign-in rate limits remain distinct for clients behind a trusted proxy', async ({
+  resources: t,
+}) => {
+  const { page, context, staffOrigin, errors } = await fixture(t);
+  await page.goto('/login');
+  const origin = new URL(page.url()).origin;
+  const unique = randomUUID();
+  for (let index = 0; index < 4; index += 1) {
+    const response = await context.request.post(
+      `${staffOrigin}/auth/sign-in/email`,
+      {
+        headers: { origin, 'x-forwarded-for': `203.0.113.${81 + index}` },
+        data: { email: `distinct_${unique}_${index}@example.test`, password },
+      },
+    );
+    expect(response.status()).toBe(401);
+  }
+  for (let index = 0; index < 4; index += 1) {
+    const response = await context.request.post(
+      `${staffOrigin}/auth/sign-in/email`,
+      {
+        headers: { origin, 'x-forwarded-for': '198.51.100.201' },
+        data: { email: `repeated_${unique}_${index}@example.test`, password },
+      },
+    );
+    expect(response.status()).toBe(index === 3 ? 429 : 401);
+  }
   expect(errors).toEqual([]);
 });

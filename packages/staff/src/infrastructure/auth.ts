@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
 
 import { createGoogleWorkspaceAuthPlugin } from '@luma/identity-provider/composition';
@@ -9,11 +10,30 @@ import type { Pool } from 'pg';
 import * as schema from './schema.js';
 import type { StaffSettings } from './settings.js';
 
-/** Configures a separate session namespace and only server-admitted Google identities or local credentials. */
-export function createStaffAuth(pool: Pool, settings: StaffSettings) {
-  const db = drizzle(pool, { schema });
+interface StaffAuth {
+  /** Handles a namespaced authentication request with its own verified identity scope. */
+  handler(request: Request): Promise<Response>;
+  api: {
+    /** Reads the uncached session without changing its lifetime. */
+    getSession(input: {
+      headers: Headers;
+      query: { disableCookieCache: boolean; disableRefresh: boolean };
+    }): Promise<{
+      user: { id: string; name: string; email: string };
+      session: { id: string };
+    } | null>;
+  };
+}
 
-  return betterAuth({
+/** Configures a separate session namespace and only server-admitted Google identities or local credentials. */
+export function createStaffAuth(
+  pool: Pool,
+  settings: StaffSettings,
+): StaffAuth {
+  const db = drizzle(pool, { schema });
+  const identityScope = new AsyncLocalStorage<{ subject?: string }>();
+
+  const auth = betterAuth({
     secret: settings.secret,
     baseURL: settings.publicOrigin + '/api/auth',
     basePath: '/auth',
@@ -33,6 +53,14 @@ export function createStaffAuth(pool: Pool, settings: StaffSettings) {
       encryptOAuthTokens: true,
     },
     session: {
+      additionalFields: {
+        providerSubject: {
+          type: 'string',
+          required: false,
+          input: false,
+          returned: false,
+        },
+      },
       expiresIn: 8 * 60 * 60,
       disableSessionRefresh: true,
       cookieCache: { enabled: false },
@@ -49,6 +77,16 @@ export function createStaffAuth(pool: Pool, settings: StaffSettings) {
       },
     },
     databaseHooks: {
+      session: {
+        create: {
+          before: async (session) => {
+            const subject = identityScope.getStore()?.subject;
+            if (settings.mode === 'google' && !subject) return false;
+
+            return { data: { ...session, providerSubject: subject ?? null } };
+          },
+        },
+      },
       account: {
         create: {
           before: async (account) => ({
@@ -86,12 +124,22 @@ export function createStaffAuth(pool: Pool, settings: StaffSettings) {
                   [identity.email.toLowerCase(), identity.subject],
                 );
 
-                return result.rowCount === 1;
+                const scope = identityScope.getStore();
+                if (result.rowCount !== 1 || !scope) return false;
+                scope.subject = identity.subject;
+
+                return true;
               },
             }),
           ]
         : [],
   });
+
+  return {
+    api: { getSession: auth.api.getSession },
+    handler: (request: Request) =>
+      identityScope.run({}, () => auth.handler(request)),
+  };
 }
 
 /** Records staff authentication outcomes before session cookies are delivered, without retaining tokens or OAuth parameters. */

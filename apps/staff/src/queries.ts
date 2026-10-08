@@ -1,5 +1,6 @@
 import { type QueryClient, queryOptions } from '@tanstack/react-query';
 
+import { staffActivity } from './activity';
 import { staffApi, StaffApiError } from './api';
 
 /** Revalidates staff eligibility on navigation, focus and a bounded refresh interval. */
@@ -34,6 +35,7 @@ export const workspaceOptions = (workspaceId: string, grantId: string) =>
 export async function clearPrivate(client: QueryClient) {
   await client.cancelQueries();
   client.clear();
+  staffActivity.reset();
 }
 
 /** Identifies a session that can no longer authorize staff access. */

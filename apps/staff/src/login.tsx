@@ -27,7 +27,7 @@ import { loginRoute } from './router';
 /** Offers only the authentication mode admitted by the server, then checks staff eligibility. */
 export function LoginPage() {
   const client = useQueryClient();
-  const { denied } = loginRoute.useSearch();
+  const { denied, signInFailed } = loginRoute.useSearch();
   const config = useQuery({
     queryKey: ['staff', 'config'],
     queryFn: ({ signal }) => staffApi.config(signal),
@@ -73,6 +73,15 @@ export function LoginPage() {
           />
         </CardHeader>
         <CardContent className="staff-form">
+          {signInFailed ? (
+            <Alert tone="warning" role="alert">
+              <AlertDescription>
+                Google Workspace sign-in was not completed. Try again with your
+                authorized staff account. Contact your administrator if access
+                is still unavailable.
+              </AlertDescription>
+            </Alert>
+          ) : null}
           {denied ? (
             <Alert tone="warning">
               <AlertDescription>

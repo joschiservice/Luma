@@ -14,6 +14,7 @@ import {
 import { createStaffRepository } from './infrastructure/repository.js';
 import type { StaffSettings } from './infrastructure/settings.js';
 import {
+  validateLocalStaffDatabaseUrl,
   validateStaffAdministratorDatabaseUrl,
   validateStaffProvisioning,
   validateStaffSettings,
@@ -39,7 +40,7 @@ export function createStaff(settings: StaffSettings) {
     settings,
     service: createStaffService(createStaffRepository(pool)),
     authHandler: createAuditedStaffAuthHandler(auth, pool),
-    /** Resolves fresh staff authorization and bounded idle/absolute lifetime; no permission cache is used. */
+    /** Resolves current staff authority and bounded session lifetime. Only explicit browser activity advances the idle timestamp. */
     async resolveSession(
       headers: Headers,
       requestId: string,
@@ -56,7 +57,9 @@ export function createStaff(settings: StaffSettings) {
         permissions: string[];
         created_at: Date;
       }>(
-        `UPDATE staff_sessions s SET updated_at=now() FROM staff_users u,staff_access a WHERE s.id=$1 AND s.user_id=u.id AND a.email=lower(u.email) AND a.active AND ($2='local' OR (a.provider_subject IS NOT NULL AND EXISTS(SELECT FROM staff_accounts p WHERE p.user_id=u.id AND p.provider_id='google' AND p.account_id=a.provider_subject))) AND s.expires_at>now() AND s.created_at>now()-interval '8 hours' AND s.updated_at>now()-interval '30 minutes' RETURNING a.permissions,s.created_at`,
+        headers.get('x-luma-staff-activity') === 'true'
+          ? `UPDATE staff_sessions s SET updated_at=clock_timestamp() FROM staff_users u,staff_access a WHERE s.id=$1 AND s.user_id=u.id AND a.email=lower(u.email) AND a.active AND (($2='local' AND a.provider_subject IS NULL AND s.provider_subject IS NULL) OR ($2='google' AND a.provider_subject IS NOT NULL AND s.provider_subject=a.provider_subject)) AND s.expires_at>clock_timestamp() AND s.created_at>clock_timestamp()-interval '8 hours' AND s.updated_at>clock_timestamp()-interval '30 minutes' RETURNING a.permissions,s.created_at`
+          : `SELECT a.permissions,s.created_at FROM staff_sessions s JOIN staff_users u ON s.user_id=u.id JOIN staff_access a ON a.email=lower(u.email) WHERE s.id=$1 AND a.active AND (($2='local' AND a.provider_subject IS NULL AND s.provider_subject IS NULL) OR ($2='google' AND a.provider_subject IS NOT NULL AND s.provider_subject=a.provider_subject)) AND s.expires_at>clock_timestamp() AND s.created_at>clock_timestamp()-interval '8 hours' AND s.updated_at>clock_timestamp()-interval '30 minutes'`,
         [session.session.id, settings.mode],
       );
       const access = result.rows[0];
@@ -113,12 +116,9 @@ export async function seedLocalStaff(
   );
   if (settings.mode !== 'local' || settings.environment === 'production')
     throw new Error('Staff credential seeding is development-only.');
-  if (
-    !['localhost', '127.0.0.1', '[::1]'].includes(
-      new URL(administratorDatabaseUrl).hostname,
-    )
-  )
-    throw new Error('Local staff seeding requires a loopback database.');
+  administratorDatabaseUrl = validateLocalStaffDatabaseUrl(
+    administratorDatabaseUrl,
+  );
   if (
     input.password.length < 12 ||
     !input.permissions.every((permission) =>
@@ -195,6 +195,7 @@ export async function provisionStaffIdentity(
     const admission = previous.rows[0];
     if (
       !input.active ||
+      !admission ||
       (admission &&
         (admission.provider_subject !== input.subject ||
           admission.active !== input.active ||
@@ -205,6 +206,34 @@ export async function provisionStaffIdentity(
         'DELETE FROM staff_sessions s USING staff_users u WHERE s.user_id=u.id AND lower(u.email)=$1',
         [input.email],
       );
+    const principal = await tx.query<{ id: string }>(
+      'SELECT id FROM staff_users WHERE lower(email)=$1 FOR UPDATE',
+      [input.email],
+    );
+    const principalId = principal.rows[0]?.id;
+    if (principalId) {
+      // This is an explicit administrator binding, never automatic linking by email during sign-in.
+      const existing = await tx.query<{ account_id: string }>(
+        "SELECT account_id FROM staff_accounts WHERE user_id=$1 AND provider_id='google'",
+        [principalId],
+      );
+      if (
+        existing.rows.length !== 1 ||
+        existing.rows[0]?.account_id !== input.subject
+      ) {
+        await tx.query('DELETE FROM staff_sessions WHERE user_id=$1', [
+          principalId,
+        ]);
+        await tx.query(
+          "DELETE FROM staff_accounts WHERE user_id=$1 AND provider_id='google'",
+          [principalId],
+        );
+        await tx.query(
+          "INSERT INTO staff_accounts(id,account_id,provider_id,user_id,created_at,updated_at) VALUES($1,$2,'google',$3,now(),now())",
+          [randomUUID(), input.subject, principalId],
+        );
+      }
+    }
     await tx.query(
       'INSERT INTO staff_access(email,provider_subject,active,permissions) VALUES($1,$2,$3,$4) ON CONFLICT(email) DO UPDATE SET provider_subject=excluded.provider_subject,active=excluded.active,permissions=excluded.permissions',
       [

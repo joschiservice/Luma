@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { generateKeyPairSync, randomUUID, sign } from 'node:crypto';
 import { promisify } from 'node:util';
 
 import { createIdentity } from '@luma/identity/composition';
@@ -12,7 +12,7 @@ import {
 import { registerStaffHttp } from '@luma/staff/http';
 import Fastify from 'fastify';
 import { Pool } from 'pg';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 describe.skipIf(!databaseUrl)(
@@ -402,6 +402,60 @@ describe.skipIf(!databaseUrl)(
         ).rowCount,
       ).toBe(1);
     });
+    it('expires passive polling while extending idle time only for activity before expiry', async () => {
+      const session = await owner.query<{ id: string }>(
+        'SELECT s.id FROM staff_sessions s JOIN staff_users u ON u.id=s.user_id WHERE u.email=$1',
+        ['support@example.test'],
+      );
+      const sessionId = session.rows[0]?.id;
+      if (!sessionId) throw new Error('Staff session unavailable.');
+      const before = new Date(Date.now() - 29 * 60_000);
+      await owner.query('UPDATE staff_sessions SET updated_at=$1 WHERE id=$2', [
+        before,
+        sessionId,
+      ]);
+      const readTime = async () => {
+        const result = await owner.query<{ updated_at: Date }>(
+          'SELECT updated_at FROM staff_sessions WHERE id=$1',
+          [sessionId],
+        );
+
+        return result.rows[0]?.updated_at.getTime();
+      };
+      for (let attempt = 0; attempt < 3; attempt++)
+        expect(
+          (await app.inject({ url: '/v1/staff/session', headers: { cookie } }))
+            .statusCode,
+        ).toBe(200);
+      expect(await readTime()).toBe(before.getTime());
+      expect(
+        (
+          await app.inject({
+            url: '/v1/staff/session',
+            headers: { cookie, 'x-luma-staff-activity': 'true' },
+          })
+        ).statusCode,
+      ).toBe(200);
+      expect(await readTime()).toBeGreaterThan(before.getTime());
+      const expired = new Date(Date.now() - 31 * 60_000);
+      await owner.query('UPDATE staff_sessions SET updated_at=$1 WHERE id=$2', [
+        expired,
+        sessionId,
+      ]);
+      expect(
+        (
+          await app.inject({
+            url: '/v1/staff/session',
+            headers: { cookie, 'x-luma-staff-activity': 'true' },
+          })
+        ).statusCode,
+      ).toBe(403);
+      expect(await readTime()).toBe(expired.getTime());
+      await owner.query(
+        'UPDATE staff_sessions SET updated_at=now() WHERE id=$1',
+        [sessionId],
+      );
+    });
     it('honors expiration and immediate operator revocation, and local setup preserves revocation', async () => {
       await owner.query(
         "UPDATE staff_support_grants SET expires_at=now()-interval '1 second' WHERE id=$1",
@@ -423,7 +477,21 @@ describe.skipIf(!databaseUrl)(
           .statusCode,
       ).toBe(403);
     });
-    it('invalidates staff sessions permanently on offboarding, permission changes and subject rebinding', async () => {
+    it('rejects remote effective administrator destinations before local seeding connects', async () => {
+      await expect(
+        seedLocalStaff(
+          settings,
+          {
+            email: 'guard@example.test',
+            name: 'Guard',
+            password: 'local-password-long-enough',
+            permissions: ['staff.directory.read'],
+          },
+          'postgresql://administrator:password@localhost/test?host=db.example.com',
+        ),
+      ).rejects.toThrow('effective loopback');
+    });
+    it('invalidates persisted staff sessions permanently on offboarding, permission changes and subject rebinding', async () => {
       const administrator = new URL(databaseUrl!);
       administrator.pathname = `/${database}`;
       const email = 'rotation@example.test';
@@ -461,65 +529,34 @@ describe.skipIf(!databaseUrl)(
           permissions: [...principal.permissions],
           ...changes,
         });
-      const signIn = async () => {
-        const response = await app.inject({
-          method: 'POST',
-          url: '/auth/sign-in/email',
-          headers: { origin },
-          payload: { email, password: 'rotating-staff-password-long-enough' },
-        });
-        expect(response.statusCode, response.body).toBe(200);
-        const values = response.headers['set-cookie'];
+      const createSession = async () => {
+        const id = randomUUID();
+        await owner.query(
+          "INSERT INTO staff_sessions(id,token,user_id,provider_subject,expires_at,created_at,updated_at) SELECT $1,$2,id,$3,now()+interval '1 hour',now(),now() FROM staff_users WHERE email=$4",
+          [id, randomUUID(), principal.subject, email],
+        );
 
-        return (Array.isArray(values) ? values : [values])
-          .filter((value): value is string => typeof value === 'string')
-          .map((value) => value.split(';')[0])
-          .join('; ');
+        return id;
       };
-      const sessionStatus = async (value: string) =>
-        (
-          await app.inject({
-            url: '/v1/staff/session',
-            headers: { cookie: value },
-          })
-        ).statusCode;
-
+      const count = async (id: string) =>
+        (await owner.query('SELECT FROM staff_sessions WHERE id=$1', [id]))
+          .rowCount;
       await provision();
-      const firstCookie = await signIn();
-      expect(await sessionStatus(firstCookie)).toBe(200);
+      const first = await createSession();
+      expect(await count(first)).toBe(1);
       await provision({ active: false });
-      expect(await sessionStatus(firstCookie)).toBe(401);
+      expect(await count(first)).toBe(0);
       await provision({ active: true });
-      expect(await sessionStatus(firstCookie)).toBe(401);
-
-      const permissionCookie = await signIn();
-      expect(await sessionStatus(permissionCookie)).toBe(200);
+      expect(await count(first)).toBe(0);
+      const permission = await createSession();
       await provision({ permissions: ['staff.directory.read'] });
-      expect(await sessionStatus(permissionCookie)).toBe(401);
-
-      const subjectSessionId = randomUUID();
-      await owner.query(
-        "INSERT INTO staff_sessions(id,token,user_id,expires_at,created_at,updated_at) SELECT $1,$2,id,now()+interval '1 hour',now(),now() FROM staff_users WHERE email=$3",
-        [subjectSessionId, randomUUID(), email],
-      );
-      expect(
-        (
-          await owner.query('SELECT FROM staff_sessions WHERE id=$1', [
-            subjectSessionId,
-          ])
-        ).rowCount,
-      ).toBe(1);
+      expect(await count(permission)).toBe(0);
+      const subject = await createSession();
       await provision({
         subject: 'verified-google-subject-after-rotation',
         permissions: ['staff.directory.read'],
       });
-      expect(
-        (
-          await owner.query('SELECT FROM staff_sessions WHERE id=$1', [
-            subjectSessionId,
-          ])
-        ).rowCount,
-      ).toBe(0);
+      expect(await count(subject)).toBe(0);
       const evidence = await owner.query<{
         details: { email: string; active: boolean; operator: string };
       }>(
@@ -532,14 +569,278 @@ describe.skipIf(!databaseUrl)(
         active: false,
         operator: principal.operator,
       });
-      expect(
-        (
+    });
+    it('rebinds a Google subject explicitly without automatic account linking and rolls back conflicts', async () => {
+      const issuer = 'https://accounts.google.com';
+      const clientId = 'staff-rebind-client';
+      const origin = 'https://staff.example.test';
+      const email = 'google-rebind@example.test';
+      const beforeSubject = 'google-subject-before';
+      const afterSubject = 'google-subject-after';
+      const administrator = new URL(databaseUrl!);
+      administrator.pathname = `/${database}`;
+      const principal = {
+        email,
+        subject: beforeSubject,
+        active: true,
+        permissions: ['staff.directory.read'] as const,
+        operator: 'workspace-administrator',
+        reason: 'Approved explicit Google identity subject rebinding',
+      };
+      const provision = (subject: string) =>
+        provisionStaffIdentity(administrator.toString(), {
+          ...principal,
+          subject,
+          permissions: [...principal.permissions],
+        });
+      const { privateKey, publicKey } = generateKeyPairSync('rsa', {
+        modulusLength: 2048,
+      });
+      const jwk = {
+        ...publicKey.export({ format: 'jwk' }),
+        kid: suffix,
+        alg: 'RS256',
+        use: 'sig',
+      };
+      const codes = new Map<string, { nonce: string; subject: string }>();
+      const providerFetch = vi
+        .spyOn(globalThis, 'fetch')
+        .mockImplementation(async (input, options) => {
+          const url = input instanceof Request ? input.url : String(input);
+          if (url.endsWith('/.well-known/openid-configuration'))
+            return Response.json({
+              issuer,
+              authorization_endpoint: issuer + '/authorize',
+              token_endpoint: issuer + '/test-token',
+              jwks_uri: issuer + '/test-keys/' + suffix,
+              id_token_signing_alg_values_supported: ['RS256'],
+            });
+          if (url === issuer + '/test-keys/' + suffix)
+            return Response.json({ keys: [jwk] });
+          if (url === issuer + '/test-token') {
+            const code = new URLSearchParams(String(options?.body)).get('code');
+            const transaction = codes.get(code ?? '');
+            if (!transaction)
+              throw new Error('Unknown synthetic authorization code.');
+            codes.delete(code ?? '');
+            const header = Buffer.from(
+              JSON.stringify({ alg: 'RS256', kid: suffix }),
+            ).toString('base64url');
+            const now = Math.floor(Date.now() / 1000);
+            const claims = Buffer.from(
+              JSON.stringify({
+                iss: issuer,
+                aud: clientId,
+                sub: transaction.subject,
+                email,
+                email_verified: true,
+                hd: 'example.test',
+                name: 'Google operator',
+                nonce: transaction.nonce,
+                iat: now,
+                exp: now + 300,
+              }),
+            ).toString('base64url');
+            const payload = header + '.' + claims;
+            const jwt =
+              payload +
+              '.' +
+              sign('RSA-SHA256', Buffer.from(payload), privateKey).toString(
+                'base64url',
+              );
+
+            return Response.json({
+              token_type: 'Bearer',
+              access_token: 'synthetic-provider-token',
+              id_token: jwt,
+            });
+          }
+          throw new Error('Unexpected synthetic provider request.');
+        });
+      let google: ReturnType<typeof createStaff> | undefined;
+      let googleApp: ReturnType<typeof Fastify> | undefined;
+      try {
+        await provision(beforeSubject);
+        google = createStaff({
+          ...settings,
+          mode: 'google',
+          publicOrigin: origin,
+          googleClientId: clientId,
+          googleClientSecret: 'synthetic-google-client-secret',
+          googleHostedDomain: 'example.test',
+          cookiePrefix: 'google-rebind',
+        });
+        googleApp = Fastify();
+        registerStaffHttp(googleApp, google);
+        await googleApp.ready();
+        const app = googleApp;
+        const cookies = (response: { headers: Record<string, unknown> }) => {
+          const value = response.headers['set-cookie'];
+
+          return (Array.isArray(value) ? value : [value])
+            .filter((cookie): cookie is string => typeof cookie === 'string')
+            .map((cookie) => cookie.split(';')[0])
+            .join('; ');
+        };
+        let client = 1;
+        const signIn = async (subject: string) => {
+          const remoteAddress = '192.0.2.' + client++;
+          const start = await app.inject({
+            remoteAddress,
+            method: 'POST',
+            url: '/auth/sign-in/social',
+            headers: { origin },
+            payload: {
+              provider: 'google',
+              callbackURL: origin + '/workspaces',
+              errorCallbackURL: origin + '/login?signInFailed=true',
+            },
+          });
+          expect(start.statusCode, start.body).toBe(200);
+          const authorization = new URL(start.json().url);
+          const code = randomUUID();
+          codes.set(code, {
+            nonce: authorization.searchParams.get('nonce') ?? '',
+            subject,
+          });
+
+          return app.inject({
+            url:
+              '/auth/callback/google?' +
+              new URLSearchParams({
+                code,
+                state: authorization.searchParams.get('state') ?? '',
+              }),
+            headers: { cookie: cookies(start) },
+            remoteAddress,
+          });
+        };
+        const first = await signIn(beforeSubject);
+        expect(first.headers.location).toBe(origin + '/workspaces');
+        const firstCookie = cookies(first);
+        const firstSession = await app.inject({
+          url: '/v1/staff/session',
+          headers: { cookie: firstCookie },
+        });
+        expect(firstSession.statusCode, firstSession.body).toBe(200);
+        const userId = firstSession.json().user.id;
+        const raceKey = Number.parseInt(suffix.slice(0, 7), 16);
+        const blocker = await owner.connect();
+        let staleResponse: Awaited<ReturnType<typeof signIn>> | undefined;
+        let paused: ReturnType<typeof signIn> | undefined;
+        try {
+          await blocker.query('BEGIN');
+          await blocker.query('SELECT pg_advisory_xact_lock($1)', [raceKey]);
           await owner.query(
-            'SELECT FROM staff_sessions s JOIN staff_users u ON u.id=s.user_id WHERE u.email=$1',
-            [email],
-          )
-        ).rowCount,
-      ).toBe(0);
+            `CREATE FUNCTION pause_staff_subject_session() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.provider_subject='google-subject-before' THEN PERFORM pg_advisory_xact_lock(${raceKey}); END IF; RETURN NEW; END $$`,
+          );
+          await owner.query(
+            'CREATE TRIGGER pause_staff_subject_session BEFORE INSERT ON staff_sessions FOR EACH ROW EXECUTE FUNCTION pause_staff_subject_session()',
+          );
+          paused = signIn(beforeSubject);
+          await expect
+            .poll(
+              async () => {
+                const result = await owner.query<{ waiting: boolean }>(
+                  "SELECT EXISTS(SELECT FROM pg_locks WHERE locktype='advisory' AND NOT granted AND objid=$1::oid) AS waiting",
+                  [raceKey],
+                );
+
+                return result.rows[0]?.waiting;
+              },
+              { timeout: 5000 },
+            )
+            .toBe(true);
+          await provision(afterSubject);
+          await blocker.query('COMMIT');
+          staleResponse = await paused;
+        } finally {
+          await blocker.query('ROLLBACK');
+          blocker.release();
+          await paused;
+          await owner.query(
+            'DROP TRIGGER IF EXISTS pause_staff_subject_session ON staff_sessions',
+          );
+          await owner.query(
+            'DROP FUNCTION IF EXISTS pause_staff_subject_session()',
+          );
+        }
+        if (!staleResponse)
+          throw new Error('Paused callback did not complete.');
+        expect(staleResponse.headers.location).toBe(origin + '/workspaces');
+        const staleCookie = cookies(staleResponse);
+        expect(
+          (
+            await app.inject({
+              url: '/v1/staff/session',
+              headers: { cookie: staleCookie },
+            })
+          ).statusCode,
+        ).toBe(403);
+        expect(
+          (
+            await app.inject({
+              url: '/v1/staff/directory?query=google',
+              headers: { cookie: staleCookie },
+            })
+          ).statusCode,
+        ).toBe(403);
+        expect(
+          (
+            await app.inject({
+              url: '/v1/staff/session',
+              headers: { cookie: firstCookie },
+            })
+          ).statusCode,
+        ).toBe(401);
+        const rejected = await signIn(beforeSubject);
+        expect(rejected.headers.location).toContain('error=');
+        expect(cookies(rejected)).not.toContain('session_token');
+        const second = await signIn(afterSubject);
+        expect(second.headers.location).toBe(origin + '/workspaces');
+        const secondCookie = cookies(second);
+        const secondSession = await app.inject({
+          url: '/v1/staff/session',
+          headers: { cookie: secondCookie },
+        });
+        expect(secondSession.statusCode, secondSession.body).toBe(200);
+        expect(secondSession.json().user.id).toBe(userId);
+        const collisionUser = randomUUID();
+        const collisionSubject = 'google-subject-bound-to-another-user';
+        await owner.query(
+          'INSERT INTO staff_users(id,name,email,email_verified,created_at,updated_at) VALUES($1,$2,$3,true,now(),now())',
+          [collisionUser, 'Other operator', 'other-google@example.test'],
+        );
+        await owner.query(
+          "INSERT INTO staff_accounts(id,account_id,provider_id,user_id,created_at,updated_at) VALUES($1,$2,'google',$3,now(),now())",
+          [randomUUID(), collisionSubject, collisionUser],
+        );
+        await expect(provision(collisionSubject)).rejects.toMatchObject({
+          code: '23505',
+        });
+        expect(
+          (
+            await app.inject({
+              url: '/v1/staff/session',
+              headers: { cookie: secondCookie },
+            })
+          ).statusCode,
+        ).toBe(200);
+        const accounts = await owner.query<{ account_id: string }>(
+          'SELECT account_id FROM staff_accounts WHERE user_id=$1',
+          [userId],
+        );
+        expect(accounts.rows).toEqual([{ account_id: afterSubject }]);
+        const grant = await owner.query<{ provider_subject: string }>(
+          'SELECT provider_subject FROM staff_access WHERE email=$1',
+          [email],
+        );
+        expect(grant.rows[0]?.provider_subject).toBe(afterSubject);
+      } finally {
+        await googleApp?.close();
+        await google?.close();
+        providerFetch.mockRestore();
+      }
     });
   },
 );
