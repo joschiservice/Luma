@@ -5,6 +5,7 @@ import type {
   OperationalMetricRequest,
   OperationalMetricResponse,
 } from '@luma/api-contract';
+import { slowRequestMs } from '@luma/ui/lib/use-slow-request';
 import {
   useQuery,
   useQueryClient,
@@ -25,6 +26,7 @@ import {
   type SummaryPart,
 } from './metric-summary-data';
 
+/** `syncing` means a refresh has run longer than `slowRequestMs`; quicker refreshes stay `live`. */
 export type LiveConnection =
   'connecting' | 'live' | 'syncing' | 'reconnecting' | 'offline' | 'denied';
 
@@ -140,13 +142,19 @@ export function useLiveMetricSummary(
       busy = true;
       dirty = false;
       lastReadAt = Date.now();
+      // Live views refresh every few seconds; only a read that runs long reports that it is updating.
+      let slow: ReturnType<typeof setTimeout> | undefined;
       try {
         if (!navigator.onLine) {
           update({ connection: 'offline' });
 
           return;
         }
-        update({ connection: connected ? 'syncing' : 'reconnecting' });
+        if (connected)
+          slow = setTimeout(() => {
+            if (active) update({ connection: 'syncing' });
+          }, slowRequestMs);
+        else update({ connection: 'reconnecting' });
         await client.cancelQueries({ queryKey: key });
         await client.invalidateQueries({ queryKey: key, refetchType: 'none' });
         await client.fetchQuery(metricSummaryOptions(organizationId, parts));
@@ -167,6 +175,7 @@ export function useLiveMetricSummary(
           client.removeQueries({ queryKey: key });
         }
       } finally {
+        clearTimeout(slow);
         busy = false;
         if (dirty) schedule();
       }
@@ -310,11 +319,12 @@ export function useLiveMetricSummary(
 }
 
 /**
- * Shows a widget's slice of the live summary, or a page of its matching records while the
- * person pages through them. A live refresh returns the widget to the first page.
+ * Pages through a widget's matching records. The first page is the widget's slice of the live
+ * summary and follows live changes. A later page stays in place while live data changes, so the
+ * person can keep reading; `first` returns to the live first page. Counts belong to `live`.
  */
 export function usePagedMetric<
-  Request extends { snapshot?: string | undefined },
+  Request extends { cursor?: string | undefined },
   Response,
 >(
   live: LiveMetricView<Response>,
@@ -323,28 +333,29 @@ export function usePagedMetric<
     request: Request,
   ) => UseQueryOptions<Response, Error, Response, (string | Request)[]>,
 ): {
-  query: LiveMetricRead<Response>;
-  request: Request;
-  setRequest: (request: Request) => void;
+  records: LiveMetricRead<Response>;
+  /** The page shown, starting at 1. */
+  page: number;
+  /** Moves to the page that starts at a metric's `nextCursor`. */
+  next: (cursor: string) => void;
+  previous: () => void;
+  first: () => void;
   connection: LiveConnection;
 } {
-  const [paging, setPaging] = useState<{
-    request: Request;
-    updatedAt: number;
-  }>();
-  const paged =
-    paging?.request.snapshot && paging.updatedAt === live.updatedAt
-      ? paging.request
-      : undefined;
+  // Cursors of the pages after the first, in the order the person opened them.
+  const [paging, setPaging] = useState({ initial, cursors: [] as string[] });
+  const cursors = paging.initial === initial ? paging.cursors : [];
+  const cursor = cursors.at(-1);
   const page = useQuery({
-    ...options(paged ?? initial),
-    enabled: !!paged && live.connection !== 'denied',
+    ...options(cursor ? { ...initial, cursor } : initial),
+    enabled: !!cursor && live.connection !== 'denied',
     placeholderData: (previous) => previous,
   });
+  const go = (next: string[]) => setPaging({ initial, cursors: next });
 
   return {
-    // The summary stays visible while the first requested page loads, as the next page does.
-    query: paged
+    // The shown page stays visible while the next one loads.
+    records: cursor
       ? {
           data: page.data ?? live.data,
           error: page.error,
@@ -355,11 +366,13 @@ export function usePagedMetric<
           refetch: () => void page.refetch(),
         }
       : live,
-    request: paged ?? initial,
-    setRequest: (request) =>
-      setPaging(
-        request.snapshot ? { request, updatedAt: live.updatedAt } : undefined,
-      ),
+    page: cursors.length + 1,
+    // A repeated click while the next page loads offers the same cursor again.
+    next: (next) => {
+      if (next !== cursor) go([...cursors, next]);
+    },
+    previous: () => go(cursors.slice(0, -1)),
+    first: () => go([]),
     connection: live.connection,
   };
 }

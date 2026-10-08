@@ -24,7 +24,7 @@ export const operationalMetricRequest: OperationalMetricRequest = {
   ],
 };
 
-/** Reads selected metric families with exact snapshot pagination and per-family coverage. */
+/** Reads selected metric families with per-family coverage and a page of each cohort. */
 export function operationalMetricsOptions(
   organizationId: string,
   request: OperationalMetricRequest,
@@ -41,7 +41,7 @@ export function operationalMetricsOptions(
     ],
     ...privateQueryDefaults,
     retry: false,
-    refetchOnWindowFocus: !request.snapshot,
+    refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     queryFn: async ({ signal }) => {
       const result = await api.metrics.operationalQuery({

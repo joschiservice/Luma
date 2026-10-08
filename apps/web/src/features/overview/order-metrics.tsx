@@ -19,6 +19,7 @@ import {
   DialogTitle,
 } from '@luma/ui/components/primitives/dialog';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
+import { useSlowRequest } from '@luma/ui/lib/use-slow-request';
 import { Link, useLocation } from '@tanstack/react-router';
 import {
   ArrowRight,
@@ -29,7 +30,6 @@ import {
 } from 'lucide-react';
 import { useRef, useState } from 'react';
 
-import { IdentityError } from '../identity/data';
 import {
   metricDescription,
   metricTimeSemantics,
@@ -80,7 +80,7 @@ function LiveOrderMetrics({
   const location = useLocation();
   const restoredMetric = new URLSearchParams(location.searchStr).get('metric');
   const trigger = useRef<HTMLButtonElement>(null);
-  const { query, request, setRequest, connection } = usePagedMetric(
+  const { records, page, next, previous, first, connection } = usePagedMetric(
     live,
     orderMetricRequest,
     (paged: MetricRequest) => metricsOptions(organizationId, paged),
@@ -91,19 +91,22 @@ function LiveOrderMetrics({
   const [open, setOpen] = useState(
     Boolean(restoredMetric?.startsWith('orders.')),
   );
-  const data =
-    query.isError ||
-    query.isPaused ||
-    connection === 'denied' ||
-    connection === 'offline'
-      ? undefined
-      : query.data;
-  const metric = data?.metrics.find((m) => m.definition.id === selected);
-  const conflict =
-    query.error instanceof IdentityError && query.error.status === 409;
+  const offline = connection === 'denied' || connection === 'offline';
+  const data = live.isError || live.isPaused || offline ? undefined : live.data;
+  // The dialog lists the page the person is reading; the cards keep showing live counts.
+  const shown =
+    records.isError || records.isPaused || offline ? undefined : records.data;
+  const metric = shown?.metrics.find((m) => m.definition.id === selected);
+  const latest = data?.metrics.find((m) => m.definition.id === selected);
+  const changed =
+    page > 1 &&
+    !!metric &&
+    !!latest &&
+    latest.observedCount !== metric.observedCount;
+  const slow = useSlowRequest(live.isFetching);
   const refresh = () => {
-    if (request.snapshot) setRequest({});
-    else void query.refetch();
+    first();
+    void live.refetch();
   };
 
   return (
@@ -118,10 +121,7 @@ function LiveOrderMetrics({
           variant="outline"
           onClick={refresh}
           disabled={
-            query.isFetching ||
-            query.isPaused ||
-            connection === 'offline' ||
-            connection === 'denied'
+            live.isPaused || connection === 'offline' || connection === 'denied'
           }
         >
           <RefreshCw size={14} aria-hidden="true" />
@@ -135,20 +135,19 @@ function LiveOrderMetrics({
       >
         <Badge
           tone={
-            (connection === 'live' || connection === 'syncing') &&
-            !query.isError
+            (connection === 'live' || connection === 'syncing') && !live.isError
               ? 'neutral'
               : 'warning'
           }
         >
           {connection === 'denied'
             ? m.overview_live_access_changed()
-            : query.isPaused || connection === 'offline'
+            : live.isPaused || connection === 'offline'
               ? m.overview_live_offline()
-              : query.isError
+              : live.isError
                 ? m.overview_live_unavailable()
                 : connection === 'live'
-                  ? query.isFetching
+                  ? slow
                     ? m.overview_live_updating()
                     : m.overview_live_on()
                   : connection === 'syncing'
@@ -165,25 +164,16 @@ function LiveOrderMetrics({
               : m.overview_orders_status_default()}
         </span>
       </div>
-      {connection === 'denied' ? null : query.isPaused ||
+      {connection === 'denied' ? null : live.isPaused ||
         connection === 'offline' ? (
         <CaseNotice title={m.overview_orders_paused_title()}>
           {m.overview_orders_paused_body()}
         </CaseNotice>
-      ) : query.isError ? (
-        <CaseNotice
-          error
-          title={
-            conflict
-              ? m.overview_orders_conflict_title()
-              : m.overview_orders_error_title()
-          }
-        >
-          {conflict
-            ? m.overview_orders_conflict_body()
-            : m.overview_orders_error_body()}
+      ) : live.isError ? (
+        <CaseNotice error title={m.overview_orders_error_title()}>
+          {m.overview_orders_error_body()}
         </CaseNotice>
-      ) : query.isPending ? (
+      ) : live.isPending ? (
         <CaseLoading />
       ) : data ? (
         <>
@@ -224,6 +214,7 @@ function LiveOrderMetrics({
                     onClick={(event) => {
                       trigger.current = event.currentTarget;
                       setSelected(item.definition.id);
+                      first();
                       setOpen(true);
                     }}
                   >
@@ -255,7 +246,13 @@ function LiveOrderMetrics({
           </div>
         </>
       ) : null}
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog
+        open={open}
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (!next) first();
+        }}
+      >
         <DialogContent className="order-cohort-dialog" finalFocus={trigger}>
           <DialogHeader>
             <DialogTitle>
@@ -267,7 +264,7 @@ function LiveOrderMetrics({
               {m.overview_orders_dialog_description()}
             </DialogDescription>
           </DialogHeader>
-          {metric && data ? (
+          {metric && shown ? (
             <>
               <div className="order-cohort-definition">
                 <Badge tone="neutral">
@@ -289,29 +286,37 @@ function LiveOrderMetrics({
                 </div>
                 <div>
                   <dt>{m.overview_orders_fact_coverage()}</dt>
-                  <dd>{coverageLabels[data.coverage]()}</dd>
+                  <dd>{coverageLabels[shown.coverage]()}</dd>
                 </div>
               </dl>
               <p className="order-cohort-note">
-                {data.coverageExplanation}{' '}
+                {shown.coverageExplanation}{' '}
                 {metric.unknownCount ? m.overview_orders_unknown_note() : ''}
               </p>
               <div className="order-cohort-timestamps">
                 <span>{m.overview_orders_scope()}</span>
                 <span>
                   {rich(m.overview_orders_calculated, {
-                    time: <WorkspaceDate value={data.asOf} />,
+                    time: <WorkspaceDate value={shown.asOf} />,
                   })}
                 </span>
                 <span>
-                  {data.observedAt
+                  {shown.observedAt
                     ? rich(m.overview_orders_latest, {
-                        time: <WorkspaceDate value={data.observedAt} />,
+                        time: <WorkspaceDate value={shown.observedAt} />,
                       })
                     : m.overview_orders_latest_none()}
                 </span>
                 <span>{m.overview_orders_completeness()}</span>
               </div>
+              {changed ? (
+                <CaseNotice title={m.overview_orders_changed_title()}>
+                  {m.overview_orders_changed_body()}{' '}
+                  <Button variant="outline" size="sm" onClick={first}>
+                    {m.overview_records_show_latest()}
+                  </Button>
+                </CaseNotice>
+              ) : null}
               <Cohort metric={metric} organizationId={organizationId} />
               <Link
                 className="order-cohort-open"
@@ -326,9 +331,9 @@ function LiveOrderMetrics({
                 <span>
                   {metric.observedCount
                     ? m.overview_orders_range({
-                        from: Math.min(data.offset + 1, metric.observedCount),
+                        from: Math.min(metric.offset + 1, metric.observedCount),
                         to: Math.min(
-                          data.offset + metric.items.length,
+                          metric.offset + metric.items.length,
                           metric.observedCount,
                         ),
                         total: metric.observedCount,
@@ -338,48 +343,27 @@ function LiveOrderMetrics({
                 <div>
                   <Button
                     variant="outline"
-                    disabled={data.offset === 0 || query.isFetching}
-                    onClick={() =>
-                      setRequest({
-                        asOf: data.asOf,
-                        snapshot: data.snapshot,
-                        offset: Math.max(0, data.offset - data.limit),
-                      })
-                    }
+                    disabled={page === 1}
+                    onClick={previous}
                   >
                     {m.common_previous()}
                   </Button>
                   <Button
                     variant="outline"
-                    disabled={
-                      data.offset + data.limit >= metric.observedCount ||
-                      data.offset + data.limit > 10000 ||
-                      query.isFetching
-                    }
-                    onClick={() =>
-                      setRequest({
-                        asOf: data.asOf,
-                        snapshot: data.snapshot,
-                        offset: data.offset + data.limit,
-                      })
-                    }
+                    disabled={!metric.nextCursor}
+                    onClick={() => {
+                      if (metric.nextCursor) next(metric.nextCursor);
+                    }}
                   >
                     {m.common_next()}
                   </Button>
                 </div>
               </div>
             </>
-          ) : query.isPending ? (
+          ) : records.isPending ? (
             <CaseLoading />
           ) : (
-            <CaseNotice
-              error
-              title={
-                conflict
-                  ? m.overview_orders_conflict_title()
-                  : m.overview_orders_records_error_title()
-              }
-            >
+            <CaseNotice error title={m.overview_orders_records_error_title()}>
               {m.overview_orders_records_error_body()}{' '}
               <Button variant="outline" onClick={refresh}>
                 {m.overview_orders_refresh()}

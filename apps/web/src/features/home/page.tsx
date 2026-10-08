@@ -25,6 +25,7 @@ import {
   WorkspaceDate,
   WorkspaceTimezone,
 } from '@luma/ui/components/primitives/workspace-date';
+import { useSlowRequest } from '@luma/ui/lib/use-slow-request';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Link,
@@ -284,6 +285,7 @@ export function HomePage() {
   const client = useQueryClient();
   const session = client.getQueryData(sessionOptions().queryKey);
   const overview = useQuery(overviewOptions(organizationId, window));
+  const slowOverview = useSlowRequest(overview.isFetching);
   const waiting = useQuery({
     ...decisionsOptions(organizationId, {}, 5),
     select: (list) => list.counts.views.all,
@@ -405,11 +407,11 @@ export function HomePage() {
           <Button
             variant="outline"
             onClick={() => void overview.refetch()}
-            disabled={overview.isFetching || overview.isPaused}
+            disabled={overview.isPaused}
           >
             <RefreshCw
               aria-hidden="true"
-              className={overview.isFetching ? 'home-spin' : undefined}
+              className={slowOverview ? 'home-spin' : undefined}
             />
             {overview.isError ? m.common_retry() : m.common_refresh()}
           </Button>

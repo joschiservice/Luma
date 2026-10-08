@@ -76,7 +76,6 @@ export function OperationalCharts({
   });
   const queryFor = (chart: InsightChart) =>
     charts[insightCharts.indexOf(chart)]!;
-  const refreshing = charts.some((chart) => chart.isFetching);
 
   useEffect(
     () => subscribeToInsightChanges(organizationId, client),
@@ -143,7 +142,6 @@ export function OperationalCharts({
           <Button
             variant="outline"
             size="sm"
-            disabled={refreshing}
             onClick={() =>
               void client.invalidateQueries({
                 queryKey: insightsKey(organizationId),
@@ -169,6 +167,7 @@ export function OperationalCharts({
               data={query.isError ? undefined : query.data}
               loading={query.isPending}
               refreshing={query.isFetching && !query.isPending}
+              previous={query.isPlaceholderData}
               error={insightsError(query.error)}
               selected={
                 search.chart === chart

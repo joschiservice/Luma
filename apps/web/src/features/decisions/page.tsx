@@ -475,7 +475,6 @@ export function NeedsYouView({
                   hasNext={!!list.nextCursor}
                   onPrevious={onPrevious}
                   onNext={onNext}
-                  disabled={refreshing}
                   formatTotal={(count) =>
                     m.decisions_pagination_total({ count })
                   }

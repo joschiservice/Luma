@@ -56,30 +56,78 @@ it('reads only selected families and rejects unsupported filters before database
     metrics(context, { ...request, scope: { supplierId: tenant } }),
   ).rejects.toThrow();
   expect(transaction).toHaveBeenCalledTimes(1);
-  const next = await metrics(context, {
-    ...request,
-    snapshot: first.snapshot,
-    asOf: first.asOf,
-    offset: 1,
+});
+
+it('pages cohorts after the last record read, unaffected by records joining or leaving', async () => {
+  const tx = { query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }) };
+  const db: TenantDatabase = {
+    transaction: async (_tenantId, operation) => operation(tx),
+  };
+  const connection = (id: number, label: string) => ({
+    id: `00000000-0000-4000-8000-00000000000${id}`,
+    label,
+    status: 'pending' as const,
+    freshness: 'unobserved' as const,
+    lastObservedAt: null,
   });
-  expect(next.snapshot).toBe(first.snapshot);
+  const coverage = vi
+    .fn()
+    .mockResolvedValue([
+      connection(3, 'Cologne'),
+      connection(1, 'Aachen'),
+      connection(2, 'Berlin'),
+    ]);
+  const metrics = createOperationalSummary(
+    db,
+    { cases: vi.fn(), procurement: vi.fn(), coverage: () => coverage },
+    () => new Date('2026-09-28T00:00:00Z'),
+  );
+  const request = {
+    definitionVersion: 2 as const,
+    metrics: ['connections.needing_attention'],
+    limit: 1,
+  };
+  const labels = (read: Awaited<ReturnType<typeof metrics>>) =>
+    read.metrics[0]!.items.map((item) => 'label' in item && item.label);
+
+  const first = await metrics(context, request);
+  expect(labels(first)).toEqual(['Aachen']);
+  expect(first.metrics[0]).toMatchObject({ offset: 0, observedCount: 3 });
+  const cursor = first.metrics[0]!.nextCursor!;
+
+  // A record that sorts earlier doesn't shift the next page.
   coverage.mockResolvedValue([
-    {
-      id: tenant,
-      label: 'New connection',
-      status: 'pending',
-      freshness: 'unobserved',
-      lastObservedAt: null,
-    },
+    connection(4, 'Aa'),
+    connection(1, 'Aachen'),
+    connection(2, 'Berlin'),
+    connection(3, 'Cologne'),
   ]);
+  const second = await metrics(context, { ...request, cursor });
+  expect(labels(second)).toEqual(['Berlin']);
+  expect(second.metrics[0]).toMatchObject({ offset: 1, observedCount: 4 });
+
+  // The last record read can leave the cohort; the page after it still follows.
+  coverage.mockResolvedValue([
+    connection(1, 'Aachen'),
+    connection(3, 'Cologne'),
+  ]);
+  const third = await metrics(context, {
+    ...request,
+    cursor: second.metrics[0]!.nextCursor!,
+  });
+  expect(labels(third)).toEqual(['Cologne']);
+  expect(third.metrics[0]!.nextCursor).toBeNull();
+
+  await expect(
+    metrics(context, { ...request, cursor: 'not-a-cursor' }),
+  ).rejects.toMatchObject({ statusCode: 422 });
   await expect(
     metrics(context, {
       ...request,
-      snapshot: first.snapshot,
-      asOf: first.asOf,
-      offset: 1,
+      metrics: ['cases.active'],
+      cursor,
     }),
-  ).rejects.toThrow('matching records changed');
+  ).rejects.toMatchObject({ statusCode: 422 });
 });
 
 it('withholds metric families the reader cannot read without asking their owners', async () => {

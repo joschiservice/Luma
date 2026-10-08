@@ -51,12 +51,12 @@ export const metricsContract = c.router({
       400: apiErrorSchema,
       401: apiErrorSchema,
       404: apiErrorSchema,
-      409: apiErrorSchema,
+      422: apiErrorSchema,
       503: apiErrorSchema,
     },
     summary: 'Read selected operational metrics and matching records',
     description:
-      'Reads cases, monitored stock, purchase orders, connection health and evidence-backed resolution outcomes in one authorized snapshot. Select metric IDs explicitly. Filters must be supported by every selected metric. Reuse snapshot and asOf for pagination; refresh on 409. Resolution alone accepts environment and a 24-hour or seven-day first-detection window; other families describe current state. Null values, unknown classification and unavailable coverage are distinct from zero.',
+      'Reads cases, monitored stock, purchase orders, connection health and evidence-backed resolution outcomes in one consistent, current read. Select metric IDs explicitly. Filters must be supported by every selected metric. Each metric returns its first page of records; pass a metric’s nextCursor as cursor to read the records after that page. Pages read current data, so records can join or leave between pages; deduplicate by ID. A cursor from another request returns 422. Resolution alone accepts environment and a 24-hour or seven-day first-detection window; other families describe current state. Null values, unknown classification and unavailable coverage are distinct from zero.',
   },
   summary: {
     method: 'POST',
@@ -72,7 +72,7 @@ export const metricsContract = c.router({
     },
     summary: 'Read several metric views in one request',
     description:
-      'Reads up to four parts, each an order (v1) or operational (v2) metric query, with the same rules as those endpoints, and returns them in request order. A part that fails carries its own status and error; the other parts are unaffected. Each part has its own snapshot and asOf; page a part through its own query endpoint. nextRefreshAt is the earliest boundary across the parts that were read.',
+      'Reads up to four parts, each an order (v1) or operational (v2) metric query, with the same rules as those endpoints, and returns them in request order. A part that fails carries its own status and error; the other parts are unaffected. Each part returns its first page of records; read later pages through the part’s own query endpoint. nextRefreshAt is the earliest boundary across the parts that were read.',
   },
   definitions: {
     method: 'GET',
@@ -97,13 +97,14 @@ export const metricsContract = c.router({
     body: metricRequestSchema,
     responses: {
       200: metricResponseSchema,
+      400: apiErrorSchema,
       401: apiErrorSchema,
       404: apiErrorSchema,
-      409: apiErrorSchema,
+      422: apiErrorSchema,
       503: apiErrorSchema,
     },
     summary: 'Read order totals and their matching records',
     description:
-      'Returns open, overdue and attention counts with bounded cohorts from one consistent read snapshot. Null totals mean incomplete source coverage; observedCount counts only known matching orders. Reuse snapshot and asOf when paging. A 409 requires refreshing from offset zero. Windows filter accepted source update times using [updatedFrom, updatedBefore) UTC instants. Requests accept only registered fields, never executable code.',
+      'Returns open, overdue and attention counts with a page of matching orders for each, from one consistent, current read. Null totals mean incomplete source coverage; observedCount counts only known matching orders. Pass a metric’s nextCursor as cursor to read the orders after that page; pages read current data, so deduplicate by ID. A cursor from another request returns 422. Windows filter accepted source update times using [updatedFrom, updatedBefore) UTC instants. Requests accept only registered fields, never executable code.',
   },
 });

@@ -21,7 +21,6 @@ export const operationalMetricIdSchema = z.enum([
   'resolution.time_to_outcome',
   'resolution.unresolved_age',
 ]);
-const timestamp = z.string().datetime({ offset: true });
 
 export const operationalMetricScopeSchema = z
   .object({
@@ -41,22 +40,12 @@ export const operationalMetricRequestSchema = z
     metrics: z.array(operationalMetricIdSchema).min(1).max(19),
     scope: operationalMetricScopeSchema.default({}),
     limit: z.number().int().min(1).max(100).default(20),
-    offset: z.number().int().min(0).max(10000).default(0),
-    asOf: timestamp.optional(),
-    snapshot: z
-      .string()
-      .regex(/^[a-f0-9]{64}$/)
-      .optional(),
+    cursor: z.string().max(2048).optional(),
   })
   .strict()
   .refine(
     (v) => new Set(v.metrics).size === v.metrics.length,
     'Choose each metric once.',
-  )
-  .refine(
-    (v) =>
-      (!v.snapshot && !v.asOf && v.offset === 0) || (!!v.snapshot && !!v.asOf),
-    'Pagination requires the snapshot and evaluation time.',
   )
   .refine(
     (v) =>

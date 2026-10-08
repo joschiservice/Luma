@@ -162,6 +162,7 @@ function Content({
         data={data}
         loading={state === 'loading'}
         refreshing={false}
+        previous={false}
         error={error}
         selected={selected}
         onSelect={(selection) => {
