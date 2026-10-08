@@ -1,48 +1,4 @@
 /* Page chrome shared by workspace pages. Feature stylesheets own their content. */
-.page-header {
-  display: grid;
-  gap: 16px;
-  margin-bottom: 20px;
-}
-
-.page-header-main {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.page-header-icon {
-  padding-top: 1px;
-}
-
-.page-header-copy {
-  flex: 1;
-  min-width: 0;
-}
-
-.page-header h1 {
-  font-size: 20px;
-  font-weight: 600;
-  line-height: 28px;
-  letter-spacing: -0.02em;
-}
-
-.page-header-description {
-  max-width: 72ch;
-  margin-top: 2px;
-  color: var(--foreground-subtle);
-  font-size: 13px;
-  line-height: 20px;
-}
-
-.page-header-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
 /* Constrained pages read better at a comfortable measure. */
 .page-narrow {
   max-width: 880px;
@@ -95,15 +51,4 @@
 
 .row-list > li {
   border-bottom: 1px solid var(--line);
-}
-
-@media (max-width: 900px) {
-  .page-header-main {
-    flex-wrap: wrap;
-  }
-
-  .page-header-actions {
-    justify-content: flex-start;
-    width: 100%;
-  }
 }

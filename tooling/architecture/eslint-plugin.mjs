@@ -163,6 +163,7 @@ export function violation(from, to) {
         'apps/api/src/workflow-runtime.test.ts',
         'apps/api/src/resolution-learning.test.ts',
         'apps/api/src/connections.integration.test.ts',
+        'apps/api/src/staff.integration.test.ts',
         'apps/api/src/shopify-oauth.integration.test.ts',
         'apps/api/src/connections.test.ts',
         'apps/api/src/installation-verifier.test.ts',
@@ -175,8 +176,11 @@ export function violation(from, to) {
         'apps/worker/src/bootstrap.ts',
         'apps/worker/src/sync.ts',
         'apps/worker/src/sync-bootstrap.ts',
+        'apps/staff-api/src/index.ts',
+        'apps/staff-api/scripts/provision.ts',
       ].includes(from) &&
       !/^apps\/api\/src\/composition\/[^/]+\.ts$/.test(from) &&
+      !/^apps\/staff-api\/src\/composition\/[^/]+\.ts$/.test(from) &&
       !from.startsWith('apps/api/e2e/')
     ) {
       return 'Only the API composition root may wire backend modules.';
@@ -204,7 +208,8 @@ export function violation(from, to) {
         from.endsWith('/infrastructure/measurement-validation.ts') ||
         from.endsWith('/infrastructure/shadow-validation.ts') ||
         from.endsWith('/infrastructure/diagnosis-validation.ts')) &&
-      to === 'packages/api-contract/'
+      (to === 'packages/api-contract/' ||
+        (source.name === 'staff' && to === 'packages/api-contract/staff'))
     )
       return null;
     if (source.name === 'connectors') {
@@ -237,6 +242,15 @@ export function violation(from, to) {
 
     return null;
   }
+  // Staff auth composes the reviewed federation adapter, never its private layers.
+  if (
+    source.name === 'staff' &&
+    ['composition.ts', 'infrastructure'].includes(source.layer) &&
+    target.name === 'federation' &&
+    target.layer === 'composition.ts' &&
+    target.entry
+  )
+    return null;
   if (
     source.layer === 'api' &&
     target.name === 'identity' &&

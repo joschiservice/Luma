@@ -8,6 +8,8 @@ export const connectorPackages = {
 export const dependencies = {
   platform: [],
   identity: ['platform'],
+  federation: [],
+  staff: ['platform', 'identity', 'federation'],
   audit: ['platform'],
   orders: ['platform', 'identity'],
   procurement: [
@@ -71,6 +73,8 @@ export const layers = {
 export const domainPackages = {
   platform: 'platform',
   identity: 'identity',
+  'identity-provider': 'federation',
+  staff: 'staff',
   audit: 'audit',
   orders: 'orders',
   procurement: 'procurement',

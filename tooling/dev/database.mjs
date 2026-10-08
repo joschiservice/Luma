@@ -30,6 +30,7 @@ export async function provision(saved, migrationUrl) {
         saved.workerPassword,
         'luma_exceptions,luma_policies,luma_execution,luma_audit,luma_connectors,luma_orders,luma_inventory,luma_desk,luma_commerce_sync,luma_customers',
       ],
+      ['luma_staff', saved.staffPassword, 'luma_staff_runtime'],
     ]) {
       const exists = await client.query(
         'SELECT 1 FROM pg_roles WHERE rolname = $1',

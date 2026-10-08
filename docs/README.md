@@ -24,6 +24,7 @@ for Luma's users live in `apps/web/content/docs`.
 - [HTTP API](api.md): contract rules, errors, probes and correlation.
 - [Authentication and organization access](identity.md), with the generated
   [permission reference](permissions.md).
+- [Staff access](staff.md): isolated sign-in, support grants, audit and deployment boundaries.
 - [Workspace settings](workspace-settings.md): invitations, email delivery, approvals and
   personal layouts.
 - [Workspace apps](apps.md): app ownership, installation, permissions and removal.

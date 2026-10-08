@@ -66,6 +66,7 @@
     "vitest": "catalog:",
     "@luma/app-jtl": "workspace:*",
     "@luma/app-shopify": "workspace:*",
-    "tsx": "catalog:"
+    "tsx": "catalog:",
+    "@luma/staff": "workspace:*"
   }
 }

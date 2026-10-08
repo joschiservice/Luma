@@ -16,6 +16,11 @@ import { root, run } from './process.mjs';
  * @property {string} seedPassword
  * @property {number} webPort
  * @property {number} apiPort
+ * @property {string} staffPassword
+ * @property {string} staffAuthSecret
+ * @property {string} staffSeedPassword
+ * @property {number} staffWebPort
+ * @property {number} staffApiPort
  */
 
 export const stateDirectory = join(root, '.luma');
@@ -107,6 +112,13 @@ export async function state(create = false) {
         'Local state belongs to a different checkout. Remove this checkout’s .luma directory and rerun pnpm run setup.',
       );
 
+    if (!saved.staffPassword) {
+      Object.assign(saved, await staffState([saved.webPort, saved.apiPort]));
+      await writeFile(statePath, `${JSON.stringify(saved, null, 2)}\n`, {
+        mode: 0o600,
+      });
+    }
+
     return saved;
   } catch (error) {
     if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT'))
@@ -129,6 +141,7 @@ export async function state(create = false) {
     webPort,
     apiPort,
     seedPassword: randomBytes(18).toString('hex'),
+    ...(await staffState([webPort, apiPort])),
   };
   await mkdir(stateDirectory, { recursive: true, mode: 0o700 });
   await writeFile(statePath, `${JSON.stringify(saved, null, 2)}\n`, {
@@ -137,6 +150,26 @@ export async function state(create = false) {
   });
 
   return saved;
+}
+
+/** Allocates separate staff credentials and ports without reusing customer sessions.
+ * @param {number[]} occupied
+ */
+async function staffState(occupied) {
+  const ports = new Set(occupied);
+  let staffWebPort = await freePort();
+  while (ports.has(staffWebPort)) staffWebPort = await freePort();
+  ports.add(staffWebPort);
+  let staffApiPort = await freePort();
+  while (ports.has(staffApiPort)) staffApiPort = await freePort();
+
+  return {
+    staffPassword: randomBytes(24).toString('hex'),
+    staffAuthSecret: randomBytes(32).toString('hex'),
+    staffSeedPassword: randomBytes(18).toString('hex'),
+    staffWebPort,
+    staffApiPort,
+  };
 }
 
 /**
@@ -212,6 +245,15 @@ export async function environment(saved, workflows = false, observing = false) {
     TEMPORAL_DATA_REGION: 'EU',
     TEMPORAL_TLS: 'false',
     TEMPORAL_API_KEY: '',
+    STAFF_DATABASE_URL: database('luma_staff', saved.staffPassword),
+    STAFF_AUTH_SECRET: saved.staffAuthSecret,
+    STAFF_PUBLIC_ORIGIN: `http://localhost:${saved.staffWebPort}`,
+    STAFF_AUTH_MODE: 'local',
+    STAFF_API_HOST: '127.0.0.1',
+    STAFF_API_PORT: String(saved.staffApiPort),
+    STAFF_API_PROXY_TARGET: `http://127.0.0.1:${saved.staffApiPort}`,
+    STAFF_WEB_PORT: String(saved.staffWebPort),
+    STAFF_COOKIE_PREFIX: `${project}-staff`,
   };
   const codeRuntime = await codeRuntimeDirectory(apiEnv);
   // The API and the workflow worker both run Code Steps, so both need the same runtime.

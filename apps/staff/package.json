@@ -1,0 +1,30 @@
+{
+  "name": "@luma/staff-web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --config vitest.config.ts"
+  },
+  "dependencies": {
+    "@luma/api-contract": "workspace:*",
+    "@luma/ui": "workspace:*",
+    "@tanstack/react-form": "catalog:",
+    "@tanstack/react-query": "catalog:",
+    "@tanstack/react-router": "^1.168.0",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "zod": "catalog:zod4"
+  },
+  "devDependencies": {
+    "@luma/typescript-config": "workspace:*",
+    "@tailwindcss/vite": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "^6.0.0",
+    "vite": "catalog:"
+  }
+}

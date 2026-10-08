@@ -47,3 +47,10 @@ export type {
 } from './application/roles.js';
 
 export type { MailProvider } from './application/mail.js';
+
+export { revokeCustomerSessionsForSupport } from './application/support.js';
+
+export type {
+  IdentitySupportTransaction,
+  SupportSessionRevocation,
+} from './application/support.js';
